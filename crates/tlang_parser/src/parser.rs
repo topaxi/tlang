@@ -19,6 +19,17 @@ pub enum Node {
         name: String,
         value: Box<Node>,
     },
+    Identifier(String),
+}
+
+impl<'a> From<&'a Token> for Node {
+    fn from(token: &Token) -> Self {
+        match token {
+            Token::Literal(literal) => Node::Literal(literal.clone()),
+            Token::Identifier(name) => Node::Identifier(name.clone()),
+            _ => unimplemented!(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -125,17 +136,19 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_primary_expression(&mut self) -> Node {
-        println!("Parsing primary expression {:?}", self.current_token);
-
         match &self.current_token {
-            Some(Token::Literal(literal)) => {
-                let literal = literal.clone();
+            Some(Token::LParen) => {
                 self.advance();
-                Node::Literal(literal)
+                let expression = self.parse_expression();
+                self.consume_token(Token::RParen);
+                expression
             }
-            _ => {
-                unimplemented!()
+            Some(token) => {
+                let node: Node = token.into();
+                self.advance();
+                node
             }
+            _ => panic!("Expected primary expression, found None"),
         }
     }
 
@@ -331,7 +344,6 @@ mod tests {
         );
     }
 
-    #[ignore = "Parsing parentheses is not implemented yet"]
     #[test]
     fn test_simple_arithmetic_sum_mult_precedence_parentheses() {
         let program = parse!("(1 + 2) * 3;");
@@ -346,6 +358,29 @@ mod tests {
                 }),
                 rhs: Box::new(Node::Literal(Literal::Integer(3))),
             }])
+        );
+    }
+
+    #[test]
+    fn test_simple_arithmetic_with_identifiers() {
+        let program = parse!("let x = 1; let y = 2; x + y;");
+        assert_eq!(
+            program,
+            Node::Program(vec![
+                Node::VariableDeclaration {
+                    name: "x".to_string(),
+                    value: Box::new(Node::Literal(Literal::Integer(1))),
+                },
+                Node::VariableDeclaration {
+                    name: "y".to_string(),
+                    value: Box::new(Node::Literal(Literal::Integer(2))),
+                },
+                Node::BinaryOp {
+                    op: BinaryOp::Add,
+                    lhs: Box::new(Node::Identifier("x".to_string())),
+                    rhs: Box::new(Node::Identifier("y".to_string())),
+                }
+            ])
         );
     }
 }
