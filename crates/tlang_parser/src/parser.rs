@@ -116,14 +116,19 @@ impl<'src> Parser<'src> {
     fn parse_statement(&mut self) -> Node {
         println!("Parsing statement {:?}", self.current_token);
 
-        let token = match self.current_token {
+        let node = match self.current_token {
             Some(Token::Let) => self.parse_variable_declaration(),
             _ => self.parse_expression(),
         };
 
+        // FunctionDeclaration does not need to be terminated with a semicolon.
+        if let Node::FunctionDeclaration { .. } = node {
+            return node;
+        }
+
         self.consume_token(Token::Semicolon);
 
-        token
+        node
     }
 
     pub fn parse_program(&mut self) -> Node {
@@ -527,7 +532,7 @@ mod tests {
 
     #[test]
     fn test_function_declaration() {
-        let program = parse!("fn foo() { 1 + 2; };");
+        let program = parse!("fn foo() { 1 + 2; }");
         assert_eq!(
             program,
             Node::Program(vec![Node::FunctionDeclaration {
@@ -544,7 +549,7 @@ mod tests {
 
     #[test]
     fn test_function_declaration_with_parameters() {
-        let program = parse!("fn foo(x, y) { 1 + 2; };");
+        let program = parse!("fn foo(x, y) { 1 + 2; }");
         assert_eq!(
             program,
             Node::Program(vec![Node::FunctionDeclaration {
