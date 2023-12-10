@@ -1,5 +1,11 @@
 use crate::lexer::{Lexer, Literal, Token};
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Associativity {
+    Left,
+    Right,
+}
+
 #[derive(Debug, PartialEq)]
 pub enum Node {
     Program(Vec<Node>),
@@ -15,6 +21,12 @@ pub enum Node {
     },
 }
 
+#[derive(Debug, Clone, Copy)]
+struct OperatorInfo {
+    precedence: u8,
+    associativity: Associativity,
+}
+
 #[derive(Debug, PartialEq)]
 pub enum BinaryOp {
     Add,
@@ -22,7 +34,6 @@ pub enum BinaryOp {
     Multiply,
     Divide,
     Modulo,
-    Power,
     Equal,
     NotEqual,
     LessThan,
@@ -79,6 +90,8 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_statement(&mut self) -> Node {
+        println!("Parsing statement {:?}", self.current_token);
+
         let token = match self.current_token {
             Some(Token::Let) => self.parse_variable_declaration(),
             _ => self.parse_expression(),
@@ -155,7 +168,6 @@ impl<'src> Parser<'src> {
             Token::Asterisk => BinaryOp::Multiply,
             Token::Slash => BinaryOp::Divide,
             Token::Percent => BinaryOp::Modulo,
-            Token::Caret => BinaryOp::Power,
             Token::EqualEqual => BinaryOp::Equal,
             Token::NotEqual => BinaryOp::NotEqual,
             Token::LessThan => BinaryOp::LessThan,
@@ -164,6 +176,7 @@ impl<'src> Parser<'src> {
             Token::GreaterThanOrEqual => BinaryOp::GreaterThanOrEqual,
             Token::Pipe => BinaryOp::BitwiseOr,
             Token::Ampersand => BinaryOp::BitwiseAnd,
+            Token::Caret => BinaryOp::BitwiseXor,
             Token::DoublePipe => BinaryOp::Or,
             Token::DoubleAmpersand => BinaryOp::And,
             _ => {
@@ -172,52 +185,85 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn get_precedence(token: &Token) -> u8 {
-        match token {
-            Token::Pipe => 1,
-            Token::DoublePipe => 2,
-            Token::Ampersand => 3,
-            Token::DoubleAmpersand => 4,
-            Token::EqualEqual
-            | Token::NotEqual
-            | Token::LessThan
-            | Token::LessThanOrEqual
-            | Token::GreaterThan
-            | Token::GreaterThanOrEqual => 5,
-            Token::Plus | Token::Minus => 6,
-            Token::Asterisk | Token::Slash | Token::Percent => 7,
-            Token::Caret => 8,
-            _ => {
-                unimplemented!("Expected operator, found {:?}", token)
-            }
+    fn map_operator_info(operator: &BinaryOp) -> OperatorInfo {
+        match operator {
+            BinaryOp::Add | BinaryOp::Subtract => OperatorInfo {
+                precedence: 6,
+                associativity: Associativity::Left,
+            },
+            BinaryOp::Multiply | BinaryOp::Divide | BinaryOp::Modulo => OperatorInfo {
+                precedence: 7,
+                associativity: Associativity::Left,
+            },
+            BinaryOp::Equal
+            | BinaryOp::NotEqual
+            | BinaryOp::LessThan
+            | BinaryOp::LessThanOrEqual
+            | BinaryOp::GreaterThan
+            | BinaryOp::GreaterThanOrEqual => OperatorInfo {
+                precedence: 5,
+                associativity: Associativity::Left,
+            },
+            BinaryOp::And => OperatorInfo {
+                precedence: 3,
+                associativity: Associativity::Left,
+            },
+            BinaryOp::Or => OperatorInfo {
+                precedence: 2,
+                associativity: Associativity::Left,
+            },
+            BinaryOp::BitwiseAnd | BinaryOp::BitwiseOr | BinaryOp::BitwiseXor => OperatorInfo {
+                precedence: 8,
+                associativity: Associativity::Left,
+            },
         }
     }
 
-    fn parse_expression(&mut self) -> Node {
-        let lhs = self.parse_primary_expression();
-
-        println!("Parsing expression {:?}", self.current_token);
-        println!(
-            "Is binary op? {:?}",
-            Self::is_binary_op(self.current_token.as_ref().unwrap())
-        );
-
-        match &self.current_token {
-            _ if Self::is_binary_op(self.current_token.as_ref().unwrap()) => {
-                let token = self.current_token.as_ref().unwrap().clone();
-                self.advance();
-                let rhs = self.parse_expression();
-                Node::BinaryOp {
-                    op: Self::map_binary_op(&token),
-                    lhs: Box::new(lhs),
-                    rhs: Box::new(rhs),
-                }
-            }
-            Some(Token::Semicolon) => lhs,
-            _ => {
-                unimplemented!("Expected operator, found {:?}", self.current_token)
-            }
+    fn compare_precedence(op1: &OperatorInfo, op2: &OperatorInfo) -> bool {
+        if op1.precedence == op2.precedence {
+            return op1.associativity == Associativity::Left;
         }
+
+        op1.precedence > op2.precedence
+    }
+
+    fn parse_expression(&mut self) -> Node {
+        self.parse_expression_with_precedence(0)
+    }
+
+    fn parse_expression_with_precedence(&mut self, precedence: u8) -> Node {
+        let mut lhs = self.parse_primary_expression();
+
+        while let Some(token) = self.current_token.as_ref() {
+            if !Self::is_binary_op(token) {
+                break;
+            }
+
+            let operator = Self::map_binary_op(token);
+            let operator_info = Self::map_operator_info(&operator);
+
+            if Self::compare_precedence(
+                &OperatorInfo {
+                    precedence,
+                    associativity: Associativity::Left,
+                },
+                &operator_info,
+            ) {
+                break;
+            }
+
+            self.advance();
+
+            let rhs = self.parse_expression_with_precedence(operator_info.precedence);
+
+            lhs = Node::BinaryOp {
+                op: operator,
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+            };
+        }
+
+        lhs
     }
 }
 
@@ -253,6 +299,23 @@ mod tests {
 
     #[test]
     fn test_simple_arithmetic_calculations() {
+        let program = parse!("1 * 2 + 3;");
+        assert_eq!(
+            program,
+            Node::Program(vec![Node::BinaryOp {
+                op: BinaryOp::Add,
+                lhs: Box::new(Node::BinaryOp {
+                    op: BinaryOp::Multiply,
+                    lhs: Box::new(Node::Literal(Literal::Integer(1))),
+                    rhs: Box::new(Node::Literal(Literal::Integer(2))),
+                }),
+                rhs: Box::new(Node::Literal(Literal::Integer(3))),
+            }])
+        );
+    }
+
+    #[test]
+    fn test_simple_arithmetic_sum_mult_precedence() {
         let program = parse!("1 + 2 * 3;");
         assert_eq!(
             program,
@@ -268,16 +331,16 @@ mod tests {
         );
     }
 
-    #[ignore = "not implemented yet"]
+    #[ignore = "Parsing parentheses is not implemented yet"]
     #[test]
-    fn test_simple_arithmetic_sum_mult_precedence() {
-        let program = parse!("1 * 2 + 3;");
+    fn test_simple_arithmetic_sum_mult_precedence_parentheses() {
+        let program = parse!("(1 + 2) * 3;");
         assert_eq!(
             program,
             Node::Program(vec![Node::BinaryOp {
-                op: BinaryOp::Add,
+                op: BinaryOp::Multiply,
                 lhs: Box::new(Node::BinaryOp {
-                    op: BinaryOp::Multiply,
+                    op: BinaryOp::Add,
                     lhs: Box::new(Node::Literal(Literal::Integer(1))),
                     rhs: Box::new(Node::Literal(Literal::Integer(2))),
                 }),
