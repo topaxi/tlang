@@ -19,6 +19,11 @@ pub enum Node {
         name: String,
         value: Box<Node>,
     },
+    FunctionDeclaration {
+        name: String,
+        parameters: Vec<String>,
+        body: Box<Node>,
+    },
     Identifier(String),
     Call {
         function: Box<Node>,
@@ -77,11 +82,15 @@ impl<'src> Parser<'src> {
         parser
     }
 
-    fn consume_token(&mut self, expected: Token) {
+    fn expect_token(&mut self, expected: Token) {
         let actual = self.current_token.as_ref().unwrap();
         if *actual != expected {
             panic!("Expected token {:?}, found {:?}", expected, actual);
         }
+    }
+
+    fn consume_token(&mut self, expected: Token) {
+        self.expect_token(expected);
         self.advance();
     }
 
@@ -166,6 +175,38 @@ impl<'src> Parser<'src> {
                 let expression = self.parse_expression();
                 self.consume_token(Token::RParen);
                 expression
+            }
+            Some(Token::LBrace) => {
+                self.advance();
+                let mut statements = Vec::new();
+                while self.current_token != Some(Token::RBrace) {
+                    statements.push(self.parse_statement());
+                }
+                self.consume_token(Token::RBrace);
+                Node::Program(statements)
+            }
+            Some(Token::Fn) => {
+                self.advance();
+                let name = self.consume_identifier();
+                self.consume_token(Token::LParen);
+                let mut parameters = Vec::new();
+                while self.current_token != Some(Token::RParen) {
+                    parameters.push(self.consume_identifier());
+                    if let Some(Token::Comma) = self.current_token {
+                        self.advance();
+                    }
+                }
+
+                self.consume_token(Token::RParen);
+                self.expect_token(Token::LBrace);
+
+                let body = self.parse_primary_expression();
+
+                Node::FunctionDeclaration {
+                    name,
+                    parameters,
+                    body: Box::new(body),
+                }
             }
             Some(token) => {
                 let node: Node = token.into();
@@ -464,6 +505,56 @@ mod tests {
                     },
                     Node::Literal(Literal::Integer(3))
                 ],
+            }])
+        );
+    }
+
+    #[test]
+    fn test_block_expression() {
+        let program = parse!("let x = { 1 + 2; };");
+        assert_eq!(
+            program,
+            Node::Program(vec![Node::VariableDeclaration {
+                name: "x".to_string(),
+                value: Box::new(Node::Program(vec![Node::BinaryOp {
+                    op: BinaryOp::Add,
+                    lhs: Box::new(Node::Literal(Literal::Integer(1))),
+                    rhs: Box::new(Node::Literal(Literal::Integer(2))),
+                }]))
+            }])
+        );
+    }
+
+    #[test]
+    fn test_function_declaration() {
+        let program = parse!("fn foo() { 1 + 2; };");
+        assert_eq!(
+            program,
+            Node::Program(vec![Node::FunctionDeclaration {
+                name: "foo".to_string(),
+                parameters: vec![],
+                body: Box::new(Node::Program(vec![Node::BinaryOp {
+                    op: BinaryOp::Add,
+                    lhs: Box::new(Node::Literal(Literal::Integer(1))),
+                    rhs: Box::new(Node::Literal(Literal::Integer(2))),
+                }]))
+            }])
+        );
+    }
+
+    #[test]
+    fn test_function_declaration_with_parameters() {
+        let program = parse!("fn foo(x, y) { 1 + 2; };");
+        assert_eq!(
+            program,
+            Node::Program(vec![Node::FunctionDeclaration {
+                name: "foo".to_string(),
+                parameters: vec!["x".to_string(), "y".to_string()],
+                body: Box::new(Node::Program(vec![Node::BinaryOp {
+                    op: BinaryOp::Add,
+                    lhs: Box::new(Node::Literal(Literal::Integer(1))),
+                    rhs: Box::new(Node::Literal(Literal::Integer(2))),
+                }]))
             }])
         );
     }
