@@ -20,6 +20,10 @@ pub enum Node {
         value: Box<Node>,
     },
     Identifier(String),
+    Call {
+        function: Box<Node>,
+        arguments: Vec<Node>,
+    },
 }
 
 impl<'a> From<&'a Token> for Node {
@@ -135,6 +139,26 @@ impl<'src> Parser<'src> {
         }
     }
 
+    fn parse_call_expression(&mut self, function: Node) -> Node {
+        self.advance();
+
+        let mut arguments = Vec::new();
+        while self.current_token != Some(Token::RParen) {
+            arguments.push(self.parse_expression());
+
+            if let Some(Token::Comma) = self.current_token {
+                self.advance();
+            }
+        }
+
+        self.consume_token(Token::RParen);
+
+        Node::Call {
+            function: Box::new(function),
+            arguments,
+        }
+    }
+
     fn parse_primary_expression(&mut self) -> Node {
         match &self.current_token {
             Some(Token::LParen) => {
@@ -145,7 +169,15 @@ impl<'src> Parser<'src> {
             }
             Some(token) => {
                 let node: Node = token.into();
+
                 self.advance();
+
+                if let Node::Identifier(_) = node {
+                    if let Some(Token::LParen) = self.current_token {
+                        return self.parse_call_expression(node);
+                    }
+                }
+
                 node
             }
             _ => panic!("Expected primary expression, found None"),
@@ -381,6 +413,58 @@ mod tests {
                     rhs: Box::new(Node::Identifier("y".to_string())),
                 }
             ])
+        );
+    }
+
+    #[test]
+    fn test_simple_call() {
+        let program = parse!("foo(1, 2);");
+        assert_eq!(
+            program,
+            Node::Program(vec![Node::Call {
+                function: Box::new(Node::Identifier("foo".to_string())),
+                arguments: vec![
+                    Node::Literal(Literal::Integer(1)),
+                    Node::Literal(Literal::Integer(2))
+                ],
+            }])
+        );
+    }
+
+    #[test]
+    fn test_nested_call() {
+        let program = parse!("foo(bar(1), 2);");
+        assert_eq!(
+            program,
+            Node::Program(vec![Node::Call {
+                function: Box::new(Node::Identifier("foo".to_string())),
+                arguments: vec![
+                    Node::Call {
+                        function: Box::new(Node::Identifier("bar".to_string())),
+                        arguments: vec![Node::Literal(Literal::Integer(1))]
+                    },
+                    Node::Literal(Literal::Integer(2))
+                ],
+            }])
+        );
+    }
+
+    #[test]
+    fn test_call_with_expression() {
+        let program = parse!("foo(1 + 2, 3);");
+        assert_eq!(
+            program,
+            Node::Program(vec![Node::Call {
+                function: Box::new(Node::Identifier("foo".to_string())),
+                arguments: vec![
+                    Node::BinaryOp {
+                        op: BinaryOp::Add,
+                        lhs: Box::new(Node::Literal(Literal::Integer(1))),
+                        rhs: Box::new(Node::Literal(Literal::Integer(2))),
+                    },
+                    Node::Literal(Literal::Integer(3))
+                ],
+            }])
         );
     }
 }
