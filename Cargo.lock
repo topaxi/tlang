@@ -3,5 +3,12 @@
 version = 3
 
 [[package]]
+name = "tlang_codegen_js"
+version = "0.1.0"
+dependencies = [
+ "tlang_parser",
+]
+
+[[package]]
 name = "tlang_parser"
 version = "0.1.0"
