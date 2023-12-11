@@ -82,6 +82,7 @@ impl Codegen {
                 self.generate_node(value);
                 self.output.push_str(";\n");
             }
+            Node::IfElse { .. } => todo!("implement if/else codegen"),
             Node::FunctionDeclaration {
                 name,
                 parameters,

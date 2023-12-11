@@ -19,6 +19,11 @@ pub enum Node {
         name: String,
         value: Box<Node>,
     },
+    IfElse {
+        condition: Box<Node>,
+        then_branch: Box<Node>,
+        else_branch: Option<Box<Node>>,
+    },
     FunctionDeclaration {
         name: String,
         parameters: Vec<String>,
@@ -189,6 +194,24 @@ impl<'src> Parser<'src> {
                 }
                 self.consume_token(Token::RBrace);
                 Node::Program(statements)
+            }
+            Some(Token::If) => {
+                self.advance();
+                let condition = self.parse_expression();
+                self.expect_token(Token::LBrace);
+                let then_branch = self.parse_primary_expression();
+                let else_branch = if let Some(Token::Else) = self.current_token {
+                    self.advance();
+                    self.expect_token(Token::LBrace);
+                    Some(Box::new(self.parse_primary_expression()))
+                } else {
+                    None
+                };
+                Node::IfElse {
+                    condition: Box::new(condition),
+                    then_branch: Box::new(then_branch),
+                    else_branch,
+                }
             }
             Some(Token::Fn) => {
                 self.advance();
@@ -526,6 +549,52 @@ mod tests {
                     lhs: Box::new(Node::Literal(Literal::Integer(1))),
                     rhs: Box::new(Node::Literal(Literal::Integer(2))),
                 }]))
+            }])
+        );
+    }
+
+    #[test]
+    fn test_if_expression() {
+        let program = parse!("if (1 + 2) { 3 + 4; };");
+        assert_eq!(
+            program,
+            Node::Program(vec![Node::IfElse {
+                condition: Box::new(Node::BinaryOp {
+                    op: BinaryOp::Add,
+                    lhs: Box::new(Node::Literal(Literal::Integer(1))),
+                    rhs: Box::new(Node::Literal(Literal::Integer(2))),
+                }),
+                then_branch: Box::new(Node::Program(vec![Node::BinaryOp {
+                    op: BinaryOp::Add,
+                    lhs: Box::new(Node::Literal(Literal::Integer(3))),
+                    rhs: Box::new(Node::Literal(Literal::Integer(4))),
+                }])),
+                else_branch: None,
+            }])
+        );
+    }
+
+    #[test]
+    fn test_if_else_expression() {
+        let program = parse!("if (1 + 2) { 3 + 4; } else { 5 + 6; };");
+        assert_eq!(
+            program,
+            Node::Program(vec![Node::IfElse {
+                condition: Box::new(Node::BinaryOp {
+                    op: BinaryOp::Add,
+                    lhs: Box::new(Node::Literal(Literal::Integer(1))),
+                    rhs: Box::new(Node::Literal(Literal::Integer(2))),
+                }),
+                then_branch: Box::new(Node::Program(vec![Node::BinaryOp {
+                    op: BinaryOp::Add,
+                    lhs: Box::new(Node::Literal(Literal::Integer(3))),
+                    rhs: Box::new(Node::Literal(Literal::Integer(4))),
+                }])),
+                else_branch: Some(Box::new(Node::Program(vec![Node::BinaryOp {
+                    op: BinaryOp::Add,
+                    lhs: Box::new(Node::Literal(Literal::Integer(5))),
+                    rhs: Box::new(Node::Literal(Literal::Integer(6))),
+                }]))),
             }])
         );
     }
