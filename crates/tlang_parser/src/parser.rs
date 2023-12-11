@@ -1,4 +1,5 @@
 use crate::lexer::{Lexer, Literal, Token};
+use log::debug;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Associativity {
@@ -118,11 +119,11 @@ impl<'src> Parser<'src> {
 
     fn advance(&mut self) {
         self.current_token = Some(self.lexer.next_token());
-        println!("Advanced to {:?}", self.current_token);
+        debug!("Advanced to {:?}", self.current_token);
     }
 
     fn parse_statement(&mut self) -> Option<Node> {
-        println!("Parsing statement {:?}", self.current_token);
+        debug!("Parsing statement {:?}", self.current_token);
 
         // Skip stray semicolons.
         if let Some(Token::Semicolon) = self.current_token {
