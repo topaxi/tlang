@@ -68,6 +68,9 @@ impl Codegen {
                     Literal::Float(value) => {
                         self.output.push_str(&value.to_string());
                     }
+                    Literal::Boolean(value) => {
+                        self.output.push_str(&value.to_string());
+                    }
                 }
             }
             Node::BinaryOp { op, lhs, rhs } => {

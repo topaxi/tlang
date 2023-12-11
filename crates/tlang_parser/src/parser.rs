@@ -126,8 +126,8 @@ impl<'src> Parser<'src> {
             _ => self.parse_expression(),
         };
 
-        // FunctionDeclaration does not need to be terminated with a semicolon.
-        if let Node::FunctionDeclaration { .. } = node {
+        // FunctionDeclarations and IfElse statements does not need to be terminated with a semicolon.
+        if let Node::FunctionDeclaration { .. } | Node::IfElse { .. } = node {
             return node;
         }
 
@@ -554,8 +554,8 @@ mod tests {
     }
 
     #[test]
-    fn test_if_expression() {
-        let program = parse!("if (1 + 2) { 3 + 4; };");
+    fn test_if_statement() {
+        let program = parse!("if (1 + 2) { 3 + 4; }");
         assert_eq!(
             program,
             Node::Program(vec![Node::IfElse {
@@ -575,8 +575,8 @@ mod tests {
     }
 
     #[test]
-    fn test_if_else_expression() {
-        let program = parse!("if (1 + 2) { 3 + 4; } else { 5 + 6; };");
+    fn test_if_else_statement() {
+        let program = parse!("if (1 + 2) { 3 + 4; } else { 5 + 6; }");
         assert_eq!(
             program,
             Node::Program(vec![Node::IfElse {
@@ -595,6 +595,26 @@ mod tests {
                     lhs: Box::new(Node::Literal(Literal::Integer(5))),
                     rhs: Box::new(Node::Literal(Literal::Integer(6))),
                 }]))),
+            }])
+        );
+    }
+
+    #[test]
+    fn test_if_expression() {
+        let program = parse!("let x = if (true) { 1; } else { 2; };");
+        assert_eq!(
+            program,
+            Node::Program(vec![Node::VariableDeclaration {
+                name: "x".to_string(),
+                value: Box::new(Node::IfElse {
+                    condition: Box::new(Node::Literal(Literal::Boolean(true))),
+                    then_branch: Box::new(Node::Program(vec![Node::Literal(Literal::Integer(
+                        1
+                    ))])),
+                    else_branch: Some(Box::new(Node::Program(vec![Node::Literal(Literal::Integer(
+                        2
+                    ))]))),
+                })
             }])
         );
     }

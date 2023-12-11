@@ -53,6 +53,7 @@ pub enum Token {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Literal {
+    Boolean(bool),
     Integer(i64),
     UnsignedInteger(u64),
     Float(f64),
@@ -282,6 +283,8 @@ impl Lexer<'_> {
                     "if" => Token::If,
                     "else" => Token::Else,
                     "match" => Token::Match,
+                    "true" => Token::Literal(Literal::Boolean(true)),
+                    "false" => Token::Literal(Literal::Boolean(false)),
                     _ => Token::Identifier(identifier.to_owned()),
                 }
             }
