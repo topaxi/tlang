@@ -41,7 +41,7 @@ impl<'a> From<&'a Token> for Node {
         match token {
             Token::Literal(literal) => Node::Literal(literal.clone()),
             Token::Identifier(name) => Node::Identifier(name.clone()),
-            _ => unimplemented!(),
+            _ => unimplemented!("Expected token to be a literal or identifier, found {:?}", token),
         }
     }
 }
@@ -249,7 +249,7 @@ impl<'src> Parser<'src> {
 
                 node
             }
-            _ => panic!("Expected primary expression, found None"),
+            _ => panic!("Expected primary expression, found {:?}", self.current_token),
         }
     }
 
