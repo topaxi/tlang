@@ -41,7 +41,10 @@ impl<'a> From<&'a Token> for Node {
         match token {
             Token::Literal(literal) => Node::Literal(literal.clone()),
             Token::Identifier(name) => Node::Identifier(name.clone()),
-            _ => unimplemented!("Expected token to be a literal or identifier, found {:?}", token),
+            _ => unimplemented!(
+                "Expected token to be a literal or identifier, found {:?}",
+                token
+            ),
         }
     }
 }
@@ -118,8 +121,15 @@ impl<'src> Parser<'src> {
         println!("Advanced to {:?}", self.current_token);
     }
 
-    fn parse_statement(&mut self) -> Node {
+    fn parse_statement(&mut self) -> Option<Node> {
         println!("Parsing statement {:?}", self.current_token);
+
+        // Skip stray semicolons.
+        if let Some(Token::Semicolon) = self.current_token {
+            self.advance();
+
+            return None;
+        }
 
         let node = match self.current_token {
             Some(Token::Let) => self.parse_variable_declaration(),
@@ -128,19 +138,23 @@ impl<'src> Parser<'src> {
 
         // FunctionDeclarations and IfElse statements does not need to be terminated with a semicolon.
         if let Node::FunctionDeclaration { .. } | Node::IfElse { .. } = node {
-            return node;
+            return Some(node);
         }
 
         self.consume_token(Token::Semicolon);
 
-        node
+        Some(node)
     }
 
     pub fn parse_program(&mut self) -> Node {
         let mut statements = Vec::new();
 
-        while self.current_token != Some(Token::Eof) {
-            statements.push(self.parse_statement());
+        while self.current_token != Some(Token::RBrace) && self.current_token != Some(Token::Eof) {
+            let statement = self.parse_statement();
+
+            if let Some(statement) = statement {
+                statements.push(statement);
+            }
         }
 
         Node::Program(statements)
@@ -188,12 +202,9 @@ impl<'src> Parser<'src> {
             }
             Some(Token::LBrace) => {
                 self.advance();
-                let mut statements = Vec::new();
-                while self.current_token != Some(Token::RBrace) {
-                    statements.push(self.parse_statement());
-                }
+                let token = self.parse_program();
                 self.consume_token(Token::RBrace);
-                Node::Program(statements)
+                token
             }
             Some(Token::If) => {
                 self.advance();
@@ -249,7 +260,10 @@ impl<'src> Parser<'src> {
 
                 node
             }
-            _ => panic!("Expected primary expression, found {:?}", self.current_token),
+            _ => panic!(
+                "Expected primary expression, found {:?}",
+                self.current_token
+            ),
         }
     }
 
@@ -608,12 +622,10 @@ mod tests {
                 name: "x".to_string(),
                 value: Box::new(Node::IfElse {
                     condition: Box::new(Node::Literal(Literal::Boolean(true))),
-                    then_branch: Box::new(Node::Program(vec![Node::Literal(Literal::Integer(
-                        1
-                    ))])),
-                    else_branch: Some(Box::new(Node::Program(vec![Node::Literal(Literal::Integer(
-                        2
-                    ))]))),
+                    then_branch: Box::new(Node::Program(vec![Node::Literal(Literal::Integer(1))])),
+                    else_branch: Some(Box::new(Node::Program(vec![Node::Literal(
+                        Literal::Integer(2)
+                    )]))),
                 })
             }])
         );
@@ -649,6 +661,19 @@ mod tests {
                     lhs: Box::new(Node::Literal(Literal::Integer(1))),
                     rhs: Box::new(Node::Literal(Literal::Integer(2))),
                 }]))
+            }])
+        );
+    }
+
+    #[test]
+    fn test_stray_semicolon() {
+        let program = parse!("1 + 2;;");
+        assert_eq!(
+            program,
+            Node::Program(vec![Node::BinaryOp {
+                op: BinaryOp::Add,
+                lhs: Box::new(Node::Literal(Literal::Integer(1))),
+                rhs: Box::new(Node::Literal(Literal::Integer(2))),
             }])
         );
     }
