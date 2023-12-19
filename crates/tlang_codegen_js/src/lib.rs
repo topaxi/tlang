@@ -99,6 +99,23 @@ impl CodegenJS {
         }
     }
 
+    fn generate_literal(&mut self, literal: &Literal) {
+        match literal {
+            Literal::Integer(value) => {
+                self.output.push_str(&value.to_string());
+            }
+            Literal::UnsignedInteger(value) => {
+                self.output.push_str(&value.to_string());
+            }
+            Literal::Float(value) => {
+                self.output.push_str(&value.to_string());
+            }
+            Literal::Boolean(value) => {
+                self.output.push_str(&value.to_string());
+            }
+        }
+    }
+
     fn generate_node(&mut self, node: &Node, parent_op: Option<&BinaryOp>) {
         match node {
             Node::Program(statements) => {
@@ -108,21 +125,7 @@ impl CodegenJS {
             }
             Node::Literal(literal) => {
                 self.output.push_str(&self.get_indent());
-
-                match literal {
-                    Literal::Integer(value) => {
-                        self.output.push_str(&value.to_string());
-                    }
-                    Literal::UnsignedInteger(value) => {
-                        self.output.push_str(&value.to_string());
-                    }
-                    Literal::Float(value) => {
-                        self.output.push_str(&value.to_string());
-                    }
-                    Literal::Boolean(value) => {
-                        self.output.push_str(&value.to_string());
-                    }
-                }
+                self.generate_literal(literal);
             }
             Node::BinaryOp { op, lhs, rhs } => {
                 self.output.push_str(&self.get_indent());
