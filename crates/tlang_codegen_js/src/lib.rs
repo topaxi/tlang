@@ -124,16 +124,12 @@ impl CodegenJS {
                 }
             }
             Node::ExpressionStatement(expression) => {
+                self.output.push_str(&self.get_indent());
                 self.generate_node(expression, None);
                 self.output.push_str(";\n");
             }
-            Node::Literal(literal) => {
-                self.output.push_str(&self.get_indent());
-                self.generate_literal(literal);
-            }
+            Node::Literal(literal) => self.generate_literal(literal),
             Node::BinaryOp { op, lhs, rhs } => {
-                self.output.push_str(&self.get_indent());
-
                 let needs_parentheses = parent_op.map_or(false, |parent| {
                     Self::should_wrap_with_parentheses(op, parent)
                 });
@@ -170,7 +166,6 @@ impl CodegenJS {
                 then_branch,
                 else_branch,
             } => {
-                self.output.push_str(&self.get_indent());
                 self.output.push_str("if (");
                 let indent_level = self.indent_level;
                 self.indent_level = 0;
@@ -199,12 +194,14 @@ impl CodegenJS {
             } => {
                 self.output.push_str(&self.get_indent());
                 self.output.push_str(&format!("function {}(", name));
+
                 for (i, param) in parameters.iter().enumerate() {
                     if i > 0 {
                         self.output.push_str(", ");
                     }
                     self.output.push_str(param);
                 }
+
                 self.output.push_str(") {\n");
                 self.indent_level += 1;
                 self.generate_node(body, None);
@@ -213,10 +210,31 @@ impl CodegenJS {
                 self.output.push_str("}\n");
             }
             Node::FunctionExpression {
-                name: _,
-                parameters: _,
-                body: _,
-            } => todo!(),
+                name,
+                parameters,
+                body,
+            } => {
+                let function_keyword = match name {
+                    Some(name) => format!("function {}(", name),
+                    None => "function(".to_string(),
+                };
+
+                self.output.push_str(&function_keyword);
+
+                for (i, param) in parameters.iter().enumerate() {
+                    if i > 0 {
+                        self.output.push_str(", ");
+                    }
+                    self.output.push_str(param);
+                }
+
+                self.output.push_str(") {\n");
+                self.indent_level += 1;
+                self.generate_node(body, None);
+                self.indent_level -= 1;
+                self.output.push_str(&self.get_indent());
+                self.output.push('}');
+            }
             Node::Identifier(name) => {
                 self.output.push_str(name);
             }
@@ -224,7 +242,6 @@ impl CodegenJS {
                 function,
                 arguments,
             } => {
-                self.output.push_str(&self.get_indent());
                 self.generate_node(function, None);
                 self.output.push('(');
                 for (i, arg) in arguments.iter().enumerate() {
@@ -303,6 +320,19 @@ mod tests {
         let expected_output = indoc! {"
             function main() {
                 foo();
+            }
+        "};
+        assert_eq!(output, expected_output);
+    }
+
+    #[test]
+    fn test_codegen_function_expression() {
+        let output = gen!("fn main() { let foo = fn() { 1 + 2; }; }");
+        let expected_output = indoc! {"
+            function main() {
+                let foo = function() {
+                    1 + 2;
+                };
             }
         "};
         assert_eq!(output, expected_output);
