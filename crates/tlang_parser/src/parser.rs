@@ -364,10 +364,14 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_expression(&mut self) -> Node {
-        self.parse_expression_with_precedence(0)
+        self.parse_expression_with_precedence(0, Associativity::Left)
     }
 
-    fn parse_expression_with_precedence(&mut self, precedence: u8) -> Node {
+    fn parse_expression_with_precedence(
+        &mut self,
+        precedence: u8,
+        associativity: Associativity,
+    ) -> Node {
         let mut lhs = self.parse_primary_expression();
 
         while let Some(token) = self.current_token.as_ref() {
@@ -381,7 +385,7 @@ impl<'src> Parser<'src> {
             if Self::compare_precedence(
                 &OperatorInfo {
                     precedence,
-                    associativity: Associativity::Left,
+                    associativity,
                 },
                 &operator_info,
             ) {
@@ -390,7 +394,10 @@ impl<'src> Parser<'src> {
 
             self.advance();
 
-            let rhs = self.parse_expression_with_precedence(operator_info.precedence);
+            let rhs = self.parse_expression_with_precedence(
+                operator_info.precedence,
+                operator_info.associativity,
+            );
 
             lhs = Node::BinaryOp {
                 op: operator,
@@ -435,6 +442,20 @@ mod tests {
 
     #[test]
     fn test_simple_arithmetic_calculations() {
+        let program = parse!("1 + 2 + 3;");
+        assert_eq!(
+            program,
+            Node::Program(vec![Node::BinaryOp {
+                op: BinaryOp::Add,
+                lhs: Box::new(Node::BinaryOp {
+                    op: BinaryOp::Add,
+                    lhs: Box::new(Node::Literal(Literal::Integer(1))),
+                    rhs: Box::new(Node::Literal(Literal::Integer(2))),
+                }),
+                rhs: Box::new(Node::Literal(Literal::Integer(3))),
+            }])
+        );
+
         let program = parse!("1 * 2 + 3;");
         assert_eq!(
             program,
@@ -693,6 +714,34 @@ mod tests {
             program,
             Node::Program(vec![Node::BinaryOp {
                 op: BinaryOp::Multiply,
+                lhs: Box::new(Node::Literal(Literal::Integer(1))),
+                rhs: Box::new(Node::BinaryOp {
+                    op: BinaryOp::Exponentiation,
+                    lhs: Box::new(Node::Literal(Literal::Integer(2))),
+                    rhs: Box::new(Node::Literal(Literal::Integer(3))),
+                }),
+            }])
+        );
+
+        let program = parse!("1 ** 2 * 3;");
+        assert_eq!(
+            program,
+            Node::Program(vec![Node::BinaryOp {
+                op: BinaryOp::Multiply,
+                lhs: Box::new(Node::BinaryOp {
+                    op: BinaryOp::Exponentiation,
+                    lhs: Box::new(Node::Literal(Literal::Integer(1))),
+                    rhs: Box::new(Node::Literal(Literal::Integer(2))),
+                }),
+                rhs: Box::new(Node::Literal(Literal::Integer(3))),
+            }])
+        );
+
+        let program = parse!("1 ** 2 ** 3;");
+        assert_eq!(
+            program,
+            Node::Program(vec![Node::BinaryOp {
+                op: BinaryOp::Exponentiation,
                 lhs: Box::new(Node::Literal(Literal::Integer(1))),
                 rhs: Box::new(Node::BinaryOp {
                     op: BinaryOp::Exponentiation,
