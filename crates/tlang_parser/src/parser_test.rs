@@ -29,6 +29,7 @@ fn test_simple_variable_declaration() {
 #[test]
 fn test_simple_arithmetic_calculations() {
     let program = parse!("1 + 2 + 3;");
+
     assert_eq!(
         program,
         Node::Program(vec![Node::BinaryOp {
@@ -43,6 +44,7 @@ fn test_simple_arithmetic_calculations() {
     );
 
     let program = parse!("1 * 2 + 3;");
+
     assert_eq!(
         program,
         Node::Program(vec![Node::BinaryOp {
@@ -60,6 +62,7 @@ fn test_simple_arithmetic_calculations() {
 #[test]
 fn test_simple_arithmetic_sum_mult_precedence() {
     let program = parse!("1 + 2 * 3;");
+
     assert_eq!(
         program,
         Node::Program(vec![Node::BinaryOp {
@@ -77,6 +80,7 @@ fn test_simple_arithmetic_sum_mult_precedence() {
 #[test]
 fn test_simple_arithmetic_sum_mult_precedence_parentheses() {
     let program = parse!("(1 + 2) * 3;");
+
     assert_eq!(
         program,
         Node::Program(vec![Node::BinaryOp {
@@ -94,6 +98,7 @@ fn test_simple_arithmetic_sum_mult_precedence_parentheses() {
 #[test]
 fn test_simple_arithmetic_with_identifiers() {
     let program = parse!("let x = 1; let y = 2; x + y;");
+
     assert_eq!(
         program,
         Node::Program(vec![
@@ -117,6 +122,7 @@ fn test_simple_arithmetic_with_identifiers() {
 #[test]
 fn test_simple_call() {
     let program = parse!("foo(1, 2);");
+
     assert_eq!(
         program,
         Node::Program(vec![Node::Call {
@@ -132,6 +138,7 @@ fn test_simple_call() {
 #[test]
 fn test_nested_call() {
     let program = parse!("foo(bar(1), 2);");
+
     assert_eq!(
         program,
         Node::Program(vec![Node::Call {
@@ -150,6 +157,7 @@ fn test_nested_call() {
 #[test]
 fn test_call_with_expression() {
     let program = parse!("foo(1 + 2, 3);");
+
     assert_eq!(
         program,
         Node::Program(vec![Node::Call {
@@ -169,6 +177,7 @@ fn test_call_with_expression() {
 #[test]
 fn test_block_expression() {
     let program = parse!("let x = { 1 + 2; };");
+
     assert_eq!(
         program,
         Node::Program(vec![Node::VariableDeclaration {
@@ -185,6 +194,7 @@ fn test_block_expression() {
 #[test]
 fn test_if_statement() {
     let program = parse!("if (1 + 2) { 3 + 4; }");
+
     assert_eq!(
         program,
         Node::Program(vec![Node::IfElse {
@@ -206,6 +216,7 @@ fn test_if_statement() {
 #[test]
 fn test_if_else_statement() {
     let program = parse!("if (1 + 2) { 3 + 4; } else { 5 + 6; }");
+
     assert_eq!(
         program,
         Node::Program(vec![Node::IfElse {
@@ -231,6 +242,7 @@ fn test_if_else_statement() {
 #[test]
 fn test_if_expression() {
     let program = parse!("let x = if (true) { 1; } else { 2; };");
+
     assert_eq!(
         program,
         Node::Program(vec![Node::VariableDeclaration {
@@ -249,6 +261,7 @@ fn test_if_expression() {
 #[test]
 fn test_function_declaration() {
     let program = parse!("fn foo() { 1 + 2; }");
+
     assert_eq!(
         program,
         Node::Program(vec![Node::FunctionDeclaration {
@@ -266,6 +279,7 @@ fn test_function_declaration() {
 #[test]
 fn test_function_declaration_with_parameters() {
     let program = parse!("fn foo(x, y) { 1 + 2; }");
+
     assert_eq!(
         program,
         Node::Program(vec![Node::FunctionDeclaration {
@@ -283,6 +297,7 @@ fn test_function_declaration_with_parameters() {
 #[test]
 fn test_stray_semicolon() {
     let program = parse!("1 + 2;;");
+
     assert_eq!(
         program,
         Node::Program(vec![Node::BinaryOp {
@@ -296,6 +311,7 @@ fn test_stray_semicolon() {
 #[test]
 fn test_exponentiation() {
     let program = parse!("1 * 2 ** 3;");
+
     assert_eq!(
         program,
         Node::Program(vec![Node::BinaryOp {
@@ -310,6 +326,7 @@ fn test_exponentiation() {
     );
 
     let program = parse!("1 ** 2 * 3;");
+
     assert_eq!(
         program,
         Node::Program(vec![Node::BinaryOp {
@@ -324,6 +341,7 @@ fn test_exponentiation() {
     );
 
     let program = parse!("1 ** 2 ** 3;");
+
     assert_eq!(
         program,
         Node::Program(vec![Node::BinaryOp {

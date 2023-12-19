@@ -27,6 +27,7 @@ fn test_float() {
 #[test]
 fn test_typed_integer() {
     let mut lexer = Lexer::new("123i64");
+
     assert_eq!(lexer.next_token(), Token::Literal(Literal::Integer(123)));
     assert_eq!(lexer.next_token(), Token::Identifier("i64".to_string()));
     assert_eq!(lexer.next_token(), Token::Eof);
@@ -35,6 +36,7 @@ fn test_typed_integer() {
 #[test]
 fn test_typed_float() {
     let mut lexer = Lexer::new("123.456f64");
+
     assert_eq!(lexer.next_token(), Token::Literal(Literal::Float(123.456)));
     assert_eq!(lexer.next_token(), Token::Identifier("f64".to_string()));
     assert_eq!(lexer.next_token(), Token::Eof);
