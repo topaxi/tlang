@@ -152,7 +152,35 @@ impl CodegenJS {
                 self.generate_node(value, None);
                 self.output.push_str(";\n");
             }
-            Node::IfElse { .. } => todo!("implement if/else codegen"),
+            Node::IfElse {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                self.output.push_str(&self.get_indent());
+                self.output.push_str("if (");
+                let indent_level = self.indent_level;
+                self.indent_level = 0;
+                self.generate_node(condition, None);
+                self.indent_level = indent_level;
+                self.output.push_str(") {\n");
+                self.indent_level += 1;
+                self.generate_node(then_branch, None);
+                self.output.push_str(";\n");
+                self.indent_level -= 1;
+
+                if let Some(else_branch) = else_branch {
+                    self.output.push_str(&self.get_indent());
+                    self.output.push_str("} else {\n");
+                    self.indent_level += 1;
+                    self.generate_node(else_branch, None);
+                    self.output.push_str(";\n");
+                    self.indent_level -= 1;
+                }
+
+                self.output.push_str(&self.get_indent());
+                self.output.push_str("}\n");
+            }
             Node::FunctionDeclaration {
                 name,
                 parameters,
@@ -275,6 +303,21 @@ mod tests {
     fn test_codegen_operator_precedence() {
         let output = gen!("let result = 1 + 2 * 3;");
         let expected_output = "let result = 1 + 2 * 3;\n";
+        assert_eq!(output, expected_output);
+    }
+
+    #[test]
+    fn test_if_else() {
+        let output = gen!("fn main() { if true { 1; } else { 2; } }");
+        let expected_output = indoc! {"
+            function main() {
+                if (true) {
+                    1;
+                } else {
+                    2;
+                }
+            }
+        "};
         assert_eq!(output, expected_output);
     }
 }
