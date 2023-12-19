@@ -16,19 +16,25 @@ pub enum Node {
         lhs: Box<Node>,
         rhs: Box<Node>,
     },
+    ExpressionStatement(Box<Node>),
     VariableDeclaration {
         name: String,
         value: Box<Node>,
-    },
-    IfElse {
-        condition: Box<Node>,
-        then_branch: Box<Node>,
-        else_branch: Option<Box<Node>>,
     },
     FunctionDeclaration {
         name: String,
         parameters: Vec<String>,
         body: Box<Node>,
+    },
+    FunctionExpression {
+        name: Option<String>,
+        parameters: Vec<String>,
+        body: Box<Node>,
+    },
+    IfElse {
+        condition: Box<Node>,
+        then_branch: Box<Node>,
+        else_branch: Option<Box<Node>>,
     },
     Identifier(String),
     Call {
@@ -135,12 +141,20 @@ impl<'src> Parser<'src> {
 
         let node = match self.current_token {
             Some(Token::Let) => self.parse_variable_declaration(),
-            _ => self.parse_expression(),
+            Some(Token::Fn) => self.parse_function_declaration(),
+            _ => Node::ExpressionStatement(Box::new(self.parse_expression())),
         };
 
-        // FunctionDeclarations and IfElse statements does not need to be terminated with a semicolon.
-        if let Node::FunctionDeclaration { .. } | Node::IfElse { .. } = node {
+        // FunctionDeclarations statements does not need to be terminated with a semicolon.
+        if let Node::FunctionDeclaration { .. } = node {
             return Some(node);
+        }
+
+        // Expressions like IfElse as statements also do not need to be terminated with a semicolon.
+        if let Node::ExpressionStatement(ref expr) = node {
+            if let Node::IfElse { .. } = **expr {
+                return Some(node);
+            }
         }
 
         self.consume_token(Token::Semicolon);
@@ -226,29 +240,7 @@ impl<'src> Parser<'src> {
                     else_branch,
                 }
             }
-            Some(Token::Fn) => {
-                self.advance();
-                let name = self.consume_identifier();
-                self.consume_token(Token::LParen);
-                let mut parameters = Vec::new();
-                while self.current_token != Some(Token::RParen) {
-                    parameters.push(self.consume_identifier());
-                    if let Some(Token::Comma) = self.current_token {
-                        self.advance();
-                    }
-                }
-
-                self.consume_token(Token::RParen);
-                self.expect_token(Token::LBrace);
-
-                let body = self.parse_primary_expression();
-
-                Node::FunctionDeclaration {
-                    name,
-                    parameters,
-                    body: Box::new(body),
-                }
-            }
+            Some(Token::Fn) => self.parse_function_expression(),
             Some(token) => {
                 let node: Node = token.into();
 
@@ -266,6 +258,58 @@ impl<'src> Parser<'src> {
                 "Expected primary expression, found {:?}",
                 self.current_token
             ),
+        }
+    }
+
+    fn parse_function_expression(&mut self) -> Node {
+        self.consume_token(Token::Fn);
+        let name = if let Some(Token::Identifier(name)) = &self.current_token {
+            let name = name.to_owned();
+            self.advance();
+            Some(name)
+        } else {
+            None
+        };
+
+        let mut parameters = Vec::new();
+        if name.is_some() || self.current_token == Some(Token::LParen) {
+            self.consume_token(Token::LParen);
+            while self.current_token != Some(Token::RParen) {
+                parameters.push(self.consume_identifier());
+                if let Some(Token::Comma) = self.current_token {
+                    self.advance();
+                }
+            }
+            self.consume_token(Token::RParen);
+        }
+
+        self.expect_token(Token::LBrace);
+        let body = self.parse_primary_expression();
+        Node::FunctionExpression {
+            name,
+            parameters,
+            body: Box::new(body),
+        }
+    }
+
+    fn parse_function_declaration(&mut self) -> Node {
+        self.consume_token(Token::Fn);
+        let name = self.consume_identifier();
+        self.consume_token(Token::LParen);
+        let mut parameters = Vec::new();
+        while self.current_token != Some(Token::RParen) {
+            parameters.push(self.consume_identifier());
+            if let Some(Token::Comma) = self.current_token {
+                self.advance();
+            }
+        }
+        self.consume_token(Token::RParen);
+        self.expect_token(Token::LBrace);
+        let body = self.parse_primary_expression();
+        Node::FunctionDeclaration {
+            name,
+            parameters,
+            body: Box::new(body),
         }
     }
 

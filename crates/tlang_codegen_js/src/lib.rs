@@ -123,6 +123,10 @@ impl CodegenJS {
                     self.generate_node(statement, None);
                 }
             }
+            Node::ExpressionStatement(expression) => {
+                self.generate_node(expression, None);
+                self.output.push_str(";\n");
+            }
             Node::Literal(literal) => {
                 self.output.push_str(&self.get_indent());
                 self.generate_literal(literal);
@@ -166,7 +170,6 @@ impl CodegenJS {
                 self.output.push_str(") {\n");
                 self.indent_level += 1;
                 self.generate_node(then_branch, None);
-                self.output.push_str(";\n");
                 self.indent_level -= 1;
 
                 if let Some(else_branch) = else_branch {
@@ -174,12 +177,11 @@ impl CodegenJS {
                     self.output.push_str("} else {\n");
                     self.indent_level += 1;
                     self.generate_node(else_branch, None);
-                    self.output.push_str(";\n");
                     self.indent_level -= 1;
                 }
 
                 self.output.push_str(&self.get_indent());
-                self.output.push_str("}\n");
+                self.output.push('}');
             }
             Node::FunctionDeclaration {
                 name,
@@ -201,6 +203,11 @@ impl CodegenJS {
                 self.output.push_str(&self.get_indent());
                 self.output.push_str("}\n");
             }
+            Node::FunctionExpression {
+                name: _,
+                parameters: _,
+                body: _,
+            } => todo!(),
             Node::Identifier(name) => {
                 self.output.push_str(name);
             }
@@ -217,7 +224,7 @@ impl CodegenJS {
                     }
                     self.generate_node(arg, None);
                 }
-                self.output.push_str(");\n");
+                self.output.push(')');
             }
         }
     }
@@ -309,13 +316,14 @@ mod tests {
     #[test]
     fn test_if_else() {
         let output = gen!("fn main() { if true { 1; } else { 2; } }");
+        // TODO: Do not generate unnecessary semicolon at the end of if statements.
         let expected_output = indoc! {"
             function main() {
                 if (true) {
                     1;
                 } else {
                     2;
-                }
+                };
             }
         "};
         assert_eq!(output, expected_output);
