@@ -478,3 +478,32 @@ fn test_function_expressions() {
         }])
     );
 }
+
+#[test]
+fn test_pattern_matching() {
+    let program = parse!("let x = match 1 { 1 => 2, 3 => 4, _ => 5 };");
+
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::VariableDeclaration {
+            name: "x".to_string(),
+            value: Box::new(Node::Match {
+                expression: Box::new(Node::Literal(Literal::Integer(1))),
+                arms: vec![
+                    Node::MatchArm {
+                        pattern: Box::new(Node::Literal(Literal::Integer(1))),
+                        expression: Box::new(Node::Literal(Literal::Integer(2)))
+                    },
+                    Node::MatchArm {
+                        pattern: Box::new(Node::Literal(Literal::Integer(3))),
+                        expression: Box::new(Node::Literal(Literal::Integer(4)))
+                    },
+                    Node::MatchArm {
+                        pattern: Box::new(Node::Wildcard),
+                        expression: Box::new(Node::Literal(Literal::Integer(5)))
+                    }
+                ]
+            })
+        }])
+    );
+}

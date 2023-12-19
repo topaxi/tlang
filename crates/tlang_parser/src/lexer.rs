@@ -35,6 +35,11 @@ pub enum Token {
     LBracket,
     RBracket,
 
+    // Others
+    Arrow,
+    FatArrow,
+    Pipeline,
+
     // Tokens for numbers
     Literal(Literal),
 
@@ -64,6 +69,8 @@ pub enum Literal {
 pub struct Lexer<'src> {
     source: &'src str,
     position: usize,
+    current_line: usize,
+    current_column: usize,
     current_token: Option<Token>,
 }
 
@@ -72,8 +79,22 @@ impl Lexer<'_> {
         Lexer {
             source,
             position: 0,
+            current_line: 1,
+            current_column: 1,
             current_token: None,
         }
+    }
+
+    pub fn current_line(&self) -> usize {
+        self.current_line
+    }
+
+    pub fn current_column(&self) -> usize {
+        self.current_column
+    }
+
+    pub fn source(&self) -> &str {
+        self.source
     }
 
     fn peek_ahead(&self) -> Option<char> {
@@ -83,6 +104,15 @@ impl Lexer<'_> {
     fn advance(&mut self) {
         if self.position < self.source.len() {
             self.position += 1;
+
+            if let Some(ch) = self.source.chars().nth(self.position - 1) {
+                if ch == '\n' {
+                    self.current_line += 1;
+                    self.current_column = 1;
+                } else {
+                    self.current_column += 1;
+                }
+            }
         }
     }
 
@@ -144,8 +174,14 @@ impl Lexer<'_> {
                 Token::Plus
             }
             '-' => {
-                self.advance();
-                Token::Minus
+                if self.peek_ahead() == Some('>') {
+                    self.advance();
+                    self.advance();
+                    Token::Arrow
+                } else {
+                    self.advance();
+                    Token::Minus
+                }
             }
             '*' => {
                 if self.peek_ahead() == Some('*') {
@@ -174,6 +210,10 @@ impl Lexer<'_> {
                     self.advance();
                     self.advance();
                     Token::DoublePipe
+                } else if self.peek_ahead() == Some('>') {
+                    self.advance();
+                    self.advance();
+                    Token::Pipeline
                 } else {
                     self.advance();
                     Token::Pipe
@@ -242,6 +282,10 @@ impl Lexer<'_> {
                     self.advance();
                     self.advance();
                     Token::EqualEqual
+                } else if self.peek_ahead() == Some('>') {
+                    self.advance();
+                    self.advance();
+                    Token::FatArrow
                 } else {
                     self.advance();
                     Token::EqualSign

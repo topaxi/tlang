@@ -31,6 +31,15 @@ pub enum Node {
         parameters: Vec<String>,
         body: Box<Node>,
     },
+    Match {
+        expression: Box<Node>,
+        arms: Vec<Node>,
+    },
+    MatchArm {
+        pattern: Box<Node>,
+        expression: Box<Node>,
+    },
+    Wildcard,
     IfElse {
         condition: Box<Node>,
         then_branch: Box<Node>,
@@ -101,7 +110,19 @@ impl<'src> Parser<'src> {
     fn expect_token(&mut self, expected: Token) {
         let actual = self.current_token.as_ref().unwrap();
         if *actual != expected {
-            panic!("Expected token {:?}, found {:?}", expected, actual);
+            panic!(
+                "Exprected {:?} on line {}, column {}, found {:?} instead\n{}\n{}",
+                expected,
+                self.lexer.current_line(),
+                self.lexer.current_column(),
+                actual,
+                self.lexer
+                    .source()
+                    .lines()
+                    .nth(self.lexer.current_line() - 1)
+                    .unwrap(),
+                " ".repeat(self.lexer.current_column() - 1) + "^"
+            );
         }
     }
 
@@ -119,7 +140,18 @@ impl<'src> Parser<'src> {
                 name
             }
             _ => {
-                panic!("Expected identifier, found {:?}", actual);
+                panic!(
+                    "Expected identifier on line {}, column {}, found {:?} instead\n{}\n{}",
+                    self.lexer.current_line(),
+                    self.lexer.current_column(),
+                    actual,
+                    self.lexer
+                        .source()
+                        .lines()
+                        .nth(self.lexer.current_line() - 1)
+                        .unwrap(),
+                    " ".repeat(self.lexer.current_column() - 1) + "^"
+                );
             }
         }
     }
@@ -241,12 +273,17 @@ impl<'src> Parser<'src> {
                 }
             }
             Some(Token::Fn) => self.parse_function_expression(),
+            Some(Token::Match) => self.parse_match_expression(),
             Some(token) => {
                 let node: Node = token.into();
 
                 self.advance();
 
-                if let Node::Identifier(_) = node {
+                if let Node::Identifier(identifier) = &node {
+                    if identifier == "_" {
+                        return Node::Wildcard;
+                    }
+
                     if let Some(Token::LParen) = self.current_token {
                         return self.parse_call_expression(node);
                     }
@@ -255,9 +292,44 @@ impl<'src> Parser<'src> {
                 node
             }
             _ => panic!(
-                "Expected primary expression, found {:?}",
-                self.current_token
+                "Expected primary expression on line {}, column {}, found {:?} instead\n{}\n{}",
+                self.lexer.current_line(),
+                self.lexer.current_column(),
+                self.current_token,
+                self.lexer
+                    .source()
+                    .lines()
+                    .nth(self.lexer.current_line() - 1)
+                    .unwrap(),
+                " ".repeat(self.lexer.current_column() - 1) + "^"
             ),
+        }
+    }
+
+    fn parse_match_expression(&mut self) -> Node {
+        self.consume_token(Token::Match);
+        let expression = self.parse_expression();
+        self.consume_token(Token::LBrace);
+
+        let mut arms = Vec::new();
+        while self.current_token != Some(Token::RBrace) {
+            let pattern = self.parse_expression();
+            self.consume_token(Token::FatArrow);
+            let expression = self.parse_expression();
+            arms.push(Node::MatchArm {
+                pattern: Box::new(pattern),
+                expression: Box::new(expression),
+            });
+            if let Some(Token::Comma) = self.current_token {
+                self.advance();
+            }
+        }
+
+        self.consume_token(Token::RBrace);
+
+        Node::Match {
+            expression: Box::new(expression),
+            arms,
         }
     }
 

@@ -61,7 +61,7 @@ fn test_single_char_operators() {
 
 #[test]
 fn test_multi_char_operators() {
-    let mut lexer = Lexer::new("|| && == != >= <= **");
+    let mut lexer = Lexer::new("|| && == != >= <= ** |>");
 
     assert_eq!(lexer.next_token(), Token::DoublePipe);
     assert_eq!(lexer.next_token(), Token::DoubleAmpersand);
@@ -70,6 +70,16 @@ fn test_multi_char_operators() {
     assert_eq!(lexer.next_token(), Token::GreaterThanOrEqual);
     assert_eq!(lexer.next_token(), Token::LessThanOrEqual);
     assert_eq!(lexer.next_token(), Token::AsteriskAsterisk);
+    assert_eq!(lexer.next_token(), Token::Pipeline);
+    assert_eq!(lexer.next_token(), Token::Eof);
+}
+
+#[test]
+fn test_arrows() {
+    let mut lexer = Lexer::new("-> =>");
+
+    assert_eq!(lexer.next_token(), Token::Arrow);
+    assert_eq!(lexer.next_token(), Token::FatArrow);
     assert_eq!(lexer.next_token(), Token::Eof);
 }
 

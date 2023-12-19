@@ -156,6 +156,15 @@ impl CodegenJS {
                 self.generate_node(value, None);
                 self.output.push_str(";\n");
             }
+            Node::Match {
+                expression: _,
+                arms: _,
+            } => todo!(),
+            Node::MatchArm {
+                pattern: _,
+                expression: _,
+            } => todo!(),
+            Node::Wildcard => todo!(),
             Node::IfElse {
                 condition,
                 then_branch,
