@@ -3,19 +3,31 @@ use tlang_parser::{
     parser::{BinaryOp, Node},
 };
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum JSAssociativity {
+    Left,
+    Right,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct JSOperatorInfo {
+    precedence: u8,
+    associativity: JSAssociativity,
+}
+
 #[derive(Debug, PartialEq)]
-pub struct Codegen {
+pub struct CodegenJS {
     output: String,
     indent_level: usize,
 }
 
-impl Default for Codegen {
+impl Default for CodegenJS {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Codegen {
+impl CodegenJS {
     pub fn new() -> Self {
         Self {
             output: String::new(),
@@ -24,7 +36,7 @@ impl Codegen {
     }
 
     pub fn generate_code(&mut self, node: &Node) {
-        self.generate_node(node)
+        self.generate_node(node, None)
     }
 
     fn generate_binary_op(&mut self, op: &BinaryOp) {
@@ -49,11 +61,49 @@ impl Codegen {
         }
     }
 
-    fn generate_node(&mut self, node: &Node) {
+    fn map_operator_info(op: &BinaryOp) -> JSOperatorInfo {
+        match op {
+            BinaryOp::Add | BinaryOp::Subtract => JSOperatorInfo {
+                precedence: 6,
+                associativity: JSAssociativity::Left,
+            },
+            BinaryOp::Multiply | BinaryOp::Divide | BinaryOp::Modulo => JSOperatorInfo {
+                precedence: 7,
+                associativity: JSAssociativity::Left,
+            },
+            BinaryOp::Equal
+            | BinaryOp::NotEqual
+            | BinaryOp::LessThan
+            | BinaryOp::LessThanOrEqual
+            | BinaryOp::GreaterThan
+            | BinaryOp::GreaterThanOrEqual => JSOperatorInfo {
+                precedence: 5,
+                associativity: JSAssociativity::Left,
+            },
+            BinaryOp::And => JSOperatorInfo {
+                precedence: 3,
+                associativity: JSAssociativity::Left,
+            },
+            BinaryOp::Or => JSOperatorInfo {
+                precedence: 2,
+                associativity: JSAssociativity::Left,
+            },
+            BinaryOp::BitwiseAnd | BinaryOp::BitwiseOr | BinaryOp::BitwiseXor => JSOperatorInfo {
+                precedence: 8,
+                associativity: JSAssociativity::Left,
+            },
+            BinaryOp::Exponentiation => JSOperatorInfo {
+                precedence: 9,
+                associativity: JSAssociativity::Right,
+            },
+        }
+    }
+
+    fn generate_node(&mut self, node: &Node, parent_op: Option<&BinaryOp>) {
         match node {
             Node::Program(statements) => {
                 for statement in statements {
-                    self.generate_node(statement);
+                    self.generate_node(statement, None);
                 }
             }
             Node::Literal(literal) => {
@@ -76,14 +126,27 @@ impl Codegen {
             }
             Node::BinaryOp { op, lhs, rhs } => {
                 self.output.push_str(&self.get_indent());
-                self.generate_node(lhs);
+
+                let needs_parentheses = parent_op.map_or(false, |parent| {
+                    Self::should_wrap_with_parentheses(op, parent)
+                });
+
+                if needs_parentheses {
+                    self.output.push('(');
+                }
+
+                self.generate_node(lhs, Some(op));
                 self.generate_binary_op(op);
-                self.generate_node(rhs);
+                self.generate_node(rhs, Some(op));
+
+                if needs_parentheses {
+                    self.output.push(')');
+                }
             }
             Node::VariableDeclaration { name, value } => {
                 self.output.push_str(&self.get_indent());
                 self.output.push_str(&format!("let {} = ", name));
-                self.generate_node(value);
+                self.generate_node(value, None);
                 self.output.push_str(";\n");
             }
             Node::IfElse { .. } => todo!("implement if/else codegen"),
@@ -102,7 +165,7 @@ impl Codegen {
                 }
                 self.output.push_str(") {\n");
                 self.indent_level += 1;
-                self.generate_node(body);
+                self.generate_node(body, None);
                 self.indent_level -= 1;
                 self.output.push_str(&self.get_indent());
                 self.output.push_str("}\n");
@@ -115,17 +178,29 @@ impl Codegen {
                 arguments,
             } => {
                 self.output.push_str(&self.get_indent());
-                self.generate_node(function);
+                self.generate_node(function, None);
                 self.output.push('(');
                 for (i, arg) in arguments.iter().enumerate() {
                     if i > 0 {
                         self.output.push_str(", ");
                     }
-                    self.generate_node(arg);
+                    self.generate_node(arg, None);
                 }
                 self.output.push_str(");\n");
             }
         }
+    }
+
+    fn should_wrap_with_parentheses(op: &BinaryOp, parent_op: &BinaryOp) -> bool {
+        let op_info = Self::map_operator_info(op);
+        let parent_op_info = Self::map_operator_info(parent_op);
+
+        if op_info.precedence < parent_op_info.precedence {
+            return true;
+        }
+
+        op_info.precedence == parent_op_info.precedence
+            && op_info.associativity == JSAssociativity::Right
     }
 
     fn get_indent(&self) -> String {
@@ -147,7 +222,7 @@ mod tests {
             let lexer = Lexer::new($source);
             let mut parser = Parser::new(lexer);
             let node = parser.parse_program();
-            let mut codegen = Codegen::default();
+            let mut codegen = CodegenJS::default();
             codegen.generate_code(&node);
             codegen.get_output().to_string()
         }};
@@ -178,6 +253,20 @@ mod tests {
     fn test_codegen_function_call() {
         let output = gen!("fn main() { foo(); }");
         let expected_output = "function main() {\n    foo();\n}\n";
+        assert_eq!(output, expected_output);
+    }
+
+    #[test]
+    fn test_codegen_parenthesis_expression() {
+        let output = gen!("let x = (42 + 1) * 2;");
+        let expected_output = "let x = (42 + 1) * 2;\n";
+        assert_eq!(output, expected_output);
+    }
+
+    #[test]
+    fn test_codegen_operator_precedence() {
+        let output = gen!("let result = 1 + 2 * 3;");
+        let expected_output = "let result = 1 + 2 * 3;\n";
         assert_eq!(output, expected_output);
     }
 }
