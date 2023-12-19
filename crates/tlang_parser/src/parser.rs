@@ -63,6 +63,7 @@ pub enum BinaryOp {
     Multiply,
     Divide,
     Modulo,
+    Exponentiation,
     Equal,
     NotEqual,
     LessThan,
@@ -274,6 +275,7 @@ impl<'src> Parser<'src> {
             Token::Plus
                 | Token::Minus
                 | Token::Asterisk
+                | Token::AsteriskAsterisk
                 | Token::Slash
                 | Token::Percent
                 | Token::Caret
@@ -295,6 +297,7 @@ impl<'src> Parser<'src> {
             Token::Plus => BinaryOp::Add,
             Token::Minus => BinaryOp::Subtract,
             Token::Asterisk => BinaryOp::Multiply,
+            Token::AsteriskAsterisk => BinaryOp::Exponentiation,
             Token::Slash => BinaryOp::Divide,
             Token::Percent => BinaryOp::Modulo,
             Token::EqualEqual => BinaryOp::Equal,
@@ -344,6 +347,10 @@ impl<'src> Parser<'src> {
             BinaryOp::BitwiseAnd | BinaryOp::BitwiseOr | BinaryOp::BitwiseXor => OperatorInfo {
                 precedence: 8,
                 associativity: Associativity::Left,
+            },
+            BinaryOp::Exponentiation => OperatorInfo {
+                precedence: 9,
+                associativity: Associativity::Right,
             },
         }
     }
@@ -675,6 +682,23 @@ mod tests {
                 op: BinaryOp::Add,
                 lhs: Box::new(Node::Literal(Literal::Integer(1))),
                 rhs: Box::new(Node::Literal(Literal::Integer(2))),
+            }])
+        );
+    }
+
+    #[test]
+    fn test_exponentiation() {
+        let program = parse!("1 * 2 ** 3;");
+        assert_eq!(
+            program,
+            Node::Program(vec![Node::BinaryOp {
+                op: BinaryOp::Multiply,
+                lhs: Box::new(Node::Literal(Literal::Integer(1))),
+                rhs: Box::new(Node::BinaryOp {
+                    op: BinaryOp::Exponentiation,
+                    lhs: Box::new(Node::Literal(Literal::Integer(2))),
+                    rhs: Box::new(Node::Literal(Literal::Integer(3))),
+                }),
             }])
         );
     }

@@ -5,6 +5,7 @@ pub enum Token {
     Plus,
     Minus,
     Asterisk,
+    AsteriskAsterisk,
     Slash,
     EqualEqual,
     NotEqual,
@@ -147,8 +148,14 @@ impl Lexer<'_> {
                 Token::Minus
             }
             '*' => {
-                self.advance();
-                Token::Asterisk
+                if self.peek_ahead() == Some('*') {
+                    self.advance();
+                    self.advance();
+                    Token::AsteriskAsterisk
+                } else {
+                    self.advance();
+                    Token::Asterisk
+                }
             }
             '/' => {
                 self.advance();
@@ -362,7 +369,7 @@ mod tests {
 
     #[test]
     fn test_multi_char_operators() {
-        let mut lexer = Lexer::new("|| && == != >= <=");
+        let mut lexer = Lexer::new("|| && == != >= <= **");
 
         assert_eq!(lexer.next_token(), Token::DoublePipe);
         assert_eq!(lexer.next_token(), Token::DoubleAmpersand);
@@ -370,6 +377,7 @@ mod tests {
         assert_eq!(lexer.next_token(), Token::NotEqual);
         assert_eq!(lexer.next_token(), Token::GreaterThanOrEqual);
         assert_eq!(lexer.next_token(), Token::LessThanOrEqual);
+        assert_eq!(lexer.next_token(), Token::AsteriskAsterisk);
         assert_eq!(lexer.next_token(), Token::Eof);
     }
 

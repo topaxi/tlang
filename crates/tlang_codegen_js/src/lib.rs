@@ -34,6 +34,7 @@ impl Codegen {
             BinaryOp::Multiply => self.output.push_str(" * "),
             BinaryOp::Divide => self.output.push_str(" / "),
             BinaryOp::Modulo => self.output.push_str(" % "),
+            BinaryOp::Exponentiation => self.output.push_str(" ** "),
             BinaryOp::Equal => self.output.push_str(" === "),
             BinaryOp::NotEqual => self.output.push_str(" !== "),
             BinaryOp::LessThan => self.output.push_str(" < "),
