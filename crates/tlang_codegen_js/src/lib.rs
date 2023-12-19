@@ -215,6 +215,7 @@ impl CodegenJS {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use indoc::indoc;
     use tlang_parser::{lexer::Lexer, parser::Parser};
 
     macro_rules! gen {
@@ -252,7 +253,11 @@ mod tests {
     #[test]
     fn test_codegen_function_call() {
         let output = gen!("fn main() { foo(); }");
-        let expected_output = "function main() {\n    foo();\n}\n";
+        let expected_output = indoc! {"
+            function main() {
+                foo();
+            }
+        "};
         assert_eq!(output, expected_output);
     }
 
