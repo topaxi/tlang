@@ -126,6 +126,12 @@ impl CodegenJS {
             Node::ExpressionStatement(expression) => {
                 self.output.push_str(&self.get_indent());
                 self.generate_node(expression, None);
+
+                if let Node::IfElse { .. } = **expression {
+                    self.output.push('\n');
+                    return;
+                }
+
                 self.output.push_str(";\n");
             }
             Node::Literal(literal) => self.generate_literal(literal),
@@ -355,14 +361,13 @@ mod tests {
     #[test]
     fn test_if_else() {
         let output = gen!("fn main() { if true { 1; } else { 2; } }");
-        // TODO: Do not generate unnecessary semicolon at the end of if statements.
         let expected_output = indoc! {"
             function main() {
                 if (true) {
                     1;
                 } else {
                     2;
-                };
+                }
             }
         "};
         assert_eq!(output, expected_output);
