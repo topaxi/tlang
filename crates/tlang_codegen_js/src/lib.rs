@@ -239,6 +239,11 @@ impl CodegenJS {
                         self.output.push_str(" else ");
                     }
 
+                    // Expand parameter matching if any definition has a different amount of
+                    // paramaters.
+                    let parameter_variadic = definitions
+                        .iter()
+                        .any(|(params, _)| params.len() != parameters.len());
                     let literal_parameters = parameters.iter().enumerate().filter(|(_, param)| {
                         if let Node::FunctionParameter(node) = param {
                             matches!(**node, Node::Literal(_))
@@ -247,8 +252,17 @@ impl CodegenJS {
                         }
                     });
 
-                    if literal_parameters.clone().count() > 0 {
-                        self.output.push_str("if (");
+                    if parameter_variadic || literal_parameters.clone().count() > 0 {
+                        if parameter_variadic {
+                            self.output.push_str("if (args.length === ");
+                            self.output.push_str(&parameters.len().to_string());
+
+                            if literal_parameters.clone().count() > 0 {
+                                self.output.push_str(" && ");
+                            }
+                        } else {
+                            self.output.push_str("if (");
+                        }
                         // Filter only literal params.
                         for (j, (k, param)) in literal_parameters.enumerate() {
                             if j > 0 {
@@ -548,6 +562,59 @@ mod tests {
                     let m = args[0];
                     let n = args[1];
                     return gcd(n, m % n);
+                }
+            }
+        "};
+        assert_eq!(output, expected_output);
+    }
+
+    #[test]
+    fn test_tail_recursive_factorial_nested() {
+        let output = gen!(indoc! {"
+            fn factorial(n) {
+                fn factorial_rec(0, acc) { return acc; }
+                fn factorial_rec(n, acc) { return factorial_rec(n - 1, n * acc); }
+
+                return factorial_rec(n, 1);
+            }
+        "});
+        let expected_output = indoc! {"
+            function factorial(n) {
+                function factorial_rec(...args) {
+                    if (args[0] === 0) {
+                        let acc = args[1];
+                        return acc;
+                    } else {
+                        let n = args[0];
+                        let acc = args[1];
+                        return factorial_rec(n - 1, n * acc);
+                    }
+                }
+                return factorial_rec(n, 1);
+            }
+        "};
+        assert_eq!(output, expected_output);
+    }
+
+    #[test]
+    fn test_tail_recursive_factorial_idiomatic() {
+        let output = gen!(indoc! {"
+            fn factorial(n) { return factorial(n, 1); }
+            fn factorial(0, acc) { return acc; }
+            fn factorial(n, acc) { return factorial(n - 1, n * acc); }
+        "});
+        let expected_output = indoc! {"
+            function factorial(...args) {
+                if (args.length === 1) {
+                    let n = args[0];
+                    return factorial(n, 1);
+                } else if (args.length === 2 && args[0] === 0) {
+                    let acc = args[1];
+                    return acc;
+                } else if (args.length === 2) {
+                    let n = args[0];
+                    let acc = args[1];
+                    return factorial(n - 1, n * acc);
                 }
             }
         "};
