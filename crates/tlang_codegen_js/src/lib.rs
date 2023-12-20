@@ -412,4 +412,23 @@ mod tests {
         "};
         assert_eq!(output, expected_output);
     }
+
+    #[ignore = "implement pattern matching first"]
+    #[test]
+    fn test_recursive_factorial_function_definition() {
+        let output = gen!(indoc! {"
+            fn factorial(0) { return 1; }
+            fn factorial(n) { return n * factorial(n - 1); }
+        "});
+        let expected_output = indoc! {"
+            function factorial(n) {
+                if (n === 0) {
+                    return 1;
+                } else {
+                    return n * factorial(n - 1);
+                }
+            }
+        "};
+        assert_eq!(output, expected_output);
+    }
 }

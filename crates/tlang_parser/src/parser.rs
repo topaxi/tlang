@@ -366,7 +366,10 @@ impl<'src> Parser<'src> {
         if name.is_some() || self.current_token == Some(Token::LParen) {
             self.consume_token(Token::LParen);
             while self.current_token != Some(Token::RParen) {
-                parameters.push(Node::Identifier(self.consume_identifier()));
+                parameters.push(Node::FunctionParameter(Box::new(Node::Identifier(
+                    self.consume_identifier(),
+                ))));
+
                 if let Some(Token::Comma) = self.current_token {
                     self.advance();
                 }
@@ -406,7 +409,8 @@ impl<'src> Parser<'src> {
                 ),
             };
 
-            parameters.push(parameter);
+            parameters.push(Node::FunctionParameter(Box::new(parameter)));
+
             if let Some(Token::Comma) = self.current_token {
                 self.advance();
             }

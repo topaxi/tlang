@@ -316,8 +316,8 @@ fn test_function_declaration_with_parameters() {
         Node::Program(vec![Node::FunctionDeclaration {
             name: "foo".to_string(),
             parameters: vec![
-                Node::Identifier("x".to_string()),
-                Node::Identifier("y".to_string())
+                Node::FunctionParameter(Box::new(Node::Identifier("x".to_string()))),
+                Node::FunctionParameter(Box::new(Node::Identifier("y".to_string())))
             ],
             body: Box::new(Node::Block(
                 vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
@@ -425,8 +425,8 @@ fn test_nameless_function_expressions() {
             value: Box::new(Node::FunctionExpression {
                 name: None,
                 parameters: vec![
-                    Node::Identifier("x".to_string()),
-                    Node::Identifier("y".to_string())
+                    Node::FunctionParameter(Box::new(Node::Identifier("x".to_string()))),
+                    Node::FunctionParameter(Box::new(Node::Identifier("y".to_string())))
                 ],
                 body: Box::new(Node::Block(
                     vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
@@ -493,8 +493,8 @@ fn test_function_expressions() {
             value: Box::new(Node::FunctionExpression {
                 name: Some("foo".to_string()),
                 parameters: vec![
-                    Node::Identifier("x".to_string()),
-                    Node::Identifier("y".to_string())
+                    Node::FunctionParameter(Box::new(Node::Identifier("x".to_string()))),
+                    Node::FunctionParameter(Box::new(Node::Identifier("y".to_string())))
                 ],
                 body: Box::new(Node::Block(
                     vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
@@ -603,7 +603,9 @@ fn test_recursive_factorial_functional_definition() {
         Node::Program(vec![
             Node::FunctionDeclaration {
                 name: "factorial".to_string(),
-                parameters: vec![Node::Literal(Literal::Integer(0))],
+                parameters: vec![Node::FunctionParameter(Box::new(Node::Literal(
+                    Literal::Integer(0)
+                )))],
                 body: Box::new(Node::Block(
                     vec![Node::ReturnStatement(Some(Box::new(Node::Literal(
                         Literal::Integer(1)
@@ -613,7 +615,9 @@ fn test_recursive_factorial_functional_definition() {
             },
             Node::FunctionDeclaration {
                 name: "factorial".to_string(),
-                parameters: vec![Node::Identifier("n".to_string())],
+                parameters: vec![Node::FunctionParameter(Box::new(Node::Identifier(
+                    "n".to_string()
+                )))],
                 body: Box::new(Node::Block(
                     vec![Node::ReturnStatement(Some(Box::new(Node::BinaryOp {
                         op: BinaryOp::Multiply,
