@@ -31,6 +31,7 @@ pub enum Node {
         parameters: Vec<String>,
         body: Box<Node>,
     },
+    ReturnStatement(Option<Box<Node>>),
     Match {
         expression: Box<Node>,
         arms: Vec<Node>,
@@ -174,6 +175,7 @@ impl<'src> Parser<'src> {
         let node = match self.current_token {
             Some(Token::Let) => self.parse_variable_declaration(),
             Some(Token::Fn) => self.parse_function_declaration(),
+            Some(Token::Return) => self.parse_return_statement(),
             _ => Node::ExpressionStatement(Box::new(self.parse_expression())),
         };
 
@@ -192,6 +194,16 @@ impl<'src> Parser<'src> {
         self.consume_token(Token::Semicolon);
 
         Some(node)
+    }
+
+    fn parse_return_statement(&mut self) -> Node {
+        self.consume_token(Token::Return);
+
+        if self.current_token == Some(Token::Semicolon) {
+            return Node::ReturnStatement(None);
+        }
+
+        Node::ReturnStatement(Some(Box::new(self.parse_expression())))
     }
 
     pub fn parse_program(&mut self) -> Node {

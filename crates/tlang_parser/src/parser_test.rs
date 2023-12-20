@@ -507,3 +507,54 @@ fn test_pattern_matching() {
         }])
     );
 }
+
+#[test]
+fn test_explicit_return_statements() {
+    let program = parse!("fn foo() { return 1 + 2; }");
+
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::FunctionDeclaration {
+            name: "foo".to_string(),
+            parameters: vec![],
+            body: Box::new(Node::Program(vec![Node::ReturnStatement(Some(Box::new(
+                Node::BinaryOp {
+                    op: BinaryOp::Add,
+                    lhs: Box::new(Node::Literal(Literal::Integer(1))),
+                    rhs: Box::new(Node::Literal(Literal::Integer(2))),
+                }
+            )))]))
+        }])
+    );
+
+    let program = parse!("fn foo() { return; }");
+
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::FunctionDeclaration {
+            name: "foo".to_string(),
+            parameters: vec![],
+            body: Box::new(Node::Program(vec![Node::ReturnStatement(None)]))
+        }])
+    );
+
+    let program = parse!("let x = fn() { return 1 + 2; };");
+
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::VariableDeclaration {
+            name: "x".to_string(),
+            value: Box::new(Node::FunctionExpression {
+                name: None,
+                parameters: vec![],
+                body: Box::new(Node::Program(vec![Node::ReturnStatement(Some(Box::new(
+                    Node::BinaryOp {
+                        op: BinaryOp::Add,
+                        lhs: Box::new(Node::Literal(Literal::Integer(1))),
+                        rhs: Box::new(Node::Literal(Literal::Integer(2))),
+                    }
+                )))]))
+            })
+        }])
+    );
+}

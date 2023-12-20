@@ -129,3 +129,30 @@ fn test_simple_assignment() {
     assert_eq!(lexer.next_token(), Token::Semicolon);
     assert_eq!(lexer.next_token(), Token::Eof);
 }
+
+#[test]
+fn test_function_declaration_with_explicit_return_statement() {
+    let mut lexer = Lexer::new("fn add(a: i64, b: i64) -> i64 { return a + b; }");
+
+    assert_eq!(lexer.next_token(), Token::Fn);
+    assert_eq!(lexer.next_token(), Token::Identifier("add".to_string()));
+    assert_eq!(lexer.next_token(), Token::LParen);
+    assert_eq!(lexer.next_token(), Token::Identifier("a".to_string()));
+    assert_eq!(lexer.next_token(), Token::Colon);
+    assert_eq!(lexer.next_token(), Token::Identifier("i64".to_string()));
+    assert_eq!(lexer.next_token(), Token::Comma);
+    assert_eq!(lexer.next_token(), Token::Identifier("b".to_string()));
+    assert_eq!(lexer.next_token(), Token::Colon);
+    assert_eq!(lexer.next_token(), Token::Identifier("i64".to_string()));
+    assert_eq!(lexer.next_token(), Token::RParen);
+    assert_eq!(lexer.next_token(), Token::Arrow);
+    assert_eq!(lexer.next_token(), Token::Identifier("i64".to_string()));
+    assert_eq!(lexer.next_token(), Token::LBrace);
+    assert_eq!(lexer.next_token(), Token::Return);
+    assert_eq!(lexer.next_token(), Token::Identifier("a".to_string()));
+    assert_eq!(lexer.next_token(), Token::Plus);
+    assert_eq!(lexer.next_token(), Token::Identifier("b".to_string()));
+    assert_eq!(lexer.next_token(), Token::Semicolon);
+    assert_eq!(lexer.next_token(), Token::RBrace);
+    assert_eq!(lexer.next_token(), Token::Eof);
+}

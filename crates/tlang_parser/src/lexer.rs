@@ -49,6 +49,7 @@ pub enum Token {
     // Keywords
     Let,
     Fn,
+    Return,
     If,
     Else,
     Match,
@@ -331,6 +332,7 @@ impl Lexer<'_> {
                 match identifier {
                     "let" => Token::Let,
                     "fn" => Token::Fn,
+                    "return" => Token::Return,
                     "if" => Token::If,
                     "else" => Token::Else,
                     "match" => Token::Match,

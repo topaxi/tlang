@@ -241,6 +241,17 @@ impl CodegenJS {
                 self.output.push_str(&self.get_indent());
                 self.output.push('}');
             }
+            Node::ReturnStatement(expr) => {
+                self.output.push_str(&self.get_indent());
+                self.output.push_str("return");
+
+                if expr.is_some() {
+                    self.output.push(' ');
+                    self.generate_node(expr.as_ref().unwrap(), None);
+                }
+
+                self.output.push_str(";\n");
+            }
             Node::Identifier(name) => {
                 self.output.push_str(name);
             }
@@ -339,6 +350,25 @@ mod tests {
                 let foo = function() {
                     1 + 2;
                 };
+            }
+        "};
+        assert_eq!(output, expected_output);
+    }
+
+    #[test]
+    fn test_codegen_functions_with_explicit_return_statements() {
+        let output = gen!("fn main() { return 42; }");
+        let expected_output = indoc! {"
+            function main() {
+                return 42;
+            }
+        "};
+        assert_eq!(output, expected_output);
+
+        let output = gen!("fn main() { return; }");
+        let expected_output = indoc! {"
+            function main() {
+                return;
             }
         "};
         assert_eq!(output, expected_output);
