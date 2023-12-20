@@ -207,33 +207,25 @@ impl<'src> Parser<'src> {
         Node::ReturnStatement(Some(Box::new(self.parse_expression())))
     }
 
-    pub fn parse_program(&mut self) -> Node {
+    fn parse_statements(&mut self) -> Vec<Node> {
         let mut statements = Vec::new();
 
         while self.current_token != Some(Token::RBrace) && self.current_token != Some(Token::Eof) {
-            let statement = self.parse_statement();
-
-            if let Some(statement) = statement {
+            if let Some(statement) = self.parse_statement() {
                 statements.push(statement);
             }
         }
 
-        Node::Program(statements)
+        statements
+    }
+
+    pub fn parse_program(&mut self) -> Node {
+        Node::Program(self.parse_statements())
     }
 
     fn parse_block(&mut self) -> Node {
         self.consume_token(Token::LBrace);
-
-        let mut statements = Vec::new();
-
-        while self.current_token != Some(Token::RBrace) && self.current_token != Some(Token::Eof) {
-            let statement = self.parse_statement();
-
-            if let Some(statement) = statement {
-                statements.push(statement);
-            }
-        }
-
+        let statements = self.parse_statements();
         self.consume_token(Token::RBrace);
 
         Node::Block(statements, None)
