@@ -7,4 +7,4 @@ edition.workspace = true
 tlang_parser = { path = "../tlang_parser" }
 
 [dev-dependencies]
-indoc = "2"
+indoc = { workspace = true }

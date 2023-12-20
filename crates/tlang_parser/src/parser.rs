@@ -24,14 +24,15 @@ pub enum Node {
     },
     FunctionDeclaration {
         name: String,
-        parameters: Vec<String>,
+        parameters: Vec<Node>,
         body: Box<Node>,
     },
     FunctionExpression {
         name: Option<String>,
-        parameters: Vec<String>,
+        parameters: Vec<Node>,
         body: Box<Node>,
     },
+    FunctionParameter(Box<Node>),
     ReturnStatement(Option<Box<Node>>),
     Match {
         expression: Box<Node>,
@@ -365,7 +366,7 @@ impl<'src> Parser<'src> {
         if name.is_some() || self.current_token == Some(Token::LParen) {
             self.consume_token(Token::LParen);
             while self.current_token != Some(Token::RParen) {
-                parameters.push(self.consume_identifier());
+                parameters.push(Node::Identifier(self.consume_identifier()));
                 if let Some(Token::Comma) = self.current_token {
                     self.advance();
                 }
@@ -388,7 +389,24 @@ impl<'src> Parser<'src> {
 
         let mut parameters = Vec::new();
         while self.current_token != Some(Token::RParen) {
-            parameters.push(self.consume_identifier());
+            let parameter = match self.current_token {
+                Some(Token::Identifier(_)) => self.parse_primary_expression(),
+                Some(Token::Literal(_)) => self.parse_primary_expression(),
+                _ => panic!(
+                    "Expected identifier or literal on line {}, column {}, found {:?} instead\n{}\n{}",
+                    self.lexer.current_line(),
+                    self.lexer.current_column(),
+                    self.current_token,
+                    self.lexer
+                .source()
+                .lines()
+                .nth(self.lexer.current_line() - 1)
+                .unwrap(),
+                    " ".repeat(self.lexer.current_column() - 1) + "^"
+                ),
+            };
+
+            parameters.push(parameter);
             if let Some(Token::Comma) = self.current_token {
                 self.advance();
             }

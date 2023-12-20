@@ -199,6 +199,10 @@ impl CodegenJS {
                 self.output.push_str(&self.get_indent());
                 self.output.push('}');
             }
+            Node::FunctionParameter(node) => match **node {
+                Node::Identifier { .. } => self.generate_node(node, None),
+                _ => todo!(),
+            },
             Node::FunctionDeclaration {
                 name,
                 parameters,
@@ -211,7 +215,7 @@ impl CodegenJS {
                     if i > 0 {
                         self.output.push_str(", ");
                     }
-                    self.output.push_str(param);
+                    self.generate_node(param, None);
                 }
 
                 self.output.push_str(") {\n");
@@ -237,7 +241,7 @@ impl CodegenJS {
                     if i > 0 {
                         self.output.push_str(", ");
                     }
-                    self.output.push_str(param);
+                    self.generate_node(param, None);
                 }
 
                 self.output.push_str(") {\n");

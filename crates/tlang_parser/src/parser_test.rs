@@ -1,3 +1,5 @@
+use indoc::indoc;
+
 use crate::lexer::{Lexer, Literal};
 use crate::parser::{BinaryOp, Node, Parser};
 
@@ -313,7 +315,10 @@ fn test_function_declaration_with_parameters() {
         program,
         Node::Program(vec![Node::FunctionDeclaration {
             name: "foo".to_string(),
-            parameters: vec!["x".to_string(), "y".to_string()],
+            parameters: vec![
+                Node::Identifier("x".to_string()),
+                Node::Identifier("y".to_string())
+            ],
             body: Box::new(Node::Block(
                 vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
                     op: BinaryOp::Add,
@@ -419,7 +424,10 @@ fn test_nameless_function_expressions() {
             name: "x".to_string(),
             value: Box::new(Node::FunctionExpression {
                 name: None,
-                parameters: vec!["x".to_string(), "y".to_string()],
+                parameters: vec![
+                    Node::Identifier("x".to_string()),
+                    Node::Identifier("y".to_string())
+                ],
                 body: Box::new(Node::Block(
                     vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
                         op: BinaryOp::Add,
@@ -484,7 +492,10 @@ fn test_function_expressions() {
             name: "x".to_string(),
             value: Box::new(Node::FunctionExpression {
                 name: Some("foo".to_string()),
-                parameters: vec!["x".to_string(), "y".to_string()],
+                parameters: vec![
+                    Node::Identifier("x".to_string()),
+                    Node::Identifier("y".to_string())
+                ],
                 body: Box::new(Node::Block(
                     vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
                         op: BinaryOp::Add,
@@ -577,5 +588,48 @@ fn test_explicit_return_statements() {
                 ))
             })
         }])
+    );
+}
+
+#[test]
+fn test_recursive_factorial_functional_definition() {
+    let program = parse!(indoc! {"
+        fn factorial(0) { return 1; }
+        fn factorial(n) { return n * factorial(n - 1); }
+    "});
+
+    assert_eq!(
+        program,
+        Node::Program(vec![
+            Node::FunctionDeclaration {
+                name: "factorial".to_string(),
+                parameters: vec![Node::Literal(Literal::Integer(0))],
+                body: Box::new(Node::Block(
+                    vec![Node::ReturnStatement(Some(Box::new(Node::Literal(
+                        Literal::Integer(1)
+                    ))))],
+                    None
+                ))
+            },
+            Node::FunctionDeclaration {
+                name: "factorial".to_string(),
+                parameters: vec![Node::Identifier("n".to_string())],
+                body: Box::new(Node::Block(
+                    vec![Node::ReturnStatement(Some(Box::new(Node::BinaryOp {
+                        op: BinaryOp::Multiply,
+                        lhs: Box::new(Node::Identifier("n".to_string())),
+                        rhs: Box::new(Node::Call {
+                            function: Box::new(Node::Identifier("factorial".to_string())),
+                            arguments: vec![Node::BinaryOp {
+                                op: BinaryOp::Subtract,
+                                lhs: Box::new(Node::Identifier("n".to_string())),
+                                rhs: Box::new(Node::Literal(Literal::Integer(1)))
+                            }]
+                        })
+                    })))],
+                    None
+                ))
+            }
+        ])
     );
 }

@@ -26,5 +26,6 @@ dependencies = [
 name = "tlang_parser"
 version = "0.1.0"
 dependencies = [
+ "indoc",
  "log",
 ]
