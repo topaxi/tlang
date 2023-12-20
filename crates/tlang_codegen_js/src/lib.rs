@@ -383,7 +383,7 @@ mod tests {
     use pretty_assertions::assert_eq;
     use tlang_parser::{lexer::Lexer, parser::Parser};
 
-    macro_rules! gen {
+    macro_rules! compile {
         ($source:expr) => {{
             let lexer = Lexer::new($source);
             let mut parser = Parser::new(lexer);
@@ -396,28 +396,28 @@ mod tests {
 
     #[test]
     fn test_codegen_variable_declaration() {
-        let output = gen!("let x = 42;");
+        let output = compile!("let x = 42;");
         let expected_output = "let x = 42;\n";
         assert_eq!(output, expected_output);
     }
 
     #[test]
     fn test_codegen_binary_expression() {
-        let output = gen!("let x = 42 + 1;");
+        let output = compile!("let x = 42 + 1;");
         let expected_output = "let x = 42 + 1;\n";
         assert_eq!(output, expected_output);
     }
 
     #[test]
     fn test_codegen_function_declaration() {
-        let output = gen!("fn main() {}");
+        let output = compile!("fn main() {}");
         let expected_output = "function main() {\n}\n";
         assert_eq!(output, expected_output);
     }
 
     #[test]
     fn test_codegen_function_call() {
-        let output = gen!("fn main() { foo(); }");
+        let output = compile!("fn main() { foo(); }");
         let expected_output = indoc! {"
             function main() {
                 foo();
@@ -428,7 +428,7 @@ mod tests {
 
     #[test]
     fn test_codegen_function_expression() {
-        let output = gen!("fn main() { let foo = fn() { 1 + 2; }; }");
+        let output = compile!("fn main() { let foo = fn() { 1 + 2; }; }");
         let expected_output = indoc! {"
             function main() {
                 let foo = function() {
@@ -441,7 +441,7 @@ mod tests {
 
     #[test]
     fn test_codegen_functions_with_explicit_return_statements() {
-        let output = gen!("fn main() { return 42; }");
+        let output = compile!("fn main() { return 42; }");
         let expected_output = indoc! {"
             function main() {
                 return 42;
@@ -449,7 +449,7 @@ mod tests {
         "};
         assert_eq!(output, expected_output);
 
-        let output = gen!("fn main() { return; }");
+        let output = compile!("fn main() { return; }");
         let expected_output = indoc! {"
             function main() {
                 return;
@@ -460,21 +460,21 @@ mod tests {
 
     #[test]
     fn test_codegen_parenthesis_expression() {
-        let output = gen!("let x = (42 + 1) * 2;");
+        let output = compile!("let x = (42 + 1) * 2;");
         let expected_output = "let x = (42 + 1) * 2;\n";
         assert_eq!(output, expected_output);
     }
 
     #[test]
     fn test_codegen_operator_precedence() {
-        let output = gen!("let result = 1 + 2 * 3;");
+        let output = compile!("let result = 1 + 2 * 3;");
         let expected_output = "let result = 1 + 2 * 3;\n";
         assert_eq!(output, expected_output);
     }
 
     #[test]
     fn test_if_else() {
-        let output = gen!("fn main() { if true { 1; } else { 2; } }");
+        let output = compile!("fn main() { if true { 1; } else { 2; } }");
         let expected_output = indoc! {"
             function main() {
                 if (true) {
@@ -490,7 +490,7 @@ mod tests {
     #[ignore = "implement if/else in expression position first"]
     #[test]
     fn test_if_else_as_expression() {
-        let output = gen!("fn main() { let result = if true { 1 } else { 2 }; }");
+        let output = compile!("fn main() { let result = if true { 1 } else { 2 }; }");
         let expected_output = indoc! {"
             function main() {
                 let tmp0;
@@ -507,7 +507,7 @@ mod tests {
 
     #[test]
     fn test_recursive_function_definition() {
-        let output = gen!(indoc! {"
+        let output = compile!(indoc! {"
             fn factorial(0) { return 1; }
             fn factorial(n) { return n * factorial(n - 1); }
         "});
@@ -523,7 +523,7 @@ mod tests {
         "};
         assert_eq!(output, expected_output);
 
-        let output = gen!(indoc! {"
+        let output = compile!(indoc! {"
             fn fibonacci(0) { return 0; }
             fn fibonacci(1) { return 1; }
             fn fibonacci(n) { return fibonacci(n - 1) + fibonacci(n - 2); }
@@ -545,7 +545,7 @@ mod tests {
 
     #[test]
     fn test_recursive_function_definition_multiple_with_multiple_args() {
-        let output = gen!(indoc! {"
+        let output = compile!(indoc! {"
             fn gcd(0, n) { return n; }
             fn gcd(m, 0) { return m; }
             fn gcd(m, n) { return gcd(n, m % n); }
@@ -570,7 +570,7 @@ mod tests {
 
     #[test]
     fn test_tail_recursive_factorial_nested() {
-        let output = gen!(indoc! {"
+        let output = compile!(indoc! {"
             fn factorial(n) {
                 fn factorial_rec(0, acc) { return acc; }
                 fn factorial_rec(n, acc) { return factorial_rec(n - 1, n * acc); }
@@ -598,7 +598,7 @@ mod tests {
 
     #[test]
     fn test_tail_recursive_factorial_idiomatic() {
-        let output = gen!(indoc! {"
+        let output = compile!(indoc! {"
             fn factorial(n) { return factorial(n, 1); }
             fn factorial(0, acc) { return acc; }
             fn factorial(n, acc) { return factorial(n - 1, n * acc); }
