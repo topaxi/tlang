@@ -123,6 +123,12 @@ impl CodegenJS {
                     self.generate_node(statement, None);
                 }
             }
+            // TODO: Handle block expressions
+            Node::Block(statements, _expression) => {
+                for statement in statements {
+                    self.generate_node(statement, None);
+                }
+            }
             Node::ExpressionStatement(expression) => {
                 self.output.push_str(&self.get_indent());
                 self.generate_node(expression, None);

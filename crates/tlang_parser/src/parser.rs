@@ -10,6 +10,7 @@ enum Associativity {
 #[derive(Debug, PartialEq)]
 pub enum Node {
     Program(Vec<Node>),
+    Block(Vec<Node>, Option<Box<Node>>),
     Literal(Literal),
     BinaryOp {
         op: BinaryOp,
@@ -220,6 +221,24 @@ impl<'src> Parser<'src> {
         Node::Program(statements)
     }
 
+    fn parse_block(&mut self) -> Node {
+        self.consume_token(Token::LBrace);
+
+        let mut statements = Vec::new();
+
+        while self.current_token != Some(Token::RBrace) && self.current_token != Some(Token::Eof) {
+            let statement = self.parse_statement();
+
+            if let Some(statement) = statement {
+                statements.push(statement);
+            }
+        }
+
+        self.consume_token(Token::RBrace);
+
+        Node::Block(statements, None)
+    }
+
     fn parse_variable_declaration(&mut self) -> Node {
         self.consume_token(Token::Let);
         let name = self.consume_identifier();
@@ -260,24 +279,19 @@ impl<'src> Parser<'src> {
                 self.consume_token(Token::RParen);
                 expression
             }
-            Some(Token::LBrace) => {
-                self.advance();
-                let token = self.parse_program();
-                self.consume_token(Token::RBrace);
-                token
-            }
+            Some(Token::LBrace) => self.parse_block(),
             Some(Token::If) => {
                 self.advance();
                 let condition = self.parse_expression();
                 self.expect_token(Token::LBrace);
-                let then_branch = self.parse_primary_expression();
+                let then_branch = self.parse_block();
                 let else_branch = if let Some(Token::Else) = self.current_token {
                     self.advance();
-                    self.expect_token(Token::LBrace);
-                    Some(Box::new(self.parse_primary_expression()))
+                    Some(Box::new(self.parse_block()))
                 } else {
                     None
                 };
+
                 Node::IfElse {
                     condition: Box::new(condition),
                     then_branch: Box::new(then_branch),
@@ -367,8 +381,7 @@ impl<'src> Parser<'src> {
             self.consume_token(Token::RParen);
         }
 
-        self.expect_token(Token::LBrace);
-        let body = self.parse_primary_expression();
+        let body = self.parse_block();
         Node::FunctionExpression {
             name,
             parameters,
@@ -380,6 +393,7 @@ impl<'src> Parser<'src> {
         self.consume_token(Token::Fn);
         let name = self.consume_identifier();
         self.consume_token(Token::LParen);
+
         let mut parameters = Vec::new();
         while self.current_token != Some(Token::RParen) {
             parameters.push(self.consume_identifier());
@@ -388,8 +402,8 @@ impl<'src> Parser<'src> {
             }
         }
         self.consume_token(Token::RParen);
-        self.expect_token(Token::LBrace);
-        let body = self.parse_primary_expression();
+
+        let body = self.parse_block();
         Node::FunctionDeclaration {
             name,
             parameters,
