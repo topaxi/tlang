@@ -600,40 +600,41 @@ fn test_recursive_factorial_functional_definition() {
 
     assert_eq!(
         program,
-        Node::Program(vec![
-            Node::FunctionDeclaration {
-                name: "factorial".to_string(),
-                parameters: vec![Node::FunctionParameter(Box::new(Node::Literal(
-                    Literal::Integer(0)
-                )))],
-                body: Box::new(Node::Block(
-                    vec![Node::ReturnStatement(Some(Box::new(Node::Literal(
-                        Literal::Integer(1)
-                    ))))],
-                    None
-                ))
-            },
-            Node::FunctionDeclaration {
-                name: "factorial".to_string(),
-                parameters: vec![Node::FunctionParameter(Box::new(Node::Identifier(
-                    "n".to_string()
-                )))],
-                body: Box::new(Node::Block(
-                    vec![Node::ReturnStatement(Some(Box::new(Node::BinaryOp {
-                        op: BinaryOp::Multiply,
-                        lhs: Box::new(Node::Identifier("n".to_string())),
-                        rhs: Box::new(Node::Call {
-                            function: Box::new(Node::Identifier("factorial".to_string())),
-                            arguments: vec![Node::BinaryOp {
-                                op: BinaryOp::Subtract,
-                                lhs: Box::new(Node::Identifier("n".to_string())),
-                                rhs: Box::new(Node::Literal(Literal::Integer(1)))
-                            }]
-                        })
-                    })))],
-                    None
-                ))
-            }
-        ])
+        Node::Program(vec![Node::FunctionDeclarations(
+            "factorial".to_string(),
+            vec![
+                (
+                    vec![Node::FunctionParameter(Box::new(Node::Literal(
+                        Literal::Integer(0)
+                    )))],
+                    Box::new(Node::Block(
+                        vec![Node::ReturnStatement(Some(Box::new(Node::Literal(
+                            Literal::Integer(1)
+                        ))))],
+                        None
+                    ))
+                ),
+                (
+                    vec![Node::FunctionParameter(Box::new(Node::Identifier(
+                        "n".to_string()
+                    )))],
+                    Box::new(Node::Block(
+                        vec![Node::ReturnStatement(Some(Box::new(Node::BinaryOp {
+                            op: BinaryOp::Multiply,
+                            lhs: Box::new(Node::Identifier("n".to_string())),
+                            rhs: Box::new(Node::Call {
+                                function: Box::new(Node::Identifier("factorial".to_string())),
+                                arguments: vec![Node::BinaryOp {
+                                    op: BinaryOp::Subtract,
+                                    lhs: Box::new(Node::Identifier("n".to_string())),
+                                    rhs: Box::new(Node::Literal(Literal::Integer(1)))
+                                }]
+                            })
+                        })))],
+                        None
+                    ))
+                )
+            ]
+        )])
     );
 }

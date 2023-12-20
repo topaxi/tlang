@@ -10,3 +10,4 @@ edition = "2021"
 [workspace.dependencies]
 log = "0.4"
 indoc = "2"
+pretty_assertions = "1"

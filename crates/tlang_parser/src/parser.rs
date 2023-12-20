@@ -27,6 +27,7 @@ pub enum Node {
         parameters: Vec<Node>,
         body: Box<Node>,
     },
+    FunctionDeclarations(String, Vec<(Vec<Node>, Box<Node>)>),
     FunctionExpression {
         name: Option<String>,
         parameters: Vec<Node>,
@@ -98,6 +99,7 @@ pub enum BinaryOp {
 pub struct Parser<'src> {
     lexer: Lexer<'src>,
     current_token: Option<Token>,
+    next_token: Option<Token>,
 }
 
 impl<'src> Parser<'src> {
@@ -105,7 +107,9 @@ impl<'src> Parser<'src> {
         let mut parser = Parser {
             lexer,
             current_token: None,
+            next_token: None,
         };
+        parser.advance();
         parser.advance();
         parser
     }
@@ -114,7 +118,7 @@ impl<'src> Parser<'src> {
         let actual = self.current_token.as_ref().unwrap();
         if *actual != expected {
             panic!(
-                "Exprected {:?} on line {}, column {}, found {:?} instead\n{}\n{}",
+                "Expected {:?} on line {}, column {}, found {:?} instead\n{}\n{}",
                 expected,
                 self.lexer.current_line(),
                 self.lexer.current_column(),
@@ -160,8 +164,13 @@ impl<'src> Parser<'src> {
     }
 
     fn advance(&mut self) {
-        self.current_token = Some(self.lexer.next_token());
+        self.current_token = self.next_token.clone();
+        self.next_token = Some(self.lexer.next_token());
         debug!("Advanced to {:?}", self.current_token);
+    }
+
+    pub fn peek_token(&self) -> Option<&Token> {
+        self.next_token.as_ref()
     }
 
     fn parse_statement(&mut self) -> Option<Node> {
@@ -181,9 +190,11 @@ impl<'src> Parser<'src> {
             _ => Node::ExpressionStatement(Box::new(self.parse_expression())),
         };
 
-        // FunctionDeclarations statements does not need to be terminated with a semicolon.
-        if let Node::FunctionDeclaration { .. } = node {
-            return Some(node);
+        // FunctionDeclaration statements does not need to be terminated with a semicolon.
+        match node {
+            Node::FunctionDeclaration { .. } => return Some(node),
+            Node::FunctionDeclarations(_, _) => return Some(node),
+            _ => {}
         }
 
         // Expressions like IfElse as statements also do not need to be terminated with a semicolon.
@@ -386,13 +397,28 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_function_declaration(&mut self) -> Node {
-        self.consume_token(Token::Fn);
-        let name = self.consume_identifier();
-        self.consume_token(Token::LParen);
+        let mut name: Option<String> = None;
+        let mut definitions: Vec<(Vec<Node>, Box<Node>)> = Vec::new();
 
-        let mut parameters = Vec::new();
-        while self.current_token != Some(Token::RParen) {
-            let parameter = match self.current_token {
+        while let Some(Token::Fn) = self.current_token {
+            if let Some(Token::Identifier(current_definition_name)) = self.peek_token() {
+                if name.is_some() && name.as_ref().unwrap() != current_definition_name {
+                    break;
+                }
+            }
+
+            self.advance();
+            let current_definition_name = self.consume_identifier();
+
+            if name.is_none() {
+                name = Some(current_definition_name.clone());
+            }
+
+            self.consume_token(Token::LParen);
+
+            let mut parameters = Vec::new();
+            while self.current_token != Some(Token::RParen) {
+                let parameter = match self.current_token {
                 Some(Token::Identifier(_)) => self.parse_primary_expression(),
                 Some(Token::Literal(_)) => self.parse_primary_expression(),
                 _ => panic!(
@@ -409,20 +435,30 @@ impl<'src> Parser<'src> {
                 ),
             };
 
-            parameters.push(Node::FunctionParameter(Box::new(parameter)));
+                parameters.push(Node::FunctionParameter(Box::new(parameter)));
 
-            if let Some(Token::Comma) = self.current_token {
-                self.advance();
+                if let Some(Token::Comma) = self.current_token {
+                    self.advance();
+                }
             }
-        }
-        self.consume_token(Token::RParen);
+            self.consume_token(Token::RParen);
 
-        let body = self.parse_block();
-        Node::FunctionDeclaration {
-            name,
-            parameters,
-            body: Box::new(body),
+            let body = self.parse_block();
+
+            definitions.push((parameters, Box::new(body)));
         }
+
+        if definitions.len() == 1 {
+            let (parameters, body) = definitions.pop().unwrap();
+
+            return Node::FunctionDeclaration {
+                name: name.unwrap(),
+                parameters,
+                body,
+            };
+        }
+
+        Node::FunctionDeclarations(name.unwrap(), definitions)
     }
 
     fn is_binary_op(token: &Token) -> bool {

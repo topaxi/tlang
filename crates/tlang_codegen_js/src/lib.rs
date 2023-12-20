@@ -201,6 +201,7 @@ impl CodegenJS {
             }
             Node::FunctionParameter(node) => match **node {
                 Node::Identifier { .. } => self.generate_node(node, None),
+                Node::Literal(_) => self.generate_node(node, None),
                 _ => todo!(),
             },
             Node::FunctionDeclaration {
@@ -222,6 +223,64 @@ impl CodegenJS {
                 self.indent_level += 1;
                 self.generate_node(body, None);
                 self.indent_level -= 1;
+                self.output.push_str(&self.get_indent());
+                self.output.push_str("}\n");
+            }
+            Node::FunctionDeclarations(name, definitions) => {
+                self.output.push_str(&self.get_indent());
+                self.output
+                    .push_str(&format!("function {}(...args) {{\n", name));
+                self.indent_level += 1;
+                self.output.push_str(&self.get_indent());
+
+                for (i, (parameters, body)) in definitions.iter().enumerate() {
+                    // TODO: Only render else if there is another definition with a literal.
+                    if i > 0 {
+                        self.output.push_str(" else ");
+                    }
+
+                    let literal_parameters = parameters.iter().enumerate().filter(|(_, param)| {
+                        if let Node::FunctionParameter(node) = param {
+                            matches!(**node, Node::Literal(_))
+                        } else {
+                            false
+                        }
+                    });
+
+                    if literal_parameters.clone().count() > 0 {
+                        self.output.push_str("if (");
+                        // Filter only literal params.
+                        for (j, (k, param)) in literal_parameters.enumerate() {
+                            if j > 0 {
+                                self.output.push_str(" && ");
+                            }
+                            self.output.push_str(&format!("args[{}] === ", k));
+                            self.generate_node(param, None);
+                        }
+                        self.output.push_str(") {\n");
+                    } else {
+                        self.output.push_str("{\n");
+                    }
+
+                    self.indent_level += 1;
+                    // Alias identifier args to the parameter names
+                    for (j, param) in parameters.iter().enumerate() {
+                        if let Node::FunctionParameter(node) = param {
+                            if let Node::Identifier(ref name) = **node {
+                                self.output.push_str(&self.get_indent());
+                                self.output
+                                    .push_str(&format!("let {} = args[{}];\n", name, j));
+                            }
+                        }
+                    }
+                    self.generate_node(body, None);
+                    self.indent_level -= 1;
+                    self.output.push_str(&self.get_indent());
+                    self.output.push('}');
+                }
+
+                self.indent_level -= 1;
+                self.output.push('\n');
                 self.output.push_str(&self.get_indent());
                 self.output.push_str("}\n");
             }
@@ -307,6 +366,7 @@ impl CodegenJS {
 mod tests {
     use super::*;
     use indoc::indoc;
+    use pretty_assertions::assert_eq;
     use tlang_parser::{lexer::Lexer, parser::Parser};
 
     macro_rules! gen {
@@ -431,7 +491,6 @@ mod tests {
         assert_eq!(output, expected_output);
     }
 
-    #[ignore = "implement pattern matching first"]
     #[test]
     fn test_recursive_factorial_function_definition() {
         let output = gen!(indoc! {"
@@ -439,10 +498,11 @@ mod tests {
             fn factorial(n) { return n * factorial(n - 1); }
         "});
         let expected_output = indoc! {"
-            function factorial(n) {
-                if (n === 0) {
+            function factorial(...args) {
+                if (args[0] === 0) {
                     return 1;
                 } else {
+                    let n = args[0];
                     return n * factorial(n - 1);
                 }
             }
