@@ -413,6 +413,24 @@ mod tests {
         assert_eq!(output, expected_output);
     }
 
+    #[ignore = "implement if/else in expression position first"]
+    #[test]
+    fn test_if_else_as_expression() {
+        let output = gen!("fn main() { let result = if true { 1 } else { 2 }; }");
+        let expected_output = indoc! {"
+            function main() {
+                let tmp0;
+                if (true) {
+                    tmp0 = 1;
+                } else {
+                    tmp0 = 2;
+                }
+                let result = tmp0;
+            }
+        "};
+        assert_eq!(output, expected_output);
+    }
+
     #[ignore = "implement pattern matching first"]
     #[test]
     fn test_recursive_factorial_function_definition() {
