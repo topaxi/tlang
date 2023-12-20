@@ -492,7 +492,7 @@ mod tests {
     }
 
     #[test]
-    fn test_recursive_factorial_function_definition() {
+    fn test_recursive_function_definition() {
         let output = gen!(indoc! {"
             fn factorial(0) { return 1; }
             fn factorial(n) { return n * factorial(n - 1); }
@@ -504,6 +504,50 @@ mod tests {
                 } else {
                     let n = args[0];
                     return n * factorial(n - 1);
+                }
+            }
+        "};
+        assert_eq!(output, expected_output);
+
+        let output = gen!(indoc! {"
+            fn fibonacci(0) { return 0; }
+            fn fibonacci(1) { return 1; }
+            fn fibonacci(n) { return fibonacci(n - 1) + fibonacci(n - 2); }
+        "});
+        let expected_output = indoc! {"
+            function fibonacci(...args) {
+                if (args[0] === 0) {
+                    return 0;
+                } else if (args[0] === 1) {
+                    return 1;
+                } else {
+                    let n = args[0];
+                    return fibonacci(n - 1) + fibonacci(n - 2);
+                }
+            }
+        "};
+        assert_eq!(output, expected_output);
+    }
+
+    #[test]
+    fn test_recursive_function_definition_multiple_with_multiple_args() {
+        let output = gen!(indoc! {"
+            fn gcd(0, n) { return n; }
+            fn gcd(m, 0) { return m; }
+            fn gcd(m, n) { return gcd(n, m % n); }
+        "});
+        let expected_output = indoc! {"
+            function gcd(...args) {
+                if (args[0] === 0) {
+                    let n = args[1];
+                    return n;
+                } else if (args[1] === 0) {
+                    let m = args[0];
+                    return m;
+                } else {
+                    let m = args[0];
+                    let n = args[1];
+                    return gcd(n, m % n);
                 }
             }
         "};
