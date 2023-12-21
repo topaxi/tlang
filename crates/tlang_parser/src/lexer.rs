@@ -53,6 +53,8 @@ pub enum Token {
     If,
     Else,
     Match,
+    Enum,
+    Struct,
 
     // Token for end-of-file
     Eof,
@@ -336,6 +338,8 @@ impl Lexer<'_> {
                     "if" => Token::If,
                     "else" => Token::Else,
                     "match" => Token::Match,
+                    "enum" => Token::Enum,
+                    "struct" => Token::Struct,
                     "true" => Token::Literal(Literal::Boolean(true)),
                     "false" => Token::Literal(Literal::Boolean(false)),
                     _ => Token::Identifier(identifier.to_owned()),

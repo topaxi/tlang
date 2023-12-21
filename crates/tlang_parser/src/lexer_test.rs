@@ -85,13 +85,15 @@ fn test_arrows() {
 
 #[test]
 fn test_keywords() {
-    let mut lexer = Lexer::new("let fn if else match");
+    let mut lexer = Lexer::new("let fn if else match enum struct");
 
     assert_eq!(lexer.next_token(), Token::Let);
     assert_eq!(lexer.next_token(), Token::Fn);
     assert_eq!(lexer.next_token(), Token::If);
     assert_eq!(lexer.next_token(), Token::Else);
     assert_eq!(lexer.next_token(), Token::Match);
+    assert_eq!(lexer.next_token(), Token::Enum);
+    assert_eq!(lexer.next_token(), Token::Struct);
     assert_eq!(lexer.next_token(), Token::Eof);
 }
 
