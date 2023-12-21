@@ -58,6 +58,7 @@ impl CodegenJS {
             BinaryOp::BitwiseOr => self.output.push_str(" | "),
             BinaryOp::BitwiseAnd => self.output.push_str(" & "),
             BinaryOp::BitwiseXor => self.output.push_str(" ^ "),
+            BinaryOp::Pipeline => unimplemented!("Pipeline does not neatly map to a JS operator."),
         }
     }
 
@@ -95,6 +96,11 @@ impl CodegenJS {
             BinaryOp::Exponentiation => JSOperatorInfo {
                 precedence: 9,
                 associativity: JSAssociativity::Right,
+            },
+            // TODO: Do we need this? As we'll map the pipeline operator to a function call.
+            BinaryOp::Pipeline => JSOperatorInfo {
+                precedence: 1,
+                associativity: JSAssociativity::Left,
             },
         }
     }
@@ -150,9 +156,16 @@ impl CodegenJS {
                     self.output.push('(');
                 }
 
-                self.generate_node(lhs, Some(op));
-                self.generate_binary_op(op);
-                self.generate_node(rhs, Some(op));
+                if let BinaryOp::Pipeline = op {
+                    self.generate_node(rhs, None);
+                    self.output.push('(');
+                    self.generate_node(lhs, None);
+                    self.output.push(')');
+                } else {
+                    self.generate_node(lhs, Some(op));
+                    self.generate_binary_op(op);
+                    self.generate_node(rhs, Some(op));
+                }
 
                 if needs_parentheses {
                     self.output.push(')');
@@ -616,6 +629,25 @@ mod tests {
                     let acc = args[1];
                     return factorial(n - 1, n * acc);
                 }
+            }
+        "};
+        assert_eq!(output, expected_output);
+    }
+
+    #[test]
+    fn test_pipeline_operator() {
+        let output = compile!("fn main() { 1 |> log; }");
+        let expected_output = indoc! {"
+            function main() {
+                log(1);
+            }
+        "};
+        assert_eq!(output, expected_output);
+
+        let output = compile!("fn main() { 1 |> foo |> bar; }");
+        let expected_output = indoc! {"
+            function main() {
+                bar(foo(1));
             }
         "};
         assert_eq!(output, expected_output);

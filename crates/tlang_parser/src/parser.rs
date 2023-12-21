@@ -94,6 +94,7 @@ pub enum BinaryOp {
     BitwiseAnd,
     BitwiseOr,
     BitwiseXor,
+    Pipeline,
 }
 
 pub struct Parser<'src> {
@@ -481,6 +482,7 @@ impl<'src> Parser<'src> {
                 | Token::Ampersand
                 | Token::DoublePipe
                 | Token::DoubleAmpersand
+                | Token::Pipeline
         )
     }
 
@@ -503,6 +505,7 @@ impl<'src> Parser<'src> {
             Token::Caret => BinaryOp::BitwiseXor,
             Token::DoublePipe => BinaryOp::Or,
             Token::DoubleAmpersand => BinaryOp::And,
+            Token::Pipeline => BinaryOp::Pipeline,
             _ => {
                 unimplemented!("Expected binary operator, found {:?}", token)
             }
@@ -543,6 +546,10 @@ impl<'src> Parser<'src> {
             BinaryOp::Exponentiation => OperatorInfo {
                 precedence: 9,
                 associativity: Associativity::Right,
+            },
+            BinaryOp::Pipeline => OperatorInfo {
+                precedence: 1,
+                associativity: Associativity::Left,
             },
         }
     }
