@@ -15,10 +15,23 @@ struct JSOperatorInfo {
     associativity: JSAssociativity,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum BlockContext {
+    // Are we in a top level Program?
+    ProgramBlock,
+    // Are we in a StatementExpression with a Block?
+    StatementBlock,
+    // Are we in a FunctionDeclaration or FunctionExpression with a Block?
+    FunctionBodyBlock,
+    // Are we in an expression with a Block?
+    ExpressionBlock,
+}
+
 #[derive(Debug, PartialEq)]
 pub struct CodegenJS {
     output: String,
     indent_level: usize,
+    context_stack: Vec<BlockContext>,
 }
 
 impl Default for CodegenJS {
@@ -32,7 +45,12 @@ impl CodegenJS {
         Self {
             output: String::new(),
             indent_level: 0,
+            context_stack: vec![BlockContext::ProgramBlock],
         }
+    }
+
+    fn current_context(&self) -> BlockContext {
+        *self.context_stack.last().unwrap()
     }
 
     pub fn generate_code(&mut self, node: &Node) {
@@ -129,15 +147,39 @@ impl CodegenJS {
                     self.generate_node(statement, None);
                 }
             }
-            // TODO: Handle block expressions
-            Node::Block(statements, _expression) => {
+            Node::Block(statements, expression) => {
                 for statement in statements {
                     self.generate_node(statement, None);
+                }
+
+                if expression.is_none() {
+                    return;
+                }
+
+                match self.current_context() {
+                    BlockContext::ProgramBlock => {
+                        // Last statement/expression of the program has no semicolon, we allow it, but don't do anything with it.
+                        // Maybe we should not allow it.
+                    }
+                    BlockContext::StatementBlock => {
+                        unimplemented!("Block with completion in StatementBlock context not implemented yet.")
+                    }
+                    BlockContext::FunctionBodyBlock => {
+                        self.output.push_str(&self.get_indent());
+                        self.output.push_str("return ");
+                        self.generate_node(expression.as_ref().unwrap(), None);
+                        self.output.push_str(";\n");
+                    }
+                    BlockContext::ExpressionBlock => {
+                        unimplemented!("Block with completion in ExpressionBlock context not implemented yet.")
+                    }
                 }
             }
             Node::ExpressionStatement(expression) => {
                 self.output.push_str(&self.get_indent());
+                self.context_stack.push(BlockContext::StatementBlock);
                 self.generate_node(expression, None);
+                self.context_stack.pop();
 
                 if let Node::IfElse { .. } = **expression {
                     self.output.push('\n');
@@ -232,14 +274,18 @@ impl CodegenJS {
                 self.indent_level = indent_level;
                 self.output.push_str(") {\n");
                 self.indent_level += 1;
+                self.context_stack.push(BlockContext::ExpressionBlock);
                 self.generate_node(then_branch, None);
+                self.context_stack.push(BlockContext::ExpressionBlock);
                 self.indent_level -= 1;
 
                 if let Some(else_branch) = else_branch {
                     self.output.push_str(&self.get_indent());
                     self.output.push_str("} else {\n");
                     self.indent_level += 1;
+                    self.context_stack.push(BlockContext::ExpressionBlock);
                     self.generate_node(else_branch, None);
+                    self.context_stack.push(BlockContext::ExpressionBlock);
                     self.indent_level -= 1;
                 }
 
@@ -268,7 +314,9 @@ impl CodegenJS {
 
                 self.output.push_str(") {\n");
                 self.indent_level += 1;
+                self.context_stack.push(BlockContext::FunctionBodyBlock);
                 self.generate_node(body, None);
+                self.context_stack.pop();
                 self.indent_level -= 1;
                 self.output.push_str(&self.get_indent());
                 self.output.push_str("}\n");
@@ -334,7 +382,9 @@ impl CodegenJS {
                             }
                         }
                     }
+                    self.context_stack.push(BlockContext::FunctionBodyBlock);
                     self.generate_node(body, None);
+                    self.context_stack.pop();
                     self.indent_level -= 1;
                     self.output.push_str(&self.get_indent());
                     self.output.push('}');
@@ -366,7 +416,9 @@ impl CodegenJS {
 
                 self.output.push_str(") {\n");
                 self.indent_level += 1;
+                self.context_stack.push(BlockContext::FunctionBodyBlock);
                 self.generate_node(body, None);
+                self.context_stack.pop();
                 self.indent_level -= 1;
                 self.output.push_str(&self.get_indent());
                 self.output.push('}');
@@ -554,8 +606,8 @@ mod tests {
     #[test]
     fn test_recursive_function_definition() {
         let output = compile!(indoc! {"
-            fn factorial(0) { return 1; }
-            fn factorial(n) { return n * factorial(n - 1); }
+            fn factorial(0) { 1 }
+            fn factorial(n) { n * factorial(n - 1) }
         "});
         let expected_output = indoc! {"
             function factorial(...args) {
@@ -570,9 +622,9 @@ mod tests {
         assert_eq!(output, expected_output);
 
         let output = compile!(indoc! {"
-            fn fibonacci(0) { return 0; }
-            fn fibonacci(1) { return 1; }
-            fn fibonacci(n) { return fibonacci(n - 1) + fibonacci(n - 2); }
+            fn fibonacci(0) { 0 }
+            fn fibonacci(1) { 1 }
+            fn fibonacci(n) { fibonacci(n - 1) + fibonacci(n - 2) }
         "});
         let expected_output = indoc! {"
             function fibonacci(...args) {
@@ -592,9 +644,9 @@ mod tests {
     #[test]
     fn test_recursive_function_definition_multiple_with_multiple_args() {
         let output = compile!(indoc! {"
-            fn gcd(0, n) { return n; }
-            fn gcd(m, 0) { return m; }
-            fn gcd(m, n) { return gcd(n, m % n); }
+            fn gcd(0, n) { n }
+            fn gcd(m, 0) { m }
+            fn gcd(m, n) { gcd(n, m % n) }
         "});
         let expected_output = indoc! {"
             function gcd(...args) {
@@ -618,10 +670,10 @@ mod tests {
     fn test_tail_recursive_factorial_nested() {
         let output = compile!(indoc! {"
             fn factorial(n) {
-                fn factorial_rec(0, acc) { return acc; }
-                fn factorial_rec(n, acc) { return factorial_rec(n - 1, n * acc); }
+                fn factorial_rec(0, acc) { acc }
+                fn factorial_rec(n, acc) { factorial_rec(n - 1, n * acc) }
 
-                return factorial_rec(n, 1);
+                factorial_rec(n, 1)
             }
         "});
         let expected_output = indoc! {"
@@ -645,9 +697,9 @@ mod tests {
     #[test]
     fn test_tail_recursive_factorial_idiomatic() {
         let output = compile!(indoc! {"
-            fn factorial(n) { return factorial(n, 1); }
-            fn factorial(0, acc) { return acc; }
-            fn factorial(n, acc) { return factorial(n - 1, n * acc); }
+            fn factorial(n) { factorial(n, 1) }
+            fn factorial(0, acc) { acc }
+            fn factorial(n, acc) { factorial(n - 1, n * acc) }
         "});
         let expected_output = indoc! {"
             function factorial(...args) {
