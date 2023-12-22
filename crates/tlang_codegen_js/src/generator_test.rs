@@ -309,3 +309,24 @@ fn test_list_literal() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[ignore = "implement list literal in function parameter position first"]
+#[test]
+fn test_recursive_sum() {
+    let output = compile!(indoc! {"
+        fn sum([]) { 0 }
+        fn sum([x, ...xs]) { x + sum(xs) }
+    "});
+    let expected_output = indoc! {"
+        function sum(...args) {
+            if (args[0].length === 0) {
+                return 0;
+            } else {
+                let x = args[0][0];
+                let xs = args[0].slice(1);
+                return x + sum(xs);
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
