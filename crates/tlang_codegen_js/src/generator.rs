@@ -218,10 +218,7 @@ impl CodegenJS {
 
                         // If we have a wildcard in the argument list, we instead replace the wildcard with the lhs.
                         // Otherwise we prepend the lhs to the argument list.
-                        let has_wildcard = arguments.iter().any(|arg| match arg {
-                            Node::Wildcard => true,
-                            _ => false,
-                        });
+                        let has_wildcard = arguments.iter().any(|arg| matches!(arg, Node::Wildcard));
                         if has_wildcard {
                             for (i, arg) in arguments.iter().enumerate() {
                                 if i > 0 {
@@ -306,248 +303,264 @@ impl CodegenJS {
                 Node::Wildcard => unreachable!("Unexpected wildcard in function parameter."),
                 _ => todo!(),
             },
-            Node::FunctionDeclaration {
-                name,
-                parameters,
-                body,
-            } => {
-                self.output.push_str(&self.get_indent());
-                self.output.push_str(&format!("function {}(", name));
+            Node::FunctionDeclaration { name, parameters, body } =>
+                self.generate_function_declaration(name, parameters, body),
+            Node::FunctionDeclarations(name, definitions) =>
+                self.generate_function_declarations(name, definitions),
+            Node::FunctionExpression { name, parameters, body } =>
+                self.generate_function_expression(name, parameters, body),
+            Node::ReturnStatement(expr) => self.generate_return_statement(expr),
+            Node::Identifier(name) => self.output.push_str(name),
+            Node::Call { function, arguments } =>
+                self.generate_call_expression(function, arguments),
+        }
+    }
 
-                for (i, param) in parameters.iter().enumerate() {
-                    if i > 0 {
-                        self.output.push_str(", ");
-                    }
-                    self.generate_node(param, None);
-                }
+    fn generate_function_declaration(&mut self, name: &str, parameters: &[Node], body: &Node) {
+        self.output.push_str(&self.get_indent());
+        self.output.push_str(&format!("function {}(", name));
 
-                self.output.push_str(") {\n");
-                self.indent_level += 1;
-                self.context_stack.push(BlockContext::FunctionBodyBlock);
-                self.generate_node(body, None);
-                self.context_stack.pop();
-                self.indent_level -= 1;
-                self.output.push_str(&self.get_indent());
-                self.output.push_str("}\n");
+        for (i, param) in parameters.iter().enumerate() {
+            if i > 0 {
+                self.output.push_str(", ");
             }
-            Node::FunctionDeclarations(name, definitions) => {
-                self.output.push_str(&self.get_indent());
-                self.output
-                    .push_str(&format!("function {}(...args) {{\n", name));
-                self.indent_level += 1;
-                self.output.push_str(&self.get_indent());
+            self.generate_node(param, None);
+        }
 
-                for (i, (parameters, body)) in definitions.iter().enumerate() {
-                    // TODO: Only render else if there is another definition with a literal.
-                    if i > 0 {
-                        self.output.push_str(" else ");
+        self.output.push_str(") {\n");
+        self.indent_level += 1;
+        self.context_stack.push(BlockContext::FunctionBodyBlock);
+        self.generate_node(body, None);
+        self.context_stack.pop();
+        self.indent_level -= 1;
+        self.output.push_str(&self.get_indent());
+        self.output.push_str("}\n");
+    }
+
+    fn generate_function_expression(
+        &mut self,
+        name: &Option<String>,
+        parameters: &[Node],
+        body: &Node,
+    ) {
+        let function_keyword = match name {
+            Some(name) => format!("function {}(", name),
+            None => "function(".to_string(),
+        };
+
+        self.output.push_str(&function_keyword);
+
+        for (i, param) in parameters.iter().enumerate() {
+            if i > 0 {
+                self.output.push_str(", ");
+            }
+            self.generate_node(param, None);
+        }
+
+        self.output.push_str(") {\n");
+        self.indent_level += 1;
+        self.context_stack.push(BlockContext::FunctionBodyBlock);
+        self.generate_node(body, None);
+        self.context_stack.pop();
+        self.indent_level -= 1;
+        self.output.push_str(&self.get_indent());
+        self.output.push('}');
+    }
+
+    fn generate_function_declarations(
+        &mut self,
+        name: &str,
+        definitions: &[(Vec<Node>, Box<Node>)],
+    ) {
+        self.output.push_str(&self.get_indent());
+        self.output
+            .push_str(&format!("function {}(...args) {{\n", name));
+        self.indent_level += 1;
+        self.output.push_str(&self.get_indent());
+
+        for (i, (parameters, body)) in definitions.iter().enumerate() {
+            // TODO: Only render else if there is another definition with a literal.
+            if i > 0 {
+                self.output.push_str(" else ");
+            }
+
+            // Expand parameter matching if any definition has a different amount of
+            // paramaters.
+            let parameter_variadic = definitions
+                .iter()
+                .any(|(params, _)| params.len() != parameters.len());
+            let literal_parameters = parameters.iter().enumerate().filter(|(_, param)| {
+                if let Node::FunctionParameter(node) = param {
+                    matches!(**node, Node::Literal(_) | Node::List(_))
+                } else {
+                    false
+                }
+            });
+
+            if parameter_variadic || literal_parameters.clone().count() > 0 {
+                if parameter_variadic {
+                    self.output.push_str("if (args.length === ");
+                    self.output.push_str(&parameters.len().to_string());
+
+                    if literal_parameters.clone().count() > 0 {
+                        self.output.push_str(" && ");
+                    }
+                } else {
+                    self.output.push_str("if (");
+                }
+                // Filter only literal params.
+                for (j, (k, param)) in literal_parameters.enumerate() {
+                    if j > 0 {
+                        self.output.push_str(" && ");
                     }
 
-                    // Expand parameter matching if any definition has a different amount of
-                    // paramaters.
-                    let parameter_variadic = definitions
-                        .iter()
-                        .any(|(params, _)| params.len() != parameters.len());
-                    let literal_parameters = parameters.iter().enumerate().filter(|(_, param)| {
-                        if let Node::FunctionParameter(node) = param {
-                            matches!(**node, Node::Literal(_) | Node::List(_))
-                        } else {
-                            false
-                        }
-                    });
-
-                    if parameter_variadic || literal_parameters.clone().count() > 0 {
-                        if parameter_variadic {
-                            self.output.push_str("if (args.length === ");
-                            self.output.push_str(&parameters.len().to_string());
-
-                            if literal_parameters.clone().count() > 0 {
-                                self.output.push_str(" && ");
+                    if let Node::FunctionParameter(node) = param {
+                        match *node.clone() {
+                            Node::Identifier(_) | Node::Literal(_) => {
+                                self.output.push_str(&format!("args[{}] === ", k));
+                                self.generate_node(param, None);
                             }
-                        } else {
-                            self.output.push_str("if (");
-                        }
-                        // Filter only literal params.
-                        for (j, (k, param)) in literal_parameters.enumerate() {
-                            if j > 0 {
-                                self.output.push_str(" && ");
-                            }
+                            Node::List(patterns) => {
+                                if patterns.len() == 0 {
+                                    self.output.push_str(&format!("args[{}].length === 0", k));
+                                    continue;
+                                }
 
-                            if let Node::FunctionParameter(node) = param {
-                                match *node.clone() {
-                                    Node::Identifier(_) | Node::Literal(_) => {
-                                        self.output.push_str(&format!("args[{}] === ", k));
-                                        self.generate_node(param, None);
+                                // TODO: Handle multiple patterns, for now a simple recursive sum was the test case :D
+                                let mut should_and = false;
+                                for (i, pattern) in patterns.iter().enumerate() {
+                                    if should_and {
+                                        self.output.push_str(" && ");
                                     }
-                                    Node::List(patterns) => {
-                                        if patterns.len() == 0 {
-                                            self.output.push_str(&format!("args[{}].length === 0", k));
-                                            continue;
+
+                                    match pattern {
+                                        Node::Literal(_) => {
+                                            self.output
+                                                .push_str(&format!("args[{}][{}] === ", k, i));
+                                            self.generate_node(pattern, None);
                                         }
-
-                                        // TODO: Handle multiple patterns, for now a simple recursive sum was the test case :D
-                                        let mut should_and = false;
-                                        for (i, pattern) in patterns.iter().enumerate() {
-                                            if should_and {
-                                                self.output.push_str(" && ");
-                                            }
-
-                                            match pattern {
-                                                Node::Literal(_) => {
-                                                    self.output.push_str(&format!(
-                                                        "args[{}][{}] === ",
-                                                        k, i
-                                                    ));
-                                                    self.generate_node(pattern, None);
-                                                }
-                                                Node::PrefixOp(PrefixOp::Rest, identified) => {
-                                                    if let Node::Identifier(ref name) = **identified
-                                                    {
-                                                        self.output.push_str(&format!(
-                                                            "args[{}].length >= {}",
-                                                            k, i
-                                                        ));
-                                                        self.indent_level += 1;
-                                                        self.function_pre_body.push_str(&self.get_indent());
-                                                        self.function_pre_body.push_str(format!("let {} = args[{}].slice({});\n", name, k, i).as_str());
-                                                        self.indent_level -= 1;
-                                                    }
-                                                }
-                                                Node::Identifier(name) => {
-                                                    self.indent_level += 1;
-                                                    self.function_pre_body.push_str(&self.get_indent());
-                                                    self.function_pre_body.push_str(format!("let {} = args[{}][{}];\n", name, k, i).as_str());
-                                                    self.indent_level -= 1;
-                                                }
-                                                _ => unreachable!(),
+                                        Node::PrefixOp(PrefixOp::Rest, identified) => {
+                                            if let Node::Identifier(ref name) = **identified {
+                                                self.output.push_str(&format!(
+                                                    "args[{}].length >= {}",
+                                                    k, i
+                                                ));
+                                                self.indent_level += 1;
+                                                self.function_pre_body.push_str(&self.get_indent());
+                                                self.function_pre_body.push_str(
+                                                    format!(
+                                                        "let {} = args[{}].slice({});\n",
+                                                        name, k, i
+                                                    )
+                                                    .as_str(),
+                                                );
+                                                self.indent_level -= 1;
                                             }
                                         }
+                                        Node::Identifier(name) => {
+                                            self.indent_level += 1;
+                                            self.function_pre_body.push_str(&self.get_indent());
+                                            self.function_pre_body.push_str(
+                                                format!("let {} = args[{}][{}];\n", name, k, i)
+                                                    .as_str(),
+                                            );
+                                            self.indent_level -= 1;
+                                        }
+                                        _ => unreachable!(),
                                     }
-                                    _ => unreachable!(),
                                 }
                             }
-                        }
-                        self.output.push_str(") {\n");
-                    } else {
-                        self.output.push_str("{\n");
-                    }
-
-                    self.indent_level += 1;
-                    // Alias identifier args to the parameter names
-                    for (j, param) in parameters.iter().enumerate() {
-                        if let Node::FunctionParameter(node) = param {
-                            if let Node::Identifier(ref name) = **node {
-                                self.output.push_str(&self.get_indent());
-                                self.output
-                                    .push_str(&format!("let {} = args[{}];\n", name, j));
-                            }
+                            _ => unreachable!(),
                         }
                     }
-                    self.context_stack.push(BlockContext::FunctionBodyBlock);
-                    self.output.push_str(&self.function_pre_body);
-                    self.function_pre_body.clear();
-                    self.generate_node(body, None);
-                    self.context_stack.pop();
-                    self.indent_level -= 1;
-                    self.output.push_str(&self.get_indent());
-                    self.output.push('}');
                 }
-
-                self.indent_level -= 1;
-                self.output.push('\n');
-                self.output.push_str(&self.get_indent());
-                self.output.push_str("}\n");
-            }
-            Node::FunctionExpression {
-                name,
-                parameters,
-                body,
-            } => {
-                let function_keyword = match name {
-                    Some(name) => format!("function {}(", name),
-                    None => "function(".to_string(),
-                };
-
-                self.output.push_str(&function_keyword);
-
-                for (i, param) in parameters.iter().enumerate() {
-                    if i > 0 {
-                        self.output.push_str(", ");
-                    }
-                    self.generate_node(param, None);
-                }
-
                 self.output.push_str(") {\n");
-                self.indent_level += 1;
-                self.context_stack.push(BlockContext::FunctionBodyBlock);
-                self.output.push_str(&self.function_pre_body);
-                self.generate_node(body, None);
-                self.context_stack.pop();
-                self.indent_level -= 1;
-                self.output.push_str(&self.get_indent());
-                self.output.push('}');
+            } else {
+                self.output.push_str("{\n");
             }
-            Node::ReturnStatement(expr) => {
-                self.output.push_str(&self.get_indent());
-                self.output.push_str("return");
 
-                if expr.is_some() {
-                    self.output.push(' ');
-                    self.generate_node(expr.as_ref().unwrap(), None);
+            self.indent_level += 1;
+            // Alias identifier args to the parameter names
+            for (j, param) in parameters.iter().enumerate() {
+                if let Node::FunctionParameter(node) = param {
+                    if let Node::Identifier(ref name) = **node {
+                        self.output.push_str(&self.get_indent());
+                        self.output
+                            .push_str(&format!("let {} = args[{}];\n", name, j));
+                    }
+                }
+            }
+            self.context_stack.push(BlockContext::FunctionBodyBlock);
+            self.output.push_str(&self.function_pre_body);
+            self.function_pre_body.clear();
+            self.generate_node(body, None);
+            self.context_stack.pop();
+            self.indent_level -= 1;
+            self.output.push_str(&self.get_indent());
+            self.output.push('}');
+        }
+
+        self.indent_level -= 1;
+        self.output.push('\n');
+        self.output.push_str(&self.get_indent());
+        self.output.push_str("}\n");
+    }
+
+    fn generate_return_statement(&mut self, expr: &Option<Box<Node>>) {
+        self.output.push_str(&self.get_indent());
+        self.output.push_str("return");
+
+        if let Some(expr) = expr {
+            self.output.push(' ');
+            self.generate_node(expr, None);
+        }
+
+        self.output.push_str(";\n");
+    }
+
+    fn generate_call_expression(&mut self, function: &Node, arguments: &[Node]) {
+        let has_wildcards = arguments.iter().any(|arg| matches!(arg, Node::Wildcard));
+
+        if has_wildcards {
+            self.output.push_str("function(...args) {\n");
+            self.indent_level += 1;
+            self.output.push_str(&self.get_indent());
+            self.output.push_str("return ");
+            self.generate_node(function, None);
+            self.output.push('(');
+
+            let mut wildcard_index = 0;
+            for (i, arg) in arguments.iter().enumerate() {
+                if i > 0 {
+                    self.output.push_str(", ");
                 }
 
-                self.output.push_str(";\n");
-            }
-            Node::Identifier(name) => {
-                self.output.push_str(name);
-            }
-            Node::Call {
-                function,
-                arguments,
-            } => {
-                let has_wildcards = arguments.iter().any(|arg| matches!(arg, Node::Wildcard));
-
-                if has_wildcards {
-                    self.output.push_str("function(...args) {\n");
-                    self.indent_level += 1;
-                    self.output.push_str(&self.get_indent());
-                    self.output.push_str("return ");
-                    self.generate_node(function, None);
-                    self.output.push('(');
-
-                    let mut wildcard_index = 0;
-                    for (i, arg) in arguments.iter().enumerate() {
-                        if i > 0 {
-                            self.output.push_str(", ");
-                        }
-
-                        if let Node::Wildcard = arg {
-                            self.output.push_str(format!("args[{}]", wildcard_index).as_str());
-                            wildcard_index += 1;
-                        } else {
-                            self.generate_node(arg, None);
-                        }
-                    }
-
-                    self.output.push_str(");\n");
-                    self.indent_level -= 1;
-                    self.output.push_str(&self.get_indent());
-                    self.output.push('}');
-                    return;
-                }
-
-                self.generate_node(function, None);
-                self.output.push('(');
-
-                for (i, arg) in arguments.iter().enumerate() {
-                    if i > 0 {
-                        self.output.push_str(", ");
-                    }
+                if let Node::Wildcard = arg {
+                    self.output
+                        .push_str(format!("args[{}]", wildcard_index).as_str());
+                    wildcard_index += 1;
+                } else {
                     self.generate_node(arg, None);
                 }
-                self.output.push(')');
             }
+
+            self.output.push_str(");\n");
+            self.indent_level -= 1;
+            self.output.push_str(&self.get_indent());
+            self.output.push('}');
+            return;
         }
+
+        self.generate_node(function, None);
+        self.output.push('(');
+
+        for (i, arg) in arguments.iter().enumerate() {
+            if i > 0 {
+                self.output.push_str(", ");
+            }
+            self.generate_node(arg, None);
+        }
+        self.output.push(')');
     }
 
     fn should_wrap_with_parentheses(op: &BinaryOp, parent_op: &BinaryOp) -> bool {
