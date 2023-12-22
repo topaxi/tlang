@@ -84,6 +84,14 @@ fn test_arrows() {
 }
 
 #[test]
+fn test_dotdotdot() {
+    let mut lexer = Lexer::new("...");
+
+    assert_eq!(lexer.next_token(), Token::DotDotDot);
+    assert_eq!(lexer.next_token(), Token::Eof);
+}
+
+#[test]
 fn test_keywords() {
     let mut lexer = Lexer::new("let fn if else match enum struct");
 
@@ -155,6 +163,40 @@ fn test_function_declaration_with_explicit_return_statement() {
     assert_eq!(lexer.next_token(), Token::Plus);
     assert_eq!(lexer.next_token(), Token::Identifier("b".to_string()));
     assert_eq!(lexer.next_token(), Token::Semicolon);
+    assert_eq!(lexer.next_token(), Token::RBrace);
+    assert_eq!(lexer.next_token(), Token::Eof);
+}
+
+#[test]
+fn test_regression_integer_literal_followed_by_dot() {
+    let mut lexer = Lexer::new("fn sum([]) { 0 }\nfn sum([x, ...xs]) { x + sum(xs) }");
+
+    assert_eq!(lexer.next_token(), Token::Fn);
+    assert_eq!(lexer.next_token(), Token::Identifier("sum".to_string()));
+    assert_eq!(lexer.next_token(), Token::LParen);
+    assert_eq!(lexer.next_token(), Token::LBracket);
+    assert_eq!(lexer.next_token(), Token::RBracket);
+    assert_eq!(lexer.next_token(), Token::RParen);
+    assert_eq!(lexer.next_token(), Token::LBrace);
+    assert_eq!(lexer.next_token(), Token::Literal(Literal::Integer(0)));
+    assert_eq!(lexer.next_token(), Token::RBrace);
+    assert_eq!(lexer.next_token(), Token::Fn);
+    assert_eq!(lexer.next_token(), Token::Identifier("sum".to_string()));
+    assert_eq!(lexer.next_token(), Token::LParen);
+    assert_eq!(lexer.next_token(), Token::LBracket);
+    assert_eq!(lexer.next_token(), Token::Identifier("x".to_string()));
+    assert_eq!(lexer.next_token(), Token::Comma);
+    assert_eq!(lexer.next_token(), Token::DotDotDot);
+    assert_eq!(lexer.next_token(), Token::Identifier("xs".to_string()));
+    assert_eq!(lexer.next_token(), Token::RBracket);
+    assert_eq!(lexer.next_token(), Token::RParen);
+    assert_eq!(lexer.next_token(), Token::LBrace);
+    assert_eq!(lexer.next_token(), Token::Identifier("x".to_string()));
+    assert_eq!(lexer.next_token(), Token::Plus);
+    assert_eq!(lexer.next_token(), Token::Identifier("sum".to_string()));
+    assert_eq!(lexer.next_token(), Token::LParen);
+    assert_eq!(lexer.next_token(), Token::Identifier("xs".to_string()));
+    assert_eq!(lexer.next_token(), Token::RParen);
     assert_eq!(lexer.next_token(), Token::RBrace);
     assert_eq!(lexer.next_token(), Token::Eof);
 }

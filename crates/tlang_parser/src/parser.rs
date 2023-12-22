@@ -13,6 +13,7 @@ pub enum Node {
     Block(Vec<Node>, Option<Box<Node>>),
     Literal(Literal),
     List(Vec<Node>),
+    PrefixOp(PrefixOp, Box<Node>),
     BinaryOp {
         op: BinaryOp,
         lhs: Box<Node>,
@@ -68,6 +69,12 @@ impl<'a> From<&'a Token> for Node {
             ),
         }
     }
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum PrefixOp {
+    Rest,
+    Spread,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -293,6 +300,49 @@ impl<'src> Parser<'src> {
         }
     }
 
+    fn parse_list_extraction(&mut self) -> Node {
+        self.consume_token(Token::LBracket);
+
+        let mut elements = Vec::new();
+        // Only allow literal values, identifiers and and rest params for now.
+        while self.current_token != Some(Token::RBracket) {
+            let element = match self.current_token {
+                Some(Token::Identifier(_) | Token::Literal(_) | Token::LBracket) => {
+                    self.parse_primary_expression()
+                }
+                Some(Token::DotDotDot) => {
+                    self.advance();
+                    Node::PrefixOp(PrefixOp::Rest, Box::new(self.parse_primary_expression()))
+                }
+                _ => panic!(
+                    "Expected identifier or literal on line {}, column {}, found {:?} instead\n{}\n{}",
+                    self.lexer.current_line(),
+                    self.lexer.current_column(),
+                    self.current_token,
+                    self.lexer
+                .source()
+                .lines()
+                .nth(self.lexer.current_line() - 1)
+                .unwrap(),
+                    " ".repeat(self.lexer.current_column() - 1) + "^"
+                ),
+            };
+
+            elements.push(element);
+
+            // Allow trailing comma.
+            if self.current_token == Some(Token::RBracket) {
+                break;
+            }
+
+            self.consume_token(Token::Comma);
+        }
+
+        self.consume_token(Token::RBracket);
+
+        Node::List(elements)
+    }
+
     fn parse_list_expression(&mut self) -> Node {
         self.consume_token(Token::LBracket);
 
@@ -458,8 +508,8 @@ impl<'src> Parser<'src> {
             let mut parameters = Vec::new();
             while self.current_token != Some(Token::RParen) {
                 let parameter = match self.current_token {
-                Some(Token::Identifier(_)) => self.parse_primary_expression(),
-                Some(Token::Literal(_)) => self.parse_primary_expression(),
+                Some(Token::Identifier(_) | Token::Literal(_)) => self.parse_primary_expression(),
+                Some(Token::LBracket) => self.parse_list_extraction(),
                 _ => panic!(
                     "Expected identifier or literal on line {}, column {}, found {:?} instead\n{}\n{}",
                     self.lexer.current_line(),

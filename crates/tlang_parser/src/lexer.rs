@@ -39,6 +39,7 @@ pub enum Token {
     Arrow,
     FatArrow,
     Pipeline,
+    DotDotDot,
 
     // Tokens for numbers
     Literal(Literal),
@@ -317,6 +318,16 @@ impl Lexer<'_> {
                 Token::Semicolon
             }
             '.' | '0'..='9' => {
+                // If followed by three dots, we have a dotdotdot token.
+                if self.peek_ahead() == Some('.') && self.source[self.position + 1..].starts_with("..")
+                {
+                    self.advance();
+                    self.advance();
+                    self.advance();
+
+                    return Token::DotDotDot
+                }
+
                 let is_float = self.source[self.position..]
                     .chars()
                     .take_while(|&ch| Self::is_digit(ch) || ch == '.')

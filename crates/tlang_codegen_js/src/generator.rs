@@ -192,6 +192,7 @@ impl CodegenJS {
                 }
                 self.output.push(']');
             }
+            Node::PrefixOp(_, _) => todo!("PrefixOp not implemented yet."),
             Node::BinaryOp { op, lhs, rhs } => {
                 let needs_parentheses = parent_op.map_or(false, |parent| {
                     Self::should_wrap_with_parentheses(op, parent)
@@ -264,7 +265,7 @@ impl CodegenJS {
                 pattern: _,
                 expression: _,
             } => todo!(),
-            Node::Wildcard => todo!(),
+            Node::Wildcard => unreachable!("Stray wildcard expression, you can only use _ wildcards in function declarations, pipelines and pattern matching."),
             Node::IfElse {
                 condition,
                 then_branch,
@@ -344,7 +345,7 @@ impl CodegenJS {
                         .any(|(params, _)| params.len() != parameters.len());
                     let literal_parameters = parameters.iter().enumerate().filter(|(_, param)| {
                         if let Node::FunctionParameter(node) = param {
-                            matches!(**node, Node::Literal(_))
+                            matches!(**node, Node::Literal(_) | Node::List(_))
                         } else {
                             false
                         }

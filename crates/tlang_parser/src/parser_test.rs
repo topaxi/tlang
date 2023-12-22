@@ -1,7 +1,7 @@
 use indoc::indoc;
 
 use crate::lexer::{Lexer, Literal};
-use crate::parser::{BinaryOp, Node, Parser};
+use crate::parser::{BinaryOp, Node, Parser, PrefixOp};
 
 macro_rules! parse {
     ($source:expr) => {{
@@ -691,6 +691,51 @@ fn test_recursive_factorial_functional_definition() {
 }
 
 #[test]
+fn test_recursive_sum() {
+    let program = parse!(indoc! {"
+        fn sum([]) { 0 }
+        fn sum([x, ...xs]) { x + sum(xs) }
+    "});
+
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::FunctionDeclarations(
+            "sum".to_string(),
+            vec![
+                (
+                    vec![Node::FunctionParameter(Box::new(Node::List(vec![])))],
+                    Box::new(Node::Block(
+                        vec![],
+                        Some(Box::new(Node::Literal(
+                            Literal::Integer(0)
+                        ))),
+                    ))
+                ),
+                (
+                    vec![Node::FunctionParameter(Box::new(Node::List(vec![
+                        Node::Identifier("x".to_string()),
+                        Node::PrefixOp(PrefixOp::Rest, Box::new(Node::Identifier(
+                            "xs".to_string()
+                        )))
+                    ])))],
+                    Box::new(Node::Block(
+                        vec![],
+                        Some(Box::new(Node::BinaryOp {
+                            op: BinaryOp::Add,
+                            lhs: Box::new(Node::Identifier("x".to_string())),
+                            rhs: Box::new(Node::Call {
+                                function: Box::new(Node::Identifier("sum".to_string())),
+                                arguments: vec![Node::Identifier("xs".to_string())]
+                            })
+                        }))
+                    ))
+                )
+            ]
+        )])
+    )
+}
+
+#[test]
 fn test_pipeline_operator_to_identifier() {
     let program = parse!("1 |> foo;");
 
@@ -797,6 +842,16 @@ fn test_pipeline_operator_to_function_call_with_wildcards() {
 
 #[test]
 fn test_list_literal() {
+    let program = parse!("let x = [];");
+
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::VariableDeclaration {
+            name: "x".to_string(),
+            value: Box::new(Node::List(vec![]))
+        }])
+    );
+
     let program = parse!("let x = [1, 2, 3];");
 
     assert_eq!(
