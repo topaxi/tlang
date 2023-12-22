@@ -157,10 +157,44 @@ impl CodegenJS {
                 }
 
                 if let BinaryOp::Pipeline = op {
-                    self.generate_node(rhs, None);
-                    self.output.push('(');
-                    self.generate_node(lhs, None);
-                    self.output.push(')');
+                    // If rhs was an identifier, we just pass lhs it as an argument to a function call.
+                    if let Node::Identifier(_) = **rhs {
+                        self.generate_node(rhs, None);
+                        self.output.push('(');
+                        self.generate_node(lhs, None);
+                        self.output.push(')');
+                    // If rhs is a Call node and we prepend the lhs to the argument list.
+                    } else if let Node::Call { function, arguments } = *rhs.clone() {
+                        self.generate_node(&function, None);
+                        self.output.push('(');
+
+                        // If we have a wildcard in the argument list, we instead replace the wildcard with the lhs.
+                        // Otherwise we prepend the lhs to the argument list.
+                        let has_wildcard = arguments.iter().any(|arg| match arg {
+                            Node::Wildcard => true,
+                            _ => false,
+                        });
+                        if has_wildcard {
+                            for (i, arg) in arguments.iter().enumerate() {
+                                if i > 0 {
+                                    self.output.push_str(", ");
+                                }
+
+                                if let Node::Wildcard = arg {
+                                    self.generate_node(lhs, None);
+                                } else {
+                                    self.generate_node(arg, None);
+                                }
+                            }
+                        } else {
+                            self.generate_node(lhs, None);
+                            for arg in arguments.iter() {
+                                self.output.push_str(", ");
+                                self.generate_node(arg, None);
+                            }
+                        };
+                        self.output.push(')');
+                    }
                 } else {
                     self.generate_node(lhs, Some(op));
                     self.generate_binary_op(op);
@@ -357,6 +391,7 @@ impl CodegenJS {
             } => {
                 self.generate_node(function, None);
                 self.output.push('(');
+
                 for (i, arg) in arguments.iter().enumerate() {
                     if i > 0 {
                         self.output.push_str(", ");
@@ -648,6 +683,47 @@ mod tests {
         let expected_output = indoc! {"
             function main() {
                 bar(foo(1));
+            }
+        "};
+        assert_eq!(output, expected_output);
+    }
+
+    #[test]
+    fn test_pipeline_operator_with_call_parenthesis() {
+        let output = compile!("fn main() { 1 |> foo(); }");
+        let expected_output = indoc! {"
+            function main() {
+                foo(1);
+            }
+        "};
+        assert_eq!(output, expected_output);
+    }
+
+    #[test]
+    fn test_pipeline_operator_with_call_parenthesis_and_arguments() {
+        let output = compile!("fn main() { 1 |> foo(2); }");
+        let expected_output = indoc! {"
+            function main() {
+                foo(1, 2);
+            }
+        "};
+        assert_eq!(output, expected_output);
+
+        let output = compile!("fn main() { 1 |> foo(2, 3); }");
+        let expected_output = indoc! {"
+            function main() {
+                foo(1, 2, 3);
+            }
+        "};
+        assert_eq!(output, expected_output);
+    }
+
+    #[test]
+    fn test_pipeline_operator_to_function_call_with_wildcards() {
+        let output = compile!("fn main() { 1 |> foo(2, _); }");
+        let expected_output = indoc! {"
+            function main() {
+                foo(2, 1);
             }
         "};
         assert_eq!(output, expected_output);

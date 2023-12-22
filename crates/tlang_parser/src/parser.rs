@@ -7,7 +7,7 @@ enum Associativity {
     Right,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Node {
     Program(Vec<Node>),
     Block(Vec<Node>, Option<Box<Node>>),
@@ -75,7 +75,7 @@ struct OperatorInfo {
     associativity: Associativity,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum BinaryOp {
     Add,
     Subtract,

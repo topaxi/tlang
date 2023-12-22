@@ -640,18 +640,35 @@ fn test_recursive_factorial_functional_definition() {
 }
 
 #[test]
-fn test_pipeline_operator() {
+fn test_pipeline_operator_to_identifier() {
     let program = parse!("1 |> foo;");
+
     assert_eq!(
         program,
         Node::Program(vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
             op: BinaryOp::Pipeline,
             lhs: Box::new(Node::Literal(Literal::Integer(1))),
             rhs: Box::new(Node::Identifier("foo".to_string())),
+        }))])
+    );
+}
+
+#[test]
+fn test_pipeline_operator() {
+    let program = parse!("1 |> foo();");
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
+            op: BinaryOp::Pipeline,
+            lhs: Box::new(Node::Literal(Literal::Integer(1))),
+            rhs: Box::new(Node::Call {
+                function: Box::new(Node::Identifier("foo".to_string())),
+                arguments: vec![]
+            }),
         }))]),
     );
 
-    let program = parse!("1 |> foo |> bar;");
+    let program = parse!("1 |> foo() |> bar();");
     assert_eq!(
         program,
         Node::Program(vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
@@ -659,16 +676,22 @@ fn test_pipeline_operator() {
             lhs: Box::new(Node::BinaryOp {
                 op: BinaryOp::Pipeline,
                 lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                rhs: Box::new(Node::Identifier("foo".to_string())),
+                rhs: Box::new(Node::Call {
+                    function: Box::new(Node::Identifier("foo".to_string())),
+                    arguments: vec![]
+                }),
             }),
-            rhs: Box::new(Node::Identifier("bar".to_string())),
+            rhs: Box::new(Node::Call {
+                function: Box::new(Node::Identifier("bar".to_string())),
+                arguments: vec![]
+            }),
         }))]),
     );
 }
 
 #[test]
 fn test_pipeline_operator_precedence() {
-    let program = parse!("1 + 2 |> foo;");
+    let program = parse!("1 + 2 |> foo();");
     assert_eq!(
         program,
         Node::Program(vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
@@ -678,7 +701,45 @@ fn test_pipeline_operator_precedence() {
                 lhs: Box::new(Node::Literal(Literal::Integer(1))),
                 rhs: Box::new(Node::Literal(Literal::Integer(2))),
             }),
-            rhs: Box::new(Node::Identifier("foo".to_string())),
+            rhs: Box::new(Node::Call {
+                function: Box::new(Node::Identifier("foo".to_string())),
+                arguments: vec![]
+            }),
+        }))]),
+    );
+}
+
+#[test]
+fn test_pipeline_operator_to_function_call_with_arguments() {
+    let program = parse!("1 |> foo(2);");
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
+            op: BinaryOp::Pipeline,
+            lhs: Box::new(Node::Literal(Literal::Integer(1))),
+            rhs: Box::new(Node::Call {
+                function: Box::new(Node::Identifier("foo".to_string())),
+                arguments: vec![Node::Literal(Literal::Integer(2))]
+            }),
+        }))]),
+    );
+}
+
+#[test]
+fn test_pipeline_operator_to_function_call_with_wildcards() {
+    let program = parse!("1 |> foo(2, _);");
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
+            op: BinaryOp::Pipeline,
+            lhs: Box::new(Node::Literal(Literal::Integer(1))),
+            rhs: Box::new(Node::Call {
+                function: Box::new(Node::Identifier("foo".to_string())),
+                arguments: vec![
+                    Node::Literal(Literal::Integer(2)),
+                    Node::Wildcard,
+                ]
+            }),
         }))]),
     );
 }
