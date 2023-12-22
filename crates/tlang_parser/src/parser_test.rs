@@ -223,6 +223,26 @@ fn test_if_statement() {
 
 #[test]
 fn test_if_else_statement() {
+    let program = parse!("if true { 1; } else { 2; }");
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::IfElse {
+            condition: Box::new(Node::Literal(Literal::Boolean(true))),
+            then_branch: Box::new(Node::Block(
+                vec![Node::ExpressionStatement(Box::new(Node::Literal(
+                    Literal::Integer(1)
+                )))],
+                None
+            )),
+            else_branch: Some(Box::new(Node::Block(
+                vec![Node::ExpressionStatement(Box::new(Node::Literal(
+                    Literal::Integer(2)
+                )))],
+                None
+            ))),
+        }))])
+    );
+
     let program = parse!("if (1 + 2) { 3 + 4; } else { 5 + 6; }");
 
     assert_eq!(
@@ -251,6 +271,37 @@ fn test_if_else_statement() {
             ))),
         }))])
     );
+}
+
+#[test]
+fn test_if_else_as_last_expression() {
+    let program = parse!("fn main() { if true { 1 } else { 2 } }");
+
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::FunctionDeclaration {
+            name: "main".to_string(),
+            parameters: vec![],
+            body: Box::new(Node::Block(
+                vec![],
+                Some(Box::new(Node::IfElse {
+                    condition: Box::new(Node::Literal(Literal::Boolean(true))),
+                    then_branch: Box::new(Node::Block(
+                        vec![],
+                        Some(Box::new(Node::Literal(
+                            Literal::Integer(1)
+                        )))
+                    )),
+                    else_branch: Some(Box::new(Node::Block(
+                        vec![],
+                        Some(Box::new(Node::Literal(
+                            Literal::Integer(2)
+                        )))
+                    ))),
+                })
+            )))
+        }])
+);
 }
 
 #[test]

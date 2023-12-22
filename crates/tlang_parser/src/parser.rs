@@ -174,14 +174,14 @@ impl<'src> Parser<'src> {
         self.next_token.as_ref()
     }
 
-    fn parse_statement(&mut self) -> Option<Node> {
+    fn parse_statement(&mut self) -> (bool, Option<Node>) {
         debug!("Parsing statement {:?}", self.current_token);
 
         // Skip stray semicolons.
         if let Some(Token::Semicolon) = self.current_token {
             self.advance();
 
-            return None;
+            return (false, None);
         }
 
         let node = match self.current_token {
@@ -193,21 +193,18 @@ impl<'src> Parser<'src> {
 
         // FunctionDeclaration statements does not need to be terminated with a semicolon.
         match node {
-            Node::FunctionDeclaration { .. } => return Some(node),
-            Node::FunctionDeclarations(_, _) => return Some(node),
-            _ => {}
+            Node::FunctionDeclaration { .. } | Node::FunctionDeclarations(_, _) => return (false, Some(node)),
+            _ => ()
         }
 
         // Expressions like IfElse as statements also do not need to be terminated with a semicolon.
         if let Node::ExpressionStatement(ref expr) = node {
             if let Node::IfElse { .. } = **expr {
-                return Some(node);
+                return (false, Some(node));
             }
         }
 
-        self.consume_token(Token::Semicolon);
-
-        Some(node)
+        (true, Some(node))
     }
 
     fn parse_return_statement(&mut self) -> Node {
@@ -220,28 +217,47 @@ impl<'src> Parser<'src> {
         Node::ReturnStatement(Some(Box::new(self.parse_expression())))
     }
 
-    fn parse_statements(&mut self) -> Vec<Node> {
+    fn parse_statements(&mut self, may_complete: bool) -> (Vec<Node>, Option<Box<Node>>) {
         let mut statements = Vec::new();
+        let mut completion_expression = None;
 
         while self.current_token != Some(Token::RBrace) && self.current_token != Some(Token::Eof) {
-            if let Some(statement) = self.parse_statement() {
+            if let (consume_semicolon, Some(statement)) = self.parse_statement() {
+                let is_statement_expression = match &statement {
+                    Node::ExpressionStatement(_) => true,
+                    _ => false,
+                };
+
+                if may_complete && self.current_token == Some(Token::RBrace) && is_statement_expression {
+                    let expression = match statement {
+                        Node::ExpressionStatement(expr) => expr,
+                        _ => unreachable!(),
+                    };
+                    completion_expression = Some(expression);
+                    break;
+                }
+
                 statements.push(statement);
+
+                if consume_semicolon {
+                    self.consume_token(Token::Semicolon);
+                }
             }
         }
 
-        statements
+        (statements, completion_expression)
     }
 
     pub fn parse_program(&mut self) -> Node {
-        Node::Program(self.parse_statements())
+        Node::Program(self.parse_statements(false).0)
     }
 
     fn parse_block(&mut self) -> Node {
         self.consume_token(Token::LBrace);
-        let statements = self.parse_statements();
+        let (statements, completion) = self.parse_statements(true);
         self.consume_token(Token::RBrace);
 
-        Node::Block(statements, None)
+        Node::Block(statements, completion)
     }
 
     fn parse_variable_declaration(&mut self) -> Node {

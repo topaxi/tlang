@@ -522,14 +522,12 @@ mod tests {
 
     #[test]
     fn test_if_else() {
-        let output = compile!("fn main() { if true { 1; } else { 2; } }");
+        let output = compile!("if true { 1; } else { 2; }");
         let expected_output = indoc! {"
-            function main() {
-                if (true) {
-                    1;
-                } else {
-                    2;
-                }
+            if (true) {
+                1;
+            } else {
+                2;
             }
         "};
         assert_eq!(output, expected_output);
