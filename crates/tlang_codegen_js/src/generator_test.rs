@@ -334,10 +334,10 @@ fn test_recursive_sum() {
 fn test_partial_application() {
     let output = compile!("let add1 = add(_, 1); }");
     let expected_output = indoc! {"
-            let add1 = function(...args) {
-                return add(args[0], 1);
-            };
-        "};
+        let add1 = function(...args) {
+            return add(args[0], 1);
+        };
+    "};
     assert_eq!(output, expected_output);
 }
 
@@ -345,9 +345,9 @@ fn test_partial_application() {
 fn test_partial_application_with_multiple_arguments() {
     let output = compile!("let add1 = add(_, 1, _); }");
     let expected_output = indoc! {"
-            let add1 = function(...args) {
-                return add(args[0], 1, args[1]);
-            };
-        "};
+        let add1 = function(...args) {
+            return add(args[0], 1, args[1]);
+        };
+    "};
     assert_eq!(output, expected_output);
 }
