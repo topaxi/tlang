@@ -1,6 +1,6 @@
 use tlang_parser::{
     lexer::Literal,
-    parser::{BinaryOp, Node},
+    parser::{BinaryOp, Node, PrefixOp},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -32,6 +32,7 @@ pub struct CodegenJS {
     output: String,
     indent_level: usize,
     context_stack: Vec<BlockContext>,
+    function_pre_body: String,
 }
 
 impl Default for CodegenJS {
@@ -46,6 +47,7 @@ impl CodegenJS {
             output: String::new(),
             indent_level: 0,
             context_stack: vec![BlockContext::ProgramBlock],
+            function_pre_body: String::new(),
         }
     }
 
@@ -299,6 +301,7 @@ impl CodegenJS {
             Node::FunctionParameter(node) => match **node {
                 Node::Identifier { .. } => self.generate_node(node, None),
                 Node::Literal(_) => self.generate_node(node, None),
+                Node::List(_) => todo!(),
                 _ => todo!(),
             },
             Node::FunctionDeclaration {
@@ -367,8 +370,60 @@ impl CodegenJS {
                             if j > 0 {
                                 self.output.push_str(" && ");
                             }
-                            self.output.push_str(&format!("args[{}] === ", k));
-                            self.generate_node(param, None);
+
+                            if let Node::FunctionParameter(node) = param {
+                                match *node.clone() {
+                                    Node::Identifier(_) | Node::Literal(_) => {
+                                        self.output.push_str(&format!("args[{}] === ", k));
+                                        self.generate_node(param, None);
+                                    }
+                                    Node::List(patterns) => {
+                                        if patterns.len() == 0 {
+                                            self.output.push_str(&format!("args[{}].length === 0", k));
+                                            continue;
+                                        }
+
+                                        // TODO: Handle multiple patterns, for now a simple recursive sum was the test case :D
+                                        let mut should_and = false;
+                                        for (i, pattern) in patterns.iter().enumerate() {
+                                            if should_and {
+                                                self.output.push_str(" && ");
+                                            }
+
+                                            match pattern {
+                                                Node::Literal(_) => {
+                                                    self.output.push_str(&format!(
+                                                        "args[{}][{}] === ",
+                                                        k, i
+                                                    ));
+                                                    self.generate_node(pattern, None);
+                                                }
+                                                Node::PrefixOp(PrefixOp::Rest, identified) => {
+                                                    if let Node::Identifier(ref name) = **identified
+                                                    {
+                                                        self.output.push_str(&format!(
+                                                            "args[{}].length >= {}",
+                                                            k, i
+                                                        ));
+                                                        self.indent_level += 1;
+                                                        self.function_pre_body.push_str(&self.get_indent());
+                                                        self.function_pre_body.push_str(format!("let {} = args[{}].slice({});\n", name, k, i).as_str());
+                                                        self.indent_level -= 1;
+                                                    }
+                                                }
+                                                Node::Identifier(name) => {
+                                                    self.indent_level += 1;
+                                                    self.function_pre_body.push_str(&self.get_indent());
+                                                    self.function_pre_body.push_str(format!("let {} = args[{}][{}];\n", name, k, i).as_str());
+                                                    self.indent_level -= 1;
+                                                }
+                                                _ => unreachable!(),
+                                            }
+                                        }
+                                    }
+                                    _ => unreachable!(),
+                                }
+                            }
                         }
                         self.output.push_str(") {\n");
                     } else {
@@ -387,6 +442,8 @@ impl CodegenJS {
                         }
                     }
                     self.context_stack.push(BlockContext::FunctionBodyBlock);
+                    self.output.push_str(&self.function_pre_body);
+                    self.function_pre_body.clear();
                     self.generate_node(body, None);
                     self.context_stack.pop();
                     self.indent_level -= 1;
@@ -421,6 +478,7 @@ impl CodegenJS {
                 self.output.push_str(") {\n");
                 self.indent_level += 1;
                 self.context_stack.push(BlockContext::FunctionBodyBlock);
+                self.output.push_str(&self.function_pre_body);
                 self.generate_node(body, None);
                 self.context_stack.pop();
                 self.indent_level -= 1;
