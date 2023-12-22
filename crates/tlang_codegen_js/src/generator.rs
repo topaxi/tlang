@@ -302,6 +302,8 @@ impl CodegenJS {
                 Node::Identifier { .. } => self.generate_node(node, None),
                 Node::Literal(_) => self.generate_node(node, None),
                 Node::List(_) => todo!(),
+                // Wildcards are handled within pipeline and call expressions,
+                Node::Wildcard => unreachable!("Unexpected wildcard in function parameter."),
                 _ => todo!(),
             },
             Node::FunctionDeclaration {
@@ -503,6 +505,37 @@ impl CodegenJS {
                 function,
                 arguments,
             } => {
+                let has_wildcards = arguments.iter().any(|arg| matches!(arg, Node::Wildcard));
+
+                if has_wildcards {
+                    self.output.push_str("function(...args) {\n");
+                    self.indent_level += 1;
+                    self.output.push_str(&self.get_indent());
+                    self.output.push_str("return ");
+                    self.generate_node(function, None);
+                    self.output.push('(');
+
+                    let mut wildcard_index = 0;
+                    for (i, arg) in arguments.iter().enumerate() {
+                        if i > 0 {
+                            self.output.push_str(", ");
+                        }
+
+                        if let Node::Wildcard = arg {
+                            self.output.push_str(format!("args[{}]", wildcard_index).as_str());
+                            wildcard_index += 1;
+                        } else {
+                            self.generate_node(arg, None);
+                        }
+                    }
+
+                    self.output.push_str(");\n");
+                    self.indent_level -= 1;
+                    self.output.push_str(&self.get_indent());
+                    self.output.push('}');
+                    return;
+                }
+
                 self.generate_node(function, None);
                 self.output.push('(');
 

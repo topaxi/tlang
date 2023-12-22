@@ -201,8 +201,10 @@ impl<'src> Parser<'src> {
 
         // FunctionDeclaration statements does not need to be terminated with a semicolon.
         match node {
-            Node::FunctionDeclaration { .. } | Node::FunctionDeclarations(_, _) => return (false, Some(node)),
-            _ => ()
+            Node::FunctionDeclaration { .. } | Node::FunctionDeclarations(_, _) => {
+                return (false, Some(node))
+            }
+            _ => (),
         }
 
         // Expressions like IfElse as statements also do not need to be terminated with a semicolon.
@@ -236,7 +238,10 @@ impl<'src> Parser<'src> {
                     _ => false,
                 };
 
-                if may_complete && self.current_token == Some(Token::RBrace) && is_statement_expression {
+                if may_complete
+                    && self.current_token == Some(Token::RBrace)
+                    && is_statement_expression
+                {
                     let expression = match statement {
                         Node::ExpressionStatement(expr) => expr,
                         _ => unreachable!(),

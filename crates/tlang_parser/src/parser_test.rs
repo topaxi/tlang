@@ -288,20 +288,16 @@ fn test_if_else_as_last_expression() {
                     condition: Box::new(Node::Literal(Literal::Boolean(true))),
                     then_branch: Box::new(Node::Block(
                         vec![],
-                        Some(Box::new(Node::Literal(
-                            Literal::Integer(1)
-                        )))
+                        Some(Box::new(Node::Literal(Literal::Integer(1))))
                     )),
                     else_branch: Some(Box::new(Node::Block(
                         vec![],
-                        Some(Box::new(Node::Literal(
-                            Literal::Integer(2)
-                        )))
+                        Some(Box::new(Node::Literal(Literal::Integer(2))))
                     ))),
-                })
-            )))
+                }))
+            ))
         }])
-);
+    );
 }
 
 #[test]
@@ -706,17 +702,16 @@ fn test_recursive_sum() {
                     vec![Node::FunctionParameter(Box::new(Node::List(vec![])))],
                     Box::new(Node::Block(
                         vec![],
-                        Some(Box::new(Node::Literal(
-                            Literal::Integer(0)
-                        ))),
+                        Some(Box::new(Node::Literal(Literal::Integer(0)))),
                     ))
                 ),
                 (
                     vec![Node::FunctionParameter(Box::new(Node::List(vec![
                         Node::Identifier("x".to_string()),
-                        Node::PrefixOp(PrefixOp::Rest, Box::new(Node::Identifier(
-                            "xs".to_string()
-                        )))
+                        Node::PrefixOp(
+                            PrefixOp::Rest,
+                            Box::new(Node::Identifier("xs".to_string()))
+                        )
                     ])))],
                     Box::new(Node::Block(
                         vec![],
@@ -831,10 +826,7 @@ fn test_pipeline_operator_to_function_call_with_wildcards() {
             lhs: Box::new(Node::Literal(Literal::Integer(1))),
             rhs: Box::new(Node::Call {
                 function: Box::new(Node::Identifier("foo".to_string())),
-                arguments: vec![
-                    Node::Literal(Literal::Integer(2)),
-                    Node::Wildcard,
-                ]
+                arguments: vec![Node::Literal(Literal::Integer(2)), Node::Wildcard,]
             }),
         }))]),
     );

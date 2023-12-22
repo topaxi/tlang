@@ -319,13 +319,14 @@ impl Lexer<'_> {
             }
             '.' | '0'..='9' => {
                 // If followed by three dots, we have a dotdotdot token.
-                if self.peek_ahead() == Some('.') && self.source[self.position + 1..].starts_with("..")
+                if self.peek_ahead() == Some('.')
+                    && self.source[self.position + 1..].starts_with("..")
                 {
                     self.advance();
                     self.advance();
                     self.advance();
 
-                    return Token::DotDotDot
+                    return Token::DotDotDot;
                 }
 
                 let is_float = self.source[self.position..]

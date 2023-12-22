@@ -1,7 +1,7 @@
+use crate::generator::CodegenJS;
 use indoc::indoc;
 use pretty_assertions::assert_eq;
 use tlang_parser::{lexer::Lexer, parser::Parser};
-use crate::generator::CodegenJS;
 
 macro_rules! compile {
     ($source:expr) => {{
@@ -327,5 +327,27 @@ fn test_recursive_sum() {
             }
         }
     "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn test_partial_application() {
+    let output = compile!("let add1 = add(_, 1); }");
+    let expected_output = indoc! {"
+            let add1 = function(...args) {
+                return add(args[0], 1);
+            };
+        "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn test_partial_application_with_multiple_arguments() {
+    let output = compile!("let add1 = add(_, 1, _); }");
+    let expected_output = indoc! {"
+            let add1 = function(...args) {
+                return add(args[0], 1, args[1]);
+            };
+        "};
     assert_eq!(output, expected_output);
 }
