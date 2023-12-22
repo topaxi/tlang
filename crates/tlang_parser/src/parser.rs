@@ -233,14 +233,9 @@ impl<'src> Parser<'src> {
 
         while self.current_token != Some(Token::RBrace) && self.current_token != Some(Token::Eof) {
             if let (consume_semicolon, Some(statement)) = self.parse_statement() {
-                let is_statement_expression = match &statement {
-                    Node::ExpressionStatement(_) => true,
-                    _ => false,
-                };
-
                 if may_complete
                     && self.current_token == Some(Token::RBrace)
-                    && is_statement_expression
+                    && matches!(&statement, Node::ExpressionStatement(_))
                 {
                     let expression = match statement {
                         Node::ExpressionStatement(expr) => expr,

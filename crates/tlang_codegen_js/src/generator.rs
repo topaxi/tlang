@@ -18,13 +18,13 @@ struct JSOperatorInfo {
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum BlockContext {
     // Are we in a top level Program?
-    ProgramBlock,
+    Program,
     // Are we in a StatementExpression with a Block?
-    StatementBlock,
+    Statement,
     // Are we in a FunctionDeclaration or FunctionExpression with a Block?
-    FunctionBodyBlock,
+    FunctionBody,
     // Are we in an expression with a Block?
-    ExpressionBlock,
+    Expression,
 }
 
 #[derive(Debug, PartialEq)]
@@ -46,7 +46,7 @@ impl CodegenJS {
         Self {
             output: String::new(),
             indent_level: 0,
-            context_stack: vec![BlockContext::ProgramBlock],
+            context_stack: vec![BlockContext::Program],
             function_pre_body: String::new(),
         }
     }
@@ -159,20 +159,20 @@ impl CodegenJS {
                 }
 
                 match self.current_context() {
-                    BlockContext::ProgramBlock => unreachable!("Block with completion in ProgramBlock context not implemented yet."),
-                    BlockContext::StatementBlock => unimplemented!("Block with completion in StatementBlock context not implemented yet."),
-                    BlockContext::FunctionBodyBlock => {
+                    BlockContext::Program => unreachable!("Block with completion in ProgramBlock context not implemented yet."),
+                    BlockContext::Statement => unimplemented!("Block with completion in StatementBlock context not implemented yet."),
+                    BlockContext::FunctionBody => {
                         self.output.push_str(&self.get_indent());
                         self.output.push_str("return ");
                         self.generate_node(expression.as_ref().unwrap(), None);
                         self.output.push_str(";\n");
                     }
-                    BlockContext::ExpressionBlock => unimplemented!("Block with completion in ExpressionBlock context not implemented yet."),
+                    BlockContext::Expression => unimplemented!("Block with completion in ExpressionBlock context not implemented yet."),
                 }
             }
             Node::ExpressionStatement(expression) => {
                 self.output.push_str(&self.get_indent());
-                self.context_stack.push(BlockContext::StatementBlock);
+                self.context_stack.push(BlockContext::Statement);
                 self.generate_node(expression, None);
                 self.context_stack.pop();
 
@@ -277,18 +277,18 @@ impl CodegenJS {
                 self.indent_level = indent_level;
                 self.output.push_str(") {\n");
                 self.indent_level += 1;
-                self.context_stack.push(BlockContext::ExpressionBlock);
+                self.context_stack.push(BlockContext::Expression);
                 self.generate_node(then_branch, None);
-                self.context_stack.push(BlockContext::ExpressionBlock);
+                self.context_stack.push(BlockContext::Expression);
                 self.indent_level -= 1;
 
                 if let Some(else_branch) = else_branch {
                     self.output.push_str(&self.get_indent());
                     self.output.push_str("} else {\n");
                     self.indent_level += 1;
-                    self.context_stack.push(BlockContext::ExpressionBlock);
+                    self.context_stack.push(BlockContext::Expression);
                     self.generate_node(else_branch, None);
-                    self.context_stack.push(BlockContext::ExpressionBlock);
+                    self.context_stack.push(BlockContext::Expression);
                     self.indent_level -= 1;
                 }
 
@@ -329,7 +329,7 @@ impl CodegenJS {
 
         self.output.push_str(") {\n");
         self.indent_level += 1;
-        self.context_stack.push(BlockContext::FunctionBodyBlock);
+        self.context_stack.push(BlockContext::FunctionBody);
         self.generate_node(body, None);
         self.context_stack.pop();
         self.indent_level -= 1;
@@ -359,7 +359,7 @@ impl CodegenJS {
 
         self.output.push_str(") {\n");
         self.indent_level += 1;
-        self.context_stack.push(BlockContext::FunctionBodyBlock);
+        self.context_stack.push(BlockContext::FunctionBody);
         self.generate_node(body, None);
         self.context_stack.pop();
         self.indent_level -= 1;
@@ -421,7 +421,7 @@ impl CodegenJS {
                                 self.generate_node(param, None);
                             }
                             Node::List(patterns) => {
-                                if patterns.len() == 0 {
+                                if patterns.is_empty() {
                                     self.output.push_str(&format!("args[{}].length === 0", k));
                                     continue;
                                 }
@@ -490,7 +490,7 @@ impl CodegenJS {
                     }
                 }
             }
-            self.context_stack.push(BlockContext::FunctionBodyBlock);
+            self.context_stack.push(BlockContext::FunctionBody);
             self.output.push_str(&self.function_pre_body);
             self.function_pre_body.clear();
             self.generate_node(body, None);
