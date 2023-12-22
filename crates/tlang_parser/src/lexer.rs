@@ -319,8 +319,8 @@ impl Lexer<'_> {
             '.' | '0'..='9' => {
                 let is_float = self.source[self.position..]
                     .chars()
-                    .take_while(|&c| Self::is_digit(ch) || c == '.')
-                    .any(|c| c == '.');
+                    .take_while(|&ch| Self::is_digit(ch) || ch == '.')
+                    .any(|ch| ch == '.');
 
                 if is_float {
                     Token::Literal(Literal::Float(self.read_float()))
