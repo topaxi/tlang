@@ -794,3 +794,37 @@ fn test_pipeline_operator_to_function_call_with_wildcards() {
         }))]),
     );
 }
+
+#[test]
+fn test_list_literal() {
+    let program = parse!("let x = [1, 2, 3];");
+
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::VariableDeclaration {
+            name: "x".to_string(),
+            value: Box::new(Node::List(vec![
+                Node::Literal(Literal::Integer(1)),
+                Node::Literal(Literal::Integer(2)),
+                Node::Literal(Literal::Integer(3)),
+            ]))
+        }])
+    );
+}
+
+#[test]
+fn test_list_literal_with_trailing_comma() {
+    let program = parse!("let x = [1, 2, 3,];");
+
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::VariableDeclaration {
+            name: "x".to_string(),
+            value: Box::new(Node::List(vec![
+                Node::Literal(Literal::Integer(1)),
+                Node::Literal(Literal::Integer(2)),
+                Node::Literal(Literal::Integer(3)),
+            ]))
+        }])
+    );
+}

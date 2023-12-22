@@ -12,6 +12,7 @@ pub enum Node {
     Program(Vec<Node>),
     Block(Vec<Node>, Option<Box<Node>>),
     Literal(Literal),
+    List(Vec<Node>),
     BinaryOp {
         op: BinaryOp,
         lhs: Box<Node>,
@@ -292,6 +293,26 @@ impl<'src> Parser<'src> {
         }
     }
 
+    fn parse_list_expression(&mut self) -> Node {
+        self.consume_token(Token::LBracket);
+
+        let mut elements = Vec::new();
+        while self.current_token != Some(Token::RBracket) {
+            elements.push(self.parse_expression());
+
+            // Allow trailing comma.
+            if self.current_token == Some(Token::RBracket) {
+                break;
+            }
+
+            self.consume_token(Token::Comma);
+        }
+
+        self.consume_token(Token::RBracket);
+
+        Node::List(elements)
+    }
+
     fn parse_primary_expression(&mut self) -> Node {
         match &self.current_token {
             Some(Token::LParen) => {
@@ -301,6 +322,7 @@ impl<'src> Parser<'src> {
                 expression
             }
             Some(Token::LBrace) => self.parse_block(),
+            Some(Token::LBracket) => self.parse_list_expression(),
             Some(Token::If) => {
                 self.advance();
                 let condition = self.parse_expression();

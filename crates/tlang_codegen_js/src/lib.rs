@@ -157,22 +157,15 @@ impl CodegenJS {
                 }
 
                 match self.current_context() {
-                    BlockContext::ProgramBlock => {
-                        // Last statement/expression of the program has no semicolon, we allow it, but don't do anything with it.
-                        // Maybe we should not allow it.
-                    }
-                    BlockContext::StatementBlock => {
-                        unimplemented!("Block with completion in StatementBlock context not implemented yet.")
-                    }
+                    BlockContext::ProgramBlock => unreachable!("Block with completion in ProgramBlock context not implemented yet."),
+                    BlockContext::StatementBlock => unimplemented!("Block with completion in StatementBlock context not implemented yet."),
                     BlockContext::FunctionBodyBlock => {
                         self.output.push_str(&self.get_indent());
                         self.output.push_str("return ");
                         self.generate_node(expression.as_ref().unwrap(), None);
                         self.output.push_str(";\n");
                     }
-                    BlockContext::ExpressionBlock => {
-                        unimplemented!("Block with completion in ExpressionBlock context not implemented yet.")
-                    }
+                    BlockContext::ExpressionBlock => unimplemented!("Block with completion in ExpressionBlock context not implemented yet."),
                 }
             }
             Node::ExpressionStatement(expression) => {
@@ -189,6 +182,16 @@ impl CodegenJS {
                 self.output.push_str(";\n");
             }
             Node::Literal(literal) => self.generate_literal(literal),
+            Node::List(items) => {
+                self.output.push('[');
+                for (i, item) in items.iter().enumerate() {
+                    if i > 0 {
+                        self.output.push_str(", ");
+                    }
+                    self.generate_node(item, None);
+                }
+                self.output.push(']');
+            }
             Node::BinaryOp { op, lhs, rhs } => {
                 let needs_parentheses = parent_op.map_or(false, |parent| {
                     Self::should_wrap_with_parentheses(op, parent)
@@ -774,6 +777,17 @@ mod tests {
         let expected_output = indoc! {"
             function main() {
                 foo(2, 1);
+            }
+        "};
+        assert_eq!(output, expected_output);
+    }
+
+    #[test]
+    fn test_list_literal() {
+        let output = compile!("fn main() { [1, 2, 3] }");
+        let expected_output = indoc! {"
+            function main() {
+                return [1, 2, 3];
             }
         "};
         assert_eq!(output, expected_output);
