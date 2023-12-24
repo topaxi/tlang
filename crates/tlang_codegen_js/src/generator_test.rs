@@ -351,3 +351,21 @@ fn test_partial_application_with_multiple_arguments() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_single_line_comments() {
+    let output = compile!("// this is a comment");
+    let expected_output = "// this is a comment\n";
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn test_multi_line_comments() {
+    let output = compile!("/* this is a comment */");
+    let expected_output = "/* this is a comment */\n";
+    assert_eq!(output, expected_output);
+
+    let output = compile!("/* this is a comment\non multiple lines */");
+    let expected_output = "/* this is a comment\non multiple lines */\n";
+    assert_eq!(output, expected_output);
+}

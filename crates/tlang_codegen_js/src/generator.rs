@@ -144,6 +144,16 @@ impl CodegenJS {
 
     fn generate_node(&mut self, node: &Node, parent_op: Option<&BinaryOp>) {
         match node {
+            Node::SingleLineComment(comment) => {
+                self.output.push_str("//");
+                self.output.push_str(comment);
+                self.output.push('\n');
+            }
+            Node::MultiLineComment(comment) => {
+                self.output.push_str("/*");
+                self.output.push_str(comment);
+                self.output.push_str("*/\n");
+            }
             Node::Program(statements) => {
                 for statement in statements {
                     self.generate_node(statement, None);

@@ -875,3 +875,35 @@ fn test_list_literal_with_trailing_comma() {
         }])
     );
 }
+
+#[test]
+fn test_single_line_comments() {
+    let program = parse!("// this is a comment");
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::SingleLineComment(
+            " this is a comment".to_string()
+        )])
+    );
+}
+
+#[test]
+fn test_multi_line_comments() {
+    let program = parse!("/* this is a comment */");
+
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::MultiLineComment(
+            " this is a comment ".to_string()
+        )])
+    );
+
+    let program = parse!("/* this is a comment\n   spanning multiple lines */");
+
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::MultiLineComment(
+            " this is a comment\n   spanning multiple lines ".to_string()
+        )])
+    );
+}

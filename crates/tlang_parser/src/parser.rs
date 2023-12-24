@@ -56,6 +56,8 @@ pub enum Node {
         function: Box<Node>,
         arguments: Vec<Node>,
     },
+    SingleLineComment(String),
+    MultiLineComment(String),
 }
 
 impl<'a> From<&'a Token> for Node {
@@ -63,6 +65,8 @@ impl<'a> From<&'a Token> for Node {
         match token {
             Token::Literal(literal) => Node::Literal(literal.clone()),
             Token::Identifier(name) => Node::Identifier(name.clone()),
+            Token::SingleLineComment(comment) => Node::SingleLineComment(comment.clone()),
+            Token::MultiLineComment(comment) => Node::MultiLineComment(comment.clone()),
             _ => unimplemented!(
                 "Expected token to be a literal or identifier, found {:?}",
                 token
@@ -196,6 +200,11 @@ impl<'src> Parser<'src> {
             Some(Token::Let) => self.parse_variable_declaration(),
             Some(Token::Fn) => self.parse_function_declaration(),
             Some(Token::Return) => self.parse_return_statement(),
+            Some(Token::SingleLineComment(_) | Token::MultiLineComment(_)) => {
+                let comment: Node = self.current_token.as_ref().unwrap().into();
+                self.advance();
+                return (false, Some(comment));
+            }
             _ => Node::ExpressionStatement(Box::new(self.parse_expression())),
         };
 

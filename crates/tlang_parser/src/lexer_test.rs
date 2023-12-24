@@ -200,3 +200,33 @@ fn test_regression_integer_literal_followed_by_dot() {
     assert_eq!(lexer.next_token(), Token::RBrace);
     assert_eq!(lexer.next_token(), Token::Eof);
 }
+
+#[test]
+fn test_single_line_comments() {
+    let mut lexer = Lexer::new("// this is a comment");
+
+    assert_eq!(
+        lexer.next_token(),
+        Token::SingleLineComment(" this is a comment".to_string())
+    );
+    assert_eq!(lexer.next_token(), Token::Eof);
+}
+
+#[test]
+fn test_multi_line_comments() {
+    let mut lexer = Lexer::new("/* this is a comment */");
+
+    assert_eq!(
+        lexer.next_token(),
+        Token::MultiLineComment(" this is a comment ".to_string())
+    );
+    assert_eq!(lexer.next_token(), Token::Eof);
+
+    let mut lexer = Lexer::new("/* this is a comment\non multiple lines */");
+
+    assert_eq!(
+        lexer.next_token(),
+        Token::MultiLineComment(" this is a comment\non multiple lines ".to_string())
+    );
+    assert_eq!(lexer.next_token(), Token::Eof);
+}

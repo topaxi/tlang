@@ -47,6 +47,10 @@ pub enum Token {
     // Token for identifiers
     Identifier(String),
 
+    // Token for comments
+    SingleLineComment(String),
+    MultiLineComment(String),
+
     // Keywords
     Let,
     Fn,
@@ -129,7 +133,7 @@ impl Lexer<'_> {
     }
 
     #[inline(always)]
-    fn advance_while(&mut self, predicate: fn(char) -> bool) {
+    fn advance_while(&mut self, predicate: impl Fn(char) -> bool) {
         while let Some(ch) = self.source.chars().nth(self.position) {
             if predicate(ch) {
                 self.advance();
@@ -198,8 +202,30 @@ impl Lexer<'_> {
                 }
             }
             '/' => {
-                self.advance();
-                Token::Slash
+                if self.peek_ahead() == Some('/') {
+                    self.advance();
+                    self.advance();
+                    let start = self.position;
+                    self.advance_while(|ch| ch != '\n');
+                    let slice = &self.source[start..self.position];
+                    Token::SingleLineComment(slice.to_owned())
+                } else if self.peek_ahead() == Some('*') {
+                    self.advance();
+                    self.advance();
+                    let start = self.position;
+                    while !(self.source[self.position..].starts_with("*/")
+                        || self.position >= self.source.len())
+                    {
+                        self.advance();
+                    }
+                    let slice = &self.source[start..self.position];
+                    self.advance();
+                    self.advance();
+                    Token::MultiLineComment(slice.to_owned())
+                } else {
+                    self.advance();
+                    Token::Slash
+                }
             }
             '%' => {
                 self.advance();
