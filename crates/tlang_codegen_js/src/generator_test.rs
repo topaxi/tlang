@@ -404,3 +404,81 @@ fn test_char_literals() {
     let expected_output = "let x = \"a\";\n";
     assert_eq!(output, expected_output);
 }
+
+#[ignore = "implement enums first"]
+#[test]
+fn test_enums() {
+    let output = compile!(indoc! {"
+        enum Option {
+            Some(x),
+            None,
+        }
+
+        fn main() {
+            let x = Option::Some(42);
+        }
+    "});
+    let expected_output = indoc! {"
+        let Option = {
+            Some(x) {
+                return {
+                    tag: \"Some\",
+                    \"0\": x,
+                };
+            },
+            None() {
+                return {
+                    tag: \"None\",
+                };
+            },
+        };
+
+        function main() {
+            let x = Option.Some(42);
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[ignore = "implement enums first"]
+#[test]
+fn test_enums_with_fields() {
+    let output = compile!(indoc! {"
+        enum Node {
+            BinaryOperation {
+                operator,
+                left,
+                right,
+            },
+        }
+
+        fn main() {
+            let x = Node::BinaryOperation {
+                operator: \"+\",
+                left: 1,
+                right: 2,
+            };
+        }
+    "});
+    let expected_output = indoc! {"
+        let Node = {
+            BinaryOperation({ operator, left, right }) {
+                return {
+                    tag: \"BinaryOperation\",
+                    operator,
+                    left,
+                    right,
+                };
+            },
+        };
+
+        function main() {
+            let x = Node.BinaryOperation({
+                operator: \"+\",
+                left: 1,
+                right: 2,
+            });
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
