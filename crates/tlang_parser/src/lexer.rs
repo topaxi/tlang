@@ -28,6 +28,7 @@ pub enum Token {
     Semicolon,
     DoubleQuote,
     SingleQuote,
+    NamespaceSeparator,
 
     // Tokens for parentheses
     LParen,
@@ -348,8 +349,14 @@ impl Lexer<'_> {
                 Token::QuestionMark
             }
             ':' => {
-                self.advance();
-                Token::Colon
+                if self.peek_ahead() == Some(':') {
+                    self.advance();
+                    self.advance();
+                    Token::NamespaceSeparator
+                } else {
+                    self.advance();
+                    Token::Colon
+                }
             }
             ';' => {
                 self.advance();

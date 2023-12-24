@@ -92,6 +92,14 @@ fn test_dotdotdot() {
 }
 
 #[test]
+fn test_namespace_separator() {
+    let mut lexer = Lexer::new("::");
+
+    assert_eq!(lexer.next_token(), Token::NamespaceSeparator);
+    assert_eq!(lexer.next_token(), Token::Eof);
+}
+
+#[test]
 fn test_keywords() {
     let mut lexer = Lexer::new("let fn if else match enum struct");
 
