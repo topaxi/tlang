@@ -30,6 +30,18 @@ fn main() {
     };
     let output = compile(&source);
 
+    let std_lib_file = Path::new("js/stdlib.js");
+    let mut std_lib = match File::open(std_lib_file) {
+        Err(why) => panic!("couldn't open {}: {}", std_lib_file.display(), why),
+        Ok(file) => file,
+    };
+    let mut std_lib_source = String::new();
+    if let Err(why) = std_lib.read_to_string(&mut std_lib_source) {
+        panic!("couldn't read {}: {}", std_lib_file.display(), why)
+    };
+
+    let output = format!("{}\n{}", std_lib_source, output);
+
     if args.output_file.is_none() {
         println!("{}", output);
         return;
