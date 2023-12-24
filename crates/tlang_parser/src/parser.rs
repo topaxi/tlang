@@ -130,6 +130,7 @@ impl<'src> Parser<'src> {
 
     pub fn parse(&mut self) -> Node {
         self.advance();
+        self.advance();
         self.parse_program()
     }
 
@@ -185,11 +186,6 @@ impl<'src> Parser<'src> {
     fn advance(&mut self) {
         self.current_token = self.next_token.clone();
         self.next_token = Some(self.lexer.next_token());
-
-        if self.current_token.is_none() {
-            self.advance();
-        }
-
         debug!("Advanced to {:?}", self.current_token);
     }
 
