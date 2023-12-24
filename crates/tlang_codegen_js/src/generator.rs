@@ -427,7 +427,7 @@ impl CodegenJS {
                                 }
 
                                 // TODO: Handle multiple patterns, for now a simple recursive sum was the test case :D
-                                let mut should_and = false;
+                                let should_and = false;
                                 for (i, pattern) in patterns.iter().enumerate() {
                                     if should_and {
                                         self.output.push_str(" && ");
