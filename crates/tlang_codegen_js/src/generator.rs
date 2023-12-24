@@ -204,7 +204,13 @@ impl CodegenJS {
                 }
                 self.output.push(']');
             }
-            Node::PrefixOp(_, _) => todo!("PrefixOp not implemented yet."),
+            Node::PrefixOp(op, node) => {
+                match op {
+                    PrefixOp::Spread => self.output.push_str("..."),
+                    _ => unimplemented!("PrefixOp {:?} not implemented yet.", op),
+                }
+                self.generate_node(node, None);
+            },
             Node::BinaryOp { op, lhs, rhs } => {
                 let needs_parentheses = parent_op.map_or(false, |parent| {
                     Self::should_wrap_with_parentheses(op, parent)

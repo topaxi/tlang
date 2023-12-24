@@ -364,7 +364,19 @@ impl<'src> Parser<'src> {
 
         let mut elements = Vec::new();
         while self.current_token != Some(Token::RBracket) {
-            elements.push(self.parse_expression());
+            let element = match self.current_token {
+                Some(Token::DotDotDot) => {
+                    self.advance();
+
+                    Node::PrefixOp(
+                        PrefixOp::Spread,
+                        Box::new(self.parse_primary_expression()),
+                    )
+                }
+                _ => self.parse_expression(),
+            };
+
+            elements.push(element);
 
             // Allow trailing comma.
             if self.current_token == Some(Token::RBracket) {

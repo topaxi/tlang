@@ -330,6 +330,28 @@ fn test_recursive_sum() {
 }
 
 #[test]
+fn test_recursive_map() {
+    let output = compile!(indoc! {"
+        fn map([], f) { [] }
+        fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
+    "});
+    let expected_output = indoc! {"
+        function map(...args) {
+            if (args[0].length === 0) {
+                let f = args[1];
+                return [];
+            } else if (args[0].length >= 1) {
+                let f = args[1];
+                let x = args[0][0];
+                let xs = args[0].slice(1);
+                return [f(x), ...map(xs, f)];
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
 fn test_partial_application() {
     let output = compile!("let add1 = add(_, 1); }");
     let expected_output = indoc! {"
