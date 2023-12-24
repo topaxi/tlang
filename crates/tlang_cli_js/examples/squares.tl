@@ -1,4 +1,4 @@
-// map(a[], f(a) -> b) -> b[]
+// map(a[], fn(a) -> b) -> b[]
 fn map([], f) { [] }
 fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
 
