@@ -127,6 +127,10 @@ impl<'src> Parser<'src> {
         parser
     }
 
+    pub fn from_source(source: &'src str) -> Parser<'src> {
+        Parser::new(Lexer::new(source))
+    }
+
     fn expect_token(&mut self, expected: Token) {
         let actual = self.current_token.as_ref().unwrap();
         if *actual != expected {

@@ -59,8 +59,7 @@ fn main() {
 }
 
 fn compile(source: &str) -> String {
-    let lexer = tlang_parser::lexer::Lexer::new(source);
-    let mut parser = tlang_parser::parser::Parser::new(lexer);
+    let mut parser = tlang_parser::parser::Parser::from_source(source);
     let ast = parser.parse_program();
     let mut generator = CodegenJS::default();
     generator.generate_code(&ast);
