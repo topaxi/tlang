@@ -26,6 +26,8 @@ pub enum Token {
     Percent,
     QuestionMark,
     Semicolon,
+    DoubleQuote,
+    SingleQuote,
 
     // Tokens for parentheses
     LParen,
@@ -71,6 +73,8 @@ pub enum Literal {
     Integer(i64),
     UnsignedInteger(u64),
     Float(f64),
+    String(String),
+    Char(String),
 }
 
 #[derive(Debug)]
@@ -165,6 +169,14 @@ impl Lexer<'_> {
         let start = self.position;
         self.advance_while(Self::is_alphanumeric);
         &self.source[start..self.position]
+    }
+
+    fn read_string_literal(&mut self, quote: char) -> String {
+        let start = self.position;
+        self.advance_while(|ch| ch != quote);
+        let slice = &self.source[start..self.position];
+        self.advance();
+        slice.to_owned()
     }
 
     pub fn next_token(&mut self) -> Token {
@@ -364,6 +376,17 @@ impl Lexer<'_> {
                     Token::Literal(Literal::Float(self.read_float()))
                 } else {
                     Token::Literal(Literal::Integer(self.read_integer()))
+                }
+            }
+            '"' | '\'' => {
+                let quote = ch;
+                self.advance();
+                let literal = self.read_string_literal(quote);
+
+                if quote == '"' {
+                    Token::Literal(Literal::String(literal))
+                } else {
+                    Token::Literal(Literal::Char(literal))
                 }
             }
             _ if Self::is_alphanumeric(ch) => {

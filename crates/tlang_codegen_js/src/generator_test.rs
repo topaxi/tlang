@@ -390,3 +390,17 @@ fn test_multi_line_comments() {
     let expected_output = "/* this is a comment\non multiple lines */\n";
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_string_literals() {
+    let output = compile!("let x = \"hello\";");
+    let expected_output = "let x = \"hello\";\n";
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn test_char_literals() {
+    let output = compile!("let x = 'a';");
+    let expected_output = "let x = \"a\";\n";
+    assert_eq!(output, expected_output);
+}

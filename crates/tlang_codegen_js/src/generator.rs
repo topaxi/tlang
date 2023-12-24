@@ -139,6 +139,9 @@ impl CodegenJS {
             Literal::Boolean(value) => {
                 self.output.push_str(&value.to_string());
             }
+            Literal::String(value) | Literal::Char(value) => {
+                self.output.push_str(&format!("\"{}\"", value));
+            }
         }
     }
 

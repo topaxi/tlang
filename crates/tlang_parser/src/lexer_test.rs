@@ -230,3 +230,22 @@ fn test_multi_line_comments() {
     );
     assert_eq!(lexer.next_token(), Token::Eof);
 }
+
+#[test]
+fn test_string_literal() {
+    let mut lexer = Lexer::new("\"this is a string\"");
+
+    assert_eq!(
+        lexer.next_token(),
+        Token::Literal(Literal::String("this is a string".to_string()))
+    );
+    assert_eq!(lexer.next_token(), Token::Eof);
+}
+
+#[test]
+fn test_char_literal() {
+    let mut lexer = Lexer::new("'a'");
+
+    assert_eq!(lexer.next_token(), Token::Literal(Literal::Char("a".to_string())));
+    assert_eq!(lexer.next_token(), Token::Eof);
+}

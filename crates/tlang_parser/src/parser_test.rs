@@ -906,3 +906,23 @@ fn test_multi_line_comments() {
         )])
     );
 }
+
+#[test]
+fn test_string_literal() {
+    let program = parse!(r#""foo";"#);
+
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::Literal(Literal::String("foo".to_string()))))])
+    );
+}
+
+#[test]
+fn test_char_literal() {
+    let program = parse!(r#"'a';"#);
+
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::Literal(Literal::Char("a".to_string()))))])
+    );
+}
