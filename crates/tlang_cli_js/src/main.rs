@@ -60,7 +60,7 @@ fn main() {
 
 fn compile(source: &str) -> String {
     let mut parser = tlang_parser::parser::Parser::from_source(source);
-    let ast = parser.parse_program();
+    let ast = parser.parse();
     let mut generator = CodegenJS::default();
     generator.generate_code(&ast);
     generator.get_output().to_string()

@@ -1,13 +1,12 @@
 use indoc::indoc;
 
-use crate::lexer::{Lexer, Literal};
+use crate::lexer::Literal;
 use crate::parser::{BinaryOp, Node, Parser, PrefixOp};
 
 macro_rules! parse {
     ($source:expr) => {{
-        let lexer = Lexer::new($source);
-        let mut parser = Parser::new(lexer);
-        parser.parse_program()
+        let mut parser = Parser::from_source($source);
+        parser.parse()
     }};
 }
 

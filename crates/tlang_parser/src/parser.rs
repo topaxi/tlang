@@ -117,18 +117,20 @@ pub struct Parser<'src> {
 
 impl<'src> Parser<'src> {
     pub fn new(lexer: Lexer<'src>) -> Parser {
-        let mut parser = Parser {
+        Parser {
             lexer,
             current_token: None,
             next_token: None,
-        };
-        parser.advance();
-        parser.advance();
-        parser
+        }
     }
 
     pub fn from_source(source: &'src str) -> Parser<'src> {
         Parser::new(Lexer::new(source))
+    }
+
+    pub fn parse(&mut self) -> Node {
+        self.advance();
+        self.parse_program()
     }
 
     fn expect_token(&mut self, expected: Token) {
@@ -183,6 +185,11 @@ impl<'src> Parser<'src> {
     fn advance(&mut self) {
         self.current_token = self.next_token.clone();
         self.next_token = Some(self.lexer.next_token());
+
+        if self.current_token.is_none() {
+            self.advance();
+        }
+
         debug!("Advanced to {:?}", self.current_token);
     }
 
@@ -269,7 +276,7 @@ impl<'src> Parser<'src> {
         (statements, completion_expression)
     }
 
-    pub fn parse_program(&mut self) -> Node {
+    fn parse_program(&mut self) -> Node {
         Node::Program(self.parse_statements(false).0)
     }
 

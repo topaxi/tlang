@@ -1,13 +1,12 @@
 use crate::generator::CodegenJS;
 use indoc::indoc;
 use pretty_assertions::assert_eq;
-use tlang_parser::{lexer::Lexer, parser::Parser};
+use tlang_parser::parser::Parser;
 
 macro_rules! compile {
     ($source:expr) => {{
-        let lexer = Lexer::new($source);
-        let mut parser = Parser::new(lexer);
-        let node = parser.parse_program();
+        let mut parser = Parser::from_source($source);
+        let node = parser.parse();
         let mut codegen = CodegenJS::default();
         codegen.generate_code(&node);
         codegen.get_output().to_string()
