@@ -1,7 +1,8 @@
 use indoc::indoc;
 
+use crate::ast::{BinaryOp, Node, PrefixOp};
 use crate::lexer::Literal;
-use crate::parser::{BinaryOp, Node, Parser, PrefixOp};
+use crate::parser::Parser;
 
 macro_rules! parse {
     ($source:expr) => {{

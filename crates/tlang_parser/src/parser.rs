@@ -1,113 +1,8 @@
-use crate::lexer::{Lexer, Literal, Token};
+use crate::{
+    ast::{Associativity, BinaryOp, Node, OperatorInfo, PrefixOp},
+    lexer::{Lexer, Token},
+};
 use log::debug;
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum Associativity {
-    Left,
-    Right,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum Node {
-    Program(Vec<Node>),
-    Block(Vec<Node>, Option<Box<Node>>),
-    Literal(Literal),
-    List(Vec<Node>),
-    PrefixOp(PrefixOp, Box<Node>),
-    BinaryOp {
-        op: BinaryOp,
-        lhs: Box<Node>,
-        rhs: Box<Node>,
-    },
-    ExpressionStatement(Box<Node>),
-    VariableDeclaration {
-        name: String,
-        value: Box<Node>,
-    },
-    FunctionDeclaration {
-        name: String,
-        parameters: Vec<Node>,
-        body: Box<Node>,
-    },
-    FunctionDeclarations(String, Vec<(Vec<Node>, Box<Node>)>),
-    FunctionExpression {
-        name: Option<String>,
-        parameters: Vec<Node>,
-        body: Box<Node>,
-    },
-    FunctionParameter(Box<Node>),
-    ReturnStatement(Option<Box<Node>>),
-    Match {
-        expression: Box<Node>,
-        arms: Vec<Node>,
-    },
-    MatchArm {
-        pattern: Box<Node>,
-        expression: Box<Node>,
-    },
-    Wildcard,
-    IfElse {
-        condition: Box<Node>,
-        then_branch: Box<Node>,
-        else_branch: Option<Box<Node>>,
-    },
-    Identifier(String),
-    Call {
-        function: Box<Node>,
-        arguments: Vec<Node>,
-    },
-    SingleLineComment(String),
-    MultiLineComment(String),
-}
-
-impl<'a> From<&'a Token> for Node {
-    fn from(token: &Token) -> Self {
-        match token {
-            Token::Literal(literal) => Node::Literal(literal.clone()),
-            Token::Identifier(name) => Node::Identifier(name.clone()),
-            Token::SingleLineComment(comment) => Node::SingleLineComment(comment.clone()),
-            Token::MultiLineComment(comment) => Node::MultiLineComment(comment.clone()),
-            _ => unimplemented!(
-                "Expected token to be a literal or identifier, found {:?}",
-                token
-            ),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum PrefixOp {
-    Rest,
-    Spread,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct OperatorInfo {
-    precedence: u8,
-    associativity: Associativity,
-}
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum BinaryOp {
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-    Modulo,
-    Exponentiation,
-    Equal,
-    NotEqual,
-    LessThan,
-    LessThanOrEqual,
-    GreaterThan,
-    GreaterThanOrEqual,
-    And,
-    Or,
-    BitwiseAnd,
-    BitwiseOr,
-    BitwiseXor,
-    Pipeline,
-}
 
 pub struct Parser<'src> {
     lexer: Lexer<'src>,
@@ -207,6 +102,7 @@ impl<'src> Parser<'src> {
             Some(Token::Let) => self.parse_variable_declaration(),
             Some(Token::Fn) => self.parse_function_declaration(),
             Some(Token::Return) => self.parse_return_statement(),
+            Some(Token::Enum) => todo!(),
             Some(Token::SingleLineComment(_) | Token::MultiLineComment(_)) => {
                 let comment: Node = self.current_token.as_ref().unwrap().into();
                 self.advance();
@@ -368,10 +264,7 @@ impl<'src> Parser<'src> {
                 Some(Token::DotDotDot) => {
                     self.advance();
 
-                    Node::PrefixOp(
-                        PrefixOp::Spread,
-                        Box::new(self.parse_primary_expression()),
-                    )
+                    Node::PrefixOp(PrefixOp::Spread, Box::new(self.parse_primary_expression()))
                 }
                 _ => self.parse_expression(),
             };

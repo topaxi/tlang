@@ -1,6 +1,6 @@
 use tlang_parser::{
+    ast::{BinaryOp, Node, PrefixOp},
     lexer::Literal,
-    parser::{BinaryOp, Node, PrefixOp},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -332,6 +332,8 @@ impl CodegenJS {
             Node::Identifier(name) => self.output.push_str(name),
             Node::Call { function, arguments } =>
                 self.generate_call_expression(function, arguments),
+            Node::EnumDeclaration { name, variants } => todo!(),
+            Node::EnumVariant { name, parameters } => todo!(),
         }
     }
 
