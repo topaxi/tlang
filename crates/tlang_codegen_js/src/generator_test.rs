@@ -47,11 +47,11 @@ fn test_codegen_function_call() {
 
 #[test]
 fn test_codegen_function_expression() {
-    let output = compile!("fn main() { let foo = fn() { 1 + 2; }; }");
+    let output = compile!("fn main() { let foo = fn() { 1 + 2 }; }");
     let expected_output = indoc! {"
         function main() {
             let foo = function() {
-                1 + 2;
+                return 1 + 2;
             };
         }
     "};
