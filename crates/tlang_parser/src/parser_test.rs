@@ -729,6 +729,48 @@ fn test_recursive_sum() {
     )
 }
 
+// TODO: Comments between function declarations should be allowed.
+#[ignore = "not implemented yet"]
+#[test]
+fn test_functional_function_declaration_with_comments_inbetween() {
+    let program = parse!(indoc! {"
+        fn foo(1) { 1 }
+        // comment
+        fn foo(n) { n * 2 }
+    "});
+
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::FunctionDeclarations(
+            "foo".to_string(),
+            vec![
+                (
+                    vec![Node::FunctionParameter(Box::new(Node::Literal(
+                        Literal::Integer(1)
+                    )))],
+                    Box::new(Node::Block(
+                        vec![],
+                        Some(Box::new(Node::Literal(Literal::Integer(1)))),
+                    ))
+                ),
+                (
+                    vec![Node::FunctionParameter(Box::new(Node::Identifier(
+                        "n".to_string()
+                    )))],
+                    Box::new(Node::Block(
+                        vec![],
+                        Some(Box::new(Node::BinaryOp {
+                            op: BinaryOp::Multiply,
+                            lhs: Box::new(Node::Identifier("n".to_string())),
+                            rhs: Box::new(Node::Literal(Literal::Integer(2)))
+                        }))
+                    ))
+                )
+            ]
+        )])
+    );
+}
+
 #[test]
 fn test_pipeline_operator_to_identifier() {
     let program = parse!("1 |> foo;");
@@ -913,7 +955,9 @@ fn test_string_literal() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::Literal(Literal::String("foo".to_string()))))])
+        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::Literal(
+            Literal::String("foo".to_string())
+        )))])
     );
 }
 
@@ -923,6 +967,8 @@ fn test_char_literal() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::Literal(Literal::Char("a".to_string()))))])
+        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::Literal(
+            Literal::Char("a".to_string())
+        )))])
     );
 }
