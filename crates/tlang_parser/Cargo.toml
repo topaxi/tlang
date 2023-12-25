@@ -8,3 +8,4 @@ log = { workspace = true }
 
 [dev-dependencies]
 indoc = { workspace = true }
+pretty_assertions = { workspace = true }

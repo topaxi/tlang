@@ -474,3 +474,149 @@ fn test_enums_with_fields() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_enums_tree_implementation() {
+    let output = compile!(indoc! {"
+        enum Tree {
+            Leaf(x),
+            Node {
+                left,
+                right,
+            },
+        }
+
+        fn main() {
+            let x = Tree::Node {
+                left: Tree::Leaf(1),
+                right: Tree::Leaf(2),
+            };
+        }
+    "});
+    let expected_output = indoc! {"
+        const Tree = {
+            Leaf(x) {
+                return {
+                    tag: \"Leaf\",
+                    \"0\": x,
+                };
+            },
+            Node({ left, right }) {
+                return {
+                    tag: \"Node\",
+                    left,
+                    right,
+                };
+            },
+        };
+        function main() {
+            let x = Tree.Node({
+                left: Tree.Leaf(1),
+                right: Tree.Leaf(2),
+            });
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn test_maximum_depth_tree() {
+    let output = compile!(indoc! {"
+        enum Tree {
+            Leaf(x),
+            Node {
+                left,
+                right,
+            },
+        }
+
+        fn maximum_depth(Tree::Leaf(_)) { 1 }
+        fn maximum_depth(Tree::Node { left, right }) { 1 + max(maximum_depth(left), maximum_depth(right)) }
+
+        fn main() {
+            let x = Tree::Node {
+                left: Tree::Leaf(1),
+                right: Tree::Node {
+                    left: Tree::Leaf(2),
+                    right: Tree::Leaf(3),
+                },
+            };
+        }
+    "});
+    let expected_output = indoc! {"
+        const Tree = {
+            Leaf(x) {
+                return {
+                    tag: \"Leaf\",
+                    \"0\": x,
+                };
+            },
+            Node({ left, right }) {
+                return {
+                    tag: \"Node\",
+                    left,
+                    right,
+                };
+            },
+        };
+        function maximum_depth(...args) {
+            if (args[0].tag === \"Leaf\") {
+                return 1;
+            } else if (args[0].tag === \"Node\") {
+                let left = args[0].left;
+                let right = args[0].right;
+                return 1 + max(maximum_depth(left), maximum_depth(right));
+            }
+        }
+        function main() {
+            let x = Tree.Node({
+                left: Tree.Leaf(1),
+                right: Tree.Node({
+                    left: Tree.Leaf(2),
+                    right: Tree.Leaf(3),
+                }),
+            });
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn test_maximum_depth_tree_positional() {
+    let output = compile!(indoc! {"
+        enum Tree {
+            Leaf(x),
+            Node(left, right),
+        }
+
+        fn maximum_depth(Tree::Leaf(_)) { 1 }
+        fn maximum_depth(Tree::Node(left, right)) { 1 + max(maximum_depth(left), maximum_depth(right)) }
+    "});
+    let expected_output = indoc! {"
+        const Tree = {
+            Leaf(x) {
+                return {
+                    tag: \"Leaf\",
+                    \"0\": x,
+                };
+            },
+            Node(left, right) {
+                return {
+                    tag: \"Node\",
+                    \"0\": left,
+                    \"1\": right,
+                };
+            },
+        };
+        function maximum_depth(...args) {
+            if (args[0].tag === \"Leaf\") {
+                return 1;
+            } else if (args[0].tag === \"Node\") {
+                let left = args[0][0];
+                let right = args[0][1];
+                return 1 + max(maximum_depth(left), maximum_depth(right));
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+}

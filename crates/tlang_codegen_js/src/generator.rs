@@ -352,6 +352,7 @@ impl CodegenJS {
                 self.generate_call_expression(function, arguments),
             Node::EnumDeclaration { name, variants } => self.generate_enum_declaration(name, variants),
             Node::EnumVariant { name, named_fields, parameters } => self.generate_enum_variant(name, *named_fields, parameters),
+            Node::EnumExtraction { identifier, elements, named_fields } => self.generate_enum_extraction(identifier, elements, *named_fields),
         }
     }
 
@@ -415,6 +416,37 @@ impl CodegenJS {
         self.indent_level -= 1;
         self.output.push_str(&self.get_indent());
         self.output.push_str("},\n");
+    }
+
+    fn generate_enum_extraction(&mut self, identifier: &Box<Node>, elements: &[Node], named_fields: bool) {
+        self.output.push_str(&self.get_indent());
+        self.output.push_str("const ");
+        self.generate_node(identifier, None);
+        self.output.push_str(" = (");
+        self.generate_node(identifier, None);
+        self.output.push_str(") => {\n");
+        self.indent_level += 1;
+        self.output.push_str(&self.get_indent());
+        self.output.push_str("switch (");
+        self.generate_node(identifier, None);
+        self.output.push_str(".tag) {\n");
+        self.indent_level += 1;
+        for (i, element) in elements.iter().enumerate() {
+            self.output.push_str(&self.get_indent());
+            self.output.push_str(&format!("case \"{}\":\n", i));
+            self.indent_level += 1;
+            self.output.push_str(&self.get_indent());
+            self.output.push_str("return ");
+            self.generate_node(element, None);
+            self.output.push_str(";\n");
+            self.indent_level -= 1;
+        }
+        self.indent_level -= 1;
+        self.output.push_str(&self.get_indent());
+        self.output.push_str("}\n");
+        self.indent_level -= 1;
+        self.output.push_str(&self.get_indent());
+        self.output.push_str("};\n");
     }
 
     fn generate_function_declaration(&mut self, name: &str, parameters: &[Node], body: &Node) {
@@ -490,27 +522,27 @@ impl CodegenJS {
             let parameter_variadic = definitions
                 .iter()
                 .any(|(params, _)| params.len() != parameters.len());
-            let literal_parameters = parameters.iter().enumerate().filter(|(_, param)| {
+            let pattern_matched_parameters = parameters.iter().enumerate().filter(|(_, param)| {
                 if let Node::FunctionParameter(node) = param {
-                    matches!(**node, Node::Literal(_) | Node::List(_))
+                    matches!(**node, Node::Literal(_) | Node::List(_) | Node::EnumExtraction { .. })
                 } else {
                     false
                 }
             });
 
-            if parameter_variadic || literal_parameters.clone().count() > 0 {
+            if parameter_variadic || pattern_matched_parameters.clone().count() > 0 {
                 if parameter_variadic {
                     self.output.push_str("if (args.length === ");
                     self.output.push_str(&parameters.len().to_string());
 
-                    if literal_parameters.clone().count() > 0 {
+                    if pattern_matched_parameters.clone().count() > 0 {
                         self.output.push_str(" && ");
                     }
                 } else {
                     self.output.push_str("if (");
                 }
                 // Filter only literal params.
-                for (j, (k, param)) in literal_parameters.enumerate() {
+                for (j, (k, param)) in pattern_matched_parameters.enumerate() {
                     if j > 0 {
                         self.output.push_str(" && ");
                     }
@@ -570,6 +602,34 @@ impl CodegenJS {
                                         _ => unreachable!(),
                                     }
                                 }
+                            }
+                            Node::EnumExtraction { identifier, elements, named_fields } => {
+                                let identifier = match *identifier {
+                                    Node::Identifier(ref name) => name.clone(),
+                                    Node::NestedIdentifier(ref names) => names.clone().pop().unwrap(),
+                                    _ => unreachable!(),
+                                };
+                                self.output.push_str(&format!("args[{}].tag === \"{}\"", k, identifier));
+                                self.indent_level += 1;
+                                for (i, element) in elements.iter().enumerate() {
+                                    // Skip any Wildcards
+                                    if let Node::Wildcard = element {
+                                        continue;
+                                    }
+                                    let identifier = match element {
+                                        Node::Identifier(ref name) => name.clone(),
+                                        Node::NestedIdentifier(ref names) => names.clone().pop().unwrap(),
+                                        _ => unreachable!(),
+                                    };
+                                    self.function_pre_body.push_str(&self.get_indent());
+
+                                    if named_fields {
+                                        self.function_pre_body.push_str(&format!("let {} = args[{}].{};\n", identifier, k, identifier));
+                                    } else {
+                                        self.function_pre_body.push_str(&format!("let {} = args[{}][{}];\n", identifier, k, i));
+                                    }
+                                }
+                                self.indent_level -= 1;
                             }
                             _ => unreachable!(),
                         }

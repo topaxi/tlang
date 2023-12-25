@@ -68,6 +68,11 @@ pub enum Node {
         named_fields: bool,
         parameters: Vec<Node>,
     },
+    EnumExtraction {
+        identifier: Box<Node>,
+        elements: Vec<Node>,
+        named_fields: bool,
+    },
 }
 
 impl<'a> From<&'a Token> for Node {

@@ -1,4 +1,5 @@
 use indoc::indoc;
+use pretty_assertions::assert_eq;
 
 use crate::ast::{BinaryOp, Node, PrefixOp};
 use crate::lexer::Literal;
@@ -1100,6 +1101,170 @@ fn test_enums_with_fields() {
                         Node::Literal(Literal::Integer(42))
                     )])]
                 })
+            }
+        ])
+    );
+}
+
+#[test]
+fn test_enum_tree_max_depth() {
+    let program = parse!(indoc! {"
+        enum Tree {
+            Leaf(value),
+            Node { left, right },
+        }
+
+        fn maximum_depth(Tree::Leaf(_)) { 1 }
+        fn maximum_depth(Tree::Node { left, right }) { 1 + max(maximum_depth(left), maximum_depth(right)) }
+
+        fn main() {
+            let x = Tree::Node {
+                left: Tree::Leaf(1),
+                right: Tree::Node {
+                    left: Tree::Leaf(2),
+                    right: Tree::Leaf(3),
+                },
+            };
+        }
+    "});
+
+    assert_eq!(
+        program,
+        Node::Program(vec![
+            Node::EnumDeclaration {
+                name: "Tree".to_string(),
+                variants: vec![
+                    Node::EnumVariant {
+                        name: "Leaf".to_string(),
+                        named_fields: false,
+                        parameters: vec![Node::Identifier("value".to_string())]
+                    },
+                    Node::EnumVariant {
+                        name: "Node".to_string(),
+                        named_fields: true,
+                        parameters: vec![
+                            Node::Identifier("left".to_string()),
+                            Node::Identifier("right".to_string())
+                        ]
+                    }
+                ]
+            },
+            Node::FunctionDeclarations(
+                "maximum_depth".to_string(),
+                vec![
+                    (
+                        vec![Node::FunctionParameter(Box::new(Node::EnumExtraction {
+                            identifier: Box::new(Node::NestedIdentifier(vec![
+                                "Tree".to_string(),
+                                "Leaf".to_string()
+                            ])),
+                            elements: vec![Node::Wildcard],
+                            named_fields: false,
+                        }))],
+                        Box::new(Node::Block(
+                            vec![],
+                            Some(Box::new(Node::Literal(Literal::Integer(1))))
+                        ))
+                    ),
+                    (
+                        vec![Node::FunctionParameter(Box::new(Node::EnumExtraction {
+                            identifier: Box::new(Node::NestedIdentifier(vec![
+                                "Tree".to_string(),
+                                "Node".to_string()
+                            ])),
+                            elements: vec![
+                                Node::Identifier("left".to_string()),
+                                Node::Identifier("right".to_string())
+                            ],
+                            named_fields: true,
+                        }))],
+                        Box::new(Node::Block(
+                            vec![],
+                            Some(Box::new(Node::BinaryOp {
+                                op: BinaryOp::Add,
+                                lhs: Box::new(Node::Literal(Literal::Integer(1))),
+                                rhs: Box::new(Node::Call {
+                                    function: Box::new(Node::Identifier("max".to_string())),
+                                    arguments: vec![
+                                        Node::Call {
+                                            function: Box::new(Node::Identifier(
+                                                "maximum_depth".to_string()
+                                            )),
+                                            arguments: vec![Node::Identifier("left".to_string())]
+                                        },
+                                        Node::Call {
+                                            function: Box::new(Node::Identifier(
+                                                "maximum_depth".to_string()
+                                            )),
+                                            arguments: vec![Node::Identifier("right".to_string())]
+                                        }
+                                    ]
+                                })
+                            })))
+                        )
+                    )
+                ]
+            ),
+            Node::FunctionDeclaration {
+                name: "main".to_string(),
+                parameters: vec![],
+                body: Box::new(Node::Block(
+                    vec![Node::VariableDeclaration {
+                        name: "x".to_string(),
+                        value: Box::new(Node::Call {
+                            function: Box::new(Node::NestedIdentifier(vec![
+                                "Tree".to_string(),
+                                "Node".to_string()
+                            ])),
+                            arguments: vec![Node::Dict(vec![
+                                (
+                                    Node::Identifier("left".to_string()),
+                                    Node::Call {
+                                        function: Box::new(Node::NestedIdentifier(vec![
+                                            "Tree".to_string(),
+                                            "Leaf".to_string()
+                                        ])),
+                                        arguments: vec![Node::Literal(Literal::Integer(1))]
+                                    }
+                                ),
+                                (
+                                    Node::Identifier("right".to_string()),
+                                    Node::Call {
+                                        function: Box::new(Node::NestedIdentifier(vec![
+                                            "Tree".to_string(),
+                                            "Node".to_string()
+                                        ])),
+                                        arguments: vec![Node::Dict(vec![
+                                            (
+                                                Node::Identifier("left".to_string()),
+                                                Node::Call {
+                                                    function: Box::new(Node::NestedIdentifier(
+                                                        vec!["Tree".to_string(), "Leaf".to_string()]
+                                                    )),
+                                                    arguments: vec![Node::Literal(
+                                                        Literal::Integer(2)
+                                                    )]
+                                                }
+                                            ),
+                                            (
+                                                Node::Identifier("right".to_string()),
+                                                Node::Call {
+                                                    function: Box::new(Node::NestedIdentifier(
+                                                        vec!["Tree".to_string(), "Leaf".to_string()]
+                                                    )),
+                                                    arguments: vec![Node::Literal(
+                                                        Literal::Integer(3)
+                                                    )]
+                                                }
+                                            )
+                                        ])]
+                                    }
+                                )
+                            ])]
+                        })
+                    }],
+                    None
+                ))
             }
         ])
     );

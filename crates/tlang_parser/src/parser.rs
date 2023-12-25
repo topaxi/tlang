@@ -144,6 +144,20 @@ impl<'src> Parser<'src> {
         Node::ReturnStatement(Some(Box::new(self.parse_expression())))
     }
 
+    fn parse_identifier(&mut self) -> Node {
+        let mut identifiers = vec![self.consume_identifier()];
+        while let Some(Token::NamespaceSeparator) = self.current_token {
+            self.advance();
+            identifiers.push(self.consume_identifier());
+        }
+
+        if identifiers.len() == 1 {
+            Node::Identifier(identifiers.pop().unwrap())
+        } else {
+            Node::NestedIdentifier(identifiers)
+        }
+    }
+
     fn parse_enum_declaration(&mut self) -> Node {
         self.consume_token(Token::Enum);
         let name = self.consume_identifier();
@@ -164,7 +178,6 @@ impl<'src> Parser<'src> {
     fn parse_enum_variant(&mut self) -> Node {
         let name = self.consume_identifier();
         log::debug!("Parsing enum variant {}", name);
-        println!("Parsing enum variant {}", name);
         match self.current_token {
             Some(Token::LParen) => {
                 self.advance();
@@ -262,14 +275,14 @@ impl<'src> Parser<'src> {
     /// Parses a function call expression, e.g. `foo()`, `foo(1, 2, 3)` and
     /// `foo { bar, baz }`.
     fn parse_call_expression(&mut self, function: Node) -> Node {
-        println!(
+        log::debug!(
             "Parsing call expression, current token: {:?}",
             self.current_token
         );
         let is_dict_call = self.current_token == Some(Token::LBrace);
         let mut arguments = Vec::new();
 
-        println!("Is dict call: {}", is_dict_call);
+        log::debug!("Is dict call: {}", is_dict_call);
 
         if is_dict_call {
             arguments.push(self.parse_block_or_dict());
@@ -521,6 +534,54 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses an enum extraction, e.g. `Foo(bar, baz)` and `Foo { bar, baz }` within
+    /// a function declarations parameter list.
+    fn parse_enum_extraction(&mut self) -> Node {
+        let identifier = Box::new(self.parse_identifier());
+        let is_dict_extraction = self.current_token == Some(Token::LBrace);
+
+        if is_dict_extraction {
+            self.consume_token(Token::LBrace);
+            let mut elements = Vec::new();
+            while self.current_token != Some(Token::RBrace) {
+                elements.push(self.parse_identifier());
+                if let Some(Token::Comma) = self.current_token {
+                    self.advance();
+                }
+            }
+            self.consume_token(Token::RBrace);
+            Node::EnumExtraction {
+                identifier,
+                elements,
+                named_fields: true,
+            }
+        } else {
+            self.consume_token(Token::LParen);
+            let mut elements = Vec::new();
+            while self.current_token != Some(Token::RParen) {
+                let mut identifier = self.parse_identifier();
+
+                // Remap identifier of _ to Wildcard
+                if let Node::Identifier(ref ident) = identifier {
+                    if ident == "_" {
+                        identifier = Node::Wildcard;
+                    }
+                }
+
+                elements.push(identifier);
+                if let Some(Token::Comma) = self.current_token {
+                    self.advance();
+                }
+            }
+            self.consume_token(Token::RParen);
+            Node::EnumExtraction {
+                identifier,
+                elements,
+                named_fields: false,
+            }
+        }
+    }
+
     fn parse_function_declaration(&mut self) -> Node {
         let mut name: Option<String> = None;
         let mut definitions: Vec<(Vec<Node>, Box<Node>)> = Vec::new();
@@ -544,22 +605,35 @@ impl<'src> Parser<'src> {
             let mut parameters = Vec::new();
             while self.current_token != Some(Token::RParen) {
                 let parameter = match self.current_token {
-                Some(Token::Identifier(_) | Token::Literal(_)) => self.parse_primary_expression(),
-                Some(Token::LBracket) => self.parse_list_extraction(),
-                _ => panic!(
-                    "Expected identifier or literal on line {}, column {}, found {:?} instead\n{}\n{}",
-                    self.lexer.current_line(),
-                    self.lexer.current_column(),
-                    self.current_token,
-                    self.lexer
-                .source()
-                .lines()
-                .nth(self.lexer.current_line() - 1)
-                .unwrap(),
-                    " ".repeat(self.lexer.current_column() - 1) + "^"
-                ),
-            };
+                    // Literal values will be pattern matched
+                    Some(Token::Literal(_)) => self.parse_primary_expression(),
+                    // Identifiers can be namespaced identifiers or call expressions, which should be pattern matched.
+                    // Simple identifiers will be used as is and mapped to a function parameter.
+                    Some(Token::Identifier(_)) => {
+                        if let Some(Token::NamespaceSeparator) = self.peek_token() {
+                            self.parse_enum_extraction()
+                        } else if let Some(Token::LParen | Token::LBrace) = self.peek_token() {
+                            self.parse_enum_extraction()
+                        } else {
+                            Node::Identifier(self.consume_identifier())
+                        }
+                    }
+                    Some(Token::LBracket) => self.parse_list_extraction(),
+                    _ => panic!(
+                        "Expected identifier or literal on line {}, column {}, found {:?} instead\n{}\n{}",
+                        self.lexer.current_line(),
+                        self.lexer.current_column(),
+                        self.current_token,
+                        self.lexer
+                    .source()
+                    .lines()
+                    .nth(self.lexer.current_line() - 1)
+                    .unwrap(),
+                        " ".repeat(self.lexer.current_column() - 1) + "^"
+                    )
+                };
 
+                log::debug!("Parsed parameter: {:?}", parameter);
                 parameters.push(Node::FunctionParameter(Box::new(parameter)));
 
                 if let Some(Token::Comma) = self.current_token {
