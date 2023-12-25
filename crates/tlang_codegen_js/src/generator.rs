@@ -207,6 +207,23 @@ impl CodegenJS {
                 }
                 self.output.push(']');
             }
+            Node::Dict(entries) => {
+                self.output.push_str("{\n");
+                self.indent_level += 1;
+                for (i, (key, value)) in entries.iter().enumerate() {
+                    if i > 0 {
+                        self.output.push_str(",\n");
+                    }
+                    self.output.push_str(&self.get_indent());
+                    self.generate_node(key, None);
+                    self.output.push_str(": ");
+                    self.generate_node(value, None);
+                }
+                self.output.push_str(",\n");
+                self.indent_level -= 1;
+                self.output.push_str(&self.get_indent());
+                self.output.push('}');
+            }
             Node::PrefixOp(op, node) => {
                 match op {
                     PrefixOp::Spread => self.output.push_str("..."),
@@ -330,11 +347,74 @@ impl CodegenJS {
                 self.generate_function_expression(name, parameters, body),
             Node::ReturnStatement(expr) => self.generate_return_statement(expr),
             Node::Identifier(name) => self.output.push_str(name),
+            Node::NestedIdentifier(identifiers) => self.output.push_str(&identifiers.join(".")),
             Node::Call { function, arguments } =>
                 self.generate_call_expression(function, arguments),
-            Node::EnumDeclaration { name, variants } => todo!(),
-            Node::EnumVariant { name, parameters } => todo!(),
+            Node::EnumDeclaration { name, variants } => self.generate_enum_declaration(name, variants),
+            Node::EnumVariant { name, named_fields, parameters } => self.generate_enum_variant(name, *named_fields, parameters),
         }
+    }
+
+    fn generate_enum_declaration(&mut self, name: &str, variants: &[Node]) {
+        self.output.push_str(&self.get_indent());
+        self.output.push_str(&format!("const {} = {{\n", name));
+        self.indent_level += 1;
+        for variant in variants {
+            self.generate_node(variant, None);
+        }
+        self.indent_level -= 1;
+        self.output.push_str(&self.get_indent());
+        self.output.push_str("};\n");
+    }
+
+    fn generate_enum_variant(&mut self, name: &str, named_fields: bool, parameters: &[Node]) {
+        self.output.push_str(&self.get_indent());
+
+        if parameters.is_empty() {
+            self.output
+                .push_str(&format!("{}: {{ tag: \"{}\" }},\n", name, name));
+            return;
+        }
+
+        self.output.push_str(&format!("{}(", name));
+        if named_fields {
+            self.output.push_str("{ ");
+        }
+        for (i, param) in parameters.iter().enumerate() {
+            if i > 0 {
+                self.output.push_str(", ");
+            }
+            self.generate_node(param, None);
+        }
+        if named_fields {
+            self.output.push_str(" }");
+        }
+        self.output.push_str(") {\n");
+        self.indent_level += 1;
+        self.output.push_str(&self.get_indent());
+        self.output.push_str("return {\n");
+        self.indent_level += 1;
+        self.output.push_str(&self.get_indent());
+        self.output
+            .push_str(format!("tag: \"{}\",\n", name).as_str());
+        for (i, param) in parameters.iter().enumerate() {
+            self.output.push_str(&self.get_indent());
+            if named_fields {
+                if let Node::Identifier(i) = param {
+                    self.output.push_str(&i.to_string());
+                }
+            } else {
+                self.output.push_str(&format!("\"{}\": ", i));
+                self.generate_node(param, None);
+            }
+            self.output.push_str(",\n");
+        }
+        self.indent_level -= 1;
+        self.output.push_str(&self.get_indent());
+        self.output.push_str("};\n");
+        self.indent_level -= 1;
+        self.output.push_str(&self.get_indent());
+        self.output.push_str("},\n");
     }
 
     fn generate_function_declaration(&mut self, name: &str, parameters: &[Node], body: &Node) {

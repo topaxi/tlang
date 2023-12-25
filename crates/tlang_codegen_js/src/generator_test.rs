@@ -405,7 +405,6 @@ fn test_char_literals() {
     assert_eq!(output, expected_output);
 }
 
-#[ignore = "implement enums first"]
 #[test]
 fn test_enums() {
     let output = compile!(indoc! {"
@@ -419,20 +418,15 @@ fn test_enums() {
         }
     "});
     let expected_output = indoc! {"
-        let Option = {
+        const Option = {
             Some(x) {
                 return {
                     tag: \"Some\",
                     \"0\": x,
                 };
             },
-            None() {
-                return {
-                    tag: \"None\",
-                };
-            },
+            None: { tag: \"None\" },
         };
-
         function main() {
             let x = Option.Some(42);
         }
@@ -440,7 +434,6 @@ fn test_enums() {
     assert_eq!(output, expected_output);
 }
 
-#[ignore = "implement enums first"]
 #[test]
 fn test_enums_with_fields() {
     let output = compile!(indoc! {"
@@ -461,7 +454,7 @@ fn test_enums_with_fields() {
         }
     "});
     let expected_output = indoc! {"
-        let Node = {
+        const Node = {
             BinaryOperation({ operator, left, right }) {
                 return {
                     tag: \"BinaryOperation\",
@@ -471,7 +464,6 @@ fn test_enums_with_fields() {
                 };
             },
         };
-
         function main() {
             let x = Node.BinaryOperation({
                 operator: \"+\",

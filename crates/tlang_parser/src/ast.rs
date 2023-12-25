@@ -12,6 +12,7 @@ pub enum Node {
     Block(Vec<Node>, Option<Box<Node>>),
     Literal(Literal),
     List(Vec<Node>),
+    Dict(Vec<(Node, Node)>),
     PrefixOp(PrefixOp, Box<Node>),
     BinaryOp {
         op: BinaryOp,
@@ -51,6 +52,7 @@ pub enum Node {
         else_branch: Option<Box<Node>>,
     },
     Identifier(String),
+    NestedIdentifier(Vec<String>),
     Call {
         function: Box<Node>,
         arguments: Vec<Node>,
@@ -63,6 +65,7 @@ pub enum Node {
     },
     EnumVariant {
         name: String,
+        named_fields: bool,
         parameters: Vec<Node>,
     },
 }

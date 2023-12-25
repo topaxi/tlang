@@ -973,3 +973,134 @@ fn test_char_literal() {
         )))])
     );
 }
+
+#[test]
+fn test_dictionary_literal() {
+    let program = parse!(r#"let x = { foo: 1, bar: 2 };"#);
+
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::VariableDeclaration {
+            name: "x".to_string(),
+            value: Box::new(Node::Dict(vec![
+                (
+                    Node::Identifier("foo".to_string()),
+                    Node::Literal(Literal::Integer(1))
+                ),
+                (
+                    Node::Identifier("bar".to_string()),
+                    Node::Literal(Literal::Integer(2))
+                )
+            ]))
+        }])
+    );
+}
+
+#[test]
+fn test_function_call_with_dictionary_no_parens() {
+    let program = parse!(r#"foo { foo: 1, bar: 2 };"#);
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::Call {
+            function: Box::new(Node::Identifier("foo".to_string())),
+            arguments: vec![Node::Dict(vec![
+                (
+                    Node::Identifier("foo".to_string()),
+                    Node::Literal(Literal::Integer(1))
+                ),
+                (
+                    Node::Identifier("bar".to_string()),
+                    Node::Literal(Literal::Integer(2))
+                )
+            ])]
+        }))])
+    );
+}
+
+#[test]
+fn test_enums() {
+    let program = parse!(indoc! {"
+        enum Option {
+            Some(x),
+            None,
+        }
+
+        let x = Option::Some(42);
+    "});
+
+    assert_eq!(
+        program,
+        Node::Program(vec![
+            Node::EnumDeclaration {
+                name: "Option".to_string(),
+                variants: vec![
+                    Node::EnumVariant {
+                        name: "Some".to_string(),
+                        named_fields: false,
+                        parameters: vec![Node::Identifier("x".to_string())]
+                    },
+                    Node::EnumVariant {
+                        name: "None".to_string(),
+                        named_fields: false,
+                        parameters: vec![]
+                    }
+                ]
+            },
+            Node::VariableDeclaration {
+                name: "x".to_string(),
+                value: Box::new(Node::Call {
+                    function: Box::new(Node::NestedIdentifier(vec![
+                        "Option".to_string(),
+                        "Some".to_string()
+                    ])),
+                    arguments: vec![Node::Literal(Literal::Integer(42))]
+                })
+            }
+        ])
+    );
+}
+
+#[test]
+fn test_enums_with_fields() {
+    let program = parse!(indoc! {"
+        enum Option {
+            Some { x },
+            None,
+        }
+        let x = Option::Some { x: 42 };
+    "});
+
+    assert_eq!(
+        program,
+        Node::Program(vec![
+            Node::EnumDeclaration {
+                name: "Option".to_string(),
+                variants: vec![
+                    Node::EnumVariant {
+                        name: "Some".to_string(),
+                        named_fields: true,
+                        parameters: vec![Node::Identifier("x".to_string())]
+                    },
+                    Node::EnumVariant {
+                        name: "None".to_string(),
+                        named_fields: false,
+                        parameters: vec![]
+                    }
+                ]
+            },
+            Node::VariableDeclaration {
+                name: "x".to_string(),
+                value: Box::new(Node::Call {
+                    function: Box::new(Node::NestedIdentifier(vec![
+                        "Option".to_string(),
+                        "Some".to_string()
+                    ])),
+                    arguments: vec![Node::Dict(vec![(
+                        Node::Identifier("x".to_string()),
+                        Node::Literal(Literal::Integer(42))
+                    )])]
+                })
+            }
+        ])
+    );
+}
