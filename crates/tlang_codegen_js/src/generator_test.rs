@@ -620,3 +620,66 @@ fn test_maximum_depth_tree_positional() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_simple_self_recursive_tail_call_converted_to_loop() {
+    let output = compile!(indoc! {"
+        fn factorial(n, acc) {
+            if (n == 0) {
+                return acc;
+            } else {
+                return rec factorial(n - 1, n * acc);
+            };
+        }
+    "});
+    let expected_output = indoc! {"
+        function factorial(n, acc) {
+            while (true) {
+                if (n === 0) {
+                    return acc;
+                } else {
+                    let tmp0 = n - 1;
+                    let tmp1 = n * acc;
+                    n = tmp0;
+                    acc = tmp1;
+                }
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[ignore]
+#[test]
+fn test_explicit_tail_recursive_call_converted_to_loop() {
+    let output = compile!(indoc! {"
+        fn factorial(n) { factorial(n, 1) }
+        fn factorial(0, acc) { acc }
+        fn factorial(n, acc) { rec factorial(n - 1, n * acc) }
+    "});
+    let expected_output = indoc! {"
+        function factorial(...args) {
+            if (args.length === 1) {
+                let n = args[0];
+                return factorial(n, 1);
+            } else if (args.length === 2 && args[0] === 0) {
+                let acc = args[1];
+                return acc;
+            } else if (args.length === 2) {
+                let n = args[0];
+                let acc = args[1];
+                while (true) {
+                    if (n === 0) {
+                        return acc;
+                    } else {
+                        let tmp0 = n - 1;
+                        let tmp1 = n * acc;
+                        n = tmp0;
+                        acc = tmp1;
+                    }
+                }
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+}

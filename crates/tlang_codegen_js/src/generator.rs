@@ -27,11 +27,26 @@ enum BlockContext {
     Expression,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+struct FunctionContext {
+    // The name of the current function we're in.
+    // Empty string for anonymous functions.
+    name: String,
+
+    // The parameters of the current function we're in.
+    params: Vec<String>,
+
+    // Is the current function body tail recursive?
+    // This is used to determine if we should unwrap the recursion into a while loop.
+    is_tail_recursive: bool,
+}
+
 #[derive(Debug, PartialEq)]
 pub struct CodegenJS {
     output: String,
     indent_level: usize,
     context_stack: Vec<BlockContext>,
+    function_context_stack: Vec<FunctionContext>,
     function_pre_body: String,
 }
 
@@ -47,6 +62,7 @@ impl CodegenJS {
             output: String::new(),
             indent_level: 0,
             context_stack: vec![BlockContext::Program],
+            function_context_stack: vec![],
             function_pre_body: String::new(),
         }
     }
@@ -350,9 +366,39 @@ impl CodegenJS {
             Node::NestedIdentifier(identifiers) => self.output.push_str(&identifiers.join(".")),
             Node::Call { function, arguments } =>
                 self.generate_call_expression(function, arguments),
+            Node::RecursiveCall(node) => {
+                // If call expression is referencing the current function, all we do is update the arguments,
+                // as we are in a while loop.
+                if let Node::Call { function, arguments } = *node.clone() {
+                    if let Node::Identifier(name) = *function {
+                        if let Some(function_context) = self.function_context_stack.last() {
+                            println!("{} == {}", function_context.name, name);
+                            if function_context.is_tail_recursive && function_context.name == name {
+                                let params = function_context.params.clone();
+
+                                for (i, arg) in arguments.iter().enumerate() {
+                                    self.output.push_str(&self.get_indent());
+                                    self.output.push_str(&format!("let tmp{} = ", i));
+                                    self.generate_node(arg, None);
+                                    self.output.push_str(";\n");
+                                }
+                                for (i, arg_name) in params.iter().enumerate() {
+                                    self.output.push_str(&self.get_indent());
+                                    self.output.push_str(&format!("{} = tmp{};\n", arg_name, i));
+                                }
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                // For any other referenced function, we do a normal call expression.
+                self.generate_node(node, parent_op)
+            },
             Node::EnumDeclaration { name, variants } => self.generate_enum_declaration(name, variants),
             Node::EnumVariant { name, named_fields, parameters } => self.generate_enum_variant(name, *named_fields, parameters),
             Node::EnumExtraction { identifier, elements, named_fields } => self.generate_enum_extraction(identifier, elements, *named_fields),
+            _ => unimplemented!("{:?} not implemented yet.", node),
         }
     }
 
@@ -418,7 +464,12 @@ impl CodegenJS {
         self.output.push_str("},\n");
     }
 
-    fn generate_enum_extraction(&mut self, identifier: &Box<Node>, elements: &[Node], named_fields: bool) {
+    fn generate_enum_extraction(
+        &mut self,
+        identifier: &Box<Node>,
+        elements: &[Node],
+        named_fields: bool,
+    ) {
         self.output.push_str(&self.get_indent());
         self.output.push_str("const ");
         self.generate_node(identifier, None);
@@ -449,7 +500,93 @@ impl CodegenJS {
         self.output.push_str("};\n");
     }
 
+    fn is_function_body_tail_recursive(&self, function_name: &str, node: &Node) -> bool {
+        println!(
+            "Checking if {} is tail recursive: {:?}",
+            function_name, node
+        );
+        // Recursively traverse nodes to check for tail recursive calls to the function itself.
+        // We currently only support tail recursion to the function itself, not any other function.
+        // Therefore we look for RecursiveCall nodes which reference the current function name.
+        match node {
+            Node::RecursiveCall(node) => {
+                // Node is a Call expression, unwrap first.
+                if let Node::Call {
+                    function,
+                    arguments: _,
+                } = node.as_ref()
+                {
+                    // If the function is an identifier, check if it's the same as the current function name.
+                    if let Node::Identifier(name) = function.as_ref() {
+                        if name == function_name {
+                            return true;
+                        }
+                    }
+                }
+                false
+            }
+            Node::Block(statements, expression) => {
+                for statement in statements {
+                    if self.is_function_body_tail_recursive(function_name, statement) {
+                        return true;
+                    }
+                }
+                if let Some(expression) = expression {
+                    return self.is_function_body_tail_recursive(function_name, expression);
+                }
+                false
+            }
+            Node::ExpressionStatement(expression) => {
+                self.is_function_body_tail_recursive(function_name, expression)
+            }
+            Node::Match {
+                expression,
+                arms: _,
+            } => self.is_function_body_tail_recursive(function_name, expression),
+            Node::MatchArm {
+                pattern: _,
+                expression,
+            } => self.is_function_body_tail_recursive(function_name, expression),
+            Node::IfElse {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                self.is_function_body_tail_recursive(function_name, condition)
+                    || self.is_function_body_tail_recursive(function_name, then_branch)
+                    || else_branch.as_ref().map_or(false, |branch| {
+                        self.is_function_body_tail_recursive(function_name, branch)
+                    })
+            }
+            Node::ReturnStatement(node) => {
+                if node.is_some() {
+                    self.is_function_body_tail_recursive(function_name, &node.clone().unwrap())
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
     fn generate_function_declaration(&mut self, name: &str, parameters: &[Node], body: &Node) {
+        let is_tail_recursive = self.is_function_body_tail_recursive(name, body);
+        self.function_context_stack.push(FunctionContext {
+            name: name.to_string(),
+            params: parameters
+                .iter()
+                .filter_map(|param| {
+                    if let Node::FunctionParameter(node) = param {
+                        if let Node::Identifier(ref name) = **node {
+                            return Some(name.clone());
+                        }
+                    }
+                    None
+                })
+                .collect(),
+            is_tail_recursive,
+        });
+
         self.output.push_str(&self.get_indent());
         self.output.push_str(&format!("function {}(", name));
 
@@ -463,11 +600,23 @@ impl CodegenJS {
         self.output.push_str(") {\n");
         self.indent_level += 1;
         self.context_stack.push(BlockContext::FunctionBody);
+        println!("{} is tail recursive: {}", name, is_tail_recursive);
+        if is_tail_recursive {
+            self.output.push_str(&self.get_indent());
+            self.output.push_str("while (true) {\n");
+            self.indent_level += 1;
+        }
         self.generate_node(body, None);
+        if is_tail_recursive {
+            self.indent_level -= 1;
+            self.output.push_str(&self.get_indent());
+            self.output.push_str("}\n");
+        }
         self.context_stack.pop();
         self.indent_level -= 1;
         self.output.push_str(&self.get_indent());
         self.output.push_str("}\n");
+        self.function_context_stack.pop();
     }
 
     fn generate_function_expression(
@@ -476,6 +625,24 @@ impl CodegenJS {
         parameters: &[Node],
         body: &Node,
     ) {
+        self.function_context_stack.push(FunctionContext {
+            name: name.clone().unwrap_or("".to_string()).to_string(),
+            params: parameters
+                .iter()
+                .filter_map(|param| {
+                    if let Node::FunctionParameter(node) = param {
+                        if let Node::Identifier(ref name) = **node {
+                            return Some(name.clone());
+                        }
+                    }
+                    None
+                })
+                .collect(),
+            is_tail_recursive: self.is_function_body_tail_recursive(
+                &name.clone().unwrap_or("".to_string()).to_string(),
+                body,
+            ),
+        });
         let function_keyword = match name {
             Some(name) => format!("function {}(", name),
             None => "function(".to_string(),
@@ -498,6 +665,7 @@ impl CodegenJS {
         self.indent_level -= 1;
         self.output.push_str(&self.get_indent());
         self.output.push('}');
+        self.function_context_stack.pop();
     }
 
     fn generate_function_declarations(
@@ -505,6 +673,24 @@ impl CodegenJS {
         name: &str,
         definitions: &[(Vec<Node>, Box<Node>)],
     ) {
+        // TODO: Handle tail recursion for multiple definitions.
+        self.function_context_stack.push(FunctionContext {
+            name: name.to_string(),
+            params: definitions
+                .iter()
+                .flat_map(|(params, _)| {
+                    params.iter().filter_map(|param| {
+                        if let Node::FunctionParameter(node) = param {
+                            if let Node::Identifier(ref name) = **node {
+                                return Some(name.clone());
+                            }
+                        }
+                        None
+                    })
+                })
+                .collect(),
+            is_tail_recursive: false,
+        });
         self.output.push_str(&self.get_indent());
         self.output
             .push_str(&format!("function {}(...args) {{\n", name));
@@ -524,7 +710,10 @@ impl CodegenJS {
                 .any(|(params, _)| params.len() != parameters.len());
             let pattern_matched_parameters = parameters.iter().enumerate().filter(|(_, param)| {
                 if let Node::FunctionParameter(node) = param {
-                    matches!(**node, Node::Literal(_) | Node::List(_) | Node::EnumExtraction { .. })
+                    matches!(
+                        **node,
+                        Node::Literal(_) | Node::List(_) | Node::EnumExtraction { .. }
+                    )
                 } else {
                     false
                 }
@@ -603,13 +792,20 @@ impl CodegenJS {
                                     }
                                 }
                             }
-                            Node::EnumExtraction { identifier, elements, named_fields } => {
+                            Node::EnumExtraction {
+                                identifier,
+                                elements,
+                                named_fields,
+                            } => {
                                 let identifier = match *identifier {
                                     Node::Identifier(ref name) => name.clone(),
-                                    Node::NestedIdentifier(ref names) => names.clone().pop().unwrap(),
+                                    Node::NestedIdentifier(ref names) => {
+                                        names.clone().pop().unwrap()
+                                    }
                                     _ => unreachable!(),
                                 };
-                                self.output.push_str(&format!("args[{}].tag === \"{}\"", k, identifier));
+                                self.output
+                                    .push_str(&format!("args[{}].tag === \"{}\"", k, identifier));
                                 self.indent_level += 1;
                                 for (i, element) in elements.iter().enumerate() {
                                     // Skip any Wildcards
@@ -618,15 +814,23 @@ impl CodegenJS {
                                     }
                                     let identifier = match element {
                                         Node::Identifier(ref name) => name.clone(),
-                                        Node::NestedIdentifier(ref names) => names.clone().pop().unwrap(),
+                                        Node::NestedIdentifier(ref names) => {
+                                            names.clone().pop().unwrap()
+                                        }
                                         _ => unreachable!(),
                                     };
                                     self.function_pre_body.push_str(&self.get_indent());
 
                                     if named_fields {
-                                        self.function_pre_body.push_str(&format!("let {} = args[{}].{};\n", identifier, k, identifier));
+                                        self.function_pre_body.push_str(&format!(
+                                            "let {} = args[{}].{};\n",
+                                            identifier, k, identifier
+                                        ));
                                     } else {
-                                        self.function_pre_body.push_str(&format!("let {} = args[{}][{}];\n", identifier, k, i));
+                                        self.function_pre_body.push_str(&format!(
+                                            "let {} = args[{}][{}];\n",
+                                            identifier, k, i
+                                        ));
                                     }
                                 }
                                 self.indent_level -= 1;
@@ -665,9 +869,40 @@ impl CodegenJS {
         self.output.push('\n');
         self.output.push_str(&self.get_indent());
         self.output.push_str("}\n");
+        self.function_context_stack.pop();
     }
 
     fn generate_return_statement(&mut self, expr: &Option<Box<Node>>) {
+        // We do not render a return statement if we are in a tail recursive function body.
+        // Which calls the current function recursively.
+        if expr.is_some() {
+            if let Node::RecursiveCall(call_exp) = *expr.clone().unwrap() {
+                let call_identifier = match *call_exp {
+                    Node::Call {
+                        function,
+                        arguments: _,
+                    } => {
+                        if let Node::Identifier(name) = *function {
+                            Some(name)
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                };
+
+                if call_identifier.is_some() {
+                    if let Some(function_context) = self.function_context_stack.last() {
+                        if function_context.is_tail_recursive
+                            && function_context.name == call_identifier.unwrap()
+                        {
+                            return self.generate_node(&expr.clone().unwrap(), None);
+                        }
+                    }
+                }
+            }
+        }
+
         self.output.push_str(&self.get_indent());
         self.output.push_str("return");
 

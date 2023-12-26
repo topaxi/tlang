@@ -42,7 +42,7 @@ impl<'src> Parser<'src> {
                     .source()
                     .lines()
                     .nth(self.lexer.current_line() - 1)
-                    .unwrap(),
+                    .unwrap_or("!!!Code not available!!!"),
                 " ".repeat(self.lexer.current_column() - 1) + "^"
             );
         }
@@ -432,6 +432,10 @@ impl<'src> Parser<'src> {
                 }
             }
             Some(Token::Fn) => self.parse_function_expression(),
+            Some(Token::Rec) => {
+                self.advance();
+                Node::RecursiveCall(Box::new(self.parse_expression()))
+            }
             Some(Token::Match) => self.parse_match_expression(),
             Some(token) => {
                 let mut node: Node = token.into();

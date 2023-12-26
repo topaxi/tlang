@@ -101,10 +101,12 @@ fn test_namespace_separator() {
 
 #[test]
 fn test_keywords() {
-    let mut lexer = Lexer::new("let fn if else match enum struct");
+    let mut lexer = Lexer::new("let fn rec return if else match enum struct");
 
     assert_eq!(lexer.next_token(), Token::Let);
     assert_eq!(lexer.next_token(), Token::Fn);
+    assert_eq!(lexer.next_token(), Token::Rec);
+    assert_eq!(lexer.next_token(), Token::Return);
     assert_eq!(lexer.next_token(), Token::If);
     assert_eq!(lexer.next_token(), Token::Else);
     assert_eq!(lexer.next_token(), Token::Match);

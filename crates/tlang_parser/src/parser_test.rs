@@ -1269,3 +1269,73 @@ fn test_enum_tree_max_depth() {
         ])
     );
 }
+
+#[test]
+fn test_explicit_tail_recursive_call() {
+    let program = parse!(indoc! {"
+        fn factorial(n) { factorial(n, 1) }
+        fn factorial(0, acc) { acc }
+        fn factorial(n, acc) { rec factorial(n - 1, n * acc) }
+    "});
+    
+    assert_eq!(
+        program,
+        Node::Program(vec![
+            Node::FunctionDeclarations(
+                "factorial".to_string(),
+                vec![
+                    (
+                        vec![
+                            Node::FunctionParameter(Box::new(Node::Identifier(
+                                "n".to_string()
+                            )))
+                        ],
+                        Box::new(Node::Block(vec![], Some(Box::new(Node::Call {
+                            function: Box::new(Node::Identifier("factorial".to_string())),
+                            arguments: vec![
+                                Node::Identifier("n".to_string()),
+                                Node::Literal(Literal::Integer(1))
+                            ]
+                        })))),
+                    ),
+                    (
+                        vec![
+                            Node::FunctionParameter(Box::new(Node::Literal(
+                                Literal::Integer(0)
+                            ))),
+                            Node::FunctionParameter(Box::new(Node::Identifier(
+                                "acc".to_string()
+                            )))
+                        ],
+                        Box::new(Node::Block(vec![], Some(Box::new(Node::Identifier("acc".to_string()))))),
+                    ),
+                    (
+                        vec![
+                            Node::FunctionParameter(Box::new(Node::Identifier(
+                                "n".to_string()
+                            ))),
+                            Node::FunctionParameter(Box::new(Node::Identifier(
+                                "acc".to_string()
+                            )))
+                        ],
+                        Box::new(Node::Block(vec![], Some(Box::new(Node::RecursiveCall(Box::new(Node::Call {
+                            function: Box::new(Node::Identifier("factorial".to_string())),
+                            arguments: vec![
+                                Node::BinaryOp {
+                                    op: BinaryOp::Subtract,
+                                    lhs: Box::new(Node::Identifier("n".to_string())),
+                                    rhs: Box::new(Node::Literal(Literal::Integer(1)))
+                                },
+                                Node::BinaryOp {
+                                    op: BinaryOp::Multiply,
+                                    lhs: Box::new(Node::Identifier("n".to_string())),
+                                    rhs: Box::new(Node::Identifier("acc".to_string()))
+                                }
+                            ]
+                        })))))),
+                    )
+                ]
+            )
+        ])
+    );
+}

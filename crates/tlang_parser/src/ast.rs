@@ -57,6 +57,7 @@ pub enum Node {
         function: Box<Node>,
         arguments: Vec<Node>,
     },
+    RecursiveCall(Box<Node>),
     SingleLineComment(String),
     MultiLineComment(String),
     EnumDeclaration {
