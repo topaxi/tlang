@@ -386,7 +386,6 @@ impl CodegenJS {
                 if let Node::Call { function, arguments } = node.as_ref() {
                     if let Node::Identifier(name) = function.as_ref() {
                         if let Some(function_context) = self.function_context_stack.last() {
-                            println!("{} == {}", function_context.name, name);
                             if function_context.is_tail_recursive && &function_context.name == name {
                                 let params = function_context.params.clone();
                                 let remap_to_rest_args = function_context.remap_to_rest_args;
@@ -499,10 +498,6 @@ impl CodegenJS {
     }
 
     fn is_function_body_tail_recursive(&self, function_name: &str, node: &Node) -> bool {
-        println!(
-            "Checking if {} is tail recursive: {:?}",
-            function_name, node
-        );
         // Recursively traverse nodes to check for tail recursive calls to the function itself.
         // We currently only support tail recursion to the function itself, not any other function.
         // Therefore we look for RecursiveCall nodes which reference the current function name.
