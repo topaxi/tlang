@@ -331,7 +331,7 @@ impl CodegenJS {
                 self.indent_level += 1;
                 self.context_stack.push(BlockContext::Expression);
                 self.generate_node(then_branch, None);
-                self.context_stack.push(BlockContext::Expression);
+                self.context_stack.pop();
                 self.indent_level -= 1;
 
                 if let Some(else_branch) = else_branch {
@@ -340,7 +340,7 @@ impl CodegenJS {
                     self.indent_level += 1;
                     self.context_stack.push(BlockContext::Expression);
                     self.generate_node(else_branch, None);
-                    self.context_stack.push(BlockContext::Expression);
+                    self.context_stack.pop();
                     self.indent_level -= 1;
                 }
 
@@ -468,7 +468,7 @@ impl CodegenJS {
         &mut self,
         identifier: &Box<Node>,
         elements: &[Node],
-        named_fields: bool,
+        _named_fields: bool,
     ) {
         self.output.push_str(&self.get_indent());
         self.output.push_str("const ");

@@ -660,7 +660,8 @@ fn test_fn_expression_explicit_tail_recursive_call_converted_to_loop() {
                     return rec rec_helper(n - 1, n * acc);
                 };
             };
-            return factorial_rec(n, 1);
+
+            factorial_rec(n, 1)
         }
     "});
     let expected_output = indoc! {"
