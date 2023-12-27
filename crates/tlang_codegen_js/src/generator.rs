@@ -369,11 +369,11 @@ impl CodegenJS {
             Node::RecursiveCall(node) => {
                 // If call expression is referencing the current function, all we do is update the arguments,
                 // as we are in a while loop.
-                if let Node::Call { function, arguments } = *node.clone() {
-                    if let Node::Identifier(name) = *function {
+                if let Node::Call { function, arguments } = node.as_ref() {
+                    if let Node::Identifier(name) = function.as_ref() {
                         if let Some(function_context) = self.function_context_stack.last() {
                             println!("{} == {}", function_context.name, name);
-                            if function_context.is_tail_recursive && function_context.name == name {
+                            if function_context.is_tail_recursive && &function_context.name == name {
                                 let params = function_context.params.clone();
 
                                 for (i, arg) in arguments.iter().enumerate() {
@@ -532,8 +532,8 @@ impl CodegenJS {
                     })
             }
             Node::ReturnStatement(node) => {
-                if node.is_some() {
-                    self.is_function_body_tail_recursive(function_name, &node.clone().unwrap())
+                if let Some(node) = node {
+                    self.is_function_body_tail_recursive(function_name, node)
                 } else {
                     false
                 }
@@ -569,7 +569,7 @@ impl CodegenJS {
                 .iter()
                 .filter_map(|param| {
                     if let Node::FunctionParameter(node) = param {
-                        if let Node::Identifier(ref name) = **node {
+                        if let Node::Identifier(ref name) = node.as_ref() {
                             return Some(name.clone());
                         }
                     }
@@ -714,7 +714,7 @@ impl CodegenJS {
                     }
 
                     if let Node::FunctionParameter(node) = param {
-                        match *node.clone() {
+                        match node.as_ref() {
                             Node::Identifier(_) | Node::Literal(_) => {
                                 self.output.push_str(&format!("args[{}] === ", k));
                                 self.generate_node(param, None);
@@ -774,9 +774,9 @@ impl CodegenJS {
                                 elements,
                                 named_fields,
                             } => {
-                                let identifier = match *identifier {
-                                    Node::Identifier(ref name) => name.clone(),
-                                    Node::NestedIdentifier(ref names) => {
+                                let identifier = match identifier.as_ref() {
+                                    Node::Identifier(name) => name.clone(),
+                                    Node::NestedIdentifier(names) => {
                                         names.clone().pop().unwrap()
                                     }
                                     _ => unreachable!(),
@@ -798,7 +798,7 @@ impl CodegenJS {
                                     };
                                     self.function_pre_body.push_str(&self.get_indent());
 
-                                    if named_fields {
+                                    if *named_fields {
                                         self.function_pre_body.push_str(&format!(
                                             "let {} = args[{}].{};\n",
                                             identifier, k, identifier
