@@ -776,9 +776,7 @@ impl CodegenJS {
                             } => {
                                 let identifier = match identifier.as_ref() {
                                     Node::Identifier(name) => name.clone(),
-                                    Node::NestedIdentifier(names) => {
-                                        names.clone().pop().unwrap()
-                                    }
+                                    Node::NestedIdentifier(names) => names.clone().pop().unwrap(),
                                     _ => unreachable!(),
                                 };
                                 self.output
