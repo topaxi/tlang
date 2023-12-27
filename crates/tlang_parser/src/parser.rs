@@ -43,7 +43,7 @@ impl<'src> Parser<'src> {
         let column = self.current_column;
         let source_line = self.lexer.source().lines().nth(line - 1).unwrap();
         let caret = " ".repeat(column - 1) + "^";
-    
+
         panic!(
             "Expected {} on line {}, column {}, found {:?} instead\n{}\n{}",
             expected, line, column, actual, source_line, caret
@@ -460,12 +460,9 @@ impl<'src> Parser<'src> {
                 node
             }
             _ => {
-                self.panic_unexpected_token(
-                    "primary expression",
-                    self.current_token.clone(),
-                );
+                self.panic_unexpected_token("primary expression", self.current_token.clone());
                 unreachable!()
-            },
+            }
         }
     }
 

@@ -684,9 +684,34 @@ fn test_fn_expression_explicit_tail_recursive_call_converted_to_loop() {
     assert_eq!(output, expected_output);
 }
 
-#[ignore]
 #[test]
-fn test_explicit_tail_recursive_call_converted_to_loop() {
+fn test_explicit_tail_recursive_call_converted_to_loop_factorial_simple() {
+    let output = compile!(indoc! {"
+        fn factorial(0, acc) { acc }
+        fn factorial(n, acc) { return rec factorial(n - 1, n * acc); }
+    "});
+    let expected_output = indoc! {"
+        function factorial(...args) {
+            while (true) {
+                if (args[0] === 0) {
+                    let acc = args[1];
+                    return acc;
+                } else {
+                    let n = args[0];
+                    let acc = args[1];
+                    let tmp0 = n - 1;
+                    let tmp1 = n * acc;
+                    args[0] = tmp0;
+                    args[1] = tmp1;
+                }
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn test_explicit_tail_recursive_call_converted_to_loop_factorial_convenient() {
     let output = compile!(indoc! {"
         fn factorial(n) { factorial(n, 1) }
         fn factorial(0, acc) { acc }
@@ -694,24 +719,59 @@ fn test_explicit_tail_recursive_call_converted_to_loop() {
     "});
     let expected_output = indoc! {"
         function factorial(...args) {
-            if (args.length === 1) {
-                let n = args[0];
-                return factorial(n, 1);
-            } else if (args.length === 2 && args[0] === 0) {
-                let acc = args[1];
-                return acc;
-            } else if (args.length === 2) {
-                let n = args[0];
-                let acc = args[1];
-                while (true) {
-                    if (n === 0) {
-                        return acc;
-                    } else {
-                        let tmp0 = n - 1;
-                        let tmp1 = n * acc;
-                        n = tmp0;
-                        acc = tmp1;
-                    }
+            while (true) {
+                if (args.length === 1) {
+                    let n = args[0];
+                    return factorial(n, 1);
+                } else if (args.length === 2 && args[0] === 0) {
+                    let acc = args[1];
+                    return acc;
+                } else if (args.length === 2) {
+                    let n = args[0];
+                    let acc = args[1];
+                    let tmp0 = n - 1;
+                    let tmp1 = n * acc;
+                    args[0] = tmp0;
+                    args[1] = tmp1;
+                }
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn test_tail_recursive_fibonacci() {
+    let output = compile!(indoc! {"
+        fn fibonacci(n) { fibonacci(n, 0, 1) }
+        fn fibonacci(0, a, b) { a }
+        fn fibonacci(1, a, b) { b }
+        fn fibonacci(n, a, b) { rec fibonacci(n - 1, b, a + b) }
+    "});
+    let expected_output = indoc! {"
+        function fibonacci(...args) {
+            while (true) {
+                if (args.length === 1) {
+                    let n = args[0];
+                    return fibonacci(n, 0, 1);
+                } else if (args.length === 3 && args[0] === 0) {
+                    let a = args[1];
+                    let b = args[2];
+                    return a;
+                } else if (args.length === 3 && args[0] === 1) {
+                    let a = args[1];
+                    let b = args[2];
+                    return b;
+                } else if (args.length === 3) {
+                    let n = args[0];
+                    let a = args[1];
+                    let b = args[2];
+                    let tmp0 = n - 1;
+                    let tmp1 = b;
+                    let tmp2 = a + b;
+                    args[0] = tmp0;
+                    args[1] = tmp1;
+                    args[2] = tmp2;
                 }
             }
         }

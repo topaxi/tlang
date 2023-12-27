@@ -256,6 +256,9 @@ fn test_string_literal() {
 fn test_char_literal() {
     let mut lexer = Lexer::new("'a'");
 
-    assert_eq!(lexer.next_token(), Token::Literal(Literal::Char("a".to_string())));
+    assert_eq!(
+        lexer.next_token(),
+        Token::Literal(Literal::Char("a".to_string()))
+    );
     assert_eq!(lexer.next_token(), Token::Eof);
 }

@@ -699,12 +699,10 @@ fn test_implicit_return_expressions() {
             name: "foo".to_string(),
             parameters: vec![],
             body: Box::new(Node::Block(
-                vec![
-                    Node::VariableDeclaration {
-                        name: "x".to_string(),
-                        value: Box::new(Node::Literal(Literal::Integer(1)))
-                    },
-                ],
+                vec![Node::VariableDeclaration {
+                    name: "x".to_string(),
+                    value: Box::new(Node::Literal(Literal::Integer(1)))
+                },],
                 Some(Box::new(Node::Identifier("x".to_string())))
             ))
         }])
@@ -1272,8 +1270,8 @@ fn test_enum_tree_max_depth() {
                                         }
                                     ]
                                 })
-                            })))
-                        )
+                            }))
+                        ))
                     )
                 ]
             ),
@@ -1311,7 +1309,10 @@ fn test_enum_tree_max_depth() {
                                                 Node::Identifier("left".to_string()),
                                                 Node::Call {
                                                     function: Box::new(Node::NestedIdentifier(
-                                                        vec!["Tree".to_string(), "Leaf".to_string()]
+                                                        vec![
+                                                            "Tree".to_string(),
+                                                            "Leaf".to_string()
+                                                        ]
                                                     )),
                                                     arguments: vec![Node::Literal(
                                                         Literal::Integer(2)
@@ -1322,7 +1323,10 @@ fn test_enum_tree_max_depth() {
                                                 Node::Identifier("right".to_string()),
                                                 Node::Call {
                                                     function: Box::new(Node::NestedIdentifier(
-                                                        vec!["Tree".to_string(), "Leaf".to_string()]
+                                                        vec![
+                                                            "Tree".to_string(),
+                                                            "Leaf".to_string()
+                                                        ]
                                                     )),
                                                     arguments: vec![Node::Literal(
                                                         Literal::Integer(3)
@@ -1349,48 +1353,45 @@ fn test_explicit_tail_recursive_call() {
         fn factorial(0, acc) { acc }
         fn factorial(n, acc) { rec factorial(n - 1, n * acc) }
     "});
-    
+
     assert_eq!(
         program,
-        Node::Program(vec![
-            Node::FunctionDeclarations(
-                "factorial".to_string(),
-                vec![
-                    (
-                        vec![
-                            Node::FunctionParameter(Box::new(Node::Identifier(
-                                "n".to_string()
-                            )))
-                        ],
-                        Box::new(Node::Block(vec![], Some(Box::new(Node::Call {
+        Node::Program(vec![Node::FunctionDeclarations(
+            "factorial".to_string(),
+            vec![
+                (
+                    vec![Node::FunctionParameter(Box::new(Node::Identifier(
+                        "n".to_string()
+                    )))],
+                    Box::new(Node::Block(
+                        vec![],
+                        Some(Box::new(Node::Call {
                             function: Box::new(Node::Identifier("factorial".to_string())),
                             arguments: vec![
                                 Node::Identifier("n".to_string()),
                                 Node::Literal(Literal::Integer(1))
                             ]
-                        })))),
-                    ),
-                    (
-                        vec![
-                            Node::FunctionParameter(Box::new(Node::Literal(
-                                Literal::Integer(0)
-                            ))),
-                            Node::FunctionParameter(Box::new(Node::Identifier(
-                                "acc".to_string()
-                            )))
-                        ],
-                        Box::new(Node::Block(vec![], Some(Box::new(Node::Identifier("acc".to_string()))))),
-                    ),
-                    (
-                        vec![
-                            Node::FunctionParameter(Box::new(Node::Identifier(
-                                "n".to_string()
-                            ))),
-                            Node::FunctionParameter(Box::new(Node::Identifier(
-                                "acc".to_string()
-                            )))
-                        ],
-                        Box::new(Node::Block(vec![], Some(Box::new(Node::RecursiveCall(Box::new(Node::Call {
+                        }))
+                    )),
+                ),
+                (
+                    vec![
+                        Node::FunctionParameter(Box::new(Node::Literal(Literal::Integer(0)))),
+                        Node::FunctionParameter(Box::new(Node::Identifier("acc".to_string())))
+                    ],
+                    Box::new(Node::Block(
+                        vec![],
+                        Some(Box::new(Node::Identifier("acc".to_string())))
+                    )),
+                ),
+                (
+                    vec![
+                        Node::FunctionParameter(Box::new(Node::Identifier("n".to_string()))),
+                        Node::FunctionParameter(Box::new(Node::Identifier("acc".to_string())))
+                    ],
+                    Box::new(Node::Block(
+                        vec![],
+                        Some(Box::new(Node::RecursiveCall(Box::new(Node::Call {
                             function: Box::new(Node::Identifier("factorial".to_string())),
                             arguments: vec![
                                 Node::BinaryOp {
@@ -1404,11 +1405,11 @@ fn test_explicit_tail_recursive_call() {
                                     rhs: Box::new(Node::Identifier("acc".to_string()))
                                 }
                             ]
-                        })))))),
-                    )
-                ]
-            )
-        ])
+                        }))))
+                    )),
+                )
+            ]
+        )])
     );
 }
 

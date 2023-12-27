@@ -39,6 +39,9 @@ struct FunctionContext {
     // Is the current function body tail recursive?
     // This is used to determine if we should unwrap the recursion into a while loop.
     is_tail_recursive: bool,
+
+    // Should remap to rest args?
+    remap_to_rest_args: bool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -191,6 +194,17 @@ impl CodegenJS {
                     BlockContext::Program => unreachable!("Block with completion in ProgramBlock context not implemented yet."),
                     BlockContext::Statement => unimplemented!("Block with completion in StatementBlock context not implemented yet."),
                     BlockContext::FunctionBody => {
+                        // We only render the return statement if we are not in a tail recursive function body
+                        // and the node is RecursiveCall pointing to the current function. 
+                        if let Some(function_context) = self.function_context_stack.last() {
+                            if function_context.is_tail_recursive {
+                                if let Some(Node::RecursiveCall(_)) = expression.as_deref() {
+                                    self.generate_node(&expression.clone().unwrap(), None);
+                                    return;
+                                }
+                            }
+                        }
+
                         self.output.push_str(&self.get_indent());
                         self.output.push_str("return ");
                         self.generate_node(expression.as_ref().unwrap(), None);
@@ -375,6 +389,7 @@ impl CodegenJS {
                             println!("{} == {}", function_context.name, name);
                             if function_context.is_tail_recursive && &function_context.name == name {
                                 let params = function_context.params.clone();
+                                let remap_to_rest_args = function_context.remap_to_rest_args;
 
                                 for (i, arg) in arguments.iter().enumerate() {
                                     self.output.push_str(&self.get_indent());
@@ -382,9 +397,16 @@ impl CodegenJS {
                                     self.generate_node(arg, None);
                                     self.output.push_str(";\n");
                                 }
-                                for (i, arg_name) in params.iter().enumerate() {
-                                    self.output.push_str(&self.get_indent());
-                                    self.output.push_str(&format!("{} = tmp{};\n", arg_name, i));
+                                if remap_to_rest_args {
+                                    for (i, _arg_name) in params.iter().enumerate() {
+                                        self.output.push_str(&self.get_indent());
+                                        self.output.push_str(&format!("args[{}] = tmp{};\n", i, i));
+                                    }
+                                } else {
+                                    for (i, arg_name) in params.iter().enumerate() {
+                                        self.output.push_str(&self.get_indent());
+                                        self.output.push_str(&format!("{} = tmp{};\n", arg_name, i));
+                                    }
                                 }
                                 return;
                             }
@@ -545,8 +567,7 @@ impl CodegenJS {
         }
     }
 
-    fn generate_function_body(&mut self, name: &str, body: &Node) {
-        let is_tail_recursive = self.is_function_body_tail_recursive(name, body);
+    fn generate_function_body(&mut self, body: &Node, is_tail_recursive: bool) {
         self.context_stack.push(BlockContext::FunctionBody);
         self.output.push_str(&self.function_pre_body);
         self.function_pre_body.clear();
@@ -580,6 +601,7 @@ impl CodegenJS {
                 })
                 .collect(),
             is_tail_recursive,
+            remap_to_rest_args: false,
         });
 
         self.output.push_str(&self.get_indent());
@@ -594,7 +616,7 @@ impl CodegenJS {
 
         self.output.push_str(") {\n");
         self.indent_level += 1;
-        self.generate_function_body(name, body);
+        self.generate_function_body(body, is_tail_recursive);
         self.indent_level -= 1;
         self.output.push_str(&self.get_indent());
         self.output.push_str("}\n");
@@ -607,6 +629,10 @@ impl CodegenJS {
         parameters: &[Node],
         body: &Node,
     ) {
+        let is_tail_recursive = self.is_function_body_tail_recursive(
+            &name.clone().unwrap_or("".to_string()).to_string(),
+            body,
+        );
         self.function_context_stack.push(FunctionContext {
             name: name.clone().unwrap_or("".to_string()).to_string(),
             params: parameters
@@ -620,10 +646,8 @@ impl CodegenJS {
                     None
                 })
                 .collect(),
-            is_tail_recursive: self.is_function_body_tail_recursive(
-                &name.clone().unwrap_or("".to_string()).to_string(),
-                body,
-            ),
+            is_tail_recursive,
+            remap_to_rest_args: false,
         });
         let function_keyword = match name {
             Some(name) => format!("function {}(", name),
@@ -641,7 +665,7 @@ impl CodegenJS {
 
         self.output.push_str(") {\n");
         self.indent_level += 1;
-        self.generate_function_body(&name.clone().unwrap_or("".to_string()), body);
+        self.generate_function_body(body, is_tail_recursive);
         self.indent_level -= 1;
         self.output.push_str(&self.get_indent());
         self.output.push('}');
@@ -654,29 +678,21 @@ impl CodegenJS {
         definitions: &[(Vec<Node>, Box<Node>)],
     ) {
         // TODO: Handle tail recursion for multiple definitions.
-        self.function_context_stack.push(FunctionContext {
-            name: name.to_string(),
-            params: definitions
-                .iter()
-                .flat_map(|(params, _)| {
-                    params.iter().filter_map(|param| {
-                        if let Node::FunctionParameter(node) = param {
-                            if let Node::Identifier(ref name) = **node {
-                                return Some(name.clone());
-                            }
-                        }
-                        None
-                    })
-                })
-                .collect(),
-            is_tail_recursive: false,
-        });
+        let is_any_definition_tail_recursive = definitions
+            .iter()
+            .any(|(_, body)| self.is_function_body_tail_recursive(name, body));
         self.output.push_str(&self.get_indent());
         self.output
             .push_str(&format!("function {}(...args) {{\n", name));
         self.indent_level += 1;
-        self.output.push_str(&self.get_indent());
 
+        if is_any_definition_tail_recursive {
+            self.output.push_str(&self.get_indent());
+            self.output.push_str("while (true) {\n");
+            self.indent_level += 1;
+        }
+
+        self.output.push_str(&self.get_indent());
         for (i, (parameters, body)) in definitions.iter().enumerate() {
             // TODO: Only render else if there is another definition with a literal.
             if i > 0 {
@@ -826,17 +842,41 @@ impl CodegenJS {
             // Alias identifier args to the parameter names
             for (j, param) in parameters.iter().enumerate() {
                 if let Node::FunctionParameter(node) = param {
-                    if let Node::Identifier(ref name) = **node {
+                    if let Node::Identifier(ref name) = node.as_ref() {
                         self.output.push_str(&self.get_indent());
                         self.output
                             .push_str(&format!("let {} = args[{}];\n", name, j));
                     }
                 }
             }
-            self.generate_function_body(name, body);
+            // We handle the tail recursion case in multiple function body declarations ourselves higher up.
+            self.function_context_stack.push(FunctionContext {
+                name: name.to_string(),
+                params: parameters
+                    .iter()
+                    .filter_map(|param| {
+                        if let Node::FunctionParameter(node) = param {
+                            if let Node::Identifier(ref name) = node.as_ref() {
+                                return Some(name.clone());
+                            }
+                        }
+                        None
+                    })
+                    .collect(),
+                is_tail_recursive: is_any_definition_tail_recursive,
+                remap_to_rest_args: true,
+            });
+            self.generate_function_body(body, false);
             self.indent_level -= 1;
             self.output.push_str(&self.get_indent());
             self.output.push('}');
+        }
+
+        if is_any_definition_tail_recursive {
+            self.indent_level -= 1;
+            self.output.push('\n');
+            self.output.push_str(&self.get_indent());
+            self.output.push_str("}");
         }
 
         self.indent_level -= 1;
