@@ -8,6 +8,10 @@ pub struct Parser<'src> {
     lexer: Lexer<'src>,
     current_token: Option<Token>,
     next_token: Option<Token>,
+
+    // We have to copy over the lexers position as we scan ahead of the current token.
+    current_line: usize,
+    current_column: usize,
 }
 
 impl<'src> Parser<'src> {
@@ -16,6 +20,8 @@ impl<'src> Parser<'src> {
             lexer,
             current_token: None,
             next_token: None,
+            current_line: 0,
+            current_column: 0,
         }
     }
 
@@ -29,22 +35,25 @@ impl<'src> Parser<'src> {
         self.parse_program()
     }
 
+    fn panic_unexpected_token(&self, expected: &str, actual: Option<Token>) {
+        let line = self.current_line;
+        // Technically we are still off by one here as we are already pointing at the end of the current token,
+        // but it's better than nothing.
+        // We'd either have to store the beginning or the length of the current token.
+        let column = self.current_column;
+        let source_line = self.lexer.source().lines().nth(line - 1).unwrap();
+        let caret = " ".repeat(column - 1) + "^";
+    
+        panic!(
+            "Expected {} on line {}, column {}, found {:?} instead\n{}\n{}",
+            expected, line, column, actual, source_line, caret
+        );
+    }
+
     fn expect_token(&mut self, expected: Token) {
         let actual = self.current_token.as_ref().unwrap();
         if *actual != expected {
-            panic!(
-                "Expected {:?} on line {}, column {}, found {:?} instead\n{}\n{}",
-                expected,
-                self.lexer.current_line(),
-                self.lexer.current_column(),
-                actual,
-                self.lexer
-                    .source()
-                    .lines()
-                    .nth(self.lexer.current_line() - 1)
-                    .unwrap_or("!!!Code not available!!!"),
-                " ".repeat(self.lexer.current_column() - 1) + "^"
-            );
+            self.panic_unexpected_token(&format!("{:?}", expected), Some(actual.clone()));
         }
     }
 
@@ -62,24 +71,16 @@ impl<'src> Parser<'src> {
                 name
             }
             _ => {
-                panic!(
-                    "Expected identifier on line {}, column {}, found {:?} instead\n{}\n{}",
-                    self.lexer.current_line(),
-                    self.lexer.current_column(),
-                    actual,
-                    self.lexer
-                        .source()
-                        .lines()
-                        .nth(self.lexer.current_line() - 1)
-                        .unwrap(),
-                    " ".repeat(self.lexer.current_column() - 1) + "^"
-                );
+                self.panic_unexpected_token("identifier", Some(actual.clone()));
+                unreachable!()
             }
         }
     }
 
     fn advance(&mut self) {
         self.current_token = self.next_token.clone();
+        self.current_column = self.lexer.current_column();
+        self.current_line = self.lexer.current_line();
         self.next_token = Some(self.lexer.next_token());
         debug!("Advanced to {:?}", self.current_token);
     }
@@ -319,18 +320,13 @@ impl<'src> Parser<'src> {
                     self.advance();
                     Node::PrefixOp(PrefixOp::Rest, Box::new(self.parse_primary_expression()))
                 }
-                _ => panic!(
-                    "Expected identifier or literal on line {}, column {}, found {:?} instead\n{}\n{}",
-                    self.lexer.current_line(),
-                    self.lexer.current_column(),
-                    self.current_token,
-                    self.lexer
-                .source()
-                .lines()
-                .nth(self.lexer.current_line() - 1)
-                .unwrap(),
-                    " ".repeat(self.lexer.current_column() - 1) + "^"
-                ),
+                _ => {
+                    self.panic_unexpected_token(
+                        "identifier, literal or rest parameter",
+                        self.current_token.clone(),
+                    );
+                    unreachable!()
+                }
             };
 
             elements.push(element);
@@ -463,18 +459,13 @@ impl<'src> Parser<'src> {
 
                 node
             }
-            _ => panic!(
-                "Expected primary expression on line {}, column {}, found {:?} instead\n{}\n{}",
-                self.lexer.current_line(),
-                self.lexer.current_column(),
-                self.current_token,
-                self.lexer
-                    .source()
-                    .lines()
-                    .nth(self.lexer.current_line() - 1)
-                    .unwrap(),
-                " ".repeat(self.lexer.current_column() - 1) + "^"
-            ),
+            _ => {
+                self.panic_unexpected_token(
+                    "primary expression",
+                    self.current_token.clone(),
+                );
+                unreachable!()
+            },
         }
     }
 
@@ -623,18 +614,13 @@ impl<'src> Parser<'src> {
                         }
                     }
                     Some(Token::LBracket) => self.parse_list_extraction(),
-                    _ => panic!(
-                        "Expected identifier or literal on line {}, column {}, found {:?} instead\n{}\n{}",
-                        self.lexer.current_line(),
-                        self.lexer.current_column(),
-                        self.current_token,
-                        self.lexer
-                    .source()
-                    .lines()
-                    .nth(self.lexer.current_line() - 1)
-                    .unwrap(),
-                        " ".repeat(self.lexer.current_column() - 1) + "^"
-                    )
+                    _ => {
+                        self.panic_unexpected_token(
+                            "literal, identifier or list extraction",
+                            self.current_token.clone(),
+                        );
+                        unreachable!()
+                    }
                 };
 
                 log::debug!("Parsed parameter: {:?}", parameter);

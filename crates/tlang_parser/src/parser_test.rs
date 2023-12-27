@@ -1411,3 +1411,9 @@ fn test_explicit_tail_recursive_call() {
         ])
     );
 }
+
+#[test]
+#[should_panic]
+fn test_panic_on_keyword_as_identifier() {
+    parse!("let fn = 1;");
+}

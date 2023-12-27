@@ -398,6 +398,9 @@ impl CodegenJS {
             Node::EnumDeclaration { name, variants } => self.generate_enum_declaration(name, variants),
             Node::EnumVariant { name, named_fields, parameters } => self.generate_enum_variant(name, *named_fields, parameters),
             Node::EnumExtraction { identifier, elements, named_fields } => self.generate_enum_extraction(identifier, elements, *named_fields),
+            // Allow unreachable path, as we add new AST nodes, we do not want to automatically
+            // start failing tests while we are still implementing the codegen.
+            #[allow(unreachable_patterns)]
             _ => unimplemented!("{:?} not implemented yet.", node),
         }
     }
