@@ -466,38 +466,11 @@ impl CodegenJS {
 
     fn generate_enum_extraction(
         &mut self,
-        identifier: &Box<Node>,
-        elements: &[Node],
+        _identifier: &Box<Node>,
+        _elements: &[Node],
         _named_fields: bool,
     ) {
-        self.output.push_str(&self.get_indent());
-        self.output.push_str("const ");
-        self.generate_node(identifier, None);
-        self.output.push_str(" = (");
-        self.generate_node(identifier, None);
-        self.output.push_str(") => {\n");
-        self.indent_level += 1;
-        self.output.push_str(&self.get_indent());
-        self.output.push_str("switch (");
-        self.generate_node(identifier, None);
-        self.output.push_str(".tag) {\n");
-        self.indent_level += 1;
-        for (i, element) in elements.iter().enumerate() {
-            self.output.push_str(&self.get_indent());
-            self.output.push_str(&format!("case \"{}\":\n", i));
-            self.indent_level += 1;
-            self.output.push_str(&self.get_indent());
-            self.output.push_str("return ");
-            self.generate_node(element, None);
-            self.output.push_str(";\n");
-            self.indent_level -= 1;
-        }
-        self.indent_level -= 1;
-        self.output.push_str(&self.get_indent());
-        self.output.push_str("}\n");
-        self.indent_level -= 1;
-        self.output.push_str(&self.get_indent());
-        self.output.push_str("};\n");
+        todo!("enum extraction outside of function parameters is not implemented yet.")
     }
 
     fn is_function_body_tail_recursive(&self, function_name: &str, node: &Node) -> bool {
