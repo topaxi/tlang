@@ -640,6 +640,78 @@ fn test_explicit_return_statements() {
 }
 
 #[test]
+fn test_implicit_return_expressions() {
+    let program = parse!("fn foo() { 1 + 2 }");
+
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::FunctionDeclaration {
+            name: "foo".to_string(),
+            parameters: vec![],
+            body: Box::new(Node::Block(
+                vec![],
+                Some(Box::new(Node::BinaryOp {
+                    op: BinaryOp::Add,
+                    lhs: Box::new(Node::Literal(Literal::Integer(1))),
+                    rhs: Box::new(Node::Literal(Literal::Integer(2))),
+                }))
+            ))
+        }])
+    );
+
+    let program = parse!("fn foo() {}");
+
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::FunctionDeclaration {
+            name: "foo".to_string(),
+            parameters: vec![],
+            body: Box::new(Node::Block(vec![], None))
+        }])
+    );
+
+    let program = parse!("let x = fn() { 1 + 2 };");
+
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::VariableDeclaration {
+            name: "x".to_string(),
+            value: Box::new(Node::FunctionExpression {
+                name: None,
+                parameters: vec![],
+                body: Box::new(Node::Block(
+                    vec![],
+                    Some(Box::new(Node::BinaryOp {
+                        op: BinaryOp::Add,
+                        lhs: Box::new(Node::Literal(Literal::Integer(1))),
+                        rhs: Box::new(Node::Literal(Literal::Integer(2))),
+                    }))
+                ))
+            })
+        }])
+    );
+
+    let program = parse!("fn foo() { let x = 1; x }");
+
+    assert_eq!(
+        program,
+        Node::Program(vec![Node::FunctionDeclaration {
+            name: "foo".to_string(),
+            parameters: vec![],
+            body: Box::new(Node::Block(
+                vec![
+                    Node::VariableDeclaration {
+                        name: "x".to_string(),
+                        value: Box::new(Node::Literal(Literal::Integer(1)))
+                    },
+                ],
+                Some(Box::new(Node::Identifier("x".to_string())))
+            ))
+        }])
+    );
+}
+
+#[test]
 fn test_recursive_factorial_functional_definition() {
     let program = parse!(indoc! {"
         fn factorial(0) { return 1; }
