@@ -1,0 +1,12 @@
+[package]
+name = "tlang_codegen_wasm"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+tlang_parser = { path = "../tlang_parser" }
+walrus = "0.20"
+
+[dev-dependencies]
+indoc = { workspace = true }
+pretty_assertions = { workspace = true }
