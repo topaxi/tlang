@@ -649,6 +649,40 @@ fn test_simple_self_recursive_tail_call_converted_to_loop() {
     assert_eq!(output, expected_output);
 }
 
+#[test]
+fn test_fn_expression_explicit_tail_recursive_call_converted_to_loop() {
+    let output = compile!(indoc! {"
+        fn factorial(n) {
+            let factorial_rec = fn rec_helper(n, acc) {
+                if (n == 0) {
+                    return acc;
+                } else {
+                    return rec rec_helper(n - 1, n * acc);
+                };
+            };
+            return factorial_rec(n, 1);
+        }
+    "});
+    let expected_output = indoc! {"
+        function factorial(n) {
+            let factorial_rec = function rec_helper(n, acc) {
+                while (true) {
+                    if (n === 0) {
+                        return acc;
+                    } else {
+                        let tmp0 = n - 1;
+                        let tmp1 = n * acc;
+                        n = tmp0;
+                        acc = tmp1;
+                    }
+                }
+            };
+            return factorial_rec(n, 1);
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
+
 #[ignore]
 #[test]
 fn test_explicit_tail_recursive_call_converted_to_loop() {

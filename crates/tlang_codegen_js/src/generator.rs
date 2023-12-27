@@ -569,6 +569,25 @@ impl CodegenJS {
         }
     }
 
+    fn generate_function_body(&mut self, name: &str, body: &Node) {
+        let is_tail_recursive = self.is_function_body_tail_recursive(name, body);
+        self.context_stack.push(BlockContext::FunctionBody);
+        self.output.push_str(&self.function_pre_body);
+        self.function_pre_body.clear();
+        if is_tail_recursive {
+            self.output.push_str(&self.get_indent());
+            self.output.push_str("while (true) {\n");
+            self.indent_level += 1;
+        }
+        self.generate_node(body, None);
+        if is_tail_recursive {
+            self.indent_level -= 1;
+            self.output.push_str(&self.get_indent());
+            self.output.push_str("}\n");
+        }
+        self.context_stack.pop();
+    }
+
     fn generate_function_declaration(&mut self, name: &str, parameters: &[Node], body: &Node) {
         let is_tail_recursive = self.is_function_body_tail_recursive(name, body);
         self.function_context_stack.push(FunctionContext {
@@ -599,20 +618,7 @@ impl CodegenJS {
 
         self.output.push_str(") {\n");
         self.indent_level += 1;
-        self.context_stack.push(BlockContext::FunctionBody);
-        println!("{} is tail recursive: {}", name, is_tail_recursive);
-        if is_tail_recursive {
-            self.output.push_str(&self.get_indent());
-            self.output.push_str("while (true) {\n");
-            self.indent_level += 1;
-        }
-        self.generate_node(body, None);
-        if is_tail_recursive {
-            self.indent_level -= 1;
-            self.output.push_str(&self.get_indent());
-            self.output.push_str("}\n");
-        }
-        self.context_stack.pop();
+        self.generate_function_body(name, body);
         self.indent_level -= 1;
         self.output.push_str(&self.get_indent());
         self.output.push_str("}\n");
@@ -659,9 +665,7 @@ impl CodegenJS {
 
         self.output.push_str(") {\n");
         self.indent_level += 1;
-        self.context_stack.push(BlockContext::FunctionBody);
-        self.generate_node(body, None);
-        self.context_stack.pop();
+        self.generate_function_body(&name.clone().unwrap_or("".to_string()), body);
         self.indent_level -= 1;
         self.output.push_str(&self.get_indent());
         self.output.push('}');
@@ -855,11 +859,7 @@ impl CodegenJS {
                     }
                 }
             }
-            self.context_stack.push(BlockContext::FunctionBody);
-            self.output.push_str(&self.function_pre_body);
-            self.function_pre_body.clear();
-            self.generate_node(body, None);
-            self.context_stack.pop();
+            self.generate_function_body(name, body);
             self.indent_level -= 1;
             self.output.push_str(&self.get_indent());
             self.output.push('}');
