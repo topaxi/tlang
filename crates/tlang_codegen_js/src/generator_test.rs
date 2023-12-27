@@ -625,7 +625,7 @@ fn test_maximum_depth_tree_positional() {
 fn test_simple_self_recursive_tail_call_converted_to_loop() {
     let output = compile!(indoc! {"
         fn factorial(n, acc) {
-            if (n == 0) {
+            if n == 0 {
                 return acc;
             } else {
                 return rec factorial(n - 1, n * acc);
@@ -654,7 +654,7 @@ fn test_fn_expression_explicit_tail_recursive_call_converted_to_loop() {
     let output = compile!(indoc! {"
         fn factorial(n) {
             let factorial_rec = fn rec_helper(n, acc) {
-                if (n == 0) {
+                if n == 0 {
                     return acc;
                 } else {
                     return rec rec_helper(n - 1, n * acc);
