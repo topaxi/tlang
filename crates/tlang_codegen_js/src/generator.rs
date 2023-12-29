@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use tlang_parser::{
     ast::{BinaryOp, Node, PrefixOp},
     lexer::Literal,
@@ -44,10 +46,73 @@ struct FunctionContext {
     remap_to_rest_args: bool,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+struct Scope {
+    parent: Option<Box<Scope>>,
+
+    variables: HashMap<String, String>,
+}
+
+impl Scope {
+    fn new(parent: Option<Box<Scope>>) -> Self {
+        Self {
+            parent,
+            variables: HashMap::new(),
+        }
+    }
+
+    fn declare_variable(&mut self, name: &str) -> String {
+        if !self.variables.contains_key(name) {
+            self.variables.insert(name.to_string(), name.to_string());
+
+            return name.to_string();
+        }
+        // If already declared, generate a new name with a suffix (e.g., $a, $b)
+        let mut suffix = 'a';
+        loop {
+            let new_name = format!("{}${}", name, suffix);
+
+            if !self.variables.contains_key(&new_name) {
+                self.variables.insert(name.to_string(), new_name.clone());
+
+                return new_name;
+            }
+
+            suffix = (suffix as u8 + 1) as char;
+        }
+    }
+
+    fn resolve_variable(&self, name: &str) -> Option<String> {
+        if let Some(value) = self.variables.get(name) {
+            return Some(value.clone());
+        }
+
+        if let Some(parent) = &self.parent {
+            return parent.resolve_variable(name);
+        }
+
+        None
+    }
+}
+
+impl Default for Scope {
+    fn default() -> Self {
+        Self {
+            parent: None,
+            variables: HashMap::from_iter(vec![
+                ("log".to_string(), "console.log".to_string()),
+                ("min".to_string(), "Math.min".to_string()),
+                ("max".to_string(), "Math.max".to_string()),
+            ]),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct CodegenJS {
     output: String,
     indent_level: usize,
+    scopes: Scope,
     context_stack: Vec<BlockContext>,
     function_context_stack: Vec<FunctionContext>,
     function_pre_body: String,
@@ -64,9 +129,24 @@ impl CodegenJS {
         Self {
             output: String::new(),
             indent_level: 0,
+            scopes: Scope::default(),
             context_stack: vec![BlockContext::Program],
             function_context_stack: vec![],
             function_pre_body: String::new(),
+        }
+    }
+
+    fn current_scope(&self) -> &Scope {
+        &self.scopes
+    }
+
+    fn push_scope(&mut self) {
+        self.scopes = Scope::new(Some(Box::new(self.scopes.clone())));
+    }
+
+    fn pop_scope(&mut self) {
+        if let Some(parent) = &self.scopes.parent {
+            self.scopes = *parent.clone();
         }
     }
 
@@ -182,6 +262,8 @@ impl CodegenJS {
                 }
             }
             Node::Block(statements, expression) => {
+                self.push_scope();
+
                 for statement in statements {
                     self.generate_node(statement, None);
                 }
@@ -212,6 +294,8 @@ impl CodegenJS {
                     }
                     BlockContext::Expression => unimplemented!("Block with completion in ExpressionBlock context not implemented yet."),
                 }
+
+                self.pop_scope();
             }
             Node::ExpressionStatement(expression) => {
                 self.output.push_str(&self.get_indent());
@@ -318,6 +402,7 @@ impl CodegenJS {
             }
             Node::VariableDeclaration { name, value } => {
                 self.output.push_str(&self.get_indent());
+                let name = self.scopes.declare_variable(name);
                 self.output.push_str(&format!("let {} = ", name));
                 self.generate_node(value, None);
                 self.output.push_str(";\n");
@@ -376,7 +461,7 @@ impl CodegenJS {
             Node::FunctionExpression { name, parameters, body } =>
                 self.generate_function_expression(name, parameters, body),
             Node::ReturnStatement(expr) => self.generate_return_statement(expr),
-            Node::Identifier(name) => self.output.push_str(name),
+            Node::Identifier(name) => self.output.push_str(&self.current_scope().resolve_variable(name).unwrap_or(name.to_string())),
             Node::NestedIdentifier(identifiers) => self.output.push_str(&identifiers.join(".")),
             Node::Call { function, arguments } =>
                 self.generate_call_expression(function, arguments),
@@ -490,14 +575,14 @@ impl CodegenJS {
 
     fn generate_enum_extraction(
         &mut self,
-        _identifier: &Box<Node>,
+        _identifier: &Node,
         _elements: &[Node],
         _named_fields: bool,
     ) {
         todo!("enum extraction outside of function parameters is not implemented yet.")
     }
 
-    fn is_function_body_tail_recursive(&self, function_name: &str, node: &Node) -> bool {
+    fn is_function_body_tail_recursive(function_name: &str, node: &Node) -> bool {
         // Recursively traverse nodes to check for tail recursive calls to the function itself.
         // We currently only support tail recursion to the function itself, not any other function.
         // Therefore we look for RecursiveCall nodes which reference the current function name.
@@ -520,40 +605,40 @@ impl CodegenJS {
             }
             Node::Block(statements, expression) => {
                 for statement in statements {
-                    if self.is_function_body_tail_recursive(function_name, statement) {
+                    if Self::is_function_body_tail_recursive(function_name, statement) {
                         return true;
                     }
                 }
                 if let Some(expression) = expression {
-                    return self.is_function_body_tail_recursive(function_name, expression);
+                    return Self::is_function_body_tail_recursive(function_name, expression);
                 }
                 false
             }
             Node::ExpressionStatement(expression) => {
-                self.is_function_body_tail_recursive(function_name, expression)
+                Self::is_function_body_tail_recursive(function_name, expression)
             }
             Node::Match {
                 expression,
                 arms: _,
-            } => self.is_function_body_tail_recursive(function_name, expression),
+            } => Self::is_function_body_tail_recursive(function_name, expression),
             Node::MatchArm {
                 pattern: _,
                 expression,
-            } => self.is_function_body_tail_recursive(function_name, expression),
+            } => Self::is_function_body_tail_recursive(function_name, expression),
             Node::IfElse {
                 condition,
                 then_branch,
                 else_branch,
             } => {
-                self.is_function_body_tail_recursive(function_name, condition)
-                    || self.is_function_body_tail_recursive(function_name, then_branch)
+                Self::is_function_body_tail_recursive(function_name, condition)
+                    || Self::is_function_body_tail_recursive(function_name, then_branch)
                     || else_branch.as_ref().map_or(false, |branch| {
-                        self.is_function_body_tail_recursive(function_name, branch)
+                        Self::is_function_body_tail_recursive(function_name, branch)
                     })
             }
             Node::ReturnStatement(node) => {
                 if let Some(node) = node {
-                    self.is_function_body_tail_recursive(function_name, node)
+                    Self::is_function_body_tail_recursive(function_name, node)
                 } else {
                     false
                 }
@@ -581,7 +666,7 @@ impl CodegenJS {
     }
 
     fn generate_function_declaration(&mut self, name: &str, parameters: &[Node], body: &Node) {
-        let is_tail_recursive = self.is_function_body_tail_recursive(name, body);
+        let is_tail_recursive = Self::is_function_body_tail_recursive(name, body);
         self.function_context_stack.push(FunctionContext {
             name: name.to_string(),
             params: parameters
@@ -624,7 +709,7 @@ impl CodegenJS {
         parameters: &[Node],
         body: &Node,
     ) {
-        let is_tail_recursive = self.is_function_body_tail_recursive(
+        let is_tail_recursive = Self::is_function_body_tail_recursive(
             &name.clone().unwrap_or("".to_string()).to_string(),
             body,
         );
@@ -675,7 +760,7 @@ impl CodegenJS {
         // TODO: Handle tail recursion for multiple definitions.
         let is_any_definition_tail_recursive = definitions
             .iter()
-            .any(|(_, body)| self.is_function_body_tail_recursive(name, body));
+            .any(|(_, body)| Self::is_function_body_tail_recursive(name, body));
         self.output.push_str(&self.get_indent());
         self.output
             .push_str(&format!("function {}(...args) {{\n", name));
@@ -871,7 +956,7 @@ impl CodegenJS {
             self.indent_level -= 1;
             self.output.push('\n');
             self.output.push_str(&self.get_indent());
-            self.output.push_str("}");
+            self.output.push('}');
         }
 
         self.indent_level -= 1;

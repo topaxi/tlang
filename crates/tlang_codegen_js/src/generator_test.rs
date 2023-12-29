@@ -28,6 +28,13 @@ fn test_codegen_binary_expression() {
 }
 
 #[test]
+fn test_variable_shadowing() {
+    let output = compile!("let x = 42; let x = 43; x;");
+    let expected_output = "let x = 42;\nlet x$a = 43;\nx$a;\n";
+    assert_eq!(output, expected_output);
+}
+
+#[test]
 fn test_codegen_function_declaration() {
     let output = compile!("fn main() {}");
     let expected_output = "function main() {\n}\n";
@@ -243,7 +250,7 @@ fn test_pipeline_operator() {
     let output = compile!("fn main() { 1 |> log; }");
     let expected_output = indoc! {"
         function main() {
-            log(1);
+            console.log(1);
         }
     "};
     assert_eq!(output, expected_output);
@@ -565,7 +572,7 @@ fn test_maximum_depth_tree() {
             } else if (args[0].tag === \"Node\") {
                 let left = args[0].left;
                 let right = args[0].right;
-                return 1 + max(maximum_depth(left), maximum_depth(right));
+                return 1 + Math.max(maximum_depth(left), maximum_depth(right));
             }
         }
         function main() {
@@ -614,7 +621,7 @@ fn test_maximum_depth_tree_positional() {
             } else if (args[0].tag === \"Node\") {
                 let left = args[0][0];
                 let right = args[0][1];
-                return 1 + max(maximum_depth(left), maximum_depth(right));
+                return 1 + Math.max(maximum_depth(left), maximum_depth(right));
             }
         }
     "};
