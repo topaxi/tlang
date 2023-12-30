@@ -141,6 +141,30 @@ fn test_if_else_as_expression() {
     assert_eq!(output, expected_output);
 }
 
+#[ignore = "implement if/else in expression position first"]
+#[test]
+fn test_if_else_as_expression_nested() {
+    let output = compile!("fn main() { let result = if true { if true { 1 } else { 2 } } else { 3 }; }");
+    let expected_output = indoc! {"
+        function main() {
+            let tmp0;
+            if (true) {
+                let tmp1;
+                if (true) {
+                    tmp1 = 1;
+                } else {
+                    tmp1 = 2;
+                }
+                tmp0 = tmp1;
+            } else {
+                tmp0 = 3;
+            }
+            let result = tmp0;
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
+
 #[test]
 fn test_recursive_function_definition() {
     let output = compile!(indoc! {"
