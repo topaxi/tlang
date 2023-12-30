@@ -166,6 +166,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "tlang_ast"
+version = "0.1.0"
+dependencies = [
+ "indoc",
+ "pretty_assertions",
+]
+
+[[package]]
 name = "tlang_cli_js"
 version = "0.1.0"
 dependencies = [
@@ -181,6 +189,7 @@ version = "0.1.0"
 dependencies = [
  "indoc",
  "pretty_assertions",
+ "tlang_ast",
  "tlang_parser",
 ]
 
@@ -191,6 +200,7 @@ dependencies = [
  "indoc",
  "log",
  "pretty_assertions",
+ "tlang_ast",
 ]
 
 [[package]]

@@ -1,7 +1,7 @@
-use crate::{
-    ast::{Associativity, BinaryOp, Node, OperatorInfo, PrefixOp},
-    lexer::{Lexer, Token},
-};
+use tlang_ast::node::{Associativity, BinaryOp, Node, OperatorInfo, PrefixOp};
+use tlang_ast::token::Token;
+
+use crate::lexer::Lexer;
 use log::debug;
 
 pub struct Parser<'src> {

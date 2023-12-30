@@ -1,4 +1,4 @@
-use crate::lexer::{Literal, Token};
+use crate::token::{Literal, Token};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Associativity {

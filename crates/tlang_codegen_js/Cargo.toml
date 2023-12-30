@@ -4,6 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 
 [dependencies]
+tlang_ast = { path = "../tlang_ast" }
 tlang_parser = { path = "../tlang_parser" }
 
 [dev-dependencies]

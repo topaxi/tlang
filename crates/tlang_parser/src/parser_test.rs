@@ -1,9 +1,11 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
 
-use crate::ast::{BinaryOp, Node, PrefixOp};
-use crate::lexer::Literal;
 use crate::parser::Parser;
+use tlang_ast::{
+    node::{BinaryOp, Node, PrefixOp},
+    token::Literal,
+};
 
 macro_rules! parse {
     ($source:expr) => {{

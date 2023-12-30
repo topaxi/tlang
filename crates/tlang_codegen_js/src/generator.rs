@@ -1,9 +1,8 @@
-use tlang_parser::{
-    ast::{BinaryOp, Node, PrefixOp},
-    lexer::Literal,
-};
-
 use crate::scope::Scope;
+use tlang_ast::{
+    node::{BinaryOp, Node, PrefixOp},
+    token::Literal,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum JSAssociativity {

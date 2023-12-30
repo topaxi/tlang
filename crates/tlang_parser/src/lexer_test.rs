@@ -1,4 +1,6 @@
-use crate::lexer::{Lexer, Literal, Token};
+use tlang_ast::token::{Literal, Token};
+
+use crate::lexer::Lexer;
 
 #[test]
 fn test_identifier() {
