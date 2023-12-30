@@ -41,12 +41,12 @@ impl SemanticAnalyzer {
         self.symbol_table_stack.pop().unwrap()
     }
 
-    pub fn add_builtin_symbols(&mut self, symbols: Vec<(&str, &str, SymbolType)>) {
-        for (name, alias, symbol_type) in symbols {
+    pub fn add_builtin_symbols(&mut self, symbols: Vec<(&str, SymbolType)>) {
+        for (name, symbol_type) in symbols {
             self.root_symbol_table().borrow_mut().symbols.insert(
                 name.to_string(),
                 SymbolInfo {
-                    name: alias.to_string(),
+                    name: name.to_string(),
                     symbol_type,
                 },
             );

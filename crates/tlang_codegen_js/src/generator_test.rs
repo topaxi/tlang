@@ -11,9 +11,9 @@ macro_rules! compile {
         let mut ast = parser.parse();
         let mut semantic_analyzer = SemanticAnalyzer::new();
         semantic_analyzer.add_builtin_symbols(vec![
-            ("log", "console.log", SymbolType::Function),
-            ("max", "Math.max", SymbolType::Function),
-            ("min", "Math.min", SymbolType::Function),
+            ("log", SymbolType::Function),
+            ("max", SymbolType::Function),
+            ("min", SymbolType::Function),
         ]);
         semantic_analyzer.analyze(&mut ast);
         let mut codegen = CodegenJS::default();
