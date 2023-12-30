@@ -1,9 +1,9 @@
 use crate::generator::CodegenJS;
-use tlang_semantics::SemanticAnalyzer;
 use indoc::indoc;
 use pretty_assertions::assert_eq;
-use tlang_parser::parser::Parser;
 use tlang_ast::symbols::{FunctionInfo, SymbolType};
+use tlang_parser::parser::Parser;
+use tlang_semantics::SemanticAnalyzer;
 
 macro_rules! compile {
     ($source:expr) => {{
@@ -11,9 +11,21 @@ macro_rules! compile {
         let mut ast = parser.parse();
         let mut semantic_analyzer = SemanticAnalyzer::new();
         semantic_analyzer.add_builtin_symbols(vec![
-            ("log", "console.log", SymbolType::Function(Box::new(FunctionInfo::default()))),
-            ("max", "Math.max", SymbolType::Function(Box::new(FunctionInfo::default()))),
-            ("min", "Math.min", SymbolType::Function(Box::new(FunctionInfo::default()))),
+            (
+                "log",
+                "console.log",
+                SymbolType::Function(Box::new(FunctionInfo::default())),
+            ),
+            (
+                "max",
+                "Math.max",
+                SymbolType::Function(Box::new(FunctionInfo::default())),
+            ),
+            (
+                "min",
+                "Math.min",
+                SymbolType::Function(Box::new(FunctionInfo::default())),
+            ),
         ]);
         semantic_analyzer.analyze(&mut ast);
         let mut codegen = CodegenJS::default();

@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::{
     symbols::SymbolTable,
     token::{Literal, Token},
@@ -12,14 +15,14 @@ pub enum Associativity {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Node {
     pub ast_node: AstNode,
-    pub symbol_table: SymbolTable,
+    pub symbol_table: Option<Rc<RefCell<SymbolTable>>>,
 }
 
 impl Node {
     pub fn new(ast_node: AstNode) -> Self {
         Node {
             ast_node,
-            symbol_table: SymbolTable::default(),
+            symbol_table: None,
         }
     }
 }
@@ -28,7 +31,7 @@ impl From<AstNode> for Node {
     fn from(ast_node: AstNode) -> Self {
         Node {
             ast_node,
-            symbol_table: SymbolTable::default(),
+            symbol_table: None,
         }
     }
 }
@@ -37,13 +40,14 @@ impl<'a> From<&'a Token> for Node {
     fn from(token: &Token) -> Self {
         Node {
             ast_node: AstNode::from(token),
-            symbol_table: SymbolTable::default(),
+            symbol_table: None,
         }
     }
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum AstNode {
+    None,
     Program(Vec<Node>),
     Block(Vec<Node>, Option<Box<Node>>),
     Literal(Literal),

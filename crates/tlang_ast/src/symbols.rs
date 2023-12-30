@@ -49,9 +49,9 @@ impl Default for SymbolTable {
 }
 
 impl SymbolTable {
-    pub fn new(parent: Option<Rc<RefCell<SymbolTable>>>) -> Self {
+    pub fn new(parent: Rc<RefCell<SymbolTable>>) -> Self {
         SymbolTable {
-            parent,
+            parent: Some(parent),
             ..Default::default()
         }
     }
@@ -68,17 +68,5 @@ impl SymbolTable {
 
     pub fn insert(&mut self, name: String, symbol_info: SymbolInfo) {
         self.symbols.insert(name, symbol_info);
-    }
-
-    pub fn push(&mut self) -> SymbolTable {
-        SymbolTable::new(Some(Rc::new(RefCell::new(self.clone()))))
-    }
-
-    pub fn pop(&mut self) -> SymbolTable {
-        if let Some(ref parent) = self.parent {
-            parent.borrow().clone()
-        } else {
-            self.clone()
-        }
     }
 }
