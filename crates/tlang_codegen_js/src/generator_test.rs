@@ -1,7 +1,7 @@
 use crate::generator::CodegenJS;
 use indoc::indoc;
 use pretty_assertions::assert_eq;
-use tlang_ast::symbols::{FunctionInfo, SymbolType};
+use tlang_ast::symbols::SymbolType;
 use tlang_parser::parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
 
@@ -11,21 +11,9 @@ macro_rules! compile {
         let mut ast = parser.parse();
         let mut semantic_analyzer = SemanticAnalyzer::new();
         semantic_analyzer.add_builtin_symbols(vec![
-            (
-                "log",
-                "console.log",
-                SymbolType::Function(Box::new(FunctionInfo::default())),
-            ),
-            (
-                "max",
-                "Math.max",
-                SymbolType::Function(Box::new(FunctionInfo::default())),
-            ),
-            (
-                "min",
-                "Math.min",
-                SymbolType::Function(Box::new(FunctionInfo::default())),
-            ),
+            ("log", "console.log", SymbolType::Function),
+            ("max", "Math.max", SymbolType::Function),
+            ("min", "Math.min", SymbolType::Function),
         ]);
         semantic_analyzer.analyze(&mut ast);
         let mut codegen = CodegenJS::default();
@@ -64,11 +52,14 @@ fn test_codegen_function_declaration() {
 
 #[test]
 fn test_codegen_function_call() {
-    let output = compile!("fn main() { foo(); }");
+    let output = compile!(indoc! {"
+        fn main() {}
+        main();
+    "});
     let expected_output = indoc! {"
         function main() {
-            foo();
         }
+        main();
     "};
     assert_eq!(output, expected_output);
 }
@@ -276,10 +267,10 @@ fn test_pipeline_operator() {
     "};
     assert_eq!(output, expected_output);
 
-    let output = compile!("fn main() { 1 |> foo |> bar; }");
+    let output = compile!("fn main() { 1 |> min |> max; }");
     let expected_output = indoc! {"
         function main() {
-            bar(foo(1));
+            Math.max(Math.min(1));
         }
     "};
     assert_eq!(output, expected_output);
@@ -287,10 +278,10 @@ fn test_pipeline_operator() {
 
 #[test]
 fn test_pipeline_operator_with_call_parenthesis() {
-    let output = compile!("fn main() { 1 |> foo(); }");
+    let output = compile!("fn main() { 1 |> max(); }");
     let expected_output = indoc! {"
         function main() {
-            foo(1);
+            Math.max(1);
         }
     "};
     assert_eq!(output, expected_output);

@@ -5,26 +5,7 @@ use std::rc::Rc;
 #[derive(Debug, PartialEq, Clone)]
 pub enum SymbolType {
     Variable,
-    Function(Box<FunctionInfo>),
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct FunctionInfo {
-    // The parameter names of the function.
-    pub params: Vec<String>,
-
-    // Is the function body tail recursive?
-    // This is used to determine if we should unwrap the recursion into a while loop.
-    pub is_tail_recursive: bool,
-}
-
-impl Default for FunctionInfo {
-    fn default() -> Self {
-        FunctionInfo {
-            params: Vec::new(),
-            is_tail_recursive: false,
-        }
-    }
+    Function,
 }
 
 #[derive(Debug, PartialEq, Clone)]
