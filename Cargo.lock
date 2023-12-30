@@ -191,6 +191,7 @@ dependencies = [
  "pretty_assertions",
  "tlang_ast",
  "tlang_parser",
+ "tlang_semantics",
 ]
 
 [[package]]
@@ -201,6 +202,16 @@ dependencies = [
  "log",
  "pretty_assertions",
  "tlang_ast",
+]
+
+[[package]]
+name = "tlang_semantics"
+version = "0.1.0"
+dependencies = [
+ "indoc",
+ "pretty_assertions",
+ "tlang_ast",
+ "tlang_parser",
 ]
 
 [[package]]
