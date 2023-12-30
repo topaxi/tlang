@@ -9,7 +9,7 @@ macro_rules! compile {
     ($source:expr) => {{
         let mut parser = Parser::from_source($source);
         let mut ast = parser.parse();
-        let mut semantic_analyzer = SemanticAnalyzer::new();
+        let mut semantic_analyzer = SemanticAnalyzer::default();
         semantic_analyzer.add_builtin_symbols(vec![
             ("log", SymbolType::Function),
             ("max", SymbolType::Function),

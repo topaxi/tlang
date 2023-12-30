@@ -9,6 +9,12 @@ pub struct SemanticAnalyzer {
     symbol_table_stack: Vec<Rc<RefCell<SymbolTable>>>,
 }
 
+impl Default for SemanticAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SemanticAnalyzer {
     pub fn new() -> Self {
         SemanticAnalyzer {

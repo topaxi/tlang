@@ -179,8 +179,10 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "indoc",
+ "tlang_ast",
  "tlang_codegen_js",
  "tlang_parser",
+ "tlang_semantics",
 ]
 
 [[package]]
