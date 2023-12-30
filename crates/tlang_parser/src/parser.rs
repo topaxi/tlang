@@ -1,4 +1,4 @@
-use tlang_ast::node::{Associativity, BinaryOp, Node, OperatorInfo, PrefixOp};
+use tlang_ast::node::{self, Associativity, AstNode, BinaryOp, Node, OperatorInfo, PrefixOp};
 use tlang_ast::token::Token;
 
 use crate::lexer::Lexer;
@@ -109,25 +109,25 @@ impl<'src> Parser<'src> {
                 self.advance();
                 return (false, Some(comment));
             }
-            _ => Node::ExpressionStatement(Box::new(self.parse_expression())),
+            _ => node::new!(ExpressionStatement(Box::new(self.parse_expression()))),
         };
 
         // FunctionDeclaration statements does not need to be terminated with a semicolon.
-        match node {
-            Node::FunctionDeclaration { .. } | Node::FunctionDeclarations(_, _) => {
+        match node.ast_node {
+            AstNode::FunctionDeclaration { .. } | AstNode::FunctionDeclarations(_, _) => {
                 return (false, Some(node))
             }
             _ => (),
         }
 
         // Neither do EnumDeclaration statements.
-        if let Node::EnumDeclaration { .. } = node {
+        if let AstNode::EnumDeclaration { .. } = node.ast_node {
             return (false, Some(node));
         }
 
         // Expressions like IfElse as statements also do not need to be terminated with a semicolon.
-        if let Node::ExpressionStatement(ref expr) = node {
-            if let Node::IfElse { .. } = **expr {
+        if let AstNode::ExpressionStatement(ref expr) = node.ast_node {
+            if let AstNode::IfElse { .. } = expr.ast_node {
                 return (false, Some(node));
             }
         }
@@ -139,10 +139,10 @@ impl<'src> Parser<'src> {
         self.consume_token(Token::Return);
 
         if self.current_token == Some(Token::Semicolon) {
-            return Node::ReturnStatement(None);
+            return node::new!(ReturnStatement(None));
         }
 
-        Node::ReturnStatement(Some(Box::new(self.parse_expression())))
+        node::new!(ReturnStatement(Some(Box::new(self.parse_expression()))))
     }
 
     fn parse_identifier(&mut self) -> Node {
@@ -153,9 +153,9 @@ impl<'src> Parser<'src> {
         }
 
         if identifiers.len() == 1 {
-            Node::Identifier(identifiers.pop().unwrap())
+            node::new!(Identifier(identifiers.pop().unwrap()))
         } else {
-            Node::NestedIdentifier(identifiers)
+            node::new!(NestedIdentifier(identifiers))
         }
     }
 
@@ -171,7 +171,7 @@ impl<'src> Parser<'src> {
             }
         }
         self.consume_token(Token::RBrace);
-        Node::EnumDeclaration { name, variants }
+        AstNode::EnumDeclaration { name, variants }.into()
     }
 
     /// Parses an enum variant, e.g. `Foo`, `Foo(1, 2, 3)` and
@@ -184,39 +184,42 @@ impl<'src> Parser<'src> {
                 self.advance();
                 let mut parameters = Vec::new();
                 while self.current_token != Some(Token::RParen) {
-                    parameters.push(Node::Identifier(self.consume_identifier()));
+                    parameters.push(node::new!(Identifier(self.consume_identifier())));
                     if let Some(Token::Comma) = self.current_token {
                         self.advance();
                     }
                 }
                 self.consume_token(Token::RParen);
-                Node::EnumVariant {
+                AstNode::EnumVariant {
                     name,
                     named_fields: false,
                     parameters,
                 }
+                .into()
             }
             Some(Token::LBrace) => {
                 self.advance();
                 let mut parameters = Vec::new();
                 while self.current_token != Some(Token::RBrace) {
-                    parameters.push(Node::Identifier(self.consume_identifier()));
+                    parameters.push(node::new!(Identifier(self.consume_identifier())));
                     if let Some(Token::Comma) = self.current_token {
                         self.advance();
                     }
                 }
                 self.consume_token(Token::RBrace);
-                Node::EnumVariant {
+                AstNode::EnumVariant {
                     name,
                     named_fields: true,
                     parameters,
                 }
+                .into()
             }
-            _ => Node::EnumVariant {
+            _ => AstNode::EnumVariant {
                 name,
                 named_fields: false,
                 parameters: Vec::new(),
-            },
+            }
+            .into(),
         }
     }
 
@@ -228,10 +231,10 @@ impl<'src> Parser<'src> {
             if let (consume_semicolon, Some(statement)) = self.parse_statement() {
                 if may_complete
                     && self.current_token == Some(Token::RBrace)
-                    && matches!(&statement, Node::ExpressionStatement(_))
+                    && matches!(&statement.ast_node, AstNode::ExpressionStatement(_))
                 {
-                    let expression = match statement {
-                        Node::ExpressionStatement(expr) => expr,
+                    let expression = match statement.ast_node {
+                        AstNode::ExpressionStatement(expr) => expr,
                         _ => unreachable!(),
                     };
                     completion_expression = Some(expression);
@@ -250,7 +253,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_program(&mut self) -> Node {
-        Node::Program(self.parse_statements(false).0)
+        AstNode::Program(self.parse_statements(false).0).into()
     }
 
     fn parse_block(&mut self) -> Node {
@@ -258,7 +261,7 @@ impl<'src> Parser<'src> {
         let (statements, completion) = self.parse_statements(true);
         self.consume_token(Token::RBrace);
 
-        Node::Block(statements, completion)
+        AstNode::Block(statements, completion).into()
     }
 
     fn parse_variable_declaration(&mut self) -> Node {
@@ -267,10 +270,11 @@ impl<'src> Parser<'src> {
         self.consume_token(Token::EqualSign);
         let value = self.parse_expression();
 
-        Node::VariableDeclaration {
+        AstNode::VariableDeclaration {
             name,
             value: Box::new(value),
         }
+        .into()
     }
 
     /// Parses a function call expression, e.g. `foo()`, `foo(1, 2, 3)` and
@@ -300,10 +304,11 @@ impl<'src> Parser<'src> {
             self.consume_token(Token::RParen);
         }
 
-        Node::Call {
+        AstNode::Call {
             function: Box::new(function),
             arguments,
         }
+        .into()
     }
 
     fn parse_list_extraction(&mut self) -> Node {
@@ -318,7 +323,8 @@ impl<'src> Parser<'src> {
                 }
                 Some(Token::DotDotDot) => {
                     self.advance();
-                    Node::PrefixOp(PrefixOp::Rest, Box::new(self.parse_primary_expression()))
+                    AstNode::PrefixOp(PrefixOp::Rest, Box::new(self.parse_primary_expression()))
+                        .into()
                 }
                 _ => {
                     self.panic_unexpected_token(
@@ -341,7 +347,7 @@ impl<'src> Parser<'src> {
 
         self.consume_token(Token::RBracket);
 
-        Node::List(elements)
+        AstNode::List(elements).into()
     }
 
     fn parse_list_expression(&mut self) -> Node {
@@ -353,7 +359,10 @@ impl<'src> Parser<'src> {
                 Some(Token::DotDotDot) => {
                     self.advance();
 
-                    Node::PrefixOp(PrefixOp::Spread, Box::new(self.parse_primary_expression()))
+                    node::new!(PrefixOp(
+                        PrefixOp::Spread,
+                        Box::new(self.parse_primary_expression())
+                    ))
                 }
                 _ => self.parse_expression(),
             };
@@ -370,7 +379,7 @@ impl<'src> Parser<'src> {
 
         self.consume_token(Token::RBracket);
 
-        Node::List(elements)
+        AstNode::List(elements).into()
     }
 
     fn parse_block_or_dict(&mut self) -> Node {
@@ -389,14 +398,14 @@ impl<'src> Parser<'src> {
                     }
                 }
                 self.consume_token(Token::RBrace);
-                return Node::Dict(elements);
+                return AstNode::Dict(elements).into();
             }
         }
 
         let (statements, completion) = self.parse_statements(true);
         self.consume_token(Token::RBrace);
 
-        Node::Block(statements, completion)
+        AstNode::Block(statements, completion).into()
     }
 
     fn parse_primary_expression(&mut self) -> Node {
@@ -421,16 +430,17 @@ impl<'src> Parser<'src> {
                     None
                 };
 
-                Node::IfElse {
+                AstNode::IfElse {
                     condition: Box::new(condition),
                     then_branch: Box::new(then_branch),
                     else_branch,
                 }
+                .into()
             }
             Some(Token::Fn) => self.parse_function_expression(),
             Some(Token::Rec) => {
                 self.advance();
-                Node::RecursiveCall(Box::new(self.parse_expression()))
+                node::new!(RecursiveCall(Box::new(self.parse_expression())))
             }
             Some(Token::Match) => self.parse_match_expression(),
             Some(token) => {
@@ -438,9 +448,9 @@ impl<'src> Parser<'src> {
 
                 self.advance();
 
-                if let Node::Identifier(identifier) = &node {
+                if let AstNode::Identifier(identifier) = &node.ast_node {
                     if identifier == "_" {
-                        return Node::Wildcard;
+                        return node::new!(Wildcard);
                     }
 
                     if let Some(Token::NamespaceSeparator) = self.current_token {
@@ -449,7 +459,7 @@ impl<'src> Parser<'src> {
                             self.advance();
                             identifiers.push(self.consume_identifier());
                         }
-                        node = Node::NestedIdentifier(identifiers);
+                        node = node::new!(NestedIdentifier(identifiers));
                     }
 
                     if let Some(Token::LParen | Token::LBrace) = self.current_token {
@@ -476,10 +486,10 @@ impl<'src> Parser<'src> {
             let pattern = self.parse_expression();
             self.consume_token(Token::FatArrow);
             let expression = self.parse_expression();
-            arms.push(Node::MatchArm {
+            arms.push(node::new!(MatchArm {
                 pattern: Box::new(pattern),
                 expression: Box::new(expression),
-            });
+            }));
             if let Some(Token::Comma) = self.current_token {
                 self.advance();
             }
@@ -487,10 +497,10 @@ impl<'src> Parser<'src> {
 
         self.consume_token(Token::RBrace);
 
-        Node::Match {
+        node::new!(Match {
             expression: Box::new(expression),
-            arms,
-        }
+            arms: arms,
+        })
     }
 
     fn parse_function_expression(&mut self) -> Node {
@@ -507,9 +517,9 @@ impl<'src> Parser<'src> {
         if name.is_some() || self.current_token == Some(Token::LParen) {
             self.consume_token(Token::LParen);
             while self.current_token != Some(Token::RParen) {
-                parameters.push(Node::FunctionParameter(Box::new(Node::Identifier(
-                    self.consume_identifier(),
-                ))));
+                parameters.push(node::new!(FunctionParameter(Box::new(node::new!(
+                    Identifier(self.consume_identifier(),)
+                )))));
 
                 if let Some(Token::Comma) = self.current_token {
                     self.advance();
@@ -519,11 +529,11 @@ impl<'src> Parser<'src> {
         }
 
         let body = self.parse_block();
-        Node::FunctionExpression {
-            name,
-            parameters,
+        node::new!(FunctionExpression {
+            name: name,
+            parameters: parameters,
             body: Box::new(body),
-        }
+        })
     }
 
     /// Parses an enum extraction, e.g. `Foo(bar, baz)` and `Foo { bar, baz }` within
@@ -542,11 +552,11 @@ impl<'src> Parser<'src> {
                 }
             }
             self.consume_token(Token::RBrace);
-            Node::EnumExtraction {
-                identifier,
-                elements,
+            node::new!(EnumExtraction {
+                identifier: identifier,
+                elements: elements,
                 named_fields: true,
-            }
+            })
         } else {
             self.consume_token(Token::LParen);
             let mut elements = Vec::new();
@@ -554,9 +564,9 @@ impl<'src> Parser<'src> {
                 let mut identifier = self.parse_identifier();
 
                 // Remap identifier of _ to Wildcard
-                if let Node::Identifier(ref ident) = identifier {
+                if let AstNode::Identifier(ref ident) = identifier.ast_node {
                     if ident == "_" {
-                        identifier = Node::Wildcard;
+                        identifier = node::new!(Wildcard);
                     }
                 }
 
@@ -566,11 +576,12 @@ impl<'src> Parser<'src> {
                 }
             }
             self.consume_token(Token::RParen);
-            Node::EnumExtraction {
+            AstNode::EnumExtraction {
                 identifier,
                 elements,
                 named_fields: false,
             }
+            .into()
         }
     }
 
@@ -607,7 +618,7 @@ impl<'src> Parser<'src> {
                         } else if let Some(Token::LParen | Token::LBrace) = self.peek_token() {
                             self.parse_enum_extraction()
                         } else {
-                            Node::Identifier(self.consume_identifier())
+                            node::new!(Identifier(self.consume_identifier()))
                         }
                     }
                     Some(Token::LBracket) => self.parse_list_extraction(),
@@ -621,7 +632,7 @@ impl<'src> Parser<'src> {
                 };
 
                 log::debug!("Parsed parameter: {:?}", parameter);
-                parameters.push(Node::FunctionParameter(Box::new(parameter)));
+                parameters.push(node::new!(FunctionParameter(Box::new(parameter))));
 
                 if let Some(Token::Comma) = self.current_token {
                     self.advance();
@@ -637,14 +648,14 @@ impl<'src> Parser<'src> {
         if definitions.len() == 1 {
             let (parameters, body) = definitions.pop().unwrap();
 
-            return Node::FunctionDeclaration {
+            return node::new!(FunctionDeclaration {
                 name: name.unwrap(),
-                parameters,
-                body,
-            };
+                parameters: parameters,
+                body: body,
+            });
         }
 
-        Node::FunctionDeclarations(name.unwrap(), definitions)
+        node::new!(FunctionDeclarations(name.unwrap(), definitions))
     }
 
     fn is_binary_op(token: &Token) -> bool {
@@ -783,11 +794,11 @@ impl<'src> Parser<'src> {
                 operator_info.associativity,
             );
 
-            lhs = Node::BinaryOp {
+            lhs = node::new!(BinaryOp {
                 op: operator,
                 lhs: Box::new(lhs),
                 rhs: Box::new(rhs),
-            };
+            });
         }
 
         lhs

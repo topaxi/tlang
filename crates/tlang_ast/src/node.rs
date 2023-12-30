@@ -1,4 +1,7 @@
-use crate::token::{Literal, Token};
+use crate::{
+    symbols::SymbolTable,
+    token::{Literal, Token},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Associativity {
@@ -7,7 +10,40 @@ pub enum Associativity {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Node {
+pub struct Node {
+    pub ast_node: AstNode,
+    pub symbol_table: SymbolTable,
+}
+
+impl Node {
+    pub fn new(ast_node: AstNode) -> Self {
+        Node {
+            ast_node,
+            symbol_table: SymbolTable::default(),
+        }
+    }
+}
+
+impl From<AstNode> for Node {
+    fn from(ast_node: AstNode) -> Self {
+        Node {
+            ast_node,
+            symbol_table: SymbolTable::default(),
+        }
+    }
+}
+
+impl<'a> From<&'a Token> for Node {
+    fn from(token: &Token) -> Self {
+        Node {
+            ast_node: AstNode::from(token),
+            symbol_table: SymbolTable::default(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum AstNode {
     Program(Vec<Node>),
     Block(Vec<Node>, Option<Box<Node>>),
     Literal(Literal),
@@ -76,13 +112,13 @@ pub enum Node {
     },
 }
 
-impl<'a> From<&'a Token> for Node {
+impl<'a> From<&'a Token> for AstNode {
     fn from(token: &Token) -> Self {
         match token {
-            Token::Literal(literal) => Node::Literal(literal.clone()),
-            Token::Identifier(name) => Node::Identifier(name.clone()),
-            Token::SingleLineComment(comment) => Node::SingleLineComment(comment.clone()),
-            Token::MultiLineComment(comment) => Node::MultiLineComment(comment.clone()),
+            Token::Literal(literal) => AstNode::Literal(literal.clone()),
+            Token::Identifier(name) => AstNode::Identifier(name.clone()),
+            Token::SingleLineComment(comment) => AstNode::SingleLineComment(comment.clone()),
+            Token::MultiLineComment(comment) => AstNode::MultiLineComment(comment.clone()),
             _ => unimplemented!(
                 "Expected token to be a literal or identifier, found {:?}",
                 token
@@ -124,3 +160,20 @@ pub enum BinaryOp {
     BitwiseXor,
     Pipeline,
 }
+
+#[macro_export]
+macro_rules! new {
+    ($node:ident) => {
+        Node::new(AstNode::$node)
+    };
+
+    ($node:ident($( $arg:expr ),* $(,)? )) => {
+        Node::new(AstNode::$node( $( $arg ),* ))
+    };
+
+    ($node:ident { $( $field:ident : $value:expr ),* $(,)? }) => {
+        Node::new(AstNode::$node { $( $field : $value ),* })
+    };
+}
+
+pub use new;

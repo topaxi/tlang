@@ -3,7 +3,7 @@ use pretty_assertions::assert_eq;
 
 use crate::parser::Parser;
 use tlang_ast::{
-    node::{BinaryOp, Node, PrefixOp},
+    node::{self, AstNode, BinaryOp, Node, PrefixOp},
     token::Literal,
 };
 
@@ -20,14 +20,14 @@ fn test_simple_variable_declaration() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::VariableDeclaration {
+        node::new!(Program(vec![node::new!(VariableDeclaration {
             name: "x".to_string(),
-            value: Box::new(Node::BinaryOp {
+            value: Box::new(node::new!(BinaryOp {
                 op: BinaryOp::Add,
-                lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                rhs: Box::new(Node::Literal(Literal::Integer(2))),
-            }),
-        }])
+                lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+            })),
+        })]))
     );
 }
 
@@ -37,30 +37,34 @@ fn test_simple_arithmetic_calculations() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
-            op: BinaryOp::Add,
-            lhs: Box::new(Node::BinaryOp {
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(BinaryOp {
                 op: BinaryOp::Add,
-                lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                rhs: Box::new(Node::Literal(Literal::Integer(2))),
-            }),
-            rhs: Box::new(Node::Literal(Literal::Integer(3))),
-        }))])
+                lhs: Box::new(node::new!(BinaryOp {
+                    op: BinaryOp::Add,
+                    lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                    rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                })),
+                rhs: Box::new(node::new!(Literal(Literal::Integer(3)))),
+            })
+        )))]))
     );
 
     let program = parse!("1 * 2 + 3;");
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
-            op: BinaryOp::Add,
-            lhs: Box::new(Node::BinaryOp {
-                op: BinaryOp::Multiply,
-                lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                rhs: Box::new(Node::Literal(Literal::Integer(2))),
-            }),
-            rhs: Box::new(Node::Literal(Literal::Integer(3))),
-        }))])
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(BinaryOp {
+                op: BinaryOp::Add,
+                lhs: Box::new(node::new!(BinaryOp {
+                    op: BinaryOp::Multiply,
+                    lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                    rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                })),
+                rhs: Box::new(node::new!(Literal(Literal::Integer(3)))),
+            })
+        )))]))
     );
 }
 
@@ -70,15 +74,17 @@ fn test_simple_arithmetic_sum_mult_precedence() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
-            op: BinaryOp::Add,
-            lhs: Box::new(Node::Literal(Literal::Integer(1))),
-            rhs: Box::new(Node::BinaryOp {
-                op: BinaryOp::Multiply,
-                lhs: Box::new(Node::Literal(Literal::Integer(2))),
-                rhs: Box::new(Node::Literal(Literal::Integer(3))),
-            }),
-        }))])
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(BinaryOp {
+                op: BinaryOp::Add,
+                lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                rhs: Box::new(node::new!(BinaryOp {
+                    op: BinaryOp::Multiply,
+                    lhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                    rhs: Box::new(node::new!(Literal(Literal::Integer(3)))),
+                })),
+            })
+        )))]))
     );
 }
 
@@ -88,15 +94,17 @@ fn test_simple_arithmetic_sum_mult_precedence_parentheses() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
-            op: BinaryOp::Multiply,
-            lhs: Box::new(Node::BinaryOp {
-                op: BinaryOp::Add,
-                lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                rhs: Box::new(Node::Literal(Literal::Integer(2))),
-            }),
-            rhs: Box::new(Node::Literal(Literal::Integer(3))),
-        }))])
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(BinaryOp {
+                op: BinaryOp::Multiply,
+                lhs: Box::new(node::new!(BinaryOp {
+                    op: BinaryOp::Add,
+                    lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                    rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                })),
+                rhs: Box::new(node::new!(Literal(Literal::Integer(3)))),
+            })
+        )))]))
     );
 }
 
@@ -106,21 +114,21 @@ fn test_simple_arithmetic_with_identifiers() {
 
     assert_eq!(
         program,
-        Node::Program(vec![
-            Node::VariableDeclaration {
+        node::new!(Program(vec![
+            node::new!(VariableDeclaration {
                 name: "x".to_string(),
-                value: Box::new(Node::Literal(Literal::Integer(1))),
-            },
-            Node::VariableDeclaration {
+                value: Box::new(node::new!(Literal(Literal::Integer(1)))),
+            }),
+            node::new!(VariableDeclaration {
                 name: "y".to_string(),
-                value: Box::new(Node::Literal(Literal::Integer(2))),
-            },
-            Node::ExpressionStatement(Box::new(Node::BinaryOp {
+                value: Box::new(node::new!(Literal(Literal::Integer(2)))),
+            }),
+            node::new!(ExpressionStatement(Box::new(node::new!(BinaryOp {
                 op: BinaryOp::Add,
-                lhs: Box::new(Node::Identifier("x".to_string())),
-                rhs: Box::new(Node::Identifier("y".to_string())),
-            }))
-        ])
+                lhs: Box::new(node::new!(Identifier("x".to_string()))),
+                rhs: Box::new(node::new!(Identifier("y".to_string()))),
+            })))),
+        ]))
     );
 }
 
@@ -130,13 +138,15 @@ fn test_simple_call() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::Call {
-            function: Box::new(Node::Identifier("foo".to_string())),
-            arguments: vec![
-                Node::Literal(Literal::Integer(1)),
-                Node::Literal(Literal::Integer(2))
-            ],
-        }))])
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(Call {
+                function: Box::new(node::new!(Identifier("foo".to_string()))),
+                arguments: vec![
+                    node::new!(Literal(Literal::Integer(1))),
+                    node::new!(Literal(Literal::Integer(2)))
+                ],
+            })
+        )))]))
     );
 }
 
@@ -146,16 +156,18 @@ fn test_nested_call() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::Call {
-            function: Box::new(Node::Identifier("foo".to_string())),
-            arguments: vec![
-                Node::Call {
-                    function: Box::new(Node::Identifier("bar".to_string())),
-                    arguments: vec![Node::Literal(Literal::Integer(1))]
-                },
-                Node::Literal(Literal::Integer(2))
-            ],
-        }))])
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(Call {
+                function: Box::new(node::new!(Identifier("foo".to_string()))),
+                arguments: vec![
+                    node::new!(Call {
+                        function: Box::new(node::new!(Identifier("bar".to_string()))),
+                        arguments: vec![node::new!(Literal(Literal::Integer(1)))]
+                    }),
+                    node::new!(Literal(Literal::Integer(2)))
+                ],
+            })
+        )))]))
     );
 }
 
@@ -165,17 +177,19 @@ fn test_call_with_expression() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::Call {
-            function: Box::new(Node::Identifier("foo".to_string())),
-            arguments: vec![
-                Node::BinaryOp {
-                    op: BinaryOp::Add,
-                    lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                    rhs: Box::new(Node::Literal(Literal::Integer(2))),
-                },
-                Node::Literal(Literal::Integer(3))
-            ],
-        }))])
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(Call {
+                function: Box::new(node::new!(Identifier("foo".to_string()))),
+                arguments: vec![
+                    node::new!(BinaryOp {
+                        op: BinaryOp::Add,
+                        lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                        rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                    }),
+                    node::new!(Literal(Literal::Integer(3))),
+                ],
+            })
+        )))]))
     );
 }
 
@@ -185,17 +199,19 @@ fn test_block_expression() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::VariableDeclaration {
+        node::new!(Program(vec![node::new!(VariableDeclaration {
             name: "x".to_string(),
-            value: Box::new(Node::Block(
-                vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
-                    op: BinaryOp::Add,
-                    lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                    rhs: Box::new(Node::Literal(Literal::Integer(2))),
-                }))],
+            value: Box::new(node::new!(Block(
+                vec![node::new!(ExpressionStatement(Box::new(node::new!(
+                    BinaryOp {
+                        op: BinaryOp::Add,
+                        lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                        rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                    }
+                ))))],
                 None
-            ))
-        }])
+            )))
+        })]))
     );
 }
 
@@ -205,74 +221,87 @@ fn test_if_statement() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::IfElse {
-            condition: Box::new(Node::BinaryOp {
-                op: BinaryOp::Add,
-                lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                rhs: Box::new(Node::Literal(Literal::Integer(2))),
-            }),
-            then_branch: Box::new(Node::Block(
-                vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(IfElse {
+                condition: Box::new(node::new!(BinaryOp {
                     op: BinaryOp::Add,
-                    lhs: Box::new(Node::Literal(Literal::Integer(3))),
-                    rhs: Box::new(Node::Literal(Literal::Integer(4))),
-                }))],
-                None
-            )),
-            else_branch: None,
-        }))])
+                    lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                    rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                })),
+                then_branch: Box::new(node::new!(Block(
+                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
+                        BinaryOp {
+                            op: BinaryOp::Add,
+                            lhs: Box::new(node::new!(Literal(Literal::Integer(3)))),
+                            rhs: Box::new(node::new!(Literal(Literal::Integer(4)))),
+                        }
+                    ))))],
+                    None
+                ))),
+                else_branch: None,
+            })
+        )))]))
     );
 }
 
 #[test]
 fn test_if_else_statement() {
     let program = parse!("if true { 1; } else { 2; }");
+
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::IfElse {
-            condition: Box::new(Node::Literal(Literal::Boolean(true))),
-            then_branch: Box::new(Node::Block(
-                vec![Node::ExpressionStatement(Box::new(Node::Literal(
-                    Literal::Integer(1)
-                )))],
-                None
-            )),
-            else_branch: Some(Box::new(Node::Block(
-                vec![Node::ExpressionStatement(Box::new(Node::Literal(
-                    Literal::Integer(2)
-                )))],
-                None
-            ))),
-        }))])
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(IfElse {
+                condition: Box::new(node::new!(Literal(Literal::Boolean(true)))),
+                then_branch: Box::new(node::new!(Block(
+                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
+                        Literal(Literal::Integer(1))
+                    ))))],
+                    None
+                ))),
+                else_branch: Some(Box::new(node::new!(Block(
+                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
+                        Literal(Literal::Integer(2))
+                    ))))],
+                    None
+                )))),
+            })
+        )))]))
     );
 
     let program = parse!("if (1 + 2) { 3 + 4; } else { 5 + 6; }");
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::IfElse {
-            condition: Box::new(Node::BinaryOp {
-                op: BinaryOp::Add,
-                lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                rhs: Box::new(Node::Literal(Literal::Integer(2))),
-            }),
-            then_branch: Box::new(Node::Block(
-                vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(IfElse {
+                condition: Box::new(node::new!(BinaryOp {
                     op: BinaryOp::Add,
-                    lhs: Box::new(Node::Literal(Literal::Integer(3))),
-                    rhs: Box::new(Node::Literal(Literal::Integer(4))),
-                }))],
-                None
-            )),
-            else_branch: Some(Box::new(Node::Block(
-                vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
-                    op: BinaryOp::Add,
-                    lhs: Box::new(Node::Literal(Literal::Integer(5))),
-                    rhs: Box::new(Node::Literal(Literal::Integer(6))),
-                }))],
-                None
-            ))),
-        }))])
+                    lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                    rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                })),
+                then_branch: Box::new(node::new!(Block(
+                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
+                        BinaryOp {
+                            op: BinaryOp::Add,
+                            lhs: Box::new(node::new!(Literal(Literal::Integer(3)))),
+                            rhs: Box::new(node::new!(Literal(Literal::Integer(4)))),
+                        }
+                    ))))],
+                    None
+                ))),
+                else_branch: Some(Box::new(node::new!(Block(
+                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
+                        BinaryOp {
+                            op: BinaryOp::Add,
+                            lhs: Box::new(node::new!(Literal(Literal::Integer(5)))),
+                            rhs: Box::new(node::new!(Literal(Literal::Integer(6)))),
+                        }
+                    ))))],
+                    None
+                )))),
+            })
+        )))]))
     );
 }
 
@@ -282,24 +311,24 @@ fn test_if_else_as_last_expression() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::FunctionDeclaration {
+        node::new!(Program(vec![node::new!(FunctionDeclaration {
             name: "main".to_string(),
             parameters: vec![],
-            body: Box::new(Node::Block(
+            body: Box::new(node::new!(Block(
                 vec![],
-                Some(Box::new(Node::IfElse {
-                    condition: Box::new(Node::Literal(Literal::Boolean(true))),
-                    then_branch: Box::new(Node::Block(
+                Some(Box::new(node::new!(IfElse {
+                    condition: Box::new(node::new!(Literal(Literal::Boolean(true)))),
+                    then_branch: Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(Node::Literal(Literal::Integer(1))))
-                    )),
-                    else_branch: Some(Box::new(Node::Block(
-                        vec![],
-                        Some(Box::new(Node::Literal(Literal::Integer(2))))
+                        Some(Box::new(node::new!(Literal(Literal::Integer(1)))))
                     ))),
-                }))
-            ))
-        }])
+                    else_branch: Some(Box::new(node::new!(Block(
+                        vec![],
+                        Some(Box::new(node::new!(Literal(Literal::Integer(2)))))
+                    )))),
+                })))
+            )))
+        })]))
     );
 }
 
@@ -309,24 +338,24 @@ fn test_if_expression() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::VariableDeclaration {
+        node::new!(Program(vec![node::new!(VariableDeclaration {
             name: "x".to_string(),
-            value: Box::new(Node::IfElse {
-                condition: Box::new(Node::Literal(Literal::Boolean(true))),
-                then_branch: Box::new(Node::Block(
-                    vec![Node::ExpressionStatement(Box::new(Node::Literal(
-                        Literal::Integer(1)
-                    )))],
-                    None
-                )),
-                else_branch: Some(Box::new(Node::Block(
-                    vec![Node::ExpressionStatement(Box::new(Node::Literal(
-                        Literal::Integer(2)
-                    )))],
+            value: Box::new(node::new!(IfElse {
+                condition: Box::new(node::new!(Literal(Literal::Boolean(true)))),
+                then_branch: Box::new(node::new!(Block(
+                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
+                        Literal(Literal::Integer(1))
+                    ))))],
                     None
                 ))),
-            })
-        }])
+                else_branch: Some(Box::new(node::new!(Block(
+                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
+                        Literal(Literal::Integer(2))
+                    ))))],
+                    None
+                )))),
+            }))
+        })]))
     );
 }
 
@@ -336,24 +365,24 @@ fn test_function_declaration() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::FunctionDeclaration {
+        node::new!(Program(vec![node::new!(FunctionDeclaration {
             name: "foo".to_string(),
             parameters: vec![],
-            body: Box::new(Node::Block(
+            body: Box::new(node::new!(Block(
                 vec![
-                    Node::ExpressionStatement(Box::new(Node::Call {
-                        function: Box::new(Node::Identifier("bar".to_string())),
+                    node::new!(ExpressionStatement(Box::new(node::new!(Call {
+                        function: Box::new(node::new!(Identifier("bar".to_string()))),
                         arguments: vec![]
-                    })),
-                    Node::ExpressionStatement(Box::new(Node::BinaryOp {
+                    })))),
+                    node::new!(ExpressionStatement(Box::new(node::new!(BinaryOp {
                         op: BinaryOp::Add,
-                        lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                        rhs: Box::new(Node::Literal(Literal::Integer(2))),
-                    }))
+                        lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                        rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                    }))))
                 ],
                 None
-            ))
-        }])
+            )))
+        })]))
     );
 }
 
@@ -363,21 +392,27 @@ fn test_function_declaration_with_parameters() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::FunctionDeclaration {
+        node::new!(Program(vec![node::new!(FunctionDeclaration {
             name: "foo".to_string(),
             parameters: vec![
-                Node::FunctionParameter(Box::new(Node::Identifier("x".to_string()))),
-                Node::FunctionParameter(Box::new(Node::Identifier("y".to_string())))
+                node::new!(FunctionParameter(Box::new(node::new!(Identifier(
+                    "x".to_string()
+                ))))),
+                node::new!(FunctionParameter(Box::new(node::new!(Identifier(
+                    "y".to_string()
+                )))))
             ],
-            body: Box::new(Node::Block(
-                vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
-                    op: BinaryOp::Add,
-                    lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                    rhs: Box::new(Node::Literal(Literal::Integer(2))),
-                }))],
+            body: Box::new(node::new!(Block(
+                vec![node::new!(ExpressionStatement(Box::new(node::new!(
+                    BinaryOp {
+                        op: BinaryOp::Add,
+                        lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                        rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                    }
+                ))))],
                 None
-            ))
-        }])
+            )))
+        })]))
     );
 }
 
@@ -387,11 +422,13 @@ fn test_stray_semicolon() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
-            op: BinaryOp::Add,
-            lhs: Box::new(Node::Literal(Literal::Integer(1))),
-            rhs: Box::new(Node::Literal(Literal::Integer(2))),
-        }))])
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(BinaryOp {
+                op: BinaryOp::Add,
+                lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+            })
+        )))]))
     );
 }
 
@@ -401,45 +438,51 @@ fn test_exponentiation() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
-            op: BinaryOp::Multiply,
-            lhs: Box::new(Node::Literal(Literal::Integer(1))),
-            rhs: Box::new(Node::BinaryOp {
-                op: BinaryOp::Exponentiation,
-                lhs: Box::new(Node::Literal(Literal::Integer(2))),
-                rhs: Box::new(Node::Literal(Literal::Integer(3))),
-            }),
-        }))])
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(BinaryOp {
+                op: BinaryOp::Multiply,
+                lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                rhs: Box::new(node::new!(BinaryOp {
+                    op: BinaryOp::Exponentiation,
+                    lhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                    rhs: Box::new(node::new!(Literal(Literal::Integer(3)))),
+                })),
+            })
+        )))]))
     );
 
     let program = parse!("1 ** 2 * 3;");
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
-            op: BinaryOp::Multiply,
-            lhs: Box::new(Node::BinaryOp {
-                op: BinaryOp::Exponentiation,
-                lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                rhs: Box::new(Node::Literal(Literal::Integer(2))),
-            }),
-            rhs: Box::new(Node::Literal(Literal::Integer(3))),
-        }))])
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(BinaryOp {
+                op: BinaryOp::Multiply,
+                lhs: Box::new(node::new!(BinaryOp {
+                    op: BinaryOp::Exponentiation,
+                    lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                    rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                })),
+                rhs: Box::new(node::new!(Literal(Literal::Integer(3)))),
+            })
+        )))]))
     );
 
     let program = parse!("1 ** 2 ** 3;");
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
-            op: BinaryOp::Exponentiation,
-            lhs: Box::new(Node::Literal(Literal::Integer(1))),
-            rhs: Box::new(Node::BinaryOp {
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(BinaryOp {
                 op: BinaryOp::Exponentiation,
-                lhs: Box::new(Node::Literal(Literal::Integer(2))),
-                rhs: Box::new(Node::Literal(Literal::Integer(3))),
-            }),
-        }))])
+                lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                rhs: Box::new(node::new!(BinaryOp {
+                    op: BinaryOp::Exponentiation,
+                    lhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                    rhs: Box::new(node::new!(Literal(Literal::Integer(3)))),
+                })),
+            })
+        )))]))
     );
 }
 
@@ -449,113 +492,135 @@ fn test_nameless_function_expressions() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::VariableDeclaration {
+        node::new!(Program(vec![node::new!(VariableDeclaration {
             name: "x".to_string(),
-            value: Box::new(Node::FunctionExpression {
+            value: Box::new(node::new!(FunctionExpression {
                 name: None,
                 parameters: vec![],
-                body: Box::new(Node::Block(
-                    vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
-                        op: BinaryOp::Add,
-                        lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                        rhs: Box::new(Node::Literal(Literal::Integer(2))),
-                    }))],
+                body: Box::new(node::new!(Block(
+                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
+                        BinaryOp {
+                            op: BinaryOp::Add,
+                            lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                            rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                        }
+                    ))))],
                     None
-                ))
-            })
-        }])
+                )))
+            }))
+        })]))
     );
 
     let program = parse!("let x = fn(x, y) { 1 + 2; };");
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::VariableDeclaration {
+        node::new!(Program(vec![node::new!(VariableDeclaration {
             name: "x".to_string(),
-            value: Box::new(Node::FunctionExpression {
+            value: Box::new(node::new!(FunctionExpression {
                 name: None,
                 parameters: vec![
-                    Node::FunctionParameter(Box::new(Node::Identifier("x".to_string()))),
-                    Node::FunctionParameter(Box::new(Node::Identifier("y".to_string())))
+                    node::new!(FunctionParameter(Box::new(node::new!(Identifier(
+                        "x".to_string()
+                    ))))),
+                    node::new!(FunctionParameter(Box::new(node::new!(Identifier(
+                        "y".to_string()
+                    )))))
                 ],
-                body: Box::new(Node::Block(
-                    vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
-                        op: BinaryOp::Add,
-                        lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                        rhs: Box::new(Node::Literal(Literal::Integer(2))),
-                    }))],
+                body: Box::new(node::new!(Block(
+                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
+                        BinaryOp {
+                            op: BinaryOp::Add,
+                            lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                            rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                        }
+                    ))))],
                     None
-                ))
-            })
-        }])
+                )))
+            }))
+        })]))
     );
 }
 
 #[test]
 fn test_function_expression_without_name_no_argument_parenthesis() {
     let program = parse!("let x = fn { 1 + 2; };");
+
     assert_eq!(
         program,
-        Node::Program(vec![Node::VariableDeclaration {
+        node::new!(Program(vec![node::new!(VariableDeclaration {
             name: "x".to_string(),
-            value: Box::new(Node::FunctionExpression {
+            value: Box::new(node::new!(FunctionExpression {
                 name: None,
                 parameters: vec![],
-                body: Box::new(Node::Block(
-                    vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
-                        op: BinaryOp::Add,
-                        lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                        rhs: Box::new(Node::Literal(Literal::Integer(2))),
-                    }))],
+                body: Box::new(node::new!(Block(
+                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
+                        BinaryOp {
+                            op: BinaryOp::Add,
+                            lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                            rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                        }
+                    ))))],
                     None
-                ))
-            })
-        }])
+                )))
+            }))
+        })]))
     );
 }
 
 #[test]
 fn test_function_expressions() {
     let program = parse!("let x = fn foo() { 1 + 2; };");
+
     assert_eq!(
         program,
-        Node::Program(vec![Node::VariableDeclaration {
+        node::new!(Program(vec![node::new!(VariableDeclaration {
             name: "x".to_string(),
-            value: Box::new(Node::FunctionExpression {
+            value: Box::new(node::new!(FunctionExpression {
                 name: Some("foo".to_string()),
                 parameters: vec![],
-                body: Box::new(Node::Block(
-                    vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
-                        op: BinaryOp::Add,
-                        lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                        rhs: Box::new(Node::Literal(Literal::Integer(2))),
-                    }))],
+                body: Box::new(node::new!(Block(
+                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
+                        BinaryOp {
+                            op: BinaryOp::Add,
+                            lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                            rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                        }
+                    ))))],
                     None
-                ))
-            })
-        }])
+                )))
+            }))
+        })]))
     );
+
     let program = parse!("let x = fn foo(x, y) { 1 + 2; };");
+
     assert_eq!(
         program,
-        Node::Program(vec![Node::VariableDeclaration {
+        node::new!(Program(vec![node::new!(VariableDeclaration {
             name: "x".to_string(),
-            value: Box::new(Node::FunctionExpression {
+            value: Box::new(node::new!(FunctionExpression {
                 name: Some("foo".to_string()),
                 parameters: vec![
-                    Node::FunctionParameter(Box::new(Node::Identifier("x".to_string()))),
-                    Node::FunctionParameter(Box::new(Node::Identifier("y".to_string())))
+                    node::new!(FunctionParameter(Box::new(node::new!(Identifier(
+                        "x".to_string()
+                    ))))),
+                    node::new!(FunctionParameter(Box::new(node::new!(Identifier(
+                        "y".to_string()
+                    ))))),
                 ],
-                body: Box::new(Node::Block(
-                    vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
-                        op: BinaryOp::Add,
-                        lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                        rhs: Box::new(Node::Literal(Literal::Integer(2))),
-                    }))],
+                body: Box::new(node::new!(Block(
+                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
+                        BinaryOp {
+                            op: BinaryOp::Add,
+                            lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                            rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                        }
+                    ))))],
                     None
-                ))
-            })
-        }])
+                )))
+            }))
+        })]))
     );
 }
 
@@ -565,26 +630,26 @@ fn test_pattern_matching() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::VariableDeclaration {
+        node::new!(Program(vec![node::new!(VariableDeclaration {
             name: "x".to_string(),
-            value: Box::new(Node::Match {
-                expression: Box::new(Node::Literal(Literal::Integer(1))),
+            value: Box::new(node::new!(Match {
+                expression: Box::new(node::new!(Literal(Literal::Integer(1)))),
                 arms: vec![
-                    Node::MatchArm {
-                        pattern: Box::new(Node::Literal(Literal::Integer(1))),
-                        expression: Box::new(Node::Literal(Literal::Integer(2)))
-                    },
-                    Node::MatchArm {
-                        pattern: Box::new(Node::Literal(Literal::Integer(3))),
-                        expression: Box::new(Node::Literal(Literal::Integer(4)))
-                    },
-                    Node::MatchArm {
-                        pattern: Box::new(Node::Wildcard),
-                        expression: Box::new(Node::Literal(Literal::Integer(5)))
-                    }
+                    node::new!(MatchArm {
+                        pattern: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                        expression: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                    }),
+                    node::new!(MatchArm {
+                        pattern: Box::new(node::new!(Literal(Literal::Integer(3)))),
+                        expression: Box::new(node::new!(Literal(Literal::Integer(4)))),
+                    }),
+                    node::new!(MatchArm {
+                        pattern: Box::new(node::new!(Wildcard)),
+                        expression: Box::new(node::new!(Literal(Literal::Integer(5)))),
+                    })
                 ]
-            })
-        }])
+            }))
+        })]))
     );
 }
 
@@ -594,50 +659,57 @@ fn test_explicit_return_statements() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::FunctionDeclaration {
+        node::new!(Program(vec![node::new!(FunctionDeclaration {
             name: "foo".to_string(),
             parameters: vec![],
-            body: Box::new(Node::Block(
-                vec![Node::ReturnStatement(Some(Box::new(Node::BinaryOp {
-                    op: BinaryOp::Add,
-                    lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                    rhs: Box::new(Node::Literal(Literal::Integer(2))),
-                })))],
+            body: Box::new(node::new!(Block(
+                vec![node::new!(ReturnStatement(Some(Box::new(node::new!(
+                    BinaryOp {
+                        op: BinaryOp::Add,
+                        lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                        rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                    }
+                )))))],
                 None
-            ))
-        }])
+            )))
+        })]))
     );
 
     let program = parse!("fn foo() { return; }");
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::FunctionDeclaration {
+        node::new!(Program(vec![node::new!(FunctionDeclaration {
             name: "foo".to_string(),
             parameters: vec![],
-            body: Box::new(Node::Block(vec![Node::ReturnStatement(None)], None))
-        }])
+            body: Box::new(node::new!(Block(
+                vec![node::new!(ReturnStatement(None))],
+                None
+            )))
+        })]))
     );
 
     let program = parse!("let x = fn() { return 1 + 2; };");
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::VariableDeclaration {
+        node::new!(Program(vec![node::new!(VariableDeclaration {
             name: "x".to_string(),
-            value: Box::new(Node::FunctionExpression {
+            value: Box::new(node::new!(FunctionExpression {
                 name: None,
                 parameters: vec![],
-                body: Box::new(Node::Block(
-                    vec![Node::ReturnStatement(Some(Box::new(Node::BinaryOp {
-                        op: BinaryOp::Add,
-                        lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                        rhs: Box::new(Node::Literal(Literal::Integer(2))),
-                    })))],
+                body: Box::new(node::new!(Block(
+                    vec![node::new!(ReturnStatement(Some(Box::new(node::new!(
+                        BinaryOp {
+                            op: BinaryOp::Add,
+                            lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                            rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                        }
+                    )))))],
                     None
-                ))
-            })
-        }])
+                )))
+            }))
+        })]))
     );
 }
 
@@ -647,67 +719,67 @@ fn test_implicit_return_expressions() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::FunctionDeclaration {
+        node::new!(Program(vec![node::new!(FunctionDeclaration {
             name: "foo".to_string(),
             parameters: vec![],
-            body: Box::new(Node::Block(
+            body: Box::new(node::new!(Block(
                 vec![],
-                Some(Box::new(Node::BinaryOp {
+                Some(Box::new(node::new!(BinaryOp {
                     op: BinaryOp::Add,
-                    lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                    rhs: Box::new(Node::Literal(Literal::Integer(2))),
-                }))
-            ))
-        }])
+                    lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                    rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                })))
+            )))
+        })]))
     );
 
     let program = parse!("fn foo() {}");
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::FunctionDeclaration {
+        node::new!(Program(vec![node::new!(FunctionDeclaration {
             name: "foo".to_string(),
             parameters: vec![],
-            body: Box::new(Node::Block(vec![], None))
-        }])
+            body: Box::new(node::new!(Block(vec![], None)))
+        })]))
     );
 
     let program = parse!("let x = fn() { 1 + 2 };");
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::VariableDeclaration {
+        node::new!(Program(vec![node::new!(VariableDeclaration {
             name: "x".to_string(),
-            value: Box::new(Node::FunctionExpression {
+            value: Box::new(node::new!(FunctionExpression {
                 name: None,
                 parameters: vec![],
-                body: Box::new(Node::Block(
+                body: Box::new(node::new!(Block(
                     vec![],
-                    Some(Box::new(Node::BinaryOp {
+                    Some(Box::new(node::new!(BinaryOp {
                         op: BinaryOp::Add,
-                        lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                        rhs: Box::new(Node::Literal(Literal::Integer(2))),
-                    }))
-                ))
-            })
-        }])
+                        lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                        rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                    })))
+                )))
+            }))
+        })]))
     );
 
     let program = parse!("fn foo() { let x = 1; x }");
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::FunctionDeclaration {
+        node::new!(Program(vec![node::new!(FunctionDeclaration {
             name: "foo".to_string(),
             parameters: vec![],
-            body: Box::new(Node::Block(
-                vec![Node::VariableDeclaration {
+            body: Box::new(node::new!(Block(
+                vec![node::new!(VariableDeclaration {
                     name: "x".to_string(),
-                    value: Box::new(Node::Literal(Literal::Integer(1)))
-                },],
-                Some(Box::new(Node::Identifier("x".to_string())))
-            ))
-        }])
+                    value: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                })],
+                Some(Box::new(node::new!(Identifier("x".to_string()))))
+            )))
+        })]))
     );
 }
 
@@ -720,42 +792,46 @@ fn test_recursive_factorial_functional_definition() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::FunctionDeclarations(
+        node::new!(Program(vec![node::new!(FunctionDeclarations(
             "factorial".to_string(),
             vec![
                 (
-                    vec![Node::FunctionParameter(Box::new(Node::Literal(
-                        Literal::Integer(0)
-                    )))],
-                    Box::new(Node::Block(
-                        vec![Node::ReturnStatement(Some(Box::new(Node::Literal(
-                            Literal::Integer(1)
-                        ))))],
+                    vec![node::new!(FunctionParameter(Box::new(node::new!(
+                        Literal(Literal::Integer(0))
+                    ))))],
+                    Box::new(node::new!(Block(
+                        vec![node::new!(ReturnStatement(Some(Box::new(node::new!(
+                            Literal(Literal::Integer(1))
+                        )))))],
                         None
-                    ))
+                    )))
                 ),
                 (
-                    vec![Node::FunctionParameter(Box::new(Node::Identifier(
-                        "n".to_string()
-                    )))],
-                    Box::new(Node::Block(
-                        vec![Node::ReturnStatement(Some(Box::new(Node::BinaryOp {
-                            op: BinaryOp::Multiply,
-                            lhs: Box::new(Node::Identifier("n".to_string())),
-                            rhs: Box::new(Node::Call {
-                                function: Box::new(Node::Identifier("factorial".to_string())),
-                                arguments: vec![Node::BinaryOp {
-                                    op: BinaryOp::Subtract,
-                                    lhs: Box::new(Node::Identifier("n".to_string())),
-                                    rhs: Box::new(Node::Literal(Literal::Integer(1)))
-                                }]
-                            })
-                        })))],
+                    vec![node::new!(FunctionParameter(Box::new(node::new!(
+                        Identifier("n".to_string())
+                    ))))],
+                    Box::new(node::new!(Block(
+                        vec![node::new!(ReturnStatement(Some(Box::new(node::new!(
+                            BinaryOp {
+                                op: BinaryOp::Multiply,
+                                lhs: Box::new(node::new!(Identifier("n".to_string()))),
+                                rhs: Box::new(node::new!(Call {
+                                    function: Box::new(node::new!(Identifier(
+                                        "factorial".to_string()
+                                    ))),
+                                    arguments: vec![node::new!(BinaryOp {
+                                        op: BinaryOp::Subtract,
+                                        lhs: Box::new(node::new!(Identifier("n".to_string()))),
+                                        rhs: Box::new(node::new!(Literal(Literal::Integer(1))))
+                                    })]
+                                }))
+                            }
+                        )))))],
                         None
-                    ))
+                    )))
                 )
             ]
-        )])
+        ))]))
     );
 }
 
@@ -768,38 +844,42 @@ fn test_recursive_sum() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::FunctionDeclarations(
+        node::new!(Program(vec![node::new!(FunctionDeclarations(
             "sum".to_string(),
             vec![
                 (
-                    vec![Node::FunctionParameter(Box::new(Node::List(vec![])))],
-                    Box::new(Node::Block(
+                    vec![node::new!(FunctionParameter(Box::new(node::new!(List(
+                        vec![]
+                    )))))],
+                    Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(Node::Literal(Literal::Integer(0)))),
-                    ))
+                        Some(Box::new(node::new!(Literal(Literal::Integer(0))))),
+                    )))
                 ),
                 (
-                    vec![Node::FunctionParameter(Box::new(Node::List(vec![
-                        Node::Identifier("x".to_string()),
-                        Node::PrefixOp(
-                            PrefixOp::Rest,
-                            Box::new(Node::Identifier("xs".to_string()))
-                        )
-                    ])))],
-                    Box::new(Node::Block(
+                    vec![node::new!(FunctionParameter(Box::new(node::new!(List(
+                        vec![
+                            node::new!(Identifier("x".to_string())),
+                            node::new!(PrefixOp(
+                                PrefixOp::Rest,
+                                Box::new(node::new!(Identifier("xs".to_string())))
+                            ))
+                        ]
+                    )))))],
+                    Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(Node::BinaryOp {
+                        Some(Box::new(node::new!(BinaryOp {
                             op: BinaryOp::Add,
-                            lhs: Box::new(Node::Identifier("x".to_string())),
-                            rhs: Box::new(Node::Call {
-                                function: Box::new(Node::Identifier("sum".to_string())),
-                                arguments: vec![Node::Identifier("xs".to_string())]
-                            })
-                        }))
-                    ))
+                            lhs: Box::new(node::new!(Identifier("x".to_string()))),
+                            rhs: Box::new(node::new!(Call {
+                                function: Box::new(node::new!(Identifier("sum".to_string()))),
+                                arguments: vec![node::new!(Identifier("xs".to_string()))]
+                            }))
+                        })))
+                    )))
                 )
             ]
-        )])
+        ))]))
     )
 }
 
@@ -815,33 +895,33 @@ fn test_functional_function_declaration_with_comments_inbetween() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::FunctionDeclarations(
+        node::new!(Program(vec![node::new!(FunctionDeclarations(
             "foo".to_string(),
             vec![
                 (
-                    vec![Node::FunctionParameter(Box::new(Node::Literal(
-                        Literal::Integer(1)
-                    )))],
-                    Box::new(Node::Block(
+                    vec![node::new!(FunctionParameter(Box::new(node::new!(
+                        Literal(Literal::Integer(1))
+                    ))))],
+                    Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(Node::Literal(Literal::Integer(1)))),
-                    ))
+                        Some(Box::new(node::new!(Literal(Literal::Integer(1))))),
+                    )))
                 ),
                 (
-                    vec![Node::FunctionParameter(Box::new(Node::Identifier(
-                        "n".to_string()
-                    )))],
-                    Box::new(Node::Block(
+                    vec![node::new!(FunctionParameter(Box::new(node::new!(
+                        Identifier("n".to_string())
+                    ))))],
+                    Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(Node::BinaryOp {
+                        Some(Box::new(node::new!(BinaryOp {
                             op: BinaryOp::Multiply,
-                            lhs: Box::new(Node::Identifier("n".to_string())),
-                            rhs: Box::new(Node::Literal(Literal::Integer(2)))
-                        }))
-                    ))
+                            lhs: Box::new(node::new!(Identifier("n".to_string()))),
+                            rhs: Box::new(node::new!(Literal(Literal::Integer(2))))
+                        })))
+                    )))
                 )
             ]
-        )])
+        ))]))
     );
 }
 
@@ -851,11 +931,13 @@ fn test_pipeline_operator_to_identifier() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
-            op: BinaryOp::Pipeline,
-            lhs: Box::new(Node::Literal(Literal::Integer(1))),
-            rhs: Box::new(Node::Identifier("foo".to_string())),
-        }))])
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(BinaryOp {
+                op: BinaryOp::Pipeline,
+                lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                rhs: Box::new(node::new!(Identifier("foo".to_string()))),
+            })
+        )))]))
     );
 }
 
@@ -864,34 +946,38 @@ fn test_pipeline_operator() {
     let program = parse!("1 |> foo();");
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
-            op: BinaryOp::Pipeline,
-            lhs: Box::new(Node::Literal(Literal::Integer(1))),
-            rhs: Box::new(Node::Call {
-                function: Box::new(Node::Identifier("foo".to_string())),
-                arguments: vec![]
-            }),
-        }))]),
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(BinaryOp {
+                op: BinaryOp::Pipeline,
+                lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                rhs: Box::new(node::new!(Call {
+                    function: Box::new(node::new!(Identifier("foo".to_string()))),
+                    arguments: vec![]
+                })),
+            })
+        )))])),
     );
 
     let program = parse!("1 |> foo() |> bar();");
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
-            op: BinaryOp::Pipeline,
-            lhs: Box::new(Node::BinaryOp {
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(BinaryOp {
                 op: BinaryOp::Pipeline,
-                lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                rhs: Box::new(Node::Call {
-                    function: Box::new(Node::Identifier("foo".to_string())),
+                lhs: Box::new(node::new!(BinaryOp {
+                    op: BinaryOp::Pipeline,
+                    lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                    rhs: Box::new(node::new!(Call {
+                        function: Box::new(node::new!(Identifier("foo".to_string()))),
+                        arguments: vec![]
+                    })),
+                })),
+                rhs: Box::new(node::new!(Call {
+                    function: Box::new(node::new!(Identifier("bar".to_string()))),
                     arguments: vec![]
-                }),
-            }),
-            rhs: Box::new(Node::Call {
-                function: Box::new(Node::Identifier("bar".to_string())),
-                arguments: vec![]
-            }),
-        }))]),
+                })),
+            })
+        )))])),
     );
 }
 
@@ -900,18 +986,20 @@ fn test_pipeline_operator_precedence() {
     let program = parse!("1 + 2 |> foo();");
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
-            op: BinaryOp::Pipeline,
-            lhs: Box::new(Node::BinaryOp {
-                op: BinaryOp::Add,
-                lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                rhs: Box::new(Node::Literal(Literal::Integer(2))),
-            }),
-            rhs: Box::new(Node::Call {
-                function: Box::new(Node::Identifier("foo".to_string())),
-                arguments: vec![]
-            }),
-        }))]),
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(BinaryOp {
+                op: BinaryOp::Pipeline,
+                lhs: Box::new(node::new!(BinaryOp {
+                    op: BinaryOp::Add,
+                    lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                    rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                })),
+                rhs: Box::new(node::new!(Call {
+                    function: Box::new(node::new!(Identifier("foo".to_string()))),
+                    arguments: vec![]
+                })),
+            })
+        )))])),
     );
 }
 
@@ -920,14 +1008,16 @@ fn test_pipeline_operator_to_function_call_with_arguments() {
     let program = parse!("1 |> foo(2);");
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
-            op: BinaryOp::Pipeline,
-            lhs: Box::new(Node::Literal(Literal::Integer(1))),
-            rhs: Box::new(Node::Call {
-                function: Box::new(Node::Identifier("foo".to_string())),
-                arguments: vec![Node::Literal(Literal::Integer(2))]
-            }),
-        }))]),
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(BinaryOp {
+                op: BinaryOp::Pipeline,
+                lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                rhs: Box::new(node::new!(Call {
+                    function: Box::new(node::new!(Identifier("foo".to_string()))),
+                    arguments: vec![node::new!(Literal(Literal::Integer(2)))]
+                })),
+            })
+        )))])),
     );
 }
 
@@ -936,14 +1026,19 @@ fn test_pipeline_operator_to_function_call_with_wildcards() {
     let program = parse!("1 |> foo(2, _);");
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::BinaryOp {
-            op: BinaryOp::Pipeline,
-            lhs: Box::new(Node::Literal(Literal::Integer(1))),
-            rhs: Box::new(Node::Call {
-                function: Box::new(Node::Identifier("foo".to_string())),
-                arguments: vec![Node::Literal(Literal::Integer(2)), Node::Wildcard,]
-            }),
-        }))]),
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(BinaryOp {
+                op: BinaryOp::Pipeline,
+                lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                rhs: Box::new(node::new!(Call {
+                    function: Box::new(node::new!(Identifier("foo".to_string()))),
+                    arguments: vec![
+                        node::new!(Literal(Literal::Integer(2))),
+                        node::new!(Wildcard)
+                    ]
+                })),
+            })
+        )))])),
     );
 }
 
@@ -953,24 +1048,24 @@ fn test_list_literal() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::VariableDeclaration {
+        node::new!(Program(vec![node::new!(VariableDeclaration {
             name: "x".to_string(),
-            value: Box::new(Node::List(vec![]))
-        }])
+            value: Box::new(node::new!(List(vec![])))
+        })]))
     );
 
     let program = parse!("let x = [1, 2, 3];");
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::VariableDeclaration {
+        node::new!(Program(vec![node::new!(VariableDeclaration {
             name: "x".to_string(),
-            value: Box::new(Node::List(vec![
-                Node::Literal(Literal::Integer(1)),
-                Node::Literal(Literal::Integer(2)),
-                Node::Literal(Literal::Integer(3)),
-            ]))
-        }])
+            value: Box::new(node::new!(List(vec![
+                node::new!(Literal(Literal::Integer(1))),
+                node::new!(Literal(Literal::Integer(2))),
+                node::new!(Literal(Literal::Integer(3))),
+            ])))
+        })]))
     );
 }
 
@@ -980,14 +1075,14 @@ fn test_list_literal_with_trailing_comma() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::VariableDeclaration {
+        node::new!(Program(vec![node::new!(VariableDeclaration {
             name: "x".to_string(),
-            value: Box::new(Node::List(vec![
-                Node::Literal(Literal::Integer(1)),
-                Node::Literal(Literal::Integer(2)),
-                Node::Literal(Literal::Integer(3)),
-            ]))
-        }])
+            value: Box::new(node::new!(List(vec![
+                node::new!(Literal(Literal::Integer(1))),
+                node::new!(Literal(Literal::Integer(2))),
+                node::new!(Literal(Literal::Integer(3))),
+            ])))
+        })]))
     );
 }
 
@@ -996,9 +1091,9 @@ fn test_single_line_comments() {
     let program = parse!("// this is a comment");
     assert_eq!(
         program,
-        Node::Program(vec![Node::SingleLineComment(
+        node::new!(Program(vec![node::new!(SingleLineComment(
             " this is a comment".to_string()
-        )])
+        ))]))
     );
 }
 
@@ -1008,18 +1103,18 @@ fn test_multi_line_comments() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::MultiLineComment(
+        node::new!(Program(vec![node::new!(MultiLineComment(
             " this is a comment ".to_string()
-        )])
+        ))]))
     );
 
     let program = parse!("/* this is a comment\n   spanning multiple lines */");
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::MultiLineComment(
+        node::new!(Program(vec![node::new!(MultiLineComment(
             " this is a comment\n   spanning multiple lines ".to_string()
-        )])
+        ))]))
     );
 }
 
@@ -1029,9 +1124,9 @@ fn test_string_literal() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::Literal(
-            Literal::String("foo".to_string())
-        )))])
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(Literal(Literal::String("foo".to_string())))
+        )))]))
     );
 }
 
@@ -1041,9 +1136,9 @@ fn test_char_literal() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::Literal(
-            Literal::Char("a".to_string())
-        )))])
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(Literal(Literal::Char("a".to_string())))
+        )))]))
     );
 }
 
@@ -1053,19 +1148,19 @@ fn test_dictionary_literal() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::VariableDeclaration {
+        node::new!(Program(vec![node::new!(VariableDeclaration {
             name: "x".to_string(),
-            value: Box::new(Node::Dict(vec![
+            value: Box::new(node::new!(Dict(vec![
                 (
-                    Node::Identifier("foo".to_string()),
-                    Node::Literal(Literal::Integer(1))
+                    node::new!(Identifier("foo".to_string())),
+                    node::new!(Literal(Literal::Integer(1))),
                 ),
                 (
-                    Node::Identifier("bar".to_string()),
-                    Node::Literal(Literal::Integer(2))
+                    node::new!(Identifier("bar".to_string())),
+                    node::new!(Literal(Literal::Integer(2))),
                 )
-            ]))
-        }])
+            ])))
+        })]))
     );
 }
 
@@ -1074,19 +1169,21 @@ fn test_function_call_with_dictionary_no_parens() {
     let program = parse!(r#"foo { foo: 1, bar: 2 };"#);
     assert_eq!(
         program,
-        Node::Program(vec![Node::ExpressionStatement(Box::new(Node::Call {
-            function: Box::new(Node::Identifier("foo".to_string())),
-            arguments: vec![Node::Dict(vec![
-                (
-                    Node::Identifier("foo".to_string()),
-                    Node::Literal(Literal::Integer(1))
-                ),
-                (
-                    Node::Identifier("bar".to_string()),
-                    Node::Literal(Literal::Integer(2))
-                )
-            ])]
-        }))])
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(Call {
+                function: Box::new(node::new!(Identifier("foo".to_string()))),
+                arguments: vec![node::new!(Dict(vec![
+                    (
+                        node::new!(Identifier("foo".to_string())),
+                        node::new!(Literal(Literal::Integer(1))),
+                    ),
+                    (
+                        node::new!(Identifier("bar".to_string())),
+                        node::new!(Literal(Literal::Integer(2))),
+                    )
+                ]))]
+            })
+        )))]))
     );
 }
 
@@ -1103,33 +1200,33 @@ fn test_enums() {
 
     assert_eq!(
         program,
-        Node::Program(vec![
-            Node::EnumDeclaration {
+        node::new!(Program(vec![
+            node::new!(EnumDeclaration {
                 name: "Option".to_string(),
                 variants: vec![
-                    Node::EnumVariant {
+                    node::new!(EnumVariant {
                         name: "Some".to_string(),
                         named_fields: false,
-                        parameters: vec![Node::Identifier("x".to_string())]
-                    },
-                    Node::EnumVariant {
+                        parameters: vec![node::new!(Identifier("x".to_string()))]
+                    }),
+                    node::new!(EnumVariant {
                         name: "None".to_string(),
                         named_fields: false,
                         parameters: vec![]
-                    }
+                    }),
                 ]
-            },
-            Node::VariableDeclaration {
+            }),
+            node::new!(VariableDeclaration {
                 name: "x".to_string(),
-                value: Box::new(Node::Call {
-                    function: Box::new(Node::NestedIdentifier(vec![
+                value: Box::new(node::new!(Call {
+                    function: Box::new(node::new!(NestedIdentifier(vec![
                         "Option".to_string(),
                         "Some".to_string()
-                    ])),
-                    arguments: vec![Node::Literal(Literal::Integer(42))]
-                })
-            }
-        ])
+                    ]))),
+                    arguments: vec![node::new!(Literal(Literal::Integer(42)))]
+                }))
+            }),
+        ]))
     );
 }
 
@@ -1145,36 +1242,36 @@ fn test_enums_with_fields() {
 
     assert_eq!(
         program,
-        Node::Program(vec![
-            Node::EnumDeclaration {
+        node::new!(Program(vec![
+            node::new!(EnumDeclaration {
                 name: "Option".to_string(),
                 variants: vec![
-                    Node::EnumVariant {
+                    node::new!(EnumVariant {
                         name: "Some".to_string(),
                         named_fields: true,
-                        parameters: vec![Node::Identifier("x".to_string())]
-                    },
-                    Node::EnumVariant {
+                        parameters: vec![node::new!(Identifier("x".to_string()))]
+                    }),
+                    node::new!(EnumVariant {
                         name: "None".to_string(),
                         named_fields: false,
                         parameters: vec![]
-                    }
+                    }),
                 ]
-            },
-            Node::VariableDeclaration {
+            }),
+            node::new!(VariableDeclaration {
                 name: "x".to_string(),
-                value: Box::new(Node::Call {
-                    function: Box::new(Node::NestedIdentifier(vec![
+                value: Box::new(node::new!(Call {
+                    function: Box::new(node::new!(NestedIdentifier(vec![
                         "Option".to_string(),
                         "Some".to_string()
-                    ])),
-                    arguments: vec![Node::Dict(vec![(
-                        Node::Identifier("x".to_string()),
-                        Node::Literal(Literal::Integer(42))
-                    )])]
-                })
-            }
-        ])
+                    ]))),
+                    arguments: vec![node::new!(Dict(vec![(
+                        node::new!(Identifier("x".to_string())),
+                        node::new!(Literal(Literal::Integer(42))),
+                    )]))]
+                }))
+            }),
+        ]))
     );
 }
 
@@ -1202,149 +1299,157 @@ fn test_enum_tree_max_depth() {
 
     assert_eq!(
         program,
-        Node::Program(vec![
-            Node::EnumDeclaration {
+        node::new!(Program(vec![
+            node::new!(EnumDeclaration {
                 name: "Tree".to_string(),
                 variants: vec![
-                    Node::EnumVariant {
+                    node::new!(EnumVariant {
                         name: "Leaf".to_string(),
                         named_fields: false,
-                        parameters: vec![Node::Identifier("value".to_string())]
-                    },
-                    Node::EnumVariant {
+                        parameters: vec![node::new!(Identifier("value".to_string()))]
+                    }),
+                    node::new!(EnumVariant {
                         name: "Node".to_string(),
                         named_fields: true,
                         parameters: vec![
-                            Node::Identifier("left".to_string()),
-                            Node::Identifier("right".to_string())
+                            node::new!(Identifier("left".to_string())),
+                            node::new!(Identifier("right".to_string()))
                         ]
-                    }
+                    }),
                 ]
-            },
-            Node::FunctionDeclarations(
+            }),
+            node::new!(FunctionDeclarations(
                 "maximum_depth".to_string(),
                 vec![
                     (
-                        vec![Node::FunctionParameter(Box::new(Node::EnumExtraction {
-                            identifier: Box::new(Node::NestedIdentifier(vec![
-                                "Tree".to_string(),
-                                "Leaf".to_string()
-                            ])),
-                            elements: vec![Node::Wildcard],
-                            named_fields: false,
-                        }))],
-                        Box::new(Node::Block(
+                        vec![node::new!(FunctionParameter(Box::new(node::new!(
+                            EnumExtraction {
+                                identifier: Box::new(node::new!(NestedIdentifier(vec![
+                                    "Tree".to_string(),
+                                    "Leaf".to_string()
+                                ]))),
+                                elements: vec![node::new!(Wildcard)],
+                                named_fields: false,
+                            }
+                        ))))],
+                        Box::new(node::new!(Block(
                             vec![],
-                            Some(Box::new(Node::Literal(Literal::Integer(1))))
-                        ))
+                            Some(Box::new(node::new!(Literal(Literal::Integer(1)))))
+                        )))
                     ),
                     (
-                        vec![Node::FunctionParameter(Box::new(Node::EnumExtraction {
-                            identifier: Box::new(Node::NestedIdentifier(vec![
-                                "Tree".to_string(),
-                                "Node".to_string()
-                            ])),
-                            elements: vec![
-                                Node::Identifier("left".to_string()),
-                                Node::Identifier("right".to_string())
-                            ],
-                            named_fields: true,
-                        }))],
-                        Box::new(Node::Block(
+                        vec![node::new!(FunctionParameter(Box::new(node::new!(
+                            EnumExtraction {
+                                identifier: Box::new(node::new!(NestedIdentifier(vec![
+                                    "Tree".to_string(),
+                                    "Node".to_string()
+                                ]))),
+                                elements: vec![
+                                    node::new!(Identifier("left".to_string())),
+                                    node::new!(Identifier("right".to_string()))
+                                ],
+                                named_fields: true,
+                            }
+                        ))))],
+                        Box::new(node::new!(Block(
                             vec![],
-                            Some(Box::new(Node::BinaryOp {
+                            Some(Box::new(node::new!(BinaryOp {
                                 op: BinaryOp::Add,
-                                lhs: Box::new(Node::Literal(Literal::Integer(1))),
-                                rhs: Box::new(Node::Call {
-                                    function: Box::new(Node::Identifier("max".to_string())),
+                                lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                                rhs: Box::new(node::new!(Call {
+                                    function: Box::new(node::new!(Identifier("max".to_string()))),
                                     arguments: vec![
-                                        Node::Call {
-                                            function: Box::new(Node::Identifier(
+                                        node::new!(Call {
+                                            function: Box::new(node::new!(Identifier(
                                                 "maximum_depth".to_string()
-                                            )),
-                                            arguments: vec![Node::Identifier("left".to_string())]
-                                        },
-                                        Node::Call {
-                                            function: Box::new(Node::Identifier(
+                                            ))),
+                                            arguments: vec![node::new!(Identifier(
+                                                "left".to_string()
+                                            ))]
+                                        }),
+                                        node::new!(Call {
+                                            function: Box::new(node::new!(Identifier(
                                                 "maximum_depth".to_string()
-                                            )),
-                                            arguments: vec![Node::Identifier("right".to_string())]
-                                        }
+                                            ))),
+                                            arguments: vec![node::new!(Identifier(
+                                                "right".to_string()
+                                            ))]
+                                        }),
                                     ]
-                                })
-                            }))
-                        ))
+                                }))
+                            })))
+                        )))
                     )
                 ]
-            ),
-            Node::FunctionDeclaration {
+            )),
+            node::new!(FunctionDeclaration {
                 name: "main".to_string(),
                 parameters: vec![],
-                body: Box::new(Node::Block(
-                    vec![Node::VariableDeclaration {
+                body: Box::new(node::new!(Block(
+                    vec![node::new!(VariableDeclaration {
                         name: "x".to_string(),
-                        value: Box::new(Node::Call {
-                            function: Box::new(Node::NestedIdentifier(vec![
+                        value: Box::new(node::new!(Call {
+                            function: Box::new(node::new!(NestedIdentifier(vec![
                                 "Tree".to_string(),
                                 "Node".to_string()
-                            ])),
-                            arguments: vec![Node::Dict(vec![
+                            ]))),
+                            arguments: vec![node::new!(Dict(vec![
                                 (
-                                    Node::Identifier("left".to_string()),
-                                    Node::Call {
-                                        function: Box::new(Node::NestedIdentifier(vec![
+                                    node::new!(Identifier("left".to_string())),
+                                    node::new!(Call {
+                                        function: Box::new(node::new!(NestedIdentifier(vec![
                                             "Tree".to_string(),
                                             "Leaf".to_string()
-                                        ])),
-                                        arguments: vec![Node::Literal(Literal::Integer(1))]
-                                    }
+                                        ]))),
+                                        arguments: vec![node::new!(Literal(Literal::Integer(1)))]
+                                    })
                                 ),
                                 (
-                                    Node::Identifier("right".to_string()),
-                                    Node::Call {
-                                        function: Box::new(Node::NestedIdentifier(vec![
+                                    node::new!(Identifier("right".to_string())),
+                                    node::new!(Call {
+                                        function: Box::new(node::new!(NestedIdentifier(vec![
                                             "Tree".to_string(),
                                             "Node".to_string()
-                                        ])),
-                                        arguments: vec![Node::Dict(vec![
+                                        ]))),
+                                        arguments: vec![node::new!(Dict(vec![
                                             (
-                                                Node::Identifier("left".to_string()),
-                                                Node::Call {
-                                                    function: Box::new(Node::NestedIdentifier(
-                                                        vec![
+                                                node::new!(Identifier("left".to_string())),
+                                                node::new!(Call {
+                                                    function: Box::new(node::new!(
+                                                        NestedIdentifier(vec![
                                                             "Tree".to_string(),
                                                             "Leaf".to_string()
-                                                        ]
+                                                        ])
                                                     )),
-                                                    arguments: vec![Node::Literal(
+                                                    arguments: vec![node::new!(Literal(
                                                         Literal::Integer(2)
-                                                    )]
-                                                }
+                                                    ))]
+                                                })
                                             ),
                                             (
-                                                Node::Identifier("right".to_string()),
-                                                Node::Call {
-                                                    function: Box::new(Node::NestedIdentifier(
-                                                        vec![
+                                                node::new!(Identifier("right".to_string())),
+                                                node::new!(Call {
+                                                    function: Box::new(node::new!(
+                                                        NestedIdentifier(vec![
                                                             "Tree".to_string(),
                                                             "Leaf".to_string()
-                                                        ]
+                                                        ])
                                                     )),
-                                                    arguments: vec![Node::Literal(
+                                                    arguments: vec![node::new!(Literal(
                                                         Literal::Integer(3)
-                                                    )]
-                                                }
+                                                    ))]
+                                                })
                                             )
-                                        ])]
-                                    }
+                                        ]))]
+                                    })
                                 )
-                            ])]
-                        })
-                    }],
+                            ]))]
+                        }))
+                    })],
                     None
-                ))
-            }
-        ])
+                )))
+            })
+        ]))
     );
 }
 
@@ -1358,60 +1463,70 @@ fn test_explicit_tail_recursive_call() {
 
     assert_eq!(
         program,
-        Node::Program(vec![Node::FunctionDeclarations(
+        node::new!(Program(vec![node::new!(FunctionDeclarations(
             "factorial".to_string(),
             vec![
                 (
-                    vec![Node::FunctionParameter(Box::new(Node::Identifier(
-                        "n".to_string()
-                    )))],
-                    Box::new(Node::Block(
+                    vec![node::new!(FunctionParameter(Box::new(node::new!(
+                        Identifier("n".to_string())
+                    ))))],
+                    Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(Node::Call {
-                            function: Box::new(Node::Identifier("factorial".to_string())),
+                        Some(Box::new(node::new!(Call {
+                            function: Box::new(node::new!(Identifier("factorial".to_string()))),
                             arguments: vec![
-                                Node::Identifier("n".to_string()),
-                                Node::Literal(Literal::Integer(1))
+                                node::new!(Identifier("n".to_string())),
+                                node::new!(Literal(Literal::Integer(1)))
                             ]
-                        }))
-                    )),
+                        })))
+                    ))),
                 ),
                 (
                     vec![
-                        Node::FunctionParameter(Box::new(Node::Literal(Literal::Integer(0)))),
-                        Node::FunctionParameter(Box::new(Node::Identifier("acc".to_string())))
+                        node::new!(FunctionParameter(Box::new(node::new!(Literal(
+                            Literal::Integer(0)
+                        ))))),
+                        node::new!(FunctionParameter(Box::new(node::new!(Identifier(
+                            "acc".to_string()
+                        )))))
                     ],
-                    Box::new(Node::Block(
+                    Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(Node::Identifier("acc".to_string())))
-                    )),
+                        Some(Box::new(node::new!(Identifier("acc".to_string()))))
+                    ))),
                 ),
                 (
                     vec![
-                        Node::FunctionParameter(Box::new(Node::Identifier("n".to_string()))),
-                        Node::FunctionParameter(Box::new(Node::Identifier("acc".to_string())))
+                        node::new!(FunctionParameter(Box::new(node::new!(Identifier(
+                            "n".to_string()
+                        ))))),
+                        node::new!(FunctionParameter(Box::new(node::new!(Identifier(
+                            "acc".to_string()
+                        )))))
                     ],
-                    Box::new(Node::Block(
+                    Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(Node::RecursiveCall(Box::new(Node::Call {
-                            function: Box::new(Node::Identifier("factorial".to_string())),
-                            arguments: vec![
-                                Node::BinaryOp {
-                                    op: BinaryOp::Subtract,
-                                    lhs: Box::new(Node::Identifier("n".to_string())),
-                                    rhs: Box::new(Node::Literal(Literal::Integer(1)))
-                                },
-                                Node::BinaryOp {
-                                    op: BinaryOp::Multiply,
-                                    lhs: Box::new(Node::Identifier("n".to_string())),
-                                    rhs: Box::new(Node::Identifier("acc".to_string()))
-                                }
-                            ]
-                        }))))
-                    )),
+                        Some(Box::new(node::new!(RecursiveCall(Box::new(node::new!(
+                            Call {
+                                function: Box::new(node::new!(Identifier("factorial".to_string()))),
+                                arguments: vec![
+                                    node::new!(BinaryOp {
+                                        op: BinaryOp::Subtract,
+                                        lhs: Box::new(node::new!(Identifier("n".to_string()))),
+                                        rhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                                    }),
+                                    node::new!(BinaryOp {
+                                        op: BinaryOp::Multiply,
+                                        lhs: Box::new(node::new!(Identifier("n".to_string()))),
+                                        rhs: Box::new(node::new!(Identifier("acc".to_string())))
+                                    }),
+                                ]
+                            }
+                        ))))))
+                    ))),
                 )
             ]
-        )])
+        ))]))
     );
 }
 
