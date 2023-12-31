@@ -285,3 +285,67 @@ fn should_collect_function_arguments_with_enum_extraction() {
         })
     );
 }
+
+#[test]
+fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
+    let ast = analyze!(indoc! {"
+        fn add(a, b) {
+            c + a + b
+        }
+
+        let c = 1;
+    "});
+
+    let program_symbols = ast
+        .symbol_table
+        .clone()
+        .expect("Program to have a symbol_table");
+
+    assert_eq!(
+        program_symbols.borrow().get("add"),
+        Some(SymbolInfo {
+            name: "add".to_string(),
+            symbol_type: SymbolType::Function,
+        })
+    );
+
+    let (function_declaration, function_body) = match ast.ast_node {
+        AstNode::Program(ref nodes) => match &nodes[0].ast_node {
+            AstNode::FunctionDeclaration {
+                name: _,
+                parameters: _,
+                ref body,
+            } => (nodes[0].clone(), body.clone()),
+            _ => panic!("Expected function declaration {:?}", nodes[0].ast_node),
+        },
+        _ => panic!("Expected program {:?}", ast.ast_node),
+    };
+
+    // Verify that c is within the scope of the function arguments
+    assert_eq!(
+        function_declaration
+            .symbol_table
+            .clone()
+            .unwrap()
+            .borrow()
+            .get("c"),
+        Some(SymbolInfo {
+            name: "c".to_string(),
+            symbol_type: SymbolType::Variable,
+        })
+    );
+
+    // Verify that c is within the scope of the function body
+    assert_eq!(
+        function_body
+            .symbol_table
+            .clone()
+            .unwrap()
+            .borrow()
+            .get("c"),
+        Some(SymbolInfo {
+            name: "c".to_string(),
+            symbol_type: SymbolType::Variable,
+        })
+    );
+}

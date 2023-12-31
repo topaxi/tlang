@@ -85,19 +85,6 @@ impl DeclarationAnalyzer {
                 self.collect_function_declarations(ast, name, declarations)
             }
             AstNode::FunctionParameter(ref mut name) => self.collect_function_parameter(ast, name),
-            AstNode::Identifier(ref name) => {
-                if self.get_last_symbol_table().borrow().get(name).is_none() {
-                    panic!("Undefined symbol: {}", name);
-                }
-            }
-            AstNode::BinaryOp {
-                op: _,
-                ref mut lhs,
-                ref mut rhs,
-            } => {
-                self.collect_declarations(lhs);
-                self.collect_declarations(rhs);
-            }
             _ => {}
         }
 

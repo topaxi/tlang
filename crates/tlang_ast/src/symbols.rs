@@ -14,19 +14,10 @@ pub struct SymbolInfo {
     pub symbol_type: SymbolType,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct SymbolTable {
     pub parent: Option<Rc<RefCell<SymbolTable>>>,
     pub symbols: HashMap<String, SymbolInfo>,
-}
-
-impl Default for SymbolTable {
-    fn default() -> Self {
-        SymbolTable {
-            parent: None,
-            symbols: HashMap::new(),
-        }
-    }
 }
 
 impl SymbolTable {
@@ -35,6 +26,10 @@ impl SymbolTable {
             parent: Some(parent),
             ..Default::default()
         }
+    }
+
+    pub fn parent(&self) -> Option<Rc<RefCell<SymbolTable>>> {
+        self.parent.clone()
     }
 
     pub fn get(&self, name: &str) -> Option<SymbolInfo> {
