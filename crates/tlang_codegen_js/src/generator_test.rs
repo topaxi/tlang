@@ -111,6 +111,20 @@ fn test_codegen_operator_precedence() {
 }
 
 #[test]
+#[ignore = "implement block in expression position first"]
+fn test_block_expression() {
+    let output = compile!("let one = { 1 };");
+    let expected_output = indoc! {"
+        let tmp0;
+        {
+            tmp0 = 1;
+        };
+        let one = tmp0;
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
 fn test_if_else() {
     let output = compile!("if true { 1; } else { 2; }");
     let expected_output = indoc! {"

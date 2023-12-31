@@ -53,6 +53,7 @@ pub struct CodegenJS {
     context_stack: Vec<BlockContext>,
     function_context_stack: Vec<FunctionContext>,
     function_pre_body: String,
+    current_statement_buffer: String,
 }
 
 impl Default for CodegenJS {
@@ -70,7 +71,23 @@ impl CodegenJS {
             context_stack: vec![BlockContext::Program],
             function_context_stack: vec![],
             function_pre_body: String::new(),
+            current_statement_buffer: String::new(),
         }
+    }
+
+    #[inline(always)]
+    fn push_str(&mut self, str: &str) {
+        self.current_statement_buffer.push_str(str);
+    }
+
+    #[inline(always)]
+    fn push_char(&mut self, char: char) {
+        self.current_statement_buffer.push(char);
+    }
+
+    fn flush_statement_buffer(&mut self) {
+        self.output.push_str(&self.current_statement_buffer);
+        self.current_statement_buffer.clear();
     }
 
     fn current_scope(&self) -> &Scope {
@@ -97,23 +114,23 @@ impl CodegenJS {
 
     fn generate_binary_op(&mut self, op: &BinaryOp) {
         match op {
-            BinaryOp::Add => self.output.push_str(" + "),
-            BinaryOp::Subtract => self.output.push_str(" - "),
-            BinaryOp::Multiply => self.output.push_str(" * "),
-            BinaryOp::Divide => self.output.push_str(" / "),
-            BinaryOp::Modulo => self.output.push_str(" % "),
-            BinaryOp::Exponentiation => self.output.push_str(" ** "),
-            BinaryOp::Equal => self.output.push_str(" === "),
-            BinaryOp::NotEqual => self.output.push_str(" !== "),
-            BinaryOp::LessThan => self.output.push_str(" < "),
-            BinaryOp::LessThanOrEqual => self.output.push_str(" <= "),
-            BinaryOp::GreaterThan => self.output.push_str(" > "),
-            BinaryOp::GreaterThanOrEqual => self.output.push_str(" >= "),
-            BinaryOp::And => self.output.push_str(" && "),
-            BinaryOp::Or => self.output.push_str(" || "),
-            BinaryOp::BitwiseOr => self.output.push_str(" | "),
-            BinaryOp::BitwiseAnd => self.output.push_str(" & "),
-            BinaryOp::BitwiseXor => self.output.push_str(" ^ "),
+            BinaryOp::Add => self.push_str(" + "),
+            BinaryOp::Subtract => self.push_str(" - "),
+            BinaryOp::Multiply => self.push_str(" * "),
+            BinaryOp::Divide => self.push_str(" / "),
+            BinaryOp::Modulo => self.push_str(" % "),
+            BinaryOp::Exponentiation => self.push_str(" ** "),
+            BinaryOp::Equal => self.push_str(" === "),
+            BinaryOp::NotEqual => self.push_str(" !== "),
+            BinaryOp::LessThan => self.push_str(" < "),
+            BinaryOp::LessThanOrEqual => self.push_str(" <= "),
+            BinaryOp::GreaterThan => self.push_str(" > "),
+            BinaryOp::GreaterThanOrEqual => self.push_str(" >= "),
+            BinaryOp::And => self.push_str(" && "),
+            BinaryOp::Or => self.push_str(" || "),
+            BinaryOp::BitwiseOr => self.push_str(" | "),
+            BinaryOp::BitwiseAnd => self.push_str(" & "),
+            BinaryOp::BitwiseXor => self.push_str(" ^ "),
             BinaryOp::Pipeline => unimplemented!("Pipeline does not neatly map to a JS operator."),
         }
     }
@@ -164,19 +181,19 @@ impl CodegenJS {
     fn generate_literal(&mut self, literal: &Literal) {
         match literal {
             Literal::Integer(value) => {
-                self.output.push_str(&value.to_string());
+                self.push_str(&value.to_string());
             }
             Literal::UnsignedInteger(value) => {
-                self.output.push_str(&value.to_string());
+                self.push_str(&value.to_string());
             }
             Literal::Float(value) => {
-                self.output.push_str(&value.to_string());
+                self.push_str(&value.to_string());
             }
             Literal::Boolean(value) => {
-                self.output.push_str(&value.to_string());
+                self.push_str(&value.to_string());
             }
             Literal::String(value) | Literal::Char(value) => {
-                self.output.push_str(&format!("\"{}\"", value));
+                self.push_str(&format!("\"{}\"", value));
             }
         }
     }
@@ -184,18 +201,19 @@ impl CodegenJS {
     fn generate_node(&mut self, node: &Node, parent_op: Option<&BinaryOp>) {
         match &node.ast_node {
             AstNode::SingleLineComment(comment) => {
-                self.output.push_str("//");
-                self.output.push_str(comment);
-                self.output.push('\n');
+                self.push_str("//");
+                self.push_str(comment);
+                self.push_char('\n');
             }
             AstNode::MultiLineComment(comment) => {
-                self.output.push_str("/*");
-                self.output.push_str(comment);
-                self.output.push_str("*/\n");
+                self.push_str("/*");
+                self.push_str(comment);
+                self.push_str("*/\n");
             }
             AstNode::Program(statements) => {
                 for statement in statements {
                     self.generate_node(statement, None);
+                    self.flush_statement_buffer();
                 }
             }
             AstNode::Block(statements, expression) => {
@@ -203,6 +221,7 @@ impl CodegenJS {
 
                 for statement in statements {
                     self.generate_node(statement, None);
+                    self.flush_statement_buffer();
                 }
 
                 if expression.is_none() {
@@ -214,7 +233,7 @@ impl CodegenJS {
                     BlockContext::Statement => unimplemented!("Block with completion in StatementBlock context not implemented yet."),
                     BlockContext::FunctionBody => {
                         // We only render the return statement if we are not in a tail recursive function body
-                        // and the node is RecursiveCall pointing to the current function. 
+                        // and the node is RecursiveCall pointing to the current function.
                         if let Some(function_context) = self.function_context_stack.last() {
                             if function_context.is_tail_recursive && expression.is_some() {
                                 if let AstNode::RecursiveCall(_) = expression.as_ref().unwrap().ast_node {
@@ -224,60 +243,61 @@ impl CodegenJS {
                             }
                         }
 
-                        self.output.push_str(&self.get_indent());
-                        self.output.push_str("return ");
+                        self.push_str(&self.get_indent());
+                        self.push_str("return ");
                         self.generate_node(expression.as_ref().unwrap(), None);
-                        self.output.push_str(";\n");
+                        self.push_str(";\n");
                     }
                     BlockContext::Expression => unimplemented!("Block with completion in ExpressionBlock context not implemented yet."),
                 }
 
+                self.flush_statement_buffer();
                 self.pop_scope();
             }
             AstNode::ExpressionStatement(expression) => {
-                self.output.push_str(&self.get_indent());
+                self.push_str(&self.get_indent());
                 self.context_stack.push(BlockContext::Statement);
                 self.generate_node(expression, None);
                 self.context_stack.pop();
 
                 if let AstNode::IfElse { .. } = expression.ast_node {
-                    self.output.push('\n');
+                    self.push_char('\n');
                     return;
                 }
 
-                self.output.push_str(";\n");
+                self.push_str(";\n");
             }
             AstNode::Literal(literal) => self.generate_literal(literal),
             AstNode::List(items) => {
-                self.output.push('[');
+                self.push_char('[');
                 for (i, item) in items.iter().enumerate() {
                     if i > 0 {
-                        self.output.push_str(", ");
+                        self.push_str(", ");
                     }
                     self.generate_node(item, None);
                 }
-                self.output.push(']');
+                self.push_char(']');
             }
             AstNode::Dict(entries) => {
-                self.output.push_str("{\n");
+                self.push_str("{\n");
                 self.indent_level += 1;
                 for (i, (key, value)) in entries.iter().enumerate() {
                     if i > 0 {
-                        self.output.push_str(",\n");
+                        self.push_str(",\n");
                     }
-                    self.output.push_str(&self.get_indent());
+                    self.push_str(&self.get_indent());
                     self.generate_node(key, None);
-                    self.output.push_str(": ");
+                    self.push_str(": ");
                     self.generate_node(value, None);
                 }
-                self.output.push_str(",\n");
+                self.push_str(",\n");
                 self.indent_level -= 1;
-                self.output.push_str(&self.get_indent());
-                self.output.push('}');
+                self.push_str(&self.get_indent());
+                self.push_char('}');
             }
             AstNode::PrefixOp(op, node) => {
                 match op {
-                    PrefixOp::Spread => self.output.push_str("..."),
+                    PrefixOp::Spread => self.push_str("..."),
                     _ => unimplemented!("PrefixOp {:?} not implemented yet.", op),
                 }
                 self.generate_node(node, None);
@@ -288,20 +308,20 @@ impl CodegenJS {
                 });
 
                 if needs_parentheses {
-                    self.output.push('(');
+                    self.push_char('(');
                 }
 
                 if let BinaryOp::Pipeline = op {
                     // If rhs was an identifier, we just pass lhs it as an argument to a function call.
                     if let AstNode::Identifier(_) = rhs.ast_node {
-                        self.generate_node(&rhs, None);
-                        self.output.push('(');
-                        self.generate_node(&lhs, None);
-                        self.output.push(')');
+                        self.generate_node(rhs, None);
+                        self.push_char('(');
+                        self.generate_node(lhs, None);
+                        self.push_char(')');
                     // If rhs is a Call node and we prepend the lhs to the argument list.
                     } else if let AstNode::Call { function, arguments } = &rhs.ast_node {
-                        self.generate_node(&function, None);
-                        self.output.push('(');
+                        self.generate_node(function, None);
+                        self.push_char('(');
 
                         // If we have a wildcard in the argument list, we instead replace the wildcard with the lhs.
                         // Otherwise we prepend the lhs to the argument list.
@@ -309,40 +329,40 @@ impl CodegenJS {
                         if has_wildcard {
                             for (i, arg) in arguments.iter().enumerate() {
                                 if i > 0 {
-                                    self.output.push_str(", ");
+                                    self.push_str(", ");
                                 }
 
                                 if let AstNode::Wildcard = arg.ast_node {
-                                    self.generate_node(&lhs, None);
+                                    self.generate_node(lhs, None);
                                 } else {
                                     self.generate_node(arg, None);
                                 }
                             }
                         } else {
-                            self.generate_node(&lhs, None);
+                            self.generate_node(lhs, None);
                             for arg in arguments.iter() {
-                                self.output.push_str(", ");
+                                self.push_str(", ");
                                 self.generate_node(arg, None);
                             }
                         };
-                        self.output.push(')');
+                        self.push_char(')');
                     }
                 } else {
-                    self.generate_node(&lhs, Some(&op));
-                    self.generate_binary_op(&op);
-                    self.generate_node(&rhs, Some(&op));
+                    self.generate_node(lhs, Some(op));
+                    self.generate_binary_op(op);
+                    self.generate_node(rhs, Some(op));
                 }
 
                 if needs_parentheses {
-                    self.output.push(')');
+                    self.push_char(')');
                 }
             }
             AstNode::VariableDeclaration { name, value } => {
-                self.output.push_str(&self.get_indent());
-                let name = self.scopes.declare_variable(&name);
-                self.output.push_str(&format!("let {} = ", name));
-                self.generate_node(&value, None);
-                self.output.push_str(";\n");
+                self.push_str(&self.get_indent());
+                let name = self.scopes.declare_variable(name);
+                self.push_str(&format!("let {} = ", name));
+                self.generate_node(value, None);
+                self.push_str(";\n");
             }
             AstNode::Match {
                 expression: _,
@@ -358,50 +378,50 @@ impl CodegenJS {
                 then_branch,
                 else_branch,
             } => {
-                self.output.push_str("if (");
+                self.push_str("if (");
                 let indent_level = self.indent_level;
                 self.indent_level = 0;
-                self.generate_node(&condition, None);
+                self.generate_node(condition, None);
                 self.indent_level = indent_level;
-                self.output.push_str(") {\n");
+                self.push_str(") {\n");
                 self.indent_level += 1;
                 self.context_stack.push(BlockContext::Expression);
-                self.generate_node(&then_branch, None);
+                self.generate_node(then_branch, None);
                 self.context_stack.pop();
                 self.indent_level -= 1;
 
                 if let Some(else_branch) = else_branch {
-                    self.output.push_str(&self.get_indent());
-                    self.output.push_str("} else {\n");
+                    self.push_str(&self.get_indent());
+                    self.push_str("} else {\n");
                     self.indent_level += 1;
                     self.context_stack.push(BlockContext::Expression);
-                    self.generate_node(&else_branch, None);
+                    self.generate_node(else_branch, None);
                     self.context_stack.pop();
                     self.indent_level -= 1;
                 }
 
-                self.output.push_str(&self.get_indent());
-                self.output.push('}');
+                self.push_str(&self.get_indent());
+                self.push_char('}');
             }
             AstNode::FunctionParameter(node) => match node.ast_node {
-                AstNode::Identifier { .. } => self.generate_node(&node, None),
-                AstNode::Literal(_) => self.generate_node(&node, None),
+                AstNode::Identifier { .. } => self.generate_node(node, None),
+                AstNode::Literal(_) => self.generate_node(node, None),
                 AstNode::List(_) => todo!(),
                 // Wildcards are handled within pipeline and call expressions,
                 AstNode::Wildcard => unreachable!("Unexpected wildcard in function parameter."),
                 _ => todo!(),
             },
             AstNode::FunctionDeclaration { name, parameters, body } =>
-                self.generate_function_declaration(&name, &parameters, &body),
+                self.generate_function_declaration(name, parameters, body),
             AstNode::FunctionDeclarations(name, definitions) =>
-                self.generate_function_declarations(&name, &definitions),
+                self.generate_function_declarations(name, definitions),
             AstNode::FunctionExpression { name, parameters, body } =>
-                self.generate_function_expression(&name, &parameters, &body),
-            AstNode::ReturnStatement(expr) => self.generate_return_statement(&expr),
-            AstNode::Identifier(name) => self.output.push_str(&self.current_scope().resolve_variable(&name).unwrap_or(name.to_string())),
-            AstNode::NestedIdentifier(identifiers) => self.output.push_str(&identifiers.join(".")),
+                self.generate_function_expression(name, parameters, body),
+            AstNode::ReturnStatement(expr) => self.generate_return_statement(expr),
+            AstNode::Identifier(name) => self.push_str(&self.current_scope().resolve_variable(name).unwrap_or(name.to_string())),
+            AstNode::NestedIdentifier(identifiers) => self.push_str(&identifiers.join(".")),
             AstNode::Call { function, arguments } =>
-                self.generate_call_expression(&function, &arguments),
+                self.generate_call_expression(function, arguments),
             AstNode::RecursiveCall(node) => {
                 // If call expression is referencing the current function, all we do is update the arguments,
                 // as we are in a while loop.
@@ -413,20 +433,20 @@ impl CodegenJS {
                                 let remap_to_rest_args = function_context.remap_to_rest_args;
 
                                 for (i, arg) in arguments.iter().enumerate() {
-                                    self.output.push_str(&self.get_indent());
-                                    self.output.push_str(&format!("let tmp{} = ", i));
+                                    self.push_str(&self.get_indent());
+                                    self.push_str(&format!("let tmp{} = ", i));
                                     self.generate_node(arg, None);
-                                    self.output.push_str(";\n");
+                                    self.push_str(";\n");
                                 }
                                 if remap_to_rest_args {
                                     for (i, _arg_name) in params.iter().enumerate() {
-                                        self.output.push_str(&self.get_indent());
-                                        self.output.push_str(&format!("args[{}] = tmp{};\n", i, i));
+                                        self.push_str(&self.get_indent());
+                                        self.push_str(&format!("args[{}] = tmp{};\n", i, i));
                                     }
                                 } else {
                                     for (i, arg_name) in params.iter().enumerate() {
-                                        self.output.push_str(&self.get_indent());
-                                        self.output.push_str(&format!("{} = tmp{};\n", arg_name, i));
+                                        self.push_str(&self.get_indent());
+                                        self.push_str(&format!("{} = tmp{};\n", arg_name, i));
                                     }
                                 }
                                 return;
@@ -436,11 +456,11 @@ impl CodegenJS {
                 }
 
                 // For any other referenced function, we do a normal call expression.
-                self.generate_node(&node, parent_op)
+                self.generate_node(node, parent_op)
             },
-            AstNode::EnumDeclaration { name, variants } => self.generate_enum_declaration(&name, &variants),
-            AstNode::EnumVariant { name, named_fields, parameters } => self.generate_enum_variant(&name, *named_fields, &parameters),
-            AstNode::EnumExtraction { identifier, elements, named_fields } => self.generate_enum_extraction(&identifier, &elements, *named_fields),
+            AstNode::EnumDeclaration { name, variants } => self.generate_enum_declaration(name, variants),
+            AstNode::EnumVariant { name, named_fields, parameters } => self.generate_enum_variant(name, *named_fields, parameters),
+            AstNode::EnumExtraction { identifier, elements, named_fields } => self.generate_enum_extraction(identifier, elements, *named_fields),
             // Allow unreachable path, as we add new AST nodes, we do not want to automatically
             // start failing tests while we are still implementing the codegen.
             #[allow(unreachable_patterns)]
@@ -449,65 +469,63 @@ impl CodegenJS {
     }
 
     fn generate_enum_declaration(&mut self, name: &str, variants: &[Node]) {
-        self.output.push_str(&self.get_indent());
-        self.output.push_str(&format!("const {} = {{\n", name));
+        self.push_str(&self.get_indent());
+        self.push_str(&format!("const {} = {{\n", name));
         self.indent_level += 1;
         for variant in variants {
             self.generate_node(variant, None);
         }
         self.indent_level -= 1;
-        self.output.push_str(&self.get_indent());
-        self.output.push_str("};\n");
+        self.push_str(&self.get_indent());
+        self.push_str("};\n");
     }
 
     fn generate_enum_variant(&mut self, name: &str, named_fields: bool, parameters: &[Node]) {
-        self.output.push_str(&self.get_indent());
+        self.push_str(&self.get_indent());
 
         if parameters.is_empty() {
-            self.output
-                .push_str(&format!("{}: {{ tag: \"{}\" }},\n", name, name));
+            self.push_str(&format!("{}: {{ tag: \"{}\" }},\n", name, name));
             return;
         }
 
-        self.output.push_str(&format!("{}(", name));
+        self.push_str(&format!("{}(", name));
         if named_fields {
-            self.output.push_str("{ ");
+            self.push_str("{ ");
         }
         for (i, param) in parameters.iter().enumerate() {
             if i > 0 {
-                self.output.push_str(", ");
+                self.push_str(", ");
             }
             self.generate_node(param, None);
         }
         if named_fields {
-            self.output.push_str(" }");
+            self.push_str(" }");
         }
-        self.output.push_str(") {\n");
+        self.push_str(") {\n");
         self.indent_level += 1;
-        self.output.push_str(&self.get_indent());
-        self.output.push_str("return {\n");
+        self.push_str(&self.get_indent());
+        self.push_str("return {\n");
         self.indent_level += 1;
-        self.output.push_str(&self.get_indent());
-        self.output
-            .push_str(format!("tag: \"{}\",\n", name).as_str());
+        self.push_str(&self.get_indent());
+        self.push_str(format!("tag: \"{}\",\n", name).as_str());
         for (i, param) in parameters.iter().enumerate() {
-            self.output.push_str(&self.get_indent());
+            self.push_str(&self.get_indent());
             if named_fields {
                 if let AstNode::Identifier(i) = &param.ast_node {
-                    self.output.push_str(i);
+                    self.push_str(i);
                 }
             } else {
-                self.output.push_str(&format!("\"{}\": ", i));
+                self.push_str(&format!("\"{}\": ", i));
                 self.generate_node(param, None);
             }
-            self.output.push_str(",\n");
+            self.push_str(",\n");
         }
         self.indent_level -= 1;
-        self.output.push_str(&self.get_indent());
-        self.output.push_str("};\n");
+        self.push_str(&self.get_indent());
+        self.push_str("};\n");
         self.indent_level -= 1;
-        self.output.push_str(&self.get_indent());
-        self.output.push_str("},\n");
+        self.push_str(&self.get_indent());
+        self.push_str("},\n");
     }
 
     fn generate_enum_extraction(
@@ -542,40 +560,40 @@ impl CodegenJS {
             }
             AstNode::Block(statements, expression) => {
                 for statement in statements {
-                    if Self::is_function_body_tail_recursive(function_name, &statement) {
+                    if Self::is_function_body_tail_recursive(function_name, statement) {
                         return true;
                     }
                 }
                 if let Some(expression) = expression {
-                    return Self::is_function_body_tail_recursive(function_name, &expression);
+                    return Self::is_function_body_tail_recursive(function_name, expression);
                 }
                 false
             }
             AstNode::ExpressionStatement(expression) => {
-                Self::is_function_body_tail_recursive(function_name, &expression)
+                Self::is_function_body_tail_recursive(function_name, expression)
             }
             AstNode::Match {
                 expression,
                 arms: _,
-            } => Self::is_function_body_tail_recursive(function_name, &expression),
+            } => Self::is_function_body_tail_recursive(function_name, expression),
             AstNode::MatchArm {
                 pattern: _,
                 expression,
-            } => Self::is_function_body_tail_recursive(function_name, &expression),
+            } => Self::is_function_body_tail_recursive(function_name, expression),
             AstNode::IfElse {
                 condition,
                 then_branch,
                 else_branch,
             } => {
-                Self::is_function_body_tail_recursive(function_name, &condition)
-                    || Self::is_function_body_tail_recursive(function_name, &then_branch)
+                Self::is_function_body_tail_recursive(function_name, condition)
+                    || Self::is_function_body_tail_recursive(function_name, then_branch)
                     || else_branch.as_ref().map_or(false, |branch| {
                         Self::is_function_body_tail_recursive(function_name, branch)
                     })
             }
             AstNode::ReturnStatement(node) => {
                 if let Some(node) = node {
-                    Self::is_function_body_tail_recursive(function_name, &node)
+                    Self::is_function_body_tail_recursive(function_name, node)
                 } else {
                     false
                 }
@@ -586,18 +604,18 @@ impl CodegenJS {
 
     fn generate_function_body(&mut self, body: &Node, is_tail_recursive: bool) {
         self.context_stack.push(BlockContext::FunctionBody);
-        self.output.push_str(&self.function_pre_body);
+        self.push_str(&self.function_pre_body.clone());
         self.function_pre_body.clear();
         if is_tail_recursive {
-            self.output.push_str(&self.get_indent());
-            self.output.push_str("while (true) {\n");
+            self.push_str(&self.get_indent());
+            self.push_str("while (true) {\n");
             self.indent_level += 1;
         }
-        self.generate_node(&body, None);
+        self.generate_node(body, None);
         if is_tail_recursive {
             self.indent_level -= 1;
-            self.output.push_str(&self.get_indent());
-            self.output.push_str("}\n");
+            self.push_str(&self.get_indent());
+            self.push_str("}\n");
         }
         self.context_stack.pop();
     }
@@ -621,22 +639,22 @@ impl CodegenJS {
             remap_to_rest_args: false,
         });
 
-        self.output.push_str(&self.get_indent());
-        self.output.push_str(&format!("function {}(", name));
+        self.push_str(&self.get_indent());
+        self.push_str(&format!("function {}(", name));
 
         for (i, param) in parameters.iter().enumerate() {
             if i > 0 {
-                self.output.push_str(", ");
+                self.push_str(", ");
             }
             self.generate_node(param, None);
         }
 
-        self.output.push_str(") {\n");
+        self.push_str(") {\n");
         self.indent_level += 1;
         self.generate_function_body(body, is_tail_recursive);
         self.indent_level -= 1;
-        self.output.push_str(&self.get_indent());
-        self.output.push_str("}\n");
+        self.push_str(&self.get_indent());
+        self.push_str("}\n");
         self.function_context_stack.pop();
     }
 
@@ -671,21 +689,21 @@ impl CodegenJS {
             None => "function(".to_string(),
         };
 
-        self.output.push_str(&function_keyword);
+        self.push_str(&function_keyword);
 
         for (i, param) in parameters.iter().enumerate() {
             if i > 0 {
-                self.output.push_str(", ");
+                self.push_str(", ");
             }
             self.generate_node(param, None);
         }
 
-        self.output.push_str(") {\n");
+        self.push_str(") {\n");
         self.indent_level += 1;
         self.generate_function_body(body, is_tail_recursive);
         self.indent_level -= 1;
-        self.output.push_str(&self.get_indent());
-        self.output.push('}');
+        self.push_str(&self.get_indent());
+        self.push_char('}');
         self.function_context_stack.pop();
     }
 
@@ -698,22 +716,21 @@ impl CodegenJS {
         let is_any_definition_tail_recursive = definitions
             .iter()
             .any(|(_, body)| Self::is_function_body_tail_recursive(name, body));
-        self.output.push_str(&self.get_indent());
-        self.output
-            .push_str(&format!("function {}(...args) {{\n", name));
+        self.push_str(&self.get_indent());
+        self.push_str(&format!("function {}(...args) {{\n", name));
         self.indent_level += 1;
 
         if is_any_definition_tail_recursive {
-            self.output.push_str(&self.get_indent());
-            self.output.push_str("while (true) {\n");
+            self.push_str(&self.get_indent());
+            self.push_str("while (true) {\n");
             self.indent_level += 1;
         }
 
-        self.output.push_str(&self.get_indent());
+        self.push_str(&self.get_indent());
         for (i, (parameters, body)) in definitions.iter().enumerate() {
             // TODO: Only render else if there is another definition with a literal.
             if i > 0 {
-                self.output.push_str(" else ");
+                self.push_str(" else ");
             }
 
             // Expand parameter matching if any definition has a different amount of
@@ -734,30 +751,30 @@ impl CodegenJS {
 
             if parameter_variadic || pattern_matched_parameters.clone().count() > 0 {
                 if parameter_variadic {
-                    self.output.push_str("if (args.length === ");
-                    self.output.push_str(&parameters.len().to_string());
+                    self.push_str("if (args.length === ");
+                    self.push_str(&parameters.len().to_string());
 
                     if pattern_matched_parameters.clone().count() > 0 {
-                        self.output.push_str(" && ");
+                        self.push_str(" && ");
                     }
                 } else {
-                    self.output.push_str("if (");
+                    self.push_str("if (");
                 }
                 // Filter only literal params.
                 for (j, (k, param)) in pattern_matched_parameters.enumerate() {
                     if j > 0 {
-                        self.output.push_str(" && ");
+                        self.push_str(" && ");
                     }
 
                     if let AstNode::FunctionParameter(node) = &param.ast_node {
                         match &node.ast_node {
                             AstNode::Identifier(_) | AstNode::Literal(_) => {
-                                self.output.push_str(&format!("args[{}] === ", k));
+                                self.push_str(&format!("args[{}] === ", k));
                                 self.generate_node(param, None);
                             }
                             AstNode::List(patterns) => {
                                 if patterns.is_empty() {
-                                    self.output.push_str(&format!("args[{}].length === 0", k));
+                                    self.push_str(&format!("args[{}].length === 0", k));
                                     continue;
                                 }
 
@@ -765,20 +782,19 @@ impl CodegenJS {
                                 let should_and = false;
                                 for (i, pattern) in patterns.iter().enumerate() {
                                     if should_and {
-                                        self.output.push_str(" && ");
+                                        self.push_str(" && ");
                                     }
 
                                     match &pattern.ast_node {
                                         AstNode::Literal(_) => {
-                                            self.output
-                                                .push_str(&format!("args[{}][{}] === ", k, i));
+                                            self.push_str(&format!("args[{}][{}] === ", k, i));
                                             self.generate_node(pattern, None);
                                         }
                                         AstNode::PrefixOp(PrefixOp::Rest, identified) => {
                                             if let AstNode::Identifier(ref name) =
                                                 identified.ast_node
                                             {
-                                                self.output.push_str(&format!(
+                                                self.push_str(&format!(
                                                     "args[{}].length >= {}",
                                                     k, i
                                                 ));
@@ -819,8 +835,7 @@ impl CodegenJS {
                                     }
                                     _ => unreachable!(),
                                 };
-                                self.output
-                                    .push_str(&format!("args[{}].tag === \"{}\"", k, identifier));
+                                self.push_str(&format!("args[{}].tag === \"{}\"", k, identifier));
                                 self.indent_level += 1;
                                 for (i, element) in elements.iter().enumerate() {
                                     // Skip any Wildcards
@@ -854,9 +869,9 @@ impl CodegenJS {
                         }
                     }
                 }
-                self.output.push_str(") {\n");
+                self.push_str(") {\n");
             } else {
-                self.output.push_str("{\n");
+                self.push_str("{\n");
             }
 
             self.indent_level += 1;
@@ -864,9 +879,8 @@ impl CodegenJS {
             for (j, param) in parameters.iter().enumerate() {
                 if let AstNode::FunctionParameter(node) = &param.ast_node {
                     if let AstNode::Identifier(ref name) = node.ast_node {
-                        self.output.push_str(&self.get_indent());
-                        self.output
-                            .push_str(&format!("let {} = args[{}];\n", name, j));
+                        self.push_str(&self.get_indent());
+                        self.push_str(&format!("let {} = args[{}];\n", name, j));
                     }
                 }
             }
@@ -889,21 +903,21 @@ impl CodegenJS {
             });
             self.generate_function_body(body, false);
             self.indent_level -= 1;
-            self.output.push_str(&self.get_indent());
-            self.output.push('}');
+            self.push_str(&self.get_indent());
+            self.push_char('}');
         }
 
         if is_any_definition_tail_recursive {
             self.indent_level -= 1;
-            self.output.push('\n');
-            self.output.push_str(&self.get_indent());
-            self.output.push('}');
+            self.push_char('\n');
+            self.push_str(&self.get_indent());
+            self.push_char('}');
         }
 
         self.indent_level -= 1;
-        self.output.push('\n');
-        self.output.push_str(&self.get_indent());
-        self.output.push_str("}\n");
+        self.push_char('\n');
+        self.push_str(&self.get_indent());
+        self.push_str("}\n");
         self.function_context_stack.pop();
     }
 
@@ -938,15 +952,15 @@ impl CodegenJS {
             }
         }
 
-        self.output.push_str(&self.get_indent());
-        self.output.push_str("return");
+        self.push_str(&self.get_indent());
+        self.push_str("return");
 
         if let Some(expr) = expr {
-            self.output.push(' ');
+            self.push_char(' ');
             self.generate_node(expr, None);
         }
 
-        self.output.push_str(";\n");
+        self.push_str(";\n");
     }
 
     fn generate_call_expression(&mut self, function: &Node, arguments: &[Node]) {
@@ -955,45 +969,44 @@ impl CodegenJS {
             .any(|arg| matches!(arg.ast_node, AstNode::Wildcard));
 
         if has_wildcards {
-            self.output.push_str("function(...args) {\n");
+            self.push_str("function(...args) {\n");
             self.indent_level += 1;
-            self.output.push_str(&self.get_indent());
-            self.output.push_str("return ");
+            self.push_str(&self.get_indent());
+            self.push_str("return ");
             self.generate_node(function, None);
-            self.output.push('(');
+            self.push_char('(');
 
             let mut wildcard_index = 0;
             for (i, arg) in arguments.iter().enumerate() {
                 if i > 0 {
-                    self.output.push_str(", ");
+                    self.push_str(", ");
                 }
 
                 if let AstNode::Wildcard = arg.ast_node {
-                    self.output
-                        .push_str(format!("args[{}]", wildcard_index).as_str());
+                    self.push_str(format!("args[{}]", wildcard_index).as_str());
                     wildcard_index += 1;
                 } else {
                     self.generate_node(arg, None);
                 }
             }
 
-            self.output.push_str(");\n");
+            self.push_str(");\n");
             self.indent_level -= 1;
-            self.output.push_str(&self.get_indent());
-            self.output.push('}');
+            self.push_str(&self.get_indent());
+            self.push_char('}');
             return;
         }
 
         self.generate_node(function, None);
-        self.output.push('(');
+        self.push_char('(');
 
         for (i, arg) in arguments.iter().enumerate() {
             if i > 0 {
-                self.output.push_str(", ");
+                self.push_str(", ");
             }
             self.generate_node(arg, None);
         }
-        self.output.push(')');
+        self.push_char(')');
     }
 
     fn should_wrap_with_parentheses(op: &BinaryOp, parent_op: &BinaryOp) -> bool {
