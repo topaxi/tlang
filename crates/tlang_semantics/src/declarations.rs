@@ -124,14 +124,13 @@ impl DeclarationAnalyzer {
 
         let symbol_table = self.get_last_symbol_table_mut();
 
-        let symbol_info = SymbolInfo {
-            name: name.to_string(),
-            symbol_type: SymbolType::Variable,
-        };
-
-        symbol_table
-            .borrow_mut()
-            .insert(name.to_string(), symbol_info);
+        symbol_table.borrow_mut().insert(
+            name.to_string(),
+            SymbolInfo {
+                name: name.to_string(),
+                symbol_type: SymbolType::Variable,
+            },
+        );
     }
 
     fn collect_function_declaration(
@@ -143,14 +142,13 @@ impl DeclarationAnalyzer {
     ) {
         let symbol_table = self.get_last_symbol_table_mut();
 
-        let symbol_info = SymbolInfo {
-            name: name.to_string(),
-            symbol_type: SymbolType::Function,
-        };
-
-        symbol_table
-            .borrow_mut()
-            .insert(name.to_string(), symbol_info);
+        symbol_table.borrow_mut().insert(
+            name.to_string(),
+            SymbolInfo {
+                name: name.to_string(),
+                symbol_type: SymbolType::Function,
+            },
+        );
 
         // Function arguments have their own scope.
         self.push_symbol_table();
@@ -172,14 +170,13 @@ impl DeclarationAnalyzer {
     ) {
         let symbol_table = self.get_last_symbol_table_mut();
 
-        let symbol_info = SymbolInfo {
-            name: name.to_string(),
-            symbol_type: SymbolType::Function,
-        };
-
-        symbol_table
-            .borrow_mut()
-            .insert(name.to_string(), symbol_info);
+        symbol_table.borrow_mut().insert(
+            name.to_string(),
+            SymbolInfo {
+                name: name.to_string(),
+                symbol_type: SymbolType::Function,
+            },
+        );
 
         for declaration in declarations {
             // Function arguments have their own scope.
@@ -198,14 +195,13 @@ impl DeclarationAnalyzer {
 
         match name.ast_node {
             AstNode::Identifier(ref name) => {
-                let symbol_info = SymbolInfo {
-                    name: name.to_string(),
-                    symbol_type: SymbolType::Variable,
-                };
-
-                symbol_table
-                    .borrow_mut()
-                    .insert(name.to_string(), symbol_info);
+                symbol_table.borrow_mut().insert(
+                    name.to_string(),
+                    SymbolInfo {
+                        name: name.to_string(),
+                        symbol_type: SymbolType::Variable,
+                    },
+                );
             }
             AstNode::List(ref mut nodes) => {
                 for node in nodes.iter_mut() {
@@ -214,14 +210,13 @@ impl DeclarationAnalyzer {
             }
             AstNode::PrefixOp(PrefixOp::Rest, ref mut identifier) => match identifier.ast_node {
                 AstNode::Identifier(ref name) => {
-                    let symbol_info = SymbolInfo {
-                        name: name.to_string(),
-                        symbol_type: SymbolType::Variable,
-                    };
-
-                    symbol_table
-                        .borrow_mut()
-                        .insert(name.to_string(), symbol_info);
+                    symbol_table.borrow_mut().insert(
+                        name.to_string(),
+                        SymbolInfo {
+                            name: name.to_string(),
+                            symbol_type: SymbolType::Variable,
+                        },
+                    );
                 }
                 _ => panic!("Expected identifier, found {:?}", identifier.ast_node),
             },
@@ -245,14 +240,13 @@ impl DeclarationAnalyzer {
         for element in elements.iter_mut() {
             match element.ast_node {
                 AstNode::Identifier(ref name) => {
-                    let symbol_info = SymbolInfo {
-                        name: name.to_string(),
-                        symbol_type: SymbolType::Variable,
-                    };
-
-                    self.get_last_symbol_table_mut()
-                        .borrow_mut()
-                        .insert(name.to_string(), symbol_info);
+                    self.get_last_symbol_table_mut().borrow_mut().insert(
+                        name.to_string(),
+                        SymbolInfo {
+                            name: name.to_string(),
+                            symbol_type: SymbolType::Variable,
+                        },
+                    );
                 }
                 AstNode::Wildcard => {} // Wildcard discards values, nothing to do here.
                 _ => panic!("Expected identifier, found {:?}", element.ast_node),
