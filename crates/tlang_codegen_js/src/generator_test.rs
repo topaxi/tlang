@@ -144,7 +144,8 @@ fn test_if_else_as_expression() {
 #[ignore = "implement if/else in expression position first"]
 #[test]
 fn test_if_else_as_expression_nested() {
-    let output = compile!("fn main() { let result = if true { if true { 1 } else { 2 } } else { 3 }; }");
+    let output =
+        compile!("fn main() { let result = if true { if true { 1 } else { 2 } } else { 3 }; }");
     let expected_output = indoc! {"
         function main() {
             let tmp0;
