@@ -198,8 +198,8 @@ impl DeclarationAnalyzer {
             // Function arguments have their own scope.
             self.push_symbol_table();
             node.symbol_table = Some(Rc::clone(&self.get_last_symbol_table()));
-            for mut param in &mut declaration.0 {
-                self.collect_declarations(&mut param);
+            for param in &mut declaration.0 {
+                self.collect_declarations(param);
             }
             self.collect_declarations(&mut declaration.1);
             self.pop_symbol_table();
@@ -221,8 +221,8 @@ impl DeclarationAnalyzer {
                     .insert(name.to_string(), symbol_info);
             }
             AstNode::List(ref mut nodes) => {
-                for mut node in nodes.iter_mut() {
-                    self.collect_function_parameter(_node, &mut node);
+                for node in nodes.iter_mut() {
+                    self.collect_function_parameter(_node, node);
                 }
             }
             AstNode::PrefixOp(PrefixOp::Rest, ref mut identifier) => match identifier.ast_node {
