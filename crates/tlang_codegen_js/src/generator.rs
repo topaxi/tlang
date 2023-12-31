@@ -185,24 +185,24 @@ impl CodegenJS {
         match &node.ast_node {
             AstNode::SingleLineComment(comment) => {
                 self.output.push_str("//");
-                self.output.push_str(&comment);
+                self.output.push_str(comment);
                 self.output.push('\n');
             }
             AstNode::MultiLineComment(comment) => {
                 self.output.push_str("/*");
-                self.output.push_str(&comment);
+                self.output.push_str(comment);
                 self.output.push_str("*/\n");
             }
             AstNode::Program(statements) => {
                 for statement in statements {
-                    self.generate_node(&statement, None);
+                    self.generate_node(statement, None);
                 }
             }
             AstNode::Block(statements, expression) => {
                 self.push_scope();
 
                 for statement in statements {
-                    self.generate_node(&statement, None);
+                    self.generate_node(statement, None);
                 }
 
                 if expression.is_none() {
@@ -218,7 +218,7 @@ impl CodegenJS {
                         if let Some(function_context) = self.function_context_stack.last() {
                             if function_context.is_tail_recursive && expression.is_some() {
                                 if let AstNode::RecursiveCall(_) = expression.as_ref().unwrap().ast_node {
-                                    self.generate_node(&expression.as_ref().unwrap(), None);
+                                    self.generate_node(expression.as_ref().unwrap(), None);
                                     return;
                                 }
                             }
@@ -237,7 +237,7 @@ impl CodegenJS {
             AstNode::ExpressionStatement(expression) => {
                 self.output.push_str(&self.get_indent());
                 self.context_stack.push(BlockContext::Statement);
-                self.generate_node(&expression, None);
+                self.generate_node(expression, None);
                 self.context_stack.pop();
 
                 if let AstNode::IfElse { .. } = expression.ast_node {
@@ -247,7 +247,7 @@ impl CodegenJS {
 
                 self.output.push_str(";\n");
             }
-            AstNode::Literal(literal) => self.generate_literal(&literal),
+            AstNode::Literal(literal) => self.generate_literal(literal),
             AstNode::List(items) => {
                 self.output.push('[');
                 for (i, item) in items.iter().enumerate() {
@@ -280,11 +280,11 @@ impl CodegenJS {
                     PrefixOp::Spread => self.output.push_str("..."),
                     _ => unimplemented!("PrefixOp {:?} not implemented yet.", op),
                 }
-                self.generate_node(&node, None);
+                self.generate_node(node, None);
             },
             AstNode::BinaryOp { op, lhs, rhs } => {
                 let needs_parentheses = parent_op.map_or(false, |parent| {
-                    Self::should_wrap_with_parentheses(&op, parent)
+                    Self::should_wrap_with_parentheses(op, parent)
                 });
 
                 if needs_parentheses {
