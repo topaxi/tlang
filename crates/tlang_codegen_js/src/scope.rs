@@ -26,18 +26,27 @@ impl Scope {
             return name.to_string();
         }
         // If already declared, generate a new name with a suffix (e.g., $a, $b)
+        let new_name = self.get_unique_variable_name(name);
+        self.variables.insert(name.to_string(), new_name.clone());
+        new_name
+    }
+
+    fn get_unique_variable_name(&self, prefix: &str) -> String {
         let mut suffix = 'a';
         loop {
-            let new_name = format!("{}${}", name, suffix);
-
+            let new_name = format!("{}${}", prefix, suffix);
             if !self.variables.contains_key(&new_name) {
-                self.variables.insert(name.to_string(), new_name.clone());
-
                 return new_name;
             }
-
             suffix = (suffix as u8 + 1) as char;
         }
+    }
+
+    pub fn declare_tmp_variable(&mut self) -> String {
+        let tmp_var_name = self.get_unique_variable_name("$tmp");
+        self.variables
+            .insert(tmp_var_name.clone(), tmp_var_name.clone());
+        tmp_var_name
     }
 
     pub fn resolve_variable(&self, name: &str) -> Option<String> {

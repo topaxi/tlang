@@ -225,12 +225,11 @@ impl CodegenJS {
                 }
 
                 if expression.is_none() {
+                    self.pop_scope();
                     return;
                 }
 
                 match self.current_context() {
-                    BlockContext::Program => unreachable!("Block with completion in ProgramBlock context not implemented yet."),
-                    BlockContext::Statement => unimplemented!("Block with completion in StatementBlock context not implemented yet."),
                     BlockContext::FunctionBody => {
                         // We only render the return statement if we are not in a tail recursive function body
                         // and the node is RecursiveCall pointing to the current function.
@@ -248,7 +247,26 @@ impl CodegenJS {
                         self.generate_node(expression.as_ref().unwrap(), None);
                         self.push_str(";\n");
                     }
-                    BlockContext::Expression => unimplemented!("Block with completion in ExpressionBlock context not implemented yet."),
+                    _ => {
+                        // In a case of `let a = { 1 }`, we want to render the expression as a statement.
+                        // We do this by temporarily swapping the statement buffer, generating the
+                        // expression as an statement, and then swapping the statement buffer back.
+                        let statement_buffer = std::mem::take(&mut self.current_statement_buffer);
+                        let tmp_var = self.scopes.declare_tmp_variable();
+                        self.push_str(&self.get_indent());
+                        self.push_str(&format!("let {};{{\n", tmp_var));
+                        self.indent_level += 1;
+                        self.push_str(&self.get_indent());
+                        self.push_str(&format!("{} = ", tmp_var));
+                        self.generate_node(expression.as_ref().unwrap(), None);
+                        self.push_str(";\n");
+                        self.indent_level -= 1;
+                        self.push_str(&self.get_indent());
+                        self.push_str("};\n");
+                        self.flush_statement_buffer();
+                        self.current_statement_buffer = statement_buffer;
+                        self.push_str(tmp_var.as_str());
+                    }
                 }
 
                 self.flush_statement_buffer();

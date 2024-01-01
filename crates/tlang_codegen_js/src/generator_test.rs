@@ -111,15 +111,13 @@ fn test_codegen_operator_precedence() {
 }
 
 #[test]
-#[ignore = "implement block in expression position first"]
 fn test_block_expression() {
     let output = compile!("let one = { 1 };");
     let expected_output = indoc! {"
-        let tmp0;
-        {
-            tmp0 = 1;
+        let $tmp$a;{
+            $tmp$a = 1;
         };
-        let one = tmp0;
+        let one = $tmp$a;
     "};
     assert_eq!(output, expected_output);
 }
@@ -143,13 +141,13 @@ fn test_if_else_as_expression() {
     let output = compile!("fn main() { let result = if true { 1 } else { 2 }; }");
     let expected_output = indoc! {"
         function main() {
-            let tmp0;
+            let $tmp$a;
             if (true) {
-                tmp0 = 1;
+                $tmp$a = 1;
             } else {
-                tmp0 = 2;
+                $tmp$a = 2;
             }
-            let result = tmp0;
+            let result = $tmp$a;
         }
     "};
     assert_eq!(output, expected_output);
@@ -162,19 +160,21 @@ fn test_if_else_as_expression_nested() {
         compile!("fn main() { let result = if true { if true { 1 } else { 2 } } else { 3 }; }");
     let expected_output = indoc! {"
         function main() {
-            let tmp0;
-            if (true) {
-                let tmp1;
+            let $tmp$a;{
                 if (true) {
-                    tmp1 = 1;
+                    let $tmp$b;{
+                        if (true) {
+                            $tmp$b = 1;
+                        } else {
+                            $tmp$b = 2;
+                        }
+                    };
+                    $tmp$a = $tmp$b;
                 } else {
-                    tmp1 = 2;
+                    $tmp$a = 3;
                 }
-                tmp0 = tmp1;
-            } else {
-                tmp0 = 3;
-            }
-            let result = tmp0;
+            };
+            let result = $tmp$a;
         }
     "};
     assert_eq!(output, expected_output);
