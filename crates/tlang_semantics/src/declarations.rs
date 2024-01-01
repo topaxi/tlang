@@ -1,8 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use tlang_ast::{
-    node::{AstNode, Node, PrefixOp},
-    symbols::{SymbolInfo, SymbolTable, SymbolType},
+    node::{AstNode, FunctionDeclaration, Node, PrefixOp},
+    symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
 };
 
 pub struct DeclarationAnalyzer {
@@ -52,6 +52,7 @@ impl DeclarationAnalyzer {
             self.root_symbol_table().borrow_mut().symbols.insert(
                 name.to_string(),
                 SymbolInfo {
+                    id: SymbolId::new(0), // Builtins have ID 0 for now.
                     name: name.to_string(),
                     symbol_type,
                 },
@@ -73,18 +74,24 @@ impl DeclarationAnalyzer {
                 self.collect_block_declarations(ast, nodes, return_value)
             }
             AstNode::VariableDeclaration {
+                ref id,
                 ref name,
                 ref mut value,
-            } => self.collect_variable_declaration(ast, name, value),
+            } => self.collect_variable_declaration(ast, *id, name, value),
             AstNode::FunctionDeclaration {
+                ref id,
                 ref name,
-                ref mut parameters,
-                ref mut body,
-            } => self.collect_function_declaration(ast, name, parameters, body),
-            AstNode::FunctionDeclarations(ref name, ref mut declarations) => {
-                self.collect_function_declarations(ast, name, declarations)
-            }
-            AstNode::FunctionParameter(ref mut name) => self.collect_function_parameter(ast, name),
+                ref mut declaration,
+            } => self.collect_function_declaration(ast, *id, name, declaration),
+            AstNode::FunctionDeclarations {
+                ref id,
+                ref name,
+                ref mut declarations,
+            } => self.collect_function_declarations(ast, *id, name, declarations),
+            AstNode::FunctionParameter {
+                ref id,
+                ref mut node,
+            } => self.collect_function_parameter(ast, *id, node),
             _ => {}
         }
 
@@ -119,7 +126,13 @@ impl DeclarationAnalyzer {
         self.pop_symbol_table();
     }
 
-    fn collect_variable_declaration(&mut self, _node: &mut Node, name: &str, expr: &mut Node) {
+    fn collect_variable_declaration(
+        &mut self,
+        _node: &mut Node,
+        id: SymbolId,
+        name: &str,
+        expr: &mut Node,
+    ) {
         self.collect_declarations(expr);
 
         let symbol_table = self.get_last_symbol_table_mut();
@@ -127,6 +140,8 @@ impl DeclarationAnalyzer {
         symbol_table.borrow_mut().insert(
             name.to_string(),
             SymbolInfo {
+                id,
+
                 name: name.to_string(),
                 symbol_type: SymbolType::Variable,
             },
@@ -136,15 +151,16 @@ impl DeclarationAnalyzer {
     fn collect_function_declaration(
         &mut self,
         node: &mut Node,
+        id: SymbolId,
         name: &String,
-        parameters: &mut [Node],
-        body: &mut Node,
+        declaration: &mut FunctionDeclaration,
     ) {
         let symbol_table = self.get_last_symbol_table_mut();
 
         symbol_table.borrow_mut().insert(
             name.to_string(),
             SymbolInfo {
+                id,
                 name: name.to_string(),
                 symbol_type: SymbolType::Function,
             },
@@ -154,25 +170,27 @@ impl DeclarationAnalyzer {
         self.push_symbol_table();
         node.symbol_table = Some(Rc::clone(&self.get_last_symbol_table()));
 
-        for param in parameters {
+        for param in &mut declaration.parameters {
             self.collect_declarations(param);
         }
 
-        self.collect_declarations(body);
+        self.collect_declarations(&mut declaration.body);
         self.pop_symbol_table();
     }
 
     fn collect_function_declarations(
         &mut self,
         node: &mut Node,
+        id: SymbolId,
         name: &String,
-        declarations: &mut [(Vec<Node>, Box<Node>)],
+        declarations: &mut [FunctionDeclaration],
     ) {
         let symbol_table = self.get_last_symbol_table_mut();
 
         symbol_table.borrow_mut().insert(
             name.to_string(),
             SymbolInfo {
+                id,
                 name: name.to_string(),
                 symbol_type: SymbolType::Function,
             },
@@ -182,15 +200,15 @@ impl DeclarationAnalyzer {
             // Function arguments have their own scope.
             self.push_symbol_table();
             node.symbol_table = Some(Rc::clone(&self.get_last_symbol_table()));
-            for param in &mut declaration.0 {
+            for param in &mut declaration.parameters {
                 self.collect_declarations(param);
             }
-            self.collect_declarations(&mut declaration.1);
+            self.collect_declarations(&mut declaration.body);
             self.pop_symbol_table();
         }
     }
 
-    fn collect_function_parameter(&mut self, _node: &mut Node, name: &mut Node) {
+    fn collect_function_parameter(&mut self, _node: &mut Node, id: SymbolId, name: &mut Node) {
         let symbol_table = self.get_last_symbol_table_mut();
 
         match name.ast_node {
@@ -198,6 +216,7 @@ impl DeclarationAnalyzer {
                 symbol_table.borrow_mut().insert(
                     name.to_string(),
                     SymbolInfo {
+                        id,
                         name: name.to_string(),
                         symbol_type: SymbolType::Variable,
                     },
@@ -205,7 +224,8 @@ impl DeclarationAnalyzer {
             }
             AstNode::List(ref mut nodes) => {
                 for node in nodes.iter_mut() {
-                    self.collect_function_parameter(_node, node);
+                    // TODO: I think this id here might be wrong.
+                    self.collect_function_parameter(_node, id, node);
                 }
             }
             AstNode::PrefixOp(PrefixOp::Rest, ref mut identifier) => match identifier.ast_node {
@@ -213,6 +233,7 @@ impl DeclarationAnalyzer {
                     symbol_table.borrow_mut().insert(
                         name.to_string(),
                         SymbolInfo {
+                            id,
                             name: name.to_string(),
                             symbol_type: SymbolType::Variable,
                         },
@@ -225,7 +246,10 @@ impl DeclarationAnalyzer {
                 ref mut identifier,
                 ref mut elements,
                 named_fields,
-            } => self.collect_enum_extraction(_node, identifier, elements, named_fields),
+            } => {
+                // TODO: The passed in id is for the enum, not the extracted value.
+                self.collect_enum_extraction(_node, id, identifier, elements, named_fields)
+            }
             _ => panic!("Expected identifier or list, found {:?}", name.ast_node),
         }
     }
@@ -233,6 +257,7 @@ impl DeclarationAnalyzer {
     fn collect_enum_extraction(
         &mut self,
         _node: &mut Node,
+        id: SymbolId,
         _identifier: &mut Node,
         elements: &mut [Node],
         _named_fields: bool,
@@ -243,6 +268,8 @@ impl DeclarationAnalyzer {
                     self.get_last_symbol_table_mut().borrow_mut().insert(
                         name.to_string(),
                         SymbolInfo {
+                            // TODO: Verify that this id is correct.
+                            id,
                             name: name.to_string(),
                             symbol_type: SymbolType::Variable,
                         },

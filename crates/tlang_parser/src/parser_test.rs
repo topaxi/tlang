@@ -3,7 +3,8 @@ use pretty_assertions::assert_eq;
 
 use crate::parser::Parser;
 use tlang_ast::{
-    node::{self, AstNode, BinaryOp, Node, PrefixOp},
+    node::{self, AstNode, BinaryOp, FunctionDeclaration, Node, PrefixOp},
+    symbols::SymbolId,
     token::Literal,
 };
 
@@ -21,6 +22,7 @@ fn test_simple_variable_declaration() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
+            id: SymbolId::new(1),
             name: "x".to_string(),
             value: Box::new(node::new!(BinaryOp {
                 op: BinaryOp::Add,
@@ -116,10 +118,12 @@ fn test_simple_arithmetic_with_identifiers() {
         program,
         node::new!(Program(vec![
             node::new!(VariableDeclaration {
+                id: SymbolId::new(1),
                 name: "x".to_string(),
                 value: Box::new(node::new!(Literal(Literal::Integer(1)))),
             }),
             node::new!(VariableDeclaration {
+                id: SymbolId::new(2),
                 name: "y".to_string(),
                 value: Box::new(node::new!(Literal(Literal::Integer(2)))),
             }),
@@ -200,6 +204,7 @@ fn test_block_expression() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
+            id: SymbolId::new(1),
             name: "x".to_string(),
             value: Box::new(node::new!(Block(
                 vec![node::new!(ExpressionStatement(Box::new(node::new!(
@@ -312,22 +317,25 @@ fn test_if_else_as_last_expression() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(FunctionDeclaration {
+            id: SymbolId::new(1),
             name: "main".to_string(),
-            parameters: vec![],
-            body: Box::new(node::new!(Block(
-                vec![],
-                Some(Box::new(node::new!(IfElse {
-                    condition: Box::new(node::new!(Literal(Literal::Boolean(true)))),
-                    then_branch: Box::new(node::new!(Block(
-                        vec![],
-                        Some(Box::new(node::new!(Literal(Literal::Integer(1)))))
-                    ))),
-                    else_branch: Some(Box::new(node::new!(Block(
-                        vec![],
-                        Some(Box::new(node::new!(Literal(Literal::Integer(2)))))
-                    )))),
-                })))
-            )))
+            declaration: FunctionDeclaration {
+                parameters: vec![],
+                body: Box::new(node::new!(Block(
+                    vec![],
+                    Some(Box::new(node::new!(IfElse {
+                        condition: Box::new(node::new!(Literal(Literal::Boolean(true)))),
+                        then_branch: Box::new(node::new!(Block(
+                            vec![],
+                            Some(Box::new(node::new!(Literal(Literal::Integer(1)))))
+                        ))),
+                        else_branch: Some(Box::new(node::new!(Block(
+                            vec![],
+                            Some(Box::new(node::new!(Literal(Literal::Integer(2)))))
+                        )))),
+                    })))
+                )))
+            }
         })]))
     );
 }
@@ -339,6 +347,7 @@ fn test_if_expression() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
+            id: SymbolId::new(1),
             name: "x".to_string(),
             value: Box::new(node::new!(IfElse {
                 condition: Box::new(node::new!(Literal(Literal::Boolean(true)))),
@@ -366,22 +375,25 @@ fn test_function_declaration() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(FunctionDeclaration {
+            id: SymbolId::new(1),
             name: "foo".to_string(),
-            parameters: vec![],
-            body: Box::new(node::new!(Block(
-                vec![
-                    node::new!(ExpressionStatement(Box::new(node::new!(Call {
-                        function: Box::new(node::new!(Identifier("bar".to_string()))),
-                        arguments: vec![]
-                    })))),
-                    node::new!(ExpressionStatement(Box::new(node::new!(BinaryOp {
-                        op: BinaryOp::Add,
-                        lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                        rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
-                    }))))
-                ],
-                None
-            )))
+            declaration: FunctionDeclaration {
+                parameters: vec![],
+                body: Box::new(node::new!(Block(
+                    vec![
+                        node::new!(ExpressionStatement(Box::new(node::new!(Call {
+                            function: Box::new(node::new!(Identifier("bar".to_string()))),
+                            arguments: vec![]
+                        })))),
+                        node::new!(ExpressionStatement(Box::new(node::new!(BinaryOp {
+                            op: BinaryOp::Add,
+                            lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                            rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                        }))))
+                    ],
+                    None
+                )))
+            }
         })]))
     );
 }
@@ -393,25 +405,30 @@ fn test_function_declaration_with_parameters() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(FunctionDeclaration {
+            id: SymbolId::new(3),
             name: "foo".to_string(),
-            parameters: vec![
-                node::new!(FunctionParameter(Box::new(node::new!(Identifier(
-                    "x".to_string()
-                ))))),
-                node::new!(FunctionParameter(Box::new(node::new!(Identifier(
-                    "y".to_string()
-                )))))
-            ],
-            body: Box::new(node::new!(Block(
-                vec![node::new!(ExpressionStatement(Box::new(node::new!(
-                    BinaryOp {
-                        op: BinaryOp::Add,
-                        lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                        rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
-                    }
-                ))))],
-                None
-            )))
+            declaration: FunctionDeclaration {
+                parameters: vec![
+                    node::new!(FunctionParameter {
+                        id: SymbolId::new(1),
+                        node: Box::new(node::new!(Identifier("x".to_string())))
+                    }),
+                    node::new!(FunctionParameter {
+                        id: SymbolId::new(2),
+                        node: Box::new(node::new!(Identifier("y".to_string())))
+                    }),
+                ],
+                body: Box::new(node::new!(Block(
+                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
+                        BinaryOp {
+                            op: BinaryOp::Add,
+                            lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                            rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                        }
+                    ))))],
+                    None
+                )))
+            }
         })]))
     );
 }
@@ -493,20 +510,24 @@ fn test_nameless_function_expressions() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
+            id: SymbolId::new(2),
             name: "x".to_string(),
             value: Box::new(node::new!(FunctionExpression {
+                id: SymbolId::new(1),
                 name: None,
-                parameters: vec![],
-                body: Box::new(node::new!(Block(
-                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
-                        BinaryOp {
-                            op: BinaryOp::Add,
-                            lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                            rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
-                        }
-                    ))))],
-                    None
-                )))
+                declaration: FunctionDeclaration {
+                    parameters: vec![],
+                    body: Box::new(node::new!(Block(
+                        vec![node::new!(ExpressionStatement(Box::new(node::new!(
+                            BinaryOp {
+                                op: BinaryOp::Add,
+                                lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                                rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                            }
+                        ))))],
+                        None
+                    )))
+                }
             }))
         })]))
     );
@@ -516,27 +537,33 @@ fn test_nameless_function_expressions() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
+            id: SymbolId::new(4),
             name: "x".to_string(),
             value: Box::new(node::new!(FunctionExpression {
+                id: SymbolId::new(3),
                 name: None,
-                parameters: vec![
-                    node::new!(FunctionParameter(Box::new(node::new!(Identifier(
-                        "x".to_string()
-                    ))))),
-                    node::new!(FunctionParameter(Box::new(node::new!(Identifier(
-                        "y".to_string()
-                    )))))
-                ],
-                body: Box::new(node::new!(Block(
-                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
-                        BinaryOp {
-                            op: BinaryOp::Add,
-                            lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                            rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
-                        }
-                    ))))],
-                    None
-                )))
+                declaration: FunctionDeclaration {
+                    parameters: vec![
+                        node::new!(FunctionParameter {
+                            id: SymbolId::new(1),
+                            node: Box::new(node::new!(Identifier("x".to_string())))
+                        }),
+                        node::new!(FunctionParameter {
+                            id: SymbolId::new(2),
+                            node: Box::new(node::new!(Identifier("y".to_string())))
+                        }),
+                    ],
+                    body: Box::new(node::new!(Block(
+                        vec![node::new!(ExpressionStatement(Box::new(node::new!(
+                            BinaryOp {
+                                op: BinaryOp::Add,
+                                lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                                rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                            }
+                        ))))],
+                        None
+                    )))
+                }
             }))
         })]))
     );
@@ -549,20 +576,24 @@ fn test_function_expression_without_name_no_argument_parenthesis() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
+            id: SymbolId::new(2),
             name: "x".to_string(),
             value: Box::new(node::new!(FunctionExpression {
+                id: SymbolId::new(1),
                 name: None,
-                parameters: vec![],
-                body: Box::new(node::new!(Block(
-                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
-                        BinaryOp {
-                            op: BinaryOp::Add,
-                            lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                            rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
-                        }
-                    ))))],
-                    None
-                )))
+                declaration: FunctionDeclaration {
+                    parameters: vec![],
+                    body: Box::new(node::new!(Block(
+                        vec![node::new!(ExpressionStatement(Box::new(node::new!(
+                            BinaryOp {
+                                op: BinaryOp::Add,
+                                lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                                rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                            }
+                        ))))],
+                        None
+                    )))
+                }
             }))
         })]))
     );
@@ -575,20 +606,24 @@ fn test_function_expressions() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
+            id: SymbolId::new(2),
             name: "x".to_string(),
             value: Box::new(node::new!(FunctionExpression {
+                id: SymbolId::new(1),
                 name: Some("foo".to_string()),
-                parameters: vec![],
-                body: Box::new(node::new!(Block(
-                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
-                        BinaryOp {
-                            op: BinaryOp::Add,
-                            lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                            rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
-                        }
-                    ))))],
-                    None
-                )))
+                declaration: FunctionDeclaration {
+                    parameters: vec![],
+                    body: Box::new(node::new!(Block(
+                        vec![node::new!(ExpressionStatement(Box::new(node::new!(
+                            BinaryOp {
+                                op: BinaryOp::Add,
+                                lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                                rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                            }
+                        ))))],
+                        None
+                    )))
+                }
             }))
         })]))
     );
@@ -598,27 +633,33 @@ fn test_function_expressions() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
+            id: SymbolId::new(4),
             name: "x".to_string(),
             value: Box::new(node::new!(FunctionExpression {
+                id: SymbolId::new(3),
                 name: Some("foo".to_string()),
-                parameters: vec![
-                    node::new!(FunctionParameter(Box::new(node::new!(Identifier(
-                        "x".to_string()
-                    ))))),
-                    node::new!(FunctionParameter(Box::new(node::new!(Identifier(
-                        "y".to_string()
-                    ))))),
-                ],
-                body: Box::new(node::new!(Block(
-                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
-                        BinaryOp {
-                            op: BinaryOp::Add,
-                            lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                            rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
-                        }
-                    ))))],
-                    None
-                )))
+                declaration: FunctionDeclaration {
+                    parameters: vec![
+                        node::new!(FunctionParameter {
+                            id: SymbolId::new(1),
+                            node: Box::new(node::new!(Identifier("x".to_string())))
+                        }),
+                        node::new!(FunctionParameter {
+                            id: SymbolId::new(2),
+                            node: Box::new(node::new!(Identifier("y".to_string())))
+                        }),
+                    ],
+                    body: Box::new(node::new!(Block(
+                        vec![node::new!(ExpressionStatement(Box::new(node::new!(
+                            BinaryOp {
+                                op: BinaryOp::Add,
+                                lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                                rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                            }
+                        ))))],
+                        None
+                    )))
+                }
             }))
         })]))
     );
@@ -631,6 +672,7 @@ fn test_pattern_matching() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
+            id: SymbolId::new(1),
             name: "x".to_string(),
             value: Box::new(node::new!(Match {
                 expression: Box::new(node::new!(Literal(Literal::Integer(1)))),
@@ -660,43 +702,9 @@ fn test_explicit_return_statements() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(FunctionDeclaration {
+            id: SymbolId::new(1),
             name: "foo".to_string(),
-            parameters: vec![],
-            body: Box::new(node::new!(Block(
-                vec![node::new!(ReturnStatement(Some(Box::new(node::new!(
-                    BinaryOp {
-                        op: BinaryOp::Add,
-                        lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                        rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
-                    }
-                )))))],
-                None
-            )))
-        })]))
-    );
-
-    let program = parse!("fn foo() { return; }");
-
-    assert_eq!(
-        program,
-        node::new!(Program(vec![node::new!(FunctionDeclaration {
-            name: "foo".to_string(),
-            parameters: vec![],
-            body: Box::new(node::new!(Block(
-                vec![node::new!(ReturnStatement(None))],
-                None
-            )))
-        })]))
-    );
-
-    let program = parse!("let x = fn() { return 1 + 2; };");
-
-    assert_eq!(
-        program,
-        node::new!(Program(vec![node::new!(VariableDeclaration {
-            name: "x".to_string(),
-            value: Box::new(node::new!(FunctionExpression {
-                name: None,
+            declaration: FunctionDeclaration {
                 parameters: vec![],
                 body: Box::new(node::new!(Block(
                     vec![node::new!(ReturnStatement(Some(Box::new(node::new!(
@@ -708,6 +716,50 @@ fn test_explicit_return_statements() {
                     )))))],
                     None
                 )))
+            }
+        })]))
+    );
+
+    let program = parse!("fn foo() { return; }");
+
+    assert_eq!(
+        program,
+        node::new!(Program(vec![node::new!(FunctionDeclaration {
+            id: SymbolId::new(1),
+            name: "foo".to_string(),
+            declaration: FunctionDeclaration {
+                parameters: vec![],
+                body: Box::new(node::new!(Block(
+                    vec![node::new!(ReturnStatement(None))],
+                    None
+                )))
+            }
+        })]))
+    );
+
+    let program = parse!("let x = fn() { return 1 + 2; };");
+
+    assert_eq!(
+        program,
+        node::new!(Program(vec![node::new!(VariableDeclaration {
+            id: SymbolId::new(2),
+            name: "x".to_string(),
+            value: Box::new(node::new!(FunctionExpression {
+                id: SymbolId::new(1),
+                name: None,
+                declaration: FunctionDeclaration {
+                    parameters: vec![],
+                    body: Box::new(node::new!(Block(
+                        vec![node::new!(ReturnStatement(Some(Box::new(node::new!(
+                            BinaryOp {
+                                op: BinaryOp::Add,
+                                lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                                rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                            }
+                        )))))],
+                        None
+                    )))
+                }
             }))
         })]))
     );
@@ -720,38 +772,9 @@ fn test_implicit_return_expressions() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(FunctionDeclaration {
+            id: SymbolId::new(1),
             name: "foo".to_string(),
-            parameters: vec![],
-            body: Box::new(node::new!(Block(
-                vec![],
-                Some(Box::new(node::new!(BinaryOp {
-                    op: BinaryOp::Add,
-                    lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                    rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
-                })))
-            )))
-        })]))
-    );
-
-    let program = parse!("fn foo() {}");
-
-    assert_eq!(
-        program,
-        node::new!(Program(vec![node::new!(FunctionDeclaration {
-            name: "foo".to_string(),
-            parameters: vec![],
-            body: Box::new(node::new!(Block(vec![], None)))
-        })]))
-    );
-
-    let program = parse!("let x = fn() { 1 + 2 };");
-
-    assert_eq!(
-        program,
-        node::new!(Program(vec![node::new!(VariableDeclaration {
-            name: "x".to_string(),
-            value: Box::new(node::new!(FunctionExpression {
-                name: None,
+            declaration: FunctionDeclaration {
                 parameters: vec![],
                 body: Box::new(node::new!(Block(
                     vec![],
@@ -761,6 +784,45 @@ fn test_implicit_return_expressions() {
                         rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
                     })))
                 )))
+            }
+        })]))
+    );
+
+    let program = parse!("fn foo() {}");
+
+    assert_eq!(
+        program,
+        node::new!(Program(vec![node::new!(FunctionDeclaration {
+            id: SymbolId::new(1),
+            name: "foo".to_string(),
+            declaration: FunctionDeclaration {
+                parameters: vec![],
+                body: Box::new(node::new!(Block(vec![], None)))
+            }
+        })]))
+    );
+
+    let program = parse!("let x = fn() { 1 + 2 };");
+
+    assert_eq!(
+        program,
+        node::new!(Program(vec![node::new!(VariableDeclaration {
+            id: SymbolId::new(2),
+            name: "x".to_string(),
+            value: Box::new(node::new!(FunctionExpression {
+                id: SymbolId::new(1),
+                name: None,
+                declaration: FunctionDeclaration {
+                    parameters: vec![],
+                    body: Box::new(node::new!(Block(
+                        vec![],
+                        Some(Box::new(node::new!(BinaryOp {
+                            op: BinaryOp::Add,
+                            lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                            rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                        })))
+                    )))
+                }
             }))
         })]))
     );
@@ -770,15 +832,19 @@ fn test_implicit_return_expressions() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(FunctionDeclaration {
+            id: SymbolId::new(2),
             name: "foo".to_string(),
-            parameters: vec![],
-            body: Box::new(node::new!(Block(
-                vec![node::new!(VariableDeclaration {
-                    name: "x".to_string(),
-                    value: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                })],
-                Some(Box::new(node::new!(Identifier("x".to_string()))))
-            )))
+            declaration: FunctionDeclaration {
+                parameters: vec![],
+                body: Box::new(node::new!(Block(
+                    vec![node::new!(VariableDeclaration {
+                        id: SymbolId::new(1),
+                        name: "x".to_string(),
+                        value: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                    })],
+                    Some(Box::new(node::new!(Identifier("x".to_string()))))
+                )))
+            }
         })]))
     );
 }
@@ -792,25 +858,28 @@ fn test_recursive_factorial_functional_definition() {
 
     assert_eq!(
         program,
-        node::new!(Program(vec![node::new!(FunctionDeclarations(
-            "factorial".to_string(),
-            vec![
-                (
-                    vec![node::new!(FunctionParameter(Box::new(node::new!(
-                        Literal(Literal::Integer(0))
-                    ))))],
-                    Box::new(node::new!(Block(
+        node::new!(Program(vec![node::new!(FunctionDeclarations {
+            id: SymbolId::new(3),
+            name: "factorial".to_string(),
+            declarations: vec![
+                FunctionDeclaration {
+                    parameters: vec![node::new!(FunctionParameter {
+                        id: SymbolId::new(1),
+                        node: Box::new(node::new!(Literal(Literal::Integer(0))))
+                    })],
+                    body: Box::new(node::new!(Block(
                         vec![node::new!(ReturnStatement(Some(Box::new(node::new!(
                             Literal(Literal::Integer(1))
                         )))))],
                         None
                     )))
-                ),
-                (
-                    vec![node::new!(FunctionParameter(Box::new(node::new!(
-                        Identifier("n".to_string())
-                    ))))],
-                    Box::new(node::new!(Block(
+                },
+                FunctionDeclaration {
+                    parameters: vec![node::new!(FunctionParameter {
+                        id: SymbolId::new(2),
+                        node: Box::new(node::new!(Identifier("n".to_string())))
+                    })],
+                    body: Box::new(node::new!(Block(
                         vec![node::new!(ReturnStatement(Some(Box::new(node::new!(
                             BinaryOp {
                                 op: BinaryOp::Multiply,
@@ -829,9 +898,9 @@ fn test_recursive_factorial_functional_definition() {
                         )))))],
                         None
                     )))
-                )
+                }
             ]
-        ))]))
+        })]))
     );
 }
 
@@ -844,29 +913,32 @@ fn test_recursive_sum() {
 
     assert_eq!(
         program,
-        node::new!(Program(vec![node::new!(FunctionDeclarations(
-            "sum".to_string(),
-            vec![
-                (
-                    vec![node::new!(FunctionParameter(Box::new(node::new!(List(
-                        vec![]
-                    )))))],
-                    Box::new(node::new!(Block(
+        node::new!(Program(vec![node::new!(FunctionDeclarations {
+            id: SymbolId::new(3),
+            name: "sum".to_string(),
+            declarations: vec![
+                FunctionDeclaration {
+                    parameters: vec![node::new!(FunctionParameter {
+                        id: SymbolId::new(1),
+                        node: Box::new(node::new!(List(vec![])))
+                    })],
+                    body: Box::new(node::new!(Block(
                         vec![],
                         Some(Box::new(node::new!(Literal(Literal::Integer(0))))),
                     )))
-                ),
-                (
-                    vec![node::new!(FunctionParameter(Box::new(node::new!(List(
-                        vec![
+                },
+                FunctionDeclaration {
+                    parameters: vec![node::new!(FunctionParameter {
+                        id: SymbolId::new(2),
+                        node: Box::new(node::new!(List(vec![
                             node::new!(Identifier("x".to_string())),
                             node::new!(PrefixOp(
                                 PrefixOp::Rest,
                                 Box::new(node::new!(Identifier("xs".to_string())))
                             ))
-                        ]
-                    )))))],
-                    Box::new(node::new!(Block(
+                        ])))
+                    })],
+                    body: Box::new(node::new!(Block(
                         vec![],
                         Some(Box::new(node::new!(BinaryOp {
                             op: BinaryOp::Add,
@@ -877,9 +949,9 @@ fn test_recursive_sum() {
                             }))
                         })))
                     )))
-                )
+                }
             ]
-        ))]))
+        })]))
     )
 }
 
@@ -895,23 +967,26 @@ fn test_functional_function_declaration_with_comments_inbetween() {
 
     assert_eq!(
         program,
-        node::new!(Program(vec![node::new!(FunctionDeclarations(
-            "foo".to_string(),
-            vec![
-                (
-                    vec![node::new!(FunctionParameter(Box::new(node::new!(
-                        Literal(Literal::Integer(1))
-                    ))))],
-                    Box::new(node::new!(Block(
+        node::new!(Program(vec![node::new!(FunctionDeclarations {
+            id: SymbolId::new(1),
+            name: "foo".to_string(),
+            declarations: vec![
+                FunctionDeclaration {
+                    parameters: vec![node::new!(FunctionParameter {
+                        id: SymbolId::new(2),
+                        node: Box::new(node::new!(Literal(Literal::Integer(1))))
+                    })],
+                    body: Box::new(node::new!(Block(
                         vec![],
                         Some(Box::new(node::new!(Literal(Literal::Integer(1))))),
                     )))
-                ),
-                (
-                    vec![node::new!(FunctionParameter(Box::new(node::new!(
-                        Identifier("n".to_string())
-                    ))))],
-                    Box::new(node::new!(Block(
+                },
+                FunctionDeclaration {
+                    parameters: vec![node::new!(FunctionParameter {
+                        id: SymbolId::new(3),
+                        node: Box::new(node::new!(Identifier("n".to_string())))
+                    })],
+                    body: Box::new(node::new!(Block(
                         vec![],
                         Some(Box::new(node::new!(BinaryOp {
                             op: BinaryOp::Multiply,
@@ -919,9 +994,9 @@ fn test_functional_function_declaration_with_comments_inbetween() {
                             rhs: Box::new(node::new!(Literal(Literal::Integer(2))))
                         })))
                     )))
-                )
+                }
             ]
-        ))]))
+        })]))
     );
 }
 
@@ -1049,6 +1124,7 @@ fn test_list_literal() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
+            id: SymbolId::new(1),
             name: "x".to_string(),
             value: Box::new(node::new!(List(vec![])))
         })]))
@@ -1059,6 +1135,7 @@ fn test_list_literal() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
+            id: SymbolId::new(1),
             name: "x".to_string(),
             value: Box::new(node::new!(List(vec![
                 node::new!(Literal(Literal::Integer(1))),
@@ -1076,6 +1153,7 @@ fn test_list_literal_with_trailing_comma() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
+            id: SymbolId::new(1),
             name: "x".to_string(),
             value: Box::new(node::new!(List(vec![
                 node::new!(Literal(Literal::Integer(1))),
@@ -1149,6 +1227,7 @@ fn test_dictionary_literal() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
+            id: SymbolId::new(1),
             name: "x".to_string(),
             value: Box::new(node::new!(Dict(vec![
                 (
@@ -1202,6 +1281,7 @@ fn test_enums() {
         program,
         node::new!(Program(vec![
             node::new!(EnumDeclaration {
+                id: SymbolId::new(1),
                 name: "Option".to_string(),
                 variants: vec![
                     node::new!(EnumVariant {
@@ -1217,6 +1297,7 @@ fn test_enums() {
                 ]
             }),
             node::new!(VariableDeclaration {
+                id: SymbolId::new(2),
                 name: "x".to_string(),
                 value: Box::new(node::new!(Call {
                     function: Box::new(node::new!(NestedIdentifier(vec![
@@ -1244,6 +1325,7 @@ fn test_enums_with_fields() {
         program,
         node::new!(Program(vec![
             node::new!(EnumDeclaration {
+                id: SymbolId::new(1),
                 name: "Option".to_string(),
                 variants: vec![
                     node::new!(EnumVariant {
@@ -1259,6 +1341,7 @@ fn test_enums_with_fields() {
                 ]
             }),
             node::new!(VariableDeclaration {
+                id: SymbolId::new(2),
                 name: "x".to_string(),
                 value: Box::new(node::new!(Call {
                     function: Box::new(node::new!(NestedIdentifier(vec![
@@ -1301,6 +1384,7 @@ fn test_enum_tree_max_depth() {
         program,
         node::new!(Program(vec![
             node::new!(EnumDeclaration {
+                id: SymbolId::new(1),
                 name: "Tree".to_string(),
                 variants: vec![
                     node::new!(EnumVariant {
@@ -1318,28 +1402,31 @@ fn test_enum_tree_max_depth() {
                     }),
                 ]
             }),
-            node::new!(FunctionDeclarations(
-                "maximum_depth".to_string(),
-                vec![
-                    (
-                        vec![node::new!(FunctionParameter(Box::new(node::new!(
-                            EnumExtraction {
+            node::new!(FunctionDeclarations {
+                id: SymbolId::new(4),
+                name: "maximum_depth".to_string(),
+                declarations: vec![
+                    FunctionDeclaration {
+                        parameters: vec![node::new!(FunctionParameter {
+                            id: SymbolId::new(2),
+                            node: Box::new(node::new!(EnumExtraction {
                                 identifier: Box::new(node::new!(NestedIdentifier(vec![
                                     "Tree".to_string(),
                                     "Leaf".to_string()
                                 ]))),
                                 elements: vec![node::new!(Wildcard)],
                                 named_fields: false,
-                            }
-                        ))))],
-                        Box::new(node::new!(Block(
+                            }))
+                        })],
+                        body: Box::new(node::new!(Block(
                             vec![],
                             Some(Box::new(node::new!(Literal(Literal::Integer(1)))))
                         )))
-                    ),
-                    (
-                        vec![node::new!(FunctionParameter(Box::new(node::new!(
-                            EnumExtraction {
+                    },
+                    FunctionDeclaration {
+                        parameters: vec![node::new!(FunctionParameter {
+                            id: SymbolId::new(3),
+                            node: Box::new(node::new!(EnumExtraction {
                                 identifier: Box::new(node::new!(NestedIdentifier(vec![
                                     "Tree".to_string(),
                                     "Node".to_string()
@@ -1349,9 +1436,9 @@ fn test_enum_tree_max_depth() {
                                     node::new!(Identifier("right".to_string()))
                                 ],
                                 named_fields: true,
-                            }
-                        ))))],
-                        Box::new(node::new!(Block(
+                            }))
+                        })],
+                        body: Box::new(node::new!(Block(
                             vec![],
                             Some(Box::new(node::new!(BinaryOp {
                                 op: BinaryOp::Add,
@@ -1379,75 +1466,81 @@ fn test_enum_tree_max_depth() {
                                 }))
                             })))
                         )))
-                    )
+                    }
                 ]
-            )),
+            }),
             node::new!(FunctionDeclaration {
+                id: SymbolId::new(6),
                 name: "main".to_string(),
-                parameters: vec![],
-                body: Box::new(node::new!(Block(
-                    vec![node::new!(VariableDeclaration {
-                        name: "x".to_string(),
-                        value: Box::new(node::new!(Call {
-                            function: Box::new(node::new!(NestedIdentifier(vec![
-                                "Tree".to_string(),
-                                "Node".to_string()
-                            ]))),
-                            arguments: vec![node::new!(Dict(vec![
-                                (
-                                    node::new!(Identifier("left".to_string())),
-                                    node::new!(Call {
-                                        function: Box::new(node::new!(NestedIdentifier(vec![
-                                            "Tree".to_string(),
-                                            "Leaf".to_string()
-                                        ]))),
-                                        arguments: vec![node::new!(Literal(Literal::Integer(1)))]
-                                    })
-                                ),
-                                (
-                                    node::new!(Identifier("right".to_string())),
-                                    node::new!(Call {
-                                        function: Box::new(node::new!(NestedIdentifier(vec![
-                                            "Tree".to_string(),
-                                            "Node".to_string()
-                                        ]))),
-                                        arguments: vec![node::new!(Dict(vec![
-                                            (
-                                                node::new!(Identifier("left".to_string())),
-                                                node::new!(Call {
-                                                    function: Box::new(node::new!(
-                                                        NestedIdentifier(vec![
-                                                            "Tree".to_string(),
-                                                            "Leaf".to_string()
-                                                        ])
-                                                    )),
-                                                    arguments: vec![node::new!(Literal(
-                                                        Literal::Integer(2)
-                                                    ))]
-                                                })
-                                            ),
-                                            (
-                                                node::new!(Identifier("right".to_string())),
-                                                node::new!(Call {
-                                                    function: Box::new(node::new!(
-                                                        NestedIdentifier(vec![
-                                                            "Tree".to_string(),
-                                                            "Leaf".to_string()
-                                                        ])
-                                                    )),
-                                                    arguments: vec![node::new!(Literal(
-                                                        Literal::Integer(3)
-                                                    ))]
-                                                })
-                                            )
-                                        ]))]
-                                    })
-                                )
-                            ]))]
-                        }))
-                    })],
-                    None
-                )))
+                declaration: FunctionDeclaration {
+                    parameters: vec![],
+                    body: Box::new(node::new!(Block(
+                        vec![node::new!(VariableDeclaration {
+                            id: SymbolId::new(5),
+                            name: "x".to_string(),
+                            value: Box::new(node::new!(Call {
+                                function: Box::new(node::new!(NestedIdentifier(vec![
+                                    "Tree".to_string(),
+                                    "Node".to_string()
+                                ]))),
+                                arguments: vec![node::new!(Dict(vec![
+                                    (
+                                        node::new!(Identifier("left".to_string())),
+                                        node::new!(Call {
+                                            function: Box::new(node::new!(NestedIdentifier(vec![
+                                                "Tree".to_string(),
+                                                "Leaf".to_string()
+                                            ]))),
+                                            arguments: vec![node::new!(Literal(Literal::Integer(
+                                                1
+                                            )))]
+                                        })
+                                    ),
+                                    (
+                                        node::new!(Identifier("right".to_string())),
+                                        node::new!(Call {
+                                            function: Box::new(node::new!(NestedIdentifier(vec![
+                                                "Tree".to_string(),
+                                                "Node".to_string()
+                                            ]))),
+                                            arguments: vec![node::new!(Dict(vec![
+                                                (
+                                                    node::new!(Identifier("left".to_string())),
+                                                    node::new!(Call {
+                                                        function: Box::new(node::new!(
+                                                            NestedIdentifier(vec![
+                                                                "Tree".to_string(),
+                                                                "Leaf".to_string()
+                                                            ])
+                                                        )),
+                                                        arguments: vec![node::new!(Literal(
+                                                            Literal::Integer(2)
+                                                        ))]
+                                                    })
+                                                ),
+                                                (
+                                                    node::new!(Identifier("right".to_string())),
+                                                    node::new!(Call {
+                                                        function: Box::new(node::new!(
+                                                            NestedIdentifier(vec![
+                                                                "Tree".to_string(),
+                                                                "Leaf".to_string()
+                                                            ])
+                                                        )),
+                                                        arguments: vec![node::new!(Literal(
+                                                            Literal::Integer(3)
+                                                        ))]
+                                                    })
+                                                )
+                                            ]))]
+                                        })
+                                    )
+                                ]))]
+                            }))
+                        })],
+                        None
+                    )))
+                }
             })
         ]))
     );
@@ -1463,14 +1556,16 @@ fn test_explicit_tail_recursive_call() {
 
     assert_eq!(
         program,
-        node::new!(Program(vec![node::new!(FunctionDeclarations(
-            "factorial".to_string(),
-            vec![
-                (
-                    vec![node::new!(FunctionParameter(Box::new(node::new!(
-                        Identifier("n".to_string())
-                    ))))],
-                    Box::new(node::new!(Block(
+        node::new!(Program(vec![node::new!(FunctionDeclarations {
+            id: SymbolId::new(6),
+            name: "factorial".to_string(),
+            declarations: vec![
+                FunctionDeclaration {
+                    parameters: vec![node::new!(FunctionParameter {
+                        id: SymbolId::new(1),
+                        node: Box::new(node::new!(Identifier("n".to_string())))
+                    })],
+                    body: Box::new(node::new!(Block(
                         vec![],
                         Some(Box::new(node::new!(Call {
                             function: Box::new(node::new!(Identifier("factorial".to_string()))),
@@ -1480,31 +1575,35 @@ fn test_explicit_tail_recursive_call() {
                             ]
                         })))
                     ))),
-                ),
-                (
-                    vec![
-                        node::new!(FunctionParameter(Box::new(node::new!(Literal(
-                            Literal::Integer(0)
-                        ))))),
-                        node::new!(FunctionParameter(Box::new(node::new!(Identifier(
-                            "acc".to_string()
-                        )))))
+                },
+                FunctionDeclaration {
+                    parameters: vec![
+                        node::new!(FunctionParameter {
+                            id: SymbolId::new(2),
+                            node: Box::new(node::new!(Literal(Literal::Integer(0))))
+                        }),
+                        node::new!(FunctionParameter {
+                            id: SymbolId::new(3),
+                            node: Box::new(node::new!(Identifier("acc".to_string())))
+                        })
                     ],
-                    Box::new(node::new!(Block(
+                    body: Box::new(node::new!(Block(
                         vec![],
                         Some(Box::new(node::new!(Identifier("acc".to_string()))))
                     ))),
-                ),
-                (
-                    vec![
-                        node::new!(FunctionParameter(Box::new(node::new!(Identifier(
-                            "n".to_string()
-                        ))))),
-                        node::new!(FunctionParameter(Box::new(node::new!(Identifier(
-                            "acc".to_string()
-                        )))))
+                },
+                FunctionDeclaration {
+                    parameters: vec![
+                        node::new!(FunctionParameter {
+                            id: SymbolId::new(4),
+                            node: Box::new(node::new!(Identifier("n".to_string())))
+                        }),
+                        node::new!(FunctionParameter {
+                            id: SymbolId::new(5),
+                            node: Box::new(node::new!(Identifier("acc".to_string())))
+                        })
                     ],
-                    Box::new(node::new!(Block(
+                    body: Box::new(node::new!(Block(
                         vec![],
                         Some(Box::new(node::new!(RecursiveCall(Box::new(node::new!(
                             Call {
@@ -1524,9 +1623,9 @@ fn test_explicit_tail_recursive_call() {
                             }
                         ))))))
                     ))),
-                )
+                }
             ]
-        ))]))
+        })]))
     );
 }
 

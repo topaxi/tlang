@@ -1,6 +1,6 @@
 use crate::scope::Scope;
 use tlang_ast::{
-    node::{AstNode, BinaryOp, Node, PrefixOp},
+    node::{AstNode, BinaryOp, FunctionDeclaration, Node, PrefixOp},
     token::Literal,
 };
 
@@ -357,7 +357,7 @@ impl CodegenJS {
                     self.push_char(')');
                 }
             }
-            AstNode::VariableDeclaration { name, value } => {
+            AstNode::VariableDeclaration { id: _, name, value } => {
                 self.push_str(&self.get_indent());
                 let name = self.scopes.declare_variable(name);
                 self.push_str(&format!("let {} = ", name));
@@ -403,7 +403,7 @@ impl CodegenJS {
                 self.push_str(&self.get_indent());
                 self.push_char('}');
             }
-            AstNode::FunctionParameter(node) => match node.ast_node {
+            AstNode::FunctionParameter{ id: _, node} => match node.ast_node {
                 AstNode::Identifier { .. } => self.generate_node(node, None),
                 AstNode::Literal(_) => self.generate_node(node, None),
                 AstNode::List(_) => todo!(),
@@ -411,12 +411,12 @@ impl CodegenJS {
                 AstNode::Wildcard => unreachable!("Unexpected wildcard in function parameter."),
                 _ => todo!(),
             },
-            AstNode::FunctionDeclaration { name, parameters, body } =>
-                self.generate_function_declaration(name, parameters, body),
-            AstNode::FunctionDeclarations(name, definitions) =>
-                self.generate_function_declarations(name, definitions),
-            AstNode::FunctionExpression { name, parameters, body } =>
-                self.generate_function_expression(name, parameters, body),
+            AstNode::FunctionDeclaration { id: _, name, declaration } =>
+                self.generate_function_declaration(name, declaration),
+            AstNode::FunctionDeclarations { id: _, name, declarations } =>
+                self.generate_function_declarations(name, declarations),
+            AstNode::FunctionExpression { id: _, name, declaration } =>
+                self.generate_function_expression(name, declaration),
             AstNode::ReturnStatement(expr) => self.generate_return_statement(expr),
             AstNode::Identifier(name) => self.push_str(&self.current_scope().resolve_variable(name).unwrap_or(name.to_string())),
             AstNode::NestedIdentifier(identifiers) => self.push_str(&identifiers.join(".")),
@@ -458,7 +458,7 @@ impl CodegenJS {
                 // For any other referenced function, we do a normal call expression.
                 self.generate_node(node, parent_op)
             },
-            AstNode::EnumDeclaration { name, variants } => self.generate_enum_declaration(name, variants),
+            AstNode::EnumDeclaration { id: _, name, variants } => self.generate_enum_declaration(name, variants),
             AstNode::EnumVariant { name, named_fields, parameters } => self.generate_enum_variant(name, *named_fields, parameters),
             AstNode::EnumExtraction { identifier, elements, named_fields } => self.generate_enum_extraction(identifier, elements, *named_fields),
             // Allow unreachable path, as we add new AST nodes, we do not want to automatically
@@ -620,14 +620,15 @@ impl CodegenJS {
         self.context_stack.pop();
     }
 
-    fn generate_function_declaration(&mut self, name: &str, parameters: &[Node], body: &Node) {
-        let is_tail_recursive = Self::is_function_body_tail_recursive(name, body);
+    fn generate_function_declaration(&mut self, name: &str, declaration: &FunctionDeclaration) {
+        let is_tail_recursive = Self::is_function_body_tail_recursive(name, &declaration.body);
         self.function_context_stack.push(FunctionContext {
             name: name.to_string(),
-            params: parameters
+            params: declaration
+                .parameters
                 .iter()
                 .filter_map(|param| {
-                    if let AstNode::FunctionParameter(node) = &param.ast_node {
+                    if let AstNode::FunctionParameter { id: _, node } = &param.ast_node {
                         if let AstNode::Identifier(ref name) = node.ast_node {
                             return Some(name.clone());
                         }
@@ -642,7 +643,7 @@ impl CodegenJS {
         self.push_str(&self.get_indent());
         self.push_str(&format!("function {}(", name));
 
-        for (i, param) in parameters.iter().enumerate() {
+        for (i, param) in declaration.parameters.iter().enumerate() {
             if i > 0 {
                 self.push_str(", ");
             }
@@ -651,7 +652,7 @@ impl CodegenJS {
 
         self.push_str(") {\n");
         self.indent_level += 1;
-        self.generate_function_body(body, is_tail_recursive);
+        self.generate_function_body(&declaration.body, is_tail_recursive);
         self.indent_level -= 1;
         self.push_str(&self.get_indent());
         self.push_str("}\n");
@@ -661,19 +662,19 @@ impl CodegenJS {
     fn generate_function_expression(
         &mut self,
         name: &Option<String>,
-        parameters: &[Node],
-        body: &Node,
+        declaration: &FunctionDeclaration,
     ) {
         let is_tail_recursive = Self::is_function_body_tail_recursive(
             &name.clone().unwrap_or("".to_string()).to_string(),
-            body,
+            &declaration.body,
         );
         self.function_context_stack.push(FunctionContext {
             name: name.clone().unwrap_or("".to_string()).to_string(),
-            params: parameters
+            params: declaration
+                .parameters
                 .iter()
                 .filter_map(|param| {
-                    if let AstNode::FunctionParameter(node) = &param.ast_node {
+                    if let AstNode::FunctionParameter { id: _, node } = &param.ast_node {
                         if let AstNode::Identifier(name) = &node.ast_node {
                             return Some(name.clone());
                         }
@@ -691,7 +692,7 @@ impl CodegenJS {
 
         self.push_str(&function_keyword);
 
-        for (i, param) in parameters.iter().enumerate() {
+        for (i, param) in declaration.parameters.iter().enumerate() {
             if i > 0 {
                 self.push_str(", ");
             }
@@ -700,22 +701,18 @@ impl CodegenJS {
 
         self.push_str(") {\n");
         self.indent_level += 1;
-        self.generate_function_body(body, is_tail_recursive);
+        self.generate_function_body(&declaration.body, is_tail_recursive);
         self.indent_level -= 1;
         self.push_str(&self.get_indent());
         self.push_char('}');
         self.function_context_stack.pop();
     }
 
-    fn generate_function_declarations(
-        &mut self,
-        name: &str,
-        definitions: &[(Vec<Node>, Box<Node>)],
-    ) {
+    fn generate_function_declarations(&mut self, name: &str, declarations: &[FunctionDeclaration]) {
         // TODO: Handle tail recursion for multiple definitions.
-        let is_any_definition_tail_recursive = definitions
+        let is_any_definition_tail_recursive = declarations
             .iter()
-            .any(|(_, body)| Self::is_function_body_tail_recursive(name, body));
+            .any(|declaration| Self::is_function_body_tail_recursive(name, &declaration.body));
         self.push_str(&self.get_indent());
         self.push_str(&format!("function {}(...args) {{\n", name));
         self.indent_level += 1;
@@ -727,7 +724,7 @@ impl CodegenJS {
         }
 
         self.push_str(&self.get_indent());
-        for (i, (parameters, body)) in definitions.iter().enumerate() {
+        for (i, declaration) in declarations.iter().enumerate() {
             // TODO: Only render else if there is another definition with a literal.
             if i > 0 {
                 self.push_str(" else ");
@@ -735,24 +732,32 @@ impl CodegenJS {
 
             // Expand parameter matching if any definition has a different amount of
             // paramaters.
-            let parameter_variadic = definitions
+            let parameter_variadic = declarations
                 .iter()
-                .any(|(params, _)| params.len() != parameters.len());
-            let pattern_matched_parameters = parameters.iter().enumerate().filter(|(_, param)| {
-                if let AstNode::FunctionParameter(node) = &param.ast_node {
-                    matches!(
-                        node.ast_node,
-                        AstNode::Literal(_) | AstNode::List(_) | AstNode::EnumExtraction { .. }
-                    )
-                } else {
-                    false
-                }
-            });
+                .map(|declaration| declaration.parameters.clone())
+                .any(|params| params.len() != declaration.parameters.len());
+            let pattern_matched_parameters =
+                declaration
+                    .parameters
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, param)| {
+                        if let AstNode::FunctionParameter { id: _, node } = &param.ast_node {
+                            matches!(
+                                node.ast_node,
+                                AstNode::Literal(_)
+                                    | AstNode::List(_)
+                                    | AstNode::EnumExtraction { .. }
+                            )
+                        } else {
+                            false
+                        }
+                    });
 
             if parameter_variadic || pattern_matched_parameters.clone().count() > 0 {
                 if parameter_variadic {
                     self.push_str("if (args.length === ");
-                    self.push_str(&parameters.len().to_string());
+                    self.push_str(&declaration.parameters.len().to_string());
 
                     if pattern_matched_parameters.clone().count() > 0 {
                         self.push_str(" && ");
@@ -766,7 +771,7 @@ impl CodegenJS {
                         self.push_str(" && ");
                     }
 
-                    if let AstNode::FunctionParameter(node) = &param.ast_node {
+                    if let AstNode::FunctionParameter { id: _, node } = &param.ast_node {
                         match &node.ast_node {
                             AstNode::Identifier(_) | AstNode::Literal(_) => {
                                 self.push_str(&format!("args[{}] === ", k));
@@ -876,8 +881,8 @@ impl CodegenJS {
 
             self.indent_level += 1;
             // Alias identifier args to the parameter names
-            for (j, param) in parameters.iter().enumerate() {
-                if let AstNode::FunctionParameter(node) = &param.ast_node {
+            for (j, param) in declaration.parameters.iter().enumerate() {
+                if let AstNode::FunctionParameter { id: _, node } = &param.ast_node {
                     if let AstNode::Identifier(ref name) = node.ast_node {
                         self.push_str(&self.get_indent());
                         self.push_str(&format!("let {} = args[{}];\n", name, j));
@@ -887,10 +892,11 @@ impl CodegenJS {
             // We handle the tail recursion case in multiple function body declarations ourselves higher up.
             self.function_context_stack.push(FunctionContext {
                 name: name.to_string(),
-                params: parameters
+                params: declaration
+                    .parameters
                     .iter()
                     .filter_map(|param| {
-                        if let AstNode::FunctionParameter(node) = &param.ast_node {
+                        if let AstNode::FunctionParameter { id: _, node } = &param.ast_node {
                             if let AstNode::Identifier(ref name) = node.ast_node {
                                 return Some(name.clone());
                             }
@@ -901,7 +907,7 @@ impl CodegenJS {
                 is_tail_recursive: is_any_definition_tail_recursive,
                 remap_to_rest_args: true,
             });
-            self.generate_function_body(body, false);
+            self.generate_function_body(&declaration.body, false);
             self.indent_level -= 1;
             self.push_str(&self.get_indent());
             self.push_char('}');

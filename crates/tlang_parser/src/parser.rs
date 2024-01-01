@@ -1,4 +1,7 @@
-use tlang_ast::node::{self, Associativity, AstNode, BinaryOp, Node, OperatorInfo, PrefixOp};
+use tlang_ast::node::{
+    self, Associativity, AstNode, BinaryOp, FunctionDeclaration, Node, OperatorInfo, PrefixOp,
+};
+use tlang_ast::symbols::SymbolId;
 use tlang_ast::token::Token;
 
 use crate::lexer::Lexer;
@@ -8,6 +11,9 @@ pub struct Parser<'src> {
     lexer: Lexer<'src>,
     current_token: Option<Token>,
     next_token: Option<Token>,
+
+    // Id to identifiy symbols, e.g. functions and variables.
+    unique_id: SymbolId,
 
     // We have to copy over the lexers position as we scan ahead of the current token.
     current_line: usize,
@@ -20,9 +26,15 @@ impl<'src> Parser<'src> {
             lexer,
             current_token: None,
             next_token: None,
+            unique_id: SymbolId::new(0),
             current_line: 0,
             current_column: 0,
         }
+    }
+
+    fn unique_id(&mut self) -> SymbolId {
+        self.unique_id = self.unique_id.next();
+        self.unique_id
     }
 
     pub fn from_source(source: &'src str) -> Parser<'src> {
@@ -114,7 +126,7 @@ impl<'src> Parser<'src> {
 
         // FunctionDeclaration statements does not need to be terminated with a semicolon.
         match node.ast_node {
-            AstNode::FunctionDeclaration { .. } | AstNode::FunctionDeclarations(_, _) => {
+            AstNode::FunctionDeclaration { .. } | AstNode::FunctionDeclarations { .. } => {
                 return (false, Some(node))
             }
             _ => (),
@@ -171,7 +183,11 @@ impl<'src> Parser<'src> {
             }
         }
         self.consume_token(Token::RBrace);
-        AstNode::EnumDeclaration { name, variants }.into()
+        node::new!(EnumDeclaration {
+            id: self.unique_id(),
+            name: name,
+            variants: variants,
+        })
     }
 
     /// Parses an enum variant, e.g. `Foo`, `Foo(1, 2, 3)` and
@@ -270,11 +286,11 @@ impl<'src> Parser<'src> {
         self.consume_token(Token::EqualSign);
         let value = self.parse_expression();
 
-        AstNode::VariableDeclaration {
-            name,
+        node::new!(VariableDeclaration {
+            id: self.unique_id(),
+            name: name,
             value: Box::new(value),
-        }
-        .into()
+        })
     }
 
     /// Parses a function call expression, e.g. `foo()`, `foo(1, 2, 3)` and
@@ -517,9 +533,10 @@ impl<'src> Parser<'src> {
         if name.is_some() || self.current_token == Some(Token::LParen) {
             self.consume_token(Token::LParen);
             while self.current_token != Some(Token::RParen) {
-                parameters.push(node::new!(FunctionParameter(Box::new(node::new!(
-                    Identifier(self.consume_identifier(),)
-                )))));
+                parameters.push(node::new!(FunctionParameter {
+                    id: self.unique_id(),
+                    node: Box::new(node::new!(Identifier(self.consume_identifier(),)))
+                }));
 
                 if let Some(Token::Comma) = self.current_token {
                     self.advance();
@@ -530,9 +547,12 @@ impl<'src> Parser<'src> {
 
         let body = self.parse_block();
         node::new!(FunctionExpression {
+            id: self.unique_id(),
             name: name,
-            parameters: parameters,
-            body: Box::new(body),
+            declaration: FunctionDeclaration {
+                parameters,
+                body: Box::new(body),
+            },
         })
     }
 
@@ -587,7 +607,7 @@ impl<'src> Parser<'src> {
 
     fn parse_function_declaration(&mut self) -> Node {
         let mut name: Option<String> = None;
-        let mut definitions: Vec<(Vec<Node>, Box<Node>)> = Vec::new();
+        let mut declarations: Vec<FunctionDeclaration> = Vec::new();
 
         while let Some(Token::Fn) = self.current_token {
             if let Some(Token::Identifier(current_definition_name)) = self.peek_token() {
@@ -632,7 +652,10 @@ impl<'src> Parser<'src> {
                 };
 
                 log::debug!("Parsed parameter: {:?}", parameter);
-                parameters.push(node::new!(FunctionParameter(Box::new(parameter))));
+                parameters.push(node::new!(FunctionParameter {
+                    id: self.unique_id(),
+                    node: Box::new(parameter)
+                }));
 
                 if let Some(Token::Comma) = self.current_token {
                     self.advance();
@@ -642,20 +665,27 @@ impl<'src> Parser<'src> {
 
             let body = self.parse_block();
 
-            definitions.push((parameters, Box::new(body)));
-        }
-
-        if definitions.len() == 1 {
-            let (parameters, body) = definitions.pop().unwrap();
-
-            return node::new!(FunctionDeclaration {
-                name: name.unwrap(),
-                parameters: parameters,
-                body: body,
+            declarations.push(FunctionDeclaration {
+                parameters,
+                body: Box::new(body),
             });
         }
 
-        node::new!(FunctionDeclarations(name.unwrap(), definitions))
+        if declarations.len() == 1 {
+            let declaration = declarations.pop().unwrap();
+
+            return node::new!(FunctionDeclaration {
+                id: self.unique_id(),
+                name: name.unwrap(),
+                declaration: declaration
+            });
+        }
+
+        node::new!(FunctionDeclarations {
+            id: self.unique_id(),
+            name: name.unwrap(),
+            declarations: declarations,
+        })
     }
 
     fn is_binary_op(token: &Token) -> bool {

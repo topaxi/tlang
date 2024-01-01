@@ -8,8 +8,22 @@ pub enum SymbolType {
     Function,
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct SymbolId(usize);
+
+impl SymbolId {
+    pub fn new(id: usize) -> Self {
+        SymbolId(id)
+    }
+
+    pub fn next(&self) -> Self {
+        SymbolId(self.0 + 1)
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct SymbolInfo {
+    pub id: SymbolId,
     pub name: String,
     pub symbol_type: SymbolType,
 }

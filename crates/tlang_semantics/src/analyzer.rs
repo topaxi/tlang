@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use tlang_ast::{
-    node::{AstNode, Node},
+    node::{AstNode, FunctionDeclaration, Node},
     symbols::{SymbolTable, SymbolType},
 };
 
@@ -72,18 +72,24 @@ impl SemanticAnalyzer {
                 }
             }
             AstNode::VariableDeclaration {
+                id: _,
                 ref name,
                 ref mut value,
             } => self.analyze_variable_declaration(name, value),
             AstNode::FunctionDeclaration {
+                id: _,
                 ref name,
-                ref mut parameters,
-                ref mut body,
-            } => self.analyze_function_declaration(ast, name, parameters, body),
-            AstNode::FunctionDeclarations(ref name, ref mut declarations) => {
-                self.analyze_function_declarations(ast, name, declarations)
-            }
-            AstNode::FunctionParameter(ref mut name) => self.analyze_function_parameter(ast, name),
+                ref mut declaration,
+            } => self.analyze_function_declaration(ast, name, declaration),
+            AstNode::FunctionDeclarations {
+                id: _,
+                ref name,
+                ref mut declarations,
+            } => self.analyze_function_declarations(ast, name, declarations),
+            AstNode::FunctionParameter {
+                id: _,
+                ref mut node,
+            } => self.analyze_function_parameter(ast, node),
             AstNode::Identifier(ref name) => {
                 if self.get_last_symbol_table().borrow().get(name).is_none() {
                     panic!("Undefined symbol: {}", name);
@@ -127,7 +133,6 @@ impl SemanticAnalyzer {
         if let Some(symbol) = symbol {
             self.get_last_symbol_table()
                 .borrow_mut()
-                .symbols
                 .insert(name.to_string(), symbol);
         }
     }
@@ -136,23 +141,22 @@ impl SemanticAnalyzer {
         &mut self,
         _node: &mut Node,
         _name: &str,
-        parameters: &mut [Node],
-        body: &mut Node,
+        declaration: &mut FunctionDeclaration,
     ) {
-        for parameter in parameters {
+        for parameter in &mut declaration.parameters {
             self.analyze_node(parameter);
         }
-        self.analyze_node(body);
+        self.analyze_node(&mut declaration.body);
     }
 
     fn analyze_function_declarations(
         &mut self,
         node: &mut Node,
         name: &str,
-        declarations: &mut Vec<(Vec<Node>, Box<Node>)>,
+        declarations: &mut Vec<FunctionDeclaration>,
     ) {
         for declaration in declarations {
-            self.analyze_function_declaration(node, name, &mut declaration.0, &mut declaration.1)
+            self.analyze_function_declaration(node, name, declaration)
         }
     }
 

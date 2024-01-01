@@ -2,7 +2,7 @@ use crate::analyzer::SemanticAnalyzer;
 use indoc::indoc;
 use tlang_ast::{
     node::AstNode,
-    symbols::{SymbolInfo, SymbolType},
+    symbols::{SymbolId, SymbolInfo, SymbolType},
 };
 use tlang_parser::parser::Parser;
 
@@ -23,6 +23,7 @@ fn test_analyze_variable_declaration() {
     assert_eq!(
         ast.symbol_table.unwrap().borrow().get("a"),
         Some(SymbolInfo {
+            id: SymbolId::new(1),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
         })
@@ -51,6 +52,7 @@ fn test_block_scope() {
     assert_eq!(
         program_symbols.borrow().get("a"),
         Some(SymbolInfo {
+            id: SymbolId::new(1),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
         })
@@ -77,6 +79,7 @@ fn test_block_scope() {
     assert_eq!(
         block1_symbols.borrow().get("a"),
         Some(SymbolInfo {
+            id: SymbolId::new(1),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
         })
@@ -84,6 +87,7 @@ fn test_block_scope() {
     assert_eq!(
         block1_symbols.borrow().get("b"),
         Some(SymbolInfo {
+            id: SymbolId::new(2),
             name: "b".to_string(),
             symbol_type: SymbolType::Variable,
         })
@@ -109,6 +113,7 @@ fn test_block_scope() {
     assert_eq!(
         block2_symbols.borrow().get("a"),
         Some(SymbolInfo {
+            id: SymbolId::new(1),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
         })
@@ -116,6 +121,7 @@ fn test_block_scope() {
     assert_eq!(
         block2_symbols.borrow().get("b"),
         Some(SymbolInfo {
+            id: SymbolId::new(2),
             name: "b".to_string(),
             symbol_type: SymbolType::Variable,
         })
@@ -123,6 +129,7 @@ fn test_block_scope() {
     assert_eq!(
         block2_symbols.borrow().get("c"),
         Some(SymbolInfo {
+            id: SymbolId::new(3),
             name: "c".to_string(),
             symbol_type: SymbolType::Variable,
         })
@@ -156,6 +163,7 @@ fn test_should_allow_shadowing_of_single_variable() {
     assert_eq!(
         program_symbols.borrow().get("a"),
         Some(SymbolInfo {
+            id: SymbolId::new(2),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
         })
@@ -178,6 +186,7 @@ fn test_should_collect_function_definitions() {
     assert_eq!(
         program_symbols.borrow().get("add"),
         Some(SymbolInfo {
+            id: SymbolId::new(3),
             name: "add".to_string(),
             symbol_type: SymbolType::Function,
         })
@@ -210,6 +219,7 @@ fn test_should_collect_list_destructuring_symbols_in_function_arguments() {
     assert_eq!(
         program_symbols.borrow().get("add"),
         Some(SymbolInfo {
+            id: SymbolId::new(2),
             name: "add".to_string(),
             symbol_type: SymbolType::Function,
         })
@@ -232,6 +242,7 @@ fn test_should_collect_list_destructuring_with_rest_symbols_in_function_argument
     assert_eq!(
         program_symbols.borrow().get("sum"),
         Some(SymbolInfo {
+            id: SymbolId::new(2),
             name: "sum".to_string(),
             symbol_type: SymbolType::Function,
         })
@@ -253,6 +264,7 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
     assert_eq!(
         program_symbols.borrow().get("factorial"),
         Some(SymbolInfo {
+            id: SymbolId::new(5),
             name: "factorial".to_string(),
             symbol_type: SymbolType::Function,
         })
@@ -280,6 +292,7 @@ fn should_collect_function_arguments_with_enum_extraction() {
     assert_eq!(
         program_symbols.borrow().get("unwrap"),
         Some(SymbolInfo {
+            id: SymbolId::new(1),
             name: "unwrap".to_string(),
             symbol_type: SymbolType::Function,
         })
@@ -304,18 +317,19 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
     assert_eq!(
         program_symbols.borrow().get("add"),
         Some(SymbolInfo {
+            id: SymbolId::new(3),
             name: "add".to_string(),
             symbol_type: SymbolType::Function,
         })
     );
 
-    let (function_declaration, function_body) = match ast.ast_node {
+    let (function_node, function_declaration) = match ast.ast_node {
         AstNode::Program(ref nodes) => match &nodes[0].ast_node {
             AstNode::FunctionDeclaration {
+                id: _,
                 name: _,
-                parameters: _,
-                ref body,
-            } => (nodes[0].clone(), body.clone()),
+                ref declaration,
+            } => (nodes[0].clone(), declaration.clone()),
             _ => panic!("Expected function declaration {:?}", nodes[0].ast_node),
         },
         _ => panic!("Expected program {:?}", ast.ast_node),
@@ -323,13 +337,14 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
 
     // Verify that c is within the scope of the function arguments
     assert_eq!(
-        function_declaration
+        function_node
             .symbol_table
             .clone()
             .unwrap()
             .borrow()
             .get("c"),
         Some(SymbolInfo {
+            id: SymbolId::new(4),
             name: "c".to_string(),
             symbol_type: SymbolType::Variable,
         })
@@ -337,13 +352,15 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
 
     // Verify that c is within the scope of the function body
     assert_eq!(
-        function_body
+        function_declaration
+            .body
             .symbol_table
             .clone()
             .unwrap()
             .borrow()
             .get("c"),
         Some(SymbolInfo {
+            id: SymbolId::new(4),
             name: "c".to_string(),
             symbol_type: SymbolType::Variable,
         })

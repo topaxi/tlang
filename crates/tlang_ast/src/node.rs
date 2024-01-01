@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::{
-    symbols::SymbolTable,
+    symbols::{SymbolId, SymbolTable},
     token::{Literal, Token},
 };
 
@@ -46,6 +46,12 @@ impl<'a> From<&'a Token> for Node {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct FunctionDeclaration {
+    pub parameters: Vec<Node>,
+    pub body: Box<Node>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum AstNode {
     None,
     Program(Vec<Node>),
@@ -61,21 +67,31 @@ pub enum AstNode {
     },
     ExpressionStatement(Box<Node>),
     VariableDeclaration {
+        // Unique identifier for the variable, used to reference it in the symbol table and
+        // distinguish it from other variables with the same name.
+        id: SymbolId,
         name: String,
         value: Box<Node>,
     },
     FunctionDeclaration {
+        id: SymbolId,
         name: String,
-        parameters: Vec<Node>,
-        body: Box<Node>,
+        declaration: FunctionDeclaration,
     },
-    FunctionDeclarations(String, Vec<(Vec<Node>, Box<Node>)>),
+    FunctionDeclarations {
+        id: SymbolId,
+        name: String,
+        declarations: Vec<FunctionDeclaration>,
+    },
     FunctionExpression {
+        id: SymbolId,
         name: Option<String>,
-        parameters: Vec<Node>,
-        body: Box<Node>,
+        declaration: FunctionDeclaration,
     },
-    FunctionParameter(Box<Node>),
+    FunctionParameter {
+        id: SymbolId,
+        node: Box<Node>,
+    },
     ReturnStatement(Option<Box<Node>>),
     Match {
         expression: Box<Node>,
@@ -101,6 +117,7 @@ pub enum AstNode {
     SingleLineComment(String),
     MultiLineComment(String),
     EnumDeclaration {
+        id: SymbolId,
         name: String,
         variants: Vec<Node>,
     },
