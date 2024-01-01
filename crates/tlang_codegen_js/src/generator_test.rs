@@ -111,7 +111,7 @@ fn test_codegen_operator_precedence() {
 }
 
 #[test]
-#[ignore = "implement block in expression position first"]
+//#[ignore = "implement block in expression position first"]
 fn test_block_expression() {
     let output = compile!("let one = { 1 };");
     let expected_output = indoc! {"

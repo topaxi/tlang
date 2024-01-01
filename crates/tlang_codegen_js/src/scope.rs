@@ -40,6 +40,18 @@ impl Scope {
         }
     }
 
+    pub fn declare_unique_variable(&mut self) -> String {
+        let mut suffix = 'a';
+        loop {
+            let new_name = format!("tmp${}", suffix);
+            if !self.variables.contains_key(&new_name) {
+                self.variables.insert(new_name.clone(), new_name.clone());
+                return new_name;
+            }
+            suffix = (suffix as u8 + 1) as char;
+        }
+    }
+
     pub fn resolve_variable(&self, name: &str) -> Option<String> {
         if let Some(value) = self.variables.get(name) {
             return Some(value.clone());

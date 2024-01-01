@@ -225,12 +225,11 @@ impl CodegenJS {
                 }
 
                 if expression.is_none() {
+                    self.pop_scope();
                     return;
                 }
 
                 match self.current_context() {
-                    BlockContext::Program => unreachable!("Block with completion in ProgramBlock context not implemented yet."),
-                    BlockContext::Statement => unimplemented!("Block with completion in StatementBlock context not implemented yet."),
                     BlockContext::FunctionBody => {
                         // We only render the return statement if we are not in a tail recursive function body
                         // and the node is RecursiveCall pointing to the current function.
@@ -248,7 +247,13 @@ impl CodegenJS {
                         self.generate_node(expression.as_ref().unwrap(), None);
                         self.push_str(";\n");
                     }
-                    BlockContext::Expression => unimplemented!("Block with completion in ExpressionBlock context not implemented yet."),
+                    _ => {
+                        let tmp_var = self.scopes.declare_unique_variable();
+                        let mut code_inject = String::new();
+                        code_inject.push_str(&self.get_indent());
+                        code_inject.push_str(&format!("let {};", tmp_var));
+                        self.current_statement_buffer.push_str(&code_inject);
+                    }
                 }
 
                 self.flush_statement_buffer();
@@ -383,25 +388,18 @@ impl CodegenJS {
                 self.indent_level = 0;
                 self.generate_node(condition, None);
                 self.indent_level = indent_level;
-                self.push_str(") {\n");
-                self.indent_level += 1;
+                self.push_str(") ");
                 self.context_stack.push(BlockContext::Expression);
                 self.generate_node(then_branch, None);
                 self.context_stack.pop();
-                self.indent_level -= 1;
 
                 if let Some(else_branch) = else_branch {
                     self.push_str(&self.get_indent());
-                    self.push_str("} else {\n");
-                    self.indent_level += 1;
+                    self.push_str(" else ");
                     self.context_stack.push(BlockContext::Expression);
                     self.generate_node(else_branch, None);
                     self.context_stack.pop();
-                    self.indent_level -= 1;
                 }
-
-                self.push_str(&self.get_indent());
-                self.push_char('}');
             }
             AstNode::FunctionParameter{ id: _, node} => match node.ast_node {
                 AstNode::Identifier { .. } => self.generate_node(node, None),
@@ -604,6 +602,8 @@ impl CodegenJS {
 
     fn generate_function_body(&mut self, body: &Node, is_tail_recursive: bool) {
         self.context_stack.push(BlockContext::FunctionBody);
+        self.push_str("{\n");
+        self.indent_level += 1;
         self.push_str(&self.function_pre_body.clone());
         self.function_pre_body.clear();
         if is_tail_recursive {
@@ -617,6 +617,8 @@ impl CodegenJS {
             self.push_str(&self.get_indent());
             self.push_str("}\n");
         }
+        self.indent_level -= 1;
+        self.push_char('}');
         self.context_stack.pop();
     }
 
@@ -650,12 +652,8 @@ impl CodegenJS {
             self.generate_node(param, None);
         }
 
-        self.push_str(") {\n");
-        self.indent_level += 1;
+        self.push_str(") ");
         self.generate_function_body(&declaration.body, is_tail_recursive);
-        self.indent_level -= 1;
-        self.push_str(&self.get_indent());
-        self.push_str("}\n");
         self.function_context_stack.pop();
     }
 
@@ -699,17 +697,12 @@ impl CodegenJS {
             self.generate_node(param, None);
         }
 
-        self.push_str(") {\n");
-        self.indent_level += 1;
+        self.push_str(") ");
         self.generate_function_body(&declaration.body, is_tail_recursive);
-        self.indent_level -= 1;
-        self.push_str(&self.get_indent());
-        self.push_char('}');
         self.function_context_stack.pop();
     }
 
     fn generate_function_declarations(&mut self, name: &str, declarations: &[FunctionDeclaration]) {
-        // TODO: Handle tail recursion for multiple definitions.
         let is_any_definition_tail_recursive = declarations
             .iter()
             .any(|declaration| Self::is_function_body_tail_recursive(name, &declaration.body));
@@ -841,7 +834,6 @@ impl CodegenJS {
                                     _ => unreachable!(),
                                 };
                                 self.push_str(&format!("args[{}].tag === \"{}\"", k, identifier));
-                                self.indent_level += 1;
                                 for (i, element) in elements.iter().enumerate() {
                                     // Skip any Wildcards
                                     if let AstNode::Wildcard = element.ast_node {
@@ -868,18 +860,14 @@ impl CodegenJS {
                                         ));
                                     }
                                 }
-                                self.indent_level -= 1;
                             }
                             _ => unreachable!(),
                         }
                     }
                 }
-                self.push_str(") {\n");
-            } else {
-                self.push_str("{\n");
+                self.push_str(") ");
             }
 
-            self.indent_level += 1;
             // Alias identifier args to the parameter names
             for (j, param) in declaration.parameters.iter().enumerate() {
                 if let AstNode::FunctionParameter { id: _, node } = &param.ast_node {
@@ -908,9 +896,6 @@ impl CodegenJS {
                 remap_to_rest_args: true,
             });
             self.generate_function_body(&declaration.body, false);
-            self.indent_level -= 1;
-            self.push_str(&self.get_indent());
-            self.push_char('}');
         }
 
         if is_any_definition_tail_recursive {
