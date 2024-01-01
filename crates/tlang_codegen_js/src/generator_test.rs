@@ -696,10 +696,10 @@ fn test_simple_self_recursive_tail_call_converted_to_loop() {
                 if (n === 0) {
                     return acc;
                 } else {
-                    let tmp0 = n - 1;
-                    let tmp1 = n * acc;
-                    n = tmp0;
-                    acc = tmp1;
+                    let $tmp$a = n - 1;
+                    let $tmp$b = n * acc;
+                    n = $tmp$a;
+                    acc = $tmp$b;
                 }
             }
         }
@@ -729,10 +729,10 @@ fn test_fn_expression_explicit_tail_recursive_call_converted_to_loop() {
                     if (n === 0) {
                         return acc;
                     } else {
-                        let tmp0 = n - 1;
-                        let tmp1 = n * acc;
-                        n = tmp0;
-                        acc = tmp1;
+                        let $tmp$a = n - 1;
+                        let $tmp$b = n * acc;
+                        n = $tmp$a;
+                        acc = $tmp$b;
                     }
                 }
             };
@@ -757,10 +757,10 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_simple() {
                 } else {
                     let n = args[0];
                     let acc = args[1];
-                    let tmp0 = n - 1;
-                    let tmp1 = n * acc;
-                    args[0] = tmp0;
-                    args[1] = tmp1;
+                    let $tmp$a = n - 1;
+                    let $tmp$b = n * acc;
+                    args[0] = $tmp$a;
+                    args[1] = $tmp$b;
                 }
             }
         }
@@ -787,10 +787,10 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_convenient() {
                 } else if (args.length === 2) {
                     let n = args[0];
                     let acc = args[1];
-                    let tmp0 = n - 1;
-                    let tmp1 = n * acc;
-                    args[0] = tmp0;
-                    args[1] = tmp1;
+                    let $tmp$a = n - 1;
+                    let $tmp$b = n * acc;
+                    args[0] = $tmp$a;
+                    args[1] = $tmp$b;
                 }
             }
         }
@@ -824,12 +824,12 @@ fn test_tail_recursive_fibonacci() {
                     let n = args[0];
                     let a = args[1];
                     let b = args[2];
-                    let tmp0 = n - 1;
-                    let tmp1 = b;
-                    let tmp2 = a + b;
-                    args[0] = tmp0;
-                    args[1] = tmp1;
-                    args[2] = tmp2;
+                    let $tmp$a = n - 1;
+                    let $tmp$b = b;
+                    let $tmp$c = a + b;
+                    args[0] = $tmp$a;
+                    args[1] = $tmp$b;
+                    args[2] = $tmp$c;
                 }
             }
         }

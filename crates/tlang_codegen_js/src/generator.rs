@@ -449,22 +449,23 @@ impl CodegenJS {
                             if function_context.is_tail_recursive && &function_context.name == name {
                                 let params = function_context.params.clone();
                                 let remap_to_rest_args = function_context.remap_to_rest_args;
+                                let tmp_vars = params.iter().map(|_| self.scopes.declare_tmp_variable()).collect::<Vec<_>>();
 
                                 for (i, arg) in arguments.iter().enumerate() {
                                     self.push_str(&self.get_indent());
-                                    self.push_str(&format!("let tmp{} = ", i));
+                                    self.push_str(&format!("let {} = ", tmp_vars[i]));
                                     self.generate_node(arg, None);
                                     self.push_str(";\n");
                                 }
                                 if remap_to_rest_args {
                                     for (i, _arg_name) in params.iter().enumerate() {
                                         self.push_str(&self.get_indent());
-                                        self.push_str(&format!("args[{}] = tmp{};\n", i, i));
+                                        self.push_str(&format!("args[{}] = {};\n", i, tmp_vars[i]));
                                     }
                                 } else {
                                     for (i, arg_name) in params.iter().enumerate() {
                                         self.push_str(&self.get_indent());
-                                        self.push_str(&format!("{} = tmp{};\n", arg_name, i));
+                                        self.push_str(&format!("{} = {};\n", arg_name, tmp_vars[i]));
                                     }
                                 }
                                 return;
