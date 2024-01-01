@@ -1547,6 +1547,86 @@ fn test_enum_tree_max_depth() {
 }
 
 #[test]
+fn test_enum_extraction() {
+    let program = parse!(indoc! {"
+        enum Option {
+            Some(value),
+            None,
+        }
+
+        fn unwrap(Option::None) { panic(\"Cannot unwrap None\") }
+        fn unwrap(Option::Some(value)) { value }
+    "});
+
+    assert_eq!(
+        program,
+        node::new!(Program(vec![
+            node::new!(EnumDeclaration {
+                id: SymbolId::new(1),
+                name: "Option".to_string(),
+                variants: vec![
+                    node::new!(EnumVariant {
+                        name: "Some".to_string(),
+                        named_fields: false,
+                        parameters: vec![node::new!(Identifier("value".to_string()))]
+                    }),
+                    node::new!(EnumVariant {
+                        name: "None".to_string(),
+                        named_fields: false,
+                        parameters: vec![]
+                    }),
+                ]
+            }),
+            node::new!(FunctionDeclarations {
+                id: SymbolId::new(4),
+                name: "unwrap".to_string(),
+                declarations: vec![
+                    FunctionDeclaration {
+                        parameters: vec![node::new!(FunctionParameter {
+                            id: SymbolId::new(2),
+                            node: Box::new(node::new!(EnumExtraction {
+                                identifier: Box::new(node::new!(NestedIdentifier(vec![
+                                    "Option".to_string(),
+                                    "None".to_string()
+                                ]))),
+                                elements: vec![],
+                                named_fields: false,
+                            }))
+                        })],
+                        body: Box::new(node::new!(Block(
+                            vec![],
+                            Some(Box::new(node::new!(Call {
+                                function: Box::new(node::new!(Identifier("panic".to_string()))),
+                                arguments: vec![node::new!(Literal(Literal::String(
+                                    "Cannot unwrap None".to_string()
+                                )))]
+                            })))
+                        )))
+                    },
+                    FunctionDeclaration {
+                        parameters: vec![node::new!(FunctionParameter {
+                            id: SymbolId::new(3),
+                            node: Box::new(node::new!(EnumExtraction {
+                                identifier: Box::new(node::new!(NestedIdentifier(vec![
+                                    "Option".to_string(),
+                                    "Some".to_string()
+                                ]))),
+                                elements: vec![node::new!(Identifier("value".to_string()))],
+                                named_fields: false,
+                            }))
+                        })],
+                        body: Box::new(node::new!(Block(
+                            vec![],
+                            Some(Box::new(node::new!(Identifier("value".to_string()))))
+                        )))
+                    }
+                ]
+            })
+        ]))
+    );
+}
+
+#[test]
 fn test_explicit_tail_recursive_call() {
     let program = parse!(indoc! {"
         fn factorial(n) { factorial(n, 1) }

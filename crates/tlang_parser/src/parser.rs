@@ -577,7 +577,7 @@ impl<'src> Parser<'src> {
                 elements: elements,
                 named_fields: true,
             })
-        } else {
+        } else if let Some(Token::LParen) = self.current_token {
             self.consume_token(Token::LParen);
             let mut elements = Vec::new();
             while self.current_token != Some(Token::RParen) {
@@ -602,6 +602,12 @@ impl<'src> Parser<'src> {
                 named_fields: false,
             }
             .into()
+        } else {
+            node::new!(EnumExtraction {
+                identifier: identifier,
+                elements: Vec::new(),
+                named_fields: false,
+            })
         }
     }
 

@@ -310,7 +310,6 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
 }
 
 #[test]
-#[ignore = "TODO: parse error with enum extraction, on simple non parametrized enum"]
 fn should_collect_function_arguments_with_enum_extraction() {
     let ast = analyze!(indoc! {"
         enum Option {
@@ -330,7 +329,7 @@ fn should_collect_function_arguments_with_enum_extraction() {
     assert_eq!(
         program_symbols.borrow().get_by_name("unwrap"),
         Some(SymbolInfo {
-            id: SymbolId::new(1),
+            id: SymbolId::new(4),
             name: "unwrap".to_string(),
             symbol_type: SymbolType::Function,
         })
