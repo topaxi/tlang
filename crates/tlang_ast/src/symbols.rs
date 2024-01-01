@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -30,8 +29,8 @@ pub struct SymbolInfo {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct SymbolTable {
-    pub parent: Option<Rc<RefCell<SymbolTable>>>,
-    pub symbols: HashMap<String, SymbolInfo>,
+    parent: Option<Rc<RefCell<SymbolTable>>>,
+    symbols: Vec<SymbolInfo>,
 }
 
 impl SymbolTable {
@@ -46,17 +45,42 @@ impl SymbolTable {
         self.parent.clone()
     }
 
-    pub fn get(&self, name: &str) -> Option<SymbolInfo> {
-        if let Some(symbol) = self.symbols.get(name) {
-            Some(symbol.clone())
+    fn get_local(&self, id: SymbolId) -> Option<SymbolInfo> {
+        self.symbols.iter().find(|s| s.id == id).cloned()
+    }
+
+    pub fn get(&self, id: SymbolId) -> Option<SymbolInfo> {
+        if let Some(symbol) = self.get_local(id) {
+            Some(symbol)
         } else if let Some(ref parent) = self.parent {
-            parent.borrow().get(name)
+            parent.borrow().get(id)
         } else {
             None
         }
     }
 
-    pub fn insert(&mut self, name: String, symbol_info: SymbolInfo) {
-        self.symbols.insert(name, symbol_info);
+    fn get_local_by_name(&self, name: &str) -> Option<SymbolInfo> {
+        self.symbols.iter().find(|s| s.name == name).cloned()
+    }
+
+    pub fn get_by_name(&self, name: &str) -> Option<SymbolInfo> {
+        if let Some(symbol) = self.get_local_by_name(name) {
+            Some(symbol.clone())
+        } else if let Some(ref parent) = self.parent {
+            parent.borrow().get_by_name(name)
+        } else {
+            None
+        }
+    }
+
+    pub fn insert(&mut self, symbol_info: SymbolInfo) {
+        self.symbols.push(symbol_info);
+    }
+
+    pub fn remove(&mut self, id: SymbolId) -> Option<SymbolInfo> {
+        self.symbols
+            .iter()
+            .position(|s| s.id == id)
+            .map(|index| self.symbols.remove(index))
     }
 }

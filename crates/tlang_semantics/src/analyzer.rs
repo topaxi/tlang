@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use tlang_ast::{
     node::{AstNode, FunctionDeclaration, Node},
-    symbols::{SymbolTable, SymbolType},
+    symbols::{SymbolId, SymbolTable, SymbolType},
 };
 
 use crate::declarations::DeclarationAnalyzer;
@@ -72,10 +72,10 @@ impl SemanticAnalyzer {
                 }
             }
             AstNode::VariableDeclaration {
-                id: _,
+                id,
                 ref name,
                 ref mut value,
-            } => self.analyze_variable_declaration(name, value),
+            } => self.analyze_variable_declaration(id, name, value),
             AstNode::FunctionDeclaration {
                 id: _,
                 ref name,
@@ -91,7 +91,12 @@ impl SemanticAnalyzer {
                 ref mut node,
             } => self.analyze_function_parameter(ast, node),
             AstNode::Identifier(ref name) => {
-                if self.get_last_symbol_table().borrow().get(name).is_none() {
+                if self
+                    .get_last_symbol_table()
+                    .borrow()
+                    .get_by_name(name)
+                    .is_none()
+                {
                     panic!("Undefined symbol: {}", name);
                 }
             }
@@ -113,27 +118,18 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn analyze_variable_declaration(&mut self, name: &str, value: &mut Box<Node>) {
+    fn analyze_variable_declaration(&mut self, id: SymbolId, _name: &str, value: &mut Box<Node>) {
         // When declaring a variable, we can only reference symbols that were declared before.
         // This includes our own variable name.
         // E.g. `let a = a;` is not allowed. But `let a = 1; let a = a;` is.
-
-        // This is not fully implemented yet, let's temporarily remove the symbol from the current
-        // symbol table, this will make sure that we cannot self-reference at all for the moment.
-        // Which we then can enable again once we have a proper implementation.
-
-        let symbol = self
-            .get_last_symbol_table()
-            .borrow_mut()
-            .symbols
-            .remove(name);
+        // By removing the symbol from the table while analyzing the expression, we can check
+        // whether the expression references any symbols that were not declared before.
+        let symbol = self.get_last_symbol_table().borrow_mut().remove(id);
 
         self.analyze_node(value);
 
         if let Some(symbol) = symbol {
-            self.get_last_symbol_table()
-                .borrow_mut()
-                .insert(name.to_string(), symbol);
+            self.get_last_symbol_table().borrow_mut().insert(symbol);
         }
     }
 

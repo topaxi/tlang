@@ -21,7 +21,7 @@ fn test_analyze_variable_declaration() {
     let ast = analyze!("let a = 1;");
 
     assert_eq!(
-        ast.symbol_table.unwrap().borrow().get("a"),
+        ast.symbol_table.unwrap().borrow().get_by_name("a"),
         Some(SymbolInfo {
             id: SymbolId::new(1),
             name: "a".to_string(),
@@ -50,15 +50,15 @@ fn test_block_scope() {
         .expect("Program to have a symbol_table");
 
     assert_eq!(
-        program_symbols.borrow().get("a"),
+        program_symbols.borrow().get_by_name("a"),
         Some(SymbolInfo {
             id: SymbolId::new(1),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
         })
     );
-    assert_eq!(program_symbols.borrow().get("b"), None);
-    assert_eq!(program_symbols.borrow().get("c"), None);
+    assert_eq!(program_symbols.borrow().get_by_name("b"), None);
+    assert_eq!(program_symbols.borrow().get_by_name("c"), None);
 
     let block1 = match ast.ast_node {
         AstNode::Program(ref nodes) => match nodes[1].ast_node {
@@ -77,7 +77,7 @@ fn test_block_scope() {
         .expect("Expected block 1 to have a symbol_table");
 
     assert_eq!(
-        block1_symbols.borrow().get("a"),
+        block1_symbols.borrow().get_by_name("a"),
         Some(SymbolInfo {
             id: SymbolId::new(1),
             name: "a".to_string(),
@@ -85,14 +85,14 @@ fn test_block_scope() {
         })
     );
     assert_eq!(
-        block1_symbols.borrow().get("b"),
+        block1_symbols.borrow().get_by_name("b"),
         Some(SymbolInfo {
             id: SymbolId::new(2),
             name: "b".to_string(),
             symbol_type: SymbolType::Variable,
         })
     );
-    assert_eq!(block1_symbols.borrow().get("c"), None);
+    assert_eq!(block1_symbols.borrow().get_by_name("c"), None);
 
     let block2 = match block1.ast_node {
         AstNode::Block(ref nodes, _) => match nodes[1].ast_node {
@@ -111,7 +111,7 @@ fn test_block_scope() {
         .expect("Expected block 2 to have a symbol_table");
 
     assert_eq!(
-        block2_symbols.borrow().get("a"),
+        block2_symbols.borrow().get_by_name("a"),
         Some(SymbolInfo {
             id: SymbolId::new(1),
             name: "a".to_string(),
@@ -119,7 +119,7 @@ fn test_block_scope() {
         })
     );
     assert_eq!(
-        block2_symbols.borrow().get("b"),
+        block2_symbols.borrow().get_by_name("b"),
         Some(SymbolInfo {
             id: SymbolId::new(2),
             name: "b".to_string(),
@@ -127,7 +127,7 @@ fn test_block_scope() {
         })
     );
     assert_eq!(
-        block2_symbols.borrow().get("c"),
+        block2_symbols.borrow().get_by_name("c"),
         Some(SymbolInfo {
             id: SymbolId::new(3),
             name: "c".to_string(),
@@ -161,7 +161,45 @@ fn test_should_allow_shadowing_of_single_variable() {
         .expect("Program to have a symbol_table");
 
     assert_eq!(
-        program_symbols.borrow().get("a"),
+        program_symbols.borrow().get(SymbolId::new(1)),
+        Some(SymbolInfo {
+            id: SymbolId::new(1),
+            name: "a".to_string(),
+            symbol_type: SymbolType::Variable,
+        })
+    );
+    assert_eq!(
+        program_symbols.borrow().get(SymbolId::new(2)),
+        Some(SymbolInfo {
+            id: SymbolId::new(2),
+            name: "a".to_string(),
+            symbol_type: SymbolType::Variable,
+        })
+    );
+}
+
+#[test]
+fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
+    let ast = analyze!(indoc! {"
+        let a = 1;
+        let a = a + 1;
+    "});
+
+    let program_symbols = ast
+        .symbol_table
+        .clone()
+        .expect("Program to have a symbol_table");
+
+    assert_eq!(
+        program_symbols.borrow().get(SymbolId::new(1)),
+        Some(SymbolInfo {
+            id: SymbolId::new(1),
+            name: "a".to_string(),
+            symbol_type: SymbolType::Variable,
+        })
+    );
+    assert_eq!(
+        program_symbols.borrow().get(SymbolId::new(2)),
         Some(SymbolInfo {
             id: SymbolId::new(2),
             name: "a".to_string(),
@@ -184,7 +222,7 @@ fn test_should_collect_function_definitions() {
         .expect("Program to have a symbol_table");
 
     assert_eq!(
-        program_symbols.borrow().get("add"),
+        program_symbols.borrow().get_by_name("add"),
         Some(SymbolInfo {
             id: SymbolId::new(3),
             name: "add".to_string(),
@@ -217,7 +255,7 @@ fn test_should_collect_list_destructuring_symbols_in_function_arguments() {
         .expect("Program to have a symbol_table");
 
     assert_eq!(
-        program_symbols.borrow().get("add"),
+        program_symbols.borrow().get_by_name("add"),
         Some(SymbolInfo {
             id: SymbolId::new(2),
             name: "add".to_string(),
@@ -240,7 +278,7 @@ fn test_should_collect_list_destructuring_with_rest_symbols_in_function_argument
         .expect("Program to have a symbol_table");
 
     assert_eq!(
-        program_symbols.borrow().get("sum"),
+        program_symbols.borrow().get_by_name("sum"),
         Some(SymbolInfo {
             id: SymbolId::new(2),
             name: "sum".to_string(),
@@ -262,7 +300,7 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
         .expect("Program to have a symbol_table");
 
     assert_eq!(
-        program_symbols.borrow().get("factorial"),
+        program_symbols.borrow().get_by_name("factorial"),
         Some(SymbolInfo {
             id: SymbolId::new(5),
             name: "factorial".to_string(),
@@ -290,7 +328,7 @@ fn should_collect_function_arguments_with_enum_extraction() {
         .expect("Program to have a symbol_table");
 
     assert_eq!(
-        program_symbols.borrow().get("unwrap"),
+        program_symbols.borrow().get_by_name("unwrap"),
         Some(SymbolInfo {
             id: SymbolId::new(1),
             name: "unwrap".to_string(),
@@ -315,7 +353,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
         .expect("Program to have a symbol_table");
 
     assert_eq!(
-        program_symbols.borrow().get("add"),
+        program_symbols.borrow().get_by_name("add"),
         Some(SymbolInfo {
             id: SymbolId::new(3),
             name: "add".to_string(),
@@ -342,7 +380,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
             .clone()
             .unwrap()
             .borrow()
-            .get("c"),
+            .get_by_name("c"),
         Some(SymbolInfo {
             id: SymbolId::new(4),
             name: "c".to_string(),
@@ -358,7 +396,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
             .clone()
             .unwrap()
             .borrow()
-            .get("c"),
+            .get_by_name("c"),
         Some(SymbolInfo {
             id: SymbolId::new(4),
             name: "c".to_string(),
