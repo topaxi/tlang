@@ -81,6 +81,6 @@ impl SymbolTable {
         self.symbols
             .iter()
             .position(|s| s.id == id)
-            .map(|index| self.symbols.remove(index))
+            .map(|index| self.symbols.swap_remove(index))
     }
 }
