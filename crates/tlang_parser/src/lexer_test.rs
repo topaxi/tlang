@@ -86,7 +86,12 @@ fn test_arrows() {
 }
 
 #[test]
-fn test_dotdotdot() {
+fn test_dotdot_dot() {
+    let mut lexer = Lexer::new("..");
+
+    assert_eq!(lexer.next_token(), Token::DotDot);
+    assert_eq!(lexer.next_token(), Token::Eof);
+
     let mut lexer = Lexer::new("...");
 
     assert_eq!(lexer.next_token(), Token::DotDotDot);

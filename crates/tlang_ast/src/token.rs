@@ -42,6 +42,7 @@ pub enum Token {
     Arrow,
     FatArrow,
     Pipeline,
+    DotDot,
     DotDotDot,
 
     // Tokens for numbers
