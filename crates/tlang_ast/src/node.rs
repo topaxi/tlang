@@ -76,7 +76,7 @@ pub enum AstNode {
     FunctionDeclaration {
         id: SymbolId,
         name: String,
-        declaration: FunctionDeclaration,
+        declaration: Box<FunctionDeclaration>,
     },
     FunctionDeclarations {
         id: SymbolId,
@@ -86,7 +86,7 @@ pub enum AstNode {
     FunctionExpression {
         id: SymbolId,
         name: Option<String>,
-        declaration: FunctionDeclaration,
+        declaration: Box<FunctionDeclaration>,
     },
     FunctionParameter {
         id: SymbolId,

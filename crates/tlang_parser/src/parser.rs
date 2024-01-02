@@ -549,10 +549,10 @@ impl<'src> Parser<'src> {
         node::new!(FunctionExpression {
             id: self.unique_id(),
             name: name,
-            declaration: FunctionDeclaration {
+            declaration: Box::new(FunctionDeclaration {
                 parameters,
                 body: Box::new(body),
-            },
+            }),
         })
     }
 
@@ -678,7 +678,7 @@ impl<'src> Parser<'src> {
         }
 
         if declarations.len() == 1 {
-            let declaration = declarations.pop().unwrap();
+            let declaration = Box::new(declarations.pop().unwrap());
 
             return node::new!(FunctionDeclaration {
                 id: self.unique_id(),
