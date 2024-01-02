@@ -284,23 +284,24 @@ impl Lexer<'_> {
                 self.advance();
                 Token::Semicolon
             }
-            '.' | '0'..='9' => {
-                // If followed by three dots, we have a dotdotdot token.
-                if self.peek_ahead() == Some('.') {
+            '.' => {
+                if let Some('.') = self.peek_ahead() {
                     if self.source[self.position + 1..].starts_with("..") {
                         self.advance();
                         self.advance();
                         self.advance();
-
-                        return Token::DotDotDot;
-                    } else if self.source[self.position + 1..].starts_with(".") {
+                        Token::DotDotDot
+                    } else {
                         self.advance();
                         self.advance();
-
-                        return Token::DotDot;
+                        Token::DotDot
                     }
+                } else {
+                    self.advance();
+                    Token::Dot
                 }
-
+            }
+            '0'..='9' => {
                 let is_float = self.source[self.position..]
                     .chars()
                     .take_while(|&ch| Self::is_digit(ch) || ch == '.')

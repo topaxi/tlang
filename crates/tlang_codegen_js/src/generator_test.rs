@@ -836,3 +836,33 @@ fn test_tail_recursive_fibonacci() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_field_access_expressions() {
+    let output = compile!(indoc! {"
+        fn main() {
+            let x = foo.bar;
+        }
+    "});
+    let expected_output = indoc! {"
+        function main() {
+            let x = foo.bar;
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn test_index_access_expressions() {
+    let output = compile!(indoc! {"
+        fn main() {
+            let x = foo[0];
+        }
+    "});
+    let expected_output = indoc! {"
+        function main() {
+            let x = foo[0];
+        }
+    "};
+    assert_eq!(output, expected_output);
+}

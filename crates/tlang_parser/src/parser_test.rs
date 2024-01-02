@@ -1714,3 +1714,85 @@ fn test_explicit_tail_recursive_call() {
 fn test_panic_on_keyword_as_identifier() {
     parse!("let fn = 1;");
 }
+
+#[test]
+fn test_call_return_value() {
+    let program = parse!("foo()();");
+
+    assert_eq!(
+        program,
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(Call {
+                function: Box::new(node::new!(Call {
+                    function: Box::new(node::new!(Identifier("foo".to_string()))),
+                    arguments: vec![]
+                })),
+                arguments: vec![]
+            })
+        )))]))
+    );
+}
+
+#[test]
+fn test_field_access_expressions() {
+    let program = parse!("foo.bar;");
+
+    assert_eq!(
+        program,
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(FieldExpression {
+                base: Box::new(node::new!(Identifier("foo".to_string()))),
+                field: Box::new(node::new!(Identifier("bar".to_string()))),
+            })
+        )))]))
+    );
+
+    let program = parse!("foo.bar.baz;");
+
+    assert_eq!(
+        program,
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(FieldExpression {
+                base: Box::new(node::new!(FieldExpression {
+                    base: Box::new(node::new!(Identifier("foo".to_string()))),
+                    field: Box::new(node::new!(Identifier("bar".to_string()))),
+                })),
+                field: Box::new(node::new!(Identifier("baz".to_string()))),
+            })
+        )))]))
+    );
+}
+
+#[test]
+fn test_dynamic_index_access() {
+    let program = parse!("let x = foo[1];");
+
+    assert_eq!(
+        program,
+        node::new!(Program(vec![node::new!(VariableDeclaration {
+            id: SymbolId::new(1),
+            name: "x".to_string(),
+            value: Box::new(node::new!(IndexExpression {
+                base: Box::new(node::new!(Identifier("foo".to_string()))),
+                index: Box::new(node::new!(Literal(Literal::Integer(1)))),
+            }))
+        })]))
+    );
+
+    let program = parse!("let x = foo[1][2];");
+
+    assert_eq!(
+        program,
+        node::new!(Program(vec![node::new!(VariableDeclaration {
+            id: SymbolId::new(1),
+            name: "x".to_string(),
+            value: Box::new(node::new!(IndexExpression {
+                base: Box::new(node::new!(IndexExpression {
+                    base: Box::new(node::new!(Identifier("foo".to_string()))),
+                    index: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                })),
+                index: Box::new(node::new!(Literal(Literal::Integer(2)))),
+            }))
+        })]))
+    );
+}

@@ -477,6 +477,17 @@ impl CodegenJS {
                 // For any other referenced function, we do a normal call expression.
                 self.generate_node(node, parent_op)
             },
+            AstNode::FieldExpression { base, field } => {
+                self.generate_node(base, None);
+                self.push_str(".");
+                self.generate_node(field, None);
+            }
+            AstNode::IndexExpression { base,  index } => {
+                self.generate_node(base, None);
+                self.push_str("[");
+                self.generate_node(index, None);
+                self.push_str("]");
+            }
             AstNode::EnumDeclaration { id: _, name, variants } => self.generate_enum_declaration(name, variants),
             AstNode::EnumVariant { name, named_fields, parameters } => self.generate_enum_variant(name, *named_fields, parameters),
             AstNode::EnumExtraction { identifier, elements, named_fields } => self.generate_enum_extraction(identifier, elements, *named_fields),

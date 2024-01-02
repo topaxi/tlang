@@ -131,6 +131,14 @@ pub enum AstNode {
         elements: Vec<Node>,
         named_fields: bool,
     },
+    FieldExpression {
+        base: Box<Node>,
+        field: Box<Node>,
+    },
+    IndexExpression {
+        base: Box<Node>,
+        index: Box<Node>,
+    },
 }
 
 impl<'a> From<&'a Token> for AstNode {

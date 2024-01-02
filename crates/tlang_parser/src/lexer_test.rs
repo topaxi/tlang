@@ -46,8 +46,9 @@ fn test_typed_float() {
 
 #[test]
 fn test_single_char_operators() {
-    let mut lexer = Lexer::new("+ - * / % ( ) | & ^");
+    let mut lexer = Lexer::new(". + - * / % ( ) | & ^");
 
+    assert_eq!(lexer.next_token(), Token::Dot);
     assert_eq!(lexer.next_token(), Token::Plus);
     assert_eq!(lexer.next_token(), Token::Minus);
     assert_eq!(lexer.next_token(), Token::Asterisk);

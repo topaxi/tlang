@@ -805,36 +805,57 @@ impl<'src> Parser<'src> {
     ) -> Node {
         let mut lhs = self.parse_primary_expression();
 
-        while let Some(token) = self.current_token.as_ref() {
-            if !Self::is_binary_op(token) {
-                break;
+        loop {
+            match self.current_token.as_ref() {
+                Some(Token::Dot) => {
+                    self.advance();
+                    let field_name = self.consume_identifier();
+                    lhs = node::new!(FieldExpression {
+                        base: Box::new(lhs),
+                        field: Box::new(node::new!(Identifier(field_name))),
+                    });
+                }
+                Some(Token::LBracket) => {
+                    self.advance();
+                    let index = self.parse_expression_with_precedence(0, Associativity::Left);
+                    self.consume_token(Token::RBracket);
+                    lhs = node::new!(IndexExpression {
+                        base: Box::new(lhs),
+                        index: Box::new(index),
+                    });
+                }
+                Some(Token::LParen) => {
+                    lhs = self.parse_call_expression(lhs);
+                }
+                Some(token) if Self::is_binary_op(token) => {
+                    let operator = Self::map_binary_op(token);
+                    let operator_info = Self::map_operator_info(&operator);
+
+                    if Self::compare_precedence(
+                        &OperatorInfo {
+                            precedence,
+                            associativity,
+                        },
+                        &operator_info,
+                    ) {
+                        break;
+                    }
+
+                    self.advance();
+
+                    let rhs = self.parse_expression_with_precedence(
+                        operator_info.precedence,
+                        operator_info.associativity,
+                    );
+
+                    lhs = node::new!(BinaryOp {
+                        op: operator,
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                    });
+                }
+                _ => break,
             }
-
-            let operator = Self::map_binary_op(token);
-            let operator_info = Self::map_operator_info(&operator);
-
-            if Self::compare_precedence(
-                &OperatorInfo {
-                    precedence,
-                    associativity,
-                },
-                &operator_info,
-            ) {
-                break;
-            }
-
-            self.advance();
-
-            let rhs = self.parse_expression_with_precedence(
-                operator_info.precedence,
-                operator_info.associativity,
-            );
-
-            lhs = node::new!(BinaryOp {
-                op: operator,
-                lhs: Box::new(lhs),
-                rhs: Box::new(rhs),
-            });
         }
 
         lhs
