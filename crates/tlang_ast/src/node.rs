@@ -49,6 +49,7 @@ impl<'a> From<&'a Token> for Node {
 pub struct FunctionDeclaration {
     pub parameters: Vec<Node>,
     pub body: Box<Node>,
+    pub return_type: Option<Box<Node>>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -138,6 +139,10 @@ pub enum AstNode {
     IndexExpression {
         base: Box<Node>,
         index: Box<Node>,
+    },
+    TypeAnnotation {
+        name: Box<Node>,
+        parameters: Vec<Node>,
     },
 }
 

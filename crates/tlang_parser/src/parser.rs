@@ -566,6 +566,62 @@ impl<'src> Parser<'src> {
         parameters
     }
 
+    fn is_type_annotation_token(token: &Token) -> bool {
+        matches!(
+            token,
+            Token::Identifier(_) | Token::GreaterThan | Token::LessThan | Token::NamespaceSeparator
+        )
+    }
+
+    fn parse_type_annotation(&mut self) -> Option<Node> {
+        let token = self.current_token.as_ref()?;
+
+        if !Self::is_type_annotation_token(token) {
+            return None;
+        }
+
+        match token {
+            Token::Identifier(_) => {
+                let identifier = self.parse_identifier();
+                let parameters = self.parse_type_annotation_parameters();
+
+                Some(node::new!(TypeAnnotation {
+                    name: Box::new(identifier),
+                    parameters: parameters,
+                }))
+            }
+            _ => panic!("Expected type annotation, found {:?}", token),
+        }
+    }
+
+    fn parse_type_annotation_parameters(&mut self) -> Vec<Node> {
+        let mut parameters = Vec::new();
+
+        if let Some(Token::LessThan) = self.current_token {
+            self.advance();
+            while self.current_token != Some(Token::GreaterThan) {
+                let parameter = self.parse_type_annotation().unwrap();
+                parameters.push(parameter);
+                if let Some(Token::Comma) = self.current_token {
+                    self.advance();
+                }
+            }
+            self.consume_token(Token::GreaterThan);
+        }
+
+        parameters
+    }
+
+    fn parse_return_type(&mut self) -> Option<Node> {
+        if let Some(Token::Arrow) = self.current_token {
+            self.advance();
+            let return_type = self.parse_type_annotation()?;
+            Some(return_type)
+        } else {
+            None
+        }
+    }
+
     fn parse_function_expression(&mut self) -> Node {
         self.consume_token(Token::Fn);
         let name = if let Some(Token::Identifier(name)) = &self.current_token {
@@ -577,6 +633,7 @@ impl<'src> Parser<'src> {
         };
 
         let parameters = self.parse_parameter_list();
+        let return_type = self.parse_return_type();
         let body = self.parse_block();
 
         node::new!(FunctionExpression {
@@ -585,6 +642,7 @@ impl<'src> Parser<'src> {
             declaration: Box::new(FunctionDeclaration {
                 parameters,
                 body: Box::new(body),
+                return_type: return_type.map(Box::new),
             }),
         })
     }
@@ -664,11 +722,13 @@ impl<'src> Parser<'src> {
 
             self.expect_token(Token::LParen);
             let parameters = self.parse_parameter_list();
+            let return_type = self.parse_return_type();
             let body = self.parse_block();
 
             declarations.push(FunctionDeclaration {
                 parameters,
                 body: Box::new(body),
+                return_type: return_type.map(Box::new),
             });
         }
 
