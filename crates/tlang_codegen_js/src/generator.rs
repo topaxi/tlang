@@ -112,6 +112,41 @@ impl CodegenJS {
         self.generate_node(node, None)
     }
 
+    fn push_function_context(
+        &mut self,
+        name: &str,
+        parameters: &[Node],
+        is_tail_recursive: bool,
+        remap_to_rest_args: bool,
+    ) {
+        self.function_context_stack.push(FunctionContext {
+            name: name.to_string(),
+            params: parameters
+                .iter()
+                .map(|param| {
+                    if let AstNode::FunctionParameter {
+                        id: _,
+                        node,
+                        type_annotation: _,
+                    } = &param.ast_node
+                    {
+                        if let AstNode::Identifier(ref name) = node.ast_node {
+                            name.clone()
+                        } else {
+                            // Encountered destructuring/pattern matching or wildcard, declare
+                            // tmp variable to potentially dereference from. Unused at the moment.
+                            self.scopes.declare_tmp_variable()
+                        }
+                    } else {
+                        panic!("Expected FunctionParameter, got {:?}", param);
+                    }
+                })
+                .collect(),
+            is_tail_recursive,
+            remap_to_rest_args,
+        });
+    }
+
     fn generate_binary_op(&mut self, op: &BinaryOp) {
         match op {
             BinaryOp::Add => self.push_str(" + "),
@@ -652,28 +687,7 @@ impl CodegenJS {
 
     fn generate_function_declaration(&mut self, name: &str, declaration: &FunctionDeclaration) {
         let is_tail_recursive = Self::is_function_body_tail_recursive(name, &declaration.body);
-        self.function_context_stack.push(FunctionContext {
-            name: name.to_string(),
-            params: declaration
-                .parameters
-                .iter()
-                .filter_map(|param| {
-                    if let AstNode::FunctionParameter {
-                        id: _,
-                        node,
-                        type_annotation: _,
-                    } = &param.ast_node
-                    {
-                        if let AstNode::Identifier(ref name) = node.ast_node {
-                            return Some(name.clone());
-                        }
-                    }
-                    None
-                })
-                .collect(),
-            is_tail_recursive,
-            remap_to_rest_args: false,
-        });
+        self.push_function_context(name, &declaration.parameters, is_tail_recursive, false);
 
         self.push_str(&self.get_indent());
         self.push_str(&format!("function {}(", name));
@@ -703,28 +717,12 @@ impl CodegenJS {
             &name.clone().unwrap_or("".to_string()).to_string(),
             &declaration.body,
         );
-        self.function_context_stack.push(FunctionContext {
-            name: name.clone().unwrap_or("".to_string()).to_string(),
-            params: declaration
-                .parameters
-                .iter()
-                .filter_map(|param| {
-                    if let AstNode::FunctionParameter {
-                        id: _,
-                        node,
-                        type_annotation: _,
-                    } = &param.ast_node
-                    {
-                        if let AstNode::Identifier(name) = &node.ast_node {
-                            return Some(name.clone());
-                        }
-                    }
-                    None
-                })
-                .collect(),
+        self.push_function_context(
+            &name.clone().unwrap_or("".to_string()).to_string(),
+            &declaration.parameters,
             is_tail_recursive,
-            remap_to_rest_args: false,
-        });
+            false,
+        );
         let function_keyword = match name {
             Some(name) => format!("function {}(", name),
             None => "function(".to_string(),
@@ -945,28 +943,12 @@ impl CodegenJS {
                 }
             }
             // We handle the tail recursion case in multiple function body declarations ourselves higher up.
-            self.function_context_stack.push(FunctionContext {
-                name: name.to_string(),
-                params: declaration
-                    .parameters
-                    .iter()
-                    .filter_map(|param| {
-                        if let AstNode::FunctionParameter {
-                            id: _,
-                            node,
-                            type_annotation: _,
-                        } = &param.ast_node
-                        {
-                            if let AstNode::Identifier(ref name) = node.ast_node {
-                                return Some(name.clone());
-                            }
-                        }
-                        None
-                    })
-                    .collect(),
-                is_tail_recursive: is_any_definition_tail_recursive,
-                remap_to_rest_args: true,
-            });
+            self.push_function_context(
+                name,
+                &declaration.parameters,
+                is_any_definition_tail_recursive,
+                true,
+            );
             self.generate_function_body(&declaration.body, false);
             self.indent_level -= 1;
             self.push_str(&self.get_indent());

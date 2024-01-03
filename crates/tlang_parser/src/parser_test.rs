@@ -2055,3 +2055,90 @@ fn test_function_param_types() {
         })]))
     );
 }
+
+#[test]
+fn test_foldl_impl() {
+    let program = parse!(indoc! {"
+        fn foldl([], acc, _) { acc }
+        fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+    "});
+
+    assert_eq!(
+        program,
+        node::new!(Program(vec![node::new!(FunctionDeclarations {
+            id: SymbolId::new(7),
+            name: "foldl".to_string(),
+            declarations: vec![
+                FunctionDeclaration {
+                    parameters: vec![
+                        node::new!(FunctionParameter {
+                            id: SymbolId::new(1),
+                            node: Box::new(node::new!(List(vec![]))),
+                            type_annotation: None,
+                        }),
+                        node::new!(FunctionParameter {
+                            id: SymbolId::new(2),
+                            node: Box::new(node::new!(Identifier("acc".to_string()))),
+                            type_annotation: None,
+                        }),
+                        node::new!(FunctionParameter {
+                            id: SymbolId::new(3),
+                            node: Box::new(node::new!(Wildcard)),
+                            type_annotation: None,
+                        })
+                    ],
+                    return_type_annotation: None,
+                    body: Box::new(node::new!(Block(
+                        vec![],
+                        Some(Box::new(node::new!(Identifier("acc".to_string()))))
+                    ))),
+                },
+                FunctionDeclaration {
+                    parameters: vec![
+                        node::new!(FunctionParameter {
+                            id: SymbolId::new(4),
+                            node: Box::new(node::new!(List(vec![
+                                node::new!(Identifier("x".to_string())),
+                                node::new!(PrefixOp(
+                                    PrefixOp::Rest,
+                                    Box::new(node::new!(Identifier("xs".to_string())))
+                                ))
+                            ]))),
+                            type_annotation: None,
+                        }),
+                        node::new!(FunctionParameter {
+                            id: SymbolId::new(5),
+                            node: Box::new(node::new!(Identifier("acc".to_string()))),
+                            type_annotation: None,
+                        }),
+                        node::new!(FunctionParameter {
+                            id: SymbolId::new(6),
+                            node: Box::new(node::new!(Identifier("f".to_string()))),
+                            type_annotation: None,
+                        })
+                    ],
+                    return_type_annotation: None,
+                    body: Box::new(node::new!(Block(
+                        vec![],
+                        Some(Box::new(node::new!(RecursiveCall(Box::new(node::new!(
+                            Call {
+                                function: Box::new(node::new!(Identifier("foldl".to_string()))),
+                                arguments: vec![
+                                    node::new!(Identifier("xs".to_string())),
+                                    node::new!(Call {
+                                        function: Box::new(node::new!(Identifier("f".to_string()))),
+                                        arguments: vec![
+                                            node::new!(Identifier("acc".to_string())),
+                                            node::new!(Identifier("x".to_string()))
+                                        ]
+                                    }),
+                                    node::new!(Identifier("f".to_string()))
+                                ]
+                            }
+                        ))))))
+                    )))
+                },
+            ],
+        }),])),
+    );
+}

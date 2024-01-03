@@ -866,3 +866,33 @@ fn test_index_access_expressions() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_foldl_impl() {
+    let output = compile!(indoc! {"
+        fn foldl([], acc, _) { acc }
+        fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+    "});
+    let expected_output = indoc! {"
+        function foldl(...args) {
+            while (true) {
+                if (args[0].length === 0) {
+                    let acc = args[1];
+                    return acc;
+                } else if (args[0].length >= 1) {
+                    let acc = args[1];
+                    let f = args[2];
+                    let x = args[0][0];
+                    let xs = args[0].slice(1);
+                    let $tmp$a = xs;
+                    let $tmp$b = f(acc, x);
+                    let $tmp$c = f;
+                    args[0] = $tmp$a;
+                    args[1] = $tmp$b;
+                    args[2] = $tmp$c;
+                }
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+}

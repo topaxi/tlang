@@ -537,6 +537,10 @@ impl<'src> Parser<'src> {
                 let parameter = match self.current_token {
                     // Literal values will be pattern matched
                     Some(Token::Literal(_)) => self.parse_primary_expression(),
+                    Some(Token::Identifier(ref identifier)) if identifier == "_" => {
+                        self.advance();
+                        node::new!(Wildcard)
+                    }
                     // Identifiers can be namespaced identifiers or call expressions, which should be pattern matched.
                     // Simple identifiers will be used as is and mapped to a function parameter.
                     Some(Token::Identifier(_)) => {

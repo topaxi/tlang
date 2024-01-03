@@ -233,6 +233,7 @@ impl DeclarationAnalyzer {
                 // TODO: The passed in id is for the enum, not the extracted value.
                 self.collect_enum_extraction(_node, id, identifier, elements, named_fields)
             }
+            AstNode::Wildcard => {} // Wildcard discards values, nothing to do here.
             _ => panic!("Expected identifier or list, found {:?}", name.ast_node),
         }
     }
