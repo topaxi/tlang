@@ -1,7 +1,7 @@
-use crate::generator::CodegenJS;
 use indoc::indoc;
 use pretty_assertions::assert_eq;
 use tlang_ast::symbols::SymbolType;
+use tlang_codegen_js::generator::CodegenJS;
 use tlang_parser::parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
 

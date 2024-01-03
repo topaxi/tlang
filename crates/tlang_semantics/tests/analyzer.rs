@@ -1,10 +1,10 @@
-use crate::analyzer::SemanticAnalyzer;
 use indoc::indoc;
 use tlang_ast::{
     node::AstNode,
     symbols::{SymbolId, SymbolInfo, SymbolType},
 };
 use tlang_parser::parser::Parser;
+use tlang_semantics::analyzer::SemanticAnalyzer;
 
 macro_rules! analyze {
     ($source:expr) => {{

@@ -1,12 +1,12 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
 
-use crate::parser::Parser;
 use tlang_ast::{
     node::{self, AstNode, BinaryOp, FunctionDeclaration, Node, PrefixOp},
     symbols::SymbolId,
     token::Literal,
 };
+use tlang_parser::parser::Parser;
 
 macro_rules! parse {
     ($source:expr) => {{
