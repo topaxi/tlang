@@ -89,6 +89,7 @@ impl SemanticAnalyzer {
             AstNode::FunctionParameter {
                 id: _,
                 ref mut node,
+                type_annotation: _,
             } => self.analyze_function_parameter(ast, node),
             AstNode::Identifier(ref name) => {
                 if self

@@ -421,7 +421,7 @@ impl CodegenJS {
                 self.push_str(&self.get_indent());
                 self.push_char('}');
             }
-            AstNode::FunctionParameter{ id: _, node} => match node.ast_node {
+            AstNode::FunctionParameter{ id: _, node, type_annotation: _ } => match node.ast_node {
                 AstNode::Identifier { .. } => self.generate_node(node, None),
                 AstNode::Literal(_) => self.generate_node(node, None),
                 AstNode::List(_) => todo!(),
@@ -658,7 +658,12 @@ impl CodegenJS {
                 .parameters
                 .iter()
                 .filter_map(|param| {
-                    if let AstNode::FunctionParameter { id: _, node } = &param.ast_node {
+                    if let AstNode::FunctionParameter {
+                        id: _,
+                        node,
+                        type_annotation: _,
+                    } = &param.ast_node
+                    {
                         if let AstNode::Identifier(ref name) = node.ast_node {
                             return Some(name.clone());
                         }
@@ -704,7 +709,12 @@ impl CodegenJS {
                 .parameters
                 .iter()
                 .filter_map(|param| {
-                    if let AstNode::FunctionParameter { id: _, node } = &param.ast_node {
+                    if let AstNode::FunctionParameter {
+                        id: _,
+                        node,
+                        type_annotation: _,
+                    } = &param.ast_node
+                    {
                         if let AstNode::Identifier(name) = &node.ast_node {
                             return Some(name.clone());
                         }
@@ -772,7 +782,12 @@ impl CodegenJS {
                     .iter()
                     .enumerate()
                     .filter(|(_, param)| {
-                        if let AstNode::FunctionParameter { id: _, node } = &param.ast_node {
+                        if let AstNode::FunctionParameter {
+                            id: _,
+                            node,
+                            type_annotation: _,
+                        } = &param.ast_node
+                        {
                             matches!(
                                 node.ast_node,
                                 AstNode::Literal(_)
@@ -801,7 +816,12 @@ impl CodegenJS {
                         self.push_str(" && ");
                     }
 
-                    if let AstNode::FunctionParameter { id: _, node } = &param.ast_node {
+                    if let AstNode::FunctionParameter {
+                        id: _,
+                        node,
+                        type_annotation: _,
+                    } = &param.ast_node
+                    {
                         match &node.ast_node {
                             AstNode::Identifier(_) | AstNode::Literal(_) => {
                                 self.push_str(&format!("args[{}] === ", k));
@@ -912,7 +932,12 @@ impl CodegenJS {
             self.indent_level += 1;
             // Alias identifier args to the parameter names
             for (j, param) in declaration.parameters.iter().enumerate() {
-                if let AstNode::FunctionParameter { id: _, node } = &param.ast_node {
+                if let AstNode::FunctionParameter {
+                    id: _,
+                    node,
+                    type_annotation: _,
+                } = &param.ast_node
+                {
                     if let AstNode::Identifier(ref name) = node.ast_node {
                         self.push_str(&self.get_indent());
                         self.push_str(&format!("let {} = args[{}];\n", name, j));
@@ -926,7 +951,12 @@ impl CodegenJS {
                     .parameters
                     .iter()
                     .filter_map(|param| {
-                        if let AstNode::FunctionParameter { id: _, node } = &param.ast_node {
+                        if let AstNode::FunctionParameter {
+                            id: _,
+                            node,
+                            type_annotation: _,
+                        } = &param.ast_node
+                        {
                             if let AstNode::Identifier(ref name) = node.ast_node {
                                 return Some(name.clone());
                             }

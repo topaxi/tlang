@@ -88,6 +88,7 @@ impl DeclarationAnalyzer {
             AstNode::FunctionParameter {
                 ref id,
                 ref mut node,
+                type_annotation: _,
             } => self.collect_function_parameter(ast, *id, node),
             _ => {}
         }

@@ -550,10 +550,19 @@ impl<'src> Parser<'src> {
                     }
                 };
 
+                let type_annotation = match self.current_token {
+                    Some(Token::Colon) => {
+                        self.advance();
+                        self.parse_type_annotation()
+                    }
+                    _ => None,
+                };
+
                 log::debug!("Parsed parameter: {:?}", parameter);
                 parameters.push(node::new!(FunctionParameter {
                     id: self.unique_id(),
-                    node: Box::new(parameter)
+                    node: Box::new(parameter),
+                    type_annotation: type_annotation.map(Box::new),
                 }));
 
                 if let Some(Token::Comma) = self.current_token {
@@ -642,7 +651,7 @@ impl<'src> Parser<'src> {
             declaration: Box::new(FunctionDeclaration {
                 parameters,
                 body: Box::new(body),
-                return_type: return_type.map(Box::new),
+                return_type_annotation: return_type.map(Box::new),
             }),
         })
     }
@@ -728,7 +737,7 @@ impl<'src> Parser<'src> {
             declarations.push(FunctionDeclaration {
                 parameters,
                 body: Box::new(body),
-                return_type: return_type.map(Box::new),
+                return_type_annotation: return_type.map(Box::new),
             });
         }
 

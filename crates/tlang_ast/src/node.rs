@@ -49,7 +49,7 @@ impl<'a> From<&'a Token> for Node {
 pub struct FunctionDeclaration {
     pub parameters: Vec<Node>,
     pub body: Box<Node>,
-    pub return_type: Option<Box<Node>>,
+    pub return_type_annotation: Option<Box<Node>>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -92,6 +92,7 @@ pub enum AstNode {
     FunctionParameter {
         id: SymbolId,
         node: Box<Node>,
+        type_annotation: Option<Box<Node>>,
     },
     ReturnStatement(Option<Box<Node>>),
     Match {
