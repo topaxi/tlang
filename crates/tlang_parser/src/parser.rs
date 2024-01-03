@@ -269,7 +269,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_program(&mut self) -> Node {
-        AstNode::Program(self.parse_statements(false).0).into()
+        node::new!(Program(self.parse_statements(false).0))
     }
 
     fn parse_block(&mut self) -> Node {
@@ -277,7 +277,7 @@ impl<'src> Parser<'src> {
         let (statements, completion) = self.parse_statements(true);
         self.consume_token(Token::RBrace);
 
-        AstNode::Block(statements, completion).into()
+        node::new!(Block(statements, completion))
     }
 
     fn parse_variable_declaration(&mut self) -> Node {
@@ -347,8 +347,10 @@ impl<'src> Parser<'src> {
                 }
                 Some(Token::DotDotDot) => {
                     self.advance();
-                    AstNode::PrefixOp(PrefixOp::Rest, Box::new(self.parse_primary_expression()))
-                        .into()
+                    node::new!(PrefixOp(
+                        PrefixOp::Rest,
+                        Box::new(self.parse_primary_expression())
+                    ))
                 }
                 _ => {
                     self.panic_unexpected_token(
@@ -371,7 +373,7 @@ impl<'src> Parser<'src> {
 
         self.consume_token(Token::RBracket);
 
-        AstNode::List(elements).into()
+        node::new!(List(elements))
     }
 
     fn parse_list_expression(&mut self) -> Node {
@@ -403,7 +405,7 @@ impl<'src> Parser<'src> {
 
         self.consume_token(Token::RBracket);
 
-        AstNode::List(elements).into()
+        node::new!(List(elements))
     }
 
     fn parse_block_or_dict(&mut self) -> Node {
@@ -422,14 +424,14 @@ impl<'src> Parser<'src> {
                     }
                 }
                 self.consume_token(Token::RBrace);
-                return AstNode::Dict(elements).into();
+                return node::new!(Dict(elements));
             }
         }
 
         let (statements, completion) = self.parse_statements(true);
         self.consume_token(Token::RBrace);
 
-        AstNode::Block(statements, completion).into()
+        node::new!(Block(statements, completion))
     }
 
     fn parse_primary_expression(&mut self) -> Node {
