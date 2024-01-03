@@ -519,6 +519,53 @@ impl<'src> Parser<'src> {
         })
     }
 
+    fn parse_parameter_list(&mut self) -> Vec<Node> {
+        let mut parameters = Vec::new();
+
+        if self.current_token == Some(Token::LParen) {
+            self.consume_token(Token::LParen);
+
+            while self.current_token != Some(Token::RParen) {
+                let parameter = match self.current_token {
+                    // Literal values will be pattern matched
+                    Some(Token::Literal(_)) => self.parse_primary_expression(),
+                    // Identifiers can be namespaced identifiers or call expressions, which should be pattern matched.
+                    // Simple identifiers will be used as is and mapped to a function parameter.
+                    Some(Token::Identifier(_)) => {
+                        if let Some(Token::NamespaceSeparator) = self.peek_token() {
+                            self.parse_enum_extraction()
+                        } else if let Some(Token::LParen | Token::LBrace) = self.peek_token() {
+                            self.parse_enum_extraction()
+                        } else {
+                            node::new!(Identifier(self.consume_identifier()))
+                        }
+                    }
+                    Some(Token::LBracket) => self.parse_list_extraction(),
+                    _ => {
+                        self.panic_unexpected_token(
+                            "literal, identifier or list extraction",
+                            self.current_token.clone(),
+                        );
+                        unreachable!()
+                    }
+                };
+
+                log::debug!("Parsed parameter: {:?}", parameter);
+                parameters.push(node::new!(FunctionParameter {
+                    id: self.unique_id(),
+                    node: Box::new(parameter)
+                }));
+
+                if let Some(Token::Comma) = self.current_token {
+                    self.advance();
+                }
+            }
+            self.consume_token(Token::RParen);
+        }
+
+        parameters
+    }
+
     fn parse_function_expression(&mut self) -> Node {
         self.consume_token(Token::Fn);
         let name = if let Some(Token::Identifier(name)) = &self.current_token {
@@ -529,23 +576,9 @@ impl<'src> Parser<'src> {
             None
         };
 
-        let mut parameters = Vec::new();
-        if name.is_some() || self.current_token == Some(Token::LParen) {
-            self.consume_token(Token::LParen);
-            while self.current_token != Some(Token::RParen) {
-                parameters.push(node::new!(FunctionParameter {
-                    id: self.unique_id(),
-                    node: Box::new(node::new!(Identifier(self.consume_identifier(),)))
-                }));
-
-                if let Some(Token::Comma) = self.current_token {
-                    self.advance();
-                }
-            }
-            self.consume_token(Token::RParen);
-        }
-
+        let parameters = self.parse_parameter_list();
         let body = self.parse_block();
+
         node::new!(FunctionExpression {
             id: self.unique_id(),
             name: name,
@@ -629,46 +662,8 @@ impl<'src> Parser<'src> {
                 name = Some(current_definition_name.clone());
             }
 
-            self.consume_token(Token::LParen);
-
-            let mut parameters = Vec::new();
-            while self.current_token != Some(Token::RParen) {
-                let parameter = match self.current_token {
-                    // Literal values will be pattern matched
-                    Some(Token::Literal(_)) => self.parse_primary_expression(),
-                    // Identifiers can be namespaced identifiers or call expressions, which should be pattern matched.
-                    // Simple identifiers will be used as is and mapped to a function parameter.
-                    Some(Token::Identifier(_)) => {
-                        if let Some(Token::NamespaceSeparator) = self.peek_token() {
-                            self.parse_enum_extraction()
-                        } else if let Some(Token::LParen | Token::LBrace) = self.peek_token() {
-                            self.parse_enum_extraction()
-                        } else {
-                            node::new!(Identifier(self.consume_identifier()))
-                        }
-                    }
-                    Some(Token::LBracket) => self.parse_list_extraction(),
-                    _ => {
-                        self.panic_unexpected_token(
-                            "literal, identifier or list extraction",
-                            self.current_token.clone(),
-                        );
-                        unreachable!()
-                    }
-                };
-
-                log::debug!("Parsed parameter: {:?}", parameter);
-                parameters.push(node::new!(FunctionParameter {
-                    id: self.unique_id(),
-                    node: Box::new(parameter)
-                }));
-
-                if let Some(Token::Comma) = self.current_token {
-                    self.advance();
-                }
-            }
-            self.consume_token(Token::RParen);
-
+            self.expect_token(Token::LParen);
+            let parameters = self.parse_parameter_list();
             let body = self.parse_block();
 
             declarations.push(FunctionDeclaration {
