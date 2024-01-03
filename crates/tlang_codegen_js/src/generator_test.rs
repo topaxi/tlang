@@ -896,3 +896,71 @@ fn test_foldl_impl() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+#[ignore = "reimplement enums based on the draft below"]
+fn test_declare_methods_on_option_enum() {
+    // Static functions.
+    // fn Option::is_option(Option::Some(_)) { true }
+    // Methods on enum.
+    // fn Option.is_some(Option::Some(_)) { true }
+    let output = compile!(indoc! {"
+        enum Option {
+            Some(x),
+            None,
+        }
+
+        fn Option::is_option(Option::Some(_)) { true }
+        fn Option::is_option(Option::None) { true }
+        fn Option::is_option(_) { false }
+
+        fn Option.is_some(Option::Some(_)) { true }
+        fn Option.is_some(Option::None) { false }
+
+        fn Option.map(Option::Some(x), f) { Option::Some(f(x)) }
+        fn Option.map(Option::None, _) { Option::None }
+    "});
+    let expected_output = indoc! {"
+        class Option {
+            static Some(x) {
+                return new this({ tag: \"Some\", \"0\": x });
+            }
+            static get None() {
+                const None = new this({ tag: \"None\" });
+                Object.defineProperty(this, \"None\", { value: None });
+                return None;
+            }
+            constructor({ tag, ...fields }) {
+                this.tag = tag;
+                Object.assign(this, fields);
+            }
+            static is_option(...args) {
+                if (args[0].tag === \"Some\") {
+                    return true;
+                } else if (args[0].tag === \"None\") {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+            is_some(...args) {
+                if (this.tag === \"Some\") {
+                    return true;
+                } else if (this.tag === \"None\") {
+                    return false;
+                }
+            }
+            map(...args) {
+                if (this.tag === \"Some\") {
+                    let x = this[0];
+                    let f = args[0];
+                    return Option.Some(f(x));
+                } else if (this.tag === \"None\") {
+                    return Option.None;
+                }
+            }
+        }
+
+    "};
+    assert_eq!(output, expected_output);
+}
