@@ -685,12 +685,26 @@ impl CodegenJS {
         self.context_stack.pop();
     }
 
-    fn generate_function_declaration(&mut self, name: &str, declaration: &FunctionDeclaration) {
-        let is_tail_recursive = Self::is_function_body_tail_recursive(name, &declaration.body);
-        self.push_function_context(name, &declaration.parameters, is_tail_recursive, false);
+    fn fn_identifier_to_string(&self, name: &Node) -> String {
+        match &name.ast_node {
+            AstNode::Identifier(name) => name.clone(),
+            _ => todo!(),
+        }
+    }
+
+    fn generate_function_declaration(&mut self, name: &Node, declaration: &FunctionDeclaration) {
+        let name_as_str = self.fn_identifier_to_string(name);
+        let is_tail_recursive =
+            Self::is_function_body_tail_recursive(&name_as_str, &declaration.body);
+        self.push_function_context(
+            &name_as_str,
+            &declaration.parameters,
+            is_tail_recursive,
+            false,
+        );
 
         self.push_str(&self.get_indent());
-        self.push_str(&format!("function {}(", name));
+        self.push_str(&format!("function {}(", name_as_str));
 
         for (i, param) in declaration.parameters.iter().enumerate() {
             if i > 0 {
@@ -710,22 +724,25 @@ impl CodegenJS {
 
     fn generate_function_expression(
         &mut self,
-        name: &Option<String>,
+        name: &Option<Box<Node>>,
         declaration: &FunctionDeclaration,
     ) {
-        let is_tail_recursive = Self::is_function_body_tail_recursive(
-            &name.clone().unwrap_or("".to_string()).to_string(),
-            &declaration.body,
-        );
+        let name_as_str = if name.is_some() {
+            self.fn_identifier_to_string(&name.clone().unwrap())
+        } else {
+            "".to_string()
+        };
+        let is_tail_recursive =
+            Self::is_function_body_tail_recursive(&name_as_str, &declaration.body);
         self.push_function_context(
-            &name.clone().unwrap_or("".to_string()).to_string(),
+            &name_as_str,
             &declaration.parameters,
             is_tail_recursive,
             false,
         );
-        let function_keyword = match name {
-            Some(name) => format!("function {}(", name),
-            None => "function(".to_string(),
+        let function_keyword = match name_as_str.as_str() {
+            "" => "function(".to_string(),
+            _ => format!("function {}(", name_as_str),
         };
 
         self.push_str(&function_keyword);
@@ -746,13 +763,18 @@ impl CodegenJS {
         self.function_context_stack.pop();
     }
 
-    fn generate_function_declarations(&mut self, name: &str, declarations: &[FunctionDeclaration]) {
+    fn generate_function_declarations(
+        &mut self,
+        name: &Node,
+        declarations: &[FunctionDeclaration],
+    ) {
+        let name_as_str = self.fn_identifier_to_string(name);
         // TODO: Handle tail recursion for multiple definitions.
-        let is_any_definition_tail_recursive = declarations
-            .iter()
-            .any(|declaration| Self::is_function_body_tail_recursive(name, &declaration.body));
+        let is_any_definition_tail_recursive = declarations.iter().any(|declaration| {
+            Self::is_function_body_tail_recursive(&name_as_str, &declaration.body)
+        });
         self.push_str(&self.get_indent());
-        self.push_str(&format!("function {}(...args) {{\n", name));
+        self.push_str(&format!("function {}(...args) {{\n", name_as_str));
         self.indent_level += 1;
 
         if is_any_definition_tail_recursive {
@@ -944,7 +966,7 @@ impl CodegenJS {
             }
             // We handle the tail recursion case in multiple function body declarations ourselves higher up.
             self.push_function_context(
-                name,
+                &name_as_str,
                 &declaration.parameters,
                 is_any_definition_tail_recursive,
                 true,

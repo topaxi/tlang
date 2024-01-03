@@ -1,8 +1,10 @@
+use std::rc::Rc;
+
 use tlang_ast::token::{Literal, Token};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Lexer<'src> {
-    source: &'src str,
+    source: Rc<&'src str>,
     position: usize,
     current_line: usize,
     current_column: usize,
@@ -12,7 +14,7 @@ pub struct Lexer<'src> {
 impl Lexer<'_> {
     pub fn new(source: &str) -> Lexer {
         Lexer {
-            source,
+            source: source.into(),
             position: 0,
             current_line: 1,
             current_column: 1,
@@ -29,7 +31,7 @@ impl Lexer<'_> {
     }
 
     pub fn source(&self) -> &str {
-        self.source
+        self.source.as_ref()
     }
 
     fn peek_ahead(&self) -> Option<char> {

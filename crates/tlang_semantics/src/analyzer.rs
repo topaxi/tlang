@@ -138,7 +138,7 @@ impl SemanticAnalyzer {
     fn analyze_function_declaration(
         &mut self,
         _node: &mut Node,
-        _name: &str,
+        _name: &Node,
         declaration: &mut FunctionDeclaration,
     ) {
         for parameter in &mut declaration.parameters {
@@ -150,7 +150,7 @@ impl SemanticAnalyzer {
     fn analyze_function_declarations(
         &mut self,
         node: &mut Node,
-        name: &str,
+        name: &Node,
         declarations: &mut Vec<FunctionDeclaration>,
     ) {
         for declaration in declarations {

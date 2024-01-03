@@ -101,6 +101,20 @@ impl<'src> Parser<'src> {
         self.next_token.as_ref()
     }
 
+    fn save_state(&self) -> (Lexer<'src>, Option<Token>, Option<Token>) {
+        (
+            self.lexer.clone(),
+            self.current_token.clone(),
+            self.next_token.clone(),
+        )
+    }
+
+    fn restore_state(&mut self, state: (Lexer<'src>, Option<Token>, Option<Token>)) {
+        self.lexer = state.0;
+        self.current_token = state.1;
+        self.next_token = state.2;
+    }
+
     fn parse_statement(&mut self) -> (bool, Option<Node>) {
         debug!("Parsing statement {:?}", self.current_token);
 
@@ -155,6 +169,10 @@ impl<'src> Parser<'src> {
         }
 
         node::new!(ReturnStatement(Some(Box::new(self.parse_expression()))))
+    }
+
+    fn parse_single_identifier(&mut self) -> Node {
+        node::new!(Identifier(self.consume_identifier()))
     }
 
     fn parse_identifier(&mut self) -> Node {
@@ -434,6 +452,28 @@ impl<'src> Parser<'src> {
         node::new!(Block(statements, completion))
     }
 
+    /// Can be a Identifier, NestedIdentifier or FieldExpression with a single field name.
+    fn parse_function_name(&mut self) -> Node {
+        let mut identifiers = vec![self.consume_identifier()];
+
+        if let Some(Token::NamespaceSeparator) = self.current_token {
+            while let Some(Token::NamespaceSeparator) = self.current_token {
+                self.advance();
+                identifiers.push(self.consume_identifier());
+            }
+
+            node::new!(NestedIdentifier(identifiers))
+        } else if let Some(Token::Dot) = self.current_token {
+            self.advance();
+            node::new!(FieldExpression {
+                base: Box::new(node::new!(Identifier(identifiers.pop().unwrap()))),
+                field: Box::new(node::new!(Identifier(self.consume_identifier()))),
+            })
+        } else {
+            node::new!(Identifier(identifiers.pop().unwrap()))
+        }
+    }
+
     fn parse_primary_expression(&mut self) -> Node {
         match &self.current_token {
             Some(Token::LParen) => {
@@ -647,10 +687,8 @@ impl<'src> Parser<'src> {
 
     fn parse_function_expression(&mut self) -> Node {
         self.consume_token(Token::Fn);
-        let name = if let Some(Token::Identifier(name)) = &self.current_token {
-            let name = name.to_owned();
-            self.advance();
-            Some(name)
+        let name = if let Some(Token::Identifier(_)) = &self.current_token {
+            Some(self.parse_single_identifier())
         } else {
             None
         };
@@ -661,7 +699,7 @@ impl<'src> Parser<'src> {
 
         node::new!(FunctionExpression {
             id: self.unique_id(),
-            name: name,
+            name: name.map(Box::new),
             declaration: Box::new(FunctionDeclaration {
                 parameters,
                 body: Box::new(body),
@@ -726,21 +764,48 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_function_declaration(&mut self) -> Node {
-        let mut name: Option<String> = None;
+        let mut name: Option<Node> = None;
         let mut declarations: Vec<FunctionDeclaration> = Vec::new();
 
         while let Some(Token::Fn) = self.current_token {
-            if let Some(Token::Identifier(current_definition_name)) = self.peek_token() {
-                if name.is_some() && name.as_ref().unwrap() != current_definition_name {
+            if let Some(Token::Identifier(_)) = self.peek_token() {
+                // Found an identifier after the fn keyword. We have to check if it is the same.
+                // Parse ahead to get the identifier of the function, which might be an Identifier,
+                // NestedIdentifier or FieldExpression.
+                // We do this by cloning the lexer and advancing it until we find the identifier.
+                // If we find an identifier that is not the same as the one we already parsed, we stop
+                // parsing function declarations and replace the lexer with the cloned lexer.
+                // If we find the same identifier, we parse the function declaration and continue
+                // parsing function declarations.
+                let saved_state = self.save_state();
+
+                self.advance(); // Hope for the best and advance the lexer.
+
+                let node = self.parse_function_name();
+
+                if name.is_some() && name.as_ref().unwrap().ast_node != node.ast_node {
+                    // Not the same identifier, stop parsing function declarations and rewind the
+                    // lexer.
+                    self.restore_state(saved_state);
                     break;
                 }
-            }
 
-            self.advance();
-            let current_definition_name = self.consume_identifier();
-
-            if name.is_none() {
-                name = Some(current_definition_name.clone());
+                match node.ast_node {
+                    AstNode::Identifier(_) | AstNode::NestedIdentifier(_) => {
+                        // We found a simple identifier, which we can use as the name of the function.
+                        name = Some(node);
+                    }
+                    AstNode::FieldExpression { .. } => {
+                        // We found a field expression, which we can use as the name of the function.
+                        name = Some(node);
+                    }
+                    _ => {
+                        // We found something else, which we can't use as the name of the function.
+                        // Stop parsing function declarations and rewind the lexer and panic.
+                        self.restore_state(saved_state);
+                        self.panic_unexpected_token("identifier", self.current_token.clone());
+                    }
+                }
             }
 
             self.expect_token(Token::LParen);
@@ -760,14 +825,14 @@ impl<'src> Parser<'src> {
 
             return node::new!(FunctionDeclaration {
                 id: self.unique_id(),
-                name: name.unwrap(),
+                name: Box::new(name.unwrap()),
                 declaration: declaration
             });
         }
 
         node::new!(FunctionDeclarations {
             id: self.unique_id(),
-            name: name.unwrap(),
+            name: Box::new(name.unwrap()),
             declarations: declarations,
         })
     }

@@ -143,18 +143,44 @@ impl DeclarationAnalyzer {
         });
     }
 
+    /// TODO: This is a temporary solution. We need to find a better way to handle this.
+    fn fn_identifier_to_string(&self, identifier: &Node) -> String {
+        match identifier.ast_node {
+            AstNode::Identifier(ref name) => name.to_string(),
+            AstNode::NestedIdentifier(ref names) => names.join("::"),
+            AstNode::FieldExpression {
+                ref base,
+                ref field,
+            } => {
+                let base_name = match base.ast_node {
+                    AstNode::Identifier(ref name) => name.to_string(),
+                    _ => panic!("Expected identifier, found {:?}", base),
+                };
+
+                let field_name = match field.ast_node {
+                    AstNode::Identifier(ref name) => name.to_string(),
+                    _ => panic!("Expected identifier, found {:?}", field),
+                };
+
+                format!("{}.{}", base_name, field_name)
+            }
+            _ => panic!("Expected identifier, found {:?}", identifier.ast_node),
+        }
+    }
+
     fn collect_function_declaration(
         &mut self,
         node: &mut Node,
         id: SymbolId,
-        name: &String,
+        name: &Node,
         declaration: &mut FunctionDeclaration,
     ) {
+        let name_as_str = self.fn_identifier_to_string(name);
         let symbol_table = self.get_last_symbol_table_mut();
 
         symbol_table.borrow_mut().insert(SymbolInfo {
             id,
-            name: name.to_string(),
+            name: name_as_str,
             symbol_type: SymbolType::Function,
         });
 
@@ -174,14 +200,15 @@ impl DeclarationAnalyzer {
         &mut self,
         node: &mut Node,
         id: SymbolId,
-        name: &String,
+        name: &Node,
         declarations: &mut [FunctionDeclaration],
     ) {
+        let name_as_str = self.fn_identifier_to_string(name);
         let symbol_table = self.get_last_symbol_table_mut();
 
         symbol_table.borrow_mut().insert(SymbolInfo {
             id,
-            name: name.to_string(),
+            name: name_as_str,
             symbol_type: SymbolType::Function,
         });
 

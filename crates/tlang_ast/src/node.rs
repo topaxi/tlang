@@ -77,17 +77,17 @@ pub enum AstNode {
     },
     FunctionDeclaration {
         id: SymbolId,
-        name: String,
+        name: Box<Node>,
         declaration: Box<FunctionDeclaration>,
     },
     FunctionDeclarations {
         id: SymbolId,
-        name: String,
+        name: Box<Node>,
         declarations: Vec<FunctionDeclaration>,
     },
     FunctionExpression {
         id: SymbolId,
-        name: Option<String>,
+        name: Option<Box<Node>>,
         declaration: Box<FunctionDeclaration>,
     },
     FunctionParameter {
