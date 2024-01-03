@@ -73,6 +73,7 @@ pub enum AstNode {
         id: SymbolId,
         name: String,
         value: Box<Node>,
+        type_annotation: Option<Box<Node>>,
     },
     FunctionDeclaration {
         id: SymbolId,

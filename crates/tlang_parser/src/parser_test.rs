@@ -29,6 +29,7 @@ fn test_simple_variable_declaration() {
                 lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
                 rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
             })),
+            type_annotation: None,
         })]))
     );
 }
@@ -121,11 +122,13 @@ fn test_simple_arithmetic_with_identifiers() {
                 id: SymbolId::new(1),
                 name: "x".to_string(),
                 value: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                type_annotation: None,
             }),
             node::new!(VariableDeclaration {
                 id: SymbolId::new(2),
                 name: "y".to_string(),
                 value: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                type_annotation: None,
             }),
             node::new!(ExpressionStatement(Box::new(node::new!(BinaryOp {
                 op: BinaryOp::Add,
@@ -215,7 +218,8 @@ fn test_block_expression() {
                     }
                 ))))],
                 None
-            )))
+            ))),
+            type_annotation: None,
         })]))
     );
 }
@@ -364,7 +368,8 @@ fn test_if_expression() {
                     ))))],
                     None
                 )))),
-            }))
+            })),
+            type_annotation: None,
         })]))
     );
 }
@@ -534,7 +539,8 @@ fn test_nameless_function_expressions() {
                         None
                     )))
                 })
-            }))
+            })),
+            type_annotation: None,
         })]))
     );
 
@@ -573,7 +579,8 @@ fn test_nameless_function_expressions() {
                         None
                     )))
                 })
-            }))
+            })),
+            type_annotation: None,
         })]))
     );
 }
@@ -604,7 +611,8 @@ fn test_function_expression_without_name_no_argument_parenthesis() {
                         None
                     )))
                 })
-            }))
+            })),
+            type_annotation: None,
         })]))
     );
 }
@@ -635,7 +643,8 @@ fn test_function_expressions() {
                         None
                     )))
                 })
-            }))
+            })),
+            type_annotation: None,
         })]))
     );
 
@@ -674,7 +683,8 @@ fn test_function_expressions() {
                         None
                     )))
                 })
-            }))
+            })),
+            type_annotation: None,
         })]))
     );
 }
@@ -704,7 +714,8 @@ fn test_pattern_matching() {
                         expression: Box::new(node::new!(Literal(Literal::Integer(5)))),
                     })
                 ]
-            }))
+            })),
+            type_annotation: None,
         })]))
     );
 }
@@ -777,7 +788,8 @@ fn test_explicit_return_statements() {
                         None
                     )))
                 })
-            }))
+            })),
+            type_annotation: None,
         })]))
     );
 }
@@ -843,7 +855,8 @@ fn test_implicit_return_expressions() {
                         })))
                     )))
                 })
-            }))
+            })),
+            type_annotation: None,
         })]))
     );
 
@@ -862,6 +875,7 @@ fn test_implicit_return_expressions() {
                         id: SymbolId::new(1),
                         name: "x".to_string(),
                         value: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                        type_annotation: None,
                     })],
                     Some(Box::new(node::new!(Identifier("x".to_string()))))
                 )))
@@ -1159,7 +1173,8 @@ fn test_list_literal() {
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(1),
             name: "x".to_string(),
-            value: Box::new(node::new!(List(vec![])))
+            value: Box::new(node::new!(List(vec![]))),
+            type_annotation: None,
         })]))
     );
 
@@ -1174,7 +1189,8 @@ fn test_list_literal() {
                 node::new!(Literal(Literal::Integer(1))),
                 node::new!(Literal(Literal::Integer(2))),
                 node::new!(Literal(Literal::Integer(3))),
-            ])))
+            ]))),
+            type_annotation: None,
         })]))
     );
 }
@@ -1192,7 +1208,8 @@ fn test_list_literal_with_trailing_comma() {
                 node::new!(Literal(Literal::Integer(1))),
                 node::new!(Literal(Literal::Integer(2))),
                 node::new!(Literal(Literal::Integer(3))),
-            ])))
+            ]))),
+            type_annotation: None,
         })]))
     );
 }
@@ -1271,7 +1288,8 @@ fn test_dictionary_literal() {
                     node::new!(Identifier("bar".to_string())),
                     node::new!(Literal(Literal::Integer(2))),
                 )
-            ])))
+            ]))),
+            type_annotation: None,
         })]))
     );
 }
@@ -1338,7 +1356,8 @@ fn test_enums() {
                         "Some".to_string()
                     ]))),
                     arguments: vec![node::new!(Literal(Literal::Integer(42)))]
-                }))
+                })),
+                type_annotation: None,
             }),
         ]))
     );
@@ -1384,8 +1403,9 @@ fn test_enums_with_fields() {
                     arguments: vec![node::new!(Dict(vec![(
                         node::new!(Identifier("x".to_string())),
                         node::new!(Literal(Literal::Integer(42))),
-                    )]))]
-                }))
+                    )]))],
+                })),
+                type_annotation: None,
             }),
         ]))
     );
@@ -1574,7 +1594,8 @@ fn test_enum_tree_max_depth() {
                                         })
                                     )
                                 ]))]
-                            }))
+                            })),
+                            type_annotation: None,
                         })],
                         None
                     )))
@@ -1825,7 +1846,8 @@ fn test_dynamic_index_access() {
             value: Box::new(node::new!(IndexExpression {
                 base: Box::new(node::new!(Identifier("foo".to_string()))),
                 index: Box::new(node::new!(Literal(Literal::Integer(1)))),
-            }))
+            })),
+            type_annotation: None,
         })]))
     );
 
@@ -1842,9 +1864,81 @@ fn test_dynamic_index_access() {
                     index: Box::new(node::new!(Literal(Literal::Integer(1)))),
                 })),
                 index: Box::new(node::new!(Literal(Literal::Integer(2)))),
-            }))
+            })),
+            type_annotation: None,
         })]))
     );
+}
+
+#[test]
+fn test_variable_declaration_type_annotation() {
+    let program = parse!("let x: i64 = 1;");
+
+    assert_eq!(
+        program,
+        node::new!(Program(vec![node::new!(VariableDeclaration {
+            id: SymbolId::new(1),
+            name: "x".to_string(),
+            value: Box::new(node::new!(Literal(Literal::Integer(1)))),
+            type_annotation: Some(Box::new(node::new!(TypeAnnotation {
+                name: Box::new(node::new!(Identifier("i64".to_string()))),
+                parameters: vec![]
+            })))
+        })]))
+    );
+
+    let program = parse!("let x: Option<i64> = 1;");
+
+    assert_eq!(
+        program,
+        node::new!(Program(vec![node::new!(VariableDeclaration {
+            id: SymbolId::new(1),
+            name: "x".to_string(),
+            value: Box::new(node::new!(Literal(Literal::Integer(1)))),
+            type_annotation: Some(Box::new(node::new!(TypeAnnotation {
+                name: Box::new(node::new!(Identifier("Option".to_string()))),
+                parameters: vec![node::new!(TypeAnnotation {
+                    name: Box::new(node::new!(Identifier("i64".to_string()))),
+                    parameters: vec![]
+                })]
+            })))
+        })]))
+    );
+
+    let program = parse!("let x: std::hash::Map<str, i64> = std::hash::Map();");
+
+    assert_eq!(
+        program,
+        node::new!(Program(vec![node::new!(VariableDeclaration {
+            id: SymbolId::new(1),
+            name: "x".to_string(),
+            value: Box::new(node::new!(Call {
+                function: Box::new(node::new!(NestedIdentifier(vec![
+                    "std".to_string(),
+                    "hash".to_string(),
+                    "Map".to_string()
+                ]))),
+                arguments: vec![]
+            })),
+            type_annotation: Some(Box::new(node::new!(TypeAnnotation {
+                name: Box::new(node::new!(NestedIdentifier(vec![
+                    "std".to_string(),
+                    "hash".to_string(),
+                    "Map".to_string()
+                ]))),
+                parameters: vec![
+                    node::new!(TypeAnnotation {
+                        name: Box::new(node::new!(Identifier("str".to_string()))),
+                        parameters: vec![]
+                    }),
+                    node::new!(TypeAnnotation {
+                        name: Box::new(node::new!(Identifier("i64".to_string()))),
+                        parameters: vec![]
+                    })
+                ]
+            })))
+        })]))
+    )
 }
 
 #[test]
@@ -1915,7 +2009,8 @@ fn test_return_type_annotation() {
                         parameters: vec![]
                     })))
                 })
-            }))
+            })),
+            type_annotation: None,
         })]))
     );
 }

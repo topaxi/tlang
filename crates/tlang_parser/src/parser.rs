@@ -283,6 +283,13 @@ impl<'src> Parser<'src> {
     fn parse_variable_declaration(&mut self) -> Node {
         self.consume_token(Token::Let);
         let name = self.consume_identifier();
+        let type_annotation = match self.current_token {
+            Some(Token::Colon) => {
+                self.advance();
+                self.parse_type_annotation()
+            }
+            _ => None,
+        };
         self.consume_token(Token::EqualSign);
         let value = self.parse_expression();
 
@@ -290,6 +297,7 @@ impl<'src> Parser<'src> {
             id: self.unique_id(),
             name: name,
             value: Box::new(value),
+            type_annotation: type_annotation.map(Box::new),
         })
     }
 

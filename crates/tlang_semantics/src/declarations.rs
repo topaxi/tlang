@@ -74,6 +74,7 @@ impl DeclarationAnalyzer {
                 ref id,
                 ref name,
                 ref mut value,
+                type_annotation: _,
             } => self.collect_variable_declaration(ast, *id, name, value),
             AstNode::FunctionDeclaration {
                 ref id,

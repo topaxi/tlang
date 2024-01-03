@@ -375,7 +375,7 @@ impl CodegenJS {
                     self.push_char(')');
                 }
             }
-            AstNode::VariableDeclaration { id: _, name, value } => {
+            AstNode::VariableDeclaration { id: _, name, value , type_annotation: _} => {
                 self.push_str(&self.get_indent());
                 let name = self.scopes.declare_variable(name);
                 self.push_str(&format!("let {} = ", name));

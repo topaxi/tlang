@@ -75,6 +75,7 @@ impl SemanticAnalyzer {
                 id,
                 ref name,
                 ref mut value,
+                type_annotation: _,
             } => self.analyze_variable_declaration(id, name, value),
             AstNode::FunctionDeclaration {
                 id: _,
