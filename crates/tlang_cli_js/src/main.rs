@@ -64,7 +64,7 @@ fn compile(source: &str) -> String {
     let mut parser = tlang_parser::parser::Parser::from_source(source);
     let ast = parser.parse();
     let mut semantic_analyzer = SemanticAnalyzer::default();
-    semantic_analyzer.add_builtin_symbols(vec![
+    semantic_analyzer.add_builtin_symbols(&[
         ("log", SymbolType::Function),
         ("max", SymbolType::Function),
         ("min", SymbolType::Function),

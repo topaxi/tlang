@@ -19,7 +19,19 @@ macro_rules! analyze {
 #[test]
 #[should_panic(expected = "Undefined symbol: b")]
 fn test_should_panic_on_undefined_symbol() {
+    analyze!("b;");
+}
+
+#[test]
+#[should_panic(expected = "Undefined symbol: b")]
+fn test_should_panic_on_undefined_symbol_in_variable_declaration() {
     analyze!("let a = b;");
+}
+
+#[test]
+#[should_panic(expected = "Undefined symbol: b")]
+fn test_should_panic_on_undefined_function() {
+    analyze!("b();");
 }
 
 #[test]

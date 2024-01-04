@@ -47,12 +47,12 @@ impl DeclarationAnalyzer {
         self.symbol_table_stack.pop().unwrap()
     }
 
-    pub fn add_builtin_symbols(&mut self, symbols: Vec<(&str, SymbolType)>) {
+    pub fn add_builtin_symbols(&mut self, symbols: &[(&str, SymbolType)]) {
         for (name, symbol_type) in symbols {
             self.root_symbol_table().borrow_mut().insert(SymbolInfo {
                 id: SymbolId::new(0), // Builtins have ID 0 for now.
                 name: name.to_string(),
-                symbol_type,
+                symbol_type: symbol_type.clone(),
             });
         }
     }

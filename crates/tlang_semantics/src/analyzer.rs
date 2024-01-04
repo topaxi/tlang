@@ -38,7 +38,7 @@ impl SemanticAnalyzer {
         self.symbol_table_stack.pop().unwrap()
     }
 
-    pub fn add_builtin_symbols(&mut self, symbols: Vec<(&str, SymbolType)>) {
+    pub fn add_builtin_symbols(&mut self, symbols: &[(&str, SymbolType)]) {
         self.declaration_analyzer.add_builtin_symbols(symbols)
     }
 
@@ -102,6 +102,12 @@ impl SemanticAnalyzer {
                     panic!("Undefined symbol: {}", name);
                 }
             }
+            AstNode::Call {
+                ref mut function,
+                ref mut arguments,
+            } => {
+                self.analyze_call(function, arguments);
+            }
             AstNode::BinaryOp {
                 op: _,
                 ref mut lhs,
@@ -161,5 +167,12 @@ impl SemanticAnalyzer {
     fn analyze_function_parameter(&mut self, _node: &mut Node, _name: &mut Node) {
         // TODO: In case we have default arguments, we'll have to check whether the used nodes are
         // declared.
+    }
+
+    fn analyze_call(&mut self, function: &mut Box<Node>, arguments: &mut [Node]) {
+        self.analyze_node(function);
+        for argument in arguments {
+            self.analyze_node(argument);
+        }
     }
 }

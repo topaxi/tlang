@@ -11,6 +11,7 @@ macro_rules! analyze {
         let mut parser = Parser::from_source($source);
         let mut ast = parser.parse();
         let mut analyzer = SemanticAnalyzer::default();
+        analyzer.add_builtin_symbols(&[("panic", SymbolType::Function)]);
         analyzer.analyze(&mut ast);
         ast
     }};
