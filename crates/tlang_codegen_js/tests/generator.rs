@@ -402,3 +402,36 @@ fn test_declare_methods_on_option_enum() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+#[ignore = "implement structs based on the draft below"]
+fn test_declare_methods_on_struct() {
+    let output = compile!(indoc! {"
+        struct Point {
+            x,
+            y,
+        }
+        fn Point::new(x, y) { Point { x, y } }
+        fn Point.x(self) { self.x }
+        fn Point.y(self) { self.y }
+    "});
+    // TODO: Based on classes? Or reinvent things?
+    let expected_output = indoc! {"
+        class Point {
+            static new(x, y) {
+                return new this({ x, y });
+            }
+            constructor({ x, y }) {
+                this.x = x;
+                this.y = y;
+            }
+            x() {
+                return this.x;
+            }
+            y() {
+                return this.y;
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
