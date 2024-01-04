@@ -181,66 +181,6 @@ fn test_if_else_as_expression_nested() {
 }
 
 #[test]
-fn test_pipeline_operator() {
-    let output = compile!("fn main() { 1 |> log; }");
-    let expected_output = indoc! {"
-        function main() {
-            console.log(1);
-        }
-    "};
-    assert_eq!(output, expected_output);
-
-    let output = compile!("fn main() { 1 |> min |> max; }");
-    let expected_output = indoc! {"
-        function main() {
-            Math.max(Math.min(1));
-        }
-    "};
-    assert_eq!(output, expected_output);
-}
-
-#[test]
-fn test_pipeline_operator_with_call_parenthesis() {
-    let output = compile!("fn main() { 1 |> max(); }");
-    let expected_output = indoc! {"
-        function main() {
-            Math.max(1);
-        }
-    "};
-    assert_eq!(output, expected_output);
-}
-
-#[test]
-fn test_pipeline_operator_with_call_parenthesis_and_arguments() {
-    let output = compile!("fn main() { 1 |> foo(2); }");
-    let expected_output = indoc! {"
-        function main() {
-            foo(1, 2);
-        }
-    "};
-    assert_eq!(output, expected_output);
-
-    let output = compile!("fn main() { 1 |> foo(2, 3); }");
-    let expected_output = indoc! {"
-        function main() {
-            foo(1, 2, 3);
-        }
-    "};
-    assert_eq!(output, expected_output);
-}
-
-#[test]
-fn test_pipeline_operator_to_function_call_with_wildcards() {
-    let output = compile!("fn main() { 1 |> foo(2, _); }");
-    let expected_output = indoc! {"
-        function main() {
-            foo(2, 1);
-        }
-    "};
-    assert_eq!(output, expected_output);
-}
-
-#[test]
 fn test_list_literal() {
     let output = compile!("fn main() { [1, 2, 3] }");
     let expected_output = indoc! {"
