@@ -1,0 +1,43 @@
+[env]
+CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = true
+
+[config]
+skip_core_tasks = true
+
+[tasks.build]
+command = "cargo"
+args = ["build", "--release", "--target", "wasm32-unknown-unknown"]
+
+[tasks.cargo-clean]
+command = "cargo"
+args = ["clean"]
+
+[tasks.wasm-clean]
+command = "rm"
+args = ["-rf", "wasm"]
+
+[tasks.clean]
+dependencies = ["cargo-clean", "wasm-clean"]
+
+[tasks.wasm-bindgen]
+command = "wasm-bindgen"
+args = ["--target", "web", "../../target/wasm32-unknown-unknown/release/tlang_bindings_js.wasm", "--out-dir", "wasm"]
+
+[tasks.wasm-opt-prepare]
+command = "mv"
+args = ["wasm/tlang_bindings_js_bg.wasm", "wasm/tlang_bindings_js_bg.unoptimized.wasm"]
+
+[tasks.wasm-opt]
+command = "wasm-opt"
+args = ["-Oz", "-o", "wasm/tlang_bindings_js_bg.wasm", "wasm/tlang_bindings_js_bg.unoptimized.wasm"]
+dependencies = ["wasm-opt-prepare"]
+
+[tasks.wasm-opt-cleanup]
+command = "rm"
+args = ["wasm/tlang_bindings_js_bg.unoptimized.wasm"]
+
+[tasks.custom-default]
+dependencies = ["build", "wasm-bindgen", "wasm-opt", "wasm-opt-cleanup"]
+
+[tasks.default]
+alias = "custom-default"

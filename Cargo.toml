@@ -11,3 +11,10 @@ edition = "2021"
 log = "0.4"
 indoc = "2"
 pretty_assertions = "1"
+
+[profile.release]
+opt-level = 's'
+# Disabling parallel codegen speeds enables to analyze the generated code with focus on smallest file size.
+# This shaved off around 20kb from the final binary size, at the time of writing.
+codegen-units = 1
+lto = true

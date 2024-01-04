@@ -1,0 +1,10 @@
+{
+  "name": "tlang",
+  "version": "1.0.0",
+  "description": "A simple programming language",
+  "type": "module",
+  "main": "wasm/tlang_bindings_js.js",
+  "scripts": {
+    "build": "cargo +nightly make"
+  }
+}
