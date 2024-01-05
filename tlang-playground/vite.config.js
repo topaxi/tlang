@@ -5,4 +5,9 @@ export default defineConfig({
   plugins: [
     wasm(),
   ],
+  server: {
+    fs: {
+      allow: ['..']
+    }
+  }
 });
