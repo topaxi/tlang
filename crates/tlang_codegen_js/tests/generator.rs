@@ -105,6 +105,20 @@ fn test_block_expression() {
 }
 
 #[test]
+#[ignore = "implement block expressions with statements"]
+fn test_block_expression_with_statements() {
+    let output = compile!("let one = { let x = 1; x };");
+    let expected_output = indoc! {"
+        let $tmp$a;{
+            let x = 1;
+            $tmp$a = x;
+        };
+        let one = $tmp$a;
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
 fn test_if_else() {
     let output = compile!("if true { 1; } else { 2; }");
     let expected_output = indoc! {"

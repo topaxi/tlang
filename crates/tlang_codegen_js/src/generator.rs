@@ -253,6 +253,46 @@ impl CodegenJS {
                     self.flush_statement_buffer();
                 }
             }
+            AstNode::Block(statements, expression) if self.current_context() == BlockContext::Expression => {
+                self.push_scope();
+
+                for statement in statements {
+                    self.generate_node(statement, None);
+                    self.flush_statement_buffer();
+                }
+
+                if expression.is_none() {
+                    self.flush_statement_buffer();
+                    self.pop_scope();
+                    return;
+                }
+
+                // In a case of `let a = { 1 }`, we want to render the expression as a statement.
+                // We do this by temporarily swapping the statement buffer, generating the
+                // expression as an statement, and then swapping the statement buffer back.
+                // TODO: This doesn't really work with statements within the block.
+                //       Alternatively we could render the blocks as IIFE's instead, which might be
+                //       much easier to handle, as they are allowed in expression position.
+                //       Using blocks could be a future optimization.
+                let statement_buffer = std::mem::take(&mut self.current_statement_buffer);
+                let completion_tmp_var = self.scopes.declare_tmp_variable();
+                self.push_str(&self.get_indent());
+                self.push_str(&format!("let {};{{\n", completion_tmp_var));
+                self.indent_level += 1;
+                self.push_str(&self.get_indent());
+                self.push_str(&format!("{} = ", completion_tmp_var));
+                self.generate_node(expression.as_ref().unwrap(), None);
+                self.push_str(";\n");
+                self.indent_level -= 1;
+                self.push_str(&self.get_indent());
+                self.push_str("};\n");
+                self.flush_statement_buffer();
+                self.current_statement_buffer = statement_buffer;
+                self.push_str(completion_tmp_var.as_str());
+
+                self.flush_statement_buffer();
+                self.pop_scope();
+            }
             AstNode::Block(statements, expression) => {
                 self.push_scope();
 
@@ -266,47 +306,25 @@ impl CodegenJS {
                     return;
                 }
 
-                match self.current_context() {
-                    BlockContext::FunctionBody => {
-                        // We only render the return statement if we are not in a tail recursive function body
-                        // and the node is RecursiveCall pointing to the current function.
-                        if let Some(function_context) = self.function_context_stack.last() {
-                            if function_context.is_tail_recursive && expression.is_some() {
-                                if let AstNode::RecursiveCall(_) = expression.as_ref().unwrap().ast_node {
-                                    self.generate_node(expression.as_ref().unwrap(), None);
-                                    return;
-                                }
+                if let BlockContext::FunctionBody = self.current_context() {
+                    // We only render the return statement if we are not in a tail recursive function body
+                    // and the node is RecursiveCall pointing to the current function.
+                    if let Some(function_context) = self.function_context_stack.last() {
+                        if function_context.is_tail_recursive && expression.is_some() {
+                            if let AstNode::RecursiveCall(_) = expression.as_ref().unwrap().ast_node {
+                                self.generate_node(expression.as_ref().unwrap(), None);
+                                return;
                             }
                         }
+                    }
 
-                        self.push_str(&self.get_indent());
-                        self.push_str("return ");
-                        self.generate_node(expression.as_ref().unwrap(), None);
-                        self.push_str(";\n");
-                    }
-                    _ => {
-                        // In a case of `let a = { 1 }`, we want to render the expression as a statement.
-                        // We do this by temporarily swapping the statement buffer, generating the
-                        // expression as an statement, and then swapping the statement buffer back.
-                        let statement_buffer = std::mem::take(&mut self.current_statement_buffer);
-                        let tmp_var = self.scopes.declare_tmp_variable();
-                        self.push_str(&self.get_indent());
-                        self.push_str(&format!("let {};{{\n", tmp_var));
-                        self.indent_level += 1;
-                        self.push_str(&self.get_indent());
-                        self.push_str(&format!("{} = ", tmp_var));
-                        self.generate_node(expression.as_ref().unwrap(), None);
-                        self.push_str(";\n");
-                        self.indent_level -= 1;
-                        self.push_str(&self.get_indent());
-                        self.push_str("};\n");
-                        self.flush_statement_buffer();
-                        self.current_statement_buffer = statement_buffer;
-                        self.push_str(tmp_var.as_str());
-                    }
+                    self.push_str(&self.get_indent());
+                    self.push_str("return ");
+                    self.generate_node(expression.as_ref().unwrap(), None);
+                    self.push_str(";\n");
+                    self.flush_statement_buffer();
                 }
 
-                self.flush_statement_buffer();
                 self.pop_scope();
             }
             AstNode::ExpressionStatement(expression) => {
@@ -416,7 +434,9 @@ impl CodegenJS {
                 self.push_str(&self.get_indent());
                 let name = self.scopes.declare_variable(name);
                 self.push_str(&format!("let {} = ", name));
+                self.context_stack.push(BlockContext::Expression);
                 self.generate_node(value, None);
+                self.context_stack.pop();
                 self.push_str(";\n");
             }
             AstNode::Match {
