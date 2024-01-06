@@ -39,6 +39,19 @@ export class TlangPlayground extends LitElement {
       border-bottom: 1px solid var(--ctp-macchiato-surface0);
     }
 
+    .output {
+      border-left: 1px solid var(--ctp-macchiato-surface0);
+    }
+
+    .console {
+      margin-top: 1rem;
+    }
+
+    .console-toolbar {
+      display: flex;
+      gap: 1rem;
+    }
+
     .output-console {
       border-top: 1px solid var(--ctp-macchiato-surface0);
     }
@@ -48,7 +61,7 @@ export class TlangPlayground extends LitElement {
   source = examples['factorial.tl'];
 
   @state()
-  consoleOutput: unknown[][] = [];
+  consoleOutput: Array<unknown[] | string> = [];
 
   @state()
   display: 'ast' | 'semanticAST' | 'output' = 'output';
@@ -82,7 +95,9 @@ export class TlangPlayground extends LitElement {
   }
 
   run() {
-    this.consoleOutput = [];
+    if (this.consoleOutput.length > 0) {
+      this.consoleOutput.push("---");
+    }
 
     let fn = new Function('console', this.output);
 
@@ -108,8 +123,12 @@ export class TlangPlayground extends LitElement {
     this.codemirror.source = examples[target.value];
   }
 
-  renderLogMessage(args: unknown[]) {
-    return html`<div class="log-message">${args.map(arg => JSON.stringify(arg)).join(' ')}</div>`
+  renderLogMessage(args: string | unknown[]) {
+    return html`
+      <div class="log-message">
+        ${typeof args === 'string' ? args : args.map(arg => JSON.stringify(arg)).join(', ')}
+      </div>
+    `;
   }
 
   render() {
@@ -133,9 +152,10 @@ export class TlangPlayground extends LitElement {
           ${this.display === 'output' ? html`<pre class="output-code">${this.output}</pre>` : ''}
           <div class="console">
             <div class="console-toolbar">
+              <div>Console</div>
               <button @click=${() => this.consoleOutput = []}>Clear</button>
             </div>
-            <pre class="output-console">${this.consoleOutput.map(args => this.renderLogMessage(args))}</pre>
+            <div class="output-console">${this.consoleOutput.map(args => this.renderLogMessage(args))}</div>
           </div>
         </div>
       </div>
