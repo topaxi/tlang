@@ -31,6 +31,7 @@ export class TlangPlayground extends LitElement {
     }
 
     pre {
+      font-family: inherit;
       margin: 0;
     }
 

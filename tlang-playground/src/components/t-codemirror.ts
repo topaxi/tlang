@@ -1,10 +1,16 @@
 import { EditorView, basicSetup } from "codemirror"
 import { catppuccin } from 'codemirror-theme-catppuccin'
-import { LitElement } from "lit";
+import { LitElement, css } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
 @customElement('t-codemirror')
 export class TCodeMirror extends LitElement {
+  static styles = css`
+    :host .cm-scroller {
+      font-family: inherit;
+    }
+  `;
+
   private view: EditorView | null = null
 
   @property()
