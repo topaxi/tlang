@@ -40,7 +40,7 @@ jobs:
           cargo install -f cargo-make
 
       - name: Install binaryen
-        run: apt install -y binaryen
+        run: sudo apt install -y binaryen
 
       - name: Install wasm toolchain
         run: |
