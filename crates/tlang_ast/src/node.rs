@@ -143,6 +143,11 @@ pub enum AstNode {
         base: Box<Node>,
         index: Box<Node>,
     },
+    Range {
+        start: Box<Node>,
+        end: Box<Node>,
+        inclusive: bool,
+    },
     TypeAnnotation {
         name: Box<Node>,
         parameters: Vec<Node>,
