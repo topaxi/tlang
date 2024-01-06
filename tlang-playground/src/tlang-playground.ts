@@ -1,7 +1,10 @@
-import { LitElement, css, html } from 'lit'
-import { customElement, state } from 'lit/decorators.js'
+import { LitElement, PropertyValueMap, css, html } from 'lit'
+import { customElement, query, state } from 'lit/decorators.js'
 import init, { compile_to_js, parse_and_analyze, parse_to_ast } from 'tlang_bindings_js'
 import { examples } from './examples';
+
+import './components/t-codemirror';
+import { TCodeMirror } from './components/t-codemirror';
 
 await init();
 
@@ -26,6 +29,18 @@ export class TlangPlayground extends LitElement {
       overflow: auto;
       max-height: 100%;
     }
+
+    pre {
+      margin: 0;
+    }
+
+    .log-message {
+      border-bottom: 1px solid var(--ctp-macchiato-surface0);
+    }
+
+    .output-console {
+      border-top: 1px solid var(--ctp-macchiato-surface0);
+    }
   `
 
   @state()
@@ -37,16 +52,32 @@ export class TlangPlayground extends LitElement {
   @state()
   display: 'ast' | 'semanticAST' | 'output' = 'output';
 
+  @query('t-codemirror')
+  codemirror!: TCodeMirror;
+
   get output() {
-    return compile_to_js(this.source);
+    try {
+      return compile_to_js(this.source);
+    } catch (error: any) {
+      return error.message;
+    }
   }
 
   get ast() {
-    return parse_to_ast(this.source);
+    try {
+      return parse_to_ast(this.source);
+    }
+    catch (error: any) {
+      return error.message;
+    }
   }
 
   get semanticAST() {
-    return parse_and_analyze(this.source);
+    try {
+      return parse_and_analyze(this.source);
+    } catch (error: any) {
+      return error.message;
+    }
   }
 
   run() {
@@ -61,16 +92,19 @@ export class TlangPlayground extends LitElement {
     });
   }
 
-  handleInput(event: Event) {
-    const target = event.target as HTMLTextAreaElement
-    this.source = target.value
+  protected firstUpdated(_changedProperties: PropertyValueMap<any> | Map<PropertyKey, unknown>): void {
+    this.codemirror.source = this.source;
+  }
+
+  handleSourceChange(event: CustomEvent) {
+    this.source = event.detail.source;
     this.consoleOutput = [];
   }
 
   handleSelect(event: Event) {
     const target = event.target as HTMLSelectElement
-    this.source = examples[target.value]
     this.consoleOutput = [];
+    this.codemirror.source = examples[target.value];
   }
 
   renderLogMessage(args: unknown[]) {
@@ -91,12 +125,17 @@ export class TlangPlayground extends LitElement {
         </select>
       </div>
       <div class="editor">
-        <textarea spellcheck="false" .value=${this.source} @input=${this.handleInput}></textarea>
+        <t-codemirror @source-change=${this.handleSourceChange}></t-codemirror>
         <div class="output">
           ${this.display === 'ast' ? html`<pre class="output-ast">${this.ast}</pre>` : ''}
           ${this.display === 'semanticAST' ? html`<pre class="output-ast">${this.semanticAST}</pre>` : ''}
           ${this.display === 'output' ? html`<pre class="output-code">${this.output}</pre>` : ''}
-          <pre class="output-console">${this.consoleOutput.map(args => this.renderLogMessage(args))}</pre>
+          <div class="console">
+            <div class="console-toolbar">
+              <button @click=${() => this.consoleOutput = []}>Clear</button>
+            </div>
+            <pre class="output-console">${this.consoleOutput.map(args => this.renderLogMessage(args))}</pre>
+          </div>
         </div>
       </div>
     `
