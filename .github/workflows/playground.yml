@@ -63,7 +63,7 @@ jobs:
 
       - name: Build playground
         working-directory: tlang-playground
-        run: npm run build
+        run: npm run build -- --base=/tlang
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
