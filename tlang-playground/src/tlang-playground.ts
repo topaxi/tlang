@@ -32,6 +32,7 @@ export class TlangPlayground extends LitElement {
 
     .toolbar {
       display: flex;
+      gap: 1ch;
       grid-area: toolbar;
     }
 
