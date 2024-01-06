@@ -152,10 +152,11 @@ export class TlangPlayground extends LitElement {
     this.consoleOutput = [];
   }
 
-  handleSelect(event: Event) {
+  handleExampleSelect(event: Event) {
     const target = event.target as HTMLSelectElement
     this.consoleOutput = [];
     this.codemirror.source = examples[target.value];
+    window.location.hash = `example=${encodeURIComponent(target.value)}`;
   }
 
   renderLogMessage(args: string | unknown[]) {
@@ -170,7 +171,7 @@ export class TlangPlayground extends LitElement {
     return html`
       <div class="toolbar">
         <button @click=${this.run}>Run</button>
-        <select @change=${this.handleSelect}>
+        <select @change=${this.handleExampleSelect}>
           ${Object.keys(examples).map(key => html`<option>${key}</option>`)}
         </select>
         <select @change=${(event: Event) => this.display = (event.target as HTMLSelectElement).value as typeof this.display}>
