@@ -1,18 +1,12 @@
 use pretty_assertions::assert_eq;
 
 use tlang_ast::{
-    node::{self, AstNode, BinaryOp, FunctionDeclaration, Node},
+    node::{self, BinaryOp, FunctionDeclaration},
     symbols::SymbolId,
     token::Literal,
 };
-use tlang_parser::parser::Parser;
 
-macro_rules! parse {
-    ($source:expr) => {{
-        let mut parser = Parser::from_source($source);
-        parser.parse()
-    }};
-}
+mod common;
 
 #[test]
 fn test_simple_variable_declaration() {

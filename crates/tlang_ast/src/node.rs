@@ -200,17 +200,23 @@ pub enum BinaryOp {
 
 #[macro_export]
 macro_rules! new {
-    ($node:ident) => {
+    ($node:ident) => {{
+        use tlang_ast::node::{Node, AstNode};
+
         Node::new(AstNode::$node)
-    };
+    }};
 
-    ($node:ident($( $arg:expr ),* $(,)? )) => {
+    ($node:ident($( $arg:expr ),* $(,)? )) => {{
+        use tlang_ast::node::{Node, AstNode};
+
         Node::new(AstNode::$node( $( $arg ),* ))
-    };
+    }};
 
-    ($node:ident { $( $field:ident : $value:expr ),* $(,)? }) => {
+    ($node:ident { $( $field:ident : $value:expr ),* $(,)? }) => {{
+        use tlang_ast::node::{Node, AstNode};
+
         Node::new(AstNode::$node { $( $field : $value ),* })
-    };
+    }};
 }
 
 pub use new;

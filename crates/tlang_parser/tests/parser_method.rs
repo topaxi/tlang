@@ -2,18 +2,12 @@ use indoc::indoc;
 use pretty_assertions::assert_eq;
 
 use tlang_ast::{
-    node::{self, AstNode, FunctionDeclaration, Node},
+    node::{self, FunctionDeclaration},
     symbols::SymbolId,
     token::Literal,
 };
-use tlang_parser::parser::Parser;
 
-macro_rules! parse {
-    ($source:expr) => {{
-        let mut parser = Parser::from_source($source);
-        parser.parse()
-    }};
-}
+mod common;
 
 #[test]
 fn test_declare_methods_on_option_enum() {
