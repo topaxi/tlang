@@ -19,14 +19,14 @@ export class TlangPlayground extends LitElement {
       grid-template: "toolbar" auto
                      "editor" 1fr
                      "output" 1fr
-                     "console" minmax(auto, 0.5fr);
+                     "console" auto;
     }
 
     @media (min-width: 1000px) {
       :host {
         grid-template: "toolbar toolbar" auto
                        "editor output" 1fr
-                       "editor console" minmax(auto, 0.5fr);
+                       "editor console" auto;
       }
     }
 
@@ -89,7 +89,6 @@ export class TlangPlayground extends LitElement {
       border-left: 1px solid var(--ctp-macchiato-surface0);
       padding-top: 1rem;
       grid-area: console;
-      overflow: auto;
     }
 
     .console-toolbar {
@@ -97,6 +96,11 @@ export class TlangPlayground extends LitElement {
       gap: 1rem;
       padding-left: 1ch;
       border-bottom: 1px solid var(--ctp-macchiato-surface0);
+    }
+
+    .console-output {
+      height: 24em;
+      overflow: auto;
     }
   `
 
@@ -111,6 +115,9 @@ export class TlangPlayground extends LitElement {
 
   @state()
   display: 'ast' | 'semanticAST' | 'output' = 'output';
+
+  @state()
+  showConsole = true;
 
   @query('t-codemirror')
   codemirror!: TCodeMirror;
@@ -214,9 +221,10 @@ export class TlangPlayground extends LitElement {
       <div class="console">
         <div class="console-toolbar">
           <div>Console</div>
+          <button @click=${() => this.showConsole = !this.showConsole}>${this.showConsole ? 'Hide' : 'Show'}</button>
           <button @click=${() => this.consoleOutput = []}>Clear</button>
         </div>
-        <div class="output-console">${this.consoleOutput.map(args => this.renderLogMessage(args))}</div>
+        <div class="console-output" .hidden=${!this.showConsole}>${this.consoleOutput.map(args => this.renderLogMessage(args))}</div>
       </div>
     `
   }
