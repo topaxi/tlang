@@ -161,3 +161,51 @@ fn test_recursive_map() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+#[ignore = "TODO"]
+fn test_function_declarations_args_redefinition_should_not_collide() {
+    let output = compile!(indoc! {"
+        fn foo(0) { 0 }
+        fn foo(args) { args }
+    "});
+    let expected_output = indoc! {"
+        function foo(...args) {
+            if (args[0] === 0) {
+                return 0;
+            } else {
+                let args$a = args[0];
+                return args$a;
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn test_function_declarations_with_guard() {
+    let output = compile!(indoc! {"
+        fn filter([], f) { [] }
+        fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
+        fn filter([x, ...xs], f) { filter(xs, f) }
+    "});
+    let expected_output = indoc! {"
+        function filter(...args) {
+            if (args[0].length === 0) {
+                let f = args[1];
+                return [];
+            } else if (args[0].length >= 1 && args[1](args[0][0])) {
+                let f = args[1];
+                let x = args[0][0];
+                let xs = args[0].slice(1);
+                return [x, ...filter(xs, f)];
+            } else if (args[0].length >= 1) {
+                let f = args[1];
+                let x = args[0][0];
+                let xs = args[0].slice(1);
+                return filter(xs, f);
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+}

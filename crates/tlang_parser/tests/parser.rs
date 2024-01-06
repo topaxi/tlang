@@ -324,6 +324,7 @@ fn test_if_else_as_last_expression() {
             name: Box::new(node::new!(Identifier("main".to_string()))),
             declaration: Box::new(FunctionDeclaration {
                 parameters: vec![],
+                guard: None,
                 return_type_annotation: None,
                 body: Box::new(node::new!(Block(
                     vec![],

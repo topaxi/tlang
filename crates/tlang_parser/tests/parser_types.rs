@@ -96,6 +96,7 @@ fn test_return_type_annotation() {
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
                 parameters: vec![],
+                guard: None,
                 body: Box::new(node::new!(Block(
                     vec![],
                     Some(Box::new(node::new!(Literal(Literal::Integer(1)))))
@@ -117,6 +118,7 @@ fn test_return_type_annotation() {
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
                 parameters: vec![],
+                guard: None,
                 body: Box::new(node::new!(Block(
                     vec![],
                     Some(Box::new(node::new!(Literal(Literal::Integer(1)))))
@@ -144,6 +146,7 @@ fn test_return_type_annotation() {
                 name: Some(Box::new(node::new!(Identifier("foo".to_string())))),
                 declaration: Box::new(FunctionDeclaration {
                     parameters: vec![],
+                    guard: None,
                     body: Box::new(node::new!(Block(
                         vec![],
                         Some(Box::new(node::new!(Literal(Literal::Integer(1)))))
@@ -187,6 +190,7 @@ fn test_function_param_types() {
                         })))
                     })
                 ],
+                guard: None,
                 body: Box::new(node::new!(Block(
                     vec![],
                     Some(Box::new(node::new!(Identifier("x".to_string()))))

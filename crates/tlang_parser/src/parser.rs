@@ -62,6 +62,22 @@ impl<'src> Parser<'src> {
         );
     }
 
+    fn panic_unexpected_node(&self, expected: &str, actual: Option<Node>) {
+        let actual = actual.unwrap();
+        let line = self.current_line;
+        // Technically we are still off by one here as we are already pointing at the end of the current token,
+        // but it's better than nothing.
+        // We'd either have to store the beginning or the length of the current token.
+        let column = self.current_column;
+        let source_line = self.lexer.source().lines().nth(line - 1).unwrap();
+        let caret = " ".repeat(column - 1) + "^";
+
+        panic!(
+            "Expected {} on line {}, column {}, found {:?} instead\n{}\n{}",
+            expected, line, column, actual, source_line, caret
+        );
+    }
+
     fn expect_token(&mut self, expected: Token) {
         let actual = self.current_token.as_ref().unwrap();
         if *actual != expected {
@@ -702,6 +718,7 @@ impl<'src> Parser<'src> {
             name: name.map(Box::new),
             declaration: Box::new(FunctionDeclaration {
                 parameters,
+                guard: None,
                 body: Box::new(body),
                 return_type_annotation: return_type.map(Box::new),
             }),
@@ -810,11 +827,13 @@ impl<'src> Parser<'src> {
 
             self.expect_token(Token::LParen);
             let parameters = self.parse_parameter_list();
+            let guard = self.parse_guard_clause();
             let return_type = self.parse_return_type();
             let body = self.parse_block();
 
             declarations.push(FunctionDeclaration {
                 parameters,
+                guard: guard.map(Box::new),
                 body: Box::new(body),
                 return_type_annotation: return_type.map(Box::new),
             });
@@ -835,6 +854,30 @@ impl<'src> Parser<'src> {
             name: Box::new(name.unwrap()),
             declarations: declarations,
         })
+    }
+
+    fn parse_guard_clause(&mut self) -> Option<Node> {
+        if let Some(Token::If) = self.current_token {
+            self.advance();
+
+            // Valid guard clauses are function calls, binary logical expressions and unary logical
+            // expressions.
+            let expression = self.parse_expression();
+
+            match expression.ast_node {
+                AstNode::Call { .. } | AstNode::BinaryOp { .. } | AstNode::PrefixOp { .. } => (),
+                _ => {
+                    self.panic_unexpected_node(
+                        "function call, binary logical expression or unary logical expression",
+                        Some(expression.clone()),
+                    );
+                }
+            }
+
+            Some(expression)
+        } else {
+            None
+        }
     }
 
     fn is_binary_op(token: &Token) -> bool {

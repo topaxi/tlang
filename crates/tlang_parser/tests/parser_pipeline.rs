@@ -168,6 +168,7 @@ fn test_pipeline_operator_long_chaining() {
                                             node: Box::new(node::new!(Identifier("x".to_string()))),
                                             type_annotation: None,
                                         })],
+                                        guard: None,
                                         return_type_annotation: None,
                                         body: Box::new(node::new!(Block(
                                             vec![],
@@ -196,6 +197,7 @@ fn test_pipeline_operator_long_chaining() {
                                         node: Box::new(node::new!(Identifier("x".to_string()))),
                                         type_annotation: None,
                                     })],
+                                    guard: None,
                                     return_type_annotation: None,
                                     body: Box::new(node::new!(Block(
                                         vec![],
@@ -238,6 +240,7 @@ fn test_pipeline_operator_long_chaining() {
                                             type_annotation: None,
                                         }),
                                     ],
+                                    guard: None,
                                     return_type_annotation: None,
                                     body: Box::new(node::new!(Block(
                                         vec![],

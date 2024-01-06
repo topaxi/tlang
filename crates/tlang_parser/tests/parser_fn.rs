@@ -26,6 +26,7 @@ fn test_function_declaration() {
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
                 parameters: vec![],
+                guard: None,
                 return_type_annotation: None,
                 body: Box::new(node::new!(Block(
                     vec![
@@ -68,6 +69,7 @@ fn test_function_declaration_with_parameters() {
                         type_annotation: None,
                     }),
                 ],
+                guard: None,
                 return_type_annotation: None,
                 body: Box::new(node::new!(Block(
                     vec![node::new!(ExpressionStatement(Box::new(node::new!(
@@ -98,6 +100,7 @@ fn test_nameless_function_expressions() {
                 name: None,
                 declaration: Box::new(FunctionDeclaration {
                     parameters: vec![],
+                    guard: None,
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![node::new!(ExpressionStatement(Box::new(node::new!(
@@ -138,6 +141,7 @@ fn test_nameless_function_expressions() {
                             type_annotation: None,
                         }),
                     ],
+                    guard: None,
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![node::new!(ExpressionStatement(Box::new(node::new!(
@@ -170,6 +174,7 @@ fn test_function_expression_without_name_no_argument_parenthesis() {
                 name: None,
                 declaration: Box::new(FunctionDeclaration {
                     parameters: vec![],
+                    guard: None,
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![node::new!(ExpressionStatement(Box::new(node::new!(
@@ -202,6 +207,7 @@ fn test_function_expressions() {
                 name: Some(Box::new(node::new!(Identifier("foo".to_string())))),
                 declaration: Box::new(FunctionDeclaration {
                     parameters: vec![],
+                    guard: None,
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![node::new!(ExpressionStatement(Box::new(node::new!(
@@ -242,6 +248,7 @@ fn test_function_expressions() {
                             type_annotation: None,
                         }),
                     ],
+                    guard: None,
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![node::new!(ExpressionStatement(Box::new(node::new!(
@@ -271,6 +278,7 @@ fn test_explicit_return_statements() {
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
                 parameters: vec![],
+                guard: None,
                 return_type_annotation: None,
                 body: Box::new(node::new!(Block(
                     vec![node::new!(ReturnStatement(Some(Box::new(node::new!(
@@ -295,6 +303,7 @@ fn test_explicit_return_statements() {
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
                 parameters: vec![],
+                guard: None,
                 return_type_annotation: None,
                 body: Box::new(node::new!(Block(
                     vec![node::new!(ReturnStatement(None))],
@@ -316,6 +325,7 @@ fn test_explicit_return_statements() {
                 name: None,
                 declaration: Box::new(FunctionDeclaration {
                     parameters: vec![],
+                    guard: None,
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![node::new!(ReturnStatement(Some(Box::new(node::new!(
@@ -345,6 +355,7 @@ fn test_implicit_return_expressions() {
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
                 parameters: vec![],
+                guard: None,
                 return_type_annotation: None,
                 body: Box::new(node::new!(Block(
                     vec![],
@@ -367,6 +378,7 @@ fn test_implicit_return_expressions() {
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
                 parameters: vec![],
+                guard: None,
                 return_type_annotation: None,
                 body: Box::new(node::new!(Block(vec![], None)))
             })
@@ -385,6 +397,7 @@ fn test_implicit_return_expressions() {
                 name: None,
                 declaration: Box::new(FunctionDeclaration {
                     parameters: vec![],
+                    guard: None,
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![],
@@ -409,6 +422,7 @@ fn test_implicit_return_expressions() {
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
                 parameters: vec![],
+                guard: None,
                 return_type_annotation: None,
                 body: Box::new(node::new!(Block(
                     vec![node::new!(VariableDeclaration {
@@ -443,6 +457,7 @@ fn test_recursive_factorial_functional_definition() {
                         node: Box::new(node::new!(Literal(Literal::Integer(0)))),
                         type_annotation: None,
                     })],
+                    guard: None,
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![node::new!(ReturnStatement(Some(Box::new(node::new!(
@@ -457,6 +472,7 @@ fn test_recursive_factorial_functional_definition() {
                         node: Box::new(node::new!(Identifier("n".to_string()))),
                         type_annotation: None,
                     })],
+                    guard: None,
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![node::new!(ReturnStatement(Some(Box::new(node::new!(
@@ -502,6 +518,7 @@ fn test_recursive_sum() {
                         node: Box::new(node::new!(List(vec![]))),
                         type_annotation: None,
                     })],
+                    guard: None,
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![],
@@ -520,6 +537,7 @@ fn test_recursive_sum() {
                         ]))),
                         type_annotation: None,
                     })],
+                    guard: None,
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![],
@@ -560,6 +578,7 @@ fn test_functional_function_declaration_with_comments_inbetween() {
                         node: Box::new(node::new!(Literal(Literal::Integer(1)))),
                         type_annotation: None,
                     })],
+                    guard: None,
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![],
@@ -572,6 +591,7 @@ fn test_functional_function_declaration_with_comments_inbetween() {
                         node: Box::new(node::new!(Identifier("n".to_string()))),
                         type_annotation: None,
                     })],
+                    guard: None,
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![],
@@ -607,6 +627,7 @@ fn test_explicit_tail_recursive_call() {
                         node: Box::new(node::new!(Identifier("n".to_string()))),
                         type_annotation: None,
                     })],
+                    guard: None,
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![],
@@ -632,6 +653,7 @@ fn test_explicit_tail_recursive_call() {
                             type_annotation: None,
                         })
                     ],
+                    guard: None,
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![],
@@ -651,6 +673,7 @@ fn test_explicit_tail_recursive_call() {
                             type_annotation: None,
                         })
                     ],
+                    guard: None,
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![],
@@ -709,6 +732,7 @@ fn test_foldl_impl() {
                             type_annotation: None,
                         })
                     ],
+                    guard: None,
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![],
@@ -739,6 +763,7 @@ fn test_foldl_impl() {
                             type_annotation: None,
                         })
                     ],
+                    guard: None,
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![],
@@ -776,7 +801,7 @@ fn test_function_declarations_with_guard() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(FunctionDeclarations {
-            id: SymbolId::new(5),
+            id: SymbolId::new(7),
             name: Box::new(node::new!(Identifier("filter".to_string()))),
             declarations: vec![
                 FunctionDeclaration {
@@ -792,6 +817,7 @@ fn test_function_declarations_with_guard() {
                             type_annotation: None,
                         })
                     ],
+                    guard: None,
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![],
@@ -817,13 +843,17 @@ fn test_function_declarations_with_guard() {
                             type_annotation: None,
                         })
                     ],
+                    guard: Some(Box::new(node::new!(Call {
+                        function: Box::new(node::new!(Identifier("f".to_string()))),
+                        arguments: vec![node::new!(Identifier("x".to_string()))]
+                    }))),
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![],
                         Some(Box::new(node::new!(List(vec![
                             node::new!(Identifier("x".to_string())),
                             node::new!(PrefixOp(
-                                PrefixOp::Rest,
+                                PrefixOp::Spread,
                                 Box::new(node::new!(Call {
                                     function: Box::new(node::new!(Identifier(
                                         "filter".to_string()
@@ -840,7 +870,7 @@ fn test_function_declarations_with_guard() {
                 FunctionDeclaration {
                     parameters: vec![
                         node::new!(FunctionParameter {
-                            id: SymbolId::new(6),
+                            id: SymbolId::new(5),
                             node: Box::new(node::new!(List(vec![
                                 node::new!(Identifier("x".to_string())),
                                 node::new!(PrefixOp(
@@ -851,11 +881,12 @@ fn test_function_declarations_with_guard() {
                             type_annotation: None,
                         }),
                         node::new!(FunctionParameter {
-                            id: SymbolId::new(7),
+                            id: SymbolId::new(6),
                             node: Box::new(node::new!(Identifier("f".to_string()))),
                             type_annotation: None,
                         })
                     ],
+                    guard: None,
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![],

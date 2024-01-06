@@ -53,6 +53,7 @@ pub struct CodegenJS {
     context_stack: Vec<BlockContext>,
     function_context_stack: Vec<FunctionContext>,
     function_pre_body: String,
+    function_pre_body_declarations: Vec<(String, String)>,
     current_statement_buffer: String,
 }
 
@@ -71,6 +72,7 @@ impl CodegenJS {
             context_stack: vec![BlockContext::Program],
             function_context_stack: vec![],
             function_pre_body: String::new(),
+            function_pre_body_declarations: vec![],
             current_statement_buffer: String::new(),
         }
     }
@@ -667,10 +669,21 @@ impl CodegenJS {
         }
     }
 
-    fn generate_function_body(&mut self, body: &Node, is_tail_recursive: bool) {
-        self.context_stack.push(BlockContext::FunctionBody);
+    fn flush_function_pre_body(&mut self) {
         self.push_str(&self.function_pre_body.clone());
         self.function_pre_body.clear();
+
+        for (name, value) in self.function_pre_body_declarations.clone().iter() {
+            self.push_str(&self.get_indent());
+            self.push_str(&format!("let {} = {};\n", name, value));
+            self.scopes.declare_variable_alias(&name, &name);
+        }
+        self.function_pre_body_declarations.clear();
+    }
+
+    fn generate_function_body(&mut self, body: &Node, is_tail_recursive: bool) {
+        self.context_stack.push(BlockContext::FunctionBody);
+        self.flush_function_pre_body();
         if is_tail_recursive {
             self.push_str(&self.get_indent());
             self.push_str("while (true) {\n");
@@ -775,6 +788,8 @@ impl CodegenJS {
         });
         self.push_str(&self.get_indent());
         self.push_str(&format!("function {}(...args) {{\n", name_as_str));
+        self.push_scope();
+        self.scopes.declare_variable("args");
         self.indent_level += 1;
 
         if is_any_definition_tail_recursive {
@@ -785,9 +800,40 @@ impl CodegenJS {
 
         self.push_str(&self.get_indent());
         for (i, declaration) in declarations.iter().enumerate() {
+            self.push_scope();
             // TODO: Only render else if there is another definition with a literal.
             if i > 0 {
                 self.push_str(" else ");
+            }
+
+            for (j, param) in declaration.parameters.iter().enumerate() {
+                if let AstNode::FunctionParameter {
+                    id: _,
+                    node,
+                    type_annotation: _,
+                } = &param.ast_node
+                {
+                    match &node.ast_node {
+                        AstNode::Identifier(name) => {
+                            self.scopes
+                                .declare_variable_alias(&name, &format!("args[{}]", j));
+                        }
+                        AstNode::List(patterns) => {
+                            for (i, pattern) in patterns.iter().enumerate() {
+                                match &pattern.ast_node {
+                                    AstNode::Identifier(name) => {
+                                        self.scopes.declare_variable_alias(
+                                            &name,
+                                            &format!("args[{}][{}]", j, i),
+                                        );
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
             }
 
             // Expand parameter matching if any definition has a different amount of
@@ -819,7 +865,10 @@ impl CodegenJS {
                         }
                     });
 
-            if parameter_variadic || pattern_matched_parameters.clone().count() > 0 {
+            let variadic_or_pattern_matching =
+                parameter_variadic || pattern_matched_parameters.clone().count() > 0;
+
+            if variadic_or_pattern_matching {
                 if parameter_variadic {
                     self.push_str("if (args.length === ");
                     self.push_str(&declaration.parameters.len().to_string());
@@ -873,26 +922,17 @@ impl CodegenJS {
                                                     "args[{}].length >= {}",
                                                     k, i
                                                 ));
-                                                self.indent_level += 1;
-                                                self.function_pre_body.push_str(&self.get_indent());
-                                                self.function_pre_body.push_str(
-                                                    format!(
-                                                        "let {} = args[{}].slice({});\n",
-                                                        name, k, i
-                                                    )
-                                                    .as_str(),
-                                                );
-                                                self.indent_level -= 1;
+                                                self.function_pre_body_declarations.push((
+                                                    name.clone(),
+                                                    format!("args[{}].slice({})", k, i),
+                                                ));
                                             }
                                         }
                                         AstNode::Identifier(name) => {
-                                            self.indent_level += 1;
-                                            self.function_pre_body.push_str(&self.get_indent());
-                                            self.function_pre_body.push_str(
-                                                format!("let {} = args[{}][{}];\n", name, k, i)
-                                                    .as_str(),
-                                            );
-                                            self.indent_level -= 1;
+                                            self.function_pre_body_declarations.push((
+                                                name.clone(),
+                                                format!("args[{}][{}]", k, i),
+                                            ));
                                         }
                                         _ => unreachable!(),
                                     }
@@ -911,7 +951,6 @@ impl CodegenJS {
                                     _ => unreachable!(),
                                 };
                                 self.push_str(&format!("args[{}].tag === \"{}\"", k, identifier));
-                                self.indent_level += 1;
                                 for (i, element) in elements.iter().enumerate() {
                                     // Skip any Wildcards
                                     if let AstNode::Wildcard = element.ast_node {
@@ -924,33 +963,42 @@ impl CodegenJS {
                                         }
                                         _ => unreachable!(),
                                     };
-                                    self.function_pre_body.push_str(&self.get_indent());
-
                                     if *named_fields {
-                                        self.function_pre_body.push_str(&format!(
-                                            "let {} = args[{}].{};\n",
-                                            identifier, k, identifier
+                                        self.function_pre_body_declarations.push((
+                                            identifier.clone(),
+                                            format!("args[{}].{}", k, identifier),
                                         ));
                                     } else {
-                                        self.function_pre_body.push_str(&format!(
-                                            "let {} = args[{}][{}];\n",
-                                            identifier, k, i
+                                        self.function_pre_body_declarations.push((
+                                            identifier.clone(),
+                                            format!("args[{}][{}]", k, i),
                                         ));
                                     }
                                 }
-                                self.indent_level -= 1;
                             }
                             _ => unreachable!(),
                         }
                     }
                 }
+            }
+
+            if variadic_or_pattern_matching {
+                if let Some(expr) = &declaration.guard {
+                    self.push_str(" && ");
+                    self.generate_node(expr, None);
+                }
                 self.push_str(") {\n");
             } else {
+                if let Some(expr) = &declaration.guard {
+                    self.push_str("if (");
+                    self.generate_node(expr, None);
+                    self.push_str(") {\n");
+                }
                 self.push_str("{\n");
             }
 
             self.indent_level += 1;
-            // Alias identifier args to the parameter names
+            // Alias identifier args back to the parameter names for readability of generated code.
             for (j, param) in declaration.parameters.iter().enumerate() {
                 if let AstNode::FunctionParameter {
                     id: _,
@@ -961,6 +1009,7 @@ impl CodegenJS {
                     if let AstNode::Identifier(ref name) = node.ast_node {
                         self.push_str(&self.get_indent());
                         self.push_str(&format!("let {} = args[{}];\n", name, j));
+                        self.scopes.declare_variable_alias(&name, &name);
                     }
                 }
             }
@@ -972,9 +1021,11 @@ impl CodegenJS {
                 true,
             );
             self.generate_function_body(&declaration.body, false);
+            self.function_context_stack.pop();
             self.indent_level -= 1;
             self.push_str(&self.get_indent());
             self.push_char('}');
+            self.pop_scope();
         }
 
         if is_any_definition_tail_recursive {
@@ -988,7 +1039,7 @@ impl CodegenJS {
         self.push_char('\n');
         self.push_str(&self.get_indent());
         self.push_str("}\n");
-        self.function_context_stack.pop();
+        self.pop_scope();
     }
 
     fn generate_return_statement(&mut self, expr: &Option<Box<Node>>) {

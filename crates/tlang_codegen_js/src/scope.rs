@@ -31,6 +31,10 @@ impl Scope {
         new_name
     }
 
+    pub fn declare_variable_alias(&mut self, name: &str, alias: &str) {
+        self.variables.insert(name.to_string(), alias.to_string());
+    }
+
     fn get_unique_variable_name(&self, prefix: &str) -> String {
         let mut suffix = 'a';
         loop {

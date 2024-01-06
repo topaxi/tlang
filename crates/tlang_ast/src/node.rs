@@ -48,8 +48,9 @@ impl<'a> From<&'a Token> for Node {
 #[derive(Debug, PartialEq, Clone)]
 pub struct FunctionDeclaration {
     pub parameters: Vec<Node>,
-    pub body: Box<Node>,
+    pub guard: Option<Box<Node>>,
     pub return_type_annotation: Option<Box<Node>>,
+    pub body: Box<Node>,
 }
 
 #[derive(Debug, PartialEq, Clone)]

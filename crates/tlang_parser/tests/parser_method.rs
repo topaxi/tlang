@@ -77,6 +77,7 @@ fn test_declare_methods_on_option_enum() {
                             })),
                             type_annotation: None,
                         })],
+                        guard: None,
                         return_type_annotation: None,
                         body: Box::new(node::new!(Block(
                             vec![],
@@ -96,6 +97,7 @@ fn test_declare_methods_on_option_enum() {
                             })),
                             type_annotation: None,
                         })],
+                        guard: None,
                         return_type_annotation: None,
                         body: Box::new(node::new!(Block(
                             vec![],
@@ -108,6 +110,7 @@ fn test_declare_methods_on_option_enum() {
                             node: Box::new(node::new!(Wildcard)),
                             type_annotation: None,
                         })],
+                        guard: None,
                         return_type_annotation: None,
                         body: Box::new(node::new!(Block(
                             vec![],
@@ -136,6 +139,7 @@ fn test_declare_methods_on_option_enum() {
                             })),
                             type_annotation: None,
                         })],
+                        guard: None,
                         return_type_annotation: None,
                         body: Box::new(node::new!(Block(
                             vec![],
@@ -155,6 +159,7 @@ fn test_declare_methods_on_option_enum() {
                             })),
                             type_annotation: None,
                         })],
+                        guard: None,
                         return_type_annotation: None,
                         body: Box::new(node::new!(Block(
                             vec![],
@@ -190,6 +195,7 @@ fn test_declare_methods_on_option_enum() {
                                 type_annotation: None,
                             })
                         ],
+                        guard: None,
                         return_type_annotation: None,
                         body: Box::new(node::new!(Block(
                             vec![],
@@ -225,6 +231,7 @@ fn test_declare_methods_on_option_enum() {
                                 type_annotation: None,
                             })
                         ],
+                        guard: None,
                         return_type_annotation: None,
                         body: Box::new(node::new!(Block(
                             vec![],

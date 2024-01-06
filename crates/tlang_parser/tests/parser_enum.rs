@@ -170,6 +170,7 @@ fn test_enum_tree_max_depth() {
                             })),
                             type_annotation: None,
                         })],
+                        guard: None,
                         return_type_annotation: None,
                         body: Box::new(node::new!(Block(
                             vec![],
@@ -192,6 +193,7 @@ fn test_enum_tree_max_depth() {
                             })),
                             type_annotation: None,
                         })],
+                        guard: None,
                         return_type_annotation: None,
                         body: Box::new(node::new!(Block(
                             vec![],
@@ -229,6 +231,7 @@ fn test_enum_tree_max_depth() {
                 name: Box::new(node::new!(Identifier("main".to_string()))),
                 declaration: Box::new(FunctionDeclaration {
                     parameters: vec![],
+                    guard: None,
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![node::new!(VariableDeclaration {
@@ -351,6 +354,7 @@ fn test_enum_extraction() {
                             })),
                             type_annotation: None,
                         })],
+                        guard: None,
                         return_type_annotation: None,
                         body: Box::new(node::new!(Block(
                             vec![],
@@ -375,6 +379,7 @@ fn test_enum_extraction() {
                             })),
                             type_annotation: None,
                         })],
+                        guard: None,
                         return_type_annotation: None,
                         body: Box::new(node::new!(Block(
                             vec![],
