@@ -1,7 +1,8 @@
 @import "@catppuccin/palette/css/catppuccin.css";
 
 :root {
-  font-family: "VictorMono NFM", "Victor Mono", monospace;
+  font-family: "VictorMono NFM", "Victor Mono", Inconsolata, Consolas, Menlo,
+    Monaco, monospace;
   line-height: 1.5;
   font-weight: 400;
 
