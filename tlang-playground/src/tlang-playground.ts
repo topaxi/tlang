@@ -12,16 +12,34 @@ await init();
 export class TlangPlayground extends LitElement {
   static styles = css`
     :host {
-      display: flex;
-      flex-direction: column;
+      display: grid;
       width: 100%;
-      min-height: 100vh;
+      height: 100vh;
+
+      grid-template: "toolbar" auto
+                     "editor" 1fr
+                     "output" 1fr
+                     "console" minmax(auto, 0.5fr);
+    }
+
+    @media (min-width: 1000px) {
+      :host {
+        grid-template: "toolbar toolbar" auto
+                       "editor output" 1fr
+                       "editor console" minmax(auto, 0.5fr);
+      }
+    }
+
+    .toolbar {
+      grid-area: toolbar;
     }
 
     .editor {
       display: flex;
       flex: 1 1 auto;
       max-height: 100%;
+
+      grid-area: editor;
     }
 
     .editor > * {
@@ -41,10 +59,15 @@ export class TlangPlayground extends LitElement {
 
     .output {
       border-left: 1px solid var(--ctp-macchiato-surface0);
+      grid-area: output;
+      max-height: 100%;
+      overflow: auto;
     }
 
     .console {
       margin-top: 1rem;
+      grid-area: console;
+      overflow: auto;
     }
 
     .console-toolbar {
@@ -58,7 +81,10 @@ export class TlangPlayground extends LitElement {
   `
 
   @state()
-  source = examples['factorial.tl'];
+  selectedExample = 'factorial.tl';
+
+  @state()
+  source = examples[this.selectedExample];
 
   @state()
   consoleOutput: Array<unknown[] | string> = [];
@@ -109,7 +135,16 @@ export class TlangPlayground extends LitElement {
   }
 
   protected firstUpdated(_changedProperties: PropertyValueMap<any> | Map<PropertyKey, unknown>): void {
-    this.codemirror.source = this.source;
+    let params = new URLSearchParams(window.location.hash.slice(1));
+
+    let exampleName = String(params.get('example'));
+    let exampleSource = (exampleName in examples) ? examples[exampleName] : this.source;
+
+    if (exampleName in examples) {
+      this.shadowRoot!.querySelector('select')!.value = exampleName;
+    }
+
+    this.codemirror.source = exampleSource;
   }
 
   handleSourceChange(event: CustomEvent) {
@@ -146,18 +181,18 @@ export class TlangPlayground extends LitElement {
       </div>
       <div class="editor">
         <t-codemirror @source-change=${this.handleSourceChange}></t-codemirror>
-        <div class="output">
-          ${this.display === 'ast' ? html`<pre class="output-ast">${this.ast}</pre>` : ''}
-          ${this.display === 'semanticAST' ? html`<pre class="output-ast">${this.semanticAST}</pre>` : ''}
-          ${this.display === 'output' ? html`<pre class="output-code">${this.output}</pre>` : ''}
-          <div class="console">
-            <div class="console-toolbar">
-              <div>Console</div>
-              <button @click=${() => this.consoleOutput = []}>Clear</button>
-            </div>
-            <div class="output-console">${this.consoleOutput.map(args => this.renderLogMessage(args))}</div>
-          </div>
+      </div>
+      <div class="output">
+        ${this.display === 'ast' ? html`<pre class="output-ast">${this.ast}</pre>` : ''}
+        ${this.display === 'semanticAST' ? html`<pre class="output-ast">${this.semanticAST}</pre>` : ''}
+        ${this.display === 'output' ? html`<pre class="output-code">${this.output}</pre>` : ''}
+      </div>
+      <div class="console">
+        <div class="console-toolbar">
+          <div>Console</div>
+          <button @click=${() => this.consoleOutput = []}>Clear</button>
         </div>
+        <div class="output-console">${this.consoleOutput.map(args => this.renderLogMessage(args))}</div>
       </div>
     `
   }
