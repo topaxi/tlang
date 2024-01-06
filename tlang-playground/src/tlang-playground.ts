@@ -70,6 +70,11 @@ export class TlangPlayground extends LitElement {
 
     .log-message {
       border-bottom: 1px solid var(--ctp-macchiato-surface0);
+      padding-left: 1ch;
+    }
+
+    .output {
+      padding-left: 1ch;
     }
 
     .output {
@@ -80,7 +85,8 @@ export class TlangPlayground extends LitElement {
     }
 
     .console {
-      margin-top: 1rem;
+      border-left: 1px solid var(--ctp-macchiato-surface0);
+      padding-top: 1rem;
       grid-area: console;
       overflow: auto;
     }
@@ -88,10 +94,8 @@ export class TlangPlayground extends LitElement {
     .console-toolbar {
       display: flex;
       gap: 1rem;
-    }
-
-    .output-console {
-      border-top: 1px solid var(--ctp-macchiato-surface0);
+      padding-left: 1ch;
+      border-bottom: 1px solid var(--ctp-macchiato-surface0);
     }
   `
 
