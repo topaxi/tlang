@@ -36,9 +36,13 @@ jobs:
         if: ${{ steps.cache.outputs.cache-hit != 'true' }}
         run: |
           cargo install -f rustup-toolchain-install-master
+          cargo install -f wasm-bindgen-cli
           cargo install -f cargo-make
 
-      - name: Instal wasm toolchain
+      - name: Install binaryen
+        run: apt install -y binaryen
+
+      - name: Install wasm toolchain
         run: |
           rustup target add wasm32-unknown-unknown
 
