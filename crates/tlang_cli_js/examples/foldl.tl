@@ -1,3 +1,4 @@
+// foldl(a[], b, fn(b, a) -> b) -> b
 fn foldl([], acc, _) { acc }
 fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
 
