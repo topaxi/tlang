@@ -31,7 +31,22 @@ export class TlangPlayground extends LitElement {
     }
 
     .toolbar {
+      display: flex;
       grid-area: toolbar;
+    }
+
+    .repo-link {
+      margin-left: auto;
+      margin-right: 1rem;
+    }
+
+    .repo-link a {
+      text-decoration: none;
+      color: var(--ctp-macchiato-mauve);
+    }
+
+    .repo-link a:hover {
+      text-decoration: underline;
     }
 
     .editor {
@@ -179,6 +194,9 @@ export class TlangPlayground extends LitElement {
           <option value="ast">ast</option>
           <option value="semanticAST">semantic ast</option>
         </select>
+        <div class="repo-link">
+          <a href="https://github.com/topaxi/tlang">Source Code</a>
+        </div>
       </div>
       <div class="editor">
         <t-codemirror @source-change=${this.handleSourceChange}></t-codemirror>
