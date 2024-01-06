@@ -1,0 +1,67 @@
+name: Publish Playground to Github Pages
+
+on:
+  push:
+    branches:
+      - "main"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Add cache for cargo
+        id: cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            # Taken from <https://doc.rust-lang.org/nightly/cargo/guide/cargo-home.html#caching-the-cargo-home-in-ci>.
+            ~/.cargo/bin
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            # contains package information of crates installed via `cargo install`.
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-0
+          restore-keys: ${{ runner.os }}-cargo-0
+
+      - name: Install rustup-toolchain-install-master
+        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+        run: |
+          cargo install -f rustup-toolchain-install-master
+          cargo install -f cargo-make
+
+      - name: Show Rust version
+        run: |
+          rustup show
+          rustc -Vv
+          cargo -V
+          cargo make -V
+
+      - name: Cargo Make
+        run: cargo make
+
+      - uses: actions/setup-node@v4
+        with:
+          cache: "npm"
+          cache-dependency-path: tlang-playground/package-lock.json
+
+      - name: Install playground dependencies
+        working-directory: tlang-playground
+        run: npm ci
+
+      - name: Build playground
+        working-directory: tlang-playground
+        run: npm run build
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: tlang-playground/dist

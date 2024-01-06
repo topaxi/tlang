@@ -9,5 +9,8 @@ export default defineConfig({
     fs: {
       allow: ['..']
     }
+  },
+  build: {
+    target: 'esnext',
   }
 });
