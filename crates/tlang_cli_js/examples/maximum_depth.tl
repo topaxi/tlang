@@ -3,6 +3,7 @@ enum Tree {
     Node { left, right },
 }
 
+// maximum_depth(Tree) -> Int
 fn maximum_depth(Tree::Leaf(_)) { 1 }
 fn maximum_depth(Tree::Node { left, right }) {
     1 + max(maximum_depth(left), maximum_depth(right))
