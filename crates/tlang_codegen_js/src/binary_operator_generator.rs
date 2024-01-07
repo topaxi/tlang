@@ -151,10 +151,6 @@ fn map_operator_info(op: &BinaryOp) -> JSOperatorInfo {
             precedence: 9,
             associativity: JSAssociativity::Right,
         },
-        // TODO: Do we need this? As we'll map the pipeline operator to a function call.
-        BinaryOp::Pipeline => JSOperatorInfo {
-            precedence: 1,
-            associativity: JSAssociativity::Left,
-        },
+        BinaryOp::Pipeline => unreachable!("Pipeline operator does not exist yet in JS"),
     }
 }
