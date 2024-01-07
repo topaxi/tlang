@@ -251,13 +251,11 @@ impl CodegenJS {
         }
     }
 
-    fn generate_block_expression(&mut self, statements: &[Node], expression: &Option<Node>) {
+    /// Generates blocks in expression position.
+    fn generate_block_expression(&mut self, statements: &[Node], expression: &Option<Box<Node>>) {
         self.push_scope();
 
-        for statement in statements {
-            self.generate_node(statement, None);
-            self.flush_statement_buffer();
-        }
+        self.generate_statements(statements);
 
         if expression.is_none() {
             self.flush_statement_buffer();
@@ -279,7 +277,7 @@ impl CodegenJS {
         self.indent_level += 1;
         self.push_str(&self.get_indent());
         self.push_str(&format!("{} = ", completion_tmp_var));
-        self.generate_node(&expression.unwrap(), None);
+        self.generate_node(expression.as_ref().unwrap(), None);
         self.push_str(";\n");
         self.indent_level -= 1;
         self.push_str(&self.get_indent());
@@ -292,6 +290,46 @@ impl CodegenJS {
         self.pop_scope();
     }
 
+    fn generate_block(&mut self, statements: &[Node], expression: &Option<Box<Node>>) {
+        self.push_scope();
+
+        self.generate_statements(statements);
+
+        if expression.is_none() {
+            self.pop_scope();
+            return;
+        }
+
+        if let BlockContext::FunctionBody = self.current_context() {
+            // We only render the return statement if we are not in a tail recursive function body
+            // and the node is RecursiveCall pointing to the current function.
+            if let Some(function_context) = self.function_context_stack.last() {
+                if function_context.is_tail_recursive && expression.is_some() {
+                    if let AstNode::RecursiveCall(_) = expression.as_ref().unwrap().ast_node {
+                        self.generate_node(expression.as_ref().unwrap(), None);
+                        return;
+                    }
+                }
+            }
+
+            self.push_str(&self.get_indent());
+            self.push_str("return ");
+            self.generate_node(expression.as_ref().unwrap(), None);
+            self.push_str(";\n");
+            self.flush_statement_buffer();
+        }
+
+        self.pop_scope();
+    }
+
+    #[inline(always)]
+    fn generate_statements(&mut self, statements: &[Node]) {
+        for statement in statements {
+            self.generate_node(statement, None);
+            self.flush_statement_buffer();
+        }
+    }
+
     fn generate_node(&mut self, node: &Node, parent_op: Option<&BinaryOp>) {
         // TODO: Split into generate_statement and generate_expression.
         //       This should also help setting proper block contexts.
@@ -300,47 +338,13 @@ impl CodegenJS {
                 self.generate_comment(&node.ast_node);
             }
             AstNode::Program(statements) => {
-                for statement in statements {
-                    self.generate_node(statement, None);
-                    self.flush_statement_buffer();
-                }
+                self.generate_statements(statements);
             }
             AstNode::Block(statements, expression) if self.current_context() == BlockContext::Expression => {
-                self.generate_block_expression(statement, expression);
+                self.generate_block_expression(statements, expression);
             }
             AstNode::Block(statements, expression) => {
-                self.push_scope();
-
-                for statement in statements {
-                    self.generate_node(statement, None);
-                    self.flush_statement_buffer();
-                }
-
-                if expression.is_none() {
-                    self.pop_scope();
-                    return;
-                }
-
-                if let BlockContext::FunctionBody = self.current_context() {
-                    // We only render the return statement if we are not in a tail recursive function body
-                    // and the node is RecursiveCall pointing to the current function.
-                    if let Some(function_context) = self.function_context_stack.last() {
-                        if function_context.is_tail_recursive && expression.is_some() {
-                            if let AstNode::RecursiveCall(_) = expression.as_ref().unwrap().ast_node {
-                                self.generate_node(expression.as_ref().unwrap(), None);
-                                return;
-                            }
-                        }
-                    }
-
-                    self.push_str(&self.get_indent());
-                    self.push_str("return ");
-                    self.generate_node(expression.as_ref().unwrap(), None);
-                    self.push_str(";\n");
-                    self.flush_statement_buffer();
-                }
-
-                self.pop_scope();
+                self.generate_block(statements, expression);
             }
             AstNode::ExpressionStatement(expression) => {
                 self.push_str(&self.get_indent());
