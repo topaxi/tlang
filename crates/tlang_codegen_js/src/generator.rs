@@ -1,6 +1,12 @@
-use crate::scope::Scope;
+use crate::{
+    function_generator::{
+        generate_function_declaration, generate_function_declarations,
+        generate_function_expression, generate_function_parameter, generate_return_statement,
+    },
+    scope::Scope,
+};
 use tlang_ast::{
-    node::{AstNode, BinaryOp, FunctionDeclaration, Node, PrefixOp},
+    node::{AstNode, BinaryOp, Node, PrefixOp},
     token::Literal,
 };
 
@@ -17,7 +23,7 @@ struct JSOperatorInfo {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum BlockContext {
+pub enum BlockContext {
     // Are we in a top level Program?
     Program,
     // Are we in a StatementExpression with a Block?
@@ -29,20 +35,20 @@ enum BlockContext {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct FunctionContext {
+pub struct FunctionContext {
     // The name of the current function we're in.
     // Empty string for anonymous functions.
-    name: String,
+    pub name: String,
 
     // The parameters of the current function we're in.
-    params: Vec<String>,
+    pub params: Vec<String>,
 
     // Is the current function body tail recursive?
     // This is used to determine if we should unwrap the recursion into a while loop.
-    is_tail_recursive: bool,
+    pub is_tail_recursive: bool,
 
     // Should remap to rest args?
-    remap_to_rest_args: bool,
+    pub remap_to_rest_args: bool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -52,7 +58,6 @@ pub struct CodegenJS {
     scopes: Scope,
     context_stack: Vec<BlockContext>,
     function_context_stack: Vec<FunctionContext>,
-    function_pre_body: String,
     function_pre_body_declarations: Vec<(String, String)>,
     current_statement_buffer: String,
 }
@@ -71,50 +76,89 @@ impl CodegenJS {
             scopes: Scope::default(),
             context_stack: vec![BlockContext::Program],
             function_context_stack: vec![],
-            function_pre_body: String::new(),
             function_pre_body_declarations: vec![],
             current_statement_buffer: String::new(),
         }
     }
 
     #[inline(always)]
-    fn push_str(&mut self, str: &str) {
+    pub fn push_str(&mut self, str: &str) {
         self.current_statement_buffer.push_str(str);
     }
 
     #[inline(always)]
-    fn push_char(&mut self, char: char) {
+    pub fn push_char(&mut self, char: char) {
         self.current_statement_buffer.push(char);
     }
 
+    #[inline(always)]
+    pub fn push_indent(&mut self) {
+        self.current_statement_buffer.push_str(&self.get_indent());
+    }
+
+    #[inline(always)]
+    pub fn inc_indent(&mut self) {
+        self.indent_level += 1;
+    }
+
+    #[inline(always)]
+    pub fn dec_indent(&mut self) {
+        self.indent_level -= 1;
+    }
+
+    #[inline(always)]
     fn flush_statement_buffer(&mut self) {
         self.output.push_str(&self.current_statement_buffer);
         self.current_statement_buffer.clear();
     }
 
-    fn current_scope(&self) -> &Scope {
-        &self.scopes
+    #[inline(always)]
+    pub fn current_scope(&mut self) -> &mut Scope {
+        &mut self.scopes
     }
 
-    fn push_scope(&mut self) {
+    #[inline(always)]
+    pub fn push_scope(&mut self) {
         self.scopes = Scope::new(Some(Box::new(self.scopes.clone())));
     }
 
-    fn pop_scope(&mut self) {
+    #[inline(always)]
+    pub fn pop_scope(&mut self) {
         if let Some(parent) = self.scopes.get_parent() {
             self.scopes = parent.clone();
         }
     }
 
-    fn current_context(&self) -> BlockContext {
+    pub fn current_context(&self) -> BlockContext {
         *self.context_stack.last().unwrap()
+    }
+
+    pub fn push_context(&mut self, context: BlockContext) {
+        self.context_stack.push(context);
+    }
+
+    pub fn pop_context(&mut self) {
+        self.context_stack.pop();
     }
 
     pub fn generate_code(&mut self, node: &Node) {
         self.generate_node(node, None)
     }
 
-    fn push_function_context(
+    pub fn declare_function_pre_body_variable(&mut self, name: &str, value: &str) {
+        self.function_pre_body_declarations
+            .push((name.to_string(), value.to_string()));
+    }
+
+    pub fn consume_function_pre_body_declarations(&mut self) -> Vec<(String, String)> {
+        std::mem::take(&mut self.function_pre_body_declarations)
+    }
+
+    pub fn get_function_context(&self) -> Option<&FunctionContext> {
+        self.function_context_stack.last()
+    }
+
+    pub fn push_function_context(
         &mut self,
         name: &str,
         parameters: &[Node],
@@ -147,6 +191,10 @@ impl CodegenJS {
             is_tail_recursive,
             remap_to_rest_args,
         });
+    }
+
+    pub fn pop_function_context(&mut self) {
+        self.function_context_stack.pop();
     }
 
     fn generate_binary_operator_token(&mut self, op: &BinaryOp) {
@@ -330,7 +378,7 @@ impl CodegenJS {
         }
     }
 
-    fn generate_node(&mut self, node: &Node, parent_op: Option<&BinaryOp>) {
+    pub fn generate_node(&mut self, node: &Node, parent_op: Option<&BinaryOp>) {
         // TODO: Split into generate_statement and generate_expression.
         //       This should also help setting proper block contexts.
         match &node.ast_node {
@@ -416,21 +464,14 @@ impl CodegenJS {
             } => {
                 self.generate_if_else(condition, then_branch, else_branch);
             }
-            AstNode::FunctionParameter{ id: _, node, type_annotation: _ } => match node.ast_node {
-                AstNode::Identifier { .. } => self.generate_node(node, None),
-                AstNode::Literal(_) => self.generate_node(node, None),
-                AstNode::List(_) => todo!(),
-                // Wildcards are handled within pipeline and call expressions,
-                AstNode::Wildcard => unreachable!("Unexpected wildcard in function parameter."),
-                _ => todo!(),
-            },
+            AstNode::FunctionParameter{ id: _, node, type_annotation: _ } => generate_function_parameter(self, node),
             AstNode::FunctionDeclaration { id: _, name, declaration } =>
-                self.generate_function_declaration(name, declaration),
+                generate_function_declaration(self, name, declaration),
             AstNode::FunctionDeclarations { id: _, name, declarations } =>
-                self.generate_function_declarations(name, declarations),
+                generate_function_declarations(self, name, declarations),
             AstNode::FunctionExpression { id: _, name, declaration } =>
-                self.generate_function_expression(name, declaration),
-            AstNode::ReturnStatement(expr) => self.generate_return_statement(expr),
+                generate_function_expression(self, name, declaration),
+            AstNode::ReturnStatement(expr) => generate_return_statement(self, expr),
             AstNode::Identifier(name) => self.generate_identifier(name),
             AstNode::NestedIdentifier(identifiers) => self.push_str(&identifiers.join(".")),
             AstNode::Call { function, arguments } =>
@@ -460,12 +501,11 @@ impl CodegenJS {
     }
 
     fn generate_identifier(&mut self, name: &str) {
-        self.push_str(
-            &self
-                .current_scope()
-                .resolve_variable(name)
-                .unwrap_or(name.to_string()),
-        );
+        let identifier = &self
+            .current_scope()
+            .resolve_variable(name)
+            .unwrap_or(name.to_string());
+        self.push_str(identifier);
     }
 
     fn generate_variable_declaration(&mut self, name: &str, value: &Node) {
@@ -645,483 +685,6 @@ impl CodegenJS {
         _named_fields: bool,
     ) {
         todo!("enum extraction outside of function parameters is not implemented yet.")
-    }
-
-    fn is_function_body_tail_recursive(function_name: &str, node: &Node) -> bool {
-        // Recursively traverse nodes to check for tail recursive calls to the function itself.
-        // We currently only support tail recursion to the function itself, not any other function.
-        // Therefore we look for RecursiveCall nodes which reference the current function name.
-        match &node.ast_node {
-            AstNode::RecursiveCall(node) => {
-                // Node is a Call expression, unwrap first.
-                if let AstNode::Call {
-                    function,
-                    arguments: _,
-                } = &node.ast_node
-                {
-                    // If the function is an identifier, check if it's the same as the current function name.
-                    if let AstNode::Identifier(name) = &function.ast_node {
-                        if name == function_name {
-                            return true;
-                        }
-                    }
-                }
-                false
-            }
-            AstNode::Block(statements, expression) => {
-                for statement in statements {
-                    if Self::is_function_body_tail_recursive(function_name, statement) {
-                        return true;
-                    }
-                }
-                if let Some(expression) = expression {
-                    return Self::is_function_body_tail_recursive(function_name, expression);
-                }
-                false
-            }
-            AstNode::ExpressionStatement(expression) => {
-                Self::is_function_body_tail_recursive(function_name, expression)
-            }
-            AstNode::Match {
-                expression,
-                arms: _,
-            } => Self::is_function_body_tail_recursive(function_name, expression),
-            AstNode::MatchArm {
-                pattern: _,
-                expression,
-            } => Self::is_function_body_tail_recursive(function_name, expression),
-            AstNode::IfElse {
-                condition,
-                then_branch,
-                else_branch,
-            } => {
-                Self::is_function_body_tail_recursive(function_name, condition)
-                    || Self::is_function_body_tail_recursive(function_name, then_branch)
-                    || else_branch.as_ref().map_or(false, |branch| {
-                        Self::is_function_body_tail_recursive(function_name, branch)
-                    })
-            }
-            AstNode::ReturnStatement(node) => {
-                if let Some(node) = node {
-                    Self::is_function_body_tail_recursive(function_name, node)
-                } else {
-                    false
-                }
-            }
-            _ => false,
-        }
-    }
-
-    fn flush_function_pre_body(&mut self) {
-        self.push_str(&self.function_pre_body.clone());
-        self.function_pre_body.clear();
-
-        for (name, value) in self.function_pre_body_declarations.clone().iter() {
-            self.push_str(&self.get_indent());
-            self.push_str(&format!("let {} = {};\n", name, value));
-            self.scopes.declare_variable_alias(name, name);
-        }
-        self.function_pre_body_declarations.clear();
-    }
-
-    fn generate_function_body(&mut self, body: &Node, is_tail_recursive: bool) {
-        self.context_stack.push(BlockContext::FunctionBody);
-        self.flush_function_pre_body();
-        if is_tail_recursive {
-            self.push_str(&self.get_indent());
-            self.push_str("while (true) {\n");
-            self.indent_level += 1;
-        }
-        self.generate_node(body, None);
-        if is_tail_recursive {
-            self.indent_level -= 1;
-            self.push_str(&self.get_indent());
-            self.push_str("}\n");
-        }
-        self.context_stack.pop();
-    }
-
-    fn fn_identifier_to_string(&self, name: &Node) -> String {
-        match &name.ast_node {
-            AstNode::Identifier(name) => name.clone(),
-            _ => todo!(),
-        }
-    }
-
-    fn generate_function_declaration(&mut self, name: &Node, declaration: &FunctionDeclaration) {
-        let name_as_str = self.fn_identifier_to_string(name);
-        let is_tail_recursive =
-            Self::is_function_body_tail_recursive(&name_as_str, &declaration.body);
-        self.push_function_context(
-            &name_as_str,
-            &declaration.parameters,
-            is_tail_recursive,
-            false,
-        );
-
-        self.push_str(&self.get_indent());
-        self.push_str(&format!("function {}(", name_as_str));
-
-        for (i, param) in declaration.parameters.iter().enumerate() {
-            if i > 0 {
-                self.push_str(", ");
-            }
-            self.generate_node(param, None);
-        }
-
-        self.push_str(") {\n");
-        self.indent_level += 1;
-        self.generate_function_body(&declaration.body, is_tail_recursive);
-        self.indent_level -= 1;
-        self.push_str(&self.get_indent());
-        self.push_str("}\n");
-        self.function_context_stack.pop();
-    }
-
-    fn generate_function_expression(
-        &mut self,
-        name: &Option<Box<Node>>,
-        declaration: &FunctionDeclaration,
-    ) {
-        let name_as_str = if name.is_some() {
-            self.fn_identifier_to_string(&name.clone().unwrap())
-        } else {
-            "".to_string()
-        };
-        let is_tail_recursive =
-            Self::is_function_body_tail_recursive(&name_as_str, &declaration.body);
-        self.push_function_context(
-            &name_as_str,
-            &declaration.parameters,
-            is_tail_recursive,
-            false,
-        );
-        let function_keyword = match name_as_str.as_str() {
-            "" => "function(".to_string(),
-            _ => format!("function {}(", name_as_str),
-        };
-
-        self.push_str(&function_keyword);
-
-        for (i, param) in declaration.parameters.iter().enumerate() {
-            if i > 0 {
-                self.push_str(", ");
-            }
-            self.generate_node(param, None);
-        }
-
-        self.push_str(") {\n");
-        self.indent_level += 1;
-        self.generate_function_body(&declaration.body, is_tail_recursive);
-        self.indent_level -= 1;
-        self.push_str(&self.get_indent());
-        self.push_char('}');
-        self.function_context_stack.pop();
-    }
-
-    fn generate_function_declarations(
-        &mut self,
-        name: &Node,
-        declarations: &[FunctionDeclaration],
-    ) {
-        let name_as_str = self.fn_identifier_to_string(name);
-        // TODO: Handle tail recursion for multiple definitions.
-        let is_any_definition_tail_recursive = declarations.iter().any(|declaration| {
-            Self::is_function_body_tail_recursive(&name_as_str, &declaration.body)
-        });
-        self.push_str(&self.get_indent());
-        self.push_str(&format!("function {}(...args) {{\n", name_as_str));
-        self.push_scope();
-        self.scopes.declare_variable("args");
-        self.indent_level += 1;
-
-        if is_any_definition_tail_recursive {
-            self.push_str(&self.get_indent());
-            self.push_str("while (true) {\n");
-            self.indent_level += 1;
-        }
-
-        self.push_str(&self.get_indent());
-        for (i, declaration) in declarations.iter().enumerate() {
-            self.push_scope();
-            // TODO: Only render else if there is another definition with a literal.
-            if i > 0 {
-                self.push_str(" else ");
-            }
-
-            for (j, param) in declaration.parameters.iter().enumerate() {
-                if let AstNode::FunctionParameter {
-                    id: _,
-                    node,
-                    type_annotation: _,
-                } = &param.ast_node
-                {
-                    match &node.ast_node {
-                        AstNode::Identifier(name) => {
-                            self.scopes
-                                .declare_variable_alias(name, &format!("args[{}]", j));
-                        }
-                        AstNode::List(patterns) => {
-                            for (i, pattern) in patterns.iter().enumerate() {
-                                if let AstNode::Identifier(name) = &pattern.ast_node {
-                                    self.scopes.declare_variable_alias(
-                                        name,
-                                        &format!("args[{}][{}]", j, i),
-                                    );
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-
-            // Expand parameter matching if any definition has a different amount of
-            // paramaters.
-            let parameter_variadic = declarations
-                .iter()
-                .map(|declaration| declaration.parameters.clone())
-                .any(|params| params.len() != declaration.parameters.len());
-            let pattern_matched_parameters =
-                declaration
-                    .parameters
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, param)| {
-                        if let AstNode::FunctionParameter {
-                            id: _,
-                            node,
-                            type_annotation: _,
-                        } = &param.ast_node
-                        {
-                            matches!(
-                                node.ast_node,
-                                AstNode::Literal(_)
-                                    | AstNode::List(_)
-                                    | AstNode::EnumExtraction { .. }
-                            )
-                        } else {
-                            false
-                        }
-                    });
-
-            let variadic_or_pattern_matching =
-                parameter_variadic || pattern_matched_parameters.clone().count() > 0;
-
-            if variadic_or_pattern_matching {
-                if parameter_variadic {
-                    self.push_str("if (args.length === ");
-                    self.push_str(&declaration.parameters.len().to_string());
-
-                    if pattern_matched_parameters.clone().count() > 0 {
-                        self.push_str(" && ");
-                    }
-                } else {
-                    self.push_str("if (");
-                }
-                // Filter only literal params.
-                for (j, (k, param)) in pattern_matched_parameters.enumerate() {
-                    if j > 0 {
-                        self.push_str(" && ");
-                    }
-
-                    if let AstNode::FunctionParameter {
-                        id: _,
-                        node,
-                        type_annotation: _,
-                    } = &param.ast_node
-                    {
-                        match &node.ast_node {
-                            AstNode::Identifier(_) | AstNode::Literal(_) => {
-                                self.push_str(&format!("args[{}] === ", k));
-                                self.generate_node(param, None);
-                            }
-                            AstNode::List(patterns) => {
-                                if patterns.is_empty() {
-                                    self.push_str(&format!("args[{}].length === 0", k));
-                                    continue;
-                                }
-
-                                // TODO: Handle multiple patterns, for now a simple recursive sum was the test case :D
-                                let should_and = false;
-                                for (i, pattern) in patterns.iter().enumerate() {
-                                    if should_and {
-                                        self.push_str(" && ");
-                                    }
-
-                                    match &pattern.ast_node {
-                                        AstNode::Literal(_) => {
-                                            self.push_str(&format!("args[{}][{}] === ", k, i));
-                                            self.generate_node(pattern, None);
-                                        }
-                                        AstNode::PrefixOp(PrefixOp::Rest, identified) => {
-                                            if let AstNode::Identifier(ref name) =
-                                                identified.ast_node
-                                            {
-                                                self.push_str(&format!(
-                                                    "args[{}].length >= {}",
-                                                    k, i
-                                                ));
-                                                self.function_pre_body_declarations.push((
-                                                    name.clone(),
-                                                    format!("args[{}].slice({})", k, i),
-                                                ));
-                                            }
-                                        }
-                                        AstNode::Identifier(name) => {
-                                            self.function_pre_body_declarations.push((
-                                                name.clone(),
-                                                format!("args[{}][{}]", k, i),
-                                            ));
-                                        }
-                                        _ => unreachable!(),
-                                    }
-                                }
-                            }
-                            AstNode::EnumExtraction {
-                                identifier,
-                                elements,
-                                named_fields,
-                            } => {
-                                let identifier = match &identifier.ast_node {
-                                    AstNode::Identifier(name) => name.clone(),
-                                    AstNode::NestedIdentifier(names) => {
-                                        names.clone().pop().unwrap()
-                                    }
-                                    _ => unreachable!(),
-                                };
-                                self.push_str(&format!("args[{}].tag === \"{}\"", k, identifier));
-                                for (i, element) in elements.iter().enumerate() {
-                                    // Skip any Wildcards
-                                    if let AstNode::Wildcard = element.ast_node {
-                                        continue;
-                                    }
-                                    let identifier = match &element.ast_node {
-                                        AstNode::Identifier(name) => name.clone(),
-                                        AstNode::NestedIdentifier(names) => {
-                                            names.clone().pop().unwrap()
-                                        }
-                                        _ => unreachable!(),
-                                    };
-                                    if *named_fields {
-                                        self.function_pre_body_declarations.push((
-                                            identifier.clone(),
-                                            format!("args[{}].{}", k, identifier),
-                                        ));
-                                    } else {
-                                        self.function_pre_body_declarations.push((
-                                            identifier.clone(),
-                                            format!("args[{}][{}]", k, i),
-                                        ));
-                                    }
-                                }
-                            }
-                            _ => unreachable!(),
-                        }
-                    }
-                }
-            }
-
-            if variadic_or_pattern_matching {
-                if let Some(expr) = &declaration.guard {
-                    self.push_str(" && ");
-                    self.generate_node(expr, None);
-                }
-                self.push_str(") {\n");
-            } else {
-                if let Some(expr) = &declaration.guard {
-                    self.push_str("if (");
-                    self.generate_node(expr, None);
-                    self.push_str(") {\n");
-                }
-                self.push_str("{\n");
-            }
-
-            self.indent_level += 1;
-            // Alias identifier args back to the parameter names for readability of generated code.
-            for (j, param) in declaration.parameters.iter().enumerate() {
-                if let AstNode::FunctionParameter {
-                    id: _,
-                    node,
-                    type_annotation: _,
-                } = &param.ast_node
-                {
-                    if let AstNode::Identifier(ref name) = node.ast_node {
-                        self.push_str(&self.get_indent());
-                        self.push_str(&format!("let {} = args[{}];\n", name, j));
-                        self.scopes.declare_variable_alias(name, name);
-                    }
-                }
-            }
-            // We handle the tail recursion case in multiple function body declarations ourselves higher up.
-            self.push_function_context(
-                &name_as_str,
-                &declaration.parameters,
-                is_any_definition_tail_recursive,
-                true,
-            );
-            self.generate_function_body(&declaration.body, false);
-            self.function_context_stack.pop();
-            self.indent_level -= 1;
-            self.push_str(&self.get_indent());
-            self.push_char('}');
-            self.pop_scope();
-        }
-
-        if is_any_definition_tail_recursive {
-            self.indent_level -= 1;
-            self.push_char('\n');
-            self.push_str(&self.get_indent());
-            self.push_char('}');
-        }
-
-        self.indent_level -= 1;
-        self.push_char('\n');
-        self.push_str(&self.get_indent());
-        self.push_str("}\n");
-        self.pop_scope();
-    }
-
-    fn generate_return_statement(&mut self, expr: &Option<Box<Node>>) {
-        // We do not render a return statement if we are in a tail recursive function body.
-        // Which calls the current function recursively.
-        if expr.is_some() {
-            if let AstNode::RecursiveCall(call_exp) = &expr.as_ref().unwrap().ast_node {
-                let call_identifier = match &call_exp.ast_node {
-                    AstNode::Call {
-                        function,
-                        arguments: _,
-                    } => {
-                        if let AstNode::Identifier(name) = &function.ast_node {
-                            Some(name)
-                        } else {
-                            None
-                        }
-                    }
-                    _ => None,
-                };
-
-                if call_identifier.is_some() {
-                    if let Some(function_context) = self.function_context_stack.last() {
-                        if function_context.is_tail_recursive
-                            && &function_context.name == call_identifier.unwrap()
-                        {
-                            return self.generate_node(&expr.clone().unwrap(), None);
-                        }
-                    }
-                }
-            }
-        }
-
-        self.push_str(&self.get_indent());
-        self.push_str("return");
-
-        if let Some(expr) = expr {
-            self.push_char(' ');
-            self.generate_node(expr, None);
-        }
-
-        self.push_str(";\n");
     }
 
     fn generate_call_expression(&mut self, function: &Node, arguments: &[Node]) {
