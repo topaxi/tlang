@@ -1,4 +1,5 @@
 use crate::{
+    binary_operator_generator::generate_binary_op,
     function_generator::{
         generate_function_declaration, generate_function_declarations,
         generate_function_expression, generate_function_parameter, generate_return_statement,
@@ -9,18 +10,6 @@ use tlang_ast::{
     node::{AstNode, BinaryOp, Node, PrefixOp},
     token::Literal,
 };
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum JSAssociativity {
-    Left,
-    Right,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct JSOperatorInfo {
-    precedence: u8,
-    associativity: JSAssociativity,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BlockContext {
@@ -195,72 +184,6 @@ impl CodegenJS {
 
     pub fn pop_function_context(&mut self) {
         self.function_context_stack.pop();
-    }
-
-    fn generate_binary_operator_token(&mut self, op: &BinaryOp) {
-        match op {
-            BinaryOp::Add => self.push_str(" + "),
-            BinaryOp::Subtract => self.push_str(" - "),
-            BinaryOp::Multiply => self.push_str(" * "),
-            BinaryOp::Divide => self.push_str(" / "),
-            BinaryOp::Modulo => self.push_str(" % "),
-            BinaryOp::Exponentiation => self.push_str(" ** "),
-            BinaryOp::Equal => self.push_str(" === "),
-            BinaryOp::NotEqual => self.push_str(" !== "),
-            BinaryOp::LessThan => self.push_str(" < "),
-            BinaryOp::LessThanOrEqual => self.push_str(" <= "),
-            BinaryOp::GreaterThan => self.push_str(" > "),
-            BinaryOp::GreaterThanOrEqual => self.push_str(" >= "),
-            BinaryOp::And => self.push_str(" && "),
-            BinaryOp::Or => self.push_str(" || "),
-            BinaryOp::BitwiseOr => self.push_str(" | "),
-            BinaryOp::BitwiseAnd => self.push_str(" & "),
-            BinaryOp::BitwiseXor => self.push_str(" ^ "),
-            BinaryOp::Pipeline => unimplemented!("Pipeline does not neatly map to a JS operator."),
-        }
-    }
-
-    fn map_operator_info(op: &BinaryOp) -> JSOperatorInfo {
-        match op {
-            BinaryOp::Add | BinaryOp::Subtract => JSOperatorInfo {
-                precedence: 6,
-                associativity: JSAssociativity::Left,
-            },
-            BinaryOp::Multiply | BinaryOp::Divide | BinaryOp::Modulo => JSOperatorInfo {
-                precedence: 7,
-                associativity: JSAssociativity::Left,
-            },
-            BinaryOp::Equal
-            | BinaryOp::NotEqual
-            | BinaryOp::LessThan
-            | BinaryOp::LessThanOrEqual
-            | BinaryOp::GreaterThan
-            | BinaryOp::GreaterThanOrEqual => JSOperatorInfo {
-                precedence: 5,
-                associativity: JSAssociativity::Left,
-            },
-            BinaryOp::And => JSOperatorInfo {
-                precedence: 3,
-                associativity: JSAssociativity::Left,
-            },
-            BinaryOp::Or => JSOperatorInfo {
-                precedence: 2,
-                associativity: JSAssociativity::Left,
-            },
-            BinaryOp::BitwiseAnd | BinaryOp::BitwiseOr | BinaryOp::BitwiseXor => JSOperatorInfo {
-                precedence: 8,
-                associativity: JSAssociativity::Left,
-            },
-            BinaryOp::Exponentiation => JSOperatorInfo {
-                precedence: 9,
-                associativity: JSAssociativity::Right,
-            },
-            // TODO: Do we need this? As we'll map the pipeline operator to a function call.
-            BinaryOp::Pipeline => JSOperatorInfo {
-                precedence: 1,
-                associativity: JSAssociativity::Left,
-            },
-        }
     }
 
     fn generate_literal(&mut self, literal: &Literal) {
@@ -443,7 +366,7 @@ impl CodegenJS {
                 self.generate_node(node, None);
             },
             AstNode::BinaryOp { op, lhs, rhs } => {
-                self.generate_binary_op(op, lhs, rhs, parent_op);
+                generate_binary_op(self, op, lhs, rhs, parent_op);
             }
             AstNode::VariableDeclaration { id: _, name, value , type_annotation: _} => {
                 self.generate_variable_declaration(name, value);
@@ -516,74 +439,6 @@ impl CodegenJS {
         self.generate_node(value, None);
         self.context_stack.pop();
         self.push_str(";\n");
-    }
-
-    fn generate_binary_op(
-        &mut self,
-        op: &BinaryOp,
-        lhs: &Node,
-        rhs: &Node,
-        parent_op: Option<&BinaryOp>,
-    ) {
-        let needs_parentheses = parent_op.map_or(false, |parent| {
-            Self::should_wrap_with_parentheses(op, parent)
-        });
-
-        if needs_parentheses {
-            self.push_char('(');
-        }
-
-        if let BinaryOp::Pipeline = op {
-            // If rhs was an identifier, we just pass lhs it as an argument to a function call.
-            if let AstNode::Identifier(_) = rhs.ast_node {
-                self.generate_node(rhs, None);
-                self.push_char('(');
-                self.generate_node(lhs, None);
-                self.push_char(')');
-            // If rhs is a Call node and we prepend the lhs to the argument list.
-            } else if let AstNode::Call {
-                function,
-                arguments,
-            } = &rhs.ast_node
-            {
-                self.generate_node(function, None);
-                self.push_char('(');
-
-                // If we have a wildcard in the argument list, we instead replace the wildcard with the lhs.
-                // Otherwise we prepend the lhs to the argument list.
-                let has_wildcard = arguments
-                    .iter()
-                    .any(|arg| matches!(arg.ast_node, AstNode::Wildcard));
-                if has_wildcard {
-                    for (i, arg) in arguments.iter().enumerate() {
-                        if i > 0 {
-                            self.push_str(", ");
-                        }
-
-                        if let AstNode::Wildcard = arg.ast_node {
-                            self.generate_node(lhs, None);
-                        } else {
-                            self.generate_node(arg, None);
-                        }
-                    }
-                } else {
-                    self.generate_node(lhs, None);
-                    for arg in arguments.iter() {
-                        self.push_str(", ");
-                        self.generate_node(arg, None);
-                    }
-                };
-                self.push_char(')');
-            }
-        } else {
-            self.generate_node(lhs, Some(op));
-            self.generate_binary_operator_token(op);
-            self.generate_node(rhs, Some(op));
-        }
-
-        if needs_parentheses {
-            self.push_char(')');
-        }
     }
 
     fn generate_if_else(
@@ -776,18 +631,6 @@ impl CodegenJS {
 
         // For any other referenced function, we do a normal call expression.
         self.generate_node(node, parent_op)
-    }
-
-    fn should_wrap_with_parentheses(op: &BinaryOp, parent_op: &BinaryOp) -> bool {
-        let op_info = Self::map_operator_info(op);
-        let parent_op_info = Self::map_operator_info(parent_op);
-
-        if op_info.precedence < parent_op_info.precedence {
-            return true;
-        }
-
-        op_info.precedence == parent_op_info.precedence
-            && op_info.associativity == JSAssociativity::Right
     }
 
     fn get_indent(&self) -> String {
