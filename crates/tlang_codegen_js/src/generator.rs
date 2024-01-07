@@ -149,7 +149,7 @@ impl CodegenJS {
         });
     }
 
-    fn generate_binary_op(&mut self, op: &BinaryOp) {
+    fn generate_binary_operator_token(&mut self, op: &BinaryOp) {
         match op {
             BinaryOp::Add => self.push_str(" + "),
             BinaryOp::Subtract => self.push_str(" - "),
@@ -395,68 +395,10 @@ impl CodegenJS {
                 self.generate_node(node, None);
             },
             AstNode::BinaryOp { op, lhs, rhs } => {
-                let needs_parentheses = parent_op.map_or(false, |parent| {
-                    Self::should_wrap_with_parentheses(op, parent)
-                });
-
-                if needs_parentheses {
-                    self.push_char('(');
-                }
-
-                if let BinaryOp::Pipeline = op {
-                    // If rhs was an identifier, we just pass lhs it as an argument to a function call.
-                    if let AstNode::Identifier(_) = rhs.ast_node {
-                        self.generate_node(rhs, None);
-                        self.push_char('(');
-                        self.generate_node(lhs, None);
-                        self.push_char(')');
-                    // If rhs is a Call node and we prepend the lhs to the argument list.
-                    } else if let AstNode::Call { function, arguments } = &rhs.ast_node {
-                        self.generate_node(function, None);
-                        self.push_char('(');
-
-                        // If we have a wildcard in the argument list, we instead replace the wildcard with the lhs.
-                        // Otherwise we prepend the lhs to the argument list.
-                        let has_wildcard = arguments.iter().any(|arg| matches!(arg.ast_node, AstNode::Wildcard));
-                        if has_wildcard {
-                            for (i, arg) in arguments.iter().enumerate() {
-                                if i > 0 {
-                                    self.push_str(", ");
-                                }
-
-                                if let AstNode::Wildcard = arg.ast_node {
-                                    self.generate_node(lhs, None);
-                                } else {
-                                    self.generate_node(arg, None);
-                                }
-                            }
-                        } else {
-                            self.generate_node(lhs, None);
-                            for arg in arguments.iter() {
-                                self.push_str(", ");
-                                self.generate_node(arg, None);
-                            }
-                        };
-                        self.push_char(')');
-                    }
-                } else {
-                    self.generate_node(lhs, Some(op));
-                    self.generate_binary_op(op);
-                    self.generate_node(rhs, Some(op));
-                }
-
-                if needs_parentheses {
-                    self.push_char(')');
-                }
+                self.generate_binary_op(op, lhs, rhs, parent_op);
             }
             AstNode::VariableDeclaration { id: _, name, value , type_annotation: _} => {
-                self.push_str(&self.get_indent());
-                let name = self.scopes.declare_variable(name);
-                self.push_str(&format!("let {} = ", name));
-                self.context_stack.push(BlockContext::Expression);
-                self.generate_node(value, None);
-                self.context_stack.pop();
-                self.push_str(";\n");
+                self.generate_variable_declaration(name, value);
             }
             AstNode::Match {
                 expression: _,
@@ -472,30 +414,7 @@ impl CodegenJS {
                 then_branch,
                 else_branch,
             } => {
-                self.push_str("if (");
-                let indent_level = self.indent_level;
-                self.indent_level = 0;
-                self.generate_node(condition, None);
-                self.indent_level = indent_level;
-                self.push_str(") {\n");
-                self.indent_level += 1;
-                self.context_stack.push(BlockContext::Expression);
-                self.generate_node(then_branch, None);
-                self.context_stack.pop();
-                self.indent_level -= 1;
-
-                if let Some(else_branch) = else_branch {
-                    self.push_str(&self.get_indent());
-                    self.push_str("} else {\n");
-                    self.indent_level += 1;
-                    self.context_stack.push(BlockContext::Expression);
-                    self.generate_node(else_branch, None);
-                    self.context_stack.pop();
-                    self.indent_level -= 1;
-                }
-
-                self.push_str(&self.get_indent());
-                self.push_char('}');
+                self.generate_if_else(condition, then_branch, else_branch);
             }
             AstNode::FunctionParameter{ id: _, node, type_annotation: _ } => match node.ast_node {
                 AstNode::Identifier { .. } => self.generate_node(node, None),
@@ -512,46 +431,12 @@ impl CodegenJS {
             AstNode::FunctionExpression { id: _, name, declaration } =>
                 self.generate_function_expression(name, declaration),
             AstNode::ReturnStatement(expr) => self.generate_return_statement(expr),
-            AstNode::Identifier(name) => self.push_str(&self.current_scope().resolve_variable(name).unwrap_or(name.to_string())),
+            AstNode::Identifier(name) => self.generate_identifier(name),
             AstNode::NestedIdentifier(identifiers) => self.push_str(&identifiers.join(".")),
             AstNode::Call { function, arguments } =>
                 self.generate_call_expression(function, arguments),
             AstNode::RecursiveCall(node) => {
-                // If call expression is referencing the current function, all we do is update the arguments,
-                // as we are in a while loop.
-                if let AstNode::Call { function, arguments } = &node.ast_node {
-                    if let AstNode::Identifier(name) = &function.ast_node {
-                        if let Some(function_context) = self.function_context_stack.last() {
-                            if function_context.is_tail_recursive && &function_context.name == name {
-                                let params = function_context.params.clone();
-                                let remap_to_rest_args = function_context.remap_to_rest_args;
-                                let tmp_vars = params.iter().map(|_| self.scopes.declare_tmp_variable()).collect::<Vec<_>>();
-
-                                for (i, arg) in arguments.iter().enumerate() {
-                                    self.push_str(&self.get_indent());
-                                    self.push_str(&format!("let {} = ", tmp_vars[i]));
-                                    self.generate_node(arg, None);
-                                    self.push_str(";\n");
-                                }
-                                if remap_to_rest_args {
-                                    for (i, _arg_name) in params.iter().enumerate() {
-                                        self.push_str(&self.get_indent());
-                                        self.push_str(&format!("args[{}] = {};\n", i, tmp_vars[i]));
-                                    }
-                                } else {
-                                    for (i, arg_name) in params.iter().enumerate() {
-                                        self.push_str(&self.get_indent());
-                                        self.push_str(&format!("{} = {};\n", arg_name, tmp_vars[i]));
-                                    }
-                                }
-                                return;
-                            }
-                        }
-                    }
-                }
-
-                // For any other referenced function, we do a normal call expression.
-                self.generate_node(node, parent_op)
+                self.generate_recursive_call_expression(node, parent_op)
             },
             AstNode::FieldExpression { base, field } => {
                 self.generate_node(base, None);
@@ -572,6 +457,125 @@ impl CodegenJS {
             #[allow(unreachable_patterns)]
             _ => unimplemented!("{:?} not implemented yet.", node),
         }
+    }
+
+    fn generate_identifier(&mut self, name: &str) {
+        self.push_str(
+            &self
+                .current_scope()
+                .resolve_variable(name)
+                .unwrap_or(name.to_string()),
+        );
+    }
+
+    fn generate_variable_declaration(&mut self, name: &str, value: &Node) {
+        self.push_str(&self.get_indent());
+        let name = self.scopes.declare_variable(name);
+        self.push_str(&format!("let {} = ", name));
+        self.context_stack.push(BlockContext::Expression);
+        self.generate_node(value, None);
+        self.context_stack.pop();
+        self.push_str(";\n");
+    }
+
+    fn generate_binary_op(
+        &mut self,
+        op: &BinaryOp,
+        lhs: &Node,
+        rhs: &Node,
+        parent_op: Option<&BinaryOp>,
+    ) {
+        let needs_parentheses = parent_op.map_or(false, |parent| {
+            Self::should_wrap_with_parentheses(op, parent)
+        });
+
+        if needs_parentheses {
+            self.push_char('(');
+        }
+
+        if let BinaryOp::Pipeline = op {
+            // If rhs was an identifier, we just pass lhs it as an argument to a function call.
+            if let AstNode::Identifier(_) = rhs.ast_node {
+                self.generate_node(rhs, None);
+                self.push_char('(');
+                self.generate_node(lhs, None);
+                self.push_char(')');
+            // If rhs is a Call node and we prepend the lhs to the argument list.
+            } else if let AstNode::Call {
+                function,
+                arguments,
+            } = &rhs.ast_node
+            {
+                self.generate_node(function, None);
+                self.push_char('(');
+
+                // If we have a wildcard in the argument list, we instead replace the wildcard with the lhs.
+                // Otherwise we prepend the lhs to the argument list.
+                let has_wildcard = arguments
+                    .iter()
+                    .any(|arg| matches!(arg.ast_node, AstNode::Wildcard));
+                if has_wildcard {
+                    for (i, arg) in arguments.iter().enumerate() {
+                        if i > 0 {
+                            self.push_str(", ");
+                        }
+
+                        if let AstNode::Wildcard = arg.ast_node {
+                            self.generate_node(lhs, None);
+                        } else {
+                            self.generate_node(arg, None);
+                        }
+                    }
+                } else {
+                    self.generate_node(lhs, None);
+                    for arg in arguments.iter() {
+                        self.push_str(", ");
+                        self.generate_node(arg, None);
+                    }
+                };
+                self.push_char(')');
+            }
+        } else {
+            self.generate_node(lhs, Some(op));
+            self.generate_binary_operator_token(op);
+            self.generate_node(rhs, Some(op));
+        }
+
+        if needs_parentheses {
+            self.push_char(')');
+        }
+    }
+
+    fn generate_if_else(
+        &mut self,
+        condition: &Node,
+        then_branch: &Node,
+        else_branch: &Option<Box<Node>>,
+    ) {
+        self.push_str("if (");
+        let indent_level = self.indent_level;
+        self.indent_level = 0;
+        self.generate_node(condition, None);
+        self.indent_level = indent_level;
+        self.push_str(") {\n");
+        self.indent_level += 1;
+        self.context_stack.push(BlockContext::Expression);
+        self.generate_node(then_branch, None);
+        self.context_stack.pop();
+        self.indent_level -= 1;
+
+        if let Some(else_branch) = else_branch {
+            self.push_str(&self.get_indent());
+            self.push_str("} else {\n");
+            self.indent_level += 1;
+            self.context_stack.push(BlockContext::Expression);
+            self.generate_node(else_branch, None);
+            self.context_stack.pop();
+            self.indent_level -= 1;
+        }
+
+        self.push_str(&self.get_indent());
+        self.push_char('}');
     }
 
     fn generate_enum_declaration(&mut self, name: &str, variants: &[Node]) {
@@ -715,7 +719,7 @@ impl CodegenJS {
         for (name, value) in self.function_pre_body_declarations.clone().iter() {
             self.push_str(&self.get_indent());
             self.push_str(&format!("let {} = {};\n", name, value));
-            self.scopes.declare_variable_alias(&name, &name);
+            self.scopes.declare_variable_alias(name, name);
         }
         self.function_pre_body_declarations.clear();
     }
@@ -855,18 +859,15 @@ impl CodegenJS {
                     match &node.ast_node {
                         AstNode::Identifier(name) => {
                             self.scopes
-                                .declare_variable_alias(&name, &format!("args[{}]", j));
+                                .declare_variable_alias(name, &format!("args[{}]", j));
                         }
                         AstNode::List(patterns) => {
                             for (i, pattern) in patterns.iter().enumerate() {
-                                match &pattern.ast_node {
-                                    AstNode::Identifier(name) => {
-                                        self.scopes.declare_variable_alias(
-                                            &name,
-                                            &format!("args[{}][{}]", j, i),
-                                        );
-                                    }
-                                    _ => {}
+                                if let AstNode::Identifier(name) = &pattern.ast_node {
+                                    self.scopes.declare_variable_alias(
+                                        name,
+                                        &format!("args[{}][{}]", j, i),
+                                    );
                                 }
                             }
                         }
@@ -1048,7 +1049,7 @@ impl CodegenJS {
                     if let AstNode::Identifier(ref name) = node.ast_node {
                         self.push_str(&self.get_indent());
                         self.push_str(&format!("let {} = args[{}];\n", name, j));
-                        self.scopes.declare_variable_alias(&name, &name);
+                        self.scopes.declare_variable_alias(name, name);
                     }
                 }
             }
@@ -1167,6 +1168,51 @@ impl CodegenJS {
             self.generate_node(arg, None);
         }
         self.push_char(')');
+    }
+
+    fn generate_recursive_call_expression(&mut self, node: &Node, parent_op: Option<&BinaryOp>) {
+        // If call expression is referencing the current function, all we do is update the arguments,
+        // as we are in a while loop.
+        if let AstNode::Call {
+            function,
+            arguments,
+        } = &node.ast_node
+        {
+            if let AstNode::Identifier(name) = &function.ast_node {
+                if let Some(function_context) = self.function_context_stack.last() {
+                    if function_context.is_tail_recursive && &function_context.name == name {
+                        let params = function_context.params.clone();
+                        let remap_to_rest_args = function_context.remap_to_rest_args;
+                        let tmp_vars = params
+                            .iter()
+                            .map(|_| self.scopes.declare_tmp_variable())
+                            .collect::<Vec<_>>();
+
+                        for (i, arg) in arguments.iter().enumerate() {
+                            self.push_str(&self.get_indent());
+                            self.push_str(&format!("let {} = ", tmp_vars[i]));
+                            self.generate_node(arg, None);
+                            self.push_str(";\n");
+                        }
+                        if remap_to_rest_args {
+                            for (i, _arg_name) in params.iter().enumerate() {
+                                self.push_str(&self.get_indent());
+                                self.push_str(&format!("args[{}] = {};\n", i, tmp_vars[i]));
+                            }
+                        } else {
+                            for (i, arg_name) in params.iter().enumerate() {
+                                self.push_str(&self.get_indent());
+                                self.push_str(&format!("{} = {};\n", arg_name, tmp_vars[i]));
+                            }
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+
+        // For any other referenced function, we do a normal call expression.
+        self.generate_node(node, parent_op)
     }
 
     fn should_wrap_with_parentheses(op: &BinaryOp, parent_op: &BinaryOp) -> bool {
