@@ -1,5 +1,43 @@
+use crate::span::Span;
+
+#[derive(Clone, Debug)]
+pub struct Token {
+    pub value: TokenValue,
+    pub span: Option<Span>,
+}
+
+impl PartialEq for Token {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
+}
+
+impl PartialEq<TokenValue> for Token {
+    fn eq(&self, other: &TokenValue) -> bool {
+        &self.value == other
+    }
+}
+
+impl PartialEq<TokenValue> for Option<Token> {
+    fn eq(&self, other: &TokenValue) -> bool {
+        self.as_ref().map_or(false, |t| t == other)
+    }
+}
+
+impl PartialEq<Option<TokenValue>> for Token {
+    fn eq(&self, other: &Option<TokenValue>) -> bool {
+        self == other.as_ref().map(|t| t)
+    }
+}
+
+impl Token {
+    pub fn new(value: TokenValue, span: Option<Span>) -> Self {
+        Token { value, span }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
-pub enum Token {
+pub enum TokenValue {
     // Tokens for binary operators
     Caret,
     Plus,
@@ -69,6 +107,18 @@ pub enum Token {
 
     // Token for end-of-file
     Eof,
+}
+
+impl PartialEq<Token> for TokenValue {
+    fn eq(&self, other: &Token) -> bool {
+        self == &other.value
+    }
+}
+
+impl PartialEq<Token> for Option<TokenValue> {
+    fn eq(&self, other: &Token) -> bool {
+        self.as_ref().map_or(false, |t| t == other)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

@@ -2,8 +2,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::{
+    span::Span,
     symbols::{SymbolId, SymbolTable},
-    token::{Literal, Token},
+    token::{Literal, Token, TokenValue},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -16,6 +17,7 @@ pub enum Associativity {
 pub struct Node {
     pub ast_node: AstNode,
     pub symbol_table: Option<Rc<RefCell<SymbolTable>>>,
+    pub span: Option<Span>,
 }
 
 impl Node {
@@ -23,6 +25,7 @@ impl Node {
         Node {
             ast_node,
             symbol_table: None,
+            span: None,
         }
     }
 }
@@ -32,6 +35,7 @@ impl From<AstNode> for Node {
         Node {
             ast_node,
             symbol_table: None,
+            span: None,
         }
     }
 }
@@ -41,6 +45,7 @@ impl<'a> From<&'a Token> for Node {
         Node {
             ast_node: AstNode::from(token),
             symbol_table: None,
+            span: None,
         }
     }
 }
@@ -143,11 +148,11 @@ pub enum AstNode {
 
 impl<'a> From<&'a Token> for AstNode {
     fn from(token: &Token) -> Self {
-        match token {
-            Token::Literal(literal) => AstNode::Literal(literal.clone()),
-            Token::Identifier(name) => AstNode::Identifier(name.clone()),
-            Token::SingleLineComment(comment) => AstNode::SingleLineComment(comment.clone()),
-            Token::MultiLineComment(comment) => AstNode::MultiLineComment(comment.clone()),
+        match &token.value {
+            TokenValue::Literal(literal) => AstNode::Literal(literal.clone()),
+            TokenValue::Identifier(name) => AstNode::Identifier(name.clone()),
+            TokenValue::SingleLineComment(comment) => AstNode::SingleLineComment(comment.clone()),
+            TokenValue::MultiLineComment(comment) => AstNode::MultiLineComment(comment.clone()),
             _ => unimplemented!(
                 "Expected token to be a literal or identifier, found {:?}",
                 token

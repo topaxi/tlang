@@ -1,4 +1,7 @@
-use tlang_ast::token::{Literal, Token};
+use tlang_ast::{
+    span::{LineColumn, Span},
+    token::{Literal, Token, TokenValue},
+};
 
 #[derive(Debug)]
 pub struct Lexer<'src> {
@@ -102,38 +105,56 @@ impl Lexer<'_> {
         slice.to_owned()
     }
 
+    fn create_token(&self, value: TokenValue) -> Token {
+        Token::new(
+            value,
+            Some(Span {
+                start: LineColumn {
+                    line: self.current_line,
+                    column: self.current_column,
+                },
+                end: LineColumn {
+                    line: self.current_line,
+                    column: self.current_column + 1,
+                },
+            }),
+        )
+    }
+
     pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
 
         if self.position >= self.source.len() {
-            return Token::Eof;
+            let token = self.create_token(TokenValue::Eof);
+            self.current_token = Some(token.clone());
+            return token;
         }
 
         let ch = self.source.chars().nth(self.position).unwrap();
 
-        let token = match ch {
+        let token_value = match ch {
             '+' => {
                 self.advance();
-                Token::Plus
+                TokenValue::Plus
             }
             '-' => {
                 if self.peek_ahead() == Some('>') {
                     self.advance();
                     self.advance();
-                    Token::Arrow
+                    TokenValue::Arrow
                 } else {
                     self.advance();
-                    Token::Minus
+                    TokenValue::Minus
                 }
             }
             '*' => {
                 if self.peek_ahead() == Some('*') {
                     self.advance();
                     self.advance();
-                    Token::AsteriskAsterisk
+                    TokenValue::AsteriskAsterisk
                 } else {
                     self.advance();
-                    Token::Asterisk
+                    TokenValue::Asterisk
                 }
             }
             '/' => {
@@ -143,7 +164,7 @@ impl Lexer<'_> {
                     let start = self.position;
                     self.advance_while(|ch| ch != '\n');
                     let slice = &self.source[start..self.position];
-                    Token::SingleLineComment(slice.to_owned())
+                    TokenValue::SingleLineComment(slice.to_owned())
                 } else if self.peek_ahead() == Some('*') {
                     self.advance();
                     self.advance();
@@ -156,133 +177,133 @@ impl Lexer<'_> {
                     let slice = &self.source[start..self.position];
                     self.advance();
                     self.advance();
-                    Token::MultiLineComment(slice.to_owned())
+                    TokenValue::MultiLineComment(slice.to_owned())
                 } else {
                     self.advance();
-                    Token::Slash
+                    TokenValue::Slash
                 }
             }
             '%' => {
                 self.advance();
-                Token::Percent
+                TokenValue::Percent
             }
             '^' => {
                 self.advance();
-                Token::Caret
+                TokenValue::Caret
             }
             '|' => {
                 if self.peek_ahead() == Some('|') {
                     self.advance();
                     self.advance();
-                    Token::DoublePipe
+                    TokenValue::DoublePipe
                 } else if self.peek_ahead() == Some('>') {
                     self.advance();
                     self.advance();
-                    Token::Pipeline
+                    TokenValue::Pipeline
                 } else {
                     self.advance();
-                    Token::Pipe
+                    TokenValue::Pipe
                 }
             }
             '&' => {
                 if self.peek_ahead() == Some('&') {
                     self.advance();
                     self.advance();
-                    Token::DoubleAmpersand
+                    TokenValue::DoubleAmpersand
                 } else {
                     self.advance();
-                    Token::Ampersand
+                    TokenValue::Ampersand
                 }
             }
             '<' => {
                 if self.peek_ahead() == Some('=') {
                     self.advance();
                     self.advance();
-                    Token::LessThanOrEqual
+                    TokenValue::LessThanOrEqual
                 } else {
                     self.advance();
-                    Token::LessThan
+                    TokenValue::LessThan
                 }
             }
             '>' => {
                 if self.peek_ahead() == Some('=') {
                     self.advance();
                     self.advance();
-                    Token::GreaterThanOrEqual
+                    TokenValue::GreaterThanOrEqual
                 } else {
                     self.advance();
-                    Token::GreaterThan
+                    TokenValue::GreaterThan
                 }
             }
             '(' => {
                 self.advance();
-                Token::LParen
+                TokenValue::LParen
             }
             ')' => {
                 self.advance();
-                Token::RParen
+                TokenValue::RParen
             }
             '{' => {
                 self.advance();
-                Token::LBrace
+                TokenValue::LBrace
             }
             '}' => {
                 self.advance();
-                Token::RBrace
+                TokenValue::RBrace
             }
             '[' => {
                 self.advance();
-                Token::LBracket
+                TokenValue::LBracket
             }
             ']' => {
                 self.advance();
-                Token::RBracket
+                TokenValue::RBracket
             }
             ',' => {
                 self.advance();
-                Token::Comma
+                TokenValue::Comma
             }
             '=' => {
                 if self.peek_ahead() == Some('=') {
                     self.advance();
                     self.advance();
-                    Token::EqualEqual
+                    TokenValue::EqualEqual
                 } else if self.peek_ahead() == Some('>') {
                     self.advance();
                     self.advance();
-                    Token::FatArrow
+                    TokenValue::FatArrow
                 } else {
                     self.advance();
-                    Token::EqualSign
+                    TokenValue::EqualSign
                 }
             }
             '!' => {
                 if self.peek_ahead() == Some('=') {
                     self.advance();
                     self.advance();
-                    Token::NotEqual
+                    TokenValue::NotEqual
                 } else {
                     self.advance();
-                    Token::ExclamationMark
+                    TokenValue::ExclamationMark
                 }
             }
             '?' => {
                 self.advance();
-                Token::QuestionMark
+                TokenValue::QuestionMark
             }
             ':' => {
                 if self.peek_ahead() == Some(':') {
                     self.advance();
                     self.advance();
-                    Token::NamespaceSeparator
+                    TokenValue::NamespaceSeparator
                 } else {
                     self.advance();
-                    Token::Colon
+                    TokenValue::Colon
                 }
             }
             ';' => {
                 self.advance();
-                Token::Semicolon
+                TokenValue::Semicolon
             }
             '.' => {
                 if let Some('.') = self.peek_ahead() {
@@ -290,15 +311,15 @@ impl Lexer<'_> {
                         self.advance();
                         self.advance();
                         self.advance();
-                        Token::DotDotDot
+                        TokenValue::DotDotDot
                     } else {
                         self.advance();
                         self.advance();
-                        Token::DotDot
+                        TokenValue::DotDot
                     }
                 } else {
                     self.advance();
-                    Token::Dot
+                    TokenValue::Dot
                 }
             }
             '0'..='9' => {
@@ -308,9 +329,9 @@ impl Lexer<'_> {
                     .any(|ch| ch == '.');
 
                 if is_float {
-                    Token::Literal(Literal::Float(self.read_float()))
+                    TokenValue::Literal(Literal::Float(self.read_float()))
                 } else {
-                    Token::Literal(Literal::Integer(self.read_integer()))
+                    TokenValue::Literal(Literal::Integer(self.read_integer()))
                 }
             }
             '"' | '\'' => {
@@ -319,27 +340,27 @@ impl Lexer<'_> {
                 let literal = self.read_string_literal(quote);
 
                 if quote == '"' {
-                    Token::Literal(Literal::String(literal))
+                    TokenValue::Literal(Literal::String(literal))
                 } else {
-                    Token::Literal(Literal::Char(literal))
+                    TokenValue::Literal(Literal::Char(literal))
                 }
             }
             _ if Self::is_alphanumeric(ch) => {
                 let identifier = self.read_identifier();
 
                 match identifier {
-                    "let" => Token::Let,
-                    "fn" => Token::Fn,
-                    "rec" => Token::Rec,
-                    "return" => Token::Return,
-                    "if" => Token::If,
-                    "else" => Token::Else,
-                    "match" => Token::Match,
-                    "enum" => Token::Enum,
-                    "struct" => Token::Struct,
-                    "true" => Token::Literal(Literal::Boolean(true)),
-                    "false" => Token::Literal(Literal::Boolean(false)),
-                    _ => Token::Identifier(identifier.to_owned()),
+                    "let" => TokenValue::Let,
+                    "fn" => TokenValue::Fn,
+                    "rec" => TokenValue::Rec,
+                    "return" => TokenValue::Return,
+                    "if" => TokenValue::If,
+                    "else" => TokenValue::Else,
+                    "match" => TokenValue::Match,
+                    "enum" => TokenValue::Enum,
+                    "struct" => TokenValue::Struct,
+                    "true" => TokenValue::Literal(Literal::Boolean(true)),
+                    "false" => TokenValue::Literal(Literal::Boolean(false)),
+                    _ => TokenValue::Identifier(identifier.to_owned()),
                 }
             }
             _ => {
@@ -348,6 +369,7 @@ impl Lexer<'_> {
             }
         };
 
+        let token = self.create_token(token_value);
         self.current_token = Some(token.clone());
         token
     }

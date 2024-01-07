@@ -2,7 +2,7 @@ use tlang_ast::node::{
     self, Associativity, AstNode, BinaryOp, FunctionDeclaration, Node, OperatorInfo, PrefixOp,
 };
 use tlang_ast::symbols::SymbolId;
-use tlang_ast::token::Token;
+use tlang_ast::token::{Token, TokenValue};
 
 use crate::lexer::Lexer;
 use log::debug;
@@ -62,22 +62,26 @@ impl<'src> Parser<'src> {
         );
     }
 
-    fn expect_token(&mut self, expected: Token) {
-        let actual = self.current_token.as_ref().unwrap();
-        if *actual != expected {
+    fn expect_token(&mut self, expected: TokenValue) {
+        let actual = self
+            .current_token
+            .as_ref()
+            .expect("Expected token, found None");
+
+        if actual.value != expected {
             self.panic_unexpected_token(&format!("{:?}", expected), Some(actual.clone()));
         }
     }
 
-    fn consume_token(&mut self, expected: Token) {
+    fn consume_token(&mut self, expected: TokenValue) {
         self.expect_token(expected);
         self.advance();
     }
 
     fn consume_identifier(&mut self) -> String {
         let actual = self.current_token.as_ref().unwrap();
-        match actual {
-            Token::Identifier(name) => {
+        match actual.value {
+            TokenValue::Identifier(name) => {
                 let name = name.clone();
                 self.advance();
                 name
@@ -103,20 +107,25 @@ impl<'src> Parser<'src> {
 
     fn parse_statement(&mut self) -> (bool, Option<Node>) {
         debug!("Parsing statement {:?}", self.current_token);
+        if self.current_token.is_none() {
+            return (false, None);
+        }
+
+        let current_token = self.current_token.as_ref().unwrap();
 
         // Skip stray semicolons.
-        if let Some(Token::Semicolon) = self.current_token {
+        if let TokenValue::Semicolon = current_token.value {
             self.advance();
 
             return (false, None);
         }
 
-        let node = match self.current_token {
-            Some(Token::Let) => self.parse_variable_declaration(),
-            Some(Token::Fn) => self.parse_function_declaration(),
-            Some(Token::Return) => self.parse_return_statement(),
-            Some(Token::Enum) => self.parse_enum_declaration(),
-            Some(Token::SingleLineComment(_) | Token::MultiLineComment(_)) => {
+        let node = match current_token.value {
+            TokenValue::Let => self.parse_variable_declaration(),
+            TokenValue::Fn => self.parse_function_declaration(),
+            TokenValue::Return => self.parse_return_statement(),
+            TokenValue::Enum => self.parse_enum_declaration(),
+            TokenValue::SingleLineComment(_) | TokenValue::MultiLineComment(_) => {
                 let comment: Node = self.current_token.as_ref().unwrap().into();
                 self.advance();
                 return (false, Some(comment));
@@ -148,9 +157,9 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_return_statement(&mut self) -> Node {
-        self.consume_token(Token::Return);
+        self.consume_token(TokenValue::Return);
 
-        if self.current_token == Some(Token::Semicolon) {
+        if self.current_token == Some(TokenValue::Semicolon) {
             return node::new!(ReturnStatement(None));
         }
 
@@ -159,7 +168,7 @@ impl<'src> Parser<'src> {
 
     fn parse_identifier(&mut self) -> Node {
         let mut identifiers = vec![self.consume_identifier()];
-        while let Some(Token::NamespaceSeparator) = self.current_token {
+        while let Some(TokenValue::NamespaceSeparator) = self.current_token {
             self.advance();
             identifiers.push(self.consume_identifier());
         }
@@ -172,17 +181,17 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_enum_declaration(&mut self) -> Node {
-        self.consume_token(Token::Enum);
+        self.consume_token(TokenValue::Enum);
         let name = self.consume_identifier();
-        self.consume_token(Token::LBrace);
+        self.consume_token(TokenValue::LBrace);
         let mut variants = Vec::new();
-        while self.current_token != Some(Token::RBrace) {
+        while self.current_token != Some(TokenValue::RBrace) {
             variants.push(self.parse_enum_variant());
-            if let Some(Token::Comma) = self.current_token {
+            if let Some(TokenValue::Comma) = self.current_token {
                 self.advance();
             }
         }
-        self.consume_token(Token::RBrace);
+        self.consume_token(TokenValue::RBrace);
         node::new!(EnumDeclaration {
             id: self.unique_id(),
             name: name,
@@ -196,16 +205,16 @@ impl<'src> Parser<'src> {
         let name = self.consume_identifier();
         log::debug!("Parsing enum variant {}", name);
         match self.current_token {
-            Some(Token::LParen) => {
+            Some(TokenValue::LParen) => {
                 self.advance();
                 let mut parameters = Vec::new();
-                while self.current_token != Some(Token::RParen) {
+                while self.current_token != Some(TokenValue::RParen) {
                     parameters.push(node::new!(Identifier(self.consume_identifier())));
-                    if let Some(Token::Comma) = self.current_token {
+                    if let Some(TokenValue::Comma) = self.current_token {
                         self.advance();
                     }
                 }
-                self.consume_token(Token::RParen);
+                self.consume_token(TokenValue::RParen);
                 AstNode::EnumVariant {
                     name,
                     named_fields: false,
@@ -213,16 +222,16 @@ impl<'src> Parser<'src> {
                 }
                 .into()
             }
-            Some(Token::LBrace) => {
+            Some(TokenValue::LBrace) => {
                 self.advance();
                 let mut parameters = Vec::new();
-                while self.current_token != Some(Token::RBrace) {
+                while self.current_token != Some(TokenValue::RBrace) {
                     parameters.push(node::new!(Identifier(self.consume_identifier())));
-                    if let Some(Token::Comma) = self.current_token {
+                    if let Some(TokenValue::Comma) = self.current_token {
                         self.advance();
                     }
                 }
-                self.consume_token(Token::RBrace);
+                self.consume_token(TokenValue::RBrace);
                 AstNode::EnumVariant {
                     name,
                     named_fields: true,
@@ -243,10 +252,12 @@ impl<'src> Parser<'src> {
         let mut statements = Vec::new();
         let mut completion_expression = None;
 
-        while self.current_token != Some(Token::RBrace) && self.current_token != Some(Token::Eof) {
+        while self.current_token != Some(TokenValue::RBrace)
+            && self.current_token != Some(TokenValue::Eof)
+        {
             if let (consume_semicolon, Some(statement)) = self.parse_statement() {
                 if may_complete
-                    && self.current_token == Some(Token::RBrace)
+                    && self.current_token == Some(TokenValue::RBrace)
                     && matches!(&statement.ast_node, AstNode::ExpressionStatement(_))
                 {
                     let expression = match statement.ast_node {
@@ -260,7 +271,7 @@ impl<'src> Parser<'src> {
                 statements.push(statement);
 
                 if consume_semicolon {
-                    self.consume_token(Token::Semicolon);
+                    self.consume_token(TokenValue::Semicolon);
                 }
             }
         }
@@ -273,17 +284,17 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_block(&mut self) -> Node {
-        self.consume_token(Token::LBrace);
+        self.consume_token(TokenValue::LBrace);
         let (statements, completion) = self.parse_statements(true);
-        self.consume_token(Token::RBrace);
+        self.consume_token(TokenValue::RBrace);
 
         AstNode::Block(statements, completion).into()
     }
 
     fn parse_variable_declaration(&mut self) -> Node {
-        self.consume_token(Token::Let);
+        self.consume_token(TokenValue::Let);
         let name = self.consume_identifier();
-        self.consume_token(Token::EqualSign);
+        self.consume_token(TokenValue::EqualSign);
         let value = self.parse_expression();
 
         node::new!(VariableDeclaration {
@@ -300,7 +311,7 @@ impl<'src> Parser<'src> {
             "Parsing call expression, current token: {:?}",
             self.current_token
         );
-        let is_dict_call = self.current_token == Some(Token::LBrace);
+        let is_dict_call = self.current_token == Some(TokenValue::LBrace);
         let mut arguments = Vec::new();
 
         log::debug!("Is dict call: {}", is_dict_call);
@@ -308,16 +319,16 @@ impl<'src> Parser<'src> {
         if is_dict_call {
             arguments.push(self.parse_block_or_dict());
         } else {
-            self.consume_token(Token::LParen);
-            while self.current_token != Some(Token::RParen) {
+            self.consume_token(TokenValue::LParen);
+            while self.current_token != Some(TokenValue::RParen) {
                 arguments.push(self.parse_expression());
 
-                if let Some(Token::Comma) = self.current_token {
+                if let Some(TokenValue::Comma) = self.current_token {
                     self.advance();
                 }
             }
 
-            self.consume_token(Token::RParen);
+            self.consume_token(TokenValue::RParen);
         }
 
         AstNode::Call {
@@ -328,16 +339,16 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_list_extraction(&mut self) -> Node {
-        self.consume_token(Token::LBracket);
+        self.consume_token(TokenValue::LBracket);
 
         let mut elements = Vec::new();
         // Only allow literal values, identifiers and and rest params for now.
-        while self.current_token != Some(Token::RBracket) {
+        while self.current_token != Some(TokenValue::RBracket) {
             let element = match self.current_token {
-                Some(Token::Identifier(_) | Token::Literal(_) | Token::LBracket) => {
+                Some(TokenValue::Identifier(_) | TokenValue::Literal(_) | TokenValue::LBracket) => {
                     self.parse_primary_expression()
                 }
-                Some(Token::DotDotDot) => {
+                Some(TokenValue::DotDotDot) => {
                     self.advance();
                     AstNode::PrefixOp(PrefixOp::Rest, Box::new(self.parse_primary_expression()))
                         .into()
@@ -354,25 +365,25 @@ impl<'src> Parser<'src> {
             elements.push(element);
 
             // Allow trailing comma.
-            if self.current_token == Some(Token::RBracket) {
+            if self.current_token == Some(TokenValue::RBracket) {
                 break;
             }
 
-            self.consume_token(Token::Comma);
+            self.consume_token(TokenValue::Comma);
         }
 
-        self.consume_token(Token::RBracket);
+        self.consume_token(TokenValue::RBracket);
 
         AstNode::List(elements).into()
     }
 
     fn parse_list_expression(&mut self) -> Node {
-        self.consume_token(Token::LBracket);
+        self.consume_token(TokenValue::LBracket);
 
         let mut elements = Vec::new();
-        while self.current_token != Some(Token::RBracket) {
+        while self.current_token != Some(TokenValue::RBracket) {
             let element = match self.current_token {
-                Some(Token::DotDotDot) => {
+                Some(TokenValue::DotDotDot) => {
                     self.advance();
 
                     node::new!(PrefixOp(
@@ -386,60 +397,60 @@ impl<'src> Parser<'src> {
             elements.push(element);
 
             // Allow trailing comma.
-            if self.current_token == Some(Token::RBracket) {
+            if self.current_token == Some(TokenValue::RBracket) {
                 break;
             }
 
-            self.consume_token(Token::Comma);
+            self.consume_token(TokenValue::Comma);
         }
 
-        self.consume_token(Token::RBracket);
+        self.consume_token(TokenValue::RBracket);
 
         AstNode::List(elements).into()
     }
 
     fn parse_block_or_dict(&mut self) -> Node {
-        self.consume_token(Token::LBrace);
+        self.consume_token(TokenValue::LBrace);
         // If the first token is a identifier followed by a colon, we assume a dict.
-        if let Some(Token::Identifier(_)) = self.current_token {
-            if let Some(Token::Colon) = self.peek_token() {
+        if let Some(TokenValue::Identifier(_)) = self.current_token {
+            if let Some(TokenValue::Colon) = self.peek_token() {
                 let mut elements = Vec::new();
-                while self.current_token != Some(Token::RBrace) {
+                while self.current_token != Some(TokenValue::RBrace) {
                     let key = self.parse_primary_expression();
-                    self.consume_token(Token::Colon);
+                    self.consume_token(TokenValue::Colon);
                     let value = self.parse_expression();
                     elements.push((key, value));
-                    if let Some(Token::Comma) = self.current_token {
+                    if let Some(TokenValue::Comma) = self.current_token {
                         self.advance();
                     }
                 }
-                self.consume_token(Token::RBrace);
+                self.consume_token(TokenValue::RBrace);
                 return AstNode::Dict(elements).into();
             }
         }
 
         let (statements, completion) = self.parse_statements(true);
-        self.consume_token(Token::RBrace);
+        self.consume_token(TokenValue::RBrace);
 
         AstNode::Block(statements, completion).into()
     }
 
     fn parse_primary_expression(&mut self) -> Node {
         match &self.current_token {
-            Some(Token::LParen) => {
+            Some(TokenValue::LParen) => {
                 self.advance();
                 let expression = self.parse_expression();
-                self.consume_token(Token::RParen);
+                self.consume_token(TokenValue::RParen);
                 expression
             }
-            Some(Token::LBrace) => self.parse_block_or_dict(),
-            Some(Token::LBracket) => self.parse_list_expression(),
-            Some(Token::If) => {
+            Some(TokenValue::LBrace) => self.parse_block_or_dict(),
+            Some(TokenValue::LBracket) => self.parse_list_expression(),
+            Some(TokenValue::If) => {
                 self.advance();
                 let condition = self.parse_expression();
-                self.expect_token(Token::LBrace);
+                self.expect_token(TokenValue::LBrace);
                 let then_branch = self.parse_block();
-                let else_branch = if let Some(Token::Else) = self.current_token {
+                let else_branch = if let Some(TokenValue::Else) = self.current_token {
                     self.advance();
                     Some(Box::new(self.parse_block()))
                 } else {
@@ -453,12 +464,12 @@ impl<'src> Parser<'src> {
                 }
                 .into()
             }
-            Some(Token::Fn) => self.parse_function_expression(),
-            Some(Token::Rec) => {
+            Some(TokenValue::Fn) => self.parse_function_expression(),
+            Some(TokenValue::Rec) => {
                 self.advance();
                 node::new!(RecursiveCall(Box::new(self.parse_expression())))
             }
-            Some(Token::Match) => self.parse_match_expression(),
+            Some(TokenValue::Match) => self.parse_match_expression(),
             Some(token) => {
                 let mut node: Node = token.into();
 
@@ -469,16 +480,16 @@ impl<'src> Parser<'src> {
                         return node::new!(Wildcard);
                     }
 
-                    if let Some(Token::NamespaceSeparator) = self.current_token {
+                    if let Some(TokenValue::NamespaceSeparator) = self.current_token {
                         let mut identifiers = vec![identifier.clone()];
-                        while let Some(Token::NamespaceSeparator) = self.current_token {
+                        while let Some(TokenValue::NamespaceSeparator) = self.current_token {
                             self.advance();
                             identifiers.push(self.consume_identifier());
                         }
                         node = node::new!(NestedIdentifier(identifiers));
                     }
 
-                    if let Some(Token::LParen | Token::LBrace) = self.current_token {
+                    if let Some(TokenValue::LParen | TokenValue::LBrace) = self.current_token {
                         return self.parse_call_expression(node);
                     }
                 }
@@ -493,25 +504,25 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_match_expression(&mut self) -> Node {
-        self.consume_token(Token::Match);
+        self.consume_token(TokenValue::Match);
         let expression = self.parse_expression();
-        self.consume_token(Token::LBrace);
+        self.consume_token(TokenValue::LBrace);
 
         let mut arms = Vec::new();
-        while self.current_token != Some(Token::RBrace) {
+        while self.current_token != Some(TokenValue::RBrace) {
             let pattern = self.parse_expression();
-            self.consume_token(Token::FatArrow);
+            self.consume_token(TokenValue::FatArrow);
             let expression = self.parse_expression();
             arms.push(node::new!(MatchArm {
                 pattern: Box::new(pattern),
                 expression: Box::new(expression),
             }));
-            if let Some(Token::Comma) = self.current_token {
+            if let Some(TokenValue::Comma) = self.current_token {
                 self.advance();
             }
         }
 
-        self.consume_token(Token::RBrace);
+        self.consume_token(TokenValue::RBrace);
 
         node::new!(Match {
             expression: Box::new(expression),
@@ -520,8 +531,8 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_function_expression(&mut self) -> Node {
-        self.consume_token(Token::Fn);
-        let name = if let Some(Token::Identifier(name)) = &self.current_token {
+        self.consume_token(TokenValue::Fn);
+        let name = if let Some(TokenValue::Identifier(name)) = &self.current_token {
             let name = name.to_owned();
             self.advance();
             Some(name)
@@ -530,19 +541,19 @@ impl<'src> Parser<'src> {
         };
 
         let mut parameters = Vec::new();
-        if name.is_some() || self.current_token == Some(Token::LParen) {
-            self.consume_token(Token::LParen);
-            while self.current_token != Some(Token::RParen) {
+        if name.is_some() || self.current_token == Some(TokenValue::LParen) {
+            self.consume_token(TokenValue::LParen);
+            while self.current_token != Some(TokenValue::RParen) {
                 parameters.push(node::new!(FunctionParameter {
                     id: self.unique_id(),
                     node: Box::new(node::new!(Identifier(self.consume_identifier(),)))
                 }));
 
-                if let Some(Token::Comma) = self.current_token {
+                if let Some(TokenValue::Comma) = self.current_token {
                     self.advance();
                 }
             }
-            self.consume_token(Token::RParen);
+            self.consume_token(TokenValue::RParen);
         }
 
         let body = self.parse_block();
@@ -560,27 +571,27 @@ impl<'src> Parser<'src> {
     /// a function declarations parameter list.
     fn parse_enum_extraction(&mut self) -> Node {
         let identifier = Box::new(self.parse_identifier());
-        let is_dict_extraction = self.current_token == Some(Token::LBrace);
+        let is_dict_extraction = self.current_token == Some(TokenValue::LBrace);
 
         if is_dict_extraction {
-            self.consume_token(Token::LBrace);
+            self.consume_token(TokenValue::LBrace);
             let mut elements = Vec::new();
-            while self.current_token != Some(Token::RBrace) {
+            while self.current_token != Some(TokenValue::RBrace) {
                 elements.push(self.parse_identifier());
-                if let Some(Token::Comma) = self.current_token {
+                if let Some(TokenValue::Comma) = self.current_token {
                     self.advance();
                 }
             }
-            self.consume_token(Token::RBrace);
+            self.consume_token(TokenValue::RBrace);
             node::new!(EnumExtraction {
                 identifier: identifier,
                 elements: elements,
                 named_fields: true,
             })
-        } else if let Some(Token::LParen) = self.current_token {
-            self.consume_token(Token::LParen);
+        } else if let Some(TokenValue::LParen) = self.current_token {
+            self.consume_token(TokenValue::LParen);
             let mut elements = Vec::new();
-            while self.current_token != Some(Token::RParen) {
+            while self.current_token != Some(TokenValue::RParen) {
                 let mut identifier = self.parse_identifier();
 
                 // Remap identifier of _ to Wildcard
@@ -591,11 +602,11 @@ impl<'src> Parser<'src> {
                 }
 
                 elements.push(identifier);
-                if let Some(Token::Comma) = self.current_token {
+                if let Some(TokenValue::Comma) = self.current_token {
                     self.advance();
                 }
             }
-            self.consume_token(Token::RParen);
+            self.consume_token(TokenValue::RParen);
             AstNode::EnumExtraction {
                 identifier,
                 elements,
@@ -615,8 +626,8 @@ impl<'src> Parser<'src> {
         let mut name: Option<String> = None;
         let mut declarations: Vec<FunctionDeclaration> = Vec::new();
 
-        while let Some(Token::Fn) = self.current_token {
-            if let Some(Token::Identifier(current_definition_name)) = self.peek_token() {
+        while let Some(TokenValue::Fn) = self.current_token {
+            if let Some(TokenValue::Identifier(current_definition_name)) = self.peek_token() {
                 if name.is_some() && name.as_ref().unwrap() != current_definition_name {
                     break;
                 }
@@ -629,25 +640,27 @@ impl<'src> Parser<'src> {
                 name = Some(current_definition_name.clone());
             }
 
-            self.consume_token(Token::LParen);
+            self.consume_token(TokenValue::LParen);
 
             let mut parameters = Vec::new();
-            while self.current_token != Some(Token::RParen) {
+            while self.current_token != Some(TokenValue::RParen) {
                 let parameter = match self.current_token {
                     // Literal values will be pattern matched
-                    Some(Token::Literal(_)) => self.parse_primary_expression(),
+                    Some(TokenValue::Literal(_)) => self.parse_primary_expression(),
                     // Identifiers can be namespaced identifiers or call expressions, which should be pattern matched.
                     // Simple identifiers will be used as is and mapped to a function parameter.
-                    Some(Token::Identifier(_)) => {
-                        if let Some(Token::NamespaceSeparator) = self.peek_token() {
+                    Some(TokenValue::Identifier(_)) => {
+                        if let Some(TokenValue::NamespaceSeparator) = self.peek_token() {
                             self.parse_enum_extraction()
-                        } else if let Some(Token::LParen | Token::LBrace) = self.peek_token() {
+                        } else if let Some(TokenValue::LParen | TokenValue::LBrace) =
+                            self.peek_token()
+                        {
                             self.parse_enum_extraction()
                         } else {
                             node::new!(Identifier(self.consume_identifier()))
                         }
                     }
-                    Some(Token::LBracket) => self.parse_list_extraction(),
+                    Some(TokenValue::LBracket) => self.parse_list_extraction(),
                     _ => {
                         self.panic_unexpected_token(
                             "literal, identifier or list extraction",
@@ -663,11 +676,11 @@ impl<'src> Parser<'src> {
                     node: Box::new(parameter)
                 }));
 
-                if let Some(Token::Comma) = self.current_token {
+                if let Some(TokenValue::Comma) = self.current_token {
                     self.advance();
                 }
             }
-            self.consume_token(Token::RParen);
+            self.consume_token(TokenValue::RParen);
 
             let body = self.parse_block();
 
@@ -697,47 +710,47 @@ impl<'src> Parser<'src> {
     fn is_binary_op(token: &Token) -> bool {
         matches!(
             token,
-            Token::Plus
-                | Token::Minus
-                | Token::Asterisk
-                | Token::AsteriskAsterisk
-                | Token::Slash
-                | Token::Percent
-                | Token::Caret
-                | Token::EqualEqual
-                | Token::NotEqual
-                | Token::LessThan
-                | Token::LessThanOrEqual
-                | Token::GreaterThan
-                | Token::GreaterThanOrEqual
-                | Token::Pipe
-                | Token::Ampersand
-                | Token::DoublePipe
-                | Token::DoubleAmpersand
-                | Token::Pipeline
+            TokenValue::Plus
+                | TokenValue::Minus
+                | TokenValue::Asterisk
+                | TokenValue::AsteriskAsterisk
+                | TokenValue::Slash
+                | TokenValue::Percent
+                | TokenValue::Caret
+                | TokenValue::EqualEqual
+                | TokenValue::NotEqual
+                | TokenValue::LessThan
+                | TokenValue::LessThanOrEqual
+                | TokenValue::GreaterThan
+                | TokenValue::GreaterThanOrEqual
+                | TokenValue::Pipe
+                | TokenValue::Ampersand
+                | TokenValue::DoublePipe
+                | TokenValue::DoubleAmpersand
+                | TokenValue::Pipeline
         )
     }
 
     fn map_binary_op(token: &Token) -> BinaryOp {
         match token {
-            Token::Plus => BinaryOp::Add,
-            Token::Minus => BinaryOp::Subtract,
-            Token::Asterisk => BinaryOp::Multiply,
-            Token::AsteriskAsterisk => BinaryOp::Exponentiation,
-            Token::Slash => BinaryOp::Divide,
-            Token::Percent => BinaryOp::Modulo,
-            Token::EqualEqual => BinaryOp::Equal,
-            Token::NotEqual => BinaryOp::NotEqual,
-            Token::LessThan => BinaryOp::LessThan,
-            Token::LessThanOrEqual => BinaryOp::LessThanOrEqual,
-            Token::GreaterThan => BinaryOp::GreaterThan,
-            Token::GreaterThanOrEqual => BinaryOp::GreaterThanOrEqual,
-            Token::Pipe => BinaryOp::BitwiseOr,
-            Token::Ampersand => BinaryOp::BitwiseAnd,
-            Token::Caret => BinaryOp::BitwiseXor,
-            Token::DoublePipe => BinaryOp::Or,
-            Token::DoubleAmpersand => BinaryOp::And,
-            Token::Pipeline => BinaryOp::Pipeline,
+            TokenValue::Plus => BinaryOp::Add,
+            TokenValue::Minus => BinaryOp::Subtract,
+            TokenValue::Asterisk => BinaryOp::Multiply,
+            TokenValue::AsteriskAsterisk => BinaryOp::Exponentiation,
+            TokenValue::Slash => BinaryOp::Divide,
+            TokenValue::Percent => BinaryOp::Modulo,
+            TokenValue::EqualEqual => BinaryOp::Equal,
+            TokenValue::NotEqual => BinaryOp::NotEqual,
+            TokenValue::LessThan => BinaryOp::LessThan,
+            TokenValue::LessThanOrEqual => BinaryOp::LessThanOrEqual,
+            TokenValue::GreaterThan => BinaryOp::GreaterThan,
+            TokenValue::GreaterThanOrEqual => BinaryOp::GreaterThanOrEqual,
+            TokenValue::Pipe => BinaryOp::BitwiseOr,
+            TokenValue::Ampersand => BinaryOp::BitwiseAnd,
+            TokenValue::Caret => BinaryOp::BitwiseXor,
+            TokenValue::DoublePipe => BinaryOp::Or,
+            TokenValue::DoubleAmpersand => BinaryOp::And,
+            TokenValue::Pipeline => BinaryOp::Pipeline,
             _ => {
                 unimplemented!("Expected binary operator, found {:?}", token)
             }
@@ -807,7 +820,7 @@ impl<'src> Parser<'src> {
 
         loop {
             match self.current_token.as_ref() {
-                Some(Token::Dot) => {
+                Some(TokenValue::Dot) => {
                     self.advance();
                     let field_name = self.consume_identifier();
                     lhs = node::new!(FieldExpression {
@@ -815,16 +828,16 @@ impl<'src> Parser<'src> {
                         field: Box::new(node::new!(Identifier(field_name))),
                     });
                 }
-                Some(Token::LBracket) => {
+                Some(TokenValue::LBracket) => {
                     self.advance();
                     let index = self.parse_expression_with_precedence(0, Associativity::Left);
-                    self.consume_token(Token::RBracket);
+                    self.consume_token(TokenValue::RBracket);
                     lhs = node::new!(IndexExpression {
                         base: Box::new(lhs),
                         index: Box::new(index),
                     });
                 }
-                Some(Token::LParen) => {
+                Some(TokenValue::LParen) => {
                     lhs = self.parse_call_expression(lhs);
                 }
                 Some(token) if Self::is_binary_op(token) => {
