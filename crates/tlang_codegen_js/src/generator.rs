@@ -235,8 +235,8 @@ impl CodegenJS {
         }
     }
 
-    fn generate_node(&mut self, node: &Node, parent_op: Option<&BinaryOp>) {
-        match &node.ast_node {
+    fn generate_comment(&mut self, ast_node: &AstNode) {
+        match ast_node {
             AstNode::SingleLineComment(comment) => {
                 self.push_str("//");
                 self.push_str(comment);
@@ -247,6 +247,58 @@ impl CodegenJS {
                 self.push_str(comment);
                 self.push_str("*/\n");
             }
+            _ => unreachable!(),
+        }
+    }
+
+    fn generate_block_expression(&mut self, statements: &[Node], expression: &Option<Node>) {
+        self.push_scope();
+
+        for statement in statements {
+            self.generate_node(statement, None);
+            self.flush_statement_buffer();
+        }
+
+        if expression.is_none() {
+            self.flush_statement_buffer();
+            self.pop_scope();
+            return;
+        }
+
+        // In a case of `let a = { 1 }`, we want to render the expression as a statement.
+        // We do this by temporarily swapping the statement buffer, generating the
+        // expression as an statement, and then swapping the statement buffer back.
+        // TODO: This doesn't really work with statements within the block.
+        //       Alternatively we could render the blocks as IIFE's instead, which might be
+        //       much easier to handle, as they are allowed in expression position.
+        //       Using blocks could be a future optimization.
+        let statement_buffer = std::mem::take(&mut self.current_statement_buffer);
+        let completion_tmp_var = self.scopes.declare_tmp_variable();
+        self.push_str(&self.get_indent());
+        self.push_str(&format!("let {};{{\n", completion_tmp_var));
+        self.indent_level += 1;
+        self.push_str(&self.get_indent());
+        self.push_str(&format!("{} = ", completion_tmp_var));
+        self.generate_node(&expression.unwrap(), None);
+        self.push_str(";\n");
+        self.indent_level -= 1;
+        self.push_str(&self.get_indent());
+        self.push_str("};\n");
+        self.flush_statement_buffer();
+        self.current_statement_buffer = statement_buffer;
+        self.push_str(completion_tmp_var.as_str());
+
+        self.flush_statement_buffer();
+        self.pop_scope();
+    }
+
+    fn generate_node(&mut self, node: &Node, parent_op: Option<&BinaryOp>) {
+        // TODO: Split into generate_statement and generate_expression.
+        //       This should also help setting proper block contexts.
+        match &node.ast_node {
+            AstNode::SingleLineComment(_) | AstNode::MultiLineComment(_) => {
+                self.generate_comment(&node.ast_node);
+            }
             AstNode::Program(statements) => {
                 for statement in statements {
                     self.generate_node(statement, None);
@@ -254,44 +306,7 @@ impl CodegenJS {
                 }
             }
             AstNode::Block(statements, expression) if self.current_context() == BlockContext::Expression => {
-                self.push_scope();
-
-                for statement in statements {
-                    self.generate_node(statement, None);
-                    self.flush_statement_buffer();
-                }
-
-                if expression.is_none() {
-                    self.flush_statement_buffer();
-                    self.pop_scope();
-                    return;
-                }
-
-                // In a case of `let a = { 1 }`, we want to render the expression as a statement.
-                // We do this by temporarily swapping the statement buffer, generating the
-                // expression as an statement, and then swapping the statement buffer back.
-                // TODO: This doesn't really work with statements within the block.
-                //       Alternatively we could render the blocks as IIFE's instead, which might be
-                //       much easier to handle, as they are allowed in expression position.
-                //       Using blocks could be a future optimization.
-                let statement_buffer = std::mem::take(&mut self.current_statement_buffer);
-                let completion_tmp_var = self.scopes.declare_tmp_variable();
-                self.push_str(&self.get_indent());
-                self.push_str(&format!("let {};{{\n", completion_tmp_var));
-                self.indent_level += 1;
-                self.push_str(&self.get_indent());
-                self.push_str(&format!("{} = ", completion_tmp_var));
-                self.generate_node(expression.as_ref().unwrap(), None);
-                self.push_str(";\n");
-                self.indent_level -= 1;
-                self.push_str(&self.get_indent());
-                self.push_str("};\n");
-                self.flush_statement_buffer();
-                self.current_statement_buffer = statement_buffer;
-                self.push_str(completion_tmp_var.as_str());
-
-                self.flush_statement_buffer();
-                self.pop_scope();
+                self.generate_block_expression(statement, expression);
             }
             AstNode::Block(statements, expression) => {
                 self.push_scope();
