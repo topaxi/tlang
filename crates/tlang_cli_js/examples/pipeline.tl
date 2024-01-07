@@ -11,7 +11,7 @@ fn filter([x, ...xs], f) { rec filter(xs, f) }
 fn foldl([], acc, _) { acc }
 fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
 
-[1,2,3]
+[1,2,3,4,5]
 |> map(fn (x) { x ** 2 })
 |> filter(fn (x) { x % 2 == 0 })
 |> foldl(0, fn (acc, x) { acc + x })
