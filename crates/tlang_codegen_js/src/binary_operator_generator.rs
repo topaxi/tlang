@@ -112,7 +112,7 @@ fn generate_binary_operator_token(codegen: &mut CodegenJS, op: &BinaryOp) {
         BinaryOp::BitwiseOr => codegen.push_str(" | "),
         BinaryOp::BitwiseAnd => codegen.push_str(" & "),
         BinaryOp::BitwiseXor => codegen.push_str(" ^ "),
-        BinaryOp::Pipeline => unimplemented!("Pipeline does not neatly map to a JS operator."),
+        BinaryOp::Pipeline => unreachable!("Pipeline operator does not exist yet in JS"),
     }
 }
 
