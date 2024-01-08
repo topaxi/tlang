@@ -20,6 +20,8 @@ pub fn parse_and_analyze(source: &str) -> String {
         ("log", SymbolType::Function),
         ("max", SymbolType::Function),
         ("min", SymbolType::Function),
+        ("floor", SymbolType::Function),
+        ("random", SymbolType::Function),
     ]);
     semantic_analyzer.analyze(&mut ast);
     format!("{:#?}", ast)
@@ -37,6 +39,8 @@ pub fn compile_to_js(source: &str) -> String {
         ("log", SymbolType::Function),
         ("max", SymbolType::Function),
         ("min", SymbolType::Function),
+        ("floor", SymbolType::Function),
+        ("random", SymbolType::Function),
     ]);
     semantic_analyzer.analyze(&mut ast);
 
