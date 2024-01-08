@@ -179,12 +179,12 @@ fn test_foldl_impl() {
                     let f = args[2];
                     let x = args[0][0];
                     let xs = args[0].slice(1);
-                    let $tmp$a = xs;
-                    let $tmp$b = f(acc, x);
-                    let $tmp$c = f;
-                    args[0] = $tmp$a;
-                    args[1] = $tmp$b;
-                    args[2] = $tmp$c;
+                    let $tmp$b = xs;
+                    let $tmp$c = f(acc, x);
+                    let $tmp$d = f;
+                    args[0] = $tmp$b;
+                    args[1] = $tmp$c;
+                    args[2] = $tmp$d;
                 }
             }
         }
