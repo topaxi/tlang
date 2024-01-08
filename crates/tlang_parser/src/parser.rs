@@ -454,7 +454,7 @@ impl<'src> Parser<'src> {
 
                     node::new!(PrefixOp(
                         PrefixOp::Spread,
-                        Box::new(self.parse_primary_expression())
+                        Box::new(self.parse_expression())
                     ))
                 }
                 _ => self.parse_expression(),

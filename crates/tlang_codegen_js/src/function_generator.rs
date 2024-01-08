@@ -125,7 +125,7 @@ pub fn generate_function_declarations(
         }
 
         // Expand parameter matching if any definition has a different amount of
-        // paramaters.
+        // parameters.
         let parameter_variadic = declarations
             .iter()
             .map(|declaration| declaration.parameters.clone())
@@ -205,14 +205,14 @@ pub fn generate_function_declarations(
                                             codegen
                                                 .push_str(&format!("args[{}].length >= {}", k, i));
                                             codegen.declare_function_pre_body_variable(
-                                                &name,
+                                                name,
                                                 &format!("args[{}].slice({})", k, i),
                                             );
                                         }
                                     }
                                     AstNode::Identifier(name) => {
                                         codegen.declare_function_pre_body_variable(
-                                            &name,
+                                            name,
                                             &format!("args[{}][{}]", k, i),
                                         );
                                     }
@@ -411,6 +411,7 @@ pub fn generate_function_declaration(
 
     codegen.push_indent();
     codegen.push_str(&format!("function {}(", name_as_str));
+    codegen.push_scope();
 
     for (i, param) in declaration.parameters.iter().enumerate() {
         if i > 0 {
@@ -426,6 +427,7 @@ pub fn generate_function_declaration(
     codegen.dec_indent();
     codegen.push_indent();
     codegen.push_str("}\n");
+    codegen.pop_scope();
     codegen.pop_function_context();
 }
 
@@ -434,6 +436,7 @@ pub fn generate_function_expression(
     name: &Option<Box<Node>>,
     declaration: &FunctionDeclaration,
 ) {
+    codegen.push_scope();
     let name_as_str = if name.is_some() {
         fn_identifier_to_string(&name.clone().unwrap())
     } else {
@@ -468,11 +471,16 @@ pub fn generate_function_expression(
     codegen.push_indent();
     codegen.push_char('}');
     codegen.pop_function_context();
+    codegen.pop_scope();
 }
 
 pub fn generate_function_parameter(codegen: &mut CodegenJS, node: &Node) {
-    match node.ast_node {
-        AstNode::Identifier { .. } => codegen.generate_node(node, None),
+    match &node.ast_node {
+        // Do not run generate_identifier, as that would resolve the parameter as a variable.
+        AstNode::Identifier(ident) => {
+            codegen.current_scope().declare_variable(ident);
+            codegen.push_str(ident);
+        }
         AstNode::Literal(_) => codegen.generate_node(node, None),
         AstNode::List(_) => todo!(),
         // Wildcards are handled within pipeline and call expressions,

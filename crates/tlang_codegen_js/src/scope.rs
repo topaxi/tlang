@@ -74,6 +74,8 @@ impl Default for Scope {
                 ("log".to_string(), "console.log".to_string()),
                 ("min".to_string(), "Math.min".to_string()),
                 ("max".to_string(), "Math.max".to_string()),
+                ("floor".to_string(), "Math.floor".to_string()),
+                ("random".to_string(), "Math.random".to_string()),
             ]),
         }
     }

@@ -117,10 +117,6 @@ impl CodegenJS {
 
     #[inline(always)]
     pub fn flush_statement_buffer(&mut self) {
-        println!(
-            "Flushing statement buffer: {}",
-            self.statement_buffer.last().unwrap()
-        );
         self.output.push_str(self.statement_buffer.last().unwrap());
         self.statement_buffer.last_mut().unwrap().clear();
     }
@@ -267,14 +263,6 @@ impl CodegenJS {
             self.replace_statement_buffer(String::new())
         };
 
-        println!("Generating block expression");
-        println!("lhs: {}", lhs);
-        println!("Current output: {}", self.output);
-        println!(
-            "Current statement buffer: {}",
-            self.statement_buffer.last().unwrap()
-        );
-
         if expression.is_some() {
             if has_completion_var {
                 // Halp I made a mess
@@ -297,12 +285,6 @@ impl CodegenJS {
             return;
         }
 
-        println!("Current output: {}", self.output);
-        println!(
-            "Current statement buffer: {}",
-            self.statement_buffer.last().unwrap()
-        );
-
         self.push_indent();
         self.push_str(&format!("{} = ", completion_tmp_var));
         self.generate_node(expression.as_ref().unwrap(), None);
@@ -320,12 +302,17 @@ impl CodegenJS {
     }
 
     fn generate_block(&mut self, statements: &[Node], expression: &Option<Box<Node>>) {
-        self.push_scope();
+        // Functions handle their scoping themselves
+        if self.current_context() != BlockContext::FunctionBody {
+            self.push_scope();
+        }
 
         self.generate_statements(statements);
 
         if expression.is_none() {
-            self.pop_scope();
+            if self.current_context() != BlockContext::FunctionBody {
+                self.pop_scope();
+            }
             return;
         }
 
@@ -350,7 +337,9 @@ impl CodegenJS {
             self.flush_statement_buffer();
         }
 
-        self.pop_scope();
+        if self.current_context() != BlockContext::FunctionBody {
+            self.pop_scope();
+        }
     }
 
     #[inline(always)]
@@ -500,10 +489,16 @@ impl CodegenJS {
         };
 
         self.push_str(&self.get_indent());
-        let name = self.scopes.declare_variable(name);
-        self.push_str(&format!("let {} = ", name));
+        let shadowed_name = self.current_scope().resolve_variable(name);
+        let var_name = self.current_scope().declare_variable(name);
+        self.push_str(&format!("let {} = ", var_name));
         self.context_stack.push(BlockContext::Expression);
+        if let Some(shadowed_name) = shadowed_name {
+            self.current_scope()
+                .declare_variable_alias(name, &shadowed_name);
+        }
         self.generate_node(value, None);
+        self.current_scope().declare_variable_alias(name, &var_name);
         self.context_stack.pop();
         self.push_str(";\n");
     }
