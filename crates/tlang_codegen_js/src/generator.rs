@@ -248,6 +248,7 @@ impl CodegenJS {
 
     /// Generates blocks in expression position.
     fn generate_block_expression(&mut self, statements: &[Node], expression: &Option<Box<Node>>) {
+        let has_completion_var = self.completion_variables.last().unwrap().is_some();
         let completion_tmp_var = self
             .completion_variables
             .last()
@@ -260,7 +261,11 @@ impl CodegenJS {
         // At this state, we should have `let a = ` in the statement buffer.
         // We do this by temporarily swapping the statement buffer, generating the
         // expression as an statement, and then swapping the statement buffer back.
-        let lhs = self.replace_statement_buffer(String::new());
+        let lhs = if has_completion_var {
+            String::new()
+        } else {
+            self.replace_statement_buffer(String::new())
+        };
 
         println!("Generating block expression");
         println!("lhs: {}", lhs);
@@ -271,8 +276,12 @@ impl CodegenJS {
         );
 
         if expression.is_some() {
-            self.push_indent();
-            self.push_str(&format!("let {};{{\n", completion_tmp_var));
+            if has_completion_var {
+                // Halp I made a mess
+            } else {
+                self.push_indent();
+                self.push_str(&format!("let {};{{\n", completion_tmp_var));
+            }
             self.indent_level += 1;
         }
 
