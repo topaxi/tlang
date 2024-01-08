@@ -62,7 +62,7 @@ fn main() {
 
 fn compile(source: &str) -> String {
     let mut parser = tlang_parser::parser::Parser::from_source(source);
-    let ast = parser.parse();
+    let mut ast = parser.parse();
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.add_builtin_symbols(&[
         ("log", SymbolType::Function),
@@ -71,6 +71,7 @@ fn compile(source: &str) -> String {
         ("floor", SymbolType::Function),
         ("random", SymbolType::Function),
     ]);
+    semantic_analyzer.analyze(&mut ast);
     let mut generator = CodegenJS::default();
     generator.generate_code(&ast);
     generator.get_output().to_string()
