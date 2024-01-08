@@ -88,8 +88,8 @@ fn test_nameless_function_expressions() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(2),
-            name: "x".to_string(),
-            value: Box::new(node::new!(FunctionExpression {
+            pattern: Box::new(node::new!(Identifier("x".to_string()))),
+            expression: Box::new(node::new!(FunctionExpression {
                 id: SymbolId::new(1),
                 name: None,
                 declaration: Box::new(FunctionDeclaration {
@@ -118,8 +118,8 @@ fn test_nameless_function_expressions() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(4),
-            name: "x".to_string(),
-            value: Box::new(node::new!(FunctionExpression {
+            pattern: Box::new(node::new!(Identifier("x".to_string()))),
+            expression: Box::new(node::new!(FunctionExpression {
                 id: SymbolId::new(3),
                 name: None,
                 declaration: Box::new(FunctionDeclaration {
@@ -162,8 +162,8 @@ fn test_function_expression_without_name_no_argument_parenthesis() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(2),
-            name: "x".to_string(),
-            value: Box::new(node::new!(FunctionExpression {
+            pattern: Box::new(node::new!(Identifier("x".to_string()))),
+            expression: Box::new(node::new!(FunctionExpression {
                 id: SymbolId::new(1),
                 name: None,
                 declaration: Box::new(FunctionDeclaration {
@@ -195,8 +195,8 @@ fn test_function_expressions() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(2),
-            name: "x".to_string(),
-            value: Box::new(node::new!(FunctionExpression {
+            pattern: Box::new(node::new!(Identifier("x".to_string()))),
+            expression: Box::new(node::new!(FunctionExpression {
                 id: SymbolId::new(1),
                 name: Some(Box::new(node::new!(Identifier("foo".to_string())))),
                 declaration: Box::new(FunctionDeclaration {
@@ -225,8 +225,8 @@ fn test_function_expressions() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(4),
-            name: "x".to_string(),
-            value: Box::new(node::new!(FunctionExpression {
+            pattern: Box::new(node::new!(Identifier("x".to_string()))),
+            expression: Box::new(node::new!(FunctionExpression {
                 id: SymbolId::new(3),
                 name: Some(Box::new(node::new!(Identifier("foo".to_string())))),
                 declaration: Box::new(FunctionDeclaration {
@@ -313,8 +313,8 @@ fn test_explicit_return_statements() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(2),
-            name: "x".to_string(),
-            value: Box::new(node::new!(FunctionExpression {
+            pattern: Box::new(node::new!(Identifier("x".to_string()))),
+            expression: Box::new(node::new!(FunctionExpression {
                 id: SymbolId::new(1),
                 name: None,
                 declaration: Box::new(FunctionDeclaration {
@@ -385,8 +385,8 @@ fn test_implicit_return_expressions() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(2),
-            name: "x".to_string(),
-            value: Box::new(node::new!(FunctionExpression {
+            pattern: Box::new(node::new!(Identifier("x".to_string()))),
+            expression: Box::new(node::new!(FunctionExpression {
                 id: SymbolId::new(1),
                 name: None,
                 declaration: Box::new(FunctionDeclaration {
@@ -421,8 +421,8 @@ fn test_implicit_return_expressions() {
                 body: Box::new(node::new!(Block(
                     vec![node::new!(VariableDeclaration {
                         id: SymbolId::new(1),
-                        name: "x".to_string(),
-                        value: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                        pattern: Box::new(node::new!(Identifier("x".to_string()))),
+                        expression: Box::new(node::new!(Literal(Literal::Integer(1)))),
                         type_annotation: None,
                     })],
                     Some(Box::new(node::new!(Identifier("x".to_string()))))
@@ -955,8 +955,8 @@ fn test_function_declarations_with_let_guard() {
                     ],
                     guard: Some(Box::new(node::new!(VariableDeclaration {
                         id: SymbolId::new(5),
-                        name: "y".to_string(),
-                        value: Box::new(node::new!(Call {
+                        pattern: Box::new(node::new!(Identifier("y".to_string()))),
+                        expression: Box::new(node::new!(Call {
                             function: Box::new(node::new!(Identifier("f".to_string()))),
                             arguments: vec![node::new!(Identifier("x".to_string()))]
                         })),

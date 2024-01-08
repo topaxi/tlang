@@ -15,8 +15,8 @@ fn test_range_notation() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(1),
-            name: "range".to_string(),
-            value: Box::new(node::new!(Range {
+            pattern: Box::new(node::new!(Identifier("range".to_string()))),
+            expression: Box::new(node::new!(Range {
                 start: Box::new(node::new!(Literal(Literal::Integer(1)))),
                 end: Box::new(node::new!(Literal(Literal::Integer(10)))),
                 inclusive: false
@@ -37,8 +37,8 @@ fn test_inclusive_range_notation() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(1),
-            name: "range".to_string(),
-            value: Box::new(node::new!(Range {
+            pattern: Box::new(node::new!(Identifier("range".to_string()))),
+            expression: Box::new(node::new!(Range {
                 start: Box::new(node::new!(Literal(Literal::Integer(1)))),
                 end: Box::new(node::new!(Literal(Literal::Integer(10)))),
                 inclusive: true
@@ -61,8 +61,8 @@ fn test_range_as_index() {
         node::new!(Program(vec![
             node::new!(VariableDeclaration {
                 id: SymbolId::new(1),
-                name: "x".to_string(),
-                value: Box::new(node::new!(List(vec![
+                pattern: Box::new(node::new!(Identifier("x".to_string()))),
+                expression: Box::new(node::new!(List(vec![
                     node::new!(Literal(Literal::Integer(1))),
                     node::new!(Literal(Literal::Integer(2))),
                     node::new!(Literal(Literal::Integer(3)))
@@ -71,8 +71,8 @@ fn test_range_as_index() {
             }),
             node::new!(VariableDeclaration {
                 id: SymbolId::new(2),
-                name: "y".to_string(),
-                value: Box::new(node::new!(IndexExpression {
+                pattern: Box::new(node::new!(Identifier("y".to_string()))),
+                expression: Box::new(node::new!(IndexExpression {
                     base: Box::new(node::new!(Identifier("x".to_string()))),
                     index: Box::new(node::new!(Range {
                         start: Box::new(node::new!(Literal(Literal::Integer(1)))),
@@ -99,8 +99,8 @@ fn test_inclusive_range_as_index() {
         node::new!(Program(vec![
             node::new!(VariableDeclaration {
                 id: SymbolId::new(1),
-                name: "x".to_string(),
-                value: Box::new(node::new!(List(vec![
+                pattern: Box::new(node::new!(Identifier("x".to_string()))),
+                expression: Box::new(node::new!(List(vec![
                     node::new!(Literal(Literal::Integer(1))),
                     node::new!(Literal(Literal::Integer(2))),
                     node::new!(Literal(Literal::Integer(3)))
@@ -109,8 +109,8 @@ fn test_inclusive_range_as_index() {
             }),
             node::new!(VariableDeclaration {
                 id: SymbolId::new(2),
-                name: "y".to_string(),
-                value: Box::new(node::new!(IndexExpression {
+                pattern: Box::new(node::new!(Identifier("y".to_string()))),
+                expression: Box::new(node::new!(IndexExpression {
                     base: Box::new(node::new!(Identifier("x".to_string()))),
                     index: Box::new(node::new!(Range {
                         start: Box::new(node::new!(Literal(Literal::Integer(1)))),

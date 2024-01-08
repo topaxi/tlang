@@ -314,9 +314,42 @@ impl<'src> Parser<'src> {
         node::new!(Block(statements, completion))
     }
 
+    fn parse_variable_declaration_pattern(&mut self) -> Node {
+        match self.current_token {
+            // Literal values will be pattern matched
+            Some(Token::Literal(_)) => self.parse_primary_expression(),
+            Some(Token::Identifier(ref identifier)) if identifier == "_" => {
+                self.advance();
+                node::new!(Wildcard)
+            }
+            // Identifiers can be namespaced identifiers or call expressions, which should be pattern matched.
+            // Simple identifiers will be used as is and mapped to a function parameter.
+            Some(Token::Identifier(_)) => {
+                if let Some(Token::NamespaceSeparator) = self.peek_token() {
+                    self.parse_enum_extraction()
+                } else if let Some(Token::LParen | Token::LBrace) = self.peek_token() {
+                    self.parse_enum_extraction()
+                } else {
+                    node::new!(Identifier(self.consume_identifier()))
+                }
+            }
+            Some(Token::LBracket) => self.parse_list_extraction(),
+            _ => {
+                self.panic_unexpected_token(
+                    "literal, identifier or list extraction",
+                    self.current_token.clone(),
+                );
+                unreachable!()
+            }
+        }
+    }
+
     fn parse_variable_declaration(&mut self) -> Node {
         self.consume_token(Token::Let);
-        let name = self.consume_identifier();
+
+        // We probably want to know whether we are parsing a plain declaration of `if let`.
+        let pattern = self.parse_variable_declaration_pattern();
+
         let type_annotation = match self.current_token {
             Some(Token::Colon) => {
                 self.advance();
@@ -329,8 +362,8 @@ impl<'src> Parser<'src> {
 
         node::new!(VariableDeclaration {
             id: self.unique_id(),
-            name: name,
-            value: Box::new(value),
+            pattern: Box::new(pattern),
+            expression: Box::new(value),
             type_annotation: type_annotation.map(Box::new),
         })
     }
@@ -497,6 +530,14 @@ impl<'src> Parser<'src> {
         } else {
             self.parse_expression()
         };
+        // TODO: Reevaluate whether we want `foo {}` to be a `foo({})` call expression.
+        //       As this collides with `if let` statements.
+        // Semicolon is currently needed to disambiguate call with dictionary and block.
+        // E.g. `if let x = foo { .. }` is recognized as `foo({ .. })`
+        // vs `if let x = foo; { .. }` which will properly parse.
+        if let Some(Token::Semicolon) = self.current_token {
+            self.advance();
+        }
         self.expect_token(Token::LBrace);
         let then_branch = self.parse_block();
         let else_branch = if let Some(Token::Else) = self.current_token {
@@ -597,33 +638,7 @@ impl<'src> Parser<'src> {
             self.consume_token(Token::LParen);
 
             while self.current_token != Some(Token::RParen) {
-                let parameter = match self.current_token {
-                    // Literal values will be pattern matched
-                    Some(Token::Literal(_)) => self.parse_primary_expression(),
-                    Some(Token::Identifier(ref identifier)) if identifier == "_" => {
-                        self.advance();
-                        node::new!(Wildcard)
-                    }
-                    // Identifiers can be namespaced identifiers or call expressions, which should be pattern matched.
-                    // Simple identifiers will be used as is and mapped to a function parameter.
-                    Some(Token::Identifier(_)) => {
-                        if let Some(Token::NamespaceSeparator) = self.peek_token() {
-                            self.parse_enum_extraction()
-                        } else if let Some(Token::LParen | Token::LBrace) = self.peek_token() {
-                            self.parse_enum_extraction()
-                        } else {
-                            node::new!(Identifier(self.consume_identifier()))
-                        }
-                    }
-                    Some(Token::LBracket) => self.parse_list_extraction(),
-                    _ => {
-                        self.panic_unexpected_token(
-                            "literal, identifier or list extraction",
-                            self.current_token.clone(),
-                        );
-                        unreachable!()
-                    }
-                };
+                let parameter = self.parse_variable_declaration_pattern();
 
                 let type_annotation = match self.current_token {
                     Some(Token::Colon) => {

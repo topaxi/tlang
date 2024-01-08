@@ -73,10 +73,10 @@ impl SemanticAnalyzer {
             }
             AstNode::VariableDeclaration {
                 id,
-                ref name,
-                ref mut value,
+                ref pattern,
+                ref mut expression,
                 type_annotation: _,
-            } => self.analyze_variable_declaration(id, name, value),
+            } => self.analyze_variable_declaration(id, pattern, expression),
             AstNode::FunctionDeclaration {
                 id: _,
                 ref name,
@@ -126,7 +126,12 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn analyze_variable_declaration(&mut self, id: SymbolId, _name: &str, value: &mut Box<Node>) {
+    fn analyze_variable_declaration(
+        &mut self,
+        id: SymbolId,
+        _pattern: &Node,
+        expression: &mut Box<Node>,
+    ) {
         // When declaring a variable, we can only reference symbols that were declared before.
         // This includes our own variable name.
         // E.g. `let a = a;` is not allowed. But `let a = 1; let a = a;` is.
@@ -134,7 +139,7 @@ impl SemanticAnalyzer {
         // whether the expression references any symbols that were not declared before.
         let symbol = self.get_last_symbol_table().borrow_mut().remove(id);
 
-        self.analyze_node(value);
+        self.analyze_node(expression);
 
         if let Some(symbol) = symbol {
             self.get_last_symbol_table().borrow_mut().insert(symbol);

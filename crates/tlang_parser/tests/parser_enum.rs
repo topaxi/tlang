@@ -41,8 +41,8 @@ fn test_enums() {
             }),
             node::new!(VariableDeclaration {
                 id: SymbolId::new(2),
-                name: "x".to_string(),
-                value: Box::new(node::new!(Call {
+                pattern: Box::new(node::new!(Identifier("x".to_string()))),
+                expression: Box::new(node::new!(Call {
                     function: Box::new(node::new!(NestedIdentifier(vec![
                         "Option".to_string(),
                         "Some".to_string()
@@ -86,8 +86,8 @@ fn test_enums_with_fields() {
             }),
             node::new!(VariableDeclaration {
                 id: SymbolId::new(2),
-                name: "x".to_string(),
-                value: Box::new(node::new!(Call {
+                pattern: Box::new(node::new!(Identifier("x".to_string()))),
+                expression: Box::new(node::new!(Call {
                     function: Box::new(node::new!(NestedIdentifier(vec![
                         "Option".to_string(),
                         "Some".to_string()
@@ -230,8 +230,8 @@ fn test_enum_tree_max_depth() {
                     body: Box::new(node::new!(Block(
                         vec![node::new!(VariableDeclaration {
                             id: SymbolId::new(5),
-                            name: "x".to_string(),
-                            value: Box::new(node::new!(Call {
+                            pattern: Box::new(node::new!(Identifier("x".to_string()))),
+                            expression: Box::new(node::new!(Call {
                                 function: Box::new(node::new!(NestedIdentifier(vec![
                                     "Tree".to_string(),
                                     "Node".to_string()

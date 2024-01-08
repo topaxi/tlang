@@ -16,8 +16,8 @@ fn test_variable_declaration_type_annotation() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(1),
-            name: "x".to_string(),
-            value: Box::new(node::new!(Literal(Literal::Integer(1)))),
+            pattern: Box::new(node::new!(Identifier("x".to_string()))),
+            expression: Box::new(node::new!(Literal(Literal::Integer(1)))),
             type_annotation: Some(Box::new(node::new!(TypeAnnotation {
                 name: Box::new(node::new!(Identifier("i64".to_string()))),
                 parameters: vec![]
@@ -31,8 +31,8 @@ fn test_variable_declaration_type_annotation() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(1),
-            name: "x".to_string(),
-            value: Box::new(node::new!(Literal(Literal::Integer(1)))),
+            pattern: Box::new(node::new!(Identifier("x".to_string()))),
+            expression: Box::new(node::new!(Literal(Literal::Integer(1)))),
             type_annotation: Some(Box::new(node::new!(TypeAnnotation {
                 name: Box::new(node::new!(Identifier("Option".to_string()))),
                 parameters: vec![node::new!(TypeAnnotation {
@@ -49,8 +49,8 @@ fn test_variable_declaration_type_annotation() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(1),
-            name: "x".to_string(),
-            value: Box::new(node::new!(Call {
+            pattern: Box::new(node::new!(Identifier("x".to_string()))),
+            expression: Box::new(node::new!(Call {
                 function: Box::new(node::new!(NestedIdentifier(vec![
                     "std".to_string(),
                     "hash".to_string(),
@@ -134,8 +134,8 @@ fn test_return_type_annotation() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(2),
-            name: "expr".to_string(),
-            value: Box::new(node::new!(FunctionExpression {
+            pattern: Box::new(node::new!(Identifier("expr".to_string()))),
+            expression: Box::new(node::new!(FunctionExpression {
                 id: SymbolId::new(1),
                 name: Some(Box::new(node::new!(Identifier("foo".to_string())))),
                 declaration: Box::new(FunctionDeclaration {

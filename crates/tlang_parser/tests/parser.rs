@@ -16,8 +16,8 @@ fn test_simple_variable_declaration() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(1),
-            name: "x".to_string(),
-            value: Box::new(node::new!(BinaryOp {
+            pattern: Box::new(node::new!(Identifier("x".to_string()))),
+            expression: Box::new(node::new!(BinaryOp {
                 op: BinaryOp::Add,
                 lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
                 rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
@@ -113,14 +113,14 @@ fn test_simple_arithmetic_with_identifiers() {
         node::new!(Program(vec![
             node::new!(VariableDeclaration {
                 id: SymbolId::new(1),
-                name: "x".to_string(),
-                value: Box::new(node::new!(Literal(Literal::Integer(1)))),
+                pattern: Box::new(node::new!(Identifier("x".to_string()))),
+                expression: Box::new(node::new!(Literal(Literal::Integer(1)))),
                 type_annotation: None,
             }),
             node::new!(VariableDeclaration {
                 id: SymbolId::new(2),
-                name: "y".to_string(),
-                value: Box::new(node::new!(Literal(Literal::Integer(2)))),
+                pattern: Box::new(node::new!(Identifier("y".to_string()))),
+                expression: Box::new(node::new!(Literal(Literal::Integer(2)))),
                 type_annotation: None,
             }),
             node::new!(ExpressionStatement(Box::new(node::new!(BinaryOp {
@@ -201,8 +201,8 @@ fn test_block_expression() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(1),
-            name: "x".to_string(),
-            value: Box::new(node::new!(Block(
+            pattern: Box::new(node::new!(Identifier("x".to_string()))),
+            expression: Box::new(node::new!(Block(
                 vec![node::new!(ExpressionStatement(Box::new(node::new!(
                     BinaryOp {
                         op: BinaryOp::Add,
@@ -347,8 +347,8 @@ fn test_if_expression() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(1),
-            name: "x".to_string(),
-            value: Box::new(node::new!(IfElse {
+            pattern: Box::new(node::new!(Identifier("x".to_string()))),
+            expression: Box::new(node::new!(IfElse {
                 condition: Box::new(node::new!(Literal(Literal::Boolean(true)))),
                 then_branch: Box::new(node::new!(Block(
                     vec![node::new!(ExpressionStatement(Box::new(node::new!(
@@ -446,8 +446,8 @@ fn test_pattern_matching() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(1),
-            name: "x".to_string(),
-            value: Box::new(node::new!(Match {
+            pattern: Box::new(node::new!(Identifier("x".to_string()))),
+            expression: Box::new(node::new!(Match {
                 expression: Box::new(node::new!(Literal(Literal::Integer(1)))),
                 arms: vec![
                     node::new!(MatchArm {
@@ -477,8 +477,8 @@ fn test_list_literal() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(1),
-            name: "x".to_string(),
-            value: Box::new(node::new!(List(vec![]))),
+            pattern: Box::new(node::new!(Identifier("x".to_string()))),
+            expression: Box::new(node::new!(List(vec![]))),
             type_annotation: None,
         })]))
     );
@@ -489,8 +489,8 @@ fn test_list_literal() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(1),
-            name: "x".to_string(),
-            value: Box::new(node::new!(List(vec![
+            pattern: Box::new(node::new!(Identifier("x".to_string()))),
+            expression: Box::new(node::new!(List(vec![
                 node::new!(Literal(Literal::Integer(1))),
                 node::new!(Literal(Literal::Integer(2))),
                 node::new!(Literal(Literal::Integer(3))),
@@ -508,8 +508,8 @@ fn test_list_literal_with_trailing_comma() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(1),
-            name: "x".to_string(),
-            value: Box::new(node::new!(List(vec![
+            pattern: Box::new(node::new!(Identifier("x".to_string()))),
+            expression: Box::new(node::new!(List(vec![
                 node::new!(Literal(Literal::Integer(1))),
                 node::new!(Literal(Literal::Integer(2))),
                 node::new!(Literal(Literal::Integer(3))),
@@ -583,8 +583,8 @@ fn test_dictionary_literal() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(1),
-            name: "x".to_string(),
-            value: Box::new(node::new!(Dict(vec![
+            pattern: Box::new(node::new!(Identifier("x".to_string()))),
+            expression: Box::new(node::new!(Dict(vec![
                 (
                     node::new!(Identifier("foo".to_string())),
                     node::new!(Literal(Literal::Integer(1))),
@@ -684,8 +684,8 @@ fn test_dynamic_index_access() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(1),
-            name: "x".to_string(),
-            value: Box::new(node::new!(IndexExpression {
+            pattern: Box::new(node::new!(Identifier("x".to_string()))),
+            expression: Box::new(node::new!(IndexExpression {
                 base: Box::new(node::new!(Identifier("foo".to_string()))),
                 index: Box::new(node::new!(Literal(Literal::Integer(1)))),
             })),
@@ -699,8 +699,8 @@ fn test_dynamic_index_access() {
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
             id: SymbolId::new(1),
-            name: "x".to_string(),
-            value: Box::new(node::new!(IndexExpression {
+            pattern: Box::new(node::new!(Identifier("x".to_string()))),
+            expression: Box::new(node::new!(IndexExpression {
                 base: Box::new(node::new!(IndexExpression {
                     base: Box::new(node::new!(Identifier("foo".to_string()))),
                     index: Box::new(node::new!(Literal(Literal::Integer(1)))),

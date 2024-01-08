@@ -18,6 +18,71 @@ pub fn generate_function_declarations(
     codegen.current_scope().declare_variable("args");
     codegen.inc_indent();
 
+    // Declare and output temporary variables for if let guards.
+    for declaration in declarations {
+        if let Some(expr) = &declaration.guard {
+            if let AstNode::VariableDeclaration { pattern, .. } = &expr.ast_node {
+                match &pattern.ast_node {
+                    AstNode::Identifier(name) => {
+                        let tmp_variable = codegen.current_scope().declare_tmp_variable();
+                        codegen.push_indent();
+                        codegen.push_str(&format!("let {};\n", tmp_variable));
+                        codegen
+                            .current_scope()
+                            .declare_variable_alias(name, &tmp_variable);
+                    }
+                    AstNode::List(patterns) => {
+                        for pattern in patterns {
+                            if let AstNode::Identifier(name) = &pattern.ast_node {
+                                let tmp_variable = codegen.current_scope().declare_tmp_variable();
+                                codegen.push_indent();
+                                codegen.push_str(&format!("let {};\n", tmp_variable));
+                                codegen
+                                    .current_scope()
+                                    .declare_variable_alias(name, &tmp_variable);
+                            }
+                        }
+                    }
+                    AstNode::EnumExtraction {
+                        identifier,
+                        elements,
+                        named_fields: _,
+                    } => {
+                        let tmp_variable_enum = codegen.current_scope().declare_tmp_variable();
+                        let enum_name = match &identifier.ast_node {
+                            AstNode::Identifier(name) => name.clone(),
+                            AstNode::NestedIdentifier(names) => names.clone().pop().unwrap(),
+                            _ => unreachable!(),
+                        };
+                        codegen.push_indent();
+                        codegen.push_str(&format!("let {};\n", tmp_variable_enum));
+                        codegen
+                            .current_scope()
+                            .declare_variable_alias(&enum_name, &tmp_variable_enum);
+                        for element in elements {
+                            // Skip any Wildcards
+                            if let AstNode::Wildcard = element.ast_node {
+                                continue;
+                            }
+                            let identifier = match &element.ast_node {
+                                AstNode::Identifier(name) => name.clone(),
+                                AstNode::NestedIdentifier(names) => names.clone().pop().unwrap(),
+                                _ => unreachable!(),
+                            };
+                            let tmp_variable = codegen.current_scope().declare_tmp_variable();
+                            codegen.push_indent();
+                            codegen.push_str(&format!("let {};\n", tmp_variable));
+                            codegen
+                                .current_scope()
+                                .declare_variable_alias(&identifier, &tmp_variable);
+                        }
+                    }
+                    _ => todo!("Handle if let guards with non-identifier patterns."),
+                }
+            }
+        }
+    }
+
     if is_any_definition_tail_recursive {
         codegen.push_indent();
         codegen.push_str("while (true) {\n");
@@ -200,13 +265,13 @@ pub fn generate_function_declarations(
         if variadic_or_pattern_matching {
             if let Some(expr) = &declaration.guard {
                 codegen.push_str(" && ");
-                codegen.generate_node(expr, None);
+                generate_function_definition_guard(codegen, expr);
             }
             codegen.push_str(") {\n");
         } else {
             if let Some(expr) = &declaration.guard {
                 codegen.push_str("if (");
-                codegen.generate_node(expr, None);
+                generate_function_definition_guard(codegen, expr);
                 codegen.push_str(") {\n");
             }
             codegen.push_str("{\n");
@@ -255,6 +320,79 @@ pub fn generate_function_declarations(
     codegen.push_indent();
     codegen.push_str("}\n");
     codegen.pop_scope();
+}
+
+fn generate_function_definition_guard(codegen: &mut CodegenJS, node: &Node) {
+    if let AstNode::VariableDeclaration {
+        pattern,
+        expression,
+        ..
+    } = &node.ast_node
+    {
+        match &pattern.ast_node {
+            AstNode::Identifier(name) => {
+                let guard_variable = codegen.current_scope().resolve_variable(name);
+                codegen.push_str(&format!("({} = ", guard_variable.unwrap()));
+                codegen.generate_node(expression, None);
+                codegen.push_char(')');
+            }
+            AstNode::EnumExtraction {
+                identifier,
+                elements,
+                named_fields,
+            } => {
+                let enum_name = match &identifier.ast_node {
+                    AstNode::Identifier(name) => name.clone(),
+                    AstNode::NestedIdentifier(names) => names.clone().pop().unwrap(),
+                    _ => unreachable!(),
+                };
+                let guard_variable = codegen.current_scope().resolve_variable(&enum_name);
+                codegen.push_str(&format!("({} = ", guard_variable.as_ref().unwrap()));
+                codegen.generate_node(expression, None);
+                codegen.push_char(')');
+                for (i, element) in elements.iter().enumerate() {
+                    if i == 0 {
+                        codegen.push_str(" && ");
+                        codegen.push_str(&format!(
+                            "{}.tag === \"{}\"",
+                            guard_variable.as_ref().unwrap(),
+                            enum_name
+                        ));
+                    }
+                    // Skip any Wildcards
+                    if let AstNode::Wildcard = element.ast_node {
+                        continue;
+                    }
+                    let identifier = match &element.ast_node {
+                        AstNode::Identifier(name) => name.clone(),
+                        AstNode::NestedIdentifier(names) => names.clone().pop().unwrap(),
+                        _ => unreachable!(),
+                    };
+                    codegen.push_str(" && ((");
+                    let identifier_resolved = codegen.current_scope().resolve_variable(&identifier);
+                    if *named_fields {
+                        codegen.push_str(&format!(
+                            "{} = {}.{}",
+                            identifier_resolved.unwrap(),
+                            guard_variable.as_ref().unwrap(),
+                            identifier,
+                        ));
+                    } else {
+                        codegen.push_str(&format!(
+                            "{} = {}[{}]",
+                            identifier_resolved.unwrap(),
+                            guard_variable.as_ref().unwrap(),
+                            i
+                        ));
+                    }
+                    codegen.push_str("), true)");
+                }
+            }
+            _ => todo!(),
+        }
+    } else {
+        codegen.generate_node(node, None);
+    }
 }
 
 pub fn generate_function_declaration(

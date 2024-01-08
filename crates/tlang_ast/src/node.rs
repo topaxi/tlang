@@ -72,8 +72,8 @@ pub enum AstNode {
         // Unique identifier for the variable, used to reference it in the symbol table and
         // distinguish it from other variables with the same name.
         id: SymbolId,
-        name: String,
-        value: Box<Node>,
+        pattern: Box<Node>,
+        expression: Box<Node>,
         type_annotation: Option<Box<Node>>,
     },
     FunctionDeclaration {

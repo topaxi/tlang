@@ -368,8 +368,8 @@ impl CodegenJS {
             AstNode::BinaryOp { op, lhs, rhs } => {
                 generate_binary_op(self, op, lhs, rhs, parent_op);
             }
-            AstNode::VariableDeclaration { id: _, name, value , type_annotation: _} => {
-                self.generate_variable_declaration(name, value);
+            AstNode::VariableDeclaration { id: _, pattern, expression , type_annotation: _} => {
+                self.generate_variable_declaration(pattern, expression);
             }
             AstNode::Match {
                 expression: _,
@@ -431,7 +431,13 @@ impl CodegenJS {
         self.push_str(identifier);
     }
 
-    fn generate_variable_declaration(&mut self, name: &str, value: &Node) {
+    fn generate_variable_declaration(&mut self, name: &Node, value: &Node) {
+        let name = if let AstNode::Identifier(name) = &name.ast_node {
+            name
+        } else {
+            todo!("Variable declaration pattern matching is not implemented yet.")
+        };
+
         self.push_str(&self.get_indent());
         let name = self.scopes.declare_variable(name);
         self.push_str(&format!("let {} = ", name));
