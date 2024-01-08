@@ -229,7 +229,6 @@ impl CodegenJS {
         self.generate_statements(statements);
 
         if expression.is_none() {
-            self.flush_statement_buffer();
             self.pop_scope();
             return;
         }
