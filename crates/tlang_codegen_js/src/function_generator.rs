@@ -420,6 +420,7 @@ pub fn generate_function_declaration(
     }
 
     codegen.push_str(") {\n");
+    codegen.flush_statement_buffer();
     codegen.inc_indent();
     generate_function_body(codegen, &declaration.body, is_tail_recursive);
     codegen.dec_indent();

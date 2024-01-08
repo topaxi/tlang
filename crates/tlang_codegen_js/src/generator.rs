@@ -48,7 +48,8 @@ pub struct CodegenJS {
     context_stack: Vec<BlockContext>,
     function_context_stack: Vec<FunctionContext>,
     function_pre_body_declarations: Vec<(String, String)>,
-    current_statement_buffer: String,
+    statement_buffer: Vec<String>,
+    completion_variables: Vec<Option<String>>,
 }
 
 impl Default for CodegenJS {
@@ -66,23 +67,42 @@ impl CodegenJS {
             context_stack: vec![BlockContext::Program],
             function_context_stack: vec![],
             function_pre_body_declarations: vec![],
-            current_statement_buffer: String::new(),
+            statement_buffer: vec![String::new()],
+            completion_variables: vec![None],
         }
+    }
+
+    pub fn push_statement_buffer(&mut self) {
+        self.statement_buffer.push(String::new());
+    }
+
+    pub fn replace_statement_buffer(&mut self, buffer: String) -> String {
+        let buf = self.statement_buffer.pop();
+        self.statement_buffer.push(buffer);
+        buf.unwrap()
+    }
+
+    pub fn pop_statement_buffer(&mut self) -> String {
+        if self.statement_buffer.len() == 1 {
+            panic!("Cannot pop last statement buffer.");
+        }
+
+        self.statement_buffer.pop().unwrap()
     }
 
     #[inline(always)]
     pub fn push_str(&mut self, str: &str) {
-        self.current_statement_buffer.push_str(str);
+        self.statement_buffer.last_mut().unwrap().push_str(str);
     }
 
     #[inline(always)]
     pub fn push_char(&mut self, char: char) {
-        self.current_statement_buffer.push(char);
+        self.statement_buffer.last_mut().unwrap().push(char);
     }
 
     #[inline(always)]
     pub fn push_indent(&mut self) {
-        self.current_statement_buffer.push_str(&self.get_indent());
+        self.push_str(&self.get_indent());
     }
 
     #[inline(always)]
@@ -96,9 +116,13 @@ impl CodegenJS {
     }
 
     #[inline(always)]
-    fn flush_statement_buffer(&mut self) {
-        self.output.push_str(&self.current_statement_buffer);
-        self.current_statement_buffer.clear();
+    pub fn flush_statement_buffer(&mut self) {
+        println!(
+            "Flushing statement buffer: {}",
+            self.statement_buffer.last().unwrap()
+        );
+        self.output.push_str(self.statement_buffer.last().unwrap());
+        self.statement_buffer.last_mut().unwrap().clear();
     }
 
     #[inline(always)]
@@ -224,28 +248,53 @@ impl CodegenJS {
 
     /// Generates blocks in expression position.
     fn generate_block_expression(&mut self, statements: &[Node], expression: &Option<Box<Node>>) {
+        let completion_tmp_var = self
+            .completion_variables
+            .last()
+            .unwrap_or(&None)
+            .clone()
+            .unwrap_or_else(|| self.scopes.declare_tmp_variable());
         self.push_scope();
+
+        // In a case of `let a = { 1 }`, we want to render the expression as a statement.
+        // At this state, we should have `let a = ` in the statement buffer.
+        // We do this by temporarily swapping the statement buffer, generating the
+        // expression as an statement, and then swapping the statement buffer back.
+        let lhs = self.replace_statement_buffer(String::new());
+
+        println!("Generating block expression");
+        println!("lhs: {}", lhs);
+        println!("Current output: {}", self.output);
+        println!(
+            "Current statement buffer: {}",
+            self.statement_buffer.last().unwrap()
+        );
+
+        if expression.is_some() {
+            self.push_indent();
+            self.push_str(&format!("let {};{{\n", completion_tmp_var));
+            self.indent_level += 1;
+        }
 
         self.generate_statements(statements);
 
         if expression.is_none() {
+            self.push_statement_buffer();
+            self.push_str(&lhs);
+            self.flush_statement_buffer();
+            self.pop_statement_buffer();
+            self.flush_statement_buffer();
             self.pop_scope();
             return;
         }
 
-        // In a case of `let a = { 1 }`, we want to render the expression as a statement.
-        // We do this by temporarily swapping the statement buffer, generating the
-        // expression as an statement, and then swapping the statement buffer back.
-        // TODO: This doesn't really work with statements within the block.
-        //       Alternatively we could render the blocks as IIFE's instead, which might be
-        //       much easier to handle, as they are allowed in expression position.
-        //       Using blocks could be a future optimization.
-        let statement_buffer = std::mem::take(&mut self.current_statement_buffer);
-        let completion_tmp_var = self.scopes.declare_tmp_variable();
-        self.push_str(&self.get_indent());
-        self.push_str(&format!("let {};{{\n", completion_tmp_var));
-        self.indent_level += 1;
-        self.push_str(&self.get_indent());
+        println!("Current output: {}", self.output);
+        println!(
+            "Current statement buffer: {}",
+            self.statement_buffer.last().unwrap()
+        );
+
+        self.push_indent();
         self.push_str(&format!("{} = ", completion_tmp_var));
         self.generate_node(expression.as_ref().unwrap(), None);
         self.push_str(";\n");
@@ -253,9 +302,8 @@ impl CodegenJS {
         self.push_str(&self.get_indent());
         self.push_str("};\n");
         self.flush_statement_buffer();
-        self.current_statement_buffer = statement_buffer;
+        self.push_str(&lhs);
         self.push_str(completion_tmp_var.as_str());
-
         self.flush_statement_buffer();
         self.pop_scope();
     }
@@ -284,7 +332,9 @@ impl CodegenJS {
 
             self.push_str(&self.get_indent());
             self.push_str("return ");
+            self.push_context(BlockContext::Expression);
             self.generate_node(expression.as_ref().unwrap(), None);
+            self.pop_context();
             self.push_str(";\n");
             self.flush_statement_buffer();
         }
@@ -309,6 +359,7 @@ impl CodegenJS {
             }
             AstNode::Program(statements) => {
                 self.generate_statements(statements);
+                self.flush_statement_buffer();
             }
             AstNode::Block(statements, expression) if self.current_context() == BlockContext::Expression => {
                 self.generate_block_expression(statements, expression);
@@ -452,6 +503,24 @@ impl CodegenJS {
         then_branch: &Node,
         else_branch: &Option<Box<Node>>,
     ) {
+        let mut lhs = String::new();
+        // TODO: Potentially in a return position or other expression, before we generate the if
+        //       statement, replace the current statement buffer with a new one, generate the if
+        //       statement, and then swap the statement buffer back.
+        //       Similar to how we generate blocks in expression position.
+        // TODO: Find a way to do this generically for all expressions which are represented as
+        //       statements in JavaScript.
+        let has_block_completions = self.current_context() == BlockContext::Expression
+            && match &then_branch.ast_node {
+                AstNode::Block(_, expr) => expr.is_some(),
+                _ => false,
+            };
+        if has_block_completions {
+            lhs = self.replace_statement_buffer(String::new());
+            let completion_tmp_var = self.scopes.declare_tmp_variable();
+            self.push_str(&format!("let {};", completion_tmp_var));
+            self.completion_variables.push(Some(completion_tmp_var));
+        }
         self.push_str("if (");
         let indent_level = self.indent_level;
         self.indent_level = 0;
@@ -459,23 +528,26 @@ impl CodegenJS {
         self.indent_level = indent_level;
         self.push_str(") {\n");
         self.indent_level += 1;
-        self.context_stack.push(BlockContext::Expression);
         self.generate_node(then_branch, None);
-        self.context_stack.pop();
         self.indent_level -= 1;
 
         if let Some(else_branch) = else_branch {
             self.push_str(&self.get_indent());
             self.push_str("} else {\n");
             self.indent_level += 1;
-            self.context_stack.push(BlockContext::Expression);
             self.generate_node(else_branch, None);
-            self.context_stack.pop();
             self.indent_level -= 1;
         }
 
         self.push_str(&self.get_indent());
         self.push_char('}');
+        if has_block_completions {
+            self.push_str("\n");
+            self.push_indent();
+            self.push_str(&lhs);
+            let completion_var = self.completion_variables.last().unwrap().clone().unwrap();
+            self.push_str(&completion_var);
+        }
     }
 
     fn generate_enum_declaration(&mut self, name: &str, variants: &[Node]) {

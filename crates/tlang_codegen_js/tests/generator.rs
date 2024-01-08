@@ -105,7 +105,6 @@ fn test_block_expression() {
 }
 
 #[test]
-#[ignore = "implement block expressions with statements"]
 fn test_block_expression_with_statements() {
     let output = compile!("let one = { let x = 1; x };");
     let expected_output = indoc! {"
@@ -131,7 +130,6 @@ fn test_if_else() {
     assert_eq!(output, expected_output);
 }
 
-#[ignore = "implement if/else in expression position first"]
 #[test]
 fn test_if_else_as_expression_as_fn_completion() {
     let output = compile!("fn main() { if true { 1 } else { 2 } }");
