@@ -68,6 +68,8 @@ fn compile(source: &str) -> String {
         ("log", SymbolType::Function),
         ("max", SymbolType::Function),
         ("min", SymbolType::Function),
+        ("floor", SymbolType::Function),
+        ("random", SymbolType::Function),
     ]);
     let mut generator = CodegenJS::default();
     generator.generate_code(&ast);
