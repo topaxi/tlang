@@ -281,8 +281,8 @@ impl CodegenJS {
             } else {
                 self.push_indent();
                 self.push_str(&format!("let {};{{\n", completion_tmp_var));
+                self.indent_level += 1;
             }
-            self.indent_level += 1;
         }
 
         self.generate_statements(statements);
@@ -307,12 +307,14 @@ impl CodegenJS {
         self.push_str(&format!("{} = ", completion_tmp_var));
         self.generate_node(expression.as_ref().unwrap(), None);
         self.push_str(";\n");
-        self.indent_level -= 1;
-        self.push_str(&self.get_indent());
-        self.push_str("};\n");
-        self.flush_statement_buffer();
-        self.push_str(&lhs);
-        self.push_str(completion_tmp_var.as_str());
+        if !has_completion_var {
+            self.indent_level -= 1;
+            self.push_str(&self.get_indent());
+            self.push_str("};\n");
+            self.flush_statement_buffer();
+            self.push_str(&lhs);
+            self.push_str(completion_tmp_var.as_str());
+        }
         self.flush_statement_buffer();
         self.pop_scope();
     }
@@ -527,6 +529,7 @@ impl CodegenJS {
         if has_block_completions {
             lhs = self.replace_statement_buffer(String::new());
             let completion_tmp_var = self.scopes.declare_tmp_variable();
+            self.push_indent();
             self.push_str(&format!("let {};", completion_tmp_var));
             self.completion_variables.push(Some(completion_tmp_var));
         }
@@ -552,7 +555,6 @@ impl CodegenJS {
         self.push_char('}');
         if has_block_completions {
             self.push_str("\n");
-            self.push_indent();
             self.push_str(&lhs);
             let completion_var = self.completion_variables.last().unwrap().clone().unwrap();
             self.push_str(&completion_var);

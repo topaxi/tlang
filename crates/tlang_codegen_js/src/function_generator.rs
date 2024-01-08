@@ -462,6 +462,7 @@ pub fn generate_function_expression(
 
     codegen.push_str(") {\n");
     codegen.inc_indent();
+    codegen.flush_statement_buffer();
     generate_function_body(codegen, &declaration.body, is_tail_recursive);
     codegen.dec_indent();
     codegen.push_indent();

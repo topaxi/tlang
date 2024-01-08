@@ -146,14 +146,12 @@ fn test_if_else_as_expression_as_fn_completion() {
     assert_eq!(output, expected_output);
 }
 
-#[ignore = "implement if/else in expression position first"]
 #[test]
 fn test_if_else_as_expression() {
     let output = compile!("fn main() { let result = if true { 1 } else { 2 }; }");
     let expected_output = indoc! {"
         function main() {
-            let $tmp$a;
-            if (true) {
+            let $tmp$a;if (true) {
                 $tmp$a = 1;
             } else {
                 $tmp$a = 2;
