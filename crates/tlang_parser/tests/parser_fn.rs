@@ -899,3 +899,126 @@ fn test_function_declarations_with_guard() {
         })])),
     );
 }
+
+#[test]
+fn test_function_declarations_with_let_guard() {
+    let program = parse!(indoc! {"
+        fn filter_map([], f) { [] }
+        fn filter_map([x, ...xs], f) if let y = f(x) { [y, ...filter_map(xs, f)] }
+        fn filter_map([x, ...xs], f) { rec filter_map(xs, f) }
+    "});
+
+    assert_eq!(
+        program,
+        node::new!(Program(vec![node::new!(FunctionDeclarations {
+            id: SymbolId::new(8),
+            name: Box::new(node::new!(Identifier("filter_map".to_string()))),
+            declarations: vec![
+                FunctionDeclaration {
+                    parameters: vec![
+                        node::new!(FunctionParameter {
+                            id: SymbolId::new(1),
+                            node: Box::new(node::new!(List(vec![]))),
+                            type_annotation: None,
+                        }),
+                        node::new!(FunctionParameter {
+                            id: SymbolId::new(2),
+                            node: Box::new(node::new!(Identifier("f".to_string()))),
+                            type_annotation: None,
+                        })
+                    ],
+                    guard: None,
+                    return_type_annotation: None,
+                    body: Box::new(node::new!(Block(
+                        vec![],
+                        Some(Box::new(node::new!(List(vec![]))))
+                    )))
+                },
+                FunctionDeclaration {
+                    parameters: vec![
+                        node::new!(FunctionParameter {
+                            id: SymbolId::new(3),
+                            node: Box::new(node::new!(List(vec![
+                                node::new!(Identifier("x".to_string())),
+                                node::new!(PrefixOp(
+                                    PrefixOp::Rest,
+                                    Box::new(node::new!(Identifier("xs".to_string())))
+                                ))
+                            ]))),
+                            type_annotation: None,
+                        }),
+                        node::new!(FunctionParameter {
+                            id: SymbolId::new(4),
+                            node: Box::new(node::new!(Identifier("f".to_string()))),
+                            type_annotation: None,
+                        })
+                    ],
+                    guard: Some(Box::new(node::new!(VariableDeclaration {
+                        id: SymbolId::new(5),
+                        name: "y".to_string(),
+                        value: Box::new(node::new!(Call {
+                            function: Box::new(node::new!(Identifier("f".to_string()))),
+                            arguments: vec![node::new!(Identifier("x".to_string()))]
+                        })),
+                        type_annotation: None
+                    }))),
+                    return_type_annotation: None,
+                    body: Box::new(node::new!(Block(
+                        vec![],
+                        Some(Box::new(node::new!(List(vec![
+                            node::new!(Identifier("y".to_string())),
+                            node::new!(PrefixOp(
+                                PrefixOp::Spread,
+                                Box::new(node::new!(Call {
+                                    function: Box::new(node::new!(Identifier(
+                                        "filter_map".to_string()
+                                    ))),
+                                    arguments: vec![
+                                        node::new!(Identifier("xs".to_string())),
+                                        node::new!(Identifier("f".to_string()))
+                                    ]
+                                }))
+                            ))
+                        ]))))
+                    )))
+                },
+                FunctionDeclaration {
+                    parameters: vec![
+                        node::new!(FunctionParameter {
+                            id: SymbolId::new(6),
+                            node: Box::new(node::new!(List(vec![
+                                node::new!(Identifier("x".to_string())),
+                                node::new!(PrefixOp(
+                                    PrefixOp::Rest,
+                                    Box::new(node::new!(Identifier("xs".to_string())))
+                                ))
+                            ]))),
+                            type_annotation: None,
+                        }),
+                        node::new!(FunctionParameter {
+                            id: SymbolId::new(7),
+                            node: Box::new(node::new!(Identifier("f".to_string()))),
+                            type_annotation: None,
+                        })
+                    ],
+                    guard: None,
+                    return_type_annotation: None,
+                    body: Box::new(node::new!(Block(
+                        vec![],
+                        Some(Box::new(node::new!(RecursiveCall(Box::new(node::new!(
+                            Call {
+                                function: Box::new(node::new!(Identifier(
+                                    "filter_map".to_string()
+                                ))),
+                                arguments: vec![
+                                    node::new!(Identifier("xs".to_string())),
+                                    node::new!(Identifier("f".to_string()))
+                                ]
+                            }
+                        ))))))
+                    )))
+                },
+            ],
+        })])),
+    );
+}

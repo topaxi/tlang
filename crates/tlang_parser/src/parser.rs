@@ -490,6 +490,29 @@ impl<'src> Parser<'src> {
         }
     }
 
+    fn parse_if_else_expression(&mut self) -> Node {
+        self.consume_token(Token::If);
+        let condition = if let Some(Token::Let) = self.current_token {
+            self.parse_variable_declaration()
+        } else {
+            self.parse_expression()
+        };
+        self.expect_token(Token::LBrace);
+        let then_branch = self.parse_block();
+        let else_branch = if let Some(Token::Else) = self.current_token {
+            self.advance();
+            Some(Box::new(self.parse_block()))
+        } else {
+            None
+        };
+
+        node::new!(IfElse {
+            condition: Box::new(condition),
+            then_branch: Box::new(then_branch),
+            else_branch: else_branch,
+        })
+    }
+
     fn parse_primary_expression(&mut self) -> Node {
         match &self.current_token {
             Some(Token::LParen) => {
@@ -500,25 +523,7 @@ impl<'src> Parser<'src> {
             }
             Some(Token::LBrace) => self.parse_block_or_dict(),
             Some(Token::LBracket) => self.parse_list_expression(),
-            Some(Token::If) => {
-                self.advance();
-                let condition = self.parse_expression();
-                self.expect_token(Token::LBrace);
-                let then_branch = self.parse_block();
-                let else_branch = if let Some(Token::Else) = self.current_token {
-                    self.advance();
-                    Some(Box::new(self.parse_block()))
-                } else {
-                    None
-                };
-
-                AstNode::IfElse {
-                    condition: Box::new(condition),
-                    then_branch: Box::new(then_branch),
-                    else_branch,
-                }
-                .into()
-            }
+            Some(Token::If) => self.parse_if_else_expression(),
             Some(Token::Fn) => self.parse_function_expression(),
             Some(Token::Rec) => {
                 self.advance();
@@ -859,6 +864,13 @@ impl<'src> Parser<'src> {
     fn parse_guard_clause(&mut self) -> Option<Node> {
         if let Some(Token::If) = self.current_token {
             self.advance();
+
+            if let Some(Token::Let) = self.current_token {
+                let decl = self.parse_variable_declaration();
+
+                // TODO: Should we restrict and validate valid nodes in if let guard clauses?
+                return Some(decl);
+            }
 
             // Valid guard clauses are function calls, binary logical expressions and unary logical
             // expressions.
