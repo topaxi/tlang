@@ -2,16 +2,40 @@ use tlang_ast::node::{AstNode, FunctionDeclaration, Node, PrefixOp};
 
 use crate::generator::{BlockContext, CodegenJS};
 
-pub fn generate_function_declarations(
-    codegen: &mut CodegenJS,
-    name: &Node,
-    declarations: &[FunctionDeclaration],
-) {
+fn map_to_function_declaration(node: &Node) -> Option<&FunctionDeclaration> {
+    match &node.ast_node {
+        AstNode::FunctionDeclaration(declaration) => Some(declaration),
+        _ => None,
+    }
+}
+
+fn filter_comments(node: &Node) -> bool {
+    matches!(
+        node.ast_node,
+        AstNode::SingleLineComment(_) | AstNode::MultiLineComment(_)
+    )
+}
+
+pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, declarations: &[Node]) {
     let name_as_str = fn_identifier_to_string(name);
-    // TODO: Handle tail recursion for multiple definitions.
-    let is_any_definition_tail_recursive = declarations
+
+    let function_declarations = declarations
+        .iter()
+        .filter_map(map_to_function_declaration)
+        .collect::<Vec<&FunctionDeclaration>>();
+
+    let function_comments = declarations
+        .iter()
+        .filter(|node| filter_comments(node))
+        .collect::<Vec<&Node>>();
+
+    let is_any_definition_tail_recursive = function_declarations
         .iter()
         .any(|declaration| is_function_body_tail_recursive(&name_as_str, &declaration.body));
+
+    for comment in function_comments {
+        codegen.generate_node(comment, None);
+    }
     codegen.push_indent();
     codegen.push_str(&format!("function {}(...args) {{\n", name_as_str));
     codegen.push_scope();
@@ -19,7 +43,7 @@ pub fn generate_function_declarations(
     codegen.inc_indent();
 
     // Declare and output temporary variables for if let guards.
-    for declaration in declarations {
+    for declaration in function_declarations.iter() {
         if let Some(expr) = &declaration.guard {
             if let AstNode::VariableDeclaration { pattern, .. } = &expr.ast_node {
                 match &pattern.ast_node {
@@ -90,12 +114,15 @@ pub fn generate_function_declarations(
     }
 
     codegen.push_indent();
-    for (i, declaration) in declarations.iter().enumerate() {
+    let mut first_declaration = true;
+    for declaration in function_declarations.iter() {
         codegen.push_scope();
-        // TODO: Only render else if there is another definition with a literal.
-        if i > 0 {
+
+        if !first_declaration {
             codegen.push_str(" else ");
         }
+
+        first_declaration = false;
 
         for (j, param) in declaration.parameters.iter().enumerate() {
             if let AstNode::FunctionParameter {
@@ -126,7 +153,7 @@ pub fn generate_function_declarations(
 
         // Expand parameter matching if any definition has a different amount of
         // parameters.
-        let parameter_variadic = declarations
+        let parameter_variadic = function_declarations
             .iter()
             .map(|declaration| declaration.parameters.clone())
             .any(|params| params.len() != declaration.parameters.len());

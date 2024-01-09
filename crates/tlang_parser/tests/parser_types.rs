@@ -85,7 +85,7 @@ fn test_return_type_annotation() {
 
     assert_eq!(
         program,
-        node::new!(Program(vec![node::new!(FunctionDeclaration {
+        node::new!(Program(vec![node::new!(FunctionSingleDeclaration {
             id: SymbolId::new(1),
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
@@ -107,7 +107,7 @@ fn test_return_type_annotation() {
 
     assert_eq!(
         program,
-        node::new!(Program(vec![node::new!(FunctionDeclaration {
+        node::new!(Program(vec![node::new!(FunctionSingleDeclaration {
             id: SymbolId::new(1),
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
@@ -162,7 +162,7 @@ fn test_function_param_types() {
 
     assert_eq!(
         program,
-        node::new!(Program(vec![node::new!(FunctionDeclaration {
+        node::new!(Program(vec![node::new!(FunctionSingleDeclaration {
             id: SymbolId::new(3),
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {

@@ -298,3 +298,35 @@ fn test_function_declarations_with_if_let_guard_named_fields_enum() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_function_declarations_with_comments_inbetween() {
+    let output = compile!(indoc! {"
+        fn filter_map([], f) { [] }
+        fn filter_map([x, ...xs], f) if let Some { value } = f(x) { [value, ...filter_map(xs, f)] }
+        // Comment
+        fn filter_map([x, ...xs], f) { filter_map(xs, f) }
+    "});
+    let expected_output = indoc! {"
+        // Comment
+        function filter_map(...args) {
+            let $tmp$a;
+            let $tmp$b;
+            if (args[0].length === 0) {
+                let f = args[1];
+                return [];
+            } else if (args[0].length >= 1 && ($tmp$a = args[1](args[0][0])) && $tmp$a.tag === \"Some\" && (($tmp$b = $tmp$a.value), true)) {
+                let f = args[1];
+                let x = args[0][0];
+                let xs = args[0].slice(1);
+                return [$tmp$b, ...filter_map(xs, f)];
+            } else if (args[0].length >= 1) {
+                let f = args[1];
+                let x = args[0][0];
+                let xs = args[0].slice(1);
+                return filter_map(xs, f);
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+}

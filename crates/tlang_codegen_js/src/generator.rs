@@ -438,7 +438,7 @@ impl CodegenJS {
                 self.generate_if_else(condition, then_branch, else_branch);
             }
             AstNode::FunctionParameter{ id: _, node, type_annotation: _ } => generate_function_parameter(self, node),
-            AstNode::FunctionDeclaration { id: _, name, declaration } =>
+            AstNode::FunctionSingleDeclaration { id: _, name, declaration } =>
                 generate_function_declaration(self, name, declaration),
             AstNode::FunctionDeclarations { id: _, name, declarations } =>
                 generate_function_declarations(self, name, declarations),

@@ -76,7 +76,8 @@ pub enum AstNode {
         expression: Box<Node>,
         type_annotation: Option<Box<Node>>,
     },
-    FunctionDeclaration {
+    FunctionDeclaration(FunctionDeclaration),
+    FunctionSingleDeclaration {
         id: SymbolId,
         name: Box<Node>,
         declaration: Box<FunctionDeclaration>,
@@ -84,7 +85,7 @@ pub enum AstNode {
     FunctionDeclarations {
         id: SymbolId,
         name: Box<Node>,
-        declarations: Vec<FunctionDeclaration>,
+        declarations: Vec<Node>,
     },
     FunctionExpression {
         id: SymbolId,

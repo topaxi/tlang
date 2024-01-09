@@ -77,7 +77,7 @@ impl SemanticAnalyzer {
                 ref mut expression,
                 type_annotation: _,
             } => self.analyze_variable_declaration(id, pattern, expression),
-            AstNode::FunctionDeclaration {
+            AstNode::FunctionSingleDeclaration {
                 id: _,
                 ref name,
                 ref mut declaration,
@@ -162,10 +162,12 @@ impl SemanticAnalyzer {
         &mut self,
         node: &mut Node,
         name: &Node,
-        declarations: &mut Vec<FunctionDeclaration>,
+        declarations: &mut Vec<Node>,
     ) {
         for declaration in declarations {
-            self.analyze_function_declaration(node, name, declaration)
+            if let AstNode::FunctionDeclaration(decl) = &mut declaration.ast_node {
+                self.analyze_function_declaration(node, name, decl);
+            }
         }
     }
 

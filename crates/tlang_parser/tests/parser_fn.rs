@@ -15,7 +15,7 @@ fn test_function_declaration() {
 
     assert_eq!(
         program,
-        node::new!(Program(vec![node::new!(FunctionDeclaration {
+        node::new!(Program(vec![node::new!(FunctionSingleDeclaration {
             id: SymbolId::new(1),
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
@@ -47,7 +47,7 @@ fn test_function_declaration_with_parameters() {
 
     assert_eq!(
         program,
-        node::new!(Program(vec![node::new!(FunctionDeclaration {
+        node::new!(Program(vec![node::new!(FunctionSingleDeclaration {
             id: SymbolId::new(3),
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
@@ -267,7 +267,7 @@ fn test_explicit_return_statements() {
 
     assert_eq!(
         program,
-        node::new!(Program(vec![node::new!(FunctionDeclaration {
+        node::new!(Program(vec![node::new!(FunctionSingleDeclaration {
             id: SymbolId::new(1),
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
@@ -292,7 +292,7 @@ fn test_explicit_return_statements() {
 
     assert_eq!(
         program,
-        node::new!(Program(vec![node::new!(FunctionDeclaration {
+        node::new!(Program(vec![node::new!(FunctionSingleDeclaration {
             id: SymbolId::new(1),
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
@@ -344,7 +344,7 @@ fn test_implicit_return_expressions() {
 
     assert_eq!(
         program,
-        node::new!(Program(vec![node::new!(FunctionDeclaration {
+        node::new!(Program(vec![node::new!(FunctionSingleDeclaration {
             id: SymbolId::new(1),
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
@@ -367,7 +367,7 @@ fn test_implicit_return_expressions() {
 
     assert_eq!(
         program,
-        node::new!(Program(vec![node::new!(FunctionDeclaration {
+        node::new!(Program(vec![node::new!(FunctionSingleDeclaration {
             id: SymbolId::new(1),
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
@@ -411,7 +411,7 @@ fn test_implicit_return_expressions() {
 
     assert_eq!(
         program,
-        node::new!(Program(vec![node::new!(FunctionDeclaration {
+        node::new!(Program(vec![node::new!(FunctionSingleDeclaration {
             id: SymbolId::new(2),
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
@@ -445,7 +445,7 @@ fn test_recursive_factorial_functional_definition() {
             id: SymbolId::new(3),
             name: Box::new(node::new!(Identifier("factorial".to_string()))),
             declarations: vec![
-                FunctionDeclaration {
+                node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![node::new!(FunctionParameter {
                         id: SymbolId::new(1),
                         node: Box::new(node::new!(Literal(Literal::Integer(0)))),
@@ -459,8 +459,8 @@ fn test_recursive_factorial_functional_definition() {
                         )))))],
                         None
                     )))
-                },
-                FunctionDeclaration {
+                })),
+                node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![node::new!(FunctionParameter {
                         id: SymbolId::new(2),
                         node: Box::new(node::new!(Identifier("n".to_string()))),
@@ -487,7 +487,7 @@ fn test_recursive_factorial_functional_definition() {
                         )))))],
                         None
                     )))
-                }
+                }))
             ]
         })]))
     );
@@ -506,7 +506,7 @@ fn test_recursive_sum() {
             id: SymbolId::new(3),
             name: Box::new(node::new!(Identifier("sum".to_string()))),
             declarations: vec![
-                FunctionDeclaration {
+                node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![node::new!(FunctionParameter {
                         id: SymbolId::new(1),
                         node: Box::new(node::new!(List(vec![]))),
@@ -518,8 +518,8 @@ fn test_recursive_sum() {
                         vec![],
                         Some(Box::new(node::new!(Literal(Literal::Integer(0))))),
                     )))
-                },
-                FunctionDeclaration {
+                })),
+                node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![node::new!(FunctionParameter {
                         id: SymbolId::new(2),
                         node: Box::new(node::new!(List(vec![
@@ -544,14 +544,12 @@ fn test_recursive_sum() {
                             }))
                         })))
                     )))
-                }
+                }))
             ]
         })]))
     )
 }
 
-// TODO: Comments between function declarations should be allowed.
-#[ignore = "not implemented yet"]
 #[test]
 fn test_functional_function_declaration_with_comments_inbetween() {
     let program = parse!(indoc! {"
@@ -563,12 +561,12 @@ fn test_functional_function_declaration_with_comments_inbetween() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(FunctionDeclarations {
-            id: SymbolId::new(1),
+            id: SymbolId::new(3),
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declarations: vec![
-                FunctionDeclaration {
+                node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![node::new!(FunctionParameter {
-                        id: SymbolId::new(2),
+                        id: SymbolId::new(1),
                         node: Box::new(node::new!(Literal(Literal::Integer(1)))),
                         type_annotation: None,
                     })],
@@ -578,10 +576,11 @@ fn test_functional_function_declaration_with_comments_inbetween() {
                         vec![],
                         Some(Box::new(node::new!(Literal(Literal::Integer(1))))),
                     )))
-                },
-                FunctionDeclaration {
+                })),
+                node::new!(SingleLineComment(" comment".to_string())),
+                node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![node::new!(FunctionParameter {
-                        id: SymbolId::new(3),
+                        id: SymbolId::new(2),
                         node: Box::new(node::new!(Identifier("n".to_string()))),
                         type_annotation: None,
                     })],
@@ -595,7 +594,7 @@ fn test_functional_function_declaration_with_comments_inbetween() {
                             rhs: Box::new(node::new!(Literal(Literal::Integer(2))))
                         })))
                     )))
-                }
+                }))
             ]
         })]))
     );
@@ -615,7 +614,7 @@ fn test_explicit_tail_recursive_call() {
             id: SymbolId::new(6),
             name: Box::new(node::new!(Identifier("factorial".to_string()))),
             declarations: vec![
-                FunctionDeclaration {
+                node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![node::new!(FunctionParameter {
                         id: SymbolId::new(1),
                         node: Box::new(node::new!(Identifier("n".to_string()))),
@@ -633,8 +632,8 @@ fn test_explicit_tail_recursive_call() {
                             ]
                         })))
                     ))),
-                },
-                FunctionDeclaration {
+                })),
+                node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![
                         node::new!(FunctionParameter {
                             id: SymbolId::new(2),
@@ -653,8 +652,8 @@ fn test_explicit_tail_recursive_call() {
                         vec![],
                         Some(Box::new(node::new!(Identifier("acc".to_string()))))
                     ))),
-                },
-                FunctionDeclaration {
+                })),
+                node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![
                         node::new!(FunctionParameter {
                             id: SymbolId::new(4),
@@ -689,7 +688,7 @@ fn test_explicit_tail_recursive_call() {
                             }
                         ))))))
                     ))),
-                }
+                }))
             ]
         })]))
     );
@@ -708,7 +707,7 @@ fn test_foldl_impl() {
             id: SymbolId::new(7),
             name: Box::new(node::new!(Identifier("foldl".to_string()))),
             declarations: vec![
-                FunctionDeclaration {
+                node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![
                         node::new!(FunctionParameter {
                             id: SymbolId::new(1),
@@ -732,8 +731,8 @@ fn test_foldl_impl() {
                         vec![],
                         Some(Box::new(node::new!(Identifier("acc".to_string()))))
                     ))),
-                },
-                FunctionDeclaration {
+                })),
+                node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![
                         node::new!(FunctionParameter {
                             id: SymbolId::new(4),
@@ -778,7 +777,7 @@ fn test_foldl_impl() {
                             }
                         ))))))
                     )))
-                },
+                })),
             ],
         }),])),
     );
@@ -798,7 +797,7 @@ fn test_function_declarations_with_guard() {
             id: SymbolId::new(7),
             name: Box::new(node::new!(Identifier("filter".to_string()))),
             declarations: vec![
-                FunctionDeclaration {
+                node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![
                         node::new!(FunctionParameter {
                             id: SymbolId::new(1),
@@ -817,8 +816,8 @@ fn test_function_declarations_with_guard() {
                         vec![],
                         Some(Box::new(node::new!(List(vec![]))))
                     )))
-                },
-                FunctionDeclaration {
+                })),
+                node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![
                         node::new!(FunctionParameter {
                             id: SymbolId::new(3),
@@ -860,8 +859,8 @@ fn test_function_declarations_with_guard() {
                             ))
                         ]))))
                     )))
-                },
-                FunctionDeclaration {
+                })),
+                node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![
                         node::new!(FunctionParameter {
                             id: SymbolId::new(5),
@@ -894,7 +893,7 @@ fn test_function_declarations_with_guard() {
                             }
                         ))))))
                     )))
-                },
+                })),
             ],
         })])),
     );
@@ -914,7 +913,7 @@ fn test_function_declarations_with_let_guard() {
             id: SymbolId::new(8),
             name: Box::new(node::new!(Identifier("filter_map".to_string()))),
             declarations: vec![
-                FunctionDeclaration {
+                node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![
                         node::new!(FunctionParameter {
                             id: SymbolId::new(1),
@@ -933,8 +932,8 @@ fn test_function_declarations_with_let_guard() {
                         vec![],
                         Some(Box::new(node::new!(List(vec![]))))
                     )))
-                },
-                FunctionDeclaration {
+                })),
+                node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![
                         node::new!(FunctionParameter {
                             id: SymbolId::new(3),
@@ -981,8 +980,8 @@ fn test_function_declarations_with_let_guard() {
                             ))
                         ]))))
                     )))
-                },
-                FunctionDeclaration {
+                })),
+                node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![
                         node::new!(FunctionParameter {
                             id: SymbolId::new(6),
@@ -1017,7 +1016,7 @@ fn test_function_declarations_with_let_guard() {
                             }
                         ))))))
                     )))
-                },
+                })),
             ],
         })])),
     );

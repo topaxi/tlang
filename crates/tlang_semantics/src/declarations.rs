@@ -76,7 +76,7 @@ impl DeclarationAnalyzer {
                 ref mut expression,
                 type_annotation: _,
             } => self.collect_variable_declaration(ast, *id, pattern, expression),
-            AstNode::FunctionDeclaration {
+            AstNode::FunctionSingleDeclaration {
                 ref id,
                 ref name,
                 ref mut declaration,
@@ -206,7 +206,7 @@ impl DeclarationAnalyzer {
         node: &mut Node,
         id: SymbolId,
         name: &Node,
-        declarations: &mut [FunctionDeclaration],
+        declarations: &mut [Node],
     ) {
         let name_as_str = self.fn_identifier_to_string(name);
         let symbol_table = self.get_last_symbol_table_mut();
@@ -217,15 +217,17 @@ impl DeclarationAnalyzer {
             symbol_type: SymbolType::Function,
         });
 
-        for declaration in declarations {
-            // Function arguments have their own scope.
-            self.push_symbol_table();
-            node.symbol_table = Some(Rc::clone(&self.get_last_symbol_table()));
-            for param in &mut declaration.parameters {
-                self.collect_declarations(param);
+        for declaration_node in declarations {
+            if let AstNode::FunctionDeclaration(ref mut declaration) = declaration_node.ast_node {
+                // Function arguments have their own scope.
+                self.push_symbol_table();
+                node.symbol_table = Some(Rc::clone(&self.get_last_symbol_table()));
+                for param in &mut declaration.parameters {
+                    self.collect_declarations(param);
+                }
+                self.collect_declarations(&mut declaration.body);
+                self.pop_symbol_table();
             }
-            self.collect_declarations(&mut declaration.body);
-            self.pop_symbol_table();
         }
     }
 

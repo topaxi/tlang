@@ -313,7 +313,7 @@ fn test_if_else_as_last_expression() {
 
     assert_eq!(
         program,
-        node::new!(Program(vec![node::new!(FunctionDeclaration {
+        node::new!(Program(vec![node::new!(FunctionSingleDeclaration {
             id: SymbolId::new(1),
             name: Box::new(node::new!(Identifier("main".to_string()))),
             declaration: Box::new(FunctionDeclaration {

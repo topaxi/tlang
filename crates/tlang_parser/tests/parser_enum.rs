@@ -151,7 +151,7 @@ fn test_enum_tree_max_depth() {
                 id: SymbolId::new(4),
                 name: Box::new(node::new!(Identifier("maximum_depth".to_string()))),
                 declarations: vec![
-                    FunctionDeclaration {
+                    node::new!(FunctionDeclaration(FunctionDeclaration {
                         parameters: vec![node::new!(FunctionParameter {
                             id: SymbolId::new(2),
                             node: Box::new(node::new!(EnumExtraction {
@@ -170,8 +170,8 @@ fn test_enum_tree_max_depth() {
                             vec![],
                             Some(Box::new(node::new!(Literal(Literal::Integer(1)))))
                         )))
-                    },
-                    FunctionDeclaration {
+                    })),
+                    node::new!(FunctionDeclaration(FunctionDeclaration {
                         parameters: vec![node::new!(FunctionParameter {
                             id: SymbolId::new(3),
                             node: Box::new(node::new!(EnumExtraction {
@@ -217,10 +217,10 @@ fn test_enum_tree_max_depth() {
                                 }))
                             })))
                         )))
-                    }
+                    }))
                 ]
             }),
-            node::new!(FunctionDeclaration {
+            node::new!(FunctionSingleDeclaration {
                 id: SymbolId::new(6),
                 name: Box::new(node::new!(Identifier("main".to_string()))),
                 declaration: Box::new(FunctionDeclaration {
@@ -335,7 +335,7 @@ fn test_enum_extraction() {
                 id: SymbolId::new(4),
                 name: Box::new(node::new!(Identifier("unwrap".to_string()))),
                 declarations: vec![
-                    FunctionDeclaration {
+                    node::new!(FunctionDeclaration(FunctionDeclaration {
                         parameters: vec![node::new!(FunctionParameter {
                             id: SymbolId::new(2),
                             node: Box::new(node::new!(EnumExtraction {
@@ -359,8 +359,8 @@ fn test_enum_extraction() {
                                 )))]
                             })))
                         )))
-                    },
-                    FunctionDeclaration {
+                    })),
+                    node::new!(FunctionDeclaration(FunctionDeclaration {
                         parameters: vec![node::new!(FunctionParameter {
                             id: SymbolId::new(3),
                             node: Box::new(node::new!(EnumExtraction {
@@ -379,7 +379,7 @@ fn test_enum_extraction() {
                             vec![],
                             Some(Box::new(node::new!(Identifier("value".to_string()))))
                         )))
-                    }
+                    }))
                 ]
             })
         ]))

@@ -58,7 +58,7 @@ fn test_declare_methods_on_option_enum() {
                     "is_option".to_string()
                 ]))),
                 declarations: vec![
-                    FunctionDeclaration {
+                    node::new!(FunctionDeclaration(FunctionDeclaration {
                         parameters: vec![node::new!(FunctionParameter {
                             id: SymbolId::new(2),
                             node: Box::new(node::new!(EnumExtraction {
@@ -77,8 +77,8 @@ fn test_declare_methods_on_option_enum() {
                             vec![],
                             Some(Box::new(node::new!(Literal(Literal::Boolean(true)))))
                         ))),
-                    },
-                    FunctionDeclaration {
+                    })),
+                    node::new!(FunctionDeclaration(FunctionDeclaration {
                         parameters: vec![node::new!(FunctionParameter {
                             id: SymbolId::new(3),
                             node: Box::new(node::new!(EnumExtraction {
@@ -97,8 +97,8 @@ fn test_declare_methods_on_option_enum() {
                             vec![],
                             Some(Box::new(node::new!(Literal(Literal::Boolean(true)))))
                         ))),
-                    },
-                    FunctionDeclaration {
+                    })),
+                    node::new!(FunctionDeclaration(FunctionDeclaration {
                         parameters: vec![node::new!(FunctionParameter {
                             id: SymbolId::new(4),
                             node: Box::new(node::new!(Wildcard)),
@@ -110,7 +110,7 @@ fn test_declare_methods_on_option_enum() {
                             vec![],
                             Some(Box::new(node::new!(Literal(Literal::Boolean(false)))))
                         ))),
-                    }
+                    }))
                 ]
             }),
             node::new!(FunctionDeclarations {
@@ -120,7 +120,7 @@ fn test_declare_methods_on_option_enum() {
                     field: Box::new(node::new!(Identifier("is_some".to_string()))),
                 })),
                 declarations: vec![
-                    FunctionDeclaration {
+                    node::new!(FunctionDeclaration(FunctionDeclaration {
                         parameters: vec![node::new!(FunctionParameter {
                             id: SymbolId::new(6),
                             node: Box::new(node::new!(EnumExtraction {
@@ -139,8 +139,8 @@ fn test_declare_methods_on_option_enum() {
                             vec![],
                             Some(Box::new(node::new!(Literal(Literal::Boolean(true)))))
                         ))),
-                    },
-                    FunctionDeclaration {
+                    })),
+                    node::new!(FunctionDeclaration(FunctionDeclaration {
                         parameters: vec![node::new!(FunctionParameter {
                             id: SymbolId::new(7),
                             node: Box::new(node::new!(EnumExtraction {
@@ -159,7 +159,7 @@ fn test_declare_methods_on_option_enum() {
                             vec![],
                             Some(Box::new(node::new!(Literal(Literal::Boolean(false)))))
                         ))),
-                    }
+                    }))
                 ]
             }),
             node::new!(FunctionDeclarations {
@@ -169,7 +169,7 @@ fn test_declare_methods_on_option_enum() {
                     field: Box::new(node::new!(Identifier("map".to_string()))),
                 })),
                 declarations: vec![
-                    FunctionDeclaration {
+                    node::new!(FunctionDeclaration(FunctionDeclaration {
                         parameters: vec![
                             node::new!(FunctionParameter {
                                 id: SymbolId::new(9),
@@ -204,8 +204,8 @@ fn test_declare_methods_on_option_enum() {
                                 })],
                             })))
                         ))),
-                    },
-                    FunctionDeclaration {
+                    })),
+                    node::new!(FunctionDeclaration(FunctionDeclaration {
                         parameters: vec![
                             node::new!(FunctionParameter {
                                 id: SymbolId::new(11),
@@ -234,7 +234,7 @@ fn test_declare_methods_on_option_enum() {
                                 "None".to_string()
                             ])))),
                         ))),
-                    }
+                    }))
                 ]
             }),
         ])),
