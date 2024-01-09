@@ -1,3 +1,5 @@
+use crate::span::Span;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum TokenKind {
     // Tokens for binary operators
@@ -79,4 +81,16 @@ pub enum Literal {
     Float(f64),
     String(String),
     Char(String),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Token {
+    pub kind: TokenKind,
+    pub span: Span,
+}
+
+impl Token {
+    pub fn new(kind: TokenKind, span: Span) -> Self {
+        Self { kind, span }
+    }
 }

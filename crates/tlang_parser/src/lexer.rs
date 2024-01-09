@@ -1,6 +1,9 @@
 use std::rc::Rc;
 
-use tlang_ast::token::{Literal, TokenKind};
+use tlang_ast::{
+    span::{LineColumn, Span},
+    token::{Literal, Token, TokenKind},
+};
 
 #[derive(Debug, Clone)]
 pub struct Lexer<'src> {
@@ -8,7 +11,7 @@ pub struct Lexer<'src> {
     position: usize,
     current_line: usize,
     current_column: usize,
-    current_token: Option<TokenKind>,
+    current_token: Option<Token>,
 }
 
 impl Lexer<'_> {
@@ -104,11 +107,24 @@ impl Lexer<'_> {
         slice.to_owned()
     }
 
-    pub fn next_token(&mut self) -> TokenKind {
+    fn line_column(&self) -> LineColumn {
+        LineColumn {
+            line: self.current_line,
+            column: self.current_column,
+        }
+    }
+
+    fn token(&self, kind: TokenKind, start: LineColumn) -> Token {
+        Token::new(kind, Span::new(start, self.line_column()))
+    }
+
+    pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
 
+        let start = self.line_column();
+
         if self.position >= self.source.len() {
-            return TokenKind::Eof;
+            return self.token(TokenKind::Eof, start);
         }
 
         let ch = self.source.chars().nth(self.position).unwrap();
@@ -116,175 +132,175 @@ impl Lexer<'_> {
         let token = match ch {
             '+' => {
                 self.advance();
-                TokenKind::Plus
+                self.token(TokenKind::Plus, start)
             }
             '-' => {
                 if self.peek_ahead() == Some('>') {
                     self.advance();
                     self.advance();
-                    TokenKind::Arrow
+                    self.token(TokenKind::Arrow, start)
                 } else {
                     self.advance();
-                    TokenKind::Minus
+                    self.token(TokenKind::Minus, start)
                 }
             }
             '*' => {
                 if self.peek_ahead() == Some('*') {
                     self.advance();
                     self.advance();
-                    TokenKind::AsteriskAsterisk
+                    self.token(TokenKind::AsteriskAsterisk, start)
                 } else {
                     self.advance();
-                    TokenKind::Asterisk
+                    self.token(TokenKind::Asterisk, start)
                 }
             }
             '/' => {
                 if self.peek_ahead() == Some('/') {
                     self.advance();
                     self.advance();
-                    let start = self.position;
+                    let start_position = self.position;
                     self.advance_while(|ch| ch != '\n');
-                    let slice = &self.source[start..self.position];
-                    TokenKind::SingleLineComment(slice.to_owned())
+                    let slice = &self.source[start_position..self.position];
+                    self.token(TokenKind::SingleLineComment(slice.to_owned()), start)
                 } else if self.peek_ahead() == Some('*') {
                     self.advance();
                     self.advance();
-                    let start = self.position;
+                    let start_position = self.position;
                     while !(self.source[self.position..].starts_with("*/")
                         || self.position >= self.source.len())
                     {
                         self.advance();
                     }
-                    let slice = &self.source[start..self.position];
+                    let slice = &self.source[start_position..self.position];
                     self.advance();
                     self.advance();
-                    TokenKind::MultiLineComment(slice.to_owned())
+                    self.token(TokenKind::MultiLineComment(slice.to_owned()), start)
                 } else {
                     self.advance();
-                    TokenKind::Slash
+                    self.token(TokenKind::Slash, start)
                 }
             }
             '%' => {
                 self.advance();
-                TokenKind::Percent
+                self.token(TokenKind::Percent, start)
             }
             '^' => {
                 self.advance();
-                TokenKind::Caret
+                self.token(TokenKind::Caret, start)
             }
             '|' => {
                 if self.peek_ahead() == Some('|') {
                     self.advance();
                     self.advance();
-                    TokenKind::DoublePipe
+                    self.token(TokenKind::DoublePipe, start)
                 } else if self.peek_ahead() == Some('>') {
                     self.advance();
                     self.advance();
-                    TokenKind::Pipeline
+                    self.token(TokenKind::Pipeline, start)
                 } else {
                     self.advance();
-                    TokenKind::Pipe
+                    self.token(TokenKind::Pipe, start)
                 }
             }
             '&' => {
                 if self.peek_ahead() == Some('&') {
                     self.advance();
                     self.advance();
-                    TokenKind::DoubleAmpersand
+                    self.token(TokenKind::DoubleAmpersand, start)
                 } else {
                     self.advance();
-                    TokenKind::Ampersand
+                    self.token(TokenKind::Ampersand, start)
                 }
             }
             '<' => {
                 if self.peek_ahead() == Some('=') {
                     self.advance();
                     self.advance();
-                    TokenKind::LessThanOrEqual
+                    self.token(TokenKind::LessThanOrEqual, start)
                 } else {
                     self.advance();
-                    TokenKind::LessThan
+                    self.token(TokenKind::LessThan, start)
                 }
             }
             '>' => {
                 if self.peek_ahead() == Some('=') {
                     self.advance();
                     self.advance();
-                    TokenKind::GreaterThanOrEqual
+                    self.token(TokenKind::GreaterThanOrEqual, start)
                 } else {
                     self.advance();
-                    TokenKind::GreaterThan
+                    self.token(TokenKind::GreaterThan, start)
                 }
             }
             '(' => {
                 self.advance();
-                TokenKind::LParen
+                self.token(TokenKind::LParen, start)
             }
             ')' => {
                 self.advance();
-                TokenKind::RParen
+                self.token(TokenKind::RParen, start)
             }
             '{' => {
                 self.advance();
-                TokenKind::LBrace
+                self.token(TokenKind::LBrace, start)
             }
             '}' => {
                 self.advance();
-                TokenKind::RBrace
+                self.token(TokenKind::RBrace, start)
             }
             '[' => {
                 self.advance();
-                TokenKind::LBracket
+                self.token(TokenKind::LBracket, start)
             }
             ']' => {
                 self.advance();
-                TokenKind::RBracket
+                self.token(TokenKind::RBracket, start)
             }
             ',' => {
                 self.advance();
-                TokenKind::Comma
+                self.token(TokenKind::Comma, start)
             }
             '=' => {
                 if self.peek_ahead() == Some('=') {
                     self.advance();
                     self.advance();
-                    TokenKind::EqualEqual
+                    self.token(TokenKind::EqualEqual, start)
                 } else if self.peek_ahead() == Some('>') {
                     self.advance();
                     self.advance();
-                    TokenKind::FatArrow
+                    self.token(TokenKind::FatArrow, start)
                 } else {
                     self.advance();
-                    TokenKind::EqualSign
+                    self.token(TokenKind::EqualSign, start)
                 }
             }
             '!' => {
                 if self.peek_ahead() == Some('=') {
                     self.advance();
                     self.advance();
-                    TokenKind::NotEqual
+                    self.token(TokenKind::NotEqual, start)
                 } else {
                     self.advance();
-                    TokenKind::ExclamationMark
+                    self.token(TokenKind::ExclamationMark, start)
                 }
             }
             '?' => {
                 self.advance();
-                TokenKind::QuestionMark
+                self.token(TokenKind::QuestionMark, start)
             }
             ':' => {
                 if self.peek_ahead() == Some(':') {
                     self.advance();
                     self.advance();
-                    TokenKind::NamespaceSeparator
+                    self.token(TokenKind::NamespaceSeparator, start)
                 } else {
                     self.advance();
-                    TokenKind::Colon
+                    self.token(TokenKind::Colon, start)
                 }
             }
             ';' => {
                 self.advance();
-                TokenKind::Semicolon
+                self.token(TokenKind::Semicolon, start)
             }
             '.' => {
                 if let Some('.') = self.peek_ahead() {
@@ -292,15 +308,15 @@ impl Lexer<'_> {
                         self.advance();
                         self.advance();
                         self.advance();
-                        TokenKind::DotDotDot
+                        self.token(TokenKind::DotDotDot, start)
                     } else {
                         self.advance();
                         self.advance();
-                        TokenKind::DotDot
+                        self.token(TokenKind::DotDot, start)
                     }
                 } else {
                     self.advance();
-                    TokenKind::Dot
+                    self.token(TokenKind::Dot, start)
                 }
             }
             '0'..='9' => {
@@ -310,9 +326,11 @@ impl Lexer<'_> {
                     .any(|ch| ch == '.');
 
                 if is_float {
-                    TokenKind::Literal(Literal::Float(self.read_float()))
+                    let float_value = self.read_float();
+                    self.token(TokenKind::Literal(Literal::Float(float_value)), start)
                 } else {
-                    TokenKind::Literal(Literal::Integer(self.read_integer()))
+                    let int_value = self.read_integer();
+                    self.token(TokenKind::Literal(Literal::Integer(int_value)), start)
                 }
             }
             '"' | '\'' => {
@@ -321,32 +339,38 @@ impl Lexer<'_> {
                 let literal = self.read_string_literal(quote);
 
                 if quote == '"' {
-                    TokenKind::Literal(Literal::String(literal))
+                    self.token(TokenKind::Literal(Literal::String(literal)), start)
                 } else {
-                    TokenKind::Literal(Literal::Char(literal))
+                    self.token(TokenKind::Literal(Literal::Char(literal)), start)
                 }
             }
             _ if Self::is_alphanumeric(ch) => {
-                let identifier = self.read_identifier();
+                let identifier = self.read_identifier().as_ref();
 
                 match identifier {
-                    "let" => TokenKind::Let,
-                    "fn" => TokenKind::Fn,
-                    "rec" => TokenKind::Rec,
-                    "return" => TokenKind::Return,
-                    "if" => TokenKind::If,
-                    "else" => TokenKind::Else,
-                    "match" => TokenKind::Match,
-                    "enum" => TokenKind::Enum,
-                    "struct" => TokenKind::Struct,
-                    "true" => TokenKind::Literal(Literal::Boolean(true)),
-                    "false" => TokenKind::Literal(Literal::Boolean(false)),
-                    _ => TokenKind::Identifier(identifier.to_owned()),
+                    "let" => self.token(TokenKind::Let, start),
+                    "fn" => self.token(TokenKind::Fn, start),
+                    "rec" => self.token(TokenKind::Rec, start),
+                    "return" => self.token(TokenKind::Return, start),
+                    "if" => self.token(TokenKind::If, start),
+                    "else" => self.token(TokenKind::Else, start),
+                    "match" => self.token(TokenKind::Match, start),
+                    "enum" => self.token(TokenKind::Enum, start),
+                    "struct" => self.token(TokenKind::Struct, start),
+                    "true" => self.token(TokenKind::Literal(Literal::Boolean(true)), start),
+                    "false" => self.token(TokenKind::Literal(Literal::Boolean(false)), start),
+                    _ => {
+                        let identifier_string = identifier.to_string();
+                        self.token(TokenKind::Identifier(identifier_string), start)
+                    }
                 }
             }
             _ => {
                 // TODO: We should probably use a Result type here
-                panic!("Unexpected character: {}", ch);
+                panic!(
+                    "Unexpected character \"{}\" at line {} column {}",
+                    ch, self.current_line, self.current_column
+                );
             }
         };
 
