@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use tlang_ast::token::{Literal, Token};
+use tlang_ast::token::{Literal, TokenKind};
 
 #[derive(Debug, Clone)]
 pub struct Lexer<'src> {
@@ -8,7 +8,7 @@ pub struct Lexer<'src> {
     position: usize,
     current_line: usize,
     current_column: usize,
-    current_token: Option<Token>,
+    current_token: Option<TokenKind>,
 }
 
 impl Lexer<'_> {
@@ -104,11 +104,11 @@ impl Lexer<'_> {
         slice.to_owned()
     }
 
-    pub fn next_token(&mut self) -> Token {
+    pub fn next_token(&mut self) -> TokenKind {
         self.skip_whitespace();
 
         if self.position >= self.source.len() {
-            return Token::Eof;
+            return TokenKind::Eof;
         }
 
         let ch = self.source.chars().nth(self.position).unwrap();
@@ -116,26 +116,26 @@ impl Lexer<'_> {
         let token = match ch {
             '+' => {
                 self.advance();
-                Token::Plus
+                TokenKind::Plus
             }
             '-' => {
                 if self.peek_ahead() == Some('>') {
                     self.advance();
                     self.advance();
-                    Token::Arrow
+                    TokenKind::Arrow
                 } else {
                     self.advance();
-                    Token::Minus
+                    TokenKind::Minus
                 }
             }
             '*' => {
                 if self.peek_ahead() == Some('*') {
                     self.advance();
                     self.advance();
-                    Token::AsteriskAsterisk
+                    TokenKind::AsteriskAsterisk
                 } else {
                     self.advance();
-                    Token::Asterisk
+                    TokenKind::Asterisk
                 }
             }
             '/' => {
@@ -145,7 +145,7 @@ impl Lexer<'_> {
                     let start = self.position;
                     self.advance_while(|ch| ch != '\n');
                     let slice = &self.source[start..self.position];
-                    Token::SingleLineComment(slice.to_owned())
+                    TokenKind::SingleLineComment(slice.to_owned())
                 } else if self.peek_ahead() == Some('*') {
                     self.advance();
                     self.advance();
@@ -158,133 +158,133 @@ impl Lexer<'_> {
                     let slice = &self.source[start..self.position];
                     self.advance();
                     self.advance();
-                    Token::MultiLineComment(slice.to_owned())
+                    TokenKind::MultiLineComment(slice.to_owned())
                 } else {
                     self.advance();
-                    Token::Slash
+                    TokenKind::Slash
                 }
             }
             '%' => {
                 self.advance();
-                Token::Percent
+                TokenKind::Percent
             }
             '^' => {
                 self.advance();
-                Token::Caret
+                TokenKind::Caret
             }
             '|' => {
                 if self.peek_ahead() == Some('|') {
                     self.advance();
                     self.advance();
-                    Token::DoublePipe
+                    TokenKind::DoublePipe
                 } else if self.peek_ahead() == Some('>') {
                     self.advance();
                     self.advance();
-                    Token::Pipeline
+                    TokenKind::Pipeline
                 } else {
                     self.advance();
-                    Token::Pipe
+                    TokenKind::Pipe
                 }
             }
             '&' => {
                 if self.peek_ahead() == Some('&') {
                     self.advance();
                     self.advance();
-                    Token::DoubleAmpersand
+                    TokenKind::DoubleAmpersand
                 } else {
                     self.advance();
-                    Token::Ampersand
+                    TokenKind::Ampersand
                 }
             }
             '<' => {
                 if self.peek_ahead() == Some('=') {
                     self.advance();
                     self.advance();
-                    Token::LessThanOrEqual
+                    TokenKind::LessThanOrEqual
                 } else {
                     self.advance();
-                    Token::LessThan
+                    TokenKind::LessThan
                 }
             }
             '>' => {
                 if self.peek_ahead() == Some('=') {
                     self.advance();
                     self.advance();
-                    Token::GreaterThanOrEqual
+                    TokenKind::GreaterThanOrEqual
                 } else {
                     self.advance();
-                    Token::GreaterThan
+                    TokenKind::GreaterThan
                 }
             }
             '(' => {
                 self.advance();
-                Token::LParen
+                TokenKind::LParen
             }
             ')' => {
                 self.advance();
-                Token::RParen
+                TokenKind::RParen
             }
             '{' => {
                 self.advance();
-                Token::LBrace
+                TokenKind::LBrace
             }
             '}' => {
                 self.advance();
-                Token::RBrace
+                TokenKind::RBrace
             }
             '[' => {
                 self.advance();
-                Token::LBracket
+                TokenKind::LBracket
             }
             ']' => {
                 self.advance();
-                Token::RBracket
+                TokenKind::RBracket
             }
             ',' => {
                 self.advance();
-                Token::Comma
+                TokenKind::Comma
             }
             '=' => {
                 if self.peek_ahead() == Some('=') {
                     self.advance();
                     self.advance();
-                    Token::EqualEqual
+                    TokenKind::EqualEqual
                 } else if self.peek_ahead() == Some('>') {
                     self.advance();
                     self.advance();
-                    Token::FatArrow
+                    TokenKind::FatArrow
                 } else {
                     self.advance();
-                    Token::EqualSign
+                    TokenKind::EqualSign
                 }
             }
             '!' => {
                 if self.peek_ahead() == Some('=') {
                     self.advance();
                     self.advance();
-                    Token::NotEqual
+                    TokenKind::NotEqual
                 } else {
                     self.advance();
-                    Token::ExclamationMark
+                    TokenKind::ExclamationMark
                 }
             }
             '?' => {
                 self.advance();
-                Token::QuestionMark
+                TokenKind::QuestionMark
             }
             ':' => {
                 if self.peek_ahead() == Some(':') {
                     self.advance();
                     self.advance();
-                    Token::NamespaceSeparator
+                    TokenKind::NamespaceSeparator
                 } else {
                     self.advance();
-                    Token::Colon
+                    TokenKind::Colon
                 }
             }
             ';' => {
                 self.advance();
-                Token::Semicolon
+                TokenKind::Semicolon
             }
             '.' => {
                 if let Some('.') = self.peek_ahead() {
@@ -292,15 +292,15 @@ impl Lexer<'_> {
                         self.advance();
                         self.advance();
                         self.advance();
-                        Token::DotDotDot
+                        TokenKind::DotDotDot
                     } else {
                         self.advance();
                         self.advance();
-                        Token::DotDot
+                        TokenKind::DotDot
                     }
                 } else {
                     self.advance();
-                    Token::Dot
+                    TokenKind::Dot
                 }
             }
             '0'..='9' => {
@@ -310,9 +310,9 @@ impl Lexer<'_> {
                     .any(|ch| ch == '.');
 
                 if is_float {
-                    Token::Literal(Literal::Float(self.read_float()))
+                    TokenKind::Literal(Literal::Float(self.read_float()))
                 } else {
-                    Token::Literal(Literal::Integer(self.read_integer()))
+                    TokenKind::Literal(Literal::Integer(self.read_integer()))
                 }
             }
             '"' | '\'' => {
@@ -321,27 +321,27 @@ impl Lexer<'_> {
                 let literal = self.read_string_literal(quote);
 
                 if quote == '"' {
-                    Token::Literal(Literal::String(literal))
+                    TokenKind::Literal(Literal::String(literal))
                 } else {
-                    Token::Literal(Literal::Char(literal))
+                    TokenKind::Literal(Literal::Char(literal))
                 }
             }
             _ if Self::is_alphanumeric(ch) => {
                 let identifier = self.read_identifier();
 
                 match identifier {
-                    "let" => Token::Let,
-                    "fn" => Token::Fn,
-                    "rec" => Token::Rec,
-                    "return" => Token::Return,
-                    "if" => Token::If,
-                    "else" => Token::Else,
-                    "match" => Token::Match,
-                    "enum" => Token::Enum,
-                    "struct" => Token::Struct,
-                    "true" => Token::Literal(Literal::Boolean(true)),
-                    "false" => Token::Literal(Literal::Boolean(false)),
-                    _ => Token::Identifier(identifier.to_owned()),
+                    "let" => TokenKind::Let,
+                    "fn" => TokenKind::Fn,
+                    "rec" => TokenKind::Rec,
+                    "return" => TokenKind::Return,
+                    "if" => TokenKind::If,
+                    "else" => TokenKind::Else,
+                    "match" => TokenKind::Match,
+                    "enum" => TokenKind::Enum,
+                    "struct" => TokenKind::Struct,
+                    "true" => TokenKind::Literal(Literal::Boolean(true)),
+                    "false" => TokenKind::Literal(Literal::Boolean(false)),
+                    _ => TokenKind::Identifier(identifier.to_owned()),
                 }
             }
             _ => {

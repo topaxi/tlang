@@ -1,5 +1,5 @@
 #[derive(Clone, Debug, PartialEq)]
-pub enum Token {
+pub enum TokenKind {
     // Tokens for binary operators
     Caret,
     Plus,

@@ -2,15 +2,15 @@ use tlang_ast::node::{
     self, Associativity, AstNode, BinaryOp, FunctionDeclaration, Node, OperatorInfo, PrefixOp,
 };
 use tlang_ast::symbols::SymbolId;
-use tlang_ast::token::Token;
+use tlang_ast::token::TokenKind;
 
 use crate::lexer::Lexer;
 use log::debug;
 
 pub struct Parser<'src> {
     lexer: Lexer<'src>,
-    current_token: Option<Token>,
-    next_token: Option<Token>,
+    current_token: Option<TokenKind>,
+    next_token: Option<TokenKind>,
 
     // Id to identifiy symbols, e.g. functions and variables.
     unique_id: SymbolId,
@@ -47,7 +47,7 @@ impl<'src> Parser<'src> {
         self.parse_program()
     }
 
-    fn panic_unexpected_token(&self, expected: &str, actual: Option<Token>) {
+    fn panic_unexpected_token(&self, expected: &str, actual: Option<TokenKind>) {
         let line = self.current_line;
         // Technically we are still off by one here as we are already pointing at the end of the current token,
         // but it's better than nothing.
@@ -78,14 +78,14 @@ impl<'src> Parser<'src> {
         );
     }
 
-    fn expect_token(&mut self, expected: Token) {
+    fn expect_token(&mut self, expected: TokenKind) {
         let actual = self.current_token.as_ref().unwrap();
         if *actual != expected {
             self.panic_unexpected_token(&format!("{:?}", expected), Some(actual.clone()));
         }
     }
 
-    fn consume_token(&mut self, expected: Token) {
+    fn consume_token(&mut self, expected: TokenKind) {
         self.expect_token(expected);
         self.advance();
     }
@@ -93,7 +93,7 @@ impl<'src> Parser<'src> {
     fn consume_identifier(&mut self) -> String {
         let actual = self.current_token.as_ref().unwrap();
         match actual {
-            Token::Identifier(name) => {
+            TokenKind::Identifier(name) => {
                 let name = name.clone();
                 self.advance();
                 name
@@ -113,11 +113,11 @@ impl<'src> Parser<'src> {
         debug!("Advanced to {:?}", self.current_token);
     }
 
-    pub fn peek_token(&self) -> Option<&Token> {
+    pub fn peek_token(&self) -> Option<&TokenKind> {
         self.next_token.as_ref()
     }
 
-    fn save_state(&self) -> (Lexer<'src>, Option<Token>, Option<Token>) {
+    fn save_state(&self) -> (Lexer<'src>, Option<TokenKind>, Option<TokenKind>) {
         (
             self.lexer.clone(),
             self.current_token.clone(),
@@ -125,7 +125,7 @@ impl<'src> Parser<'src> {
         )
     }
 
-    fn restore_state(&mut self, state: (Lexer<'src>, Option<Token>, Option<Token>)) {
+    fn restore_state(&mut self, state: (Lexer<'src>, Option<TokenKind>, Option<TokenKind>)) {
         self.lexer = state.0;
         self.current_token = state.1;
         self.next_token = state.2;
@@ -135,18 +135,18 @@ impl<'src> Parser<'src> {
         debug!("Parsing statement {:?}", self.current_token);
 
         // Skip stray semicolons.
-        if let Some(Token::Semicolon) = self.current_token {
+        if let Some(TokenKind::Semicolon) = self.current_token {
             self.advance();
 
             return (false, None);
         }
 
         let node = match self.current_token {
-            Some(Token::Let) => self.parse_variable_declaration(),
-            Some(Token::Fn) => self.parse_function_declaration(),
-            Some(Token::Return) => self.parse_return_statement(),
-            Some(Token::Enum) => self.parse_enum_declaration(),
-            Some(Token::SingleLineComment(_) | Token::MultiLineComment(_)) => {
+            Some(TokenKind::Let) => self.parse_variable_declaration(),
+            Some(TokenKind::Fn) => self.parse_function_declaration(),
+            Some(TokenKind::Return) => self.parse_return_statement(),
+            Some(TokenKind::Enum) => self.parse_enum_declaration(),
+            Some(TokenKind::SingleLineComment(_) | TokenKind::MultiLineComment(_)) => {
                 let comment: Node = self.current_token.as_ref().unwrap().into();
                 self.advance();
                 return (false, Some(comment));
@@ -178,9 +178,9 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_return_statement(&mut self) -> Node {
-        self.consume_token(Token::Return);
+        self.consume_token(TokenKind::Return);
 
-        if self.current_token == Some(Token::Semicolon) {
+        if self.current_token == Some(TokenKind::Semicolon) {
             return node::new!(ReturnStatement(None));
         }
 
@@ -193,7 +193,7 @@ impl<'src> Parser<'src> {
 
     fn parse_identifier(&mut self) -> Node {
         let mut identifiers = vec![self.consume_identifier()];
-        while let Some(Token::NamespaceSeparator) = self.current_token {
+        while let Some(TokenKind::NamespaceSeparator) = self.current_token {
             self.advance();
             identifiers.push(self.consume_identifier());
         }
@@ -206,17 +206,17 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_enum_declaration(&mut self) -> Node {
-        self.consume_token(Token::Enum);
+        self.consume_token(TokenKind::Enum);
         let name = self.consume_identifier();
-        self.consume_token(Token::LBrace);
+        self.consume_token(TokenKind::LBrace);
         let mut variants = Vec::new();
-        while self.current_token != Some(Token::RBrace) {
+        while self.current_token != Some(TokenKind::RBrace) {
             variants.push(self.parse_enum_variant());
-            if let Some(Token::Comma) = self.current_token {
+            if let Some(TokenKind::Comma) = self.current_token {
                 self.advance();
             }
         }
-        self.consume_token(Token::RBrace);
+        self.consume_token(TokenKind::RBrace);
         node::new!(EnumDeclaration {
             id: self.unique_id(),
             name: name,
@@ -230,16 +230,16 @@ impl<'src> Parser<'src> {
         let name = self.consume_identifier();
         log::debug!("Parsing enum variant {}", name);
         match self.current_token {
-            Some(Token::LParen) => {
+            Some(TokenKind::LParen) => {
                 self.advance();
                 let mut parameters = Vec::new();
-                while self.current_token != Some(Token::RParen) {
+                while self.current_token != Some(TokenKind::RParen) {
                     parameters.push(node::new!(Identifier(self.consume_identifier())));
-                    if let Some(Token::Comma) = self.current_token {
+                    if let Some(TokenKind::Comma) = self.current_token {
                         self.advance();
                     }
                 }
-                self.consume_token(Token::RParen);
+                self.consume_token(TokenKind::RParen);
                 AstNode::EnumVariant {
                     name,
                     named_fields: false,
@@ -247,16 +247,16 @@ impl<'src> Parser<'src> {
                 }
                 .into()
             }
-            Some(Token::LBrace) => {
+            Some(TokenKind::LBrace) => {
                 self.advance();
                 let mut parameters = Vec::new();
-                while self.current_token != Some(Token::RBrace) {
+                while self.current_token != Some(TokenKind::RBrace) {
                     parameters.push(node::new!(Identifier(self.consume_identifier())));
-                    if let Some(Token::Comma) = self.current_token {
+                    if let Some(TokenKind::Comma) = self.current_token {
                         self.advance();
                     }
                 }
-                self.consume_token(Token::RBrace);
+                self.consume_token(TokenKind::RBrace);
                 AstNode::EnumVariant {
                     name,
                     named_fields: true,
@@ -277,10 +277,12 @@ impl<'src> Parser<'src> {
         let mut statements = Vec::new();
         let mut completion_expression = None;
 
-        while self.current_token != Some(Token::RBrace) && self.current_token != Some(Token::Eof) {
+        while self.current_token != Some(TokenKind::RBrace)
+            && self.current_token != Some(TokenKind::Eof)
+        {
             if let (consume_semicolon, Some(statement)) = self.parse_statement() {
                 if may_complete
-                    && self.current_token == Some(Token::RBrace)
+                    && self.current_token == Some(TokenKind::RBrace)
                     && matches!(&statement.ast_node, AstNode::ExpressionStatement(_))
                 {
                     let expression = match statement.ast_node {
@@ -294,7 +296,7 @@ impl<'src> Parser<'src> {
                 statements.push(statement);
 
                 if consume_semicolon {
-                    self.consume_token(Token::Semicolon);
+                    self.consume_token(TokenKind::Semicolon);
                 }
             }
         }
@@ -307,9 +309,9 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_block(&mut self) -> Node {
-        self.consume_token(Token::LBrace);
+        self.consume_token(TokenKind::LBrace);
         let (statements, completion) = self.parse_statements(true);
-        self.consume_token(Token::RBrace);
+        self.consume_token(TokenKind::RBrace);
 
         node::new!(Block(statements, completion))
     }
@@ -317,23 +319,23 @@ impl<'src> Parser<'src> {
     fn parse_variable_declaration_pattern(&mut self) -> Node {
         match self.current_token {
             // Literal values will be pattern matched
-            Some(Token::Literal(_)) => self.parse_primary_expression(),
-            Some(Token::Identifier(ref identifier)) if identifier == "_" => {
+            Some(TokenKind::Literal(_)) => self.parse_primary_expression(),
+            Some(TokenKind::Identifier(ref identifier)) if identifier == "_" => {
                 self.advance();
                 node::new!(Wildcard)
             }
             // Identifiers can be namespaced identifiers or call expressions, which should be pattern matched.
             // Simple identifiers will be used as is and mapped to a function parameter.
-            Some(Token::Identifier(_)) => {
-                if let Some(Token::NamespaceSeparator) = self.peek_token() {
+            Some(TokenKind::Identifier(_)) => {
+                if let Some(TokenKind::NamespaceSeparator) = self.peek_token() {
                     self.parse_enum_extraction()
-                } else if let Some(Token::LParen | Token::LBrace) = self.peek_token() {
+                } else if let Some(TokenKind::LParen | TokenKind::LBrace) = self.peek_token() {
                     self.parse_enum_extraction()
                 } else {
                     node::new!(Identifier(self.consume_identifier()))
                 }
             }
-            Some(Token::LBracket) => self.parse_list_extraction(),
+            Some(TokenKind::LBracket) => self.parse_list_extraction(),
             _ => {
                 self.panic_unexpected_token(
                     "literal, identifier or list extraction",
@@ -345,19 +347,19 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_variable_declaration(&mut self) -> Node {
-        self.consume_token(Token::Let);
+        self.consume_token(TokenKind::Let);
 
         // We probably want to know whether we are parsing a plain declaration of `if let`.
         let pattern = self.parse_variable_declaration_pattern();
 
         let type_annotation = match self.current_token {
-            Some(Token::Colon) => {
+            Some(TokenKind::Colon) => {
                 self.advance();
                 self.parse_type_annotation()
             }
             _ => None,
         };
-        self.consume_token(Token::EqualSign);
+        self.consume_token(TokenKind::EqualSign);
         let value = self.parse_expression();
 
         node::new!(VariableDeclaration {
@@ -375,7 +377,7 @@ impl<'src> Parser<'src> {
             "Parsing call expression, current token: {:?}",
             self.current_token
         );
-        let is_dict_call = self.current_token == Some(Token::LBrace);
+        let is_dict_call = self.current_token == Some(TokenKind::LBrace);
         let mut arguments = Vec::new();
 
         log::debug!("Is dict call: {}", is_dict_call);
@@ -383,16 +385,16 @@ impl<'src> Parser<'src> {
         if is_dict_call {
             arguments.push(self.parse_block_or_dict());
         } else {
-            self.consume_token(Token::LParen);
-            while self.current_token != Some(Token::RParen) {
+            self.consume_token(TokenKind::LParen);
+            while self.current_token != Some(TokenKind::RParen) {
                 arguments.push(self.parse_expression());
 
-                if let Some(Token::Comma) = self.current_token {
+                if let Some(TokenKind::Comma) = self.current_token {
                     self.advance();
                 }
             }
 
-            self.consume_token(Token::RParen);
+            self.consume_token(TokenKind::RParen);
         }
 
         AstNode::Call {
@@ -403,16 +405,16 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_list_extraction(&mut self) -> Node {
-        self.consume_token(Token::LBracket);
+        self.consume_token(TokenKind::LBracket);
 
         let mut elements = Vec::new();
         // Only allow literal values, identifiers and and rest params for now.
-        while self.current_token != Some(Token::RBracket) {
+        while self.current_token != Some(TokenKind::RBracket) {
             let element = match self.current_token {
-                Some(Token::Identifier(_) | Token::Literal(_) | Token::LBracket) => {
+                Some(TokenKind::Identifier(_) | TokenKind::Literal(_) | TokenKind::LBracket) => {
                     self.parse_primary_expression()
                 }
-                Some(Token::DotDotDot) => {
+                Some(TokenKind::DotDotDot) => {
                     self.advance();
                     node::new!(PrefixOp(
                         PrefixOp::Rest,
@@ -431,25 +433,25 @@ impl<'src> Parser<'src> {
             elements.push(element);
 
             // Allow trailing comma.
-            if self.current_token == Some(Token::RBracket) {
+            if self.current_token == Some(TokenKind::RBracket) {
                 break;
             }
 
-            self.consume_token(Token::Comma);
+            self.consume_token(TokenKind::Comma);
         }
 
-        self.consume_token(Token::RBracket);
+        self.consume_token(TokenKind::RBracket);
 
         node::new!(List(elements))
     }
 
     fn parse_list_expression(&mut self) -> Node {
-        self.consume_token(Token::LBracket);
+        self.consume_token(TokenKind::LBracket);
 
         let mut elements = Vec::new();
-        while self.current_token != Some(Token::RBracket) {
+        while self.current_token != Some(TokenKind::RBracket) {
             let element = match self.current_token {
-                Some(Token::DotDotDot) => {
+                Some(TokenKind::DotDotDot) => {
                     self.advance();
 
                     node::new!(PrefixOp(
@@ -463,40 +465,40 @@ impl<'src> Parser<'src> {
             elements.push(element);
 
             // Allow trailing comma.
-            if self.current_token == Some(Token::RBracket) {
+            if self.current_token == Some(TokenKind::RBracket) {
                 break;
             }
 
-            self.consume_token(Token::Comma);
+            self.consume_token(TokenKind::Comma);
         }
 
-        self.consume_token(Token::RBracket);
+        self.consume_token(TokenKind::RBracket);
 
         node::new!(List(elements))
     }
 
     fn parse_block_or_dict(&mut self) -> Node {
-        self.consume_token(Token::LBrace);
+        self.consume_token(TokenKind::LBrace);
         // If the first token is a identifier followed by a colon, we assume a dict.
-        if let Some(Token::Identifier(_)) = self.current_token {
-            if let Some(Token::Colon) = self.peek_token() {
+        if let Some(TokenKind::Identifier(_)) = self.current_token {
+            if let Some(TokenKind::Colon) = self.peek_token() {
                 let mut elements = Vec::new();
-                while self.current_token != Some(Token::RBrace) {
+                while self.current_token != Some(TokenKind::RBrace) {
                     let key = self.parse_primary_expression();
-                    self.consume_token(Token::Colon);
+                    self.consume_token(TokenKind::Colon);
                     let value = self.parse_expression();
                     elements.push((key, value));
-                    if let Some(Token::Comma) = self.current_token {
+                    if let Some(TokenKind::Comma) = self.current_token {
                         self.advance();
                     }
                 }
-                self.consume_token(Token::RBrace);
+                self.consume_token(TokenKind::RBrace);
                 return node::new!(Dict(elements));
             }
         }
 
         let (statements, completion) = self.parse_statements(true);
-        self.consume_token(Token::RBrace);
+        self.consume_token(TokenKind::RBrace);
 
         node::new!(Block(statements, completion))
     }
@@ -505,14 +507,14 @@ impl<'src> Parser<'src> {
     fn parse_function_name(&mut self) -> Node {
         let mut identifiers = vec![self.consume_identifier()];
 
-        if let Some(Token::NamespaceSeparator) = self.current_token {
-            while let Some(Token::NamespaceSeparator) = self.current_token {
+        if let Some(TokenKind::NamespaceSeparator) = self.current_token {
+            while let Some(TokenKind::NamespaceSeparator) = self.current_token {
                 self.advance();
                 identifiers.push(self.consume_identifier());
             }
 
             node::new!(NestedIdentifier(identifiers))
-        } else if let Some(Token::Dot) = self.current_token {
+        } else if let Some(TokenKind::Dot) = self.current_token {
             self.advance();
             node::new!(FieldExpression {
                 base: Box::new(node::new!(Identifier(identifiers.pop().unwrap()))),
@@ -524,8 +526,8 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_if_else_expression(&mut self) -> Node {
-        self.consume_token(Token::If);
-        let condition = if let Some(Token::Let) = self.current_token {
+        self.consume_token(TokenKind::If);
+        let condition = if let Some(TokenKind::Let) = self.current_token {
             self.parse_variable_declaration()
         } else {
             self.parse_expression()
@@ -535,12 +537,12 @@ impl<'src> Parser<'src> {
         // Semicolon is currently needed to disambiguate call with dictionary and block.
         // E.g. `if let x = foo { .. }` is recognized as `foo({ .. })`
         // vs `if let x = foo; { .. }` which will properly parse.
-        if let Some(Token::Semicolon) = self.current_token {
+        if let Some(TokenKind::Semicolon) = self.current_token {
             self.advance();
         }
-        self.expect_token(Token::LBrace);
+        self.expect_token(TokenKind::LBrace);
         let then_branch = self.parse_block();
-        let else_branch = if let Some(Token::Else) = self.current_token {
+        let else_branch = if let Some(TokenKind::Else) = self.current_token {
             self.advance();
             Some(Box::new(self.parse_block()))
         } else {
@@ -556,21 +558,21 @@ impl<'src> Parser<'src> {
 
     fn parse_primary_expression(&mut self) -> Node {
         match &self.current_token {
-            Some(Token::LParen) => {
+            Some(TokenKind::LParen) => {
                 self.advance();
                 let expression = self.parse_expression();
-                self.consume_token(Token::RParen);
+                self.consume_token(TokenKind::RParen);
                 expression
             }
-            Some(Token::LBrace) => self.parse_block_or_dict(),
-            Some(Token::LBracket) => self.parse_list_expression(),
-            Some(Token::If) => self.parse_if_else_expression(),
-            Some(Token::Fn) => self.parse_function_expression(),
-            Some(Token::Rec) => {
+            Some(TokenKind::LBrace) => self.parse_block_or_dict(),
+            Some(TokenKind::LBracket) => self.parse_list_expression(),
+            Some(TokenKind::If) => self.parse_if_else_expression(),
+            Some(TokenKind::Fn) => self.parse_function_expression(),
+            Some(TokenKind::Rec) => {
                 self.advance();
                 node::new!(RecursiveCall(Box::new(self.parse_expression())))
             }
-            Some(Token::Match) => self.parse_match_expression(),
+            Some(TokenKind::Match) => self.parse_match_expression(),
             Some(token) => {
                 let mut node: Node = token.into();
 
@@ -581,16 +583,16 @@ impl<'src> Parser<'src> {
                         return node::new!(Wildcard);
                     }
 
-                    if let Some(Token::NamespaceSeparator) = self.current_token {
+                    if let Some(TokenKind::NamespaceSeparator) = self.current_token {
                         let mut identifiers = vec![identifier.clone()];
-                        while let Some(Token::NamespaceSeparator) = self.current_token {
+                        while let Some(TokenKind::NamespaceSeparator) = self.current_token {
                             self.advance();
                             identifiers.push(self.consume_identifier());
                         }
                         node = node::new!(NestedIdentifier(identifiers));
                     }
 
-                    if let Some(Token::LParen | Token::LBrace) = self.current_token {
+                    if let Some(TokenKind::LParen | TokenKind::LBrace) = self.current_token {
                         return self.parse_call_expression(node);
                     }
                 }
@@ -605,25 +607,25 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_match_expression(&mut self) -> Node {
-        self.consume_token(Token::Match);
+        self.consume_token(TokenKind::Match);
         let expression = self.parse_expression();
-        self.consume_token(Token::LBrace);
+        self.consume_token(TokenKind::LBrace);
 
         let mut arms = Vec::new();
-        while self.current_token != Some(Token::RBrace) {
+        while self.current_token != Some(TokenKind::RBrace) {
             let pattern = self.parse_expression();
-            self.consume_token(Token::FatArrow);
+            self.consume_token(TokenKind::FatArrow);
             let expression = self.parse_expression();
             arms.push(node::new!(MatchArm {
                 pattern: Box::new(pattern),
                 expression: Box::new(expression),
             }));
-            if let Some(Token::Comma) = self.current_token {
+            if let Some(TokenKind::Comma) = self.current_token {
                 self.advance();
             }
         }
 
-        self.consume_token(Token::RBrace);
+        self.consume_token(TokenKind::RBrace);
 
         node::new!(Match {
             expression: Box::new(expression),
@@ -634,14 +636,14 @@ impl<'src> Parser<'src> {
     fn parse_parameter_list(&mut self) -> Vec<Node> {
         let mut parameters = Vec::new();
 
-        if self.current_token == Some(Token::LParen) {
-            self.consume_token(Token::LParen);
+        if self.current_token == Some(TokenKind::LParen) {
+            self.consume_token(TokenKind::LParen);
 
-            while self.current_token != Some(Token::RParen) {
+            while self.current_token != Some(TokenKind::RParen) {
                 let parameter = self.parse_variable_declaration_pattern();
 
                 let type_annotation = match self.current_token {
-                    Some(Token::Colon) => {
+                    Some(TokenKind::Colon) => {
                         self.advance();
                         self.parse_type_annotation()
                     }
@@ -655,20 +657,23 @@ impl<'src> Parser<'src> {
                     type_annotation: type_annotation.map(Box::new),
                 }));
 
-                if let Some(Token::Comma) = self.current_token {
+                if let Some(TokenKind::Comma) = self.current_token {
                     self.advance();
                 }
             }
-            self.consume_token(Token::RParen);
+            self.consume_token(TokenKind::RParen);
         }
 
         parameters
     }
 
-    fn is_type_annotation_token(token: &Token) -> bool {
+    fn is_type_annotation_token(token: &TokenKind) -> bool {
         matches!(
             token,
-            Token::Identifier(_) | Token::GreaterThan | Token::LessThan | Token::NamespaceSeparator
+            TokenKind::Identifier(_)
+                | TokenKind::GreaterThan
+                | TokenKind::LessThan
+                | TokenKind::NamespaceSeparator
         )
     }
 
@@ -680,7 +685,7 @@ impl<'src> Parser<'src> {
         }
 
         match token {
-            Token::Identifier(_) => {
+            TokenKind::Identifier(_) => {
                 let identifier = self.parse_identifier();
                 let parameters = self.parse_type_annotation_parameters();
 
@@ -696,23 +701,23 @@ impl<'src> Parser<'src> {
     fn parse_type_annotation_parameters(&mut self) -> Vec<Node> {
         let mut parameters = Vec::new();
 
-        if let Some(Token::LessThan) = self.current_token {
+        if let Some(TokenKind::LessThan) = self.current_token {
             self.advance();
-            while self.current_token != Some(Token::GreaterThan) {
+            while self.current_token != Some(TokenKind::GreaterThan) {
                 let parameter = self.parse_type_annotation().unwrap();
                 parameters.push(parameter);
-                if let Some(Token::Comma) = self.current_token {
+                if let Some(TokenKind::Comma) = self.current_token {
                     self.advance();
                 }
             }
-            self.consume_token(Token::GreaterThan);
+            self.consume_token(TokenKind::GreaterThan);
         }
 
         parameters
     }
 
     fn parse_return_type(&mut self) -> Option<Node> {
-        if let Some(Token::Arrow) = self.current_token {
+        if let Some(TokenKind::Arrow) = self.current_token {
             self.advance();
             let return_type = self.parse_type_annotation()?;
             Some(return_type)
@@ -722,8 +727,8 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_function_expression(&mut self) -> Node {
-        self.consume_token(Token::Fn);
-        let name = if let Some(Token::Identifier(_)) = &self.current_token {
+        self.consume_token(TokenKind::Fn);
+        let name = if let Some(TokenKind::Identifier(_)) = &self.current_token {
             Some(self.parse_single_identifier())
         } else {
             None
@@ -749,27 +754,27 @@ impl<'src> Parser<'src> {
     /// a function declarations parameter list.
     fn parse_enum_extraction(&mut self) -> Node {
         let identifier = Box::new(self.parse_identifier());
-        let is_dict_extraction = self.current_token == Some(Token::LBrace);
+        let is_dict_extraction = self.current_token == Some(TokenKind::LBrace);
 
         if is_dict_extraction {
-            self.consume_token(Token::LBrace);
+            self.consume_token(TokenKind::LBrace);
             let mut elements = Vec::new();
-            while self.current_token != Some(Token::RBrace) {
+            while self.current_token != Some(TokenKind::RBrace) {
                 elements.push(self.parse_identifier());
-                if let Some(Token::Comma) = self.current_token {
+                if let Some(TokenKind::Comma) = self.current_token {
                     self.advance();
                 }
             }
-            self.consume_token(Token::RBrace);
+            self.consume_token(TokenKind::RBrace);
             node::new!(EnumExtraction {
                 identifier: identifier,
                 elements: elements,
                 named_fields: true,
             })
-        } else if let Some(Token::LParen) = self.current_token {
-            self.consume_token(Token::LParen);
+        } else if let Some(TokenKind::LParen) = self.current_token {
+            self.consume_token(TokenKind::LParen);
             let mut elements = Vec::new();
-            while self.current_token != Some(Token::RParen) {
+            while self.current_token != Some(TokenKind::RParen) {
                 let mut identifier = self.parse_identifier();
 
                 // Remap identifier of _ to Wildcard
@@ -780,11 +785,11 @@ impl<'src> Parser<'src> {
                 }
 
                 elements.push(identifier);
-                if let Some(Token::Comma) = self.current_token {
+                if let Some(TokenKind::Comma) = self.current_token {
                     self.advance();
                 }
             }
-            self.consume_token(Token::RParen);
+            self.consume_token(TokenKind::RParen);
             AstNode::EnumExtraction {
                 identifier,
                 elements,
@@ -807,7 +812,9 @@ impl<'src> Parser<'src> {
 
         while matches!(
             self.current_token,
-            Some(Token::Fn) | Some(Token::SingleLineComment(_)) | Some(Token::MultiLineComment(_))
+            Some(TokenKind::Fn)
+                | Some(TokenKind::SingleLineComment(_))
+                | Some(TokenKind::MultiLineComment(_))
         ) {
             // We have to check if it is the same function declaration as the previous one.
             // Parse ahead to get the identifier of the function, which might be an Identifier,
@@ -821,15 +828,15 @@ impl<'src> Parser<'src> {
 
             while matches!(
                 self.current_token,
-                Some(Token::SingleLineComment(_)) | Some(Token::MultiLineComment(_))
+                Some(TokenKind::SingleLineComment(_)) | Some(TokenKind::MultiLineComment(_))
             ) {
                 comments.push(self.current_token.as_ref().unwrap().into());
                 self.advance();
             }
 
-            self.consume_token(Token::Fn);
+            self.consume_token(TokenKind::Fn);
 
-            if let Some(Token::Identifier(_)) = self.current_token {
+            if let Some(TokenKind::Identifier(_)) = self.current_token {
                 let node = self.parse_function_name();
 
                 if name.is_some() && name.as_ref().unwrap().ast_node != node.ast_node {
@@ -857,7 +864,7 @@ impl<'src> Parser<'src> {
                 }
             }
 
-            self.expect_token(Token::LParen);
+            self.expect_token(TokenKind::LParen);
             declarations.extend_from_slice(&comments);
             let parameters = self.parse_parameter_list();
             let guard = self.parse_guard_clause();
@@ -894,10 +901,10 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_guard_clause(&mut self) -> Option<Node> {
-        if let Some(Token::If) = self.current_token {
+        if let Some(TokenKind::If) = self.current_token {
             self.advance();
 
-            if let Some(Token::Let) = self.current_token {
+            if let Some(TokenKind::Let) = self.current_token {
                 let decl = self.parse_variable_declaration();
 
                 // TODO: Should we restrict and validate valid nodes in if let guard clauses?
@@ -924,50 +931,50 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn is_binary_op(token: &Token) -> bool {
+    fn is_binary_op(token: &TokenKind) -> bool {
         matches!(
             token,
-            Token::Plus
-                | Token::Minus
-                | Token::Asterisk
-                | Token::AsteriskAsterisk
-                | Token::Slash
-                | Token::Percent
-                | Token::Caret
-                | Token::EqualEqual
-                | Token::NotEqual
-                | Token::LessThan
-                | Token::LessThanOrEqual
-                | Token::GreaterThan
-                | Token::GreaterThanOrEqual
-                | Token::Pipe
-                | Token::Ampersand
-                | Token::DoublePipe
-                | Token::DoubleAmpersand
-                | Token::Pipeline
+            TokenKind::Plus
+                | TokenKind::Minus
+                | TokenKind::Asterisk
+                | TokenKind::AsteriskAsterisk
+                | TokenKind::Slash
+                | TokenKind::Percent
+                | TokenKind::Caret
+                | TokenKind::EqualEqual
+                | TokenKind::NotEqual
+                | TokenKind::LessThan
+                | TokenKind::LessThanOrEqual
+                | TokenKind::GreaterThan
+                | TokenKind::GreaterThanOrEqual
+                | TokenKind::Pipe
+                | TokenKind::Ampersand
+                | TokenKind::DoublePipe
+                | TokenKind::DoubleAmpersand
+                | TokenKind::Pipeline
         )
     }
 
-    fn map_binary_op(token: &Token) -> BinaryOp {
+    fn map_binary_op(token: &TokenKind) -> BinaryOp {
         match token {
-            Token::Plus => BinaryOp::Add,
-            Token::Minus => BinaryOp::Subtract,
-            Token::Asterisk => BinaryOp::Multiply,
-            Token::AsteriskAsterisk => BinaryOp::Exponentiation,
-            Token::Slash => BinaryOp::Divide,
-            Token::Percent => BinaryOp::Modulo,
-            Token::EqualEqual => BinaryOp::Equal,
-            Token::NotEqual => BinaryOp::NotEqual,
-            Token::LessThan => BinaryOp::LessThan,
-            Token::LessThanOrEqual => BinaryOp::LessThanOrEqual,
-            Token::GreaterThan => BinaryOp::GreaterThan,
-            Token::GreaterThanOrEqual => BinaryOp::GreaterThanOrEqual,
-            Token::Pipe => BinaryOp::BitwiseOr,
-            Token::Ampersand => BinaryOp::BitwiseAnd,
-            Token::Caret => BinaryOp::BitwiseXor,
-            Token::DoublePipe => BinaryOp::Or,
-            Token::DoubleAmpersand => BinaryOp::And,
-            Token::Pipeline => BinaryOp::Pipeline,
+            TokenKind::Plus => BinaryOp::Add,
+            TokenKind::Minus => BinaryOp::Subtract,
+            TokenKind::Asterisk => BinaryOp::Multiply,
+            TokenKind::AsteriskAsterisk => BinaryOp::Exponentiation,
+            TokenKind::Slash => BinaryOp::Divide,
+            TokenKind::Percent => BinaryOp::Modulo,
+            TokenKind::EqualEqual => BinaryOp::Equal,
+            TokenKind::NotEqual => BinaryOp::NotEqual,
+            TokenKind::LessThan => BinaryOp::LessThan,
+            TokenKind::LessThanOrEqual => BinaryOp::LessThanOrEqual,
+            TokenKind::GreaterThan => BinaryOp::GreaterThan,
+            TokenKind::GreaterThanOrEqual => BinaryOp::GreaterThanOrEqual,
+            TokenKind::Pipe => BinaryOp::BitwiseOr,
+            TokenKind::Ampersand => BinaryOp::BitwiseAnd,
+            TokenKind::Caret => BinaryOp::BitwiseXor,
+            TokenKind::DoublePipe => BinaryOp::Or,
+            TokenKind::DoubleAmpersand => BinaryOp::And,
+            TokenKind::Pipeline => BinaryOp::Pipeline,
             _ => {
                 unimplemented!("Expected binary operator, found {:?}", token)
             }
@@ -1037,7 +1044,7 @@ impl<'src> Parser<'src> {
 
         loop {
             match self.current_token.as_ref() {
-                Some(Token::Dot) => {
+                Some(TokenKind::Dot) => {
                     self.advance();
                     let field_name = self.consume_identifier();
                     lhs = node::new!(FieldExpression {
@@ -1045,16 +1052,16 @@ impl<'src> Parser<'src> {
                         field: Box::new(node::new!(Identifier(field_name))),
                     });
                 }
-                Some(Token::LBracket) => {
+                Some(TokenKind::LBracket) => {
                     self.advance();
                     let index = self.parse_expression_with_precedence(0, Associativity::Left);
-                    self.consume_token(Token::RBracket);
+                    self.consume_token(TokenKind::RBracket);
                     lhs = node::new!(IndexExpression {
                         base: Box::new(lhs),
                         index: Box::new(index),
                     });
                 }
-                Some(Token::LParen) => {
+                Some(TokenKind::LParen) => {
                     lhs = self.parse_call_expression(lhs);
                 }
                 Some(token) if Self::is_binary_op(token) => {

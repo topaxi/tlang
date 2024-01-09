@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use crate::{
     symbols::{SymbolId, SymbolTable},
-    token::{Literal, Token},
+    token::{Literal, TokenKind},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -36,8 +36,8 @@ impl From<AstNode> for Node {
     }
 }
 
-impl<'a> From<&'a Token> for Node {
-    fn from(token: &Token) -> Self {
+impl<'a> From<&'a TokenKind> for Node {
+    fn from(token: &TokenKind) -> Self {
         Node {
             ast_node: AstNode::from(token),
             symbol_table: None,
@@ -155,13 +155,13 @@ pub enum AstNode {
     },
 }
 
-impl<'a> From<&'a Token> for AstNode {
-    fn from(token: &Token) -> Self {
+impl<'a> From<&'a TokenKind> for AstNode {
+    fn from(token: &TokenKind) -> Self {
         match token {
-            Token::Literal(literal) => AstNode::Literal(literal.clone()),
-            Token::Identifier(name) => AstNode::Identifier(name.clone()),
-            Token::SingleLineComment(comment) => AstNode::SingleLineComment(comment.clone()),
-            Token::MultiLineComment(comment) => AstNode::MultiLineComment(comment.clone()),
+            TokenKind::Literal(literal) => AstNode::Literal(literal.clone()),
+            TokenKind::Identifier(name) => AstNode::Identifier(name.clone()),
+            TokenKind::SingleLineComment(comment) => AstNode::SingleLineComment(comment.clone()),
+            TokenKind::MultiLineComment(comment) => AstNode::MultiLineComment(comment.clone()),
             _ => unimplemented!(
                 "Expected token to be a literal or identifier, found {:?}",
                 token
