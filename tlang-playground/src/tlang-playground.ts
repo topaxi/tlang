@@ -126,7 +126,7 @@ export class TlangPlayground extends LitElement {
     try {
       return compile_to_js(this.source);
     } catch (error: any) {
-      return error.message;
+      return String(error);
     }
   }
 
@@ -135,7 +135,7 @@ export class TlangPlayground extends LitElement {
       return parse_to_ast(this.source);
     }
     catch (error: any) {
-      return error.message;
+      return String(error);
     }
   }
 
@@ -143,7 +143,7 @@ export class TlangPlayground extends LitElement {
     try {
       return parse_and_analyze(this.source);
     } catch (error: any) {
-      return error.message;
+      return String(error);
     }
   }
 
