@@ -814,7 +814,6 @@ impl<'src> Parser<'src> {
     fn parse_function_declaration(&mut self) -> Node {
         let mut name: Option<Node> = None;
         let mut declarations: Vec<Node> = Vec::new();
-        let mut comments: Vec<Node> = Vec::new();
 
         while matches!(
             self.current_token_kind(),
@@ -832,6 +831,7 @@ impl<'src> Parser<'src> {
             // parsing function declarations.
             let saved_state = self.save_state();
 
+            let mut comments: Vec<Node> = Vec::new();
             while matches!(
                 self.current_token_kind(),
                 Some(TokenKind::SingleLineComment(_)) | Some(TokenKind::MultiLineComment(_))

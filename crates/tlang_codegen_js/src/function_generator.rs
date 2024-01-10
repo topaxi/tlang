@@ -581,6 +581,7 @@ fn flush_function_pre_body(codegen: &mut CodegenJS) {
         codegen.push_str(&format!("let {} = {};\n", name, value));
         codegen.current_scope().declare_variable_alias(name, name);
     }
+    codegen.flush_statement_buffer();
 }
 
 fn is_function_body_tail_recursive(function_name: &str, node: &Node) -> bool {

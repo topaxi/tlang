@@ -191,3 +191,67 @@ fn test_foldl_impl() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_partition_impl() {
+    let output = compile!(indoc! {"
+        // partition(a[], fn(a) -> bool) -> (a[], a[])
+        fn partition([], _) { [[], []] }
+        fn partition(list, predicate) { partition(list, predicate, [], []) }
+        // partition(a[], fn(a) -> bool, a[], a[]) -> (a[], a[])
+        fn partition([], predicate, satisfies, doesNotSatisfy) { [satisfies, doesNotSatisfy] }
+        fn partition([x, ...xs], predicate, satisfies, doesNotSatisfy) {
+            let partitionedSatisfies = if predicate(x) { [...satisfies, x] } else { satisfies };
+            let partitionedDoesNotSatisfy = if predicate(x) { doesNotSatisfy } else { [...doesNotSatisfy, x] };
+
+            rec partition(xs, predicate, partitionedSatisfies, partitionedDoesNotSatisfy)
+        }
+    "});
+    let expected_output = indoc! {"
+        // partition(a[], fn(a) -> bool) -> (a[], a[])
+        // partition(a[], fn(a) -> bool, a[], a[]) -> (a[], a[])
+        function partition(...args) {
+            while (true) {
+                if (args.length === 2 && args[0].length === 0) {
+                    return [[], []];
+                } else if (args.length === 2) {
+                    let list = args[0];
+                    let predicate = args[1];
+                    return partition(list, predicate, [], []);
+                } else if (args.length === 4 && args[0].length === 0) {
+                    let predicate = args[1];
+                    let satisfies = args[2];
+                    let doesNotSatisfy = args[3];
+                    return [satisfies, doesNotSatisfy];
+                } else if (args.length === 4 && args[0].length >= 1) {
+                    let predicate = args[1];
+                    let satisfies = args[2];
+                    let doesNotSatisfy = args[3];
+                    let x = args[0][0];
+                    let xs = args[0].slice(1);
+                    let $tmp$b;if (predicate(x)) {
+                        $tmp$b = [...satisfies, x];
+                    } else {
+                        $tmp$b = satisfies;
+                    }
+                    let partitionedSatisfies = $tmp$b;
+                    let $tmp$c;if (predicate(x)) {
+                        $tmp$c = doesNotSatisfy;
+                    } else {
+                        $tmp$c = [...doesNotSatisfy, x];
+                    }
+                    let partitionedDoesNotSatisfy = $tmp$c;
+                    let $tmp$d = xs;
+                    let $tmp$e = predicate;
+                    let $tmp$f = partitionedSatisfies;
+                    let $tmp$g = partitionedDoesNotSatisfy;
+                    args[0] = $tmp$d;
+                    args[1] = $tmp$e;
+                    args[2] = $tmp$f;
+                    args[3] = $tmp$g;
+                }
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
