@@ -59,7 +59,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           cache: "npm"
-          cache-dependency-path: tlang-playground/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install playground dependencies
         run: npm ci
