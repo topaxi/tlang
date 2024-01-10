@@ -8,12 +8,12 @@ fn random_int(max) { floor(random() * max) }
 fn partition([], _) { [[], []] }
 fn partition(list, predicate) { partition(list, predicate, [], []) }
 // partition(a[], fn(a) -> bool, a[], a[]) -> (a[], a[])
-fn partition([], _, satisfies, doesNotSatisfy) { [satisfies, doesNotSatisfy] }
-fn partition([x, ...xs], predicate, satisfies, doesNotSatisfy) if predicate(x) {
-  rec partition(xs, predicate, [...satisfies, x], doesNotSatisfy)
+fn partition([], _, satisfies, does_not_satisfy) { [satisfies, does_not_satisfy] }
+fn partition([x, ...xs], predicate, satisfies, does_not_satisfy) if predicate(x) {
+  rec partition(xs, predicate, [...satisfies, x], does_not_satisfy)
 }
-fn partition([x, ...xs], predicate, satisfies, doesNotSatisfy) {
-  rec partition(xs, predicate, satisfies, [...doesNotSatisfy, x])
+fn partition([x, ...xs], predicate, satisfies, does_not_satisfy) {
+  rec partition(xs, predicate, satisfies, [...does_not_satisfy, x])
 }
 
 // quicksort(a[], fn(a, a) -> int) -> a[]
