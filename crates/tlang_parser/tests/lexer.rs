@@ -2,357 +2,323 @@ use tlang_ast::token::{Literal, TokenKind};
 
 use tlang_parser::lexer::Lexer;
 
+macro_rules! assert_tokens {
+    ($lexer:ident, $tokens:expr) => {{
+        let tokens = $tokens;
+        let mut tokens = tokens.iter();
+
+        loop {
+            let token = $lexer.next_token();
+            match tokens.next() {
+                Some(expected) => assert_eq!(token.unwrap().kind, *expected),
+                None => break,
+            }
+        }
+
+        assert_eq!($lexer.next_token().unwrap().kind, TokenKind::Eof);
+    }};
+}
+
 #[test]
 fn test_identifier() {
     let mut lexer = Lexer::new("test");
 
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Identifier("test".to_string())
-    );
-    assert_eq!(lexer.next_token().kind, TokenKind::Eof);
+    assert_tokens!(lexer, [TokenKind::Identifier("test".to_string())]);
 }
 
 #[test]
 fn test_integer() {
     let mut lexer = Lexer::new("123");
 
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Literal(Literal::Integer(123))
-    );
-    assert_eq!(lexer.next_token().kind, TokenKind::Eof);
+    assert_tokens!(lexer, [TokenKind::Literal(Literal::Integer(123))]);
 }
 
 #[test]
 fn test_float() {
     let mut lexer = Lexer::new("123.456");
 
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Literal(Literal::Float(123.456))
-    );
-    assert_eq!(lexer.next_token().kind, TokenKind::Eof);
+    assert_tokens!(lexer, [TokenKind::Literal(Literal::Float(123.456))]);
 }
 
 #[test]
 fn test_typed_integer() {
     let mut lexer = Lexer::new("123i64");
 
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Literal(Literal::Integer(123))
+    assert_tokens!(
+        lexer,
+        [
+            TokenKind::Literal(Literal::Integer(123)),
+            TokenKind::Identifier("i64".to_string())
+        ]
     );
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Identifier("i64".to_string())
-    );
-    assert_eq!(lexer.next_token().kind, TokenKind::Eof);
 }
 
 #[test]
 fn test_typed_float() {
     let mut lexer = Lexer::new("123.456f64");
 
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Literal(Literal::Float(123.456))
+    assert_tokens!(
+        lexer,
+        [
+            TokenKind::Literal(Literal::Float(123.456)),
+            TokenKind::Identifier("f64".to_string())
+        ]
     );
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Identifier("f64".to_string())
-    );
-    assert_eq!(lexer.next_token().kind, TokenKind::Eof);
 }
 
 #[test]
 fn test_single_char_operators() {
     let mut lexer = Lexer::new(". + - * / % ( ) | & ^");
 
-    assert_eq!(lexer.next_token().kind, TokenKind::Dot);
-    assert_eq!(lexer.next_token().kind, TokenKind::Plus);
-    assert_eq!(lexer.next_token().kind, TokenKind::Minus);
-    assert_eq!(lexer.next_token().kind, TokenKind::Asterisk);
-    assert_eq!(lexer.next_token().kind, TokenKind::Slash);
-    assert_eq!(lexer.next_token().kind, TokenKind::Percent);
-    assert_eq!(lexer.next_token().kind, TokenKind::LParen);
-    assert_eq!(lexer.next_token().kind, TokenKind::RParen);
-    assert_eq!(lexer.next_token().kind, TokenKind::Pipe);
-    assert_eq!(lexer.next_token().kind, TokenKind::Ampersand);
-    assert_eq!(lexer.next_token().kind, TokenKind::Caret);
-    assert_eq!(lexer.next_token().kind, TokenKind::Eof);
+    assert_tokens!(
+        lexer,
+        [
+            TokenKind::Dot,
+            TokenKind::Plus,
+            TokenKind::Minus,
+            TokenKind::Asterisk,
+            TokenKind::Slash,
+            TokenKind::Percent,
+            TokenKind::LParen,
+            TokenKind::RParen,
+            TokenKind::Pipe,
+            TokenKind::Ampersand,
+            TokenKind::Caret,
+        ]
+    );
 }
 
 #[test]
 fn test_multi_char_operators() {
     let mut lexer = Lexer::new("|| && == != >= <= ** |>");
 
-    assert_eq!(lexer.next_token().kind, TokenKind::DoublePipe);
-    assert_eq!(lexer.next_token().kind, TokenKind::DoubleAmpersand);
-    assert_eq!(lexer.next_token().kind, TokenKind::EqualEqual);
-    assert_eq!(lexer.next_token().kind, TokenKind::NotEqual);
-    assert_eq!(lexer.next_token().kind, TokenKind::GreaterThanOrEqual);
-    assert_eq!(lexer.next_token().kind, TokenKind::LessThanOrEqual);
-    assert_eq!(lexer.next_token().kind, TokenKind::AsteriskAsterisk);
-    assert_eq!(lexer.next_token().kind, TokenKind::Pipeline);
-    assert_eq!(lexer.next_token().kind, TokenKind::Eof);
+    assert_tokens!(
+        lexer,
+        [
+            TokenKind::DoublePipe,
+            TokenKind::DoubleAmpersand,
+            TokenKind::EqualEqual,
+            TokenKind::NotEqual,
+            TokenKind::GreaterThanOrEqual,
+            TokenKind::LessThanOrEqual,
+            TokenKind::AsteriskAsterisk,
+            TokenKind::Pipeline,
+        ]
+    );
 }
 
 #[test]
 fn test_arrows() {
     let mut lexer = Lexer::new("-> =>");
 
-    assert_eq!(lexer.next_token().kind, TokenKind::Arrow);
-    assert_eq!(lexer.next_token().kind, TokenKind::FatArrow);
-    assert_eq!(lexer.next_token().kind, TokenKind::Eof);
+    assert_tokens!(lexer, [TokenKind::Arrow, TokenKind::FatArrow,]);
 }
 
 #[test]
 fn test_dotdot_dot() {
     let mut lexer = Lexer::new("..");
 
-    assert_eq!(lexer.next_token().kind, TokenKind::DotDot);
-    assert_eq!(lexer.next_token().kind, TokenKind::Eof);
+    assert_tokens!(lexer, [TokenKind::DotDot]);
 
     let mut lexer = Lexer::new("...");
 
-    assert_eq!(lexer.next_token().kind, TokenKind::DotDotDot);
-    assert_eq!(lexer.next_token().kind, TokenKind::Eof);
+    assert_tokens!(lexer, [TokenKind::DotDotDot]);
 }
 
 #[test]
 fn test_namespace_separator() {
     let mut lexer = Lexer::new("::");
 
-    assert_eq!(lexer.next_token().kind, TokenKind::NamespaceSeparator);
-    assert_eq!(lexer.next_token().kind, TokenKind::Eof);
+    assert_tokens!(lexer, [TokenKind::NamespaceSeparator]);
 }
 
 #[test]
 fn test_keywords() {
     let mut lexer = Lexer::new("let fn rec return if else match enum struct");
 
-    assert_eq!(lexer.next_token().kind, TokenKind::Let);
-    assert_eq!(lexer.next_token().kind, TokenKind::Fn);
-    assert_eq!(lexer.next_token().kind, TokenKind::Rec);
-    assert_eq!(lexer.next_token().kind, TokenKind::Return);
-    assert_eq!(lexer.next_token().kind, TokenKind::If);
-    assert_eq!(lexer.next_token().kind, TokenKind::Else);
-    assert_eq!(lexer.next_token().kind, TokenKind::Match);
-    assert_eq!(lexer.next_token().kind, TokenKind::Enum);
-    assert_eq!(lexer.next_token().kind, TokenKind::Struct);
-    assert_eq!(lexer.next_token().kind, TokenKind::Eof);
+    assert_tokens!(
+        lexer,
+        [
+            TokenKind::Let,
+            TokenKind::Fn,
+            TokenKind::Rec,
+            TokenKind::Return,
+            TokenKind::If,
+            TokenKind::Else,
+            TokenKind::Match,
+            TokenKind::Enum,
+            TokenKind::Struct,
+        ]
+    );
 }
 
 #[test]
 fn test_equal_sign() {
     let mut lexer = Lexer::new("=");
 
-    assert_eq!(lexer.next_token().kind, TokenKind::EqualSign);
-    assert_eq!(lexer.next_token().kind, TokenKind::Eof);
+    assert_tokens!(lexer, [TokenKind::EqualSign]);
 }
 
 #[test]
 fn test_comparison_operators() {
     let mut lexer = Lexer::new("== != >= <= > <");
 
-    assert_eq!(lexer.next_token().kind, TokenKind::EqualEqual);
-    assert_eq!(lexer.next_token().kind, TokenKind::NotEqual);
-    assert_eq!(lexer.next_token().kind, TokenKind::GreaterThanOrEqual);
-    assert_eq!(lexer.next_token().kind, TokenKind::LessThanOrEqual);
-    assert_eq!(lexer.next_token().kind, TokenKind::GreaterThan);
-    assert_eq!(lexer.next_token().kind, TokenKind::LessThan);
-    assert_eq!(lexer.next_token().kind, TokenKind::Eof);
+    assert_tokens!(
+        lexer,
+        [
+            TokenKind::EqualEqual,
+            TokenKind::NotEqual,
+            TokenKind::GreaterThanOrEqual,
+            TokenKind::LessThanOrEqual,
+            TokenKind::GreaterThan,
+            TokenKind::LessThan,
+        ]
+    );
 }
 
 #[test]
 fn test_simple_assignment() {
     let mut lexer = Lexer::new("let x = 1 + 2;");
 
-    assert_eq!(lexer.next_token().kind, TokenKind::Let);
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Identifier("x".to_string())
+    assert_tokens!(
+        lexer,
+        [
+            TokenKind::Let,
+            TokenKind::Identifier("x".to_string()),
+            TokenKind::EqualSign,
+            TokenKind::Literal(Literal::Integer(1)),
+            TokenKind::Plus,
+            TokenKind::Literal(Literal::Integer(2)),
+            TokenKind::Semicolon,
+        ]
     );
-    assert_eq!(lexer.next_token().kind, TokenKind::EqualSign);
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Literal(Literal::Integer(1))
-    );
-    assert_eq!(lexer.next_token().kind, TokenKind::Plus);
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Literal(Literal::Integer(2))
-    );
-    assert_eq!(lexer.next_token().kind, TokenKind::Semicolon);
-    assert_eq!(lexer.next_token().kind, TokenKind::Eof);
 }
 
 #[test]
 fn test_function_declaration_with_explicit_return_statement() {
     let mut lexer = Lexer::new("fn add(a: i64, b: i64) -> i64 { return a + b; }");
 
-    assert_eq!(lexer.next_token().kind, TokenKind::Fn);
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Identifier("add".to_string())
+    assert_tokens!(
+        lexer,
+        [
+            TokenKind::Fn,
+            TokenKind::Identifier("add".to_string()),
+            TokenKind::LParen,
+            TokenKind::Identifier("a".to_string()),
+            TokenKind::Colon,
+            TokenKind::Identifier("i64".to_string()),
+            TokenKind::Comma,
+            TokenKind::Identifier("b".to_string()),
+            TokenKind::Colon,
+            TokenKind::Identifier("i64".to_string()),
+            TokenKind::RParen,
+            TokenKind::Arrow,
+            TokenKind::Identifier("i64".to_string()),
+            TokenKind::LBrace,
+            TokenKind::Return,
+            TokenKind::Identifier("a".to_string()),
+            TokenKind::Plus,
+            TokenKind::Identifier("b".to_string()),
+            TokenKind::Semicolon,
+            TokenKind::RBrace,
+        ]
     );
-    assert_eq!(lexer.next_token().kind, TokenKind::LParen);
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Identifier("a".to_string())
-    );
-    assert_eq!(lexer.next_token().kind, TokenKind::Colon);
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Identifier("i64".to_string())
-    );
-    assert_eq!(lexer.next_token().kind, TokenKind::Comma);
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Identifier("b".to_string())
-    );
-    assert_eq!(lexer.next_token().kind, TokenKind::Colon);
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Identifier("i64".to_string())
-    );
-    assert_eq!(lexer.next_token().kind, TokenKind::RParen);
-    assert_eq!(lexer.next_token().kind, TokenKind::Arrow);
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Identifier("i64".to_string())
-    );
-    assert_eq!(lexer.next_token().kind, TokenKind::LBrace);
-    assert_eq!(lexer.next_token().kind, TokenKind::Return);
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Identifier("a".to_string())
-    );
-    assert_eq!(lexer.next_token().kind, TokenKind::Plus);
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Identifier("b".to_string())
-    );
-    assert_eq!(lexer.next_token().kind, TokenKind::Semicolon);
-    assert_eq!(lexer.next_token().kind, TokenKind::RBrace);
-    assert_eq!(lexer.next_token().kind, TokenKind::Eof);
 }
 
 #[test]
 fn test_regression_integer_literal_followed_by_dot() {
     let mut lexer = Lexer::new("fn sum([]) { 0 }\nfn sum([x, ...xs]) { x + sum(xs) }");
 
-    assert_eq!(lexer.next_token().kind, TokenKind::Fn);
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Identifier("sum".to_string())
+    assert_tokens!(
+        lexer,
+        [
+            TokenKind::Fn,
+            TokenKind::Identifier("sum".to_string()),
+            TokenKind::LParen,
+            TokenKind::LBracket,
+            TokenKind::RBracket,
+            TokenKind::RParen,
+            TokenKind::LBrace,
+            TokenKind::Literal(Literal::Integer(0)),
+            TokenKind::RBrace,
+            TokenKind::Fn,
+            TokenKind::Identifier("sum".to_string()),
+            TokenKind::LParen,
+            TokenKind::LBracket,
+            TokenKind::Identifier("x".to_string()),
+            TokenKind::Comma,
+            TokenKind::DotDotDot,
+            TokenKind::Identifier("xs".to_string()),
+            TokenKind::RBracket,
+            TokenKind::RParen,
+            TokenKind::LBrace,
+            TokenKind::Identifier("x".to_string()),
+            TokenKind::Plus,
+            TokenKind::Identifier("sum".to_string()),
+            TokenKind::LParen,
+            TokenKind::Identifier("xs".to_string()),
+            TokenKind::RParen,
+            TokenKind::RBrace,
+        ]
     );
-    assert_eq!(lexer.next_token().kind, TokenKind::LParen);
-    assert_eq!(lexer.next_token().kind, TokenKind::LBracket);
-    assert_eq!(lexer.next_token().kind, TokenKind::RBracket);
-    assert_eq!(lexer.next_token().kind, TokenKind::RParen);
-    assert_eq!(lexer.next_token().kind, TokenKind::LBrace);
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Literal(Literal::Integer(0))
-    );
-    assert_eq!(lexer.next_token().kind, TokenKind::RBrace);
-    assert_eq!(lexer.next_token().kind, TokenKind::Fn);
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Identifier("sum".to_string())
-    );
-    assert_eq!(lexer.next_token().kind, TokenKind::LParen);
-    assert_eq!(lexer.next_token().kind, TokenKind::LBracket);
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Identifier("x".to_string())
-    );
-    assert_eq!(lexer.next_token().kind, TokenKind::Comma);
-    assert_eq!(lexer.next_token().kind, TokenKind::DotDotDot);
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Identifier("xs".to_string())
-    );
-    assert_eq!(lexer.next_token().kind, TokenKind::RBracket);
-    assert_eq!(lexer.next_token().kind, TokenKind::RParen);
-    assert_eq!(lexer.next_token().kind, TokenKind::LBrace);
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Identifier("x".to_string())
-    );
-    assert_eq!(lexer.next_token().kind, TokenKind::Plus);
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Identifier("sum".to_string())
-    );
-    assert_eq!(lexer.next_token().kind, TokenKind::LParen);
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Identifier("xs".to_string())
-    );
-    assert_eq!(lexer.next_token().kind, TokenKind::RParen);
-    assert_eq!(lexer.next_token().kind, TokenKind::RBrace);
-    assert_eq!(lexer.next_token().kind, TokenKind::Eof);
 }
 
 #[test]
 fn test_single_line_comments() {
     let mut lexer = Lexer::new("// this is a comment");
 
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::SingleLineComment(" this is a comment".to_string())
+    assert_tokens!(
+        lexer,
+        [TokenKind::SingleLineComment(
+            " this is a comment".to_string()
+        )]
     );
-    assert_eq!(lexer.next_token().kind, TokenKind::Eof);
 }
 
 #[test]
 fn test_multi_line_comments() {
     let mut lexer = Lexer::new("/* this is a comment */");
 
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::MultiLineComment(" this is a comment ".to_string())
+    assert_tokens!(
+        lexer,
+        [TokenKind::MultiLineComment(
+            " this is a comment ".to_string()
+        )]
     );
-    assert_eq!(lexer.next_token().kind, TokenKind::Eof);
 
     let mut lexer = Lexer::new("/* this is a comment\non multiple lines */");
 
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::MultiLineComment(" this is a comment\non multiple lines ".to_string())
+    assert_tokens!(
+        lexer,
+        [TokenKind::MultiLineComment(
+            " this is a comment\non multiple lines ".to_string()
+        )]
     );
-    assert_eq!(lexer.next_token().kind, TokenKind::Eof);
 }
 
 #[test]
 fn test_string_literal() {
     let mut lexer = Lexer::new("\"this is a string\"");
 
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Literal(Literal::String("this is a string".to_string()))
+    assert_tokens!(
+        lexer,
+        [TokenKind::Literal(Literal::String(
+            "this is a string".to_string()
+        ))]
     );
-    assert_eq!(lexer.next_token().kind, TokenKind::Eof);
 }
 
 #[test]
 fn test_char_literal() {
     let mut lexer = Lexer::new("'a'");
 
-    assert_eq!(
-        lexer.next_token().kind,
-        TokenKind::Literal(Literal::Char("a".to_string()))
-    );
-    assert_eq!(lexer.next_token().kind, TokenKind::Eof);
+    assert_tokens!(lexer, [TokenKind::Literal(Literal::Char("a".to_string()))]);
 }
 
 #[test]
 fn test_token_span() {
     let mut lexer = Lexer::new("let x = 1 + 2;");
-    let token = lexer.next_token();
+    let token = lexer.next_token().unwrap();
 
     assert_eq!(token.span.start.line, 1);
     assert_eq!(token.span.start.column, 1);

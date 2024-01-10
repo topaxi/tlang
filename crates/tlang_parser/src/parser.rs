@@ -110,7 +110,12 @@ impl<'src> Parser<'src> {
         self.current_token = self.next_token.clone();
         self.current_column = self.lexer.current_column();
         self.current_line = self.lexer.current_line();
-        self.next_token = Some(self.lexer.next_token());
+        self.next_token = match self.lexer.next_token() {
+            Ok(token) => Some(token),
+            Err(error) => {
+                panic!("Error while lexing: {}", error);
+            }
+        };
         debug!("Advanced to {:?}", self.current_token);
     }
 
