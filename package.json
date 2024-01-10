@@ -1,0 +1,9 @@
+{
+  "name": "@tlang/repo",
+  "version": "1.0.0",
+  "description": "",
+  "workspaces": [
+    "packages/*",
+    "tlang-playground"
+  ]
+}
