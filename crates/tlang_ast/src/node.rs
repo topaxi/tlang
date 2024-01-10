@@ -172,6 +172,7 @@ impl<'a> From<&'a TokenKind> for AstNode {
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum PrefixOp {
+    Minus,
     Rest,
     Spread,
 }

@@ -1,12 +1,27 @@
 use pretty_assertions::assert_eq;
 
 use tlang_ast::{
-    node::{self, BinaryOp, FunctionDeclaration},
+    node::{self, BinaryOp, FunctionDeclaration, PrefixOp},
     symbols::SymbolId,
     token::Literal,
 };
 
 mod common;
+
+#[test]
+fn test_unary_minus() {
+    let program = parse!("-1;");
+
+    assert_eq!(
+        program,
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(PrefixOp(
+                PrefixOp::Minus,
+                Box::new(node::new!(Literal(Literal::Integer(1)))),
+            ))
+        )))]))
+    );
+}
 
 #[test]
 fn test_simple_variable_declaration() {
@@ -302,6 +317,36 @@ fn test_if_else_statement() {
                     ))))],
                     None
                 )))),
+            })
+        )))]))
+    );
+}
+
+#[test]
+fn test_if_else_if_statement() {
+    let program = parse!("if true { 1; } else if false { 2; }");
+
+    assert_eq!(
+        program,
+        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
+            node::new!(IfElse {
+                condition: Box::new(node::new!(Literal(Literal::Boolean(true)))),
+                then_branch: Box::new(node::new!(Block(
+                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
+                        Literal(Literal::Integer(1))
+                    ))))],
+                    None
+                ))),
+                else_branch: Some(Box::new(node::new!(IfElse {
+                    condition: Box::new(node::new!(Literal(Literal::Boolean(false)))),
+                    then_branch: Box::new(node::new!(Block(
+                        vec![node::new!(ExpressionStatement(Box::new(node::new!(
+                            Literal(Literal::Integer(2))
+                        ))))],
+                        None
+                    ))),
+                    else_branch: None,
+                }))),
             })
         )))]))
     );

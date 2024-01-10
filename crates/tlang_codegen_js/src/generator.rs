@@ -410,6 +410,7 @@ impl CodegenJS {
             }
             AstNode::PrefixOp(op, node) => {
                 match op {
+                    PrefixOp::Minus => self.push_char('-'),
                     PrefixOp::Spread => self.push_str("..."),
                     _ => unimplemented!("PrefixOp {:?} not implemented yet.", op),
                 }
@@ -516,6 +517,7 @@ impl CodegenJS {
         //       Similar to how we generate blocks in expression position.
         // TODO: Find a way to do this generically for all expressions which are represented as
         //       statements in JavaScript.
+        // TODO: In case of recursive calls in tail position, we'll want to omit lhs.
         let has_block_completions = self.current_context() == BlockContext::Expression
             && match &then_branch.ast_node {
                 AstNode::Block(_, expr) => expr.is_some(),
@@ -527,6 +529,8 @@ impl CodegenJS {
             self.push_indent();
             self.push_str(&format!("let {};", completion_tmp_var));
             self.completion_variables.push(Some(completion_tmp_var));
+        } else {
+            self.completion_variables.push(None);
         }
         self.push_str("if (");
         let indent_level = self.indent_level;
@@ -535,6 +539,7 @@ impl CodegenJS {
         self.indent_level = indent_level;
         self.push_str(") {\n");
         self.indent_level += 1;
+        self.flush_statement_buffer();
         self.generate_node(then_branch, None);
         self.indent_level -= 1;
 
@@ -542,6 +547,7 @@ impl CodegenJS {
             self.push_str(&self.get_indent());
             self.push_str("} else {\n");
             self.indent_level += 1;
+            self.flush_statement_buffer();
             self.generate_node(else_branch, None);
             self.indent_level -= 1;
         }
@@ -550,10 +556,23 @@ impl CodegenJS {
         self.push_char('}');
         if has_block_completions {
             self.push_str("\n");
-            self.push_str(&lhs);
-            let completion_var = self.completion_variables.last().unwrap().clone().unwrap();
-            self.push_str(&completion_var);
+            // If we have an lhs, put the completion var as the rhs of the lhs.
+            // Otherwise, we assign the completion_var to the previous completion_var.
+            if !lhs.is_empty() {
+                self.push_str(&lhs);
+                let completion_var = self.completion_variables.last().unwrap().clone().unwrap();
+                self.push_str(&completion_var);
+            } else {
+                self.push_str(&self.get_indent());
+                let completion_var = self.completion_variables.last().unwrap().clone().unwrap();
+                let prev_completion_var = self.completion_variables
+                    [self.completion_variables.len() - 2]
+                    .clone()
+                    .unwrap();
+                self.push_str(&format!("{} = {};\n", prev_completion_var, completion_var));
+            }
         }
+        self.completion_variables.pop();
     }
 
     fn generate_enum_declaration(&mut self, name: &str, variants: &[Node]) {

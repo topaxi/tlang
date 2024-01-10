@@ -540,17 +540,23 @@ impl<'src> Parser<'src> {
         };
         // TODO: Reevaluate whether we want `foo {}` to be a `foo({})` call expression.
         //       As this collides with `if let` statements.
-        // Semicolon is currently needed to disambiguate call with dictionary and block.
+        // Semicolon or parenthesis are currently needed to disambiguate call with dictionary and block.
         // E.g. `if let x = foo { .. }` is recognized as `foo({ .. })`
         // vs `if let x = foo; { .. }` which will properly parse.
         if let Some(TokenKind::Semicolon) = self.current_token_kind() {
             self.advance();
         }
+
         self.expect_token(TokenKind::LBrace);
         let then_branch = self.parse_block();
         let else_branch = if let Some(TokenKind::Else) = self.current_token_kind() {
             self.advance();
-            Some(Box::new(self.parse_block()))
+
+            if let Some(TokenKind::If) = self.current_token_kind() {
+                Some(Box::new(self.parse_if_else_expression()))
+            } else {
+                Some(Box::new(self.parse_block()))
+            }
         } else {
             None
         };
@@ -562,8 +568,17 @@ impl<'src> Parser<'src> {
         })
     }
 
+    fn parse_unary_expression(&mut self) -> Node {
+        self.advance();
+        node::new!(PrefixOp(
+            PrefixOp::Minus,
+            Box::new(self.parse_primary_expression())
+        ))
+    }
+
     fn parse_primary_expression(&mut self) -> Node {
         match &self.current_token_kind() {
+            Some(TokenKind::Minus) => self.parse_unary_expression(),
             Some(TokenKind::LParen) => {
                 self.advance();
                 let expression = self.parse_expression();
@@ -840,7 +855,14 @@ impl<'src> Parser<'src> {
                 self.advance();
             }
 
-            self.consume_token(TokenKind::Fn);
+            if let Some(TokenKind::Fn) = self.current_token_kind() {
+                self.advance();
+            } else {
+                // We found a comment, but not a function declaration, stop parsing function
+                // declarations and rewind the lexer.
+                self.restore_state(saved_state);
+                break;
+            }
 
             if let Some(TokenKind::Identifier(_)) = self.current_token_kind() {
                 let node = self.parse_function_name();
@@ -929,6 +951,11 @@ impl<'src> Parser<'src> {
                         Some(expression.clone()),
                     );
                 }
+            }
+
+            // Disambiguate between call with dict and block.
+            if let Some(TokenKind::Semicolon) = self.current_token_kind() {
+                self.advance();
             }
 
             Some(expression)
