@@ -1,5 +1,6 @@
 import { EditorView, basicSetup } from "codemirror"
 import { catppuccin } from 'codemirror-theme-catppuccin'
+import { tlangLanguageSupport } from "codemirror-lang-tlang"
 import { LitElement, css } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
@@ -27,7 +28,12 @@ export class TCodeMirror extends LitElement {
     });
 
     this.view = new EditorView({
-      extensions: [basicSetup, catppuccin('macchiato'), updateListener],
+      extensions: [
+        basicSetup,
+        catppuccin('macchiato'),
+        tlangLanguageSupport(),
+        updateListener
+      ],
       parent: this.shadowRoot as DocumentFragment,
     })
   }

@@ -62,7 +62,6 @@ jobs:
           cache-dependency-path: tlang-playground/package-lock.json
 
       - name: Install playground dependencies
-        working-directory: tlang-playground
         run: npm ci
 
       - name: Build playground

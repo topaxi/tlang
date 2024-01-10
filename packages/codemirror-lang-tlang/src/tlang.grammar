@@ -1,0 +1,258 @@
+// Mostly based on https://lezer.codemirror.net/examples/javascript/
+//!precedence
+
+@precedence {
+  member,
+  call,
+  times @left,
+  plus @left,
+  rel @left,
+  assign @right,
+
+  else,
+  statement @cut
+}
+
+//!top
+
+@top Script { statement* }
+
+@top SingleExpression { expression }
+
+//!statement
+
+statement[@isGroup=Statement] {
+  FunctionDeclaration |
+  VariableDeclaration |
+  IfStatement |
+  ReturnStatement |
+  Block |
+  ExpressionStatement { expression semi } |
+  EmptyStatement { ";" }
+}
+
+//!ifstatement
+
+IfStatement {
+  kw<"if"> ParenthesizedExpression statement (!else kw<"else"> statement)?
+}
+
+//!returnstatement
+
+ReturnStatement {
+  kw<"return"> (noSemi expression)? semi
+}
+
+//!functiondeclaration
+
+FunctionDeclaration {
+  !statement kw<"fn"> Identifier ParamList Block
+}
+
+ParamList {
+  "(" commaSep<"..."? pattern> ")"
+}
+
+//!variabledeclaration
+
+VariableDeclaration {
+  (kw<"let">) pattern ("=" expression) semi
+}
+
+//!pattern
+
+pattern {
+  Identifier |
+  ArrayPattern {
+    "[" commaSep<("..."? pattern ("=" expression)?)?> ~destructure "]"
+  } |
+  ObjectPattern {
+    "{" commaSep<PatternProperty> ~destructure "}"
+  }
+}
+
+PatternProperty {
+  ("..." pattern | propName ":" pattern | PropertyName) ("=" expression)?
+}
+
+//!block
+
+Block {
+  !statement "{" statement* "}"
+}
+
+//!expression
+
+expression[@isGroup=Expression] {
+  Number |
+  String |
+  Identifier |
+  @specialize[@name=BooleanLiteral]<Identifier, "true" | "false"> |
+  ArrayExpression {
+    "[" commaSep1<"..."? expression | ""> ~destructure "]"
+  } |
+  ObjectExpression {
+    "{" commaSep<Property> ~destructure "}"
+  } |
+  UnaryExpression |
+  ParenthesizedExpression |
+  FunctionExpression {
+    kw<"fn"> Identifier? ParamList? Block
+  } |
+  MemberExpression |
+  BinaryExpression |
+  AssignmentExpression |
+  CallExpression {
+    expression !call ArgList
+  }
+}
+
+//!expression_misc
+
+ParenthesizedExpression { "(" expression ")" }
+
+ArgList { "(" commaSep<"..."? expression> ")" }
+
+//!property
+
+propName { PropertyName | "[" expression "]" | Number | String }
+
+Property {
+  propName ~destructure (":" expression)? |
+  "..." expression
+}
+
+//!operators
+
+UnaryExpression {
+  (LogicOp<"!"> | ArithOp<"+" | "-">)
+  expression
+}
+
+BinaryExpression {
+  expression !times (ArithOp<"/"> | ArithOp<"%"> | ArithOp<"*">) expression |
+  expression !plus ArithOp<"+" | "-"> expression |
+  expression !rel CompareOp expression
+}
+
+//!assign
+
+AssignmentExpression {
+  (Identifier | MemberExpression) !assign UpdateOp expression |
+  (MemberExpression | pattern) !assign "=" expression
+}
+
+MemberExpression {
+  expression !member ("." PropertyName | "[" expression "]")
+}
+
+//!commaSep
+
+commaSep<content> {
+  (content ("," content)*)?
+}
+
+commaSep1<content> {
+  content ("," content)*
+}
+
+//!kw
+
+kw<term> { @specialize[@name={term}]<Identifier, term> }
+
+//!semi
+
+semi { ";" | insertSemi }
+
+//!skip
+
+@skip { spaces | newline | LineComment | BlockComment }
+
+//!context
+
+@context trackNewline from "./tokens.js"
+
+//!noSemi
+
+@external tokens noSemicolon from "./tokens.js" { noSemi }
+
+//!blockComment
+
+@skip {} {
+  BlockComment { "/*" (blockCommentContent | blockCommentNewline)* blockCommentEnd }
+}
+
+@local tokens {
+  blockCommentEnd { "*/" }
+  blockCommentNewline { "\n" }
+  @else blockCommentContent
+}
+
+//!tokens
+
+@tokens {
+
+//!skippedTokens
+  spaces[@export] { $[\u0009 \u000b\u00a0]+ }
+
+  newline[@export] { $[\r\n] }
+
+  LineComment { "//" ![\n]* }
+
+  @precedence { "/*", LineComment, ArithOp<"/"> }
+
+  @precedence { "/*", LineComment }
+
+//!identifierTokens
+
+  identifierChar { @asciiLetter | $[_$\u{a1}-\u{10ffff}] }
+
+  Identifier { identifierChar (identifierChar | @digit)* }
+
+  PropertyName { Identifier }
+
+//!numberTokens
+
+  hex { @digit | $[a-fA-F] }
+
+  Number {
+    (@digit ("_" | @digit)* ("." ("_" | @digit)*)? | "." @digit ("_" | @digit)*)
+      (("e" | "E") ("+" | "-")? ("_" | @digit)+)? |
+    @digit ("_" | @digit)* "n" |
+    "0x" (hex | "_")+ "n"? |
+    "0b" $[01_]+ "n"? |
+    "0o" $[0-7_]+ "n"?
+  }
+
+  @precedence { Number "." }
+
+//!stringTokens
+
+  String {
+    '"' (![\\\n"] | "\\" _)* '"'? |
+    "'" (![\\\n'] | "\\" _)* "'"?
+  }
+
+//!operatorTokens
+
+  ArithOp<expr> { expr }
+  LogicOp<expr> { expr }
+
+  UpdateOp { $[+\-/%*] "=" }
+
+  CompareOp { ("<" | ">" | "==" | "!=") "="? }
+
+//!literalTokens
+
+  "=" "..." "=>"
+  "(" ")" "[" "]" "{" "}"
+  "." "," ";" ":"
+}
+
+//!insertSemicolon
+
+@external tokens insertSemicolon from "./tokens.js" { insertSemi }
+
+//!detectDelim
+
+@detectDelim
