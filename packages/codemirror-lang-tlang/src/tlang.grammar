@@ -19,11 +19,16 @@
 
 @top SingleExpression { expression }
 
+declaration {
+  FunctionDeclaration |
+  VariableDeclaration |
+  EnumDeclaration
+}
+
 //!statement
 
 statement[@isGroup=Statement] {
-  FunctionDeclaration |
-  VariableDeclaration |
+  declaration |
   IfStatement |
   ReturnStatement |
   Block |
@@ -46,7 +51,7 @@ ReturnStatement {
 //!functiondeclaration
 
 FunctionDeclaration {
-  !statement kw<"fn"> Identifier ParamList Block
+  !statement kw<"fn"> VariableDefinition ParamList Block
 }
 
 ParamList {
@@ -55,14 +60,22 @@ ParamList {
 
 //!variabledeclaration
 
+VariableName { Identifier }
+VariableDefinition { Identifier }
+
 VariableDeclaration {
   (kw<"let">) pattern ("=" expression) semi
+}
+
+//!enumdeclaration
+EnumDeclaration {
+  kw<"enum"> Identifier "{" commaSep<Identifier> "}" semi
 }
 
 //!pattern
 
 pattern {
-  Identifier |
+  VariableDefinition |
   ArrayPattern {
     "[" commaSep<("..."? pattern ("=" expression)?)?> ~destructure "]"
   } |
@@ -86,7 +99,7 @@ Block {
 expression[@isGroup=Expression] {
   Number |
   String |
-  Identifier |
+  VariableName |
   @specialize[@name=BooleanLiteral]<Identifier, "true" | "false"> |
   ArrayExpression {
     "[" commaSep1<"..."? expression | ""> ~destructure "]"

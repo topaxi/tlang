@@ -216,7 +216,7 @@ export class TlangPlayground extends LitElement {
       <div class="output">
         ${this.display === 'ast' ? html`<pre class="output-ast">${this.ast}</pre>` : ''}
         ${this.display === 'semanticAST' ? html`<pre class="output-ast">${this.semanticAST}</pre>` : ''}
-        ${this.display === 'output' ? html`<pre class="output-code">${this.output}</pre>` : ''}
+        ${this.display === 'output' ? html`<t-codemirror class="output-code" language="javascript" .source=${this.output} readonly></t-codemirror>` : ''}
       </div>
       <div class="console">
         <div class="console-toolbar">

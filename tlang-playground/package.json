@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@catppuccin/palette": "^1.0.3",
+    "@codemirror/lang-javascript": "^6.2.1",
     "codemirror": "^6.0.1",
     "codemirror-lang-tlang": "file:../packages/codemirror-lang-tlang",
     "codemirror-theme-catppuccin": "^0.3.0",

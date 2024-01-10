@@ -1,6 +1,8 @@
 import { EditorView, basicSetup } from "codemirror"
+import { EditorState } from "@codemirror/state"
 import { catppuccin } from 'codemirror-theme-catppuccin'
 import { tlangLanguageSupport } from "codemirror-lang-tlang"
+import { javascript } from "@codemirror/lang-javascript"
 import { LitElement, css } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
@@ -17,6 +19,12 @@ export class TCodeMirror extends LitElement {
   @property()
   source = ''
 
+  @property({ type: Boolean })
+  readonly = false;
+
+  @property()
+  language = 'tlang';
+
   firstUpdated() {
 
     let updateListener = EditorView.updateListener.of((v) => {
@@ -31,8 +39,8 @@ export class TCodeMirror extends LitElement {
       extensions: [
         basicSetup,
         catppuccin('macchiato'),
-        tlangLanguageSupport(),
-        updateListener
+        this.language === 'javascript' ? javascript() : tlangLanguageSupport(),
+        this.readonly ? EditorState.readOnly.of(true) : updateListener
       ],
       parent: this.shadowRoot as DocumentFragment,
     })

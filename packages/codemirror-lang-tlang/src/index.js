@@ -6,16 +6,29 @@ let parserWithMetadata = parser.configure({
   props: [
     styleTags({
       Identifier: t.variableName,
-      Boolean: t.bool,
+      VariableName: t.variableName,
+      VariableDefinition: t.definition(t.variableName),
+      "if else return rec": t.controlKeyword,
+      "let enum fn": t.definitionKeyword,
+      "FunctionDeclaration/VariableDefinition": t.function(t.definition(t.variableName)),
+      PropertyName: t.propertyName,
+      "CallExpression/MemberExpression/PropertyName": t.function(t.propertyName),
+      BooleanLiteral: t.bool,
+      Number: t.number,
       String: t.string,
       LineComment: t.lineComment,
-      "( )": t.paren
+      "( )": t.paren,
+      "[ ]": t.squareBracket,
+      "{ }": t.brace,
+      ".": t.derefOperator,
+      ";": t.separator,
+      "_": t.special,
     }),
     indentNodeProp.add({
       Application: context => context.column(context.node.from) + context.unit
     }),
     foldNodeProp.add({
-      Application: foldInside
+      "Block ObjectExpression ArrayExpression": foldInside
     })
   ]
 })
@@ -23,6 +36,7 @@ let parserWithMetadata = parser.configure({
 import { LRLanguage } from "@codemirror/language"
 
 export const tlangLanguage = LRLanguage.define({
+  name: 'tlang',
   parser: parserWithMetadata,
   languageData: {
     commentTokens: { line: ";" }
