@@ -1,0 +1,11 @@
+{
+  "name": "codemirror-lang-tlang",
+  "version": "1.0.0",
+  "description": "Codemirror Syntax for tlang",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Damian Senn <damian.senn@topaxi.codes>",
+  "license": "ISC"
+}
