@@ -7,7 +7,7 @@ use crate::{
     scope::Scope,
 };
 use tlang_ast::{
-    node::{AstNode, BinaryOp, Node, PrefixOp},
+    node::{AstNode, BinaryOp, Node, UnaryOp},
     token::Literal,
 };
 
@@ -408,10 +408,10 @@ impl CodegenJS {
                 self.push_str(&self.get_indent());
                 self.push_char('}');
             }
-            AstNode::PrefixOp(op, node) => {
+            AstNode::UnaryOp(op, node) => {
                 match op {
-                    PrefixOp::Minus => self.push_char('-'),
-                    PrefixOp::Spread => self.push_str("..."),
+                    UnaryOp::Minus => self.push_char('-'),
+                    UnaryOp::Spread => self.push_str("..."),
                     _ => unimplemented!("PrefixOp {:?} not implemented yet.", op),
                 }
                 self.generate_node(node, None);

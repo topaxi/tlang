@@ -1,7 +1,7 @@
 use pretty_assertions::assert_eq;
 
 use tlang_ast::{
-    node::{self, BinaryOp, FunctionDeclaration, PrefixOp},
+    node::{self, BinaryOp, FunctionDeclaration, UnaryOp},
     symbols::SymbolId,
     token::Literal,
 };
@@ -15,8 +15,8 @@ fn test_unary_minus() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
-            node::new!(PrefixOp(
-                PrefixOp::Minus,
+            node::new!(UnaryOp(
+                UnaryOp::Minus,
                 Box::new(node::new!(Literal(Literal::Integer(1)))),
             ))
         )))]))

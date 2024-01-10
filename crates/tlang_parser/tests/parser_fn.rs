@@ -2,7 +2,7 @@ use indoc::indoc;
 use pretty_assertions::assert_eq;
 
 use tlang_ast::{
-    node::{self, BinaryOp, FunctionDeclaration, PrefixOp},
+    node::{self, BinaryOp, FunctionDeclaration, UnaryOp},
     symbols::SymbolId,
     token::Literal,
 };
@@ -524,8 +524,8 @@ fn test_recursive_sum() {
                         id: SymbolId::new(2),
                         node: Box::new(node::new!(List(vec![
                             node::new!(Identifier("x".to_string())),
-                            node::new!(PrefixOp(
-                                PrefixOp::Rest,
+                            node::new!(UnaryOp(
+                                UnaryOp::Rest,
                                 Box::new(node::new!(Identifier("xs".to_string())))
                             ))
                         ]))),
@@ -738,8 +738,8 @@ fn test_foldl_impl() {
                             id: SymbolId::new(4),
                             node: Box::new(node::new!(List(vec![
                                 node::new!(Identifier("x".to_string())),
-                                node::new!(PrefixOp(
-                                    PrefixOp::Rest,
+                                node::new!(UnaryOp(
+                                    UnaryOp::Rest,
                                     Box::new(node::new!(Identifier("xs".to_string())))
                                 ))
                             ]))),
@@ -823,8 +823,8 @@ fn test_function_declarations_with_guard() {
                             id: SymbolId::new(3),
                             node: Box::new(node::new!(List(vec![
                                 node::new!(Identifier("x".to_string())),
-                                node::new!(PrefixOp(
-                                    PrefixOp::Rest,
+                                node::new!(UnaryOp(
+                                    UnaryOp::Rest,
                                     Box::new(node::new!(Identifier("xs".to_string())))
                                 ))
                             ]))),
@@ -845,8 +845,8 @@ fn test_function_declarations_with_guard() {
                         vec![],
                         Some(Box::new(node::new!(List(vec![
                             node::new!(Identifier("x".to_string())),
-                            node::new!(PrefixOp(
-                                PrefixOp::Spread,
+                            node::new!(UnaryOp(
+                                UnaryOp::Spread,
                                 Box::new(node::new!(Call {
                                     function: Box::new(node::new!(Identifier(
                                         "filter".to_string()
@@ -866,8 +866,8 @@ fn test_function_declarations_with_guard() {
                             id: SymbolId::new(5),
                             node: Box::new(node::new!(List(vec![
                                 node::new!(Identifier("x".to_string())),
-                                node::new!(PrefixOp(
-                                    PrefixOp::Rest,
+                                node::new!(UnaryOp(
+                                    UnaryOp::Rest,
                                     Box::new(node::new!(Identifier("xs".to_string())))
                                 ))
                             ]))),
@@ -939,8 +939,8 @@ fn test_function_declarations_with_let_guard() {
                             id: SymbolId::new(3),
                             node: Box::new(node::new!(List(vec![
                                 node::new!(Identifier("x".to_string())),
-                                node::new!(PrefixOp(
-                                    PrefixOp::Rest,
+                                node::new!(UnaryOp(
+                                    UnaryOp::Rest,
                                     Box::new(node::new!(Identifier("xs".to_string())))
                                 ))
                             ]))),
@@ -966,8 +966,8 @@ fn test_function_declarations_with_let_guard() {
                         vec![],
                         Some(Box::new(node::new!(List(vec![
                             node::new!(Identifier("y".to_string())),
-                            node::new!(PrefixOp(
-                                PrefixOp::Spread,
+                            node::new!(UnaryOp(
+                                UnaryOp::Spread,
                                 Box::new(node::new!(Call {
                                     function: Box::new(node::new!(Identifier(
                                         "filter_map".to_string()
@@ -987,8 +987,8 @@ fn test_function_declarations_with_let_guard() {
                             id: SymbolId::new(6),
                             node: Box::new(node::new!(List(vec![
                                 node::new!(Identifier("x".to_string())),
-                                node::new!(PrefixOp(
-                                    PrefixOp::Rest,
+                                node::new!(UnaryOp(
+                                    UnaryOp::Rest,
                                     Box::new(node::new!(Identifier("xs".to_string())))
                                 ))
                             ]))),

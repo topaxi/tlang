@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use tlang_ast::{
-    node::{AstNode, FunctionDeclaration, Node, PrefixOp},
+    node::{AstNode, FunctionDeclaration, Node, UnaryOp},
     symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
 };
 
@@ -248,7 +248,7 @@ impl DeclarationAnalyzer {
                     self.collect_function_parameter(_node, id, node);
                 }
             }
-            AstNode::PrefixOp(PrefixOp::Rest, ref mut identifier) => match identifier.ast_node {
+            AstNode::UnaryOp(UnaryOp::Rest, ref mut identifier) => match identifier.ast_node {
                 AstNode::Identifier(ref name) => {
                     symbol_table.borrow_mut().insert(SymbolInfo {
                         id,

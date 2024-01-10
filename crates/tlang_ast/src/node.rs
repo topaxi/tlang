@@ -61,7 +61,7 @@ pub enum AstNode {
     Literal(Literal),
     List(Vec<Node>),
     Dict(Vec<(Node, Node)>),
-    PrefixOp(PrefixOp, Box<Node>),
+    UnaryOp(UnaryOp, Box<Node>),
     BinaryOp {
         op: BinaryOp,
         lhs: Box<Node>,
@@ -171,7 +171,7 @@ impl<'a> From<&'a TokenKind> for AstNode {
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub enum PrefixOp {
+pub enum UnaryOp {
     Minus,
     Rest,
     Spread,

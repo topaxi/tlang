@@ -1,5 +1,5 @@
 use tlang_ast::node::{
-    self, Associativity, AstNode, BinaryOp, FunctionDeclaration, Node, OperatorInfo, PrefixOp,
+    self, Associativity, AstNode, BinaryOp, FunctionDeclaration, Node, OperatorInfo, UnaryOp,
 };
 use tlang_ast::symbols::SymbolId;
 use tlang_ast::token::{Token, TokenKind};
@@ -422,8 +422,8 @@ impl<'src> Parser<'src> {
                 }
                 Some(TokenKind::DotDotDot) => {
                     self.advance();
-                    node::new!(PrefixOp(
-                        PrefixOp::Rest,
+                    node::new!(UnaryOp(
+                        UnaryOp::Rest,
                         Box::new(self.parse_primary_expression())
                     ))
                 }
@@ -460,10 +460,7 @@ impl<'src> Parser<'src> {
                 Some(TokenKind::DotDotDot) => {
                     self.advance();
 
-                    node::new!(PrefixOp(
-                        PrefixOp::Spread,
-                        Box::new(self.parse_expression())
-                    ))
+                    node::new!(UnaryOp(UnaryOp::Spread, Box::new(self.parse_expression())))
                 }
                 _ => self.parse_expression(),
             };
@@ -570,8 +567,8 @@ impl<'src> Parser<'src> {
 
     fn parse_unary_expression(&mut self) -> Node {
         self.advance();
-        node::new!(PrefixOp(
-            PrefixOp::Minus,
+        node::new!(UnaryOp(
+            UnaryOp::Minus,
             Box::new(self.parse_primary_expression())
         ))
     }
@@ -944,7 +941,7 @@ impl<'src> Parser<'src> {
             let expression = self.parse_expression();
 
             match expression.ast_node {
-                AstNode::Call { .. } | AstNode::BinaryOp { .. } | AstNode::PrefixOp { .. } => (),
+                AstNode::Call { .. } | AstNode::BinaryOp { .. } | AstNode::UnaryOp { .. } => (),
                 _ => {
                     self.panic_unexpected_node(
                         "function call, binary logical expression or unary logical expression",

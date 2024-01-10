@@ -1,4 +1,4 @@
-use tlang_ast::node::{AstNode, FunctionDeclaration, Node, PrefixOp};
+use tlang_ast::node::{AstNode, FunctionDeclaration, Node, UnaryOp};
 
 use crate::generator::{BlockContext, CodegenJS};
 
@@ -227,7 +227,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                                         codegen.push_str(&format!("args[{}][{}] === ", k, i));
                                         codegen.generate_node(pattern, None);
                                     }
-                                    AstNode::PrefixOp(PrefixOp::Rest, identified) => {
+                                    AstNode::UnaryOp(UnaryOp::Rest, identified) => {
                                         if let AstNode::Identifier(ref name) = identified.ast_node {
                                             codegen
                                                 .push_str(&format!("args[{}].length >= {}", k, i));
