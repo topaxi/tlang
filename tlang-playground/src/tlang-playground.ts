@@ -105,7 +105,7 @@ export class TlangPlayground extends LitElement {
   `
 
   @state()
-  selectedExample = 'factorial.tl';
+  selectedExample = Object.keys(examples)[0];
 
   @state()
   source = examples[this.selectedExample];
