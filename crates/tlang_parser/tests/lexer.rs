@@ -10,12 +10,12 @@ macro_rules! assert_tokens {
         loop {
             let token = $lexer.next_token();
             match tokens.next() {
-                Some(expected) => assert_eq!(token.unwrap().kind, *expected),
+                Some(expected) => assert_eq!(token.kind, *expected),
                 None => break,
             }
         }
 
-        assert_eq!($lexer.next_token().unwrap().kind, TokenKind::Eof);
+        assert_eq!($lexer.next_token().kind, TokenKind::Eof);
     }};
 }
 
@@ -318,10 +318,16 @@ fn test_char_literal() {
 #[test]
 fn test_token_span() {
     let mut lexer = Lexer::new("let x = 1 + 2;");
-    let token = lexer.next_token().unwrap();
 
+    let token = lexer.next_token();
     assert_eq!(token.span.start.line, 1);
     assert_eq!(token.span.start.column, 1);
     assert_eq!(token.span.end.line, 1);
     assert_eq!(token.span.end.column, 4);
+
+    let token = lexer.next_token();
+    assert_eq!(token.span.start.line, 1);
+    assert_eq!(token.span.start.column, 5);
+    assert_eq!(token.span.end.line, 1);
+    assert_eq!(token.span.end.column, 6);
 }

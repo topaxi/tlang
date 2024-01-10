@@ -1,4 +1,3 @@
-use anyhow::{anyhow, Result};
 use std::rc::Rc;
 
 use tlang_ast::{
@@ -119,13 +118,13 @@ impl Lexer<'_> {
         Token::new(kind, Span::new(start, self.line_column()))
     }
 
-    pub fn next_token(&mut self) -> Result<Token> {
+    pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
 
         let start = self.line_column();
 
         if self.position >= self.source.len() {
-            return Ok(self.token(TokenKind::Eof, start));
+            return self.token(TokenKind::Eof, start);
         }
 
         let ch = self.source.chars().nth(self.position).unwrap();
@@ -366,17 +365,10 @@ impl Lexer<'_> {
                     }
                 }
             }
-            _ => {
-                return Err(anyhow!(
-                    "Unexpected character \"{}\" at line {} column {}",
-                    ch,
-                    self.current_line,
-                    self.current_column
-                ));
-            }
+            _ => self.token(TokenKind::Unknown(ch.to_string()), start),
         };
 
         self.current_token = Some(token.clone());
-        Ok(token)
+        token
     }
 }

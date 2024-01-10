@@ -69,6 +69,9 @@ pub enum TokenKind {
     Enum,
     Struct,
 
+    // Unknown token, unexpected character
+    Unknown(String),
+
     // Token for end-of-file
     Eof,
 }
