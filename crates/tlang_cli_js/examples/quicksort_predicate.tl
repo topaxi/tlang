@@ -23,10 +23,10 @@ fn quicksort(list, predicate) {
   let pivot = list[pivotIndex];
   let list = [...list.slice(0, pivotIndex), ...list.slice(pivotIndex+1)];
 
-  let partitioned = list |> partition(fn(x) { predicate(x, pivot) < 0 });
+  let [smaller, greater] = list |> partition(fn(x) { predicate(x, pivot) < 0 });
 
-  let smaller = partitioned[0] |> quicksort(predicate);
-  let greater = partitioned[1] |> quicksort(predicate);
+  let smaller = smaller |> quicksort(predicate);
+  let greater = greater |> quicksort(predicate);
 
   [...smaller, pivot, ...greater]
 }
