@@ -242,7 +242,7 @@ impl DeclarationAnalyzer {
                     symbol_type: SymbolType::Variable,
                 });
             }
-            AstNode::List(ref mut nodes) => {
+            AstNode::ListPattern(ref mut nodes) => {
                 for node in nodes.iter_mut() {
                     // TODO: I think this id here might be wrong.
                     self.collect_function_parameter(_node, id, node);

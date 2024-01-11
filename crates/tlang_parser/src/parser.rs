@@ -448,7 +448,7 @@ impl<'src> Parser<'src> {
 
         self.consume_token(TokenKind::RBracket);
 
-        node::new!(List(elements))
+        node::new!(ListPattern(elements))
     }
 
     fn parse_list_expression(&mut self) -> Node {

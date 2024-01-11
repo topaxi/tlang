@@ -509,7 +509,7 @@ fn test_recursive_sum() {
                 node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![node::new!(FunctionParameter {
                         id: SymbolId::new(1),
-                        node: Box::new(node::new!(List(vec![]))),
+                        node: Box::new(node::new!(ListPattern(vec![]))),
                         type_annotation: None,
                     })],
                     guard: None,
@@ -522,7 +522,7 @@ fn test_recursive_sum() {
                 node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![node::new!(FunctionParameter {
                         id: SymbolId::new(2),
-                        node: Box::new(node::new!(List(vec![
+                        node: Box::new(node::new!(ListPattern(vec![
                             node::new!(Identifier("x".to_string())),
                             node::new!(UnaryOp(
                                 UnaryOp::Rest,
@@ -711,7 +711,7 @@ fn test_foldl_impl() {
                     parameters: vec![
                         node::new!(FunctionParameter {
                             id: SymbolId::new(1),
-                            node: Box::new(node::new!(List(vec![]))),
+                            node: Box::new(node::new!(ListPattern(vec![]))),
                             type_annotation: None,
                         }),
                         node::new!(FunctionParameter {
@@ -736,7 +736,7 @@ fn test_foldl_impl() {
                     parameters: vec![
                         node::new!(FunctionParameter {
                             id: SymbolId::new(4),
-                            node: Box::new(node::new!(List(vec![
+                            node: Box::new(node::new!(ListPattern(vec![
                                 node::new!(Identifier("x".to_string())),
                                 node::new!(UnaryOp(
                                     UnaryOp::Rest,
@@ -801,7 +801,7 @@ fn test_function_declarations_with_guard() {
                     parameters: vec![
                         node::new!(FunctionParameter {
                             id: SymbolId::new(1),
-                            node: Box::new(node::new!(List(vec![]))),
+                            node: Box::new(node::new!(ListPattern(vec![]))),
                             type_annotation: None,
                         }),
                         node::new!(FunctionParameter {
@@ -821,7 +821,7 @@ fn test_function_declarations_with_guard() {
                     parameters: vec![
                         node::new!(FunctionParameter {
                             id: SymbolId::new(3),
-                            node: Box::new(node::new!(List(vec![
+                            node: Box::new(node::new!(ListPattern(vec![
                                 node::new!(Identifier("x".to_string())),
                                 node::new!(UnaryOp(
                                     UnaryOp::Rest,
@@ -864,7 +864,7 @@ fn test_function_declarations_with_guard() {
                     parameters: vec![
                         node::new!(FunctionParameter {
                             id: SymbolId::new(5),
-                            node: Box::new(node::new!(List(vec![
+                            node: Box::new(node::new!(ListPattern(vec![
                                 node::new!(Identifier("x".to_string())),
                                 node::new!(UnaryOp(
                                     UnaryOp::Rest,
@@ -917,7 +917,7 @@ fn test_function_declarations_with_let_guard() {
                     parameters: vec![
                         node::new!(FunctionParameter {
                             id: SymbolId::new(1),
-                            node: Box::new(node::new!(List(vec![]))),
+                            node: Box::new(node::new!(ListPattern(vec![]))),
                             type_annotation: None,
                         }),
                         node::new!(FunctionParameter {
@@ -937,7 +937,7 @@ fn test_function_declarations_with_let_guard() {
                     parameters: vec![
                         node::new!(FunctionParameter {
                             id: SymbolId::new(3),
-                            node: Box::new(node::new!(List(vec![
+                            node: Box::new(node::new!(ListPattern(vec![
                                 node::new!(Identifier("x".to_string())),
                                 node::new!(UnaryOp(
                                     UnaryOp::Rest,
@@ -985,7 +985,7 @@ fn test_function_declarations_with_let_guard() {
                     parameters: vec![
                         node::new!(FunctionParameter {
                             id: SymbolId::new(6),
-                            node: Box::new(node::new!(List(vec![
+                            node: Box::new(node::new!(ListPattern(vec![
                                 node::new!(Identifier("x".to_string())),
                                 node::new!(UnaryOp(
                                     UnaryOp::Rest,

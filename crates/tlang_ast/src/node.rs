@@ -60,6 +60,7 @@ pub enum AstNode {
     Block(Vec<Node>, Option<Box<Node>>),
     Literal(Literal),
     List(Vec<Node>),
+    ListPattern(Vec<Node>),
     Dict(Vec<(Node, Node)>),
     UnaryOp(UnaryOp, Box<Node>),
     BinaryOp {

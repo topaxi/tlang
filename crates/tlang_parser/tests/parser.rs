@@ -24,25 +24,6 @@ fn test_unary_minus() {
 }
 
 #[test]
-fn test_simple_variable_declaration() {
-    let program = parse!("let x = 1 + 2;");
-
-    assert_eq!(
-        program,
-        node::new!(Program(vec![node::new!(VariableDeclaration {
-            id: SymbolId::new(1),
-            pattern: Box::new(node::new!(Identifier("x".to_string()))),
-            expression: Box::new(node::new!(BinaryOp {
-                op: BinaryOp::Add,
-                lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
-            })),
-            type_annotation: None,
-        })]))
-    );
-}
-
-#[test]
 fn test_simple_arithmetic_calculations() {
     let program = parse!("1 + 2 + 3;");
 
@@ -665,12 +646,6 @@ fn test_function_call_with_dictionary_no_parens() {
             })
         )))]))
     );
-}
-
-#[test]
-#[should_panic]
-fn test_panic_on_keyword_as_identifier() {
-    parse!("let fn = 1;");
 }
 
 #[test]

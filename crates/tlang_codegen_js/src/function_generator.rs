@@ -55,7 +55,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                             .current_scope()
                             .declare_variable_alias(name, &tmp_variable);
                     }
-                    AstNode::List(patterns) => {
+                    AstNode::ListPattern(patterns) => {
                         for pattern in patterns {
                             if let AstNode::Identifier(name) = &pattern.ast_node {
                                 let tmp_variable = codegen.current_scope().declare_tmp_variable();
@@ -137,7 +137,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                             .current_scope()
                             .declare_variable_alias(name, &format!("args[{}]", j));
                     }
-                    AstNode::List(patterns) => {
+                    AstNode::ListPattern(patterns) => {
                         for (i, pattern) in patterns.iter().enumerate() {
                             if let AstNode::Identifier(name) = &pattern.ast_node {
                                 codegen
@@ -171,7 +171,9 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                     {
                         matches!(
                             node.ast_node,
-                            AstNode::Literal(_) | AstNode::List(_) | AstNode::EnumExtraction { .. }
+                            AstNode::Literal(_)
+                                | AstNode::ListPattern(_)
+                                | AstNode::EnumExtraction { .. }
                         )
                     } else {
                         false
@@ -209,7 +211,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                             codegen.push_str(&format!("args[{}] === ", k));
                             codegen.generate_node(param, None);
                         }
-                        AstNode::List(patterns) => {
+                        AstNode::ListPattern(patterns) => {
                             if patterns.is_empty() {
                                 codegen.push_str(&format!("args[{}].length === 0", k));
                                 continue;
@@ -509,7 +511,7 @@ pub fn generate_function_parameter(codegen: &mut CodegenJS, node: &Node) {
             codegen.push_str(ident);
         }
         AstNode::Literal(_) => codegen.generate_node(node, None),
-        AstNode::List(_) => todo!(),
+        AstNode::ListPattern(_) => todo!(),
         // Wildcards are handled within pipeline and call expressions,
         AstNode::Wildcard => unreachable!("Unexpected wildcard in function parameter."),
         _ => todo!(),
