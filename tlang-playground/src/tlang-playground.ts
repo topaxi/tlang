@@ -1,6 +1,10 @@
-import { LitElement, PropertyValueMap, css, html } from 'lit'
-import { customElement, query, state } from 'lit/decorators.js'
-import init, { compile_to_js, parse_and_analyze, parse_to_ast } from 'tlang_bindings_js'
+import { LitElement, PropertyValueMap, css, html } from 'lit';
+import { customElement, query, state } from 'lit/decorators.js';
+import init, {
+  compile_to_js,
+  parse_and_analyze,
+  parse_to_ast,
+} from 'tlang_bindings_js';
 import { examples } from './examples';
 
 import './components/t-codemirror';
@@ -16,17 +20,19 @@ export class TlangPlayground extends LitElement {
       width: 100%;
       height: 100vh;
 
-      grid-template: "toolbar" auto
-                     "editor" 1fr
-                     "output" 1fr
-                     "console" auto;
+      grid-template:
+        'toolbar' auto
+        'editor' 1fr
+        'output' 1fr
+        'console' auto;
     }
 
     @media (min-width: 1000px) {
       :host {
-        grid-template: "toolbar toolbar" auto
-                       "editor output" 1fr
-                       "editor console" auto;
+        grid-template:
+          'toolbar toolbar' auto
+          'editor output' 1fr
+          'editor console' auto;
       }
     }
 
@@ -101,8 +107,9 @@ export class TlangPlayground extends LitElement {
     .console-output {
       height: 24em;
       overflow: auto;
+      scroll-behavior: smooth;
     }
-  `
+  `;
 
   @state()
   selectedExample = Object.keys(examples)[0];
@@ -122,6 +129,9 @@ export class TlangPlayground extends LitElement {
   @query('t-codemirror')
   codemirror!: TCodeMirror;
 
+  @query('.console-output')
+  consoleOutputElement!: HTMLElement;
+
   get output() {
     try {
       return compile_to_js(this.source);
@@ -133,8 +143,7 @@ export class TlangPlayground extends LitElement {
   get ast() {
     try {
       return parse_to_ast(this.source);
-    }
-    catch (error: any) {
+    } catch (error: any) {
       return String(error);
     }
   }
@@ -149,23 +158,26 @@ export class TlangPlayground extends LitElement {
 
   run() {
     if (this.consoleOutput.length > 0) {
-      this.consoleOutput.push("---");
+      this.consoleOutput.push('---');
     }
 
     let fn = new Function('console', this.output);
 
     fn({
       log: (...args: unknown[]) => {
-        this.consoleOutput = [...this.consoleOutput, args]
-      }
+        this.consoleOutput = [...this.consoleOutput, args];
+      },
     });
   }
 
-  protected firstUpdated(_changedProperties: PropertyValueMap<any> | Map<PropertyKey, unknown>): void {
+  protected firstUpdated(
+    _changedProperties: PropertyValueMap<any> | Map<PropertyKey, unknown>,
+  ): void {
     let params = new URLSearchParams(window.location.hash.slice(1));
 
     let exampleName = String(params.get('example'));
-    let exampleSource = (exampleName in examples) ? examples[exampleName] : this.source;
+    let exampleSource =
+      exampleName in examples ? examples[exampleName] : this.source;
 
     if (exampleName in examples) {
       this.shadowRoot!.querySelector('select')!.value = exampleName;
@@ -174,13 +186,22 @@ export class TlangPlayground extends LitElement {
     this.codemirror.source = exampleSource;
   }
 
+  protected updated(
+    changedProperties: PropertyValueMap<any> | Map<PropertyKey, unknown>,
+  ): void {
+    if (changedProperties.has('consoleOutput')) {
+      this.consoleOutputElement.scrollTop =
+        this.consoleOutputElement.scrollHeight;
+    }
+  }
+
   handleSourceChange(event: CustomEvent) {
     this.source = event.detail.source;
     this.consoleOutput = [];
   }
 
   handleExampleSelect(event: Event) {
-    const target = event.target as HTMLSelectElement
+    const target = event.target as HTMLSelectElement;
     this.consoleOutput = [];
     this.codemirror.source = examples[target.value];
     window.location.hash = `example=${encodeURIComponent(target.value)}`;
@@ -189,7 +210,9 @@ export class TlangPlayground extends LitElement {
   renderLogMessage(args: string | unknown[]) {
     return html`
       <div class="log-message">
-        ${typeof args === 'string' ? args : args.map(arg => JSON.stringify(arg)).join(', ')}
+        ${typeof args === 'string'
+          ? args
+          : args.map((arg) => JSON.stringify(arg)).join(', ')}
       </div>
     `;
   }
@@ -199,9 +222,13 @@ export class TlangPlayground extends LitElement {
       <div class="toolbar">
         <button @click=${this.run}>Run</button>
         <select @change=${this.handleExampleSelect}>
-          ${Object.keys(examples).map(key => html`<option>${key}</option>`)}
+          ${Object.keys(examples).map((key) => html`<option>${key}</option>`)}
         </select>
-        <select @change=${(event: Event) => this.display = (event.target as HTMLSelectElement).value as typeof this.display}>
+        <select
+          @change=${(event: Event) =>
+            (this.display = (event.target as HTMLSelectElement)
+              .value as typeof this.display)}
+        >
           <option value="output">code</option>
           <option value="ast">ast</option>
           <option value="semanticAST">semantic ast</option>
@@ -214,24 +241,39 @@ export class TlangPlayground extends LitElement {
         <t-codemirror @source-change=${this.handleSourceChange}></t-codemirror>
       </div>
       <div class="output">
-        ${this.display === 'ast' ? html`<pre class="output-ast">${this.ast}</pre>` : ''}
-        ${this.display === 'semanticAST' ? html`<pre class="output-ast">${this.semanticAST}</pre>` : ''}
-        ${this.display === 'output' ? html`<t-codemirror class="output-code" language="javascript" .source=${this.output} readonly></t-codemirror>` : ''}
+        ${this.display === 'ast'
+          ? html`<pre class="output-ast">${this.ast}</pre>`
+          : ''}
+        ${this.display === 'semanticAST'
+          ? html`<pre class="output-ast">${this.semanticAST}</pre>`
+          : ''}
+        ${this.display === 'output'
+          ? html`<t-codemirror
+              class="output-code"
+              language="javascript"
+              .source=${this.output}
+              readonly
+            ></t-codemirror>`
+          : ''}
       </div>
       <div class="console">
         <div class="console-toolbar">
           <div>Console</div>
-          <button @click=${() => this.showConsole = !this.showConsole}>${this.showConsole ? 'Hide' : 'Show'}</button>
-          <button @click=${() => this.consoleOutput = []}>Clear</button>
+          <button @click=${() => (this.showConsole = !this.showConsole)}>
+            ${this.showConsole ? 'Hide' : 'Show'}
+          </button>
+          <button @click=${() => (this.consoleOutput = [])}>Clear</button>
         </div>
-        <div class="console-output" .hidden=${!this.showConsole}>${this.consoleOutput.map(args => this.renderLogMessage(args))}</div>
+        <div class="console-output" .hidden=${!this.showConsole}>
+          ${this.consoleOutput.map((args) => this.renderLogMessage(args))}
+        </div>
       </div>
-    `
+    `;
   }
 }
 
 declare global {
   interface HTMLElementTagNameMap {
-    'tlang-playground': TlangPlayground
+    'tlang-playground': TlangPlayground;
   }
 }

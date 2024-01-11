@@ -1,10 +1,10 @@
-import { EditorView, basicSetup } from "codemirror"
-import { EditorState } from "@codemirror/state"
-import { catppuccin } from 'codemirror-theme-catppuccin'
-import { tlangLanguageSupport } from "codemirror-lang-tlang"
-import { javascript } from "@codemirror/lang-javascript"
-import { LitElement, css } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { EditorView, basicSetup } from 'codemirror';
+import { EditorState } from '@codemirror/state';
+import { catppuccin } from 'codemirror-theme-catppuccin';
+import { tlangLanguageSupport } from 'codemirror-lang-tlang';
+import { javascript } from '@codemirror/lang-javascript';
+import { LitElement, css } from 'lit';
+import { customElement, property } from 'lit/decorators.js';
 
 @customElement('t-codemirror')
 export class TCodeMirror extends LitElement {
@@ -14,10 +14,10 @@ export class TCodeMirror extends LitElement {
     }
   `;
 
-  private view: EditorView | null = null
+  private view: EditorView | null = null;
 
   @property()
-  source = ''
+  source = '';
 
   @property({ type: Boolean })
   readonly = false;
@@ -26,13 +26,14 @@ export class TCodeMirror extends LitElement {
   language = 'tlang';
 
   firstUpdated() {
-
     let updateListener = EditorView.updateListener.of((v) => {
-      this.dispatchEvent(new CustomEvent('source-change', {
-        detail: {
-          source: v.state.doc.toString(),
-        },
-      }));
+      this.dispatchEvent(
+        new CustomEvent('source-change', {
+          detail: {
+            source: v.state.doc.toString(),
+          },
+        }),
+      );
     });
 
     this.view = new EditorView({
@@ -40,10 +41,10 @@ export class TCodeMirror extends LitElement {
         basicSetup,
         catppuccin('macchiato'),
         this.language === 'javascript' ? javascript() : tlangLanguageSupport(),
-        this.readonly ? EditorState.readOnly.of(true) : updateListener
+        this.readonly ? EditorState.readOnly.of(true) : updateListener,
       ],
       parent: this.shadowRoot as DocumentFragment,
-    })
+    });
   }
 
   updated(changedProperties: Map<string, unknown>) {
@@ -54,13 +55,13 @@ export class TCodeMirror extends LitElement {
           to: this.view.state.doc.length,
           insert: this.source,
         },
-      })
+      });
     }
   }
 }
 
 declare global {
   interface HTMLElementTagNameMap {
-    't-codemirror': TCodeMirror
+    't-codemirror': TCodeMirror;
   }
 }
