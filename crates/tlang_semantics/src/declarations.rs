@@ -259,7 +259,7 @@ impl DeclarationAnalyzer {
                 _ => panic!("Expected identifier, found {:?}", identifier.ast_node),
             },
             AstNode::Literal(_) => {} // Nothing to do for literals
-            AstNode::EnumExtraction {
+            AstNode::EnumPattern {
                 ref mut identifier,
                 ref mut elements,
                 named_fields,

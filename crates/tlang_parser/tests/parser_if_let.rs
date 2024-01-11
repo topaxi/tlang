@@ -51,7 +51,7 @@ fn test_if_let_statement_with_enum_matching() {
             node::new!(IfElse {
                 condition: Box::new(node::new!(VariableDeclaration {
                     id: SymbolId::new(1),
-                    pattern: Box::new(node::new!(EnumExtraction {
+                    pattern: Box::new(node::new!(EnumPattern {
                         identifier: Box::new(node::new!(NestedIdentifier(vec![
                             "Option".to_string(),
                             "Some".to_string()

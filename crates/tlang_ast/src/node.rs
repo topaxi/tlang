@@ -132,7 +132,7 @@ pub enum AstNode {
         named_fields: bool,
         parameters: Vec<Node>,
     },
-    EnumExtraction {
+    EnumPattern {
         identifier: Box<Node>,
         elements: Vec<Node>,
         named_fields: bool,

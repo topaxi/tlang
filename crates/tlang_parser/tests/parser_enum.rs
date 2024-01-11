@@ -154,7 +154,7 @@ fn test_enum_tree_max_depth() {
                     node::new!(FunctionDeclaration(FunctionDeclaration {
                         parameters: vec![node::new!(FunctionParameter {
                             id: SymbolId::new(2),
-                            node: Box::new(node::new!(EnumExtraction {
+                            node: Box::new(node::new!(EnumPattern {
                                 identifier: Box::new(node::new!(NestedIdentifier(vec![
                                     "Tree".to_string(),
                                     "Leaf".to_string()
@@ -174,7 +174,7 @@ fn test_enum_tree_max_depth() {
                     node::new!(FunctionDeclaration(FunctionDeclaration {
                         parameters: vec![node::new!(FunctionParameter {
                             id: SymbolId::new(3),
-                            node: Box::new(node::new!(EnumExtraction {
+                            node: Box::new(node::new!(EnumPattern {
                                 identifier: Box::new(node::new!(NestedIdentifier(vec![
                                     "Tree".to_string(),
                                     "Node".to_string()
@@ -338,7 +338,7 @@ fn test_enum_extraction() {
                     node::new!(FunctionDeclaration(FunctionDeclaration {
                         parameters: vec![node::new!(FunctionParameter {
                             id: SymbolId::new(2),
-                            node: Box::new(node::new!(EnumExtraction {
+                            node: Box::new(node::new!(EnumPattern {
                                 identifier: Box::new(node::new!(NestedIdentifier(vec![
                                     "Option".to_string(),
                                     "None".to_string()
@@ -363,7 +363,7 @@ fn test_enum_extraction() {
                     node::new!(FunctionDeclaration(FunctionDeclaration {
                         parameters: vec![node::new!(FunctionParameter {
                             id: SymbolId::new(3),
-                            node: Box::new(node::new!(EnumExtraction {
+                            node: Box::new(node::new!(EnumPattern {
                                 identifier: Box::new(node::new!(NestedIdentifier(vec![
                                     "Option".to_string(),
                                     "Some".to_string()

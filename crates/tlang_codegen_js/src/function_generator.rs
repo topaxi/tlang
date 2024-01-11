@@ -67,7 +67,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                             }
                         }
                     }
-                    AstNode::EnumExtraction {
+                    AstNode::EnumPattern {
                         identifier,
                         elements,
                         named_fields: _,
@@ -173,7 +173,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                             node.ast_node,
                             AstNode::Literal(_)
                                 | AstNode::ListPattern(_)
-                                | AstNode::EnumExtraction { .. }
+                                | AstNode::EnumPattern { .. }
                         )
                     } else {
                         false
@@ -249,7 +249,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                                 }
                             }
                         }
-                        AstNode::EnumExtraction {
+                        AstNode::EnumPattern {
                             identifier,
                             elements,
                             named_fields,
@@ -365,7 +365,7 @@ fn generate_function_definition_guard(codegen: &mut CodegenJS, node: &Node) {
                 codegen.generate_node(expression, None);
                 codegen.push_char(')');
             }
-            AstNode::EnumExtraction {
+            AstNode::EnumPattern {
                 identifier,
                 elements,
                 named_fields,

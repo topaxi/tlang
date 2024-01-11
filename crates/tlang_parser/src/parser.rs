@@ -784,7 +784,7 @@ impl<'src> Parser<'src> {
                 }
             }
             self.consume_token(TokenKind::RBrace);
-            node::new!(EnumExtraction {
+            node::new!(EnumPattern {
                 identifier: identifier,
                 elements: elements,
                 named_fields: true,
@@ -808,14 +808,14 @@ impl<'src> Parser<'src> {
                 }
             }
             self.consume_token(TokenKind::RParen);
-            AstNode::EnumExtraction {
+            AstNode::EnumPattern {
                 identifier,
                 elements,
                 named_fields: false,
             }
             .into()
         } else {
-            node::new!(EnumExtraction {
+            node::new!(EnumPattern {
                 identifier: identifier,
                 elements: Vec::new(),
                 named_fields: false,
