@@ -482,13 +482,19 @@ impl CodegenJS {
         self.push_str(identifier);
     }
 
-    fn generate_variable_declaration(&mut self, name: &Node, value: &Node) {
-        let name = if let AstNode::Identifier(name) = &name.ast_node {
-            name
-        } else {
-            todo!("Variable declaration pattern matching is not implemented yet.")
-        };
+    fn generate_variable_declaration(&mut self, pattern: &Node, value: &Node) {
+        match &pattern.ast_node {
+            AstNode::Identifier(name) => {
+                self.generate_variable_declaration_identifier(name, value);
+            }
+            AstNode::ListPattern(patterns) => {
+                self.generate_variable_declaration_list_pattern(patterns, value);
+            }
+            _ => todo!("Variable declaration pattern matching is not implemented yet."),
+        }
+    }
 
+    fn generate_variable_declaration_identifier(&mut self, name: &str, value: &Node) {
         self.push_str(&self.get_indent());
         let shadowed_name = self.current_scope().resolve_variable(name);
         let var_name = self.current_scope().declare_variable(name);
@@ -500,6 +506,43 @@ impl CodegenJS {
         }
         self.generate_node(value, None);
         self.current_scope().declare_variable_alias(name, &var_name);
+        self.context_stack.pop();
+        self.push_str(";\n");
+    }
+
+    fn generate_variable_declaration_list_pattern(&mut self, patterns: &[Node], value: &Node) {
+        self.push_str(&self.get_indent());
+        self.push_str("let [");
+
+        let mut bindings = vec![];
+
+        for (i, pattern) in patterns.iter().enumerate() {
+            if i > 0 {
+                self.push_str(", ");
+            }
+            match &pattern.ast_node {
+                AstNode::Identifier(name) => {
+                    let shadowed_name = self.current_scope().resolve_variable(name);
+                    let var_name = self.current_scope().declare_variable(name);
+                    self.push_str(&var_name);
+                    if let Some(shadowed_name) = shadowed_name {
+                        self.current_scope()
+                            .declare_variable_alias(name, &shadowed_name);
+                    }
+                    bindings.push((name, var_name));
+                }
+                _ => todo!("Variable declaration pattern matching is not implemented yet."),
+            }
+        }
+
+        self.push_str("] = ");
+        self.context_stack.push(BlockContext::Expression);
+        self.generate_node(value, None);
+
+        for (name, var_name) in bindings {
+            self.current_scope().declare_variable_alias(name, &var_name);
+        }
+
         self.context_stack.pop();
         self.push_str(";\n");
     }

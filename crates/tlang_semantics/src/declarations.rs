@@ -72,7 +72,7 @@ impl DeclarationAnalyzer {
             }
             AstNode::VariableDeclaration {
                 ref id,
-                ref pattern,
+                ref mut pattern,
                 ref mut expression,
                 type_annotation: _,
             } => self.collect_variable_declaration(ast, *id, pattern, expression),
@@ -129,23 +129,35 @@ impl DeclarationAnalyzer {
         &mut self,
         _node: &mut Node,
         id: SymbolId,
-        pattern: &Node,
+        pattern: &mut Node,
         expr: &mut Node,
     ) {
         self.collect_declarations(expr);
 
         let symbol_table = self.get_last_symbol_table_mut();
 
-        let name = match pattern.ast_node {
-            AstNode::Identifier(ref name) => name,
+        match pattern.ast_node {
+            AstNode::Identifier(ref name) => {
+                symbol_table.borrow_mut().insert(SymbolInfo {
+                    id,
+                    name: name.to_string(),
+                    symbol_type: SymbolType::Variable,
+                });
+            }
+            AstNode::ListPattern(ref mut patterns) => {
+                for pattern in patterns {
+                    // TODO: We probably need to do this recursively.
+                    if let AstNode::Identifier(ref name) = pattern.ast_node {
+                        symbol_table.borrow_mut().insert(SymbolInfo {
+                            id,
+                            name: name.to_string(),
+                            symbol_type: SymbolType::Variable,
+                        });
+                    }
+                }
+            }
             _ => panic!("Expected identifier, found {:?}", pattern.ast_node),
         };
-
-        symbol_table.borrow_mut().insert(SymbolInfo {
-            id,
-            name: name.to_string(),
-            symbol_type: SymbolType::Variable,
-        });
     }
 
     /// TODO: This is a temporary solution. We need to find a better way to handle this.

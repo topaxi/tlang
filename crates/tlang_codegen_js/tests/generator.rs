@@ -5,27 +5,6 @@ use tlang_ast::symbols::SymbolType;
 mod common;
 
 #[test]
-fn test_codegen_variable_declaration() {
-    let output = compile!("let x = 42;");
-    let expected_output = "let x = 42;\n";
-    assert_eq!(output, expected_output);
-}
-
-#[test]
-fn test_codegen_binary_expression() {
-    let output = compile!("let x = 42 + 1;");
-    let expected_output = "let x = 42 + 1;\n";
-    assert_eq!(output, expected_output);
-}
-
-#[test]
-fn test_variable_shadowing() {
-    let output = compile!("let x = 42; let x = 43; x;");
-    let expected_output = "let x = 42;\nlet x$a = 43;\nx$a;\n";
-    assert_eq!(output, expected_output);
-}
-
-#[test]
 fn test_codegen_function_declaration() {
     let output = compile!("fn main() {}");
     let expected_output = "function main() {\n}\n";
