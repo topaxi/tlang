@@ -1021,3 +1021,9 @@ fn test_function_declarations_with_let_guard() {
         })])),
     );
 }
+
+#[test]
+#[should_panic]
+fn test_parameter_list_mandatory_comma() {
+    parse!("fn foo(x y) {}");
+}

@@ -700,7 +700,13 @@ impl<'src> Parser<'src> {
         if self.current_token_kind() == Some(TokenKind::LParen) {
             self.consume_token(TokenKind::LParen);
 
+            let mut is_first_parameter = true;
             while self.current_token_kind() != Some(TokenKind::RParen) {
+                if !is_first_parameter {
+                    self.consume_token(TokenKind::Comma);
+                }
+                is_first_parameter = false;
+
                 let parameter = self.parse_variable_declaration_pattern();
 
                 let type_annotation = match self.current_token_kind() {
@@ -717,10 +723,6 @@ impl<'src> Parser<'src> {
                     node: Box::new(parameter),
                     type_annotation: type_annotation.map(Box::new),
                 }));
-
-                if let Some(TokenKind::Comma) = self.current_token_kind() {
-                    self.advance();
-                }
             }
             self.consume_token(TokenKind::RParen);
         }
