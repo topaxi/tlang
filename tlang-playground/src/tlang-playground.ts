@@ -82,12 +82,14 @@ export class TlangPlayground extends LitElement {
 
     .output {
       padding-left: 1ch;
-    }
-
-    .output {
+      display: flex;
+      flex-direction: column;
       border-left: 1px solid var(--ctp-macchiato-surface0);
       grid-area: output;
       max-height: 100%;
+    }
+
+    .output > * {
       overflow: auto;
     }
 
@@ -132,29 +134,13 @@ export class TlangPlayground extends LitElement {
   @query('.console-output')
   consoleOutputElement!: HTMLElement;
 
-  get output() {
-    try {
-      return compile_to_js(this.source);
-    } catch (error: any) {
-      return String(error);
-    }
-  }
+  @state() output = '';
 
-  get ast() {
-    try {
-      return parse_to_ast(this.source);
-    } catch (error: any) {
-      return String(error);
-    }
-  }
+  @state() ast = '';
 
-  get semanticAST() {
-    try {
-      return parse_and_analyze(this.source);
-    } catch (error: any) {
-      return String(error);
-    }
-  }
+  @state() semanticAST = '';
+
+  @state() error = '';
 
   run() {
     if (this.consoleOutput.length > 0) {
@@ -168,6 +154,26 @@ export class TlangPlayground extends LitElement {
         this.consoleOutput = [...this.consoleOutput, args];
       },
     });
+  }
+
+  protected update(
+    changedProperties: PropertyValueMap<any> | Map<PropertyKey, unknown>,
+  ): void {
+    super.update(changedProperties);
+
+    if (changedProperties.has('source')) {
+      try {
+        this.error = '';
+        let ast = parse_to_ast(this.source);
+        this.ast = JSON.stringify(ast, null, 2);
+        let semanticAST = parse_and_analyze(this.source);
+        this.semanticAST = JSON.stringify(semanticAST, null, 2);
+        let js = compile_to_js(this.source);
+        this.output = js;
+      } catch (error) {
+        this.error = String(error);
+      }
+    }
   }
 
   protected firstUpdated(
@@ -255,6 +261,7 @@ export class TlangPlayground extends LitElement {
               readonly
             ></t-codemirror>`
           : ''}
+        ${this.error ? html`<pre class="output-error">${this.error}</pre>` : ''}
       </div>
       <div class="console">
         <div class="console-toolbar">
