@@ -1,9 +1,9 @@
 // map(a[], fn(a) -> b) -> b[]
-fn map([], f) { [] }
+fn map([], _) { [] }
 fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
 
 // filter(a[], fn(a) -> bool) -> a[]
-fn filter([], f) { [] }
+fn filter([], _) { [] }
 fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
 fn filter([x, ...xs], f) { rec filter(xs, f) }
 

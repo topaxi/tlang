@@ -4,7 +4,7 @@ enum Option {
 }
 
 // filter_map(a[], fn(a) -> Option(b)) -> b[]
-fn filter_map([], f) { [] }
+fn filter_map([], _) { [] }
 fn filter_map([x, ...xs], f) if let Option::Some(y) = f(x) { [y, ...filter_map(xs, f)] }
 fn filter_map([x, ...xs], f) { rec filter_map(xs, f) }
 

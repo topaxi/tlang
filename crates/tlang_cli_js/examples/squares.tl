@@ -1,5 +1,5 @@
 // map(a[], fn(a) -> b) -> b[]
-fn map([], f) { [] }
+fn map([], _) { [] }
 fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
 
 fn square(x) { x ** 2 }

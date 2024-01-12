@@ -5,7 +5,7 @@ fn len(list) { list.length }
 fn random_int(max) { random() * max |> floor() }
 
 // filter(a[], fn(a) -> bool) -> a[]
-fn filter([], f) { [] }
+fn filter([], _) { [] }
 fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
 fn filter([x, ...xs], f) { rec filter(xs, f) }
 
