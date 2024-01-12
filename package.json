@@ -7,6 +7,6 @@
     "tlang-playground"
   ],
   "devDependencies": {
-    "prettier": "^3.1.1"
+    "prettier": "^3.2.0"
   }
 }
