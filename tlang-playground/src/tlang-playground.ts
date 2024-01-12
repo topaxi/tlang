@@ -87,6 +87,7 @@ export class TlangPlayground extends LitElement {
       border-left: 1px solid var(--ctp-macchiato-surface0);
       grid-area: output;
       max-height: 100%;
+      overflow: hidden;
     }
 
     .output > * {
