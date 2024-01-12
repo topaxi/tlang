@@ -219,6 +219,7 @@ fn test_partition_impl() {
                     let predicate = args[1];
                     return partition(list, predicate, [], []);
                 } else if (args.length === 4 && args[0].length === 0) {
+                    // partition(a[], fn(a) -> bool, a[], a[]) -> (a[], a[])
                     let predicate = args[1];
                     let satisfies = args[2];
                     let doesNotSatisfy = args[3];

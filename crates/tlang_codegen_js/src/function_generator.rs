@@ -114,8 +114,23 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
     }
 
     codegen.push_indent();
+
+    let mut comments = vec![];
     let mut first_declaration = true;
-    for declaration in function_declarations.iter() {
+    for declaration in declarations.iter() {
+        if matches!(
+            &declaration.ast_node,
+            AstNode::SingleLineComment(_) | AstNode::MultiLineComment(_)
+        ) {
+            comments.push(declaration);
+            continue;
+        }
+
+        let declaration = match &declaration.ast_node {
+            AstNode::FunctionDeclaration(declaration) => declaration,
+            _ => unreachable!("Unexpected node in function declarations."),
+        };
+
         codegen.push_scope();
 
         if !first_declaration {
@@ -307,6 +322,13 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
         }
 
         codegen.inc_indent();
+
+        for comment in comments.iter() {
+            codegen.push_indent();
+            codegen.generate_node(comment, None);
+        }
+        comments.clear();
+
         // Alias identifier args back to the parameter names for readability of generated code.
         for (j, param) in declaration.parameters.iter().enumerate() {
             if let AstNode::FunctionParameter {

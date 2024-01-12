@@ -321,6 +321,7 @@ fn test_function_declarations_with_comments_inbetween() {
                 let xs = args[0].slice(1);
                 return [$tmp$b, ...filter_map(xs, f)];
             } else if (args[0].length >= 1) {
+                // Comment
                 let f = args[1];
                 let x = args[0][0];
                 let xs = args[0].slice(1);
