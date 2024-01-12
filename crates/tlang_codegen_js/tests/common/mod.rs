@@ -5,7 +5,11 @@ use tlang_semantics::SemanticAnalyzer;
 
 pub fn compile_src(source: &str, builtin_symbols: &[(&str, SymbolType)]) -> String {
     let mut parser = Parser::from_source(source);
-    let mut ast = parser.parse();
+    let mut ast = match parser.parse() {
+        Ok(ast) => ast,
+        Err(errors) => panic!("{:#?}", errors),
+    };
+
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.add_builtin_symbols(builtin_symbols);
     semantic_analyzer.analyze(&mut ast);

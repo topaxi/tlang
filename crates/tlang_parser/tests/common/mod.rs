@@ -4,6 +4,6 @@ macro_rules! parse {
         use tlang_parser::parser::Parser;
 
         let mut parser = Parser::from_source($source);
-        parser.parse()
+        parser.parse().unwrap()
     }};
 }

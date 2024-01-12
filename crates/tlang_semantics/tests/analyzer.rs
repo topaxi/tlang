@@ -9,7 +9,7 @@ use tlang_semantics::analyzer::SemanticAnalyzer;
 macro_rules! analyze {
     ($source:expr) => {{
         let mut parser = Parser::from_source($source);
-        let mut ast = parser.parse();
+        let mut ast = parser.parse().unwrap();
         let mut analyzer = SemanticAnalyzer::default();
         analyzer.analyze(&mut ast);
         ast

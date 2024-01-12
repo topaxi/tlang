@@ -6,6 +6,7 @@ use std::{
 
 use tlang_ast::symbols::SymbolType;
 use tlang_codegen_js::generator::CodegenJS;
+use tlang_parser::error::ParseError;
 use tlang_semantics::SemanticAnalyzer;
 
 #[derive(clap::Parser, Debug)]
@@ -30,7 +31,15 @@ fn main() {
     if let Err(why) = file.read_to_string(&mut source) {
         panic!("couldn't read {}: {}", path.display(), why)
     };
-    let output = compile(&source);
+    let output = match compile(&source) {
+        Ok(output) => output,
+        Err(errors) => {
+            for error in errors {
+                eprintln!("{:?}", error);
+            }
+            return;
+        }
+    };
 
     let std_lib_file = Path::new("js/stdlib.js");
     let mut std_lib = match File::open(std_lib_file) {
@@ -60,9 +69,9 @@ fn main() {
     };
 }
 
-fn compile(source: &str) -> String {
+fn compile(source: &str) -> Result<String, Vec<ParseError>> {
     let mut parser = tlang_parser::parser::Parser::from_source(source);
-    let mut ast = parser.parse();
+    let mut ast = parser.parse()?;
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.add_builtin_symbols(&[
         ("log", SymbolType::Function),
@@ -74,5 +83,5 @@ fn compile(source: &str) -> String {
     semantic_analyzer.analyze(&mut ast);
     let mut generator = CodegenJS::default();
     generator.generate_code(&ast);
-    generator.get_output().to_string()
+    Ok(generator.get_output().to_string())
 }

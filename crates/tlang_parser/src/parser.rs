@@ -4,6 +4,7 @@ use tlang_ast::node::{
 use tlang_ast::symbols::SymbolId;
 use tlang_ast::token::{Token, TokenKind};
 
+use crate::error::{ParseError, ParseErrorKind};
 use crate::lexer::Lexer;
 use log::debug;
 
@@ -18,6 +19,8 @@ pub struct Parser<'src> {
     // We have to copy over the lexers position as we scan ahead of the current token.
     current_line: usize,
     current_column: usize,
+
+    errors: Vec<ParseError>,
 }
 
 impl<'src> Parser<'src> {
@@ -29,7 +32,12 @@ impl<'src> Parser<'src> {
             unique_id: SymbolId::new(0),
             current_line: 0,
             current_column: 0,
+            errors: Vec::new(),
         }
+    }
+
+    pub fn errors(&self) -> Vec<ParseError> {
+        self.errors.clone()
     }
 
     fn unique_id(&mut self) -> SymbolId {
@@ -41,10 +49,25 @@ impl<'src> Parser<'src> {
         Parser::new(Lexer::new(source))
     }
 
-    pub fn parse(&mut self) -> Node {
+    pub fn parse(&mut self) -> Result<Node, Vec<ParseError>> {
         self.advance();
         self.advance();
-        self.parse_program()
+
+        let program = self.parse_program();
+
+        if self.errors().is_empty() {
+            Ok(program)
+        } else {
+            Err(self.errors())
+        }
+    }
+
+    fn push_unexpected_token_error(&mut self, expected: &str, actual: Option<Token>) {
+        self.errors.push(ParseError {
+            msg: format!("Expected {}, found {:?}", expected, actual),
+            kind: ParseErrorKind::UnexpectedToken(actual.clone().unwrap()),
+            span: actual.as_ref().unwrap().span.clone(),
+        });
     }
 
     fn panic_unexpected_token(&self, expected: &str, actual: Option<Token>) {
@@ -82,7 +105,15 @@ impl<'src> Parser<'src> {
     fn expect_token(&mut self, expected: TokenKind) {
         let actual = self.current_token.as_ref().unwrap();
         if actual.kind != expected {
-            self.panic_unexpected_token(&format!("{:?}", expected), Some(actual.clone()));
+            self.push_unexpected_token_error(&format!("{:?}", expected), Some(actual.clone()));
+
+            while let Some(token) = self.current_token.as_ref() {
+                if token.kind == expected {
+                    break;
+                }
+
+                self.advance();
+            }
         }
     }
 
@@ -107,6 +138,18 @@ impl<'src> Parser<'src> {
     }
 
     fn advance(&mut self) {
+        if self.current_token_kind() == Some(TokenKind::Eof)
+            && self.next_token.as_ref().map(|token| token.kind.clone()) == Some(TokenKind::Eof)
+        {
+            // In error recovery we scan ahead and look for the expected token.
+            // If we reach the end of the file, we don't want to continue scanning and
+            // break our `while let Some(_) = self.current_token` loop.
+            self.current_token = None;
+            self.next_token = None;
+
+            return;
+        }
+
         self.current_token = self.next_token.clone();
         self.current_column = self.lexer.current_column();
         self.current_line = self.lexer.current_line();
