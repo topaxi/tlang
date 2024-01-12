@@ -1,5 +1,6 @@
 import { LitElement, PropertyValueMap, css, html } from 'lit';
 import { customElement, query, state } from 'lit/decorators.js';
+import LZString from 'lz-string';
 import init, {
   compile_to_js,
   parse_and_analyze,
@@ -11,6 +12,27 @@ import './components/t-codemirror';
 import { TCodeMirror } from './components/t-codemirror';
 
 await init();
+
+// Default source code is either the code provided via hashcode "source"
+// compressed by lz-string or the "example" hashcode with the corresponding
+// example file name. Default is the first example.
+function defaultSource() {
+  let params = new URLSearchParams(window.location.hash.slice(1));
+
+  if (params.has('source')) {
+    return LZString.decompressFromEncodedURIComponent(params.get('source')!);
+  } else if (params.has('example')) {
+    let exampleName = params.get('example') ?? '';
+    if (exampleName in examples) {
+      return examples[exampleName];
+    }
+  }
+  return examples[Object.keys(examples)[0]];
+}
+
+function updateSourceHashparam(source: string) {
+  window.location.hash = `source=${LZString.compressToEncodedURIComponent(source)}`;
+}
 
 @customElement('tlang-playground')
 export class TlangPlayground extends LitElement {
@@ -157,6 +179,28 @@ export class TlangPlayground extends LitElement {
     });
   }
 
+  share() {
+    updateSourceHashparam(this.source);
+
+    navigator.clipboard.writeText(String(window.location)).then(() => {
+      let flashnotification = document.createElement('div');
+
+      flashnotification.textContent = 'URL copied to clipboard';
+      flashnotification.style.position = 'fixed';
+      flashnotification.style.left = '50%';
+      flashnotification.style.top = '50%';
+      flashnotification.style.transform = 'translate(-50%, -50%)';
+      flashnotification.style.padding = '1rem';
+      flashnotification.style.background = 'var(--ctp-macchiato-surface0)';
+      flashnotification.style.borderRadius = '8px';
+      flashnotification.style.zIndex = '1000';
+
+      document.body.append(flashnotification);
+
+      setTimeout(() => flashnotification.remove(), 1000);
+    });
+  }
+
   protected update(
     changedProperties: PropertyValueMap<any> | Map<PropertyKey, unknown>,
   ): void {
@@ -183,14 +227,12 @@ export class TlangPlayground extends LitElement {
     let params = new URLSearchParams(window.location.hash.slice(1));
 
     let exampleName = String(params.get('example'));
-    let exampleSource =
-      exampleName in examples ? examples[exampleName] : this.source;
 
     if (exampleName in examples) {
       this.shadowRoot!.querySelector('select')!.value = exampleName;
     }
 
-    this.codemirror.source = exampleSource;
+    this.codemirror.source = defaultSource();
   }
 
   protected updated(
@@ -228,6 +270,7 @@ export class TlangPlayground extends LitElement {
     return html`
       <div class="toolbar">
         <button @click=${this.run}>Run</button>
+        <button @click=${this.share}>Share</button>
         <select @change=${this.handleExampleSelect}>
           ${Object.keys(examples).map((key) => html`<option>${key}</option>`)}
         </select>
