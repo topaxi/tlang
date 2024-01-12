@@ -2,7 +2,7 @@
 fn len(list) { list.length }
 
 // random_int(int) -> int
-fn random_int(max) { floor(random() * max) }
+fn random_int(max) { random() * max |> floor() }
 
 // filter(a[], fn(a) -> bool) -> a[]
 fn filter([], f) { [] }
