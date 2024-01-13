@@ -257,6 +257,9 @@ impl SemanticAnalyzer {
         for parameter in &mut declaration.parameters {
             self.analyze_node(parameter);
         }
+        if let Some(ref mut guard) = declaration.guard {
+            self.analyze_node(guard);
+        }
         self.analyze_node(&mut declaration.body);
     }
 
