@@ -2,14 +2,16 @@
 //!precedence
 
 @precedence {
+  else @right,
   member,
   call,
+  exp @left,
   times @left,
   plus @left,
   rel @left,
+  and @left,
+  or @left,
   assign @right,
-
-  else,
   statement @cut
 }
 
@@ -48,6 +50,12 @@ ReturnStatement {
   kw<"return"> (noSemi expression)? semi
 }
 
+//!recexpression
+
+RecExpression {
+  kw<"rec"> expression
+}
+
 //!functiondeclaration
 
 FunctionDeclaration {
@@ -69,7 +77,11 @@ VariableDeclaration {
 
 //!enumdeclaration
 EnumDeclaration {
-  kw<"enum"> Identifier "{" commaSep<Identifier> "}" semi
+  kw<"enum"> Identifier "{" commaSep<EnumVariant> "}" semi
+}
+
+EnumVariant {
+  Identifier ("(" commaSep<Identifier> ")") | (Identifier "{" commaSep<Identifier> "}")
 }
 
 //!pattern
@@ -115,6 +127,7 @@ expression[@isGroup=Expression] {
   MemberExpression |
   BinaryExpression |
   AssignmentExpression |
+  RecExpression |
   CallExpression {
     expression !call ArgList
   }
@@ -257,7 +270,9 @@ semi { ";" | insertSemi }
 
 //!literalTokens
 
-  "=" "..." "=>"
+  "="[@name=Equals]
+  "|>"[@name="Pipeline"]
+  "..." "=>"
   "(" ")" "[" "]" "{" "}"
   "." "," ";" ":"
 }
