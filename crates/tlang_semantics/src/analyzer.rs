@@ -82,12 +82,10 @@ impl SemanticAnalyzer {
 
         let mut ast_node = std::mem::replace(&mut ast.ast_node, AstNode::None);
 
-        match ast_node {
-            AstNode::Program(ref mut nodes) => {
-                nodes.iter_mut().for_each(|node| self.analyze_node(node))
-            }
-            AstNode::ExpressionStatement(ref mut node) => self.analyze_node(node),
-            AstNode::Block(ref mut nodes, ref mut return_value) => {
+        match &mut ast_node {
+            AstNode::Program(nodes) => nodes.iter_mut().for_each(|node| self.analyze_node(node)),
+            AstNode::ExpressionStatement(node) => self.analyze_node(node),
+            AstNode::Block(nodes, ref mut return_value) => {
                 nodes.iter_mut().for_each(|node| self.analyze_node(node));
 
                 if let Some(return_value) = return_value {
@@ -96,26 +94,59 @@ impl SemanticAnalyzer {
             }
             AstNode::VariableDeclaration {
                 id,
-                ref pattern,
-                ref mut expression,
+                pattern,
+                expression,
                 type_annotation: _,
-            } => self.analyze_variable_declaration(id, pattern, expression),
+            } => self.analyze_variable_declaration(*id, pattern, expression),
             AstNode::FunctionSingleDeclaration {
                 id: _,
-                ref name,
-                ref mut declaration,
+                name,
+                declaration,
             } => self.analyze_function_declaration(ast, name, declaration),
             AstNode::FunctionDeclarations {
                 id: _,
-                ref name,
-                ref mut declarations,
+                name,
+                declarations,
             } => self.analyze_function_declarations(ast, name, declarations),
+            AstNode::FunctionDeclaration(declaration) => {
+                for parameter in &mut declaration.parameters {
+                    self.analyze_node(parameter);
+                }
+
+                self.analyze_node(&mut declaration.body);
+            }
+            AstNode::FunctionExpression {
+                id: _,
+                name: _,
+                declaration,
+            } => {
+                for parameter in &mut declaration.parameters {
+                    self.analyze_node(parameter);
+                }
+                self.analyze_node(&mut declaration.body);
+            }
             AstNode::FunctionParameter {
                 id: _,
-                ref mut node,
+                node,
                 type_annotation: _,
             } => self.analyze_function_parameter(ast, node),
-            AstNode::Identifier(ref name) => {
+            AstNode::ReturnStatement(expr) => {
+                if let Some(expr) = expr {
+                    self.analyze_node(expr);
+                }
+            }
+            AstNode::IfElse {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                self.analyze_node(condition);
+                self.analyze_node(then_branch);
+                if let Some(else_branch) = else_branch {
+                    self.analyze_node(else_branch);
+                }
+            }
+            AstNode::Identifier(name) => {
                 if self
                     .get_last_symbol_table()
                     .borrow()
@@ -128,21 +159,46 @@ impl SemanticAnalyzer {
                     ));
                 }
             }
+            AstNode::NestedIdentifier(_idents) => {
+                // TODO
+            }
             AstNode::Call {
-                ref mut function,
-                ref mut arguments,
+                function,
+                arguments,
             } => {
                 self.analyze_call(function, arguments);
             }
-            AstNode::BinaryOp {
-                op: _,
-                ref mut lhs,
-                ref mut rhs,
-            } => {
+            AstNode::RecursiveCall(node) => {
+                self.analyze_node(node);
+            }
+            AstNode::BinaryOp { op: _, lhs, rhs } => {
                 self.analyze_node(lhs);
                 self.analyze_node(rhs);
             }
-            _ => {}
+            AstNode::UnaryOp(_, node) => {
+                self.analyze_node(node);
+            }
+            AstNode::List(values) => values.iter_mut().for_each(|node| self.analyze_node(node)),
+            AstNode::ListPattern(_)
+            | AstNode::Dict(_)
+            | AstNode::EnumDeclaration { .. }
+            | AstNode::EnumVariant { .. }
+            | AstNode::EnumPattern { .. }
+            | AstNode::FieldExpression { .. }
+            | AstNode::IndexExpression { .. }
+            | AstNode::Range { .. }
+            | AstNode::Match { .. }
+            | AstNode::MatchArm { .. }
+            | AstNode::TypeAnnotation { .. } => {
+                // TODO
+            }
+            AstNode::None
+            | AstNode::Wildcard
+            | AstNode::Literal(_)
+            | AstNode::SingleLineComment(_)
+            | AstNode::MultiLineComment(_) => {
+                // Nothing to do here
+            }
         }
 
         ast.ast_node = ast_node;

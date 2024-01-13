@@ -64,33 +64,81 @@ impl DeclarationAnalyzer {
     fn collect_declarations(&mut self, ast: &mut Node) {
         let mut ast_node = std::mem::replace(&mut ast.ast_node, AstNode::None);
 
-        match ast_node {
-            AstNode::Program(ref mut nodes) => self.collect_program_declarations(ast, nodes),
-            AstNode::ExpressionStatement(ref mut node) => self.collect_declarations(node),
-            AstNode::Block(ref mut nodes, ref mut return_value) => {
+        match &mut ast_node {
+            AstNode::Program(nodes) => self.collect_program_declarations(ast, nodes),
+            AstNode::ExpressionStatement(node) => self.collect_declarations(node),
+            AstNode::Block(nodes, return_value) => {
                 self.collect_block_declarations(ast, nodes, return_value)
             }
             AstNode::VariableDeclaration {
-                ref id,
-                ref mut pattern,
-                ref mut expression,
+                id,
+                pattern,
+                expression,
                 type_annotation: _,
             } => self.collect_variable_declaration(ast, *id, pattern, expression),
             AstNode::FunctionSingleDeclaration {
-                ref id,
-                ref name,
-                ref mut declaration,
+                id,
+                name,
+                declaration,
             } => self.collect_function_declaration(ast, *id, name, declaration),
             AstNode::FunctionDeclarations {
-                ref id,
-                ref name,
-                ref mut declarations,
+                id,
+                name,
+                declarations,
             } => self.collect_function_declarations(ast, *id, name, declarations),
             AstNode::FunctionParameter {
-                ref id,
-                ref mut node,
+                id,
+                node,
                 type_annotation: _,
             } => self.collect_function_parameter(ast, *id, node),
+            AstNode::FunctionExpression {
+                id,
+                name,
+                declaration,
+            } => {
+                self.push_symbol_table();
+                if let Some(name) = name {
+                    let name_as_str = self.fn_identifier_to_string(name);
+                    let symbol_table = self.get_last_symbol_table_mut();
+
+                    symbol_table.borrow_mut().insert(SymbolInfo {
+                        id: *id,
+                        name: name_as_str,
+                        symbol_type: SymbolType::Function,
+                    });
+                }
+
+                for param in &mut declaration.parameters {
+                    self.collect_declarations(param);
+                }
+
+                self.collect_declarations(&mut declaration.body);
+                self.pop_symbol_table();
+            }
+            AstNode::EnumPattern {
+                identifier,
+                elements,
+                named_fields,
+            } => self.collect_enum_extraction(
+                ast,
+                SymbolId::new(0),
+                identifier,
+                elements,
+                *named_fields,
+            ),
+            AstNode::Call {
+                function,
+                arguments,
+            } => {
+                self.collect_declarations(function);
+                for argument in arguments {
+                    self.collect_declarations(argument);
+                }
+            }
+            AstNode::BinaryOp { op: _, lhs, rhs } => {
+                self.collect_declarations(lhs);
+                self.collect_declarations(rhs);
+            }
             _ => {}
         }
 
@@ -156,6 +204,8 @@ impl DeclarationAnalyzer {
                     }
                 }
             }
+            AstNode::EnumPattern { .. } => self.collect_declarations(pattern),
+            AstNode::VariableDeclaration { .. } => self.collect_declarations(pattern),
             _ => panic!("Expected identifier, found {:?}", pattern.ast_node),
         };
     }
@@ -236,6 +286,9 @@ impl DeclarationAnalyzer {
                 node.symbol_table = Some(Rc::clone(&self.get_last_symbol_table()));
                 for param in &mut declaration.parameters {
                     self.collect_declarations(param);
+                }
+                if let Some(ref mut guard) = declaration.guard {
+                    self.collect_declarations(guard);
                 }
                 self.collect_declarations(&mut declaration.body);
                 self.pop_symbol_table();

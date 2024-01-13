@@ -301,12 +301,15 @@ fn test_function_declarations_with_if_let_guard_named_fields_enum() {
 
 #[test]
 fn test_function_declarations_with_comments_inbetween() {
-    let output = compile!(indoc! {"
+    let output = compile!(
+        indoc! {"
         fn filter_map([], f) { [] }
         fn filter_map([x, ...xs], f) if let Some { value } = f(x) { [value, ...filter_map(xs, f)] }
         // Comment
         fn filter_map([x, ...xs], f) { filter_map(xs, f) }
-    "});
+    "},
+        &[("Some", SymbolType::Variable)]
+    );
     let expected_output = indoc! {"
         // Comment
         function filter_map(...args) {
