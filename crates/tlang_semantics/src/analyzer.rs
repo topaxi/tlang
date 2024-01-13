@@ -199,13 +199,16 @@ impl SemanticAnalyzer {
                 self.analyze_node(node);
             }
             AstNode::List(values) => values.iter_mut().for_each(|node| self.analyze_node(node)),
+            AstNode::IndexExpression { base, index } => {
+                self.analyze_node(base);
+                self.analyze_node(index);
+            }
             AstNode::ListPattern(_)
             | AstNode::Dict(_)
             | AstNode::EnumDeclaration { .. }
             | AstNode::EnumVariant { .. }
             | AstNode::EnumPattern { .. }
             | AstNode::FieldExpression { .. }
-            | AstNode::IndexExpression { .. }
             | AstNode::Range { .. }
             | AstNode::Match { .. }
             | AstNode::MatchArm { .. }

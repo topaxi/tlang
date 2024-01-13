@@ -255,11 +255,13 @@ fn test_field_access_expressions() {
 fn test_index_access_expressions() {
     let output = compile!(indoc! {"
         fn main() {
+            let foo = [1];
             let x = foo[0];
         }
     "});
     let expected_output = indoc! {"
         function main() {
+            let foo = [1];
             let x = foo[0];
         }
     "};

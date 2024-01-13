@@ -76,6 +76,9 @@ impl DeclarationAnalyzer {
                 expression,
                 type_annotation: _,
             } => self.collect_variable_declaration(ast, *id, pattern, expression),
+            AstNode::FunctionDeclaration(_decl) => {
+                // TODO: Do we hit this or are we handling this through the other nodes?
+            }
             AstNode::FunctionSingleDeclaration {
                 id,
                 name,
@@ -115,11 +118,19 @@ impl DeclarationAnalyzer {
                 self.collect_declarations(&mut declaration.body);
                 self.pop_symbol_table();
             }
+            AstNode::ReturnStatement(expr) => {
+                if let Some(expr) = expr {
+                    self.collect_declarations(expr);
+                }
+            }
+            AstNode::ListPattern(patterns) => {
+                self.collect_list_pattern(ast, patterns);
+            }
             AstNode::EnumPattern {
                 identifier,
                 elements,
                 named_fields,
-            } => self.collect_enum_extraction(
+            } => self.collect_enum_pattern(
                 ast,
                 SymbolId::new(0),
                 identifier,
@@ -135,11 +146,62 @@ impl DeclarationAnalyzer {
                     self.collect_declarations(argument);
                 }
             }
+            AstNode::RecursiveCall(expr) => {
+                self.collect_declarations(expr);
+            }
+            AstNode::UnaryOp(_, node) => self.collect_declarations(node),
             AstNode::BinaryOp { op: _, lhs, rhs } => {
                 self.collect_declarations(lhs);
                 self.collect_declarations(rhs);
             }
-            _ => {}
+            AstNode::List(values) => {
+                for value in values {
+                    self.collect_declarations(value);
+                }
+            }
+            AstNode::Dict(kvs) => {
+                for (key, value) in kvs {
+                    // TODO: Undecided what kind of values dict keys can be.
+                    self.collect_declarations(key);
+                    self.collect_declarations(value);
+                }
+            }
+            AstNode::IfElse {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                self.collect_declarations(condition);
+                self.collect_declarations(then_branch);
+                if let Some(else_branch) = else_branch {
+                    self.collect_declarations(else_branch);
+                }
+            }
+            AstNode::FieldExpression { base, field } => {
+                self.collect_declarations(base);
+                self.collect_declarations(field);
+            }
+            AstNode::IndexExpression { base, index } => {
+                self.collect_declarations(base);
+                self.collect_declarations(index);
+            }
+            AstNode::EnumDeclaration { .. }
+            | AstNode::EnumVariant { .. }
+            | AstNode::Match { .. }
+            | AstNode::MatchArm { .. }
+            | AstNode::Range { .. }
+            | AstNode::TypeAnnotation { .. } => {
+                // TODO
+            }
+            AstNode::None
+            | AstNode::Wildcard
+            | AstNode::Identifier(_)
+            | AstNode::NestedIdentifier(_)
+            | AstNode::Literal(_)
+            | AstNode::SingleLineComment(_)
+            | AstNode::MultiLineComment(_) => {
+                // Nothing to do here
+            }
         }
 
         ast.ast_node = ast_node;
@@ -330,14 +392,18 @@ impl DeclarationAnalyzer {
                 named_fields,
             } => {
                 // TODO: The passed in id is for the enum, not the extracted value.
-                self.collect_enum_extraction(_node, id, identifier, elements, named_fields)
+                self.collect_enum_pattern(_node, id, identifier, elements, named_fields)
             }
             AstNode::Wildcard => {} // Wildcard discards values, nothing to do here.
             _ => panic!("Expected identifier or list, found {:?}", name.ast_node),
         }
     }
 
-    fn collect_enum_extraction(
+    fn collect_list_pattern(&mut self, _node: &mut Node, _patterns: &mut [Node]) {
+        // TODO
+    }
+
+    fn collect_enum_pattern(
         &mut self,
         _node: &mut Node,
         id: SymbolId,
