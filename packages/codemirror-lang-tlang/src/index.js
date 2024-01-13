@@ -5,9 +5,9 @@ import { styleTags, tags as t } from "@lezer/highlight"
 let parserWithMetadata = parser.configure({
   props: [
     styleTags({
-      Identifier: t.variableName,
       VariableName: t.variableName,
       VariableDefinition: t.definition(t.variableName),
+      "CallExpression/VariableName": t.function(t.variableName),
       "if else return rec": t.controlKeyword,
       "let enum fn": t.definitionKeyword,
       "FunctionDeclaration/VariableDefinition": t.function(t.definition(t.variableName)),
@@ -26,7 +26,7 @@ let parserWithMetadata = parser.configure({
       "[ ]": t.squareBracket,
       "{ }": t.brace,
       ".": t.derefOperator,
-      ";": t.separator,
+      ", ;": t.separator,
       "_": t.special,
     }),
     indentNodeProp.add({
@@ -59,6 +59,7 @@ export const tlangCompletion = tlangLanguage.data.of({
     { label: "let", type: "keyword" },
     { label: "else", type: "keyword" },
     { label: "enum", type: "keyword" },
+
     { label: "log", type: "function" },
     { label: "max", type: "function" },
     { label: "min", type: "function" },

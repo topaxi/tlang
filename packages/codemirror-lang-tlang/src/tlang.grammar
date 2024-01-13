@@ -59,7 +59,11 @@ RecExpression {
 //!functiondeclaration
 
 FunctionDeclaration {
-  !statement kw<"fn"> VariableDefinition ParamList Block
+  !statement kw<"fn"> VariableDefinition? ParamList Block
+}
+
+FunctionExpression {
+  kw<"fn"> VariableDefinition? ParamList? Block
 }
 
 ParamList {
@@ -68,32 +72,39 @@ ParamList {
 
 //!variabledeclaration
 
-VariableName { Identifier }
-VariableDefinition { Identifier }
+VariableName { identifier }
+VariableDefinition { identifier }
 
 VariableDeclaration {
-  (kw<"let">) pattern ("=" expression) semi
+  (kw<"let">) patternAssign semi
 }
 
 //!enumdeclaration
 EnumDeclaration {
-  kw<"enum"> Identifier "{" commaSep<EnumVariant> "}" semi
+  kw<"enum"> identifier "{" commaSep<EnumVariant> "}" semi
 }
 
 EnumVariant {
-  Identifier ("(" commaSep<Identifier> ")") | (Identifier "{" commaSep<Identifier> "}")
+  identifier ("(" commaSep<identifier> ")") | (identifier "{" commaSep<identifier> "}")
 }
 
 //!pattern
 
 pattern {
   VariableDefinition |
-  ArrayPattern {
-    "[" commaSep<("..."? pattern ("=" expression)?)?> ~destructure "]"
-  } |
-  ObjectPattern {
-    "{" commaSep<PatternProperty> ~destructure "}"
-  }
+  ArrayPattern |
+  ObjectPattern
+}
+
+ArrayPattern {
+  "[" commaSep<("..."? patternAssign)?> ~destructure "]"
+}
+ObjectPattern {
+  "{" commaSep<PatternProperty> ~destructure "}"
+}
+
+patternAssign {
+  pattern ("=" expression)?
 }
 
 PatternProperty {
@@ -112,7 +123,7 @@ expression[@isGroup=Expression] {
   Number |
   String |
   VariableName |
-  @specialize[@name=BooleanLiteral]<Identifier, "true" | "false"> |
+  @specialize[@name=BooleanLiteral]<identifier, "true" | "false"> |
   ArrayExpression {
     "[" commaSep1<"..."? expression | ""> ~destructure "]"
   } |
@@ -121,10 +132,8 @@ expression[@isGroup=Expression] {
   } |
   UnaryExpression |
   ParenthesizedExpression |
-  FunctionExpression {
-    kw<"fn"> Identifier? ParamList? Block
-  } |
   MemberExpression |
+  FunctionExpression |
   BinaryExpression |
   AssignmentExpression |
   RecExpression |
@@ -164,7 +173,7 @@ BinaryExpression {
 //!assign
 
 AssignmentExpression {
-  (Identifier | MemberExpression) !assign UpdateOp expression |
+  (identifier | MemberExpression) !assign UpdateOp expression |
   (MemberExpression | pattern) !assign "=" expression
 }
 
@@ -184,7 +193,7 @@ commaSep1<content> {
 
 //!kw
 
-kw<term> { @specialize[@name={term}]<Identifier, term> }
+kw<term> { @specialize[@name={term}]<identifier, term> }
 
 //!semi
 
@@ -233,9 +242,9 @@ semi { ";" | insertSemi }
 
   identifierChar { @asciiLetter | $[_$\u{a1}-\u{10ffff}] }
 
-  Identifier { identifierChar (identifierChar | @digit)* }
+  identifier { identifierChar (identifierChar | @digit)* }
 
-  PropertyName { Identifier }
+  PropertyName { identifier }
 
 //!numberTokens
 
