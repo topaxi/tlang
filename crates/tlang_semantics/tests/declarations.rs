@@ -12,8 +12,10 @@ macro_rules! analyze {
         let mut ast = parser.parse().unwrap();
         let mut analyzer = SemanticAnalyzer::default();
         analyzer.add_builtin_symbols(&[("panic", SymbolType::Function)]);
-        analyzer.analyze(&mut ast);
-        ast
+        match analyzer.analyze(&mut ast) {
+            Ok(_) => ast,
+            Err(diagnostics) => panic!("Expected no diagnostics, got {:#?}", diagnostics),
+        }
     }};
 }
 

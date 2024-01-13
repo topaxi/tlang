@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::{
+    // span::Span,
     symbols::{SymbolId, SymbolTable},
     token::{Literal, TokenKind},
 };
@@ -16,6 +17,7 @@ pub enum Associativity {
 pub struct Node {
     pub ast_node: AstNode,
     pub symbol_table: Option<Rc<RefCell<SymbolTable>>>,
+    // pub span: Span,
 }
 
 impl Node {

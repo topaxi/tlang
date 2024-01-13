@@ -4,40 +4,85 @@ use tlang_ast::{
     symbols::{SymbolId, SymbolInfo, SymbolType},
 };
 use tlang_parser::parser::Parser;
-use tlang_semantics::analyzer::SemanticAnalyzer;
+use tlang_semantics::{
+    analyzer::SemanticAnalyzer,
+    diagnostic::{Diagnostic, Severity},
+};
 
 macro_rules! analyze {
     ($source:expr) => {{
         let mut parser = Parser::from_source($source);
         let mut ast = parser.parse().unwrap();
         let mut analyzer = SemanticAnalyzer::default();
-        analyzer.analyze(&mut ast);
-        ast
+        match analyzer.analyze(&mut ast) {
+            Ok(_) => ast,
+            Err(diagnostics) => panic!("Expected no diagnostics, got {:#?}", diagnostics),
+        }
+    }};
+}
+
+macro_rules! analyze_diag {
+    ($source:expr) => {{
+        let mut parser = Parser::from_source($source);
+        let mut ast = parser.parse().unwrap();
+        let mut analyzer = SemanticAnalyzer::default();
+        match analyzer.analyze(&mut ast) {
+            Ok(_) => vec![],
+            Err(diagnostics) => diagnostics,
+        }
     }};
 }
 
 #[test]
-#[should_panic(expected = "Undefined symbol: b")]
-fn test_should_panic_on_undefined_symbol() {
-    analyze!("b;");
+fn test_should_error_on_undefined_symbol() {
+    let diagnostics = analyze_diag!("a;");
+
+    assert_eq!(
+        diagnostics,
+        vec![Diagnostic::new(
+            "Use of undeclared variable `a`".to_string(),
+            Severity::Error
+        )]
+    );
 }
 
 #[test]
-#[should_panic(expected = "Undefined symbol: b")]
-fn test_should_panic_on_undefined_symbol_in_variable_declaration() {
-    analyze!("let a = b;");
+fn test_should_error_on_undefined_symbol_in_variable_declaration() {
+    let diagnostics = analyze_diag!("let a = b;");
+
+    assert_eq!(
+        diagnostics,
+        vec![Diagnostic::new(
+            "Use of undeclared variable `b`".to_string(),
+            Severity::Error
+        )]
+    );
 }
 
 #[test]
-#[should_panic(expected = "Undefined symbol: b")]
-fn test_should_panic_on_undefined_function() {
-    analyze!("b();");
+fn test_should_error_on_undefined_function() {
+    let diagnostics = analyze_diag!("b();");
+
+    assert_eq!(
+        diagnostics,
+        vec![Diagnostic::new(
+            "Use of undeclared variable `b`".to_string(),
+            Severity::Error
+        )]
+    );
 }
 
 #[test]
-#[should_panic(expected = "Undefined symbol: a")]
-fn test_should_panic_on_self_referencing_symbol() {
-    analyze!("let a = a;");
+fn test_should_error_on_self_referencing_symbol() {
+    let diagnostics = analyze_diag!("let a = a;");
+
+    assert_eq!(
+        diagnostics,
+        vec![Diagnostic::new(
+            "Use of undeclared variable `a`".to_string(),
+            Severity::Error
+        )]
+    );
 }
 
 #[test]
@@ -101,13 +146,20 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
 }
 
 #[test]
-#[should_panic(expected = "Undefined symbol: c")]
-fn test_should_panic_on_unused_identifier_in_function_definition() {
-    analyze!(indoc! {"
+fn test_should_error_on_unused_identifier_in_function_definition() {
+    let diagnostics = analyze_diag!(indoc! {"
         fn add(a, b) {
             a + b + c
         }
     "});
+
+    assert_eq!(
+        diagnostics,
+        vec![Diagnostic::new(
+            "Use of undeclared variable `c`".to_string(),
+            Severity::Error
+        )]
+    );
 }
 
 #[test]

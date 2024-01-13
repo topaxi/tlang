@@ -12,10 +12,14 @@ pub fn compile_src(source: &str, builtin_symbols: &[(&str, SymbolType)]) -> Stri
 
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.add_builtin_symbols(builtin_symbols);
-    semantic_analyzer.analyze(&mut ast);
-    let mut codegen = CodegenJS::default();
-    codegen.generate_code(&ast);
-    codegen.get_output().to_string()
+    match semantic_analyzer.analyze(&mut ast) {
+        Ok(_) => {
+            let mut codegen = CodegenJS::default();
+            codegen.generate_code(&ast);
+            codegen.get_output().to_string()
+        }
+        Err(diagnostics) => panic!("{:#?}", diagnostics),
+    }
 }
 
 #[macro_export]

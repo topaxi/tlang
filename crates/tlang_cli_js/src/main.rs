@@ -7,7 +7,7 @@ use std::{
 use tlang_ast::symbols::SymbolType;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_parser::error::ParseError;
-use tlang_semantics::SemanticAnalyzer;
+use tlang_semantics::{diagnostic::Diagnostic, SemanticAnalyzer};
 
 #[derive(clap::Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -34,9 +34,7 @@ fn main() {
     let output = match compile(&source) {
         Ok(output) => output,
         Err(errors) => {
-            for error in errors {
-                eprintln!("{:?}", error);
-            }
+            eprintln!("{:?}", errors);
             return;
         }
     };
@@ -69,7 +67,25 @@ fn main() {
     };
 }
 
-fn compile(source: &str) -> Result<String, Vec<ParseError>> {
+#[derive(Debug)]
+enum ParserError {
+    ParseError(Vec<ParseError>),
+    DiagnosticError(Vec<Diagnostic>),
+}
+
+impl From<Vec<ParseError>> for ParserError {
+    fn from(errors: Vec<ParseError>) -> Self {
+        ParserError::ParseError(errors)
+    }
+}
+
+impl From<Vec<Diagnostic>> for ParserError {
+    fn from(errors: Vec<Diagnostic>) -> Self {
+        ParserError::DiagnosticError(errors)
+    }
+}
+
+fn compile(source: &str) -> Result<String, ParserError> {
     let mut parser = tlang_parser::parser::Parser::from_source(source);
     let mut ast = parser.parse()?;
     let mut semantic_analyzer = SemanticAnalyzer::default();
@@ -80,8 +96,12 @@ fn compile(source: &str) -> Result<String, Vec<ParseError>> {
         ("floor", SymbolType::Function),
         ("random", SymbolType::Function),
     ]);
-    semantic_analyzer.analyze(&mut ast);
-    let mut generator = CodegenJS::default();
-    generator.generate_code(&ast);
-    Ok(generator.get_output().to_string())
+    match semantic_analyzer.analyze(&mut ast) {
+        Ok(_) => {
+            let mut generator = CodegenJS::default();
+            generator.generate_code(&ast);
+            Ok(generator.get_output().to_string())
+        }
+        Err(diagnostics) => Err(diagnostics.into()),
+    }
 }

@@ -5,11 +5,15 @@ use tlang_ast::{
     symbols::{SymbolId, SymbolTable, SymbolType},
 };
 
-use crate::declarations::DeclarationAnalyzer;
+use crate::{
+    declarations::DeclarationAnalyzer,
+    diagnostic::{Diagnostic, Severity},
+};
 
 pub struct SemanticAnalyzer {
     declaration_analyzer: DeclarationAnalyzer,
     symbol_table_stack: Vec<Rc<RefCell<SymbolTable>>>,
+    diagnostics: Vec<Diagnostic>,
 }
 
 impl Default for SemanticAnalyzer {
@@ -23,7 +27,20 @@ impl SemanticAnalyzer {
         SemanticAnalyzer {
             declaration_analyzer,
             symbol_table_stack: vec![],
+            diagnostics: vec![],
         }
+    }
+
+    pub fn get_diagnostics(&self) -> &[Diagnostic] {
+        &self.diagnostics
+    }
+
+    pub fn get_errors(&self) -> Vec<Diagnostic> {
+        self.diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.is_error())
+            .cloned()
+            .collect()
     }
 
     fn get_last_symbol_table(&self) -> Rc<RefCell<SymbolTable>> {
@@ -42,10 +59,16 @@ impl SemanticAnalyzer {
         self.declaration_analyzer.add_builtin_symbols(symbols)
     }
 
-    pub fn analyze(&mut self, ast: &mut Node) {
+    pub fn analyze(&mut self, ast: &mut Node) -> Result<(), Vec<Diagnostic>> {
         self.collect_declarations(ast);
         // self.collect_initializations(ast);
         self.analyze_node(ast);
+
+        if self.get_errors().is_empty() {
+            Ok(())
+        } else {
+            Err(self.get_errors().clone())
+        }
     }
 
     fn collect_declarations(&mut self, ast: &mut Node) {
@@ -99,7 +122,10 @@ impl SemanticAnalyzer {
                     .get_by_name(name)
                     .is_none()
                 {
-                    panic!("Undefined symbol: {}", name);
+                    self.diagnostics.push(Diagnostic::new(
+                        format!("Use of undeclared variable `{}`", name),
+                        Severity::Error,
+                    ));
                 }
             }
             AstNode::Call {
