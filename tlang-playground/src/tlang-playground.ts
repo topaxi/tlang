@@ -31,7 +31,9 @@ function defaultSource() {
 }
 
 function updateSourceHashparam(source: string) {
-  window.location.hash = `source=${LZString.compressToEncodedURIComponent(source)}`;
+  window.location.hash = `source=${LZString.compressToEncodedURIComponent(
+    source,
+  )}`;
 }
 
 @customElement('tlang-playground')
@@ -103,13 +105,18 @@ export class TlangPlayground extends LitElement {
     }
 
     .output {
-      padding-left: 1ch;
       display: flex;
       flex-direction: column;
-      border-left: 1px solid var(--ctp-macchiato-surface0);
       grid-area: output;
       max-height: 100%;
       overflow: hidden;
+    }
+
+    @media (min-width: 760px) {
+      .output {
+        padding-left: 1ch;
+        border-left: 1px solid var(--ctp-macchiato-surface0);
+      }
     }
 
     .output > * {
