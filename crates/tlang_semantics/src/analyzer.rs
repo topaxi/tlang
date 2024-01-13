@@ -153,10 +153,30 @@ impl SemanticAnalyzer {
                     .get_by_name(name)
                     .is_none()
                 {
-                    self.diagnostics.push(Diagnostic::new(
-                        format!("Use of undeclared variable `{}`", name),
-                        Severity::Error,
-                    ));
+                    let did_you_mean = did_you_mean(
+                        name,
+                        &self
+                            .get_last_symbol_table()
+                            .borrow()
+                            .get_all_symbol_names()
+                            .iter()
+                            .collect::<Vec<_>>(),
+                    );
+
+                    if let Some(suggestion) = did_you_mean {
+                        self.diagnostics.push(Diagnostic::new(
+                            format!(
+                                "Use of undeclared variable `{}`, did you mean `{}`",
+                                name, suggestion
+                            ),
+                            Severity::Error,
+                        ));
+                    } else {
+                        self.diagnostics.push(Diagnostic::new(
+                            format!("Use of undeclared variable `{}`", name),
+                            Severity::Error,
+                        ));
+                    }
                 }
             }
             AstNode::NestedIdentifier(_idents) => {
@@ -264,4 +284,49 @@ impl SemanticAnalyzer {
             self.analyze_node(argument);
         }
     }
+}
+
+fn did_you_mean(name: &str, candidates: &[&String]) -> Option<String> {
+    let mut best_distance = usize::MAX;
+    let mut best_candidate = None;
+    for candidate in candidates {
+        let distance = levenshtein_distance(name, candidate);
+        if distance < best_distance {
+            best_distance = distance;
+            best_candidate = Some(candidate);
+        }
+    }
+    if best_distance < 3 {
+        Some(best_candidate.unwrap().to_string())
+    } else {
+        None
+    }
+}
+
+fn levenshtein_distance(a: &str, b: &str) -> usize {
+    let mut matrix = vec![vec![0; b.len() + 1]; a.len() + 1];
+    for i in 0..=a.len() {
+        matrix[i][0] = i;
+    }
+    for j in 0..=b.len() {
+        matrix[0][j] = j;
+    }
+    for j in 1..=b.len() {
+        for i in 1..=a.len() {
+            let substitution_cost = if a.chars().nth(i - 1) == b.chars().nth(j - 1) {
+                0
+            } else {
+                1
+            };
+            matrix[i][j] = *[
+                matrix[i - 1][j] + 1,
+                matrix[i][j - 1] + 1,
+                matrix[i - 1][j - 1] + substitution_cost,
+            ]
+            .iter()
+            .min()
+            .unwrap();
+        }
+    }
+    matrix[a.len()][b.len()]
 }

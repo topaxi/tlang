@@ -83,4 +83,16 @@ impl SymbolTable {
             .position(|s| s.id == id)
             .map(|index| self.symbols.swap_remove(index))
     }
+
+    pub fn get_all_symbol_names(&self) -> Vec<String> {
+        let mut names = self
+            .symbols
+            .iter()
+            .map(|s| s.name.clone())
+            .collect::<Vec<String>>();
+        if let Some(ref parent) = self.parent {
+            names.extend(parent.borrow().get_all_symbol_names());
+        }
+        names
+    }
 }
