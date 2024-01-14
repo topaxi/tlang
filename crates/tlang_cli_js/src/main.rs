@@ -18,6 +18,20 @@ struct Args {
     output_file: Option<String>,
 }
 
+fn compile_standard_library() -> Result<(), ParserError> {
+    let std_lib_source = compile(&CodegenJS::get_standard_library_source())?;
+    let output_file_name = "js/stdlib.js";
+    let mut output_file = match File::create(&output_file_name) {
+        Err(why) => panic!("couldn't create {}: {}", output_file_name, why),
+        Ok(file) => file,
+    };
+    if let Err(why) = output_file.write_all(std_lib_source.as_bytes()) {
+        panic!("couldn't write to {}: {}", output_file_name, why)
+    };
+
+    Ok(())
+}
+
 // Main entry point for the CLI, which compiles tlang to javascript.
 // The cli takes a single argument, the path to the tlang source file.
 fn main() {
@@ -38,6 +52,8 @@ fn main() {
             return;
         }
     };
+
+    compile_standard_library().unwrap();
 
     let std_lib_file = Path::new("js/stdlib.js");
     let mut std_lib = match File::open(std_lib_file) {

@@ -2,6 +2,7 @@ import { LitElement, PropertyValueMap, css, html } from 'lit';
 import { customElement, query, state } from 'lit/decorators.js';
 import LZString from 'lz-string';
 import init, {
+  get_standard_library_source,
   compile_to_js,
   parse_and_analyze,
   parse_to_ast,
@@ -172,12 +173,19 @@ export class TlangPlayground extends LitElement {
 
   @state() error = '';
 
+  private get standardLibrary() {
+    return compile_to_js(get_standard_library_source());
+  }
+
   run() {
     if (this.consoleOutput.length > 0) {
       this.consoleOutput.push('---');
     }
 
-    let fn = new Function('console', this.output);
+    let fn = new Function(
+      'console',
+      `${this.standardLibrary}\n{${this.output}};`,
+    );
 
     fn({
       log: (...args: unknown[]) => {

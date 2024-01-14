@@ -1,0 +1,60 @@
+enum Option {
+  Some(value),
+  None,
+}
+
+enum Result {
+  Ok(value),
+  Err(error),
+}
+
+// len(a[]) -> int
+fn len(list) { list.length }
+
+// random_int(int) -> int
+fn random_int(max) { random() * max |> floor() }
+
+// compose(fn(a) -> b, fn(b) -> c) -> fn(a) -> c
+fn compose(f, g) { fn(x) { f(g(x)) } }
+
+// map(a[], fn(a) -> b) -> b[]
+fn map([], _) { [] }
+fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
+
+// filter(a[], fn(a) -> bool) -> a[]
+fn filter([], _) { [] }
+fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
+fn filter([x, ...xs], f) { rec filter(xs, f) }
+
+// partition(a[], fn(a) -> bool) -> (a[], a[])
+fn partition([], _) { [[], []] }
+fn partition(list, predicate) { partition(list, predicate, [], []) }
+// partition(a[], fn(a) -> bool, a[], a[]) -> (a[], a[])
+fn partition([], _, satisfies, does_not_satisfy) { [satisfies, does_not_satisfy] }
+fn partition([x, ...xs], predicate, satisfies, does_not_satisfy) if predicate(x) {
+  rec partition(xs, predicate, [...satisfies, x], does_not_satisfy)
+}
+fn partition([x, ...xs], predicate, satisfies, does_not_satisfy) {
+  rec partition(xs, predicate, satisfies, [...does_not_satisfy, x])
+}
+
+// filter_map(a[], fn(a) -> Option(b)) -> b[]
+fn filter_map([], _) { [] }
+fn filter_map([x, ...xs], f) if let Option::Some(y) = f(x) { [y, ...filter_map(xs, f)] }
+fn filter_map([x, ...xs], f) { rec filter_map(xs, f) }
+
+// foldl(a[], b, fn(b, a) -> b) -> b
+fn foldl([], acc, _) { acc }
+fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+
+// foldr(a[], b, fn(a, b) -> b) -> b
+fn foldr([], acc, _) { acc }
+fn foldr([x, ...xs], acc, f) { f(x, foldr(xs, acc, f)) }
+
+// sum(int[] xs) -> int
+fn sum([]) { 0 }
+fn sum([x, ...xs]) { x + sum(xs) }
+
+// zip(a[], b[]) -> [a, b][]
+fn zip([], []) { [] }
+fn zip([x, ...xs], [y, ...ys]) { [[x, y], ...zip(xs, ys)] }

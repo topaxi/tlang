@@ -72,6 +72,10 @@ impl CodegenJS {
         }
     }
 
+    pub fn get_standard_library_source() -> String {
+        include_str!("../std/lib.tl").to_string()
+    }
+
     pub fn push_statement_buffer(&mut self) {
         self.statement_buffer.push(String::new());
     }

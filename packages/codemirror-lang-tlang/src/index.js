@@ -60,11 +60,26 @@ export const tlangCompletion = tlangLanguage.data.of({
     { label: "else", type: "keyword" },
     { label: "enum", type: "keyword" },
 
+    { label: "Some", type: "function" },
+    { label: "None", type: "variable" },
+    { label: "Ok", type: "function" },
+    { label: "Err", type: "function" },
+    { label: "len", type: "function" },
     { label: "log", type: "function" },
     { label: "max", type: "function" },
     { label: "min", type: "function" },
     { label: "floor", type: "function" },
     { label: "random", type: "function" },
+    { label: "random_int", type: "function" },
+    { label: "compose", type: "function" },
+    { label: "map", type: "function" },
+    { label: "filter", type: "function" },
+    { label: "filter_map", type: "function" },
+    { label: "partition", type: "function" },
+    { label: "foldl", type: "function" },
+    { label: "foldr", type: "function" },
+    { label: "sum", type: "function" },
+    { label: "zip", type: "function" },
   ])
 })
 
