@@ -131,7 +131,18 @@ impl<'src> Parser<'src> {
                 name
             }
             _ => {
-                self.panic_unexpected_token("identifier", Some(actual.clone()));
+                self.push_unexpected_token_error("identifier", Some(actual.clone()));
+
+                while let Some(token) = self.current_token.as_ref() {
+                    if let TokenKind::Identifier(name) = &token.kind {
+                        let name = name.clone();
+                        self.advance();
+                        return name;
+                    }
+
+                    self.advance();
+                }
+
                 unreachable!()
             }
         }
