@@ -124,6 +124,10 @@ export class TlangPlayground extends LitElement {
       overflow: auto;
     }
 
+    .output-error {
+      min-height: 5em;
+    }
+
     .console {
       border-left: 1px solid var(--ctp-macchiato-surface0);
       padding-top: 1rem;
