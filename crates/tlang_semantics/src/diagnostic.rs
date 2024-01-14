@@ -1,7 +1,18 @@
+use std::fmt::{Display, Formatter};
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Severity {
     Error,
     Warning,
+}
+
+impl Display for Severity {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            Severity::Error => write!(f, "error"),
+            Severity::Warning => write!(f, "warning"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -33,5 +44,16 @@ impl Diagnostic {
 
     pub fn is_warning(&self) -> bool {
         self.severity == Severity::Warning
+    }
+}
+
+impl Display for Diagnostic {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{}: {}",
+            self.severity.to_string().to_uppercase(),
+            self.message
+        )
     }
 }

@@ -1,12 +1,7 @@
 import { LitElement, PropertyValueMap, css, html } from 'lit';
 import { customElement, query, state } from 'lit/decorators.js';
 import LZString from 'lz-string';
-import init, {
-  get_standard_library_source,
-  compile_to_js,
-  parse_and_analyze,
-  parse_to_ast,
-} from 'tlang_bindings_js';
+import init, { TlangCompiler } from 'tlang_bindings_js';
 import { examples } from './examples';
 
 import './components/t-codemirror';
@@ -158,7 +153,7 @@ export class TlangPlayground extends LitElement {
   consoleOutput: Array<unknown[] | string> = [];
 
   @state()
-  display: 'ast' | 'semanticAST' | 'output' = 'output';
+  display: 'ast' | 'output' = 'output';
 
   @state()
   showConsole = true;
@@ -173,12 +168,18 @@ export class TlangPlayground extends LitElement {
 
   @state() ast = '';
 
-  @state() semanticAST = '';
-
   @state() error = '';
 
   private get standardLibrary() {
-    return compile_to_js(get_standard_library_source());
+    return this.compile(TlangCompiler.standardLibrarySource).output;
+  }
+
+  private compile(source: string) {
+    let parser = new TlangCompiler(source);
+    parser.compile();
+    let { output, parseErrors, ast, diagnostics } = parser;
+    parser.free();
+    return { output, parseErrors, ast, diagnostics };
   }
 
   run() {
@@ -228,12 +229,16 @@ export class TlangPlayground extends LitElement {
     if (changedProperties.has('source')) {
       try {
         this.error = '';
-        let ast = parse_to_ast(this.source);
-        this.ast = JSON.stringify(ast, null, 2);
-        let semanticAST = parse_and_analyze(this.source);
-        this.semanticAST = JSON.stringify(semanticAST, null, 2);
-        let js = compile_to_js(this.source);
-        this.output = js;
+        let { output, parseErrors, ast, diagnostics } = this.compile(
+          this.source,
+        );
+
+        if (parseErrors.length + diagnostics.length) {
+          this.error = [...parseErrors, ...diagnostics].join('\n');
+        } else {
+          this.ast = ast;
+          this.output = output;
+        }
       } catch (error) {
         this.error = String(error);
       }
@@ -300,7 +305,6 @@ export class TlangPlayground extends LitElement {
         >
           <option value="output">code</option>
           <option value="ast">ast</option>
-          <option value="semanticAST">semantic ast</option>
         </select>
         <div class="repo-link">
           <a href="https://github.com/topaxi/tlang">Source Code</a>
@@ -312,9 +316,6 @@ export class TlangPlayground extends LitElement {
       <div class="output">
         ${this.display === 'ast'
           ? html`<pre class="output-ast">${this.ast}</pre>`
-          : ''}
-        ${this.display === 'semanticAST'
-          ? html`<pre class="output-ast">${this.semanticAST}</pre>`
           : ''}
         ${this.display === 'output'
           ? html`<t-codemirror

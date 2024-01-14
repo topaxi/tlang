@@ -1,69 +1,107 @@
-use tlang_ast::{node::Node, symbols::SymbolType};
+use tlang_ast::{
+    node::{AstNode, Node},
+    symbols::SymbolType,
+};
 use tlang_codegen_js::generator::CodegenJS;
-use tlang_parser::parser::Parser;
-use tlang_semantics::SemanticAnalyzer;
+use tlang_parser::{error::ParseError, parser::Parser};
+use tlang_semantics::{diagnostic::Diagnostic, SemanticAnalyzer};
 use wasm_bindgen::prelude::*;
 
-fn parse_source(source: &str) -> Result<Node, JsError> {
-    match Parser::from_source(source).parse() {
-        Ok(ast) => Ok(ast),
-        Err(errors) => Err(JsError::new(&format!("{:#?}", errors))),
+#[wasm_bindgen]
+pub struct TlangCompiler {
+    source: String,
+    codegen: CodegenJS,
+    analyzer: SemanticAnalyzer,
+    ast: Node,
+
+    diagnostics: Vec<Diagnostic>,
+    parse_errors: Vec<ParseError>,
+}
+
+#[wasm_bindgen]
+impl TlangCompiler {
+    #[wasm_bindgen(constructor)]
+    pub fn new(source: &str) -> Self {
+        TlangCompiler {
+            source: source.to_string(),
+            codegen: CodegenJS::default(),
+            analyzer: SemanticAnalyzer::default(),
+            ast: Node::new(AstNode::None),
+            diagnostics: Vec::new(),
+            parse_errors: Vec::new(),
+        }
     }
-}
 
-fn analyze_ast(ast: &mut Node) -> Result<(), JsError> {
-    let mut semantic_analyzer = SemanticAnalyzer::default();
-    semantic_analyzer.add_builtin_symbols(&[
-        ("Some", SymbolType::Function),
-        ("None", SymbolType::Variable),
-        ("Ok", SymbolType::Function),
-        ("Err", SymbolType::Function),
-        ("len", SymbolType::Function),
-        ("log", SymbolType::Function),
-        ("max", SymbolType::Function),
-        ("min", SymbolType::Function),
-        ("floor", SymbolType::Function),
-        ("random", SymbolType::Function),
-        ("random_int", SymbolType::Function),
-        ("compose", SymbolType::Function),
-        ("map", SymbolType::Function),
-        ("filter", SymbolType::Function),
-        ("filter_map", SymbolType::Function),
-        ("partition", SymbolType::Function),
-        ("foldl", SymbolType::Function),
-        ("foldr", SymbolType::Function),
-        ("sum", SymbolType::Function),
-        ("zip", SymbolType::Function),
-    ]);
-    match semantic_analyzer.analyze(ast) {
-        Ok(_) => Ok(()),
-        Err(diagnostics) => Err(JsError::new(&format!("{:#?}", diagnostics))),
+    fn parse(&mut self) {
+        match Parser::from_source(&self.source).parse() {
+            Ok(ast) => self.ast = ast,
+            Err(errors) => self.parse_errors = errors,
+        }
     }
-}
 
-#[wasm_bindgen]
-pub fn get_standard_library_source() -> String {
-    CodegenJS::get_standard_library_source()
-}
+    fn analyze(&mut self) {
+        self.analyzer.add_builtin_symbols(&[
+            ("Some", SymbolType::Function),
+            ("None", SymbolType::Variable),
+            ("Ok", SymbolType::Function),
+            ("Err", SymbolType::Function),
+            ("len", SymbolType::Function),
+            ("log", SymbolType::Function),
+            ("max", SymbolType::Function),
+            ("min", SymbolType::Function),
+            ("floor", SymbolType::Function),
+            ("random", SymbolType::Function),
+            ("random_int", SymbolType::Function),
+            ("compose", SymbolType::Function),
+            ("map", SymbolType::Function),
+            ("filter", SymbolType::Function),
+            ("filter_map", SymbolType::Function),
+            ("partition", SymbolType::Function),
+            ("foldl", SymbolType::Function),
+            ("foldr", SymbolType::Function),
+            ("sum", SymbolType::Function),
+            ("zip", SymbolType::Function),
+        ]);
+        match self.analyzer.analyze(&mut self.ast) {
+            Ok(_) => {}
+            Err(diagnostics) => self.diagnostics = diagnostics,
+        }
+    }
 
-#[wasm_bindgen]
-pub fn parse_to_ast(source: &str) -> Result<String, JsError> {
-    let ast = parse_source(source)?;
-    Ok(format!("{:#?}", ast))
-}
+    #[wasm_bindgen]
+    pub fn compile(&mut self) {
+        self.parse();
+        self.analyze();
+        self.codegen.generate_code(&self.ast);
+    }
 
-#[wasm_bindgen]
-pub fn parse_and_analyze(source: &str) -> Result<String, JsError> {
-    let mut ast = parse_source(source)?;
-    analyze_ast(&mut ast)?;
-    Ok(format!("{:#?}", ast))
-}
+    #[wasm_bindgen(getter)]
+    pub fn source(&self) -> String {
+        self.source.clone()
+    }
 
-#[wasm_bindgen]
-pub fn compile_to_js(source: &str) -> Result<String, JsError> {
-    let mut codegen = CodegenJS::default();
-    let mut ast = parse_source(source)?;
-    analyze_ast(&mut ast)?;
-    codegen.generate_code(&ast);
-    Ok(codegen.get_output().to_string())
+    #[wasm_bindgen(getter)]
+    pub fn ast(&self) -> String {
+        format!("{:#?}", self.ast)
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn diagnostics(&self) -> Vec<String> {
+        self.diagnostics.iter().map(|d| d.to_string()).collect()
+    }
+
+    #[wasm_bindgen(getter, js_name = "parseErrors")]
+    pub fn parse_errors(&self) -> Vec<String> {
+        self.parse_errors.iter().map(|e| e.to_string()).collect()
+    }
+
+    #[wasm_bindgen(getter, js_name = "standardLibrarySource")]
+    pub fn standard_library_source() -> String {
+        CodegenJS::get_standard_library_source()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn output(&self) -> String {
+        self.codegen.get_output().to_string()
+    }
 }
