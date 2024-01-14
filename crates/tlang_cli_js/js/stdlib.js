@@ -29,6 +29,12 @@ function len(list) {
 function random_int(max) {
     return Math.floor(Math.random() * max);
 }
+// compose(fn(a) -> b, fn(b) -> c) -> fn(a) -> c
+function compose(f, g) {
+    return function(x) {
+        return f(g(x));
+    };
+}
 // map(a[], fn(a) -> b) -> b[]
 function map(...args) {
     if (args[0].length === 0) {
@@ -148,6 +154,19 @@ function foldl(...args) {
             args[1] = $tmp$c;
             args[2] = $tmp$d;
         }
+    }
+}
+// foldr(a[], b, fn(a, b) -> b) -> b
+function foldr(...args) {
+    if (args[0].length === 0) {
+        let acc = args[1];
+        return acc;
+    } else if (args[0].length >= 1) {
+        let acc = args[1];
+        let f = args[2];
+        let x = args[0][0];
+        let xs = args[0].slice(1);
+        return f(x, foldr(xs, acc, f));
     }
 }
 // sum(int[] xs) -> int
