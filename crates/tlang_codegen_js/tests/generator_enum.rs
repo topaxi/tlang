@@ -1,6 +1,5 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
-use tlang_ast::symbols::SymbolType;
 
 mod common;
 

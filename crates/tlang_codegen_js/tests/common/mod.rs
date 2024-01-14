@@ -25,6 +25,8 @@ pub fn compile_src(source: &str, builtin_symbols: &[(&str, SymbolType)]) -> Stri
 #[macro_export]
 macro_rules! compile {
     ($source:expr) => {{
+        use tlang_ast::symbols::SymbolType;
+
         $crate::common::compile_src(
             $source,
             &[

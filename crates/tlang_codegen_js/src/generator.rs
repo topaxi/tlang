@@ -4,6 +4,7 @@ use crate::{
         generate_function_declaration, generate_function_declarations,
         generate_function_expression, generate_function_parameter, generate_return_statement,
     },
+    pattern_match_generator::generate_match_expression,
     scope::Scope,
 };
 use tlang_ast::{
@@ -120,6 +121,16 @@ impl CodegenJS {
     }
 
     #[inline(always)]
+    pub fn get_indent_level(&self) -> usize {
+        self.indent_level
+    }
+
+    #[inline(always)]
+    pub fn set_indent_level(&mut self, level: usize) {
+        self.indent_level = level;
+    }
+
+    #[inline(always)]
     pub fn flush_statement_buffer(&mut self) {
         self.output.push_str(self.statement_buffer.last().unwrap());
         self.statement_buffer.last_mut().unwrap().clear();
@@ -208,6 +219,31 @@ impl CodegenJS {
 
     pub fn pop_function_context(&mut self) {
         self.function_context_stack.pop();
+    }
+
+    #[inline(always)]
+    pub fn push_completion_variable(&mut self, name: Option<String>) {
+        self.completion_variables.push(name);
+    }
+
+    #[inline(always)]
+    pub fn pop_completion_variable(&mut self) {
+        self.completion_variables.pop();
+    }
+
+    #[inline(always)]
+    pub fn current_completion_variable(&self) -> Option<String> {
+        self.completion_variables.last().unwrap().clone()
+    }
+
+    #[inline(always)]
+    pub fn current_completion_variable_count(&self) -> usize {
+        self.completion_variables.len()
+    }
+
+    #[inline(always)]
+    pub fn nth_completion_variable(&self, index: usize) -> Option<&String> {
+        self.completion_variables.get(index).unwrap().as_ref()
     }
 
     fn generate_literal(&mut self, literal: &Literal) {
@@ -427,19 +463,12 @@ impl CodegenJS {
                 self.generate_variable_declaration(pattern, expression);
             }
             AstNode::Match {
-                expression: _,
-                arms: _,
-            } => todo!(),
-            AstNode::MatchArm {
-                pattern: _,
-                expression: _,
-            } => todo!(),
+                expression,
+                arms,
+            } => generate_match_expression(self, expression, arms),
+            AstNode::MatchArm { .. } => unreachable!("MatchArm is being generated in generate_match_expression."),
             AstNode::Wildcard => unreachable!("Stray wildcard expression, you can only use _ wildcards in function declarations, pipelines and pattern matching."),
-            AstNode::IfElse {
-                condition,
-                then_branch,
-                else_branch,
-            } => {
+            AstNode::IfElse { condition, then_branch, else_branch } => {
                 self.generate_if_else(condition, then_branch, else_branch);
             }
             AstNode::FunctionParameter{ id: _, node, type_annotation: _ } => generate_function_parameter(self, node),
