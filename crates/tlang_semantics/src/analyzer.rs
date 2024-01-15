@@ -14,6 +14,7 @@ pub struct SemanticAnalyzer {
     declaration_analyzer: DeclarationAnalyzer,
     symbol_table_stack: Vec<Rc<RefCell<SymbolTable>>>,
     diagnostics: Vec<Diagnostic>,
+    identifier_is_declaration: bool,
 }
 
 impl Default for SemanticAnalyzer {
@@ -28,6 +29,7 @@ impl SemanticAnalyzer {
             declaration_analyzer,
             symbol_table_stack: vec![],
             diagnostics: vec![],
+            identifier_is_declaration: false,
         }
     }
 
@@ -86,7 +88,9 @@ impl SemanticAnalyzer {
             AstNode::Program(nodes) => nodes.iter_mut().for_each(|node| self.analyze_node(node)),
             AstNode::ExpressionStatement(node) => self.analyze_node(node),
             AstNode::Block(nodes, ref mut return_value) => {
-                nodes.iter_mut().for_each(|node| self.analyze_node(node));
+                for node in nodes.iter_mut() {
+                    self.analyze_node(node)
+                }
 
                 if let Some(return_value) = return_value {
                     self.analyze_node(return_value);
@@ -149,12 +153,16 @@ impl SemanticAnalyzer {
                     self.analyze_node(else_branch);
                 }
             }
+            AstNode::Identifier(_) if self.identifier_is_declaration => {}
             AstNode::Identifier(name) => {
-                if let Some(ref mut symbol_info) =
-                    self.get_last_symbol_table().borrow().get_by_name(name)
-                {
-                    // How does this even work, we clone the struct 🤔
-                    symbol_info.used = true;
+                let symbol_info = self.get_last_symbol_table().borrow().get_by_name(name);
+
+                if let Some(symbol_info) = symbol_info {
+                    let symbol_table = self.get_last_symbol_table();
+                    // TODO: This only marks the by it's name, not by it's id. Maybe we should
+                    //       mark it in the collection pass? Or keep track of the current id in
+                    //       case the name is being shadowed?
+                    symbol_table.borrow_mut().mark_as_used(symbol_info.id);
                 } else {
                     let did_you_mean = did_you_mean(
                         name,
@@ -206,12 +214,18 @@ impl SemanticAnalyzer {
                 self.analyze_node(base);
                 self.analyze_node(index);
             }
+            AstNode::FieldExpression { base, field: _ } => {
+                self.analyze_node(base);
+                // TODO: We are checking for unused variables, this should be refactored into
+                //       it's own pass. Skipping analyzing field of variable as we do not have
+                //       any type information yet.
+                // self.analyze_node(field);
+            }
             AstNode::ListPattern(_)
             | AstNode::Dict(_)
             | AstNode::EnumDeclaration { .. }
             | AstNode::EnumVariant { .. }
             | AstNode::EnumPattern { .. }
-            | AstNode::FieldExpression { .. }
             | AstNode::Range { .. }
             | AstNode::Match { .. }
             | AstNode::MatchArm { .. }
@@ -234,6 +248,7 @@ impl SemanticAnalyzer {
             let local_symbols = symbol_table.get_all_local_symbols();
             let mut unused_symbols = local_symbols
                 .iter()
+                .filter(|symbol| symbol.id != SymbolId::new(0))
                 .filter(|symbol| !symbol.used)
                 .collect::<Vec<_>>();
 
@@ -251,12 +266,20 @@ impl SemanticAnalyzer {
         }
     }
 
+    fn analyze_declaration_node(&mut self, ast: &mut Node) {
+        self.identifier_is_declaration = true;
+        self.analyze_node(ast);
+        self.identifier_is_declaration = false;
+    }
+
     fn analyze_variable_declaration(
         &mut self,
         id: SymbolId,
-        _pattern: &Node,
+        pattern: &mut Node,
         expression: &mut Box<Node>,
     ) {
+        self.analyze_declaration_node(pattern);
+
         // When declaring a variable, we can only reference symbols that were declared before.
         // This includes our own variable name.
         // E.g. `let a = a;` is not allowed. But `let a = 1; let a = a;` is.
@@ -277,7 +300,7 @@ impl SemanticAnalyzer {
         name: &mut Node,
         declaration: &mut FunctionDeclaration,
     ) {
-        self.analyze_node(name);
+        self.analyze_declaration_node(name);
 
         for parameter in &mut declaration.parameters {
             self.analyze_node(parameter);
@@ -302,7 +325,7 @@ impl SemanticAnalyzer {
     }
 
     fn analyze_function_parameter(&mut self, _node: &mut Node, name: &mut Node) {
-        self.analyze_node(name);
+        self.analyze_declaration_node(name);
     }
 
     fn analyze_call(&mut self, function: &mut Box<Node>, arguments: &mut [Node]) {

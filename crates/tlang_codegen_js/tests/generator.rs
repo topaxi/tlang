@@ -240,12 +240,14 @@ fn test_char_literals() {
 fn test_field_access_expressions() {
     let output = compile!(indoc! {"
         fn main() {
-            let x = foo.bar;
+            let list = [];
+            let x = list.length;
         }
     "});
     let expected_output = indoc! {"
         function main() {
-            let x = foo.bar;
+            let list = [];
+            let x = list.length;
         }
     "};
     assert_eq!(output, expected_output);

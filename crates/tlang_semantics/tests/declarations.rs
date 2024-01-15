@@ -213,6 +213,7 @@ fn test_should_collect_list_destructuring_with_rest_symbols_in_function_argument
             id: SymbolId::new(2),
             name: "sum".to_string(),
             symbol_type: SymbolType::Function,
+            used: true,
             ..Default::default()
         })
     );
@@ -236,6 +237,7 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
             id: SymbolId::new(5),
             name: "factorial".to_string(),
             symbol_type: SymbolType::Function,
+            used: true,
             ..Default::default()
         })
     );

@@ -233,9 +233,16 @@ export class TlangPlayground extends LitElement {
           this.source,
         );
 
-        if (parseErrors.length + diagnostics.length) {
+        console.log({ output, parseErrors, ast, diagnostics });
+
+        let diagnosticsErrors = diagnostics.filter((diagnostic) =>
+          diagnostic.startsWith('ERROR:'),
+        );
+
+        if (parseErrors.length + diagnosticsErrors.length) {
           this.error = [...parseErrors, ...diagnostics].join('\n');
         } else {
+          this.error = diagnostics.join('\n');
           this.ast = ast;
           this.output = output;
         }

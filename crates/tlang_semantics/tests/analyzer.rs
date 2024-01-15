@@ -17,7 +17,7 @@ macro_rules! analyze {
         let mut analyzer = SemanticAnalyzer::default();
         match analyzer.analyze(&mut ast) {
             Ok(_) => ast,
-            Err(diagnostics) => panic!("Expected no diagnostics, got {:#?}", diagnostics),
+            Err(diagnostics) => panic!("Expected no error diagnostics, got {:#?}", diagnostics),
         }
     }};
 }
@@ -134,6 +134,7 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
             id: SymbolId::new(1),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
+            used: true,
             ..Default::default()
         })
     );
@@ -143,6 +144,7 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
             id: SymbolId::new(2),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
+            used: false,
             ..Default::default()
         })
     );
@@ -214,6 +216,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
             id: SymbolId::new(4),
             name: "c".to_string(),
             symbol_type: SymbolType::Variable,
+            used: true,
             ..Default::default()
         })
     );
@@ -231,9 +234,19 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
             id: SymbolId::new(4),
             name: "c".to_string(),
             symbol_type: SymbolType::Variable,
+            used: true,
             ..Default::default()
         })
     );
+}
+
+#[test]
+fn should_not_warn_about_used_variables() {
+    let diagnostics = analyze_diag!(indoc! {"
+        let a = 1;
+        a + 1;
+    "});
+    assert_eq!(diagnostics, vec![]);
 }
 
 #[test]
@@ -256,7 +269,6 @@ fn should_warn_about_unused_function_and_parameters() {
     let diagnostics = analyze_diag!(indoc! {"
         fn add(a, b) {
             let c = 1;
-            a + b
         }
     "});
     assert_eq!(

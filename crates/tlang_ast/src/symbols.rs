@@ -113,6 +113,28 @@ impl SymbolTable {
         self.symbols.push(symbol_info);
     }
 
+    pub fn mark_as_used(&mut self, id: SymbolId) {
+        if let Some(symbol) = self.get_local(id) {
+            self.symbols
+                .iter_mut()
+                .find(|s| s.id == symbol.id)
+                .map(|s| s.used = true);
+        } else if let Some(ref parent) = self.parent {
+            parent.borrow_mut().mark_as_used(id);
+        }
+    }
+
+    pub fn mark_name_as_used(&mut self, name: &str) {
+        if let Some(symbol) = self.get_local_by_name(name) {
+            self.symbols
+                .iter_mut()
+                .find(|s| s.id == symbol.id)
+                .map(|s| s.used = true);
+        } else if let Some(ref parent) = self.parent {
+            parent.borrow_mut().mark_name_as_used(name);
+        }
+    }
+
     pub fn remove(&mut self, id: SymbolId) -> Option<SymbolInfo> {
         self.symbols
             .iter()

@@ -62,10 +62,8 @@ impl TlangCompiler {
             ("sum", SymbolType::Function),
             ("zip", SymbolType::Function),
         ]);
-        match self.analyzer.analyze(&mut self.ast) {
-            Ok(_) => {}
-            Err(diagnostics) => self.diagnostics = diagnostics,
-        }
+        let _ = self.analyzer.analyze(&mut self.ast);
+        self.diagnostics = self.analyzer.get_diagnostics().to_owned();
     }
 
     #[wasm_bindgen]
