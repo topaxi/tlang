@@ -68,21 +68,21 @@ impl DeclarationAnalyzer {
         self.collect_declarations(ast);
     }
 
-    fn collect_declarations(&mut self, ast: &mut Node) {
-        let mut ast_node = std::mem::replace(&mut ast.ast_node, AstNode::None);
+    fn collect_declarations(&mut self, node: &mut Node) {
+        let mut ast_node = std::mem::replace(&mut node.ast_node, AstNode::None);
 
         match &mut ast_node {
-            AstNode::Program(nodes) => self.collect_program_declarations(ast, nodes),
+            AstNode::Program(nodes) => self.collect_program_declarations(node, nodes),
             AstNode::ExpressionStatement(node) => self.collect_declarations(node),
             AstNode::Block(nodes, return_value) => {
-                self.collect_block_declarations(ast, nodes, return_value)
+                self.collect_block_declarations(node, nodes, return_value)
             }
             AstNode::VariableDeclaration {
                 id,
                 pattern,
                 expression,
                 type_annotation: _,
-            } => self.collect_variable_declaration(ast, *id, pattern, expression),
+            } => self.collect_variable_declaration(node, *id, pattern, expression),
             AstNode::FunctionDeclaration(decl) => {
                 // TODO: Refactor and deduplicate function declaration handling.
                 for param in &mut decl.parameters {
@@ -97,24 +97,24 @@ impl DeclarationAnalyzer {
                 id,
                 name,
                 declaration,
-            } => self.collect_function_declaration(ast, *id, name, declaration),
+            } => self.collect_function_declaration(node, *id, name, declaration),
             AstNode::FunctionDeclarations {
                 id,
                 name,
                 declarations,
-            } => self.collect_function_declarations(ast, *id, name, declarations),
+            } => self.collect_function_declarations(node, *id, name, declarations),
             AstNode::FunctionParameter {
                 id,
-                node,
+                pattern,
                 type_annotation: _,
-            } => self.collect_function_parameter(ast, *id, node),
+            } => self.collect_function_parameter(node, *id, pattern),
             AstNode::FunctionExpression {
                 id,
                 name,
                 declaration,
             } => {
                 self.push_symbol_table();
-                ast.symbol_table = Some(Rc::clone(&self.get_last_symbol_table()));
+                node.symbol_table = Some(Rc::clone(&self.get_last_symbol_table()));
                 if let Some(name) = name {
                     let name_as_str = self.fn_identifier_to_string(name);
                     self.declare_symbol(SymbolInfo::new(*id, &name_as_str, SymbolType::Function));
@@ -133,14 +133,14 @@ impl DeclarationAnalyzer {
                 }
             }
             AstNode::ListPattern(patterns) => {
-                self.collect_list_pattern(ast, patterns);
+                self.collect_list_pattern(node, patterns);
             }
             AstNode::EnumPattern {
                 identifier,
                 elements,
                 named_fields,
             } => self.collect_enum_pattern(
-                ast,
+                node,
                 SymbolId::new(0),
                 identifier,
                 elements,
@@ -222,7 +222,7 @@ impl DeclarationAnalyzer {
             }
         }
 
-        ast.ast_node = ast_node;
+        node.ast_node = ast_node;
     }
 
     fn collect_program_declarations(&mut self, node: &mut Node, nodes: &mut [Node]) {
@@ -353,8 +353,8 @@ impl DeclarationAnalyzer {
         self.pop_symbol_table();
     }
 
-    fn collect_function_parameter(&mut self, _node: &mut Node, id: SymbolId, name: &mut Node) {
-        match name.ast_node {
+    fn collect_function_parameter(&mut self, _node: &mut Node, id: SymbolId, pattern: &mut Node) {
+        match pattern.ast_node {
             AstNode::Identifier(ref name) => {
                 self.declare_symbol(SymbolInfo::new(id, &name, SymbolType::Parameter));
             }
@@ -380,7 +380,7 @@ impl DeclarationAnalyzer {
                 self.collect_enum_pattern(_node, id, identifier, elements, named_fields)
             }
             AstNode::Wildcard => {} // Wildcard discards values, nothing to do here.
-            _ => panic!("Expected identifier or list, found {:?}", name.ast_node),
+            _ => panic!("Expected identifier or list, found {:?}", pattern.ast_node),
         }
     }
 

@@ -159,7 +159,9 @@ fn test_pipeline_operator_long_chaining() {
                                     declaration: Box::new(FunctionDeclaration {
                                         parameters: vec![node::new!(FunctionParameter {
                                             id: SymbolId::new(1),
-                                            node: Box::new(node::new!(Identifier("x".to_string()))),
+                                            pattern: Box::new(node::new!(Identifier(
+                                                "x".to_string()
+                                            ))),
                                             type_annotation: None,
                                         })],
                                         guard: None,
@@ -188,7 +190,7 @@ fn test_pipeline_operator_long_chaining() {
                                 declaration: Box::new(FunctionDeclaration {
                                     parameters: vec![node::new!(FunctionParameter {
                                         id: SymbolId::new(3),
-                                        node: Box::new(node::new!(Identifier("x".to_string()))),
+                                        pattern: Box::new(node::new!(Identifier("x".to_string()))),
                                         type_annotation: None,
                                     })],
                                     guard: None,
@@ -223,14 +225,16 @@ fn test_pipeline_operator_long_chaining() {
                                     parameters: vec![
                                         node::new!(FunctionParameter {
                                             id: SymbolId::new(5),
-                                            node: Box::new(node::new!(Identifier(
+                                            pattern: Box::new(node::new!(Identifier(
                                                 "acc".to_string()
                                             ))),
                                             type_annotation: None,
                                         }),
                                         node::new!(FunctionParameter {
                                             id: SymbolId::new(6),
-                                            node: Box::new(node::new!(Identifier("x".to_string()))),
+                                            pattern: Box::new(node::new!(Identifier(
+                                                "x".to_string()
+                                            ))),
                                             type_annotation: None,
                                         }),
                                     ],

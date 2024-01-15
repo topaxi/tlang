@@ -142,11 +142,11 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
         for (j, param) in declaration.parameters.iter().enumerate() {
             if let AstNode::FunctionParameter {
                 id: _,
-                node,
+                pattern,
                 type_annotation: _,
             } = &param.ast_node
             {
-                match &node.ast_node {
+                match &pattern.ast_node {
                     AstNode::Identifier(name) => {
                         codegen
                             .current_scope()
@@ -180,12 +180,12 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                 .filter(|(_, param)| {
                     if let AstNode::FunctionParameter {
                         id: _,
-                        node,
+                        pattern,
                         type_annotation: _,
                     } = &param.ast_node
                     {
                         matches!(
-                            node.ast_node,
+                            pattern.ast_node,
                             AstNode::Literal(_)
                                 | AstNode::ListPattern(_)
                                 | AstNode::EnumPattern { .. }
@@ -217,11 +217,11 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
 
                 if let AstNode::FunctionParameter {
                     id: _,
-                    node,
+                    pattern,
                     type_annotation: _,
                 } = &param.ast_node
                 {
-                    match &node.ast_node {
+                    match &pattern.ast_node {
                         AstNode::Identifier(_) | AstNode::Literal(_) => {
                             codegen.push_str(&format!("args[{}] === ", k));
                             codegen.generate_node(param, None);
@@ -333,11 +333,11 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
         for (j, param) in declaration.parameters.iter().enumerate() {
             if let AstNode::FunctionParameter {
                 id: _,
-                node,
+                pattern,
                 type_annotation: _,
             } = &param.ast_node
             {
-                if let AstNode::Identifier(ref name) = node.ast_node {
+                if let AstNode::Identifier(ref name) = pattern.ast_node {
                     codegen.push_indent();
                     codegen.push_str(&format!("let {} = args[{}];\n", name, j));
                     codegen.current_scope().declare_variable_alias(name, name);
@@ -525,14 +525,14 @@ pub fn generate_function_expression(
     codegen.pop_scope();
 }
 
-pub fn generate_function_parameter(codegen: &mut CodegenJS, node: &Node) {
-    match &node.ast_node {
+pub fn generate_function_parameter(codegen: &mut CodegenJS, pattern: &Node) {
+    match &pattern.ast_node {
         // Do not run generate_identifier, as that would resolve the parameter as a variable.
         AstNode::Identifier(ident) => {
             codegen.current_scope().declare_variable(ident);
             codegen.push_str(ident);
         }
-        AstNode::Literal(_) => codegen.generate_node(node, None),
+        AstNode::Literal(_) => codegen.generate_node(pattern, None),
         AstNode::ListPattern(_) => todo!(),
         // Wildcards are handled within pipeline and call expressions,
         AstNode::Wildcard => unreachable!("Unexpected wildcard in function parameter."),

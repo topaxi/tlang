@@ -134,7 +134,7 @@ impl SemanticAnalyzer {
             }
             AstNode::FunctionParameter {
                 id: _,
-                node,
+                pattern: node,
                 type_annotation: _,
             } => self.analyze_function_parameter(ast, node),
             AstNode::ReturnStatement(expr) => {

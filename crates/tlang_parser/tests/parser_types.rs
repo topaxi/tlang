@@ -169,7 +169,7 @@ fn test_function_param_types() {
                 parameters: vec![
                     node::new!(FunctionParameter {
                         id: SymbolId::new(1),
-                        node: Box::new(node::new!(Identifier("x".to_string()))),
+                        pattern: Box::new(node::new!(Identifier("x".to_string()))),
                         type_annotation: Some(Box::new(node::new!(TypeAnnotation {
                             name: Box::new(node::new!(Identifier("i64".to_string()))),
                             parameters: vec![]
@@ -177,7 +177,7 @@ fn test_function_param_types() {
                     }),
                     node::new!(FunctionParameter {
                         id: SymbolId::new(2),
-                        node: Box::new(node::new!(Identifier("y".to_string()))),
+                        pattern: Box::new(node::new!(Identifier("y".to_string()))),
                         type_annotation: Some(Box::new(node::new!(TypeAnnotation {
                             name: Box::new(node::new!(Identifier("i64".to_string()))),
                             parameters: vec![]

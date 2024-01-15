@@ -731,7 +731,7 @@ impl<'src> Parser<'src> {
                 log::debug!("Parsed parameter: {:?}", parameter);
                 parameters.push(node::new!(FunctionParameter {
                     id: self.unique_id(),
-                    node: Box::new(parameter),
+                    pattern: Box::new(parameter),
                     type_annotation: type_annotation.map(Box::new),
                 }));
             }

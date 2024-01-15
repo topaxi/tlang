@@ -196,11 +196,11 @@ impl CodegenJS {
                 .map(|param| {
                     if let AstNode::FunctionParameter {
                         id: _,
-                        node,
+                        pattern,
                         type_annotation: _,
                     } = &param.ast_node
                     {
-                        if let AstNode::Identifier(ref name) = node.ast_node {
+                        if let AstNode::Identifier(ref name) = pattern.ast_node {
                             name.clone()
                         } else {
                             // Encountered destructuring/pattern matching or wildcard, declare
@@ -471,7 +471,7 @@ impl CodegenJS {
             AstNode::IfElse { condition, then_branch, else_branch } => {
                 self.generate_if_else(condition, then_branch, else_branch);
             }
-            AstNode::FunctionParameter{ id: _, node, type_annotation: _ } => generate_function_parameter(self, node),
+            AstNode::FunctionParameter{ id: _, pattern, type_annotation: _ } => generate_function_parameter(self, pattern),
             AstNode::FunctionSingleDeclaration { id: _, name, declaration } =>
                 generate_function_declaration(self, name, declaration),
             AstNode::FunctionDeclarations { id: _, name, declarations } =>

@@ -97,7 +97,7 @@ pub enum AstNode {
     },
     FunctionParameter {
         id: SymbolId,
-        node: Box<Node>,
+        pattern: Box<Node>,
         type_annotation: Option<Box<Node>>,
     },
     ReturnStatement(Option<Box<Node>>),
