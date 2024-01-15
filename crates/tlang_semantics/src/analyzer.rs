@@ -117,9 +117,12 @@ impl SemanticAnalyzer {
             }
             AstNode::FunctionExpression {
                 id: _,
-                name: _,
+                name,
                 declaration,
             } => {
+                if let Some(name) = name {
+                    self.analyze_node(name);
+                }
                 for parameter in &mut declaration.parameters {
                     self.analyze_node(parameter);
                 }
@@ -147,12 +150,12 @@ impl SemanticAnalyzer {
                 }
             }
             AstNode::Identifier(name) => {
-                if self
-                    .get_last_symbol_table()
-                    .borrow()
-                    .get_by_name(name)
-                    .is_none()
+                if let Some(ref mut symbol_info) =
+                    self.get_last_symbol_table().borrow().get_by_name(name)
                 {
+                    // How does this even work, we clone the struct 🤔
+                    symbol_info.used = true;
+                } else {
                     let did_you_mean = did_you_mean(
                         name,
                         &self
@@ -226,7 +229,21 @@ impl SemanticAnalyzer {
 
         ast.ast_node = ast_node;
 
-        if ast.symbol_table.is_some() {
+        if let Some(symbol_table) = &ast.symbol_table {
+            let symbol_table = symbol_table.borrow();
+            let local_symbols = symbol_table.get_all_local_symbols();
+            let mut unused_symbols = local_symbols
+                .iter()
+                .filter(|symbol| !symbol.used)
+                .collect::<Vec<_>>();
+
+            for unused_symbol in unused_symbols.iter_mut() {
+                self.diagnostics.push(Diagnostic::new(
+                    format!("Unused variable `{}`", unused_symbol.name),
+                    Severity::Warning,
+                ));
+            }
+
             self.pop_symbol_table();
         }
     }
@@ -254,9 +271,11 @@ impl SemanticAnalyzer {
     fn analyze_function_declaration(
         &mut self,
         _node: &mut Node,
-        _name: &Node,
+        name: &mut Node,
         declaration: &mut FunctionDeclaration,
     ) {
+        self.analyze_node(name);
+
         for parameter in &mut declaration.parameters {
             self.analyze_node(parameter);
         }
@@ -269,7 +288,7 @@ impl SemanticAnalyzer {
     fn analyze_function_declarations(
         &mut self,
         node: &mut Node,
-        name: &Node,
+        name: &mut Node,
         declarations: &mut Vec<Node>,
     ) {
         for declaration in declarations {
@@ -279,9 +298,8 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn analyze_function_parameter(&mut self, _node: &mut Node, _name: &mut Node) {
-        // TODO: In case we have default arguments, we'll have to check whether the used nodes are
-        // declared.
+    fn analyze_function_parameter(&mut self, _node: &mut Node, name: &mut Node) {
+        self.analyze_node(name);
     }
 
     fn analyze_call(&mut self, function: &mut Box<Node>, arguments: &mut [Node]) {

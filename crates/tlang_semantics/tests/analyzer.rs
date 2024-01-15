@@ -26,10 +26,8 @@ macro_rules! analyze_diag {
         let mut parser = Parser::from_source($source);
         let mut ast = parser.parse().unwrap();
         let mut analyzer = SemanticAnalyzer::default();
-        match analyzer.analyze(&mut ast) {
-            Ok(_) => vec![],
-            Err(diagnostics) => diagnostics,
-        }
+        let _ = analyzer.analyze(&mut ast);
+        analyzer.get_diagnostics().to_owned()
     }};
 }
 
@@ -51,7 +49,7 @@ fn test_should_error_on_undefined_symbol_in_variable_declaration() {
     let diagnostics = analyze_diag!("let a = b;");
 
     assert_eq!(
-        diagnostics,
+        diagnostics[..1],
         vec![Diagnostic::new(
             "Use of undeclared variable `b`".to_string(),
             Severity::Error
@@ -77,7 +75,7 @@ fn test_should_error_on_self_referencing_symbol() {
     let diagnostics = analyze_diag!("let a = a;");
 
     assert_eq!(
-        diagnostics,
+        diagnostics[..1],
         vec![Diagnostic::new(
             "Use of undeclared variable `a`".to_string(),
             Severity::Error
@@ -103,6 +101,7 @@ fn test_should_allow_shadowing_of_single_variable() {
             id: SymbolId::new(1),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
+            ..Default::default()
         })
     );
     assert_eq!(
@@ -111,6 +110,7 @@ fn test_should_allow_shadowing_of_single_variable() {
             id: SymbolId::new(2),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
+            ..Default::default()
         })
     );
 }
@@ -133,6 +133,7 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
             id: SymbolId::new(1),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
+            ..Default::default()
         })
     );
     assert_eq!(
@@ -141,6 +142,7 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
             id: SymbolId::new(2),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
+            ..Default::default()
         })
     );
 }
@@ -154,7 +156,7 @@ fn test_should_error_on_unused_identifier_in_function_definition() {
     "});
 
     assert_eq!(
-        diagnostics,
+        diagnostics[..1],
         vec![Diagnostic::new(
             "Use of undeclared variable `c`, did you mean `a`".to_string(),
             Severity::Error
@@ -183,6 +185,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
             id: SymbolId::new(3),
             name: "add".to_string(),
             symbol_type: SymbolType::Function,
+            ..Default::default()
         })
     );
 
@@ -210,6 +213,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
             id: SymbolId::new(4),
             name: "c".to_string(),
             symbol_type: SymbolType::Variable,
+            ..Default::default()
         })
     );
 
@@ -226,6 +230,22 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
             id: SymbolId::new(4),
             name: "c".to_string(),
             symbol_type: SymbolType::Variable,
+            ..Default::default()
         })
+    );
+}
+
+#[test]
+fn should_warn_about_unused_variables() {
+    let diagnostics = analyze_diag!(indoc! {"
+        let a = 1;
+        let b = 2;
+    "});
+    assert_eq!(
+        diagnostics,
+        vec![
+            Diagnostic::new("Unused variable `a`".to_string(), Severity::Warning),
+            Diagnostic::new("Unused variable `b`".to_string(), Severity::Warning),
+        ]
     );
 }

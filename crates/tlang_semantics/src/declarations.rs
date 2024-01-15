@@ -49,11 +49,13 @@ impl DeclarationAnalyzer {
 
     pub fn add_builtin_symbols(&mut self, symbols: &[(&str, SymbolType)]) {
         for (name, symbol_type) in symbols {
-            self.root_symbol_table().borrow_mut().insert(SymbolInfo {
-                id: SymbolId::new(0), // Builtins have ID 0 for now.
-                name: name.to_string(),
-                symbol_type: symbol_type.clone(),
-            });
+            self.root_symbol_table()
+                .borrow_mut()
+                .insert(SymbolInfo::new(
+                    SymbolId::new(0), // Builtins have ID 0 for now.
+                    &name,
+                    symbol_type.clone(),
+                ));
         }
     }
 
@@ -76,8 +78,15 @@ impl DeclarationAnalyzer {
                 expression,
                 type_annotation: _,
             } => self.collect_variable_declaration(ast, *id, pattern, expression),
-            AstNode::FunctionDeclaration(_decl) => {
-                // TODO: Do we hit this or are we handling this through the other nodes?
+            AstNode::FunctionDeclaration(decl) => {
+                // TODO: Refactor and deduplicate function declaration handling.
+                for param in &mut decl.parameters {
+                    self.collect_declarations(param);
+                }
+                if let Some(ref mut guard) = decl.guard {
+                    self.collect_declarations(guard);
+                }
+                self.collect_declarations(&mut decl.body);
             }
             AstNode::FunctionSingleDeclaration {
                 id,
@@ -100,15 +109,16 @@ impl DeclarationAnalyzer {
                 declaration,
             } => {
                 self.push_symbol_table();
+                ast.symbol_table = Some(Rc::clone(&self.get_last_symbol_table()));
                 if let Some(name) = name {
                     let name_as_str = self.fn_identifier_to_string(name);
                     let symbol_table = self.get_last_symbol_table_mut();
 
-                    symbol_table.borrow_mut().insert(SymbolInfo {
-                        id: *id,
-                        name: name_as_str,
-                        symbol_type: SymbolType::Function,
-                    });
+                    symbol_table.borrow_mut().insert(SymbolInfo::new(
+                        *id,
+                        &name_as_str,
+                        SymbolType::Function,
+                    ));
                 }
 
                 for param in &mut declaration.parameters {
@@ -248,21 +258,19 @@ impl DeclarationAnalyzer {
 
         match pattern.ast_node {
             AstNode::Identifier(ref name) => {
-                symbol_table.borrow_mut().insert(SymbolInfo {
-                    id,
-                    name: name.to_string(),
-                    symbol_type: SymbolType::Variable,
-                });
+                symbol_table
+                    .borrow_mut()
+                    .insert(SymbolInfo::new(id, &name, SymbolType::Variable));
             }
             AstNode::ListPattern(ref mut patterns) => {
                 for pattern in patterns {
                     // TODO: We probably need to do this recursively.
                     if let AstNode::Identifier(ref name) = pattern.ast_node {
-                        symbol_table.borrow_mut().insert(SymbolInfo {
+                        symbol_table.borrow_mut().insert(SymbolInfo::new(
                             id,
-                            name: name.to_string(),
-                            symbol_type: SymbolType::Variable,
-                        });
+                            &name,
+                            SymbolType::Variable,
+                        ));
                     }
                 }
             }
@@ -307,11 +315,9 @@ impl DeclarationAnalyzer {
         let name_as_str = self.fn_identifier_to_string(name);
         let symbol_table = self.get_last_symbol_table_mut();
 
-        symbol_table.borrow_mut().insert(SymbolInfo {
-            id,
-            name: name_as_str,
-            symbol_type: SymbolType::Function,
-        });
+        symbol_table
+            .borrow_mut()
+            .insert(SymbolInfo::new(id, &name_as_str, SymbolType::Function));
 
         // Function arguments have their own scope.
         self.push_symbol_table();
@@ -319,6 +325,10 @@ impl DeclarationAnalyzer {
 
         for param in &mut declaration.parameters {
             self.collect_declarations(param);
+        }
+
+        if let Some(ref mut guard) = declaration.guard {
+            self.collect_declarations(guard);
         }
 
         self.collect_declarations(&mut declaration.body);
@@ -335,39 +345,30 @@ impl DeclarationAnalyzer {
         let name_as_str = self.fn_identifier_to_string(name);
         let symbol_table = self.get_last_symbol_table_mut();
 
-        symbol_table.borrow_mut().insert(SymbolInfo {
-            id,
-            name: name_as_str,
-            symbol_type: SymbolType::Function,
-        });
+        symbol_table
+            .borrow_mut()
+            .insert(SymbolInfo::new(id, &name_as_str, SymbolType::Function));
+
+        self.push_symbol_table();
+        node.symbol_table = Some(Rc::clone(&self.get_last_symbol_table()));
 
         for declaration_node in declarations {
-            if let AstNode::FunctionDeclaration(ref mut declaration) = declaration_node.ast_node {
-                // Function arguments have their own scope.
-                self.push_symbol_table();
-                node.symbol_table = Some(Rc::clone(&self.get_last_symbol_table()));
-                for param in &mut declaration.parameters {
-                    self.collect_declarations(param);
-                }
-                if let Some(ref mut guard) = declaration.guard {
-                    self.collect_declarations(guard);
-                }
-                self.collect_declarations(&mut declaration.body);
-                self.pop_symbol_table();
-            }
+            self.collect_declarations(declaration_node);
         }
+
+        self.pop_symbol_table();
     }
 
     fn collect_function_parameter(&mut self, _node: &mut Node, id: SymbolId, name: &mut Node) {
         let symbol_table = self.get_last_symbol_table_mut();
 
+        println!("Collecting function parameter {:?}", name);
+
         match name.ast_node {
             AstNode::Identifier(ref name) => {
-                symbol_table.borrow_mut().insert(SymbolInfo {
-                    id,
-                    name: name.to_string(),
-                    symbol_type: SymbolType::Variable,
-                });
+                symbol_table
+                    .borrow_mut()
+                    .insert(SymbolInfo::new(id, &name, SymbolType::Variable));
             }
             AstNode::ListPattern(ref mut nodes) => {
                 for node in nodes.iter_mut() {
@@ -377,11 +378,11 @@ impl DeclarationAnalyzer {
             }
             AstNode::UnaryOp(UnaryOp::Rest, ref mut identifier) => match identifier.ast_node {
                 AstNode::Identifier(ref name) => {
-                    symbol_table.borrow_mut().insert(SymbolInfo {
+                    symbol_table.borrow_mut().insert(SymbolInfo::new(
                         id,
-                        name: name.to_string(),
-                        symbol_type: SymbolType::Variable,
-                    });
+                        name,
+                        SymbolType::Variable,
+                    ));
                 }
                 _ => panic!("Expected identifier, found {:?}", identifier.ast_node),
             },
@@ -412,16 +413,18 @@ impl DeclarationAnalyzer {
         _named_fields: bool,
     ) {
         for element in elements.iter_mut() {
+            println!("Collecting enum pattern {:?}", element);
+
             match element.ast_node {
                 AstNode::Identifier(ref name) => {
                     self.get_last_symbol_table_mut()
                         .borrow_mut()
-                        .insert(SymbolInfo {
+                        .insert(SymbolInfo::new(
                             // TODO: Verify that this id is correct.
                             id,
-                            name: name.to_string(),
-                            symbol_type: SymbolType::Variable,
-                        });
+                            &name,
+                            SymbolType::Variable,
+                        ));
                 }
                 AstNode::Wildcard => {} // Wildcard discards values, nothing to do here.
                 _ => panic!("Expected identifier, found {:?}", element.ast_node),

@@ -29,6 +29,7 @@ fn test_analyze_variable_declaration() {
             id: SymbolId::new(1),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
+            ..Default::default()
         })
     );
 }
@@ -58,6 +59,7 @@ fn test_block_scope() {
             id: SymbolId::new(1),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
+            ..Default::default()
         })
     );
     assert_eq!(program_symbols.borrow().get_by_name("b"), None);
@@ -85,6 +87,7 @@ fn test_block_scope() {
             id: SymbolId::new(1),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
+            ..Default::default()
         })
     );
     assert_eq!(
@@ -93,6 +96,7 @@ fn test_block_scope() {
             id: SymbolId::new(2),
             name: "b".to_string(),
             symbol_type: SymbolType::Variable,
+            ..Default::default()
         })
     );
     assert_eq!(block1_symbols.borrow().get_by_name("c"), None);
@@ -119,6 +123,7 @@ fn test_block_scope() {
             id: SymbolId::new(1),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
+            ..Default::default()
         })
     );
     assert_eq!(
@@ -127,6 +132,7 @@ fn test_block_scope() {
             id: SymbolId::new(2),
             name: "b".to_string(),
             symbol_type: SymbolType::Variable,
+            ..Default::default()
         })
     );
     assert_eq!(
@@ -135,6 +141,7 @@ fn test_block_scope() {
             id: SymbolId::new(3),
             name: "c".to_string(),
             symbol_type: SymbolType::Variable,
+            ..Default::default()
         })
     );
 }
@@ -158,6 +165,7 @@ fn test_should_collect_function_definitions() {
             id: SymbolId::new(3),
             name: "add".to_string(),
             symbol_type: SymbolType::Function,
+            ..Default::default()
         })
     );
 }
@@ -181,6 +189,7 @@ fn test_should_collect_list_destructuring_symbols_in_function_arguments() {
             id: SymbolId::new(2),
             name: "add".to_string(),
             symbol_type: SymbolType::Function,
+            ..Default::default()
         })
     );
 }
@@ -204,6 +213,7 @@ fn test_should_collect_list_destructuring_with_rest_symbols_in_function_argument
             id: SymbolId::new(2),
             name: "sum".to_string(),
             symbol_type: SymbolType::Function,
+            ..Default::default()
         })
     );
 }
@@ -226,6 +236,7 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
             id: SymbolId::new(5),
             name: "factorial".to_string(),
             symbol_type: SymbolType::Function,
+            ..Default::default()
         })
     );
 }
@@ -253,6 +264,7 @@ fn should_collect_function_arguments_with_enum_extraction() {
             id: SymbolId::new(4),
             name: "unwrap".to_string(),
             symbol_type: SymbolType::Function,
+            ..Default::default()
         })
     );
 }
