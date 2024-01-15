@@ -17,7 +17,7 @@ tlang_semantics = { path = "../tlang_semantics" }
 tlang_codegen_js = { path = "../tlang_codegen_js" }
 
 [dependencies.web-sys]
-version = "0.3.4"
+version = "0.3.67"
 features = [
   'Document',
   'Element',
