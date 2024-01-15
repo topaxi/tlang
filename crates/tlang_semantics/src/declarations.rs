@@ -113,8 +113,7 @@ impl DeclarationAnalyzer {
                 name,
                 declaration,
             } => {
-                self.push_symbol_table();
-                node.symbol_table = Some(Rc::clone(&self.get_last_symbol_table()));
+                node.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
                 if let Some(name) = name {
                     let name_as_str = self.fn_identifier_to_string(name);
                     self.declare_symbol(SymbolInfo::new(*id, &name_as_str, SymbolType::Function));
@@ -239,8 +238,7 @@ impl DeclarationAnalyzer {
         nodes: &mut [Node],
         expr: &mut Option<Box<Node>>,
     ) {
-        self.push_symbol_table();
-        node.symbol_table = Some(Rc::clone(&self.get_last_symbol_table()));
+        node.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
 
         for node in nodes {
             self.collect_declarations(node);
@@ -317,8 +315,7 @@ impl DeclarationAnalyzer {
         self.declare_symbol(SymbolInfo::new(id, &name_as_str, SymbolType::Function));
 
         // Function arguments have their own scope.
-        self.push_symbol_table();
-        node.symbol_table = Some(Rc::clone(&self.get_last_symbol_table()));
+        node.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
 
         for param in &mut declaration.parameters {
             self.collect_declarations(param);
@@ -343,8 +340,7 @@ impl DeclarationAnalyzer {
 
         self.declare_symbol(SymbolInfo::new(id, &name_as_str, SymbolType::Function));
 
-        self.push_symbol_table();
-        node.symbol_table = Some(Rc::clone(&self.get_last_symbol_table()));
+        node.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
 
         for declaration_node in declarations {
             self.collect_declarations(declaration_node);
