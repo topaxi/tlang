@@ -146,14 +146,10 @@ impl SymbolTable {
         self.symbols.iter().map(|s| s.clone()).collect()
     }
 
-    pub fn get_all_symbol_names(&self) -> Vec<String> {
-        let mut names = self
-            .get_all_local_symbols()
-            .iter()
-            .map(|s| s.name.clone())
-            .collect::<Vec<_>>();
+    pub fn get_all_symbols(&self) -> Vec<SymbolInfo> {
+        let mut names = self.get_all_local_symbols();
         if let Some(ref parent) = self.parent {
-            names.extend(parent.borrow().get_all_symbol_names());
+            names.extend(parent.borrow().get_all_symbols());
         }
         names
     }

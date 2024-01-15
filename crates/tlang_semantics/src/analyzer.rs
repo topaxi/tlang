@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use tlang_ast::{
     node::{AstNode, FunctionDeclaration, Node},
-    symbols::{SymbolId, SymbolTable, SymbolType},
+    symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
 };
 
 use crate::{
@@ -166,19 +166,14 @@ impl SemanticAnalyzer {
                 } else {
                     let did_you_mean = did_you_mean(
                         name,
-                        &self
-                            .get_last_symbol_table()
-                            .borrow()
-                            .get_all_symbol_names()
-                            .iter()
-                            .collect::<Vec<_>>(),
+                        &self.get_last_symbol_table().borrow().get_all_symbols(),
                     );
 
                     if let Some(suggestion) = did_you_mean {
                         self.diagnostics.push(Diagnostic::new(
                             format!(
-                                "Use of undeclared variable `{}`, did you mean `{}`",
-                                name, suggestion
+                                "Use of undeclared variable `{}`, did you mean the {} `{}`",
+                                name, suggestion.symbol_type, suggestion.name
                             ),
                             Severity::Error,
                         ));
@@ -336,18 +331,18 @@ impl SemanticAnalyzer {
     }
 }
 
-fn did_you_mean(name: &str, candidates: &[&String]) -> Option<String> {
+fn did_you_mean(name: &str, candidates: &[SymbolInfo]) -> Option<SymbolInfo> {
     let mut best_distance = usize::MAX;
     let mut best_candidate = None;
     for candidate in candidates {
-        let distance = levenshtein_distance(name, candidate);
+        let distance = levenshtein_distance(name, &candidate.name);
         if distance < best_distance {
             best_distance = distance;
             best_candidate = Some(candidate);
         }
     }
     if best_distance < 3 {
-        Some(best_candidate.unwrap().to_string())
+        Some(best_candidate.unwrap().clone())
     } else {
         None
     }
