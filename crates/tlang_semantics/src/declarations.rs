@@ -362,13 +362,11 @@ impl DeclarationAnalyzer {
     fn collect_function_parameter(&mut self, _node: &mut Node, id: SymbolId, name: &mut Node) {
         let symbol_table = self.get_last_symbol_table_mut();
 
-        println!("Collecting function parameter {:?}", name);
-
         match name.ast_node {
             AstNode::Identifier(ref name) => {
                 symbol_table
                     .borrow_mut()
-                    .insert(SymbolInfo::new(id, &name, SymbolType::Variable));
+                    .insert(SymbolInfo::new(id, &name, SymbolType::Parameter));
             }
             AstNode::ListPattern(ref mut nodes) => {
                 for node in nodes.iter_mut() {
@@ -381,7 +379,7 @@ impl DeclarationAnalyzer {
                     symbol_table.borrow_mut().insert(SymbolInfo::new(
                         id,
                         name,
-                        SymbolType::Variable,
+                        SymbolType::Parameter,
                     ));
                 }
                 _ => panic!("Expected identifier, found {:?}", identifier.ast_node),

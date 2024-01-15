@@ -239,7 +239,10 @@ impl SemanticAnalyzer {
 
             for unused_symbol in unused_symbols.iter_mut() {
                 self.diagnostics.push(Diagnostic::new(
-                    format!("Unused variable `{}`", unused_symbol.name),
+                    format!(
+                        "Unused {} `{}`",
+                        unused_symbol.symbol_type, unused_symbol.name
+                    ),
                     Severity::Warning,
                 ));
             }

@@ -1,10 +1,22 @@
 use std::cell::RefCell;
+use std::fmt::Display;
 use std::rc::Rc;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum SymbolType {
     Variable,
     Function,
+    Parameter,
+}
+
+impl Display for SymbolType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            SymbolType::Variable => write!(f, "variable"),
+            SymbolType::Function => write!(f, "function"),
+            SymbolType::Parameter => write!(f, "parameter"),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]

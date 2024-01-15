@@ -1,4 +1,5 @@
 use indoc::indoc;
+use pretty_assertions::assert_eq;
 use tlang_ast::{
     node::AstNode,
     symbols::{SymbolId, SymbolInfo, SymbolType},
@@ -246,6 +247,25 @@ fn should_warn_about_unused_variables() {
         vec![
             Diagnostic::new("Unused variable `a`".to_string(), Severity::Warning),
             Diagnostic::new("Unused variable `b`".to_string(), Severity::Warning),
+        ]
+    );
+}
+
+#[test]
+fn should_warn_about_unused_function_and_parameters() {
+    let diagnostics = analyze_diag!(indoc! {"
+        fn add(a, b) {
+            let c = 1;
+            a + b
+        }
+    "});
+    assert_eq!(
+        diagnostics,
+        vec![
+            Diagnostic::new("Unused variable `c`".to_string(), Severity::Warning),
+            Diagnostic::new("Unused parameter `a`".to_string(), Severity::Warning),
+            Diagnostic::new("Unused parameter `b`".to_string(), Severity::Warning),
+            Diagnostic::new("Unused function `add`".to_string(), Severity::Warning),
         ]
     );
 }
