@@ -41,6 +41,12 @@ impl TlangCompiler {
 
     fn analyze(&mut self) {
         self.analyzer.add_builtin_symbols(&[
+            ("Option", SymbolType::Enum),
+            ("Result", SymbolType::Enum),
+            ("Option::Some", SymbolType::EnumVariant),
+            ("Option::None", SymbolType::EnumVariant),
+            ("Result::Ok", SymbolType::EnumVariant),
+            ("Result::Err", SymbolType::EnumVariant),
             ("Some", SymbolType::Function),
             ("None", SymbolType::Variable),
             ("Ok", SymbolType::Function),

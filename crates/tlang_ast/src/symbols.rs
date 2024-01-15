@@ -7,6 +7,8 @@ pub enum SymbolType {
     Variable,
     Function,
     Parameter,
+    Enum,
+    EnumVariant,
 }
 
 impl Display for SymbolType {
@@ -15,6 +17,8 @@ impl Display for SymbolType {
             SymbolType::Variable => write!(f, "variable"),
             SymbolType::Function => write!(f, "function"),
             SymbolType::Parameter => write!(f, "parameter"),
+            SymbolType::Enum => write!(f, "enum"),
+            SymbolType::EnumVariant => write!(f, "enum variant"),
         }
     }
 }
