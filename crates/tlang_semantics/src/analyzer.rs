@@ -204,7 +204,11 @@ impl SemanticAnalyzer {
             AstNode::UnaryOp(_, node) => {
                 self.analyze_node(node);
             }
-            AstNode::List(values) => values.iter_mut().for_each(|node| self.analyze_node(node)),
+            AstNode::List(values) => {
+                for value in values {
+                    self.analyze_node(value);
+                }
+            }
             AstNode::IndexExpression { base, index } => {
                 self.analyze_node(base);
                 self.analyze_node(index);
@@ -216,11 +220,16 @@ impl SemanticAnalyzer {
                 //       any type information yet.
                 // self.analyze_node(field);
             }
-            AstNode::ListPattern(_)
-            | AstNode::Dict(_)
+            AstNode::ListPattern(patterns) => {
+                for pattern in patterns {
+                    self.analyze_declaration_node(pattern);
+                }
+            }
+            AstNode::Dict(_)
             | AstNode::EnumDeclaration { .. }
             | AstNode::EnumVariant { .. }
             | AstNode::EnumPattern { .. }
+            | AstNode::IdentifierPattern { .. }
             | AstNode::Range { .. }
             | AstNode::Match { .. }
             | AstNode::MatchArm { .. }

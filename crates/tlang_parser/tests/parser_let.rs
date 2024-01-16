@@ -40,10 +40,16 @@ fn test_list_pattern() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
-            id: SymbolId::new(1),
+            id: SymbolId::new(3),
             pattern: Box::new(node::new!(ListPattern(vec![
-                node::new!(Identifier("x".to_string())),
-                node::new!(Identifier("y".to_string())),
+                node::new!(IdentifierPattern {
+                    id: SymbolId::new(1),
+                    name: "x".to_string()
+                }),
+                node::new!(IdentifierPattern {
+                    id: SymbolId::new(2),
+                    name: "y".to_string()
+                }),
             ]))),
             expression: Box::new(node::new!(List(vec![
                 node::new!(Literal(Literal::Integer(1))),
@@ -60,13 +66,22 @@ fn test_list_pattern_rest() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(VariableDeclaration {
-            id: SymbolId::new(1),
+            id: SymbolId::new(4),
             pattern: Box::new(node::new!(ListPattern(vec![
-                node::new!(Identifier("x".to_string())),
-                node::new!(Identifier("y".to_string())),
+                node::new!(IdentifierPattern {
+                    id: SymbolId::new(1),
+                    name: "x".to_string()
+                }),
+                node::new!(IdentifierPattern {
+                    id: SymbolId::new(2),
+                    name: "y".to_string()
+                }),
                 node::new!(UnaryOp(
                     UnaryOp::Rest,
-                    Box::new(node::new!(Identifier("z".to_string()))),
+                    Box::new(node::new!(IdentifierPattern {
+                        id: SymbolId::new(3),
+                        name: "z".to_string()
+                    }))
                 )),
             ]))),
             expression: Box::new(node::new!(List(vec![

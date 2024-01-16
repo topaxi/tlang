@@ -148,7 +148,7 @@ fn test_enum_tree_max_depth() {
                 ]
             }),
             node::new!(FunctionDeclarations {
-                id: SymbolId::new(4),
+                id: SymbolId::new(6),
                 name: Box::new(node::new!(Identifier("maximum_depth".to_string()))),
                 declarations: vec![
                     node::new!(FunctionDeclaration(FunctionDeclaration {
@@ -173,15 +173,21 @@ fn test_enum_tree_max_depth() {
                     })),
                     node::new!(FunctionDeclaration(FunctionDeclaration {
                         parameters: vec![node::new!(FunctionParameter {
-                            id: SymbolId::new(3),
+                            id: SymbolId::new(5),
                             pattern: Box::new(node::new!(EnumPattern {
                                 identifier: Box::new(node::new!(NestedIdentifier(vec![
                                     "Tree".to_string(),
                                     "Node".to_string()
                                 ]))),
                                 elements: vec![
-                                    node::new!(Identifier("left".to_string())),
-                                    node::new!(Identifier("right".to_string()))
+                                    node::new!(IdentifierPattern {
+                                        id: SymbolId::new(3),
+                                        name: "left".to_string()
+                                    }),
+                                    node::new!(IdentifierPattern {
+                                        id: SymbolId::new(4),
+                                        name: "right".to_string()
+                                    })
                                 ],
                                 named_fields: true,
                             })),
@@ -221,7 +227,7 @@ fn test_enum_tree_max_depth() {
                 ]
             }),
             node::new!(FunctionSingleDeclaration {
-                id: SymbolId::new(6),
+                id: SymbolId::new(8),
                 name: Box::new(node::new!(Identifier("main".to_string()))),
                 declaration: Box::new(FunctionDeclaration {
                     parameters: vec![],
@@ -229,7 +235,7 @@ fn test_enum_tree_max_depth() {
                     return_type_annotation: None,
                     body: Box::new(node::new!(Block(
                         vec![node::new!(VariableDeclaration {
-                            id: SymbolId::new(5),
+                            id: SymbolId::new(7),
                             pattern: Box::new(node::new!(Identifier("x".to_string()))),
                             expression: Box::new(node::new!(Call {
                                 function: Box::new(node::new!(NestedIdentifier(vec![
@@ -332,7 +338,7 @@ fn test_enum_extraction() {
                 ]
             }),
             node::new!(FunctionDeclarations {
-                id: SymbolId::new(4),
+                id: SymbolId::new(5),
                 name: Box::new(node::new!(Identifier("unwrap".to_string()))),
                 declarations: vec![
                     node::new!(FunctionDeclaration(FunctionDeclaration {
@@ -362,13 +368,16 @@ fn test_enum_extraction() {
                     })),
                     node::new!(FunctionDeclaration(FunctionDeclaration {
                         parameters: vec![node::new!(FunctionParameter {
-                            id: SymbolId::new(3),
+                            id: SymbolId::new(4),
                             pattern: Box::new(node::new!(EnumPattern {
                                 identifier: Box::new(node::new!(NestedIdentifier(vec![
                                     "Option".to_string(),
                                     "Some".to_string()
                                 ]))),
-                                elements: vec![node::new!(Identifier("value".to_string()))],
+                                elements: vec![node::new!(IdentifierPattern {
+                                    id: SymbolId::new(3),
+                                    name: "value".to_string()
+                                })],
                                 named_fields: false,
                             })),
                             type_annotation: None,

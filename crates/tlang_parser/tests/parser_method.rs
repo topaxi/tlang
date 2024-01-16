@@ -163,7 +163,7 @@ fn test_declare_methods_on_option_enum() {
                 ]
             }),
             node::new!(FunctionDeclarations {
-                id: SymbolId::new(13),
+                id: SymbolId::new(14),
                 name: Box::new(node::new!(FieldExpression {
                     base: Box::new(node::new!(Identifier("Option".to_string()))),
                     field: Box::new(node::new!(Identifier("map".to_string()))),
@@ -172,19 +172,22 @@ fn test_declare_methods_on_option_enum() {
                     node::new!(FunctionDeclaration(FunctionDeclaration {
                         parameters: vec![
                             node::new!(FunctionParameter {
-                                id: SymbolId::new(9),
+                                id: SymbolId::new(10),
                                 pattern: Box::new(node::new!(EnumPattern {
                                     identifier: Box::new(node::new!(NestedIdentifier(vec![
                                         "Option".to_string(),
                                         "Some".to_string()
                                     ]))),
-                                    elements: vec![node::new!(Identifier("x".to_string()))],
+                                    elements: vec![node::new!(IdentifierPattern {
+                                        id: SymbolId::new(9),
+                                        name: "x".to_string()
+                                    })],
                                     named_fields: false,
                                 })),
                                 type_annotation: None,
                             }),
                             node::new!(FunctionParameter {
-                                id: SymbolId::new(10),
+                                id: SymbolId::new(11),
                                 pattern: Box::new(node::new!(Identifier("f".to_string()))),
                                 type_annotation: None,
                             })
@@ -208,7 +211,7 @@ fn test_declare_methods_on_option_enum() {
                     node::new!(FunctionDeclaration(FunctionDeclaration {
                         parameters: vec![
                             node::new!(FunctionParameter {
-                                id: SymbolId::new(11),
+                                id: SymbolId::new(12),
                                 pattern: Box::new(node::new!(EnumPattern {
                                     identifier: Box::new(node::new!(NestedIdentifier(vec![
                                         "Option".to_string(),
@@ -220,7 +223,7 @@ fn test_declare_methods_on_option_enum() {
                                 type_annotation: None,
                             }),
                             node::new!(FunctionParameter {
-                                id: SymbolId::new(12),
+                                id: SymbolId::new(13),
                                 pattern: Box::new(node::new!(Wildcard)),
                                 type_annotation: None,
                             })

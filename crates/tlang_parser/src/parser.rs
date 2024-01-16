@@ -464,6 +464,19 @@ impl<'src> Parser<'src> {
         .into()
     }
 
+    fn parse_identifier_pattern(&mut self) -> Node {
+        let name = self.consume_identifier();
+
+        if name == "_" {
+            return node::new!(Wildcard);
+        }
+
+        node::new!(IdentifierPattern {
+            id: self.unique_id(),
+            name: name,
+        })
+    }
+
     fn parse_list_extraction(&mut self) -> Node {
         self.consume_token(TokenKind::LBracket);
 
@@ -471,14 +484,15 @@ impl<'src> Parser<'src> {
         // Only allow literal values, identifiers and and rest params for now.
         while self.current_token_kind() != Some(TokenKind::RBracket) {
             let element = match self.current_token_kind() {
-                Some(TokenKind::Identifier(_) | TokenKind::Literal(_) | TokenKind::LBracket) => {
+                Some(TokenKind::Identifier(_)) => self.parse_identifier_pattern(),
+                Some(TokenKind::Literal(_) | TokenKind::LBracket) => {
                     self.parse_primary_expression()
                 }
                 Some(TokenKind::DotDotDot) => {
                     self.advance();
                     node::new!(UnaryOp(
                         UnaryOp::Rest,
-                        Box::new(self.parse_primary_expression())
+                        Box::new(self.parse_identifier_pattern())
                     ))
                 }
                 _ => {
@@ -834,7 +848,7 @@ impl<'src> Parser<'src> {
             self.consume_token(TokenKind::LBrace);
             let mut elements = Vec::new();
             while self.current_token_kind() != Some(TokenKind::RBrace) {
-                elements.push(self.parse_identifier());
+                elements.push(self.parse_identifier_pattern());
                 if let Some(TokenKind::Comma) = self.current_token_kind() {
                     self.advance();
                 }
@@ -849,7 +863,7 @@ impl<'src> Parser<'src> {
             self.consume_token(TokenKind::LParen);
             let mut elements = Vec::new();
             while self.current_token_kind() != Some(TokenKind::RParen) {
-                let mut identifier = self.parse_identifier();
+                let mut identifier = self.parse_identifier_pattern();
 
                 // Remap identifier of _ to Wildcard
                 if let AstNode::Identifier(ref ident) = identifier.ast_node {

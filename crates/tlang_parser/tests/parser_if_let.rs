@@ -50,13 +50,16 @@ fn test_if_let_statement_with_enum_matching() {
         node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
             node::new!(IfElse {
                 condition: Box::new(node::new!(VariableDeclaration {
-                    id: SymbolId::new(1),
+                    id: SymbolId::new(2),
                     pattern: Box::new(node::new!(EnumPattern {
                         identifier: Box::new(node::new!(NestedIdentifier(vec![
                             "Option".to_string(),
                             "Some".to_string()
                         ]))),
-                        elements: vec![node::new!(Identifier("y".to_string()))],
+                        elements: vec![node::new!(IdentifierPattern {
+                            id: SymbolId::new(1),
+                            name: "y".to_string()
+                        })],
                         named_fields: false,
                     })),
                     expression: Box::new(node::new!(Identifier("x".to_string()))),

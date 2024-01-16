@@ -281,3 +281,32 @@ fn should_warn_about_unused_function_and_parameters() {
         ]
     );
 }
+
+#[test]
+fn should_not_warn_about_used_function_and_parameters() {
+    let diagnostics = analyze_diag!(indoc! {"
+        fn add(a, b) {
+            a + b
+        }
+
+        add(1, 2);
+    "});
+    assert_eq!(diagnostics, vec![]);
+
+    let diagnostics = analyze_diag!(indoc! {"
+        fn factorial(n) { factorial(n, 1) }
+        fn factorial(0, acc) { acc }
+        fn factorial(n, acc) { rec factorial(n - 1, n * acc) }
+
+        factorial(5);
+    "});
+    assert_eq!(diagnostics, vec![]);
+
+    let diagnostics = analyze_diag!(indoc! {"
+        fn sum([]) { 0 }
+        fn sum([head, ...tail]) { head + sum(tail) }
+
+        sum([1, 2, 3]);
+    "});
+    assert_eq!(diagnostics, vec![]);
+}

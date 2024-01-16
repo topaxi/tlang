@@ -503,7 +503,7 @@ fn test_recursive_sum() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(FunctionDeclarations {
-            id: SymbolId::new(3),
+            id: SymbolId::new(5),
             name: Box::new(node::new!(Identifier("sum".to_string()))),
             declarations: vec![
                 node::new!(FunctionDeclaration(FunctionDeclaration {
@@ -521,12 +521,18 @@ fn test_recursive_sum() {
                 })),
                 node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![node::new!(FunctionParameter {
-                        id: SymbolId::new(2),
+                        id: SymbolId::new(4),
                         pattern: Box::new(node::new!(ListPattern(vec![
-                            node::new!(Identifier("x".to_string())),
+                            node::new!(IdentifierPattern {
+                                id: SymbolId::new(2),
+                                name: "x".to_string()
+                            }),
                             node::new!(UnaryOp(
                                 UnaryOp::Rest,
-                                Box::new(node::new!(Identifier("xs".to_string())))
+                                Box::new(node::new!(IdentifierPattern {
+                                    id: SymbolId::new(3),
+                                    name: "xs".to_string()
+                                }))
                             ))
                         ]))),
                         type_annotation: None,
@@ -704,7 +710,7 @@ fn test_foldl_impl() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(FunctionDeclarations {
-            id: SymbolId::new(7),
+            id: SymbolId::new(9),
             name: Box::new(node::new!(Identifier("foldl".to_string()))),
             declarations: vec![
                 node::new!(FunctionDeclaration(FunctionDeclaration {
@@ -735,23 +741,29 @@ fn test_foldl_impl() {
                 node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![
                         node::new!(FunctionParameter {
-                            id: SymbolId::new(4),
+                            id: SymbolId::new(6),
                             pattern: Box::new(node::new!(ListPattern(vec![
-                                node::new!(Identifier("x".to_string())),
+                                node::new!(IdentifierPattern {
+                                    id: SymbolId::new(4),
+                                    name: "x".to_string()
+                                }),
                                 node::new!(UnaryOp(
                                     UnaryOp::Rest,
-                                    Box::new(node::new!(Identifier("xs".to_string())))
+                                    Box::new(node::new!(IdentifierPattern {
+                                        id: SymbolId::new(5),
+                                        name: "xs".to_string()
+                                    }))
                                 ))
                             ]))),
                             type_annotation: None,
                         }),
                         node::new!(FunctionParameter {
-                            id: SymbolId::new(5),
+                            id: SymbolId::new(7),
                             pattern: Box::new(node::new!(Identifier("acc".to_string()))),
                             type_annotation: None,
                         }),
                         node::new!(FunctionParameter {
-                            id: SymbolId::new(6),
+                            id: SymbolId::new(8),
                             pattern: Box::new(node::new!(Identifier("f".to_string()))),
                             type_annotation: None,
                         })
@@ -794,7 +806,7 @@ fn test_function_declarations_with_guard() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(FunctionDeclarations {
-            id: SymbolId::new(7),
+            id: SymbolId::new(11),
             name: Box::new(node::new!(Identifier("filter".to_string()))),
             declarations: vec![
                 node::new!(FunctionDeclaration(FunctionDeclaration {
@@ -820,18 +832,24 @@ fn test_function_declarations_with_guard() {
                 node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![
                         node::new!(FunctionParameter {
-                            id: SymbolId::new(3),
+                            id: SymbolId::new(5),
                             pattern: Box::new(node::new!(ListPattern(vec![
-                                node::new!(Identifier("x".to_string())),
+                                node::new!(IdentifierPattern {
+                                    id: SymbolId::new(3),
+                                    name: "x".to_string()
+                                }),
                                 node::new!(UnaryOp(
                                     UnaryOp::Rest,
-                                    Box::new(node::new!(Identifier("xs".to_string())))
+                                    Box::new(node::new!(IdentifierPattern {
+                                        id: SymbolId::new(4),
+                                        name: "xs".to_string()
+                                    }))
                                 ))
                             ]))),
                             type_annotation: None,
                         }),
                         node::new!(FunctionParameter {
-                            id: SymbolId::new(4),
+                            id: SymbolId::new(6),
                             pattern: Box::new(node::new!(Identifier("f".to_string()))),
                             type_annotation: None,
                         })
@@ -863,18 +881,24 @@ fn test_function_declarations_with_guard() {
                 node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![
                         node::new!(FunctionParameter {
-                            id: SymbolId::new(5),
+                            id: SymbolId::new(9),
                             pattern: Box::new(node::new!(ListPattern(vec![
-                                node::new!(Identifier("x".to_string())),
+                                node::new!(IdentifierPattern {
+                                    id: SymbolId::new(7),
+                                    name: "x".to_string()
+                                }),
                                 node::new!(UnaryOp(
                                     UnaryOp::Rest,
-                                    Box::new(node::new!(Identifier("xs".to_string())))
+                                    Box::new(node::new!(IdentifierPattern {
+                                        id: SymbolId::new(8),
+                                        name: "xs".to_string()
+                                    }))
                                 ))
                             ]))),
                             type_annotation: None,
                         }),
                         node::new!(FunctionParameter {
-                            id: SymbolId::new(6),
+                            id: SymbolId::new(10),
                             pattern: Box::new(node::new!(Identifier("f".to_string()))),
                             type_annotation: None,
                         })
@@ -910,7 +934,7 @@ fn test_function_declarations_with_let_guard() {
     assert_eq!(
         program,
         node::new!(Program(vec![node::new!(FunctionDeclarations {
-            id: SymbolId::new(8),
+            id: SymbolId::new(12),
             name: Box::new(node::new!(Identifier("filter_map".to_string()))),
             declarations: vec![
                 node::new!(FunctionDeclaration(FunctionDeclaration {
@@ -936,24 +960,30 @@ fn test_function_declarations_with_let_guard() {
                 node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![
                         node::new!(FunctionParameter {
-                            id: SymbolId::new(3),
+                            id: SymbolId::new(5),
                             pattern: Box::new(node::new!(ListPattern(vec![
-                                node::new!(Identifier("x".to_string())),
+                                node::new!(IdentifierPattern {
+                                    id: SymbolId::new(3),
+                                    name: "x".to_string()
+                                }),
                                 node::new!(UnaryOp(
                                     UnaryOp::Rest,
-                                    Box::new(node::new!(Identifier("xs".to_string())))
+                                    Box::new(node::new!(IdentifierPattern {
+                                        id: SymbolId::new(4),
+                                        name: "xs".to_string()
+                                    }))
                                 ))
                             ]))),
                             type_annotation: None,
                         }),
                         node::new!(FunctionParameter {
-                            id: SymbolId::new(4),
+                            id: SymbolId::new(6),
                             pattern: Box::new(node::new!(Identifier("f".to_string()))),
                             type_annotation: None,
                         })
                     ],
                     guard: Some(Box::new(node::new!(VariableDeclaration {
-                        id: SymbolId::new(5),
+                        id: SymbolId::new(7),
                         pattern: Box::new(node::new!(Identifier("y".to_string()))),
                         expression: Box::new(node::new!(Call {
                             function: Box::new(node::new!(Identifier("f".to_string()))),
@@ -984,18 +1014,24 @@ fn test_function_declarations_with_let_guard() {
                 node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![
                         node::new!(FunctionParameter {
-                            id: SymbolId::new(6),
+                            id: SymbolId::new(10),
                             pattern: Box::new(node::new!(ListPattern(vec![
-                                node::new!(Identifier("x".to_string())),
+                                node::new!(IdentifierPattern {
+                                    id: SymbolId::new(8),
+                                    name: "x".to_string()
+                                }),
                                 node::new!(UnaryOp(
                                     UnaryOp::Rest,
-                                    Box::new(node::new!(Identifier("xs".to_string())))
+                                    Box::new(node::new!(IdentifierPattern {
+                                        id: SymbolId::new(9),
+                                        name: "xs".to_string()
+                                    }))
                                 ))
                             ]))),
                             type_annotation: None,
                         }),
                         node::new!(FunctionParameter {
-                            id: SymbolId::new(7),
+                            id: SymbolId::new(11),
                             pattern: Box::new(node::new!(Identifier("f".to_string()))),
                             type_annotation: None,
                         })

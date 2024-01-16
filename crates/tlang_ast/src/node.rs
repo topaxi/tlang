@@ -116,6 +116,10 @@ pub enum AstNode {
         else_branch: Option<Box<Node>>,
     },
     Identifier(String),
+    IdentifierPattern {
+        id: SymbolId,
+        name: String,
+    },
     NestedIdentifier(Vec<String>),
     Call {
         function: Box<Node>,

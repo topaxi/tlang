@@ -282,6 +282,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                                 }
                                 let identifier = match &element.ast_node {
                                     AstNode::Identifier(name) => name.clone(),
+                                    AstNode::IdentifierPattern { name, .. } => name.clone(),
                                     AstNode::NestedIdentifier(names) => {
                                         names.clone().pop().unwrap()
                                     }
