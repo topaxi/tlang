@@ -52,7 +52,7 @@ export class TlangPlayground extends LitElement {
         grid-template:
           'toolbar toolbar' auto
           'editor output' 1fr
-          'editor console' auto;
+          'editor console' auto / 50% 50%;
       }
     }
 
