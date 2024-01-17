@@ -57,7 +57,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                     }
                     AstNode::ListPattern(patterns) => {
                         for pattern in patterns {
-                            if let AstNode::Identifier(name) = &pattern.ast_node {
+                            if let AstNode::IdentifierPattern { name, .. } = &pattern.ast_node {
                                 let tmp_variable = codegen.current_scope().declare_tmp_variable();
                                 codegen.push_indent();
                                 codegen.push_str(&format!("let {};\n", tmp_variable));
@@ -75,6 +75,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                         let tmp_variable_enum = codegen.current_scope().declare_tmp_variable();
                         let enum_name = match &identifier.ast_node {
                             AstNode::Identifier(name) => name.clone(),
+                            AstNode::IdentifierPattern { name, .. } => name.clone(),
                             AstNode::NestedIdentifier(names) => names.clone().pop().unwrap(),
                             _ => unreachable!(),
                         };
@@ -89,8 +90,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                                 continue;
                             }
                             let identifier = match &element.ast_node {
-                                AstNode::Identifier(name) => name.clone(),
-                                AstNode::NestedIdentifier(names) => names.clone().pop().unwrap(),
+                                AstNode::IdentifierPattern { name, .. } => name.clone(),
                                 _ => unreachable!(),
                             };
                             let tmp_variable = codegen.current_scope().declare_tmp_variable();
@@ -154,7 +154,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                     }
                     AstNode::ListPattern(patterns) => {
                         for (i, pattern) in patterns.iter().enumerate() {
-                            if let AstNode::Identifier(name) = &pattern.ast_node {
+                            if let AstNode::IdentifierPattern { name, .. } = &pattern.ast_node {
                                 codegen
                                     .current_scope()
                                     .declare_variable_alias(name, &format!("args[{}][{}]", j, i));
@@ -245,16 +245,20 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                                         codegen.generate_node(pattern, None);
                                     }
                                     AstNode::UnaryOp(UnaryOp::Rest, identified) => {
-                                        if let AstNode::Identifier(ref name) = identified.ast_node {
+                                        if let AstNode::IdentifierPattern { ref name, .. } =
+                                            identified.ast_node
+                                        {
                                             codegen
                                                 .push_str(&format!("args[{}].length >= {}", k, i));
                                             codegen.declare_function_pre_body_variable(
                                                 name,
                                                 &format!("args[{}].slice({})", k, i),
                                             );
+                                        } else {
+                                            unreachable!();
                                         }
                                     }
-                                    AstNode::Identifier(name) => {
+                                    AstNode::IdentifierPattern { name, .. } => {
                                         codegen.declare_function_pre_body_variable(
                                             name,
                                             &format!("args[{}][{}]", k, i),
@@ -271,6 +275,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                         } => {
                             let identifier = match &identifier.ast_node {
                                 AstNode::Identifier(name) => name.clone(),
+                                AstNode::IdentifierPattern { name, .. } => name.clone(),
                                 AstNode::NestedIdentifier(names) => names.clone().pop().unwrap(),
                                 _ => unreachable!(),
                             };
@@ -395,6 +400,7 @@ fn generate_function_definition_guard(codegen: &mut CodegenJS, node: &Node) {
             } => {
                 let enum_name = match &identifier.ast_node {
                     AstNode::Identifier(name) => name.clone(),
+                    AstNode::IdentifierPattern { name, .. } => name.clone(),
                     AstNode::NestedIdentifier(names) => names.clone().pop().unwrap(),
                     _ => unreachable!(),
                 };
@@ -417,6 +423,7 @@ fn generate_function_definition_guard(codegen: &mut CodegenJS, node: &Node) {
                     }
                     let identifier = match &element.ast_node {
                         AstNode::Identifier(name) => name.clone(),
+                        AstNode::IdentifierPattern { name, .. } => name.clone(),
                         AstNode::NestedIdentifier(names) => names.clone().pop().unwrap(),
                         _ => unreachable!(),
                     };

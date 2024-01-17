@@ -58,7 +58,7 @@ impl DeclarationAnalyzer {
                 .borrow_mut()
                 .insert(SymbolInfo::new(
                     SymbolId::new(0), // Builtins have ID 0 for now.
-                    &name,
+                    name,
                     symbol_type.clone(),
                 ));
         }
@@ -134,13 +134,7 @@ impl DeclarationAnalyzer {
                 identifier,
                 elements,
                 named_fields,
-            } => self.collect_enum_pattern(
-                node,
-                SymbolId::new(0),
-                identifier,
-                elements,
-                *named_fields,
-            ),
+            } => self.collect_enum_pattern(node, identifier, elements, *named_fields),
             AstNode::Call {
                 function,
                 arguments,
@@ -190,15 +184,23 @@ impl DeclarationAnalyzer {
                 self.collect_declarations(index);
             }
             AstNode::EnumDeclaration { id, name, variants } => {
-                self.declare_symbol(SymbolInfo::new(*id, &name, SymbolType::Enum));
+                self.declare_symbol(SymbolInfo::new(*id, name, SymbolType::Enum));
 
                 for variant in variants {
                     self.collect_declarations(variant);
                 }
             }
-            AstNode::EnumVariant { name: _, .. } => {
+            AstNode::EnumVariant {
+                name: _,
+                parameters,
+                ..
+            } => {
                 // TODO: We need the parent enum name here.
                 // self.collect_declarations(name)
+
+                for param in parameters {
+                    self.collect_declarations(param);
+                }
             }
             AstNode::Match { .. }
             | AstNode::MatchArm { .. }
@@ -258,16 +260,9 @@ impl DeclarationAnalyzer {
 
         match pattern.ast_node {
             AstNode::Identifier(ref name) => {
-                self.declare_symbol(SymbolInfo::new(id, &name, SymbolType::Variable));
+                self.declare_symbol(SymbolInfo::new(id, name, SymbolType::Variable));
             }
-            AstNode::ListPattern(ref mut patterns) => {
-                for pattern in patterns {
-                    // TODO: We probably need to do this recursively.
-                    if let AstNode::Identifier(ref name) = pattern.ast_node {
-                        self.declare_symbol(SymbolInfo::new(id, &name, SymbolType::Variable));
-                    }
-                }
-            }
+            AstNode::ListPattern(_) => self.collect_declarations(pattern),
             AstNode::EnumPattern { .. } => self.collect_declarations(pattern),
             AstNode::VariableDeclaration { .. } => self.collect_declarations(pattern),
             _ => panic!("Expected identifier, found {:?}", pattern.ast_node),
@@ -348,30 +343,16 @@ impl DeclarationAnalyzer {
         self.declare_symbol(SymbolInfo::new(id, name, SymbolType::Variable));
     }
 
-    fn collect_function_parameter(&mut self, node: &mut Node, id: SymbolId, pattern: &mut Node) {
+    fn collect_function_parameter(&mut self, _node: &mut Node, id: SymbolId, pattern: &mut Node) {
         match pattern.ast_node {
             AstNode::Identifier(ref name) => {
-                self.declare_symbol(SymbolInfo::new(id, &name, SymbolType::Parameter));
+                self.declare_symbol(SymbolInfo::new(id, name, SymbolType::Parameter));
             }
-            AstNode::IdentifierPattern { .. } => self.collect_declarations(node),
-            AstNode::ListPattern(_) => self.collect_declarations(node),
-
-            AstNode::UnaryOp(UnaryOp::Rest, ref mut identifier) => match identifier.ast_node {
-                AstNode::IdentifierPattern { ref id, ref name } => {
-                    self.declare_symbol(SymbolInfo::new(*id, name, SymbolType::Parameter));
-                }
-                _ => panic!("Expected identifier, found {:?}", identifier.ast_node),
-            },
-            AstNode::Literal(_) => {} // Nothing to do for literals
-            AstNode::EnumPattern {
-                ref mut identifier,
-                ref mut elements,
-                named_fields,
-            } => {
-                // TODO: The passed in id is for the enum, not the extracted value.
-                self.collect_enum_pattern(node, id, identifier, elements, named_fields)
-            }
+            AstNode::IdentifierPattern { .. } => self.collect_declarations(pattern),
+            AstNode::ListPattern(_) => self.collect_declarations(pattern),
+            AstNode::EnumPattern { .. } => self.collect_declarations(pattern),
             AstNode::Wildcard => {} // Wildcard discards values, nothing to do here.
+            AstNode::Literal(_) => {} // Literal patterns don't need to be declared.
             _ => panic!(
                 "Expected identifier, list or enum pattern, found {:?}",
                 pattern.ast_node
@@ -388,7 +369,6 @@ impl DeclarationAnalyzer {
     fn collect_enum_pattern(
         &mut self,
         _node: &mut Node,
-        _id: SymbolId,
         _identifier: &mut Node,
         elements: &mut [Node],
         _named_fields: bool,

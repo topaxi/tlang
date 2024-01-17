@@ -554,7 +554,7 @@ impl CodegenJS {
                 self.push_str(", ");
             }
             match &pattern.ast_node {
-                AstNode::Identifier(name) => {
+                AstNode::IdentifierPattern { name, .. } => {
                     let shadowed_name = self.current_scope().resolve_variable(name);
                     let var_name = self.current_scope().declare_variable(name);
                     self.push_str(&var_name);

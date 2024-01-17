@@ -186,7 +186,7 @@ fn test_should_collect_list_destructuring_symbols_in_function_arguments() {
     assert_eq!(
         program_symbols.borrow().get_by_name("add"),
         Some(SymbolInfo {
-            id: SymbolId::new(2),
+            id: SymbolId::new(4),
             name: "add".to_string(),
             symbol_type: SymbolType::Function,
             ..Default::default()
@@ -210,7 +210,7 @@ fn test_should_collect_list_destructuring_with_rest_symbols_in_function_argument
     assert_eq!(
         program_symbols.borrow().get_by_name("sum"),
         Some(SymbolInfo {
-            id: SymbolId::new(2),
+            id: SymbolId::new(4),
             name: "sum".to_string(),
             symbol_type: SymbolType::Function,
             used: true,
@@ -263,7 +263,7 @@ fn should_collect_function_arguments_with_enum_extraction() {
     assert_eq!(
         program_symbols.borrow().get_by_name("unwrap"),
         Some(SymbolInfo {
-            id: SymbolId::new(4),
+            id: SymbolId::new(5),
             name: "unwrap".to_string(),
             symbol_type: SymbolType::Function,
             ..Default::default()
