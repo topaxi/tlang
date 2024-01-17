@@ -266,13 +266,14 @@ impl SemanticAnalyzer {
                 .iter()
                 .filter(|symbol| symbol.id != SymbolId::new(0))
                 .filter(|symbol| !symbol.used)
+                .filter(|symbol| !symbol.name.starts_with('_'))
                 .collect::<Vec<_>>();
 
             for unused_symbol in unused_symbols.iter_mut() {
                 self.diagnostics.push(Diagnostic::new(
                     format!(
-                        "Unused {} `{}`",
-                        unused_symbol.symbol_type, unused_symbol.name
+                        "Unused {} `{}`, if this is intentional, prefix the name with an underscore: `_{}`",
+                        unused_symbol.symbol_type, unused_symbol.name, unused_symbol.name
                     ),
                     Severity::Warning,
                 ));

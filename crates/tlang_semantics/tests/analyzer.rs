@@ -260,8 +260,8 @@ fn should_warn_about_unused_variables() {
         vec![
             // TODO: Might be nicer to have them report in order. This currently happens
             //       due to us reinserting variables in the beginning of the symbol table.
-            Diagnostic::new("Unused variable `b`".to_string(), Severity::Warning),
-            Diagnostic::new("Unused variable `a`".to_string(), Severity::Warning),
+            Diagnostic::new("Unused variable `b`, if this is intentional, prefix the name with an underscore: `_b`".to_string(), Severity::Warning),
+            Diagnostic::new("Unused variable `a`, if this is intentional, prefix the name with an underscore: `_a`".to_string(), Severity::Warning),
         ]
     );
 }
@@ -276,10 +276,10 @@ fn should_warn_about_unused_function_and_parameters() {
     assert_eq!(
         diagnostics,
         vec![
-            Diagnostic::new("Unused variable `c`".to_string(), Severity::Warning),
-            Diagnostic::new("Unused parameter `a`".to_string(), Severity::Warning),
-            Diagnostic::new("Unused parameter `b`".to_string(), Severity::Warning),
-            Diagnostic::new("Unused function `add`".to_string(), Severity::Warning),
+            Diagnostic::new("Unused variable `c`, if this is intentional, prefix the name with an underscore: `_c`".to_string(), Severity::Warning),
+            Diagnostic::new("Unused parameter `a`, if this is intentional, prefix the name with an underscore: `_a`".to_string(), Severity::Warning),
+            Diagnostic::new("Unused parameter `b`, if this is intentional, prefix the name with an underscore: `_b`".to_string(), Severity::Warning),
+            Diagnostic::new("Unused function `add`, if this is intentional, prefix the name with an underscore: `_add`".to_string(), Severity::Warning),
         ]
     );
 }
@@ -309,6 +309,15 @@ fn should_not_warn_about_used_function_and_parameters() {
         fn sum([head, ...tail]) { head + sum(tail) }
 
         sum([1, 2, 3]);
+    "});
+    assert_eq!(diagnostics, vec![]);
+}
+
+#[test]
+fn should_not_warn_about_unused_variables_prefixed_with_underscore() {
+    let diagnostics = analyze_diag!(indoc! {"
+        let _a = 1;
+        let _b = 2;
     "});
     assert_eq!(diagnostics, vec![]);
 }
