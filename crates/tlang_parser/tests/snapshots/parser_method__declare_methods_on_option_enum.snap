@@ -3,7 +3,7 @@ source: crates/tlang_parser/tests/parser_method.rs
 expression: "parse!(indoc! {\n        \"\n        enum Option {\n            Some(x),\n            None,\n        }\n\n        fn Option::is_option(Option::Some(_)) { true }\n        fn Option::is_option(Option::None) { true }\n        fn Option::is_option(_) { false }\n\n        fn Option.is_some(Option::Some(_)) { true }\n        fn Option.is_some(Option::None) { false }\n\n        fn Option.map(Option::Some(x), f) { Option::Some(f(x)) }\n        fn Option.map(Option::None, _) { Option::None }\n    \"\n    })"
 ---
 Node(
-  ast_node: Program([
+  ast_node: Module([
     Node(
       ast_node: EnumDeclaration(
         id: SymbolId(1),

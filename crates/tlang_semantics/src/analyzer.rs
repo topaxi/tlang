@@ -126,7 +126,7 @@ impl SemanticAnalyzer {
         let mut ast_node = std::mem::replace(&mut ast.ast_node, AstNode::None);
 
         match &mut ast_node {
-            AstNode::Program(nodes) => nodes.iter_mut().for_each(|node| self.analyze_node(node)),
+            AstNode::Module(nodes) => nodes.iter_mut().for_each(|node| self.analyze_node(node)),
             AstNode::ExpressionStatement(node) => self.analyze_node(node),
             AstNode::Block(nodes, return_value) => {
                 for node in nodes.iter_mut() {

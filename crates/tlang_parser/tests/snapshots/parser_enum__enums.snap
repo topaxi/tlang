@@ -3,7 +3,7 @@ source: crates/tlang_parser/tests/parser_enum.rs
 expression: "parse!(indoc! {\n        \"\n        enum Option {\n            Some(x),\n            None,\n        }\n\n        let x = Option::Some(42);\n    \"\n    })"
 ---
 Node(
-  ast_node: Program([
+  ast_node: Module([
     Node(
       ast_node: EnumDeclaration(
         id: SymbolId(1),

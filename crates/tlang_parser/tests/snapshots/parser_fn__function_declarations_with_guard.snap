@@ -3,7 +3,7 @@ source: crates/tlang_parser/tests/parser_fn.rs
 expression: "parse!(indoc! {\n        \"\n        fn filter([], f) { [] }\n        fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }\n        fn filter([x, ...xs], f) { rec filter(xs, f) }\n    \"\n    })"
 ---
 Node(
-  ast_node: Program([
+  ast_node: Module([
     Node(
       ast_node: FunctionDeclarations(
         id: SymbolId(11),

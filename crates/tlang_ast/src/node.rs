@@ -62,7 +62,7 @@ pub struct FunctionDeclaration {
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub enum AstNode {
     None,
-    Program(Vec<Node>),
+    Module(Vec<Node>),
     Block(Vec<Node>, Box<Option<Node>>),
     Literal(Literal),
     List(Vec<Node>),

@@ -3,7 +3,7 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse!(\"// this is a comment\")"
 ---
 Node(
-  ast_node: Program([
+  ast_node: Module([
     Node(
       ast_node: SingleLineComment(" this is a comment"),
       symbol_table: None,

@@ -3,7 +3,7 @@ source: crates/tlang_parser/tests/parser_types.rs
 expression: "parse!(\"let x: std::hash::Map<str, i64> = std::hash::Map();\")"
 ---
 Node(
-  ast_node: Program([
+  ast_node: Module([
     Node(
       ast_node: VariableDeclaration(
         id: SymbolId(1),

@@ -3,7 +3,7 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse!(\"let x = if (true) { 1; } else { 2; };\")"
 ---
 Node(
-  ast_node: Program([
+  ast_node: Module([
     Node(
       ast_node: VariableDeclaration(
         id: SymbolId(1),

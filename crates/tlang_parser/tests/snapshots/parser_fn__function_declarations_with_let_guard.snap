@@ -3,7 +3,7 @@ source: crates/tlang_parser/tests/parser_fn.rs
 expression: "parse!(indoc! {\n        \"\n        fn filter_map([], f) { [] }\n        fn filter_map([x, ...xs], f) if let y = f(x) { [y, ...filter_map(xs, f)] }\n        fn filter_map([x, ...xs], f) { rec filter_map(xs, f) }\n    \"\n    })"
 ---
 Node(
-  ast_node: Program([
+  ast_node: Module([
     Node(
       ast_node: FunctionDeclarations(
         id: SymbolId(12),

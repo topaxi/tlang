@@ -94,10 +94,10 @@ impl<'src> Parser<'src> {
         self.advance();
         self.advance();
 
-        let program = self.parse_program();
+        let module = self.parse_module();
 
         if self.errors().is_empty() {
-            Ok(program)
+            Ok(module)
         } else {
             Err(self.errors())
         }
@@ -443,8 +443,8 @@ impl<'src> Parser<'src> {
         (statements, completion_expression)
     }
 
-    fn parse_program(&mut self) -> Node {
-        node::new!(Program(self.parse_statements(false).0))
+    fn parse_module(&mut self) -> Node {
+        node::new!(Module(self.parse_statements(false).0))
     }
 
     fn parse_block(&mut self) -> Node {

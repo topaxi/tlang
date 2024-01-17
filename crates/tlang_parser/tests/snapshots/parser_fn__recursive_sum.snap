@@ -3,7 +3,7 @@ source: crates/tlang_parser/tests/parser_fn.rs
 expression: "parse!(indoc! {\n        \"\n        fn sum([]) { 0 }\n        fn sum([x, ...xs]) { x + sum(xs) }\n    \"\n    })"
 ---
 Node(
-  ast_node: Program([
+  ast_node: Module([
     Node(
       ast_node: FunctionDeclarations(
         id: SymbolId(5),

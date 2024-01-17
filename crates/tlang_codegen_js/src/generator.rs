@@ -397,7 +397,7 @@ impl CodegenJS {
             AstNode::SingleLineComment(_) | AstNode::MultiLineComment(_) => {
                 self.generate_comment(&node.ast_node);
             }
-            AstNode::Program(statements) => {
+            AstNode::Module(statements) => {
                 self.generate_statements(statements);
                 self.flush_statement_buffer();
             }

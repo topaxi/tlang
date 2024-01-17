@@ -3,7 +3,7 @@ source: crates/tlang_parser/tests/parser_pipeline.rs
 expression: "parse!(indoc! {\n        \"\n        [1,2,3]\n        |> map(fn (x) { x ** 2 })\n        |> filter(fn (x) { x % 2 == 0 })\n        |> foldl(fn (acc, x) { acc + x }, 0)\n        |> log();\n    \"\n    })"
 ---
 Node(
-  ast_node: Program([
+  ast_node: Module([
     Node(
       ast_node: ExpressionStatement(Node(
         ast_node: BinaryOp(

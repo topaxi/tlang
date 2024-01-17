@@ -132,7 +132,7 @@ fn test_string_literal() {
 
     assert_eq!(
         program,
-        node::new!(Program(vec![node::new!(
+        node::new!(Module(vec![node::new!(
             ExpressionStatement(Box::new(node::new!(
                 Literal(Literal::String("foo".to_string())),
                 Span::new(
@@ -154,7 +154,7 @@ fn test_char_literal() {
 
     assert_eq!(
         program,
-        node::new!(Program(vec![node::new!(
+        node::new!(Module(vec![node::new!(
             ExpressionStatement(Box::new(node::new!(
                 Literal(Literal::Char("a".to_string())),
                 Span::new(

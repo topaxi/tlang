@@ -240,7 +240,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
     );
 
     let (function_node, function_declaration) = match ast.ast_node {
-        AstNode::Program(ref nodes) => match &nodes[0].ast_node {
+        AstNode::Module(ref nodes) => match &nodes[0].ast_node {
             AstNode::FunctionSingleDeclaration {
                 id: _,
                 name: _,

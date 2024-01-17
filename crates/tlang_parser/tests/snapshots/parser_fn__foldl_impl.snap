@@ -3,7 +3,7 @@ source: crates/tlang_parser/tests/parser_fn.rs
 expression: "parse!(indoc! {\n        \"\n        fn foldl([], acc, _) { acc }\n        fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }\n    \"\n    })"
 ---
 Node(
-  ast_node: Program([
+  ast_node: Module([
     Node(
       ast_node: FunctionDeclarations(
         id: SymbolId(9),

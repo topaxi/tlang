@@ -3,7 +3,7 @@ source: crates/tlang_parser/tests/parser_fn.rs
 expression: "parse!(\"fn foo() { bar(); 1 + 2; }\")"
 ---
 Node(
-  ast_node: Program([
+  ast_node: Module([
     Node(
       ast_node: FunctionSingleDeclaration(
         id: SymbolId(1),

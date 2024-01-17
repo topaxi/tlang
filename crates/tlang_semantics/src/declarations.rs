@@ -80,7 +80,7 @@ impl DeclarationAnalyzer {
         let mut ast_node = std::mem::take(&mut node.ast_node);
 
         match &mut ast_node {
-            AstNode::Program(nodes) => self.collect_program_declarations(node, nodes),
+            AstNode::Module(nodes) => self.collect_module_declarations(node, nodes),
             AstNode::ExpressionStatement(node) => self.collect_declarations(node),
             AstNode::Block(nodes, return_value) => {
                 self.collect_block_declarations(node, nodes, return_value)
@@ -237,7 +237,7 @@ impl DeclarationAnalyzer {
         node.ast_node = ast_node;
     }
 
-    fn collect_program_declarations(&mut self, node: &mut Node, nodes: &mut [Node]) {
+    fn collect_module_declarations(&mut self, node: &mut Node, nodes: &mut [Node]) {
         node.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
 
         for node in nodes {

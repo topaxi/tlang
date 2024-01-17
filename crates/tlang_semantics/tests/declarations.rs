@@ -82,7 +82,7 @@ fn test_block_scope() {
     assert_eq!(program_symbols.borrow().get_by_name("c"), None);
 
     let block1 = match ast.ast_node {
-        AstNode::Program(ref nodes) => match nodes[1].ast_node {
+        AstNode::Module(ref nodes) => match nodes[1].ast_node {
             AstNode::ExpressionStatement(ref node) => match node.ast_node {
                 AstNode::Block(_, _) => node,
                 _ => panic!("Expected block {:?}", node.ast_node),

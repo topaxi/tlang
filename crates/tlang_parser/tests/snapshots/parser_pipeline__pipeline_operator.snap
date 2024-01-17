@@ -3,7 +3,7 @@ source: crates/tlang_parser/tests/parser_pipeline.rs
 expression: "parse!(\"1 |> foo |> bar();\")"
 ---
 Node(
-  ast_node: Program([
+  ast_node: Module([
     Node(
       ast_node: ExpressionStatement(Node(
         ast_node: BinaryOp(
