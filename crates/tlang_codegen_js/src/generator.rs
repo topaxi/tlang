@@ -698,7 +698,7 @@ impl CodegenJS {
                     self.push_str(i);
                 }
             } else {
-                self.push_str(&format!("\"{}\": ", i));
+                self.push_str(&format!("[{}]: ", i));
                 self.generate_node(param, None);
             }
             self.push_str(",\n");

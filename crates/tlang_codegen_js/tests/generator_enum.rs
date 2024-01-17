@@ -20,7 +20,7 @@ fn test_enums() {
             Some(x) {
                 return {
                     tag: \"Some\",
-                    \"0\": x,
+                    [0]: x,
                 };
             },
             None: { tag: \"None\" },
@@ -96,7 +96,7 @@ fn test_enums_tree_implementation() {
             Leaf(x) {
                 return {
                     tag: \"Leaf\",
-                    \"0\": x,
+                    [0]: x,
                 };
             },
             Node({ left, right }) {
@@ -146,7 +146,7 @@ fn test_maximum_depth_tree() {
             Leaf(x) {
                 return {
                     tag: \"Leaf\",
-                    \"0\": x,
+                    [0]: x,
                 };
             },
             Node({ left, right }) {
@@ -195,14 +195,14 @@ fn test_maximum_depth_tree_positional() {
             Leaf(x) {
                 return {
                     tag: \"Leaf\",
-                    \"0\": x,
+                    [0]: x,
                 };
             },
             Node(left, right) {
                 return {
                     tag: \"Node\",
-                    \"0\": left,
-                    \"1\": right,
+                    [0]: left,
+                    [1]: right,
                 };
             },
         };
