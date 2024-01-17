@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use tlang_ast::{
-    node::{AstNode, FunctionDeclaration, Node, UnaryOp},
+    node::{AstNode, FunctionDeclaration, Node},
     symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
 };
 

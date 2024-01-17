@@ -85,7 +85,9 @@ fn main() {
 
 #[derive(Debug)]
 enum ParserError {
+    #[allow(dead_code)]
     ParseError(Vec<ParseError>),
+    #[allow(dead_code)]
     DiagnosticError(Vec<Diagnostic>),
 }
 
