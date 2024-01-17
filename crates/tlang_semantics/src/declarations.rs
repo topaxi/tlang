@@ -223,11 +223,13 @@ impl DeclarationAnalyzer {
     }
 
     fn collect_program_declarations(&mut self, node: &mut Node, nodes: &mut [Node]) {
-        node.symbol_table = Some(Rc::clone(&self.root_symbol_table()));
+        node.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
 
         for node in nodes {
             self.collect_declarations(node);
         }
+
+        self.pop_symbol_table();
     }
 
     fn collect_block_declarations(

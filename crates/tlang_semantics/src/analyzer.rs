@@ -77,6 +77,38 @@ impl SemanticAnalyzer {
         self.declaration_analyzer.analyze(ast);
     }
 
+    fn mark_as_used_by_name(&mut self, name: &str) {
+        let symbol_info = self.get_last_symbol_table().borrow().get_by_name(name);
+
+        if let Some(symbol_info) = symbol_info {
+            let symbol_table = self.get_last_symbol_table();
+            // TODO: This only marks the by it's name, not by it's id. Maybe we should
+            //       mark it in the collection pass? Or keep track of the current id in
+            //       case the name is being shadowed?
+            symbol_table.borrow_mut().mark_as_used(symbol_info.id);
+        } else {
+            let did_you_mean = did_you_mean(
+                name,
+                &self.get_last_symbol_table().borrow().get_all_symbols(),
+            );
+
+            if let Some(suggestion) = did_you_mean {
+                self.diagnostics.push(Diagnostic::new(
+                    format!(
+                        "Use of undeclared variable `{}`, did you mean the {} `{}`",
+                        name, suggestion.symbol_type, suggestion.name
+                    ),
+                    Severity::Error,
+                ));
+            } else {
+                self.diagnostics.push(Diagnostic::new(
+                    format!("Use of undeclared variable `{}`", name),
+                    Severity::Error,
+                ));
+            }
+        }
+    }
+
     fn analyze_node(&mut self, ast: &mut Node) {
         if let Some(symbol_table) = &ast.symbol_table {
             self.push_symbol_table(symbol_table);
@@ -154,39 +186,13 @@ impl SemanticAnalyzer {
                 }
             }
             AstNode::Identifier(_) if self.identifier_is_declaration => {}
-            AstNode::Identifier(name) => {
-                let symbol_info = self.get_last_symbol_table().borrow().get_by_name(name);
-
-                if let Some(symbol_info) = symbol_info {
-                    let symbol_table = self.get_last_symbol_table();
-                    // TODO: This only marks the by it's name, not by it's id. Maybe we should
-                    //       mark it in the collection pass? Or keep track of the current id in
-                    //       case the name is being shadowed?
-                    symbol_table.borrow_mut().mark_as_used(symbol_info.id);
-                } else {
-                    let did_you_mean = did_you_mean(
-                        name,
-                        &self.get_last_symbol_table().borrow().get_all_symbols(),
-                    );
-
-                    if let Some(suggestion) = did_you_mean {
-                        self.diagnostics.push(Diagnostic::new(
-                            format!(
-                                "Use of undeclared variable `{}`, did you mean the {} `{}`",
-                                name, suggestion.symbol_type, suggestion.name
-                            ),
-                            Severity::Error,
-                        ));
-                    } else {
-                        self.diagnostics.push(Diagnostic::new(
-                            format!("Use of undeclared variable `{}`", name),
-                            Severity::Error,
-                        ));
-                    }
+            AstNode::Identifier(name) => self.mark_as_used_by_name(name),
+            AstNode::NestedIdentifier(idents) => {
+                if let Some(first_ident) = idents.first() {
+                    self.mark_as_used_by_name(first_ident);
                 }
-            }
-            AstNode::NestedIdentifier(_idents) => {
-                // TODO
+
+                // TODO: Handle nested identifiers
             }
             AstNode::Call {
                 function,
@@ -225,10 +231,16 @@ impl SemanticAnalyzer {
                     self.analyze_declaration_node(pattern);
                 }
             }
+            AstNode::EnumPattern {
+                identifier,
+                elements: _,
+                ..
+            } => {
+                self.analyze_node(identifier);
+            }
             AstNode::Dict(_)
             | AstNode::EnumDeclaration { .. }
             | AstNode::EnumVariant { .. }
-            | AstNode::EnumPattern { .. }
             | AstNode::IdentifierPattern { .. }
             | AstNode::Range { .. }
             | AstNode::Match { .. }
@@ -280,7 +292,7 @@ impl SemanticAnalyzer {
         &mut self,
         id: SymbolId,
         pattern: &mut Node,
-        expression: &mut Box<Node>,
+        expression: &mut Node,
     ) {
         self.analyze_declaration_node(pattern);
 
@@ -294,7 +306,9 @@ impl SemanticAnalyzer {
         self.analyze_node(expression);
 
         if let Some(symbol) = symbol {
-            self.get_last_symbol_table().borrow_mut().insert(symbol);
+            self.get_last_symbol_table()
+                .borrow_mut()
+                .insert_beginning(symbol);
         }
     }
 

@@ -258,8 +258,10 @@ fn should_warn_about_unused_variables() {
     assert_eq!(
         diagnostics,
         vec![
-            Diagnostic::new("Unused variable `a`".to_string(), Severity::Warning),
+            // TODO: Might be nicer to have them report in order. This currently happens
+            //       due to us reinserting variables in the beginning of the symbol table.
             Diagnostic::new("Unused variable `b`".to_string(), Severity::Warning),
+            Diagnostic::new("Unused variable `a`".to_string(), Severity::Warning),
         ]
     );
 }

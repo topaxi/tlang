@@ -117,6 +117,10 @@ impl SymbolTable {
         self.symbols.push(symbol_info);
     }
 
+    pub fn insert_beginning(&mut self, symbol_info: SymbolInfo) {
+        self.symbols.insert(0, symbol_info);
+    }
+
     pub fn mark_as_used(&mut self, id: SymbolId) {
         if let Some(symbol) = self.get_local(id) {
             self.symbols
