@@ -264,6 +264,7 @@ export class TlangPlayground extends LitElement {
     }
 
     this.codemirror.source = defaultSource();
+    this.run();
   }
 
   protected updated(
@@ -285,6 +286,7 @@ export class TlangPlayground extends LitElement {
     this.consoleOutput = [];
     this.codemirror.source = examples[target.value];
     window.location.hash = `example=${encodeURIComponent(target.value)}`;
+    this.run();
   }
 
   renderLogMessage(args: string | unknown[]) {
