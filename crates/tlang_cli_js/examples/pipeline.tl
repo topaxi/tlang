@@ -5,7 +5,7 @@ fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
 // filter(a[], fn(a) -> bool) -> a[]
 fn filter([], _) { [] }
 fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
-fn filter([x, ...xs], f) { rec filter(xs, f) }
+fn filter([_, ...xs], f) { rec filter(xs, f) }
 
 // foldl(a[], b, fn(b, a) -> b) -> b
 fn foldl([], acc, _) { acc }

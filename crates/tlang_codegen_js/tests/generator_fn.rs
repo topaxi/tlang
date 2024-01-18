@@ -187,7 +187,7 @@ fn test_function_declarations_with_guard() {
     let output = compile!(indoc! {"
         fn filter([], f) { [] }
         fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
-        fn filter([x, ...xs], f) { filter(xs, f) }
+        fn filter([_, ...xs], f) { filter(xs, f) }
     "});
     let expected_output = indoc! {"
         function filter(...args) {
@@ -201,7 +201,6 @@ fn test_function_declarations_with_guard() {
                 return [x, ...filter(xs, f)];
             } else if (args[0].length >= 1) {
                 let f = args[1];
-                let x = args[0][0];
                 let xs = args[0].slice(1);
                 return filter(xs, f);
             }
@@ -329,6 +328,21 @@ fn test_function_declarations_with_comments_inbetween() {
                 let x = args[0][0];
                 let xs = args[0].slice(1);
                 return filter_map(xs, f);
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+#[ignore = "not yet implemented"]
+fn test_function_list_match_with_wildcard() {
+    let output = compile!("fn tail([_, ...xs]) { xs }");
+    let expected_output = indoc! {"
+        function tail(...args) {
+            if (args[0].length >= 1) {
+                let xs = args[0].slice(1);
+                return xs;
             }
         }
     "};

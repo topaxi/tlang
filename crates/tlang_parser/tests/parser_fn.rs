@@ -1063,3 +1063,38 @@ fn test_function_declarations_with_let_guard() {
 fn test_parameter_list_mandatory_comma() {
     parse!("fn foo(x y) {}");
 }
+
+#[test]
+fn test_list_matching_wildcard() {
+    let program = parse!("fn tail([_, ...xs]) { xs }");
+
+    assert_eq!(
+        program,
+        node::new!(Program(vec![node::new!(FunctionSingleDeclaration {
+            id: SymbolId::new(3),
+            name: Box::new(node::new!(Identifier("tail".to_string()))),
+            declaration: Box::new(node::new!(FunctionDeclaration(FunctionDeclaration {
+                parameters: vec![node::new!(FunctionParameter {
+                    id: SymbolId::new(2),
+                    pattern: Box::new(node::new!(ListPattern(vec![
+                        node::new!(Wildcard),
+                        node::new!(UnaryOp(
+                            UnaryOp::Rest,
+                            Box::new(node::new!(IdentifierPattern {
+                                id: SymbolId::new(1),
+                                name: "xs".to_string()
+                            }))
+                        ))
+                    ]))),
+                    type_annotation: Box::new(None),
+                })],
+                guard: Box::new(None),
+                return_type_annotation: Box::new(None),
+                body: Box::new(node::new!(Block(
+                    vec![],
+                    Box::new(Some(node::new!(Identifier("xs".to_string()))))
+                )))
+            })))
+        })]))
+    );
+}

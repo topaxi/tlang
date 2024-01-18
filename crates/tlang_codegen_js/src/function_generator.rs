@@ -271,6 +271,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                                             &format!("args[{}][{}]", k, i),
                                         );
                                     }
+                                    AstNode::Wildcard => {}
                                     _ => unreachable!(),
                                 }
                             }
