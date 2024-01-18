@@ -197,8 +197,13 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
             AstNode::FunctionSingleDeclaration {
                 id: _,
                 name: _,
-                ref declaration,
-            } => (nodes[0].clone(), declaration.clone()),
+                declaration,
+            } => match &declaration.ast_node {
+                AstNode::FunctionDeclaration(declaration) => {
+                    (nodes[0].clone(), declaration.clone())
+                }
+                _ => panic!("Expected function declaration {:?}", declaration),
+            },
             _ => panic!("Expected function declaration {:?}", nodes[0].ast_node),
         },
         _ => panic!("Expected program {:?}", ast.ast_node),

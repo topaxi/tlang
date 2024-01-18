@@ -16,6 +16,13 @@ fn filter_comments(node: &Node) -> bool {
     )
 }
 
+pub fn get_function_declaration_from_node(node: &Node) -> &FunctionDeclaration {
+    match &node.ast_node {
+        AstNode::FunctionDeclaration(declaration) => declaration,
+        _ => panic!("Unexpected node in function declarations."),
+    }
+}
+
 pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, declarations: &[Node]) {
     let name_as_str = fn_identifier_to_string(name);
 
@@ -454,11 +461,19 @@ fn generate_function_definition_guard(codegen: &mut CodegenJS, node: &Node) {
     }
 }
 
-pub fn generate_function_declaration(
-    codegen: &mut CodegenJS,
-    name: &Node,
-    declaration: &FunctionDeclaration,
-) {
+pub fn generate_function_parameter_list(codegen: &mut CodegenJS, parameters: &[Node]) {
+    codegen.push_str("(");
+    for (i, param) in parameters.iter().enumerate() {
+        if i > 0 {
+            codegen.push_str(", ");
+        }
+        codegen.generate_node(param, None);
+    }
+    codegen.push_str(")");
+}
+
+pub fn generate_function_declaration(codegen: &mut CodegenJS, name: &Node, node: &Node) {
+    let declaration = get_function_declaration_from_node(node);
     let name_as_str = fn_identifier_to_string(name);
     let is_tail_recursive = is_function_body_tail_recursive(&name_as_str, &declaration.body);
     codegen.push_function_context(
@@ -469,17 +484,10 @@ pub fn generate_function_declaration(
     );
 
     codegen.push_indent();
-    codegen.push_str(&format!("function {}(", name_as_str));
+    codegen.push_str(&format!("function {}", name_as_str));
     codegen.push_scope();
-
-    for (i, param) in declaration.parameters.iter().enumerate() {
-        if i > 0 {
-            codegen.push_str(", ");
-        }
-        codegen.generate_node(param, None);
-    }
-
-    codegen.push_str(") {\n");
+    generate_function_parameter_list(codegen, &declaration.parameters);
+    codegen.push_str(" {\n");
     codegen.flush_statement_buffer();
     codegen.inc_indent();
     generate_function_body(codegen, &declaration.body, is_tail_recursive);
@@ -490,11 +498,8 @@ pub fn generate_function_declaration(
     codegen.pop_function_context();
 }
 
-pub fn generate_function_expression(
-    codegen: &mut CodegenJS,
-    name: &Option<Node>,
-    declaration: &FunctionDeclaration,
-) {
+pub fn generate_function_expression(codegen: &mut CodegenJS, name: &Option<Node>, node: &Node) {
+    let declaration = get_function_declaration_from_node(node);
     codegen.push_scope();
     let name_as_str = if name.is_some() {
         fn_identifier_to_string(&name.clone().unwrap())
@@ -509,20 +514,13 @@ pub fn generate_function_expression(
         false,
     );
     let function_keyword = match name_as_str.as_str() {
-        "" => "function(".to_string(),
-        _ => format!("function {}(", name_as_str),
+        "" => "function".to_string(),
+        _ => format!("function {}", name_as_str),
     };
 
     codegen.push_str(&function_keyword);
-
-    for (i, param) in declaration.parameters.iter().enumerate() {
-        if i > 0 {
-            codegen.push_str(", ");
-        }
-        codegen.generate_node(param, None);
-    }
-
-    codegen.push_str(") {\n");
+    generate_function_parameter_list(codegen, &declaration.parameters);
+    codegen.push_str(" {\n");
     codegen.inc_indent();
     codegen.flush_statement_buffer();
     generate_function_body(codegen, &declaration.body, is_tail_recursive);

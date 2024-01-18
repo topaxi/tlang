@@ -829,12 +829,12 @@ impl<'src> Parser<'src> {
         node::new!(FunctionExpression {
             id: self.unique_id(),
             name: Box::new(name),
-            declaration: Box::new(FunctionDeclaration {
+            declaration: Box::new(node::new!(FunctionDeclaration(FunctionDeclaration {
                 parameters,
                 guard: Box::new(None),
                 body: Box::new(body),
                 return_type_annotation: Box::new(return_type),
-            }),
+            }))),
         })
     }
 
@@ -976,16 +976,16 @@ impl<'src> Parser<'src> {
 
         if declarations.len() == 1 {
             let declaration = declarations.pop().unwrap();
-            let declaration = match declaration.ast_node {
-                AstNode::FunctionDeclaration(declaration) => declaration,
-                _ => unreachable!(),
-            };
 
-            return node::new!(FunctionSingleDeclaration {
-                id: self.unique_id(),
-                name: Box::new(name.unwrap()),
-                declaration: Box::new(declaration)
-            });
+            if let AstNode::FunctionDeclaration(_) = declaration.ast_node {
+                return node::new!(FunctionSingleDeclaration {
+                    id: self.unique_id(),
+                    name: Box::new(name.unwrap()),
+                    declaration: Box::new(declaration)
+                });
+            } else {
+                unreachable!();
+            }
         }
 
         node::new!(FunctionDeclarations {

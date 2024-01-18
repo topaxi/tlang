@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use tlang_ast::{
-    node::{AstNode, FunctionDeclaration, Node},
+    node::{AstNode, Node},
     symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
 };
 
@@ -162,10 +162,7 @@ impl SemanticAnalyzer {
                 declaration,
             } => {
                 self.analyze_optional_node(name);
-                for parameter in &mut declaration.parameters {
-                    self.analyze_node(parameter);
-                }
-                self.analyze_node(&mut declaration.body);
+                self.analyze_node(declaration);
             }
             AstNode::FunctionParameter {
                 id: _,
@@ -316,27 +313,21 @@ impl SemanticAnalyzer {
         &mut self,
         _node: &mut Node,
         name: &mut Node,
-        declaration: &mut FunctionDeclaration,
+        declaration: &mut Node,
     ) {
         self.analyze_declaration_node(name);
-
-        for parameter in &mut declaration.parameters {
-            self.analyze_node(parameter);
-        }
-        self.analyze_optional_node(&mut declaration.guard);
-        self.analyze_node(&mut declaration.body);
+        self.analyze_node(declaration);
     }
 
     fn analyze_function_declarations(
         &mut self,
-        node: &mut Node,
+        _node: &mut Node,
         name: &mut Node,
         declarations: &mut Vec<Node>,
     ) {
+        self.analyze_declaration_node(name);
         for declaration in declarations {
-            if let AstNode::FunctionDeclaration(decl) = &mut declaration.ast_node {
-                self.analyze_function_declaration(node, name, decl);
-            }
+            self.analyze_node(declaration);
         }
     }
 

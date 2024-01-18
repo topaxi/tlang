@@ -88,7 +88,7 @@ fn test_return_type_annotation() {
         node::new!(Program(vec![node::new!(FunctionSingleDeclaration {
             id: SymbolId::new(1),
             name: Box::new(node::new!(Identifier("foo".to_string()))),
-            declaration: Box::new(FunctionDeclaration {
+            declaration: Box::new(node::new!(FunctionDeclaration(FunctionDeclaration {
                 parameters: vec![],
                 guard: Box::new(None),
                 body: Box::new(node::new!(Block(
@@ -99,7 +99,7 @@ fn test_return_type_annotation() {
                     name: Box::new(node::new!(Identifier("i64".to_string()))),
                     parameters: vec![]
                 })))
-            })
+            })))
         })]))
     );
 
@@ -110,7 +110,7 @@ fn test_return_type_annotation() {
         node::new!(Program(vec![node::new!(FunctionSingleDeclaration {
             id: SymbolId::new(1),
             name: Box::new(node::new!(Identifier("foo".to_string()))),
-            declaration: Box::new(FunctionDeclaration {
+            declaration: Box::new(node::new!(FunctionDeclaration(FunctionDeclaration {
                 parameters: vec![],
                 guard: Box::new(None),
                 body: Box::new(node::new!(Block(
@@ -124,7 +124,7 @@ fn test_return_type_annotation() {
                         parameters: vec![]
                     })]
                 })))
-            })
+            })))
         })]))
     );
 
@@ -138,7 +138,7 @@ fn test_return_type_annotation() {
             expression: Box::new(node::new!(FunctionExpression {
                 id: SymbolId::new(1),
                 name: Box::new(Some(node::new!(Identifier("foo".to_string())))),
-                declaration: Box::new(FunctionDeclaration {
+                declaration: Box::new(node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![],
                     guard: Box::new(None),
                     body: Box::new(node::new!(Block(
@@ -149,7 +149,7 @@ fn test_return_type_annotation() {
                         name: Box::new(node::new!(Identifier("i64".to_string()))),
                         parameters: vec![]
                     })))
-                })
+                })))
             })),
             type_annotation: Box::new(None),
         })]))
@@ -165,7 +165,7 @@ fn test_function_param_types() {
         node::new!(Program(vec![node::new!(FunctionSingleDeclaration {
             id: SymbolId::new(3),
             name: Box::new(node::new!(Identifier("foo".to_string()))),
-            declaration: Box::new(FunctionDeclaration {
+            declaration: Box::new(node::new!(FunctionDeclaration(FunctionDeclaration {
                 parameters: vec![
                     node::new!(FunctionParameter {
                         id: SymbolId::new(1),
@@ -193,7 +193,7 @@ fn test_function_param_types() {
                     name: Box::new(node::new!(Identifier("i64".to_string()))),
                     parameters: vec![]
                 })))
-            })
+            })))
         })]))
     );
 }

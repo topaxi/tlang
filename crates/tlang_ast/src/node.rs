@@ -79,11 +79,12 @@ pub enum AstNode {
         expression: Box<Node>,
         type_annotation: Box<Option<Node>>,
     },
+    // Do we still need this to wrap a struct or could we inline?
     FunctionDeclaration(FunctionDeclaration),
     FunctionSingleDeclaration {
         id: SymbolId,
         name: Box<Node>,
-        declaration: Box<FunctionDeclaration>,
+        declaration: Box<Node>,
     },
     FunctionDeclarations {
         id: SymbolId,
@@ -93,7 +94,7 @@ pub enum AstNode {
     FunctionExpression {
         id: SymbolId,
         name: Box<Option<Node>>,
-        declaration: Box<FunctionDeclaration>,
+        declaration: Box<Node>,
     },
     FunctionParameter {
         id: SymbolId,

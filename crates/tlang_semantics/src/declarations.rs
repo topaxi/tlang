@@ -122,11 +122,7 @@ impl DeclarationAnalyzer {
                     self.declare_symbol(SymbolInfo::new(*id, &name_as_str, SymbolType::Function));
                 }
 
-                for param in &mut declaration.parameters {
-                    self.collect_declarations(param);
-                }
-
-                self.collect_declarations(&mut declaration.body);
+                self.collect_declarations(declaration);
                 self.pop_symbol_table();
             }
             AstNode::ReturnStatement(expr) => {
@@ -311,7 +307,7 @@ impl DeclarationAnalyzer {
         node: &mut Node,
         id: SymbolId,
         name: &Node,
-        declaration: &mut FunctionDeclaration,
+        declaration: &mut Node,
     ) {
         let name_as_str = self.fn_identifier_to_string(name);
 
@@ -320,7 +316,7 @@ impl DeclarationAnalyzer {
         // Function arguments have their own scope.
         node.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
 
-        self.collect_function_declaration(declaration);
+        self.collect_declarations(declaration);
         self.pop_symbol_table();
     }
 

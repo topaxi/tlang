@@ -342,7 +342,7 @@ fn test_if_else_as_last_expression() {
         node::new!(Program(vec![node::new!(FunctionSingleDeclaration {
             id: SymbolId::new(1),
             name: Box::new(node::new!(Identifier("main".to_string()))),
-            declaration: Box::new(FunctionDeclaration {
+            declaration: Box::new(node::new!(FunctionDeclaration(FunctionDeclaration {
                 parameters: vec![],
                 guard: Box::new(None),
                 return_type_annotation: Box::new(None),
@@ -360,7 +360,7 @@ fn test_if_else_as_last_expression() {
                         )))),
                     })))
                 )))
-            })
+            })))
         })]))
     );
 }

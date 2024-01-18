@@ -156,9 +156,43 @@ fn test_pipeline_operator_long_chaining() {
                                 arguments: vec![node::new!(FunctionExpression {
                                     id: SymbolId::new(2),
                                     name: Box::new(None),
-                                    declaration: Box::new(FunctionDeclaration {
+                                    declaration: Box::new(node::new!(FunctionDeclaration(
+                                        FunctionDeclaration {
+                                            parameters: vec![node::new!(FunctionParameter {
+                                                id: SymbolId::new(1),
+                                                pattern: Box::new(node::new!(Identifier(
+                                                    "x".to_string()
+                                                ))),
+                                                type_annotation: Box::new(None),
+                                            })],
+                                            guard: Box::new(None),
+                                            return_type_annotation: Box::new(None),
+                                            body: Box::new(node::new!(Block(
+                                                vec![],
+                                                Box::new(Some(node::new!(BinaryOp {
+                                                    op: BinaryOp::Exponentiation,
+                                                    lhs: Box::new(node::new!(Identifier(
+                                                        "x".to_string()
+                                                    ))),
+                                                    rhs: Box::new(node::new!(Literal(
+                                                        Literal::Integer(2)
+                                                    ))),
+                                                })))
+                                            )))
+                                        }
+                                    ))),
+                                })]
+                            })),
+                        })),
+                        rhs: Box::new(node::new!(Call {
+                            function: Box::new(node::new!(Identifier("filter".to_string()))),
+                            arguments: vec![node::new!(FunctionExpression {
+                                id: SymbolId::new(4),
+                                name: Box::new(None),
+                                declaration: Box::new(node::new!(FunctionDeclaration(
+                                    FunctionDeclaration {
                                         parameters: vec![node::new!(FunctionParameter {
-                                            id: SymbolId::new(1),
+                                            id: SymbolId::new(3),
                                             pattern: Box::new(node::new!(Identifier(
                                                 "x".to_string()
                                             ))),
@@ -169,49 +203,23 @@ fn test_pipeline_operator_long_chaining() {
                                         body: Box::new(node::new!(Block(
                                             vec![],
                                             Box::new(Some(node::new!(BinaryOp {
-                                                op: BinaryOp::Exponentiation,
-                                                lhs: Box::new(node::new!(Identifier(
-                                                    "x".to_string()
-                                                ))),
+                                                op: BinaryOp::Equal,
+                                                lhs: Box::new(node::new!(BinaryOp {
+                                                    op: BinaryOp::Modulo,
+                                                    lhs: Box::new(node::new!(Identifier(
+                                                        "x".to_string()
+                                                    ))),
+                                                    rhs: Box::new(node::new!(Literal(
+                                                        Literal::Integer(2)
+                                                    ))),
+                                                })),
                                                 rhs: Box::new(node::new!(Literal(
-                                                    Literal::Integer(2)
+                                                    Literal::Integer(0)
                                                 ))),
                                             })))
                                         )))
-                                    }),
-                                })]
-                            })),
-                        })),
-                        rhs: Box::new(node::new!(Call {
-                            function: Box::new(node::new!(Identifier("filter".to_string()))),
-                            arguments: vec![node::new!(FunctionExpression {
-                                id: SymbolId::new(4),
-                                name: Box::new(None),
-                                declaration: Box::new(FunctionDeclaration {
-                                    parameters: vec![node::new!(FunctionParameter {
-                                        id: SymbolId::new(3),
-                                        pattern: Box::new(node::new!(Identifier("x".to_string()))),
-                                        type_annotation: Box::new(None),
-                                    })],
-                                    guard: Box::new(None),
-                                    return_type_annotation: Box::new(None),
-                                    body: Box::new(node::new!(Block(
-                                        vec![],
-                                        Box::new(Some(node::new!(BinaryOp {
-                                            op: BinaryOp::Equal,
-                                            lhs: Box::new(node::new!(BinaryOp {
-                                                op: BinaryOp::Modulo,
-                                                lhs: Box::new(node::new!(Identifier(
-                                                    "x".to_string()
-                                                ))),
-                                                rhs: Box::new(node::new!(Literal(
-                                                    Literal::Integer(2)
-                                                ))),
-                                            })),
-                                            rhs: Box::new(node::new!(Literal(Literal::Integer(0)))),
-                                        })))
-                                    )))
-                                }),
+                                    }
+                                ))),
                             })]
                         })),
                     })),
@@ -221,36 +229,40 @@ fn test_pipeline_operator_long_chaining() {
                             node::new!(FunctionExpression {
                                 id: SymbolId::new(7),
                                 name: Box::new(None),
-                                declaration: Box::new(FunctionDeclaration {
-                                    parameters: vec![
-                                        node::new!(FunctionParameter {
-                                            id: SymbolId::new(5),
-                                            pattern: Box::new(node::new!(Identifier(
-                                                "acc".to_string()
-                                            ))),
-                                            type_annotation: Box::new(None),
-                                        }),
-                                        node::new!(FunctionParameter {
-                                            id: SymbolId::new(6),
-                                            pattern: Box::new(node::new!(Identifier(
-                                                "x".to_string()
-                                            ))),
-                                            type_annotation: Box::new(None),
-                                        }),
-                                    ],
-                                    guard: Box::new(None),
-                                    return_type_annotation: Box::new(None),
-                                    body: Box::new(node::new!(Block(
-                                        vec![],
-                                        Box::new(Some(node::new!(BinaryOp {
-                                            op: BinaryOp::Add,
-                                            lhs: Box::new(node::new!(Identifier(
-                                                "acc".to_string()
-                                            ))),
-                                            rhs: Box::new(node::new!(Identifier("x".to_string()))),
-                                        })))
-                                    )))
-                                })
+                                declaration: Box::new(node::new!(FunctionDeclaration(
+                                    FunctionDeclaration {
+                                        parameters: vec![
+                                            node::new!(FunctionParameter {
+                                                id: SymbolId::new(5),
+                                                pattern: Box::new(node::new!(Identifier(
+                                                    "acc".to_string()
+                                                ))),
+                                                type_annotation: Box::new(None),
+                                            }),
+                                            node::new!(FunctionParameter {
+                                                id: SymbolId::new(6),
+                                                pattern: Box::new(node::new!(Identifier(
+                                                    "x".to_string()
+                                                ))),
+                                                type_annotation: Box::new(None),
+                                            }),
+                                        ],
+                                        guard: Box::new(None),
+                                        return_type_annotation: Box::new(None),
+                                        body: Box::new(node::new!(Block(
+                                            vec![],
+                                            Box::new(Some(node::new!(BinaryOp {
+                                                op: BinaryOp::Add,
+                                                lhs: Box::new(node::new!(Identifier(
+                                                    "acc".to_string()
+                                                ))),
+                                                rhs: Box::new(node::new!(Identifier(
+                                                    "x".to_string()
+                                                ))),
+                                            })))
+                                        )))
+                                    }
+                                )))
                             }),
                             node::new!(Literal(Literal::Integer(0))),
                         ]
