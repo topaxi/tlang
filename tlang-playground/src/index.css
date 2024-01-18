@@ -1,7 +1,15 @@
-@import "@catppuccin/palette/css/catppuccin.css";
+@import '@catppuccin/palette/css/catppuccin.css';
+
+@font-face {
+  font-family: 'Victor Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/VictorMono-Regular.woff2') format('woff2');
+}
 
 :root {
-  font-family: "VictorMono NFM", "Victor Mono", Inconsolata, Consolas, Menlo,
+  font-family: 'VictorMono NFM', 'Victor Mono', Inconsolata, Consolas, Menlo,
     Monaco, monospace;
   line-height: 1.5;
   font-weight: 400;
