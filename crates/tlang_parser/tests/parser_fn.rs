@@ -1098,3 +1098,37 @@ fn test_list_matching_wildcard() {
         })]))
     );
 }
+
+#[test]
+fn test_fn_expression_in_function_completion_position() {
+    // TODO: This should work without parentheses.
+    let program = parse!("fn foo() { (fn bar() {}) }");
+
+    assert_eq!(
+        program,
+        node::new!(Program(vec![node::new!(FunctionSingleDeclaration {
+            id: SymbolId::new(2),
+            name: Box::new(node::new!(Identifier("foo".to_string()))),
+            declaration: Box::new(node::new!(FunctionDeclaration(FunctionDeclaration {
+                parameters: vec![],
+                guard: Box::new(None),
+                return_type_annotation: Box::new(None),
+                body: Box::new(node::new!(Block(
+                    vec![],
+                    Box::new(Some(node::new!(FunctionExpression {
+                        id: SymbolId::new(1),
+                        name: Box::new(Some(node::new!(Identifier("bar".to_string())))),
+                        declaration: Box::new(node::new!(FunctionDeclaration(
+                            FunctionDeclaration {
+                                parameters: vec![],
+                                guard: Box::new(None),
+                                return_type_annotation: Box::new(None),
+                                body: Box::new(node::new!(Block(vec![], Box::new(None))))
+                            }
+                        )))
+                    })))
+                )))
+            })))
+        })]))
+    );
+}
