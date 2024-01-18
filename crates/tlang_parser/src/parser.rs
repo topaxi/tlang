@@ -207,9 +207,7 @@ impl<'src> Parser<'src> {
             Some(TokenKind::Return) => self.parse_return_statement(),
             Some(TokenKind::Enum) => self.parse_enum_declaration(),
             Some(TokenKind::SingleLineComment(_) | TokenKind::MultiLineComment(_)) => {
-                let comment: Node = (&self.current_token_kind().unwrap()).into();
-                self.advance();
-                return (false, Some(comment));
+                return (false, Some(self.parse_comment()));
             }
             _ => node::new!(ExpressionStatement(Box::new(self.parse_expression()))),
         };
@@ -235,6 +233,12 @@ impl<'src> Parser<'src> {
         }
 
         (true, Some(node))
+    }
+
+    fn parse_comment(&mut self) -> Node {
+        let comment: Node = (&self.current_token_kind().unwrap()).into();
+        self.advance();
+        comment
     }
 
     fn parse_return_statement(&mut self) -> Node {
