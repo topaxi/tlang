@@ -109,6 +109,13 @@ impl SemanticAnalyzer {
         }
     }
 
+    #[inline(always)]
+    fn analyze_optional_node(&mut self, ast: &mut Option<Node>) {
+        if let Some(node) = ast {
+            self.analyze_node(node);
+        }
+    }
+
     fn analyze_node(&mut self, ast: &mut Node) {
         if let Some(symbol_table) = &ast.symbol_table {
             self.push_symbol_table(symbol_table);
@@ -119,14 +126,12 @@ impl SemanticAnalyzer {
         match &mut ast_node {
             AstNode::Program(nodes) => nodes.iter_mut().for_each(|node| self.analyze_node(node)),
             AstNode::ExpressionStatement(node) => self.analyze_node(node),
-            AstNode::Block(nodes, ref mut return_value) => {
+            AstNode::Block(nodes, return_value) => {
                 for node in nodes.iter_mut() {
                     self.analyze_node(node)
                 }
 
-                if let Some(return_value) = return_value {
-                    self.analyze_node(return_value);
-                }
+                self.analyze_optional_node(return_value);
             }
             AstNode::VariableDeclaration {
                 id,
@@ -156,9 +161,7 @@ impl SemanticAnalyzer {
                 name,
                 declaration,
             } => {
-                if let Some(name) = name {
-                    self.analyze_node(name);
-                }
+                self.analyze_optional_node(name);
                 for parameter in &mut declaration.parameters {
                     self.analyze_node(parameter);
                 }
@@ -170,9 +173,7 @@ impl SemanticAnalyzer {
                 type_annotation: _,
             } => self.analyze_function_parameter(ast, node),
             AstNode::ReturnStatement(expr) => {
-                if let Some(expr) = expr {
-                    self.analyze_node(expr);
-                }
+                self.analyze_optional_node(expr);
             }
             AstNode::IfElse {
                 condition,
@@ -181,9 +182,7 @@ impl SemanticAnalyzer {
             } => {
                 self.analyze_node(condition);
                 self.analyze_node(then_branch);
-                if let Some(else_branch) = else_branch {
-                    self.analyze_node(else_branch);
-                }
+                self.analyze_optional_node(else_branch);
             }
             AstNode::Identifier(_) if self.identifier_is_declaration => {}
             AstNode::Identifier(name) => self.mark_as_used_by_name(name),
@@ -324,9 +323,7 @@ impl SemanticAnalyzer {
         for parameter in &mut declaration.parameters {
             self.analyze_node(parameter);
         }
-        if let Some(ref mut guard) = declaration.guard {
-            self.analyze_node(guard);
-        }
+        self.analyze_optional_node(&mut declaration.guard);
         self.analyze_node(&mut declaration.body);
     }
 

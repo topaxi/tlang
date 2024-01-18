@@ -68,6 +68,13 @@ impl DeclarationAnalyzer {
         self.collect_declarations(ast);
     }
 
+    #[inline(always)]
+    fn collect_optional_declarations(&mut self, node: &mut Option<Node>) {
+        if let Some(node) = node {
+            self.collect_declarations(node);
+        }
+    }
+
     fn collect_declarations(&mut self, node: &mut Node) {
         let mut ast_node = std::mem::replace(&mut node.ast_node, AstNode::None);
 
@@ -110,7 +117,7 @@ impl DeclarationAnalyzer {
                 declaration,
             } => {
                 node.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
-                if let Some(name) = name {
+                if let Some(name) = name.as_ref() {
                     let name_as_str = self.fn_identifier_to_string(name);
                     self.declare_symbol(SymbolInfo::new(*id, &name_as_str, SymbolType::Function));
                 }
@@ -123,9 +130,7 @@ impl DeclarationAnalyzer {
                 self.pop_symbol_table();
             }
             AstNode::ReturnStatement(expr) => {
-                if let Some(expr) = expr {
-                    self.collect_declarations(expr);
-                }
+                self.collect_optional_declarations(expr);
             }
             AstNode::ListPattern(patterns) => {
                 self.collect_list_pattern(patterns);
@@ -171,9 +176,7 @@ impl DeclarationAnalyzer {
             } => {
                 self.collect_declarations(condition);
                 self.collect_declarations(then_branch);
-                if let Some(else_branch) = else_branch {
-                    self.collect_declarations(else_branch);
-                }
+                self.collect_optional_declarations(else_branch);
             }
             AstNode::FieldExpression { base, field } => {
                 self.collect_declarations(base);
@@ -236,7 +239,7 @@ impl DeclarationAnalyzer {
         &mut self,
         node: &mut Node,
         nodes: &mut [Node],
-        expr: &mut Option<Box<Node>>,
+        expr: &mut Box<Option<Node>>,
     ) {
         node.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
 
@@ -244,9 +247,7 @@ impl DeclarationAnalyzer {
             self.collect_declarations(node);
         }
 
-        if let Some(expr) = expr {
-            self.collect_declarations(expr);
-        }
+        self.collect_optional_declarations(expr);
 
         self.pop_symbol_table();
     }
@@ -300,9 +301,8 @@ impl DeclarationAnalyzer {
         for param in &mut declaration.parameters {
             self.collect_declarations(param);
         }
-        if let Some(ref mut guard) = declaration.guard {
-            self.collect_declarations(guard);
-        }
+
+        self.collect_optional_declarations(&mut declaration.guard);
         self.collect_declarations(&mut declaration.body);
     }
 

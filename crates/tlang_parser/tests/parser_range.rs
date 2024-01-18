@@ -21,7 +21,7 @@ fn test_range_notation() {
                 end: Box::new(node::new!(Literal(Literal::Integer(10)))),
                 inclusive: false
             })),
-            type_annotation: None
+            type_annotation: Box::new(None)
         })]))
     );
 }
@@ -43,7 +43,7 @@ fn test_inclusive_range_notation() {
                 end: Box::new(node::new!(Literal(Literal::Integer(10)))),
                 inclusive: true
             })),
-            type_annotation: None
+            type_annotation: Box::new(None)
         })]))
     );
 }
@@ -67,7 +67,7 @@ fn test_range_as_index() {
                     node::new!(Literal(Literal::Integer(2))),
                     node::new!(Literal(Literal::Integer(3)))
                 ]))),
-                type_annotation: None
+                type_annotation: Box::new(None)
             }),
             node::new!(VariableDeclaration {
                 id: SymbolId::new(2),
@@ -80,7 +80,7 @@ fn test_range_as_index() {
                         inclusive: false
                     }))
                 })),
-                type_annotation: None
+                type_annotation: Box::new(None)
             })
         ]))
     );
@@ -105,7 +105,7 @@ fn test_inclusive_range_as_index() {
                     node::new!(Literal(Literal::Integer(2))),
                     node::new!(Literal(Literal::Integer(3)))
                 ]))),
-                type_annotation: None
+                type_annotation: Box::new(None)
             }),
             node::new!(VariableDeclaration {
                 id: SymbolId::new(2),
@@ -118,7 +118,7 @@ fn test_inclusive_range_as_index() {
                         inclusive: true
                     }))
                 })),
-                type_annotation: None
+                type_annotation: Box::new(None)
             })
         ]))
     );

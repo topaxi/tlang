@@ -22,7 +22,7 @@ fn test_simple_variable_declaration() {
                 lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
                 rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
             })),
-            type_annotation: None,
+            type_annotation: Box::new(None),
         })]))
     );
 }
@@ -55,7 +55,7 @@ fn test_list_pattern() {
                 node::new!(Literal(Literal::Integer(1))),
                 node::new!(Literal(Literal::Integer(2))),
             ]))),
-            type_annotation: None,
+            type_annotation: Box::new(None),
         })]))
     );
 }
@@ -90,7 +90,7 @@ fn test_list_pattern_rest() {
                 node::new!(Literal(Literal::Integer(3))),
                 node::new!(Literal(Literal::Integer(4))),
             ]))),
-            type_annotation: None,
+            type_annotation: Box::new(None),
         })]))
     );
 }

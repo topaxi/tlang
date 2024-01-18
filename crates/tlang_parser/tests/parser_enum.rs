@@ -49,7 +49,7 @@ fn test_enums() {
                     ]))),
                     arguments: vec![node::new!(Literal(Literal::Integer(42)))]
                 })),
-                type_annotation: None,
+                type_annotation: Box::new(None),
             }),
         ]))
     );
@@ -97,7 +97,7 @@ fn test_enums_with_fields() {
                         node::new!(Literal(Literal::Integer(42))),
                     )]))],
                 })),
-                type_annotation: None,
+                type_annotation: Box::new(None),
             }),
         ]))
     );
@@ -162,13 +162,13 @@ fn test_enum_tree_max_depth() {
                                 elements: vec![node::new!(Wildcard)],
                                 named_fields: false,
                             })),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         })],
-                        guard: None,
-                        return_type_annotation: None,
+                        guard: Box::new(None),
+                        return_type_annotation: Box::new(None),
                         body: Box::new(node::new!(Block(
                             vec![],
-                            Some(Box::new(node::new!(Literal(Literal::Integer(1)))))
+                            Box::new(Some(node::new!(Literal(Literal::Integer(1)))))
                         )))
                     })),
                     node::new!(FunctionDeclaration(FunctionDeclaration {
@@ -191,13 +191,13 @@ fn test_enum_tree_max_depth() {
                                 ],
                                 named_fields: true,
                             })),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         })],
-                        guard: None,
-                        return_type_annotation: None,
+                        guard: Box::new(None),
+                        return_type_annotation: Box::new(None),
                         body: Box::new(node::new!(Block(
                             vec![],
-                            Some(Box::new(node::new!(BinaryOp {
+                            Box::new(Some(node::new!(BinaryOp {
                                 op: BinaryOp::Add,
                                 lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
                                 rhs: Box::new(node::new!(Call {
@@ -231,8 +231,8 @@ fn test_enum_tree_max_depth() {
                 name: Box::new(node::new!(Identifier("main".to_string()))),
                 declaration: Box::new(FunctionDeclaration {
                     parameters: vec![],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![node::new!(VariableDeclaration {
                             id: SymbolId::new(7),
@@ -296,9 +296,9 @@ fn test_enum_tree_max_depth() {
                                     )
                                 ]))]
                             })),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         })],
-                        None
+                        Box::new(None)
                     )))
                 })
             })
@@ -352,13 +352,13 @@ fn test_enum_extraction() {
                                 elements: vec![],
                                 named_fields: false,
                             })),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         })],
-                        guard: None,
-                        return_type_annotation: None,
+                        guard: Box::new(None),
+                        return_type_annotation: Box::new(None),
                         body: Box::new(node::new!(Block(
                             vec![],
-                            Some(Box::new(node::new!(Call {
+                            Box::new(Some(node::new!(Call {
                                 function: Box::new(node::new!(Identifier("panic".to_string()))),
                                 arguments: vec![node::new!(Literal(Literal::String(
                                     "Cannot unwrap None".to_string()
@@ -380,13 +380,13 @@ fn test_enum_extraction() {
                                 })],
                                 named_fields: false,
                             })),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         })],
-                        guard: None,
-                        return_type_annotation: None,
+                        guard: Box::new(None),
+                        return_type_annotation: Box::new(None),
                         body: Box::new(node::new!(Block(
                             vec![],
-                            Some(Box::new(node::new!(Identifier("value".to_string()))))
+                            Box::new(Some(node::new!(Identifier("value".to_string()))))
                         )))
                     }))
                 ]

@@ -50,8 +50,8 @@ impl<'a> From<&'a TokenKind> for Node {
 #[derive(Debug, PartialEq, Clone)]
 pub struct FunctionDeclaration {
     pub parameters: Vec<Node>,
-    pub guard: Option<Box<Node>>,
-    pub return_type_annotation: Option<Box<Node>>,
+    pub guard: Box<Option<Node>>,
+    pub return_type_annotation: Box<Option<Node>>,
     pub body: Box<Node>,
 }
 
@@ -59,7 +59,7 @@ pub struct FunctionDeclaration {
 pub enum AstNode {
     None,
     Program(Vec<Node>),
-    Block(Vec<Node>, Option<Box<Node>>),
+    Block(Vec<Node>, Box<Option<Node>>),
     Literal(Literal),
     List(Vec<Node>),
     ListPattern(Vec<Node>),
@@ -77,7 +77,7 @@ pub enum AstNode {
         id: SymbolId,
         pattern: Box<Node>,
         expression: Box<Node>,
-        type_annotation: Option<Box<Node>>,
+        type_annotation: Box<Option<Node>>,
     },
     FunctionDeclaration(FunctionDeclaration),
     FunctionSingleDeclaration {
@@ -92,15 +92,15 @@ pub enum AstNode {
     },
     FunctionExpression {
         id: SymbolId,
-        name: Option<Box<Node>>,
+        name: Box<Option<Node>>,
         declaration: Box<FunctionDeclaration>,
     },
     FunctionParameter {
         id: SymbolId,
         pattern: Box<Node>,
-        type_annotation: Option<Box<Node>>,
+        type_annotation: Box<Option<Node>>,
     },
-    ReturnStatement(Option<Box<Node>>),
+    ReturnStatement(Box<Option<Node>>),
     Match {
         expression: Box<Node>,
         arms: Vec<Node>,
@@ -113,7 +113,7 @@ pub enum AstNode {
     IfElse {
         condition: Box<Node>,
         then_branch: Box<Node>,
-        else_branch: Option<Box<Node>>,
+        else_branch: Box<Option<Node>>,
     },
     Identifier(String),
     IdentifierPattern {

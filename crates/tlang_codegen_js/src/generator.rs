@@ -283,7 +283,7 @@ impl CodegenJS {
     }
 
     /// Generates blocks in expression position.
-    fn generate_block_expression(&mut self, statements: &[Node], expression: &Option<Box<Node>>) {
+    fn generate_block_expression(&mut self, statements: &[Node], expression: &Option<Node>) {
         let has_completion_var = self.completion_variables.last().unwrap().is_some();
         let completion_tmp_var = self
             .completion_variables
@@ -341,7 +341,7 @@ impl CodegenJS {
         self.pop_scope();
     }
 
-    fn generate_block(&mut self, statements: &[Node], expression: &Option<Box<Node>>) {
+    fn generate_block(&mut self, statements: &[Node], expression: &Option<Node>) {
         // Functions handle their scoping themselves
         if self.current_context() != BlockContext::FunctionBody {
             self.push_scope();
@@ -584,7 +584,7 @@ impl CodegenJS {
         &mut self,
         condition: &Node,
         then_branch: &Node,
-        else_branch: &Option<Box<Node>>,
+        else_branch: &Option<Node>,
     ) {
         let mut lhs = String::new();
         // TODO: Potentially in a return position or other expression, before we generate the if

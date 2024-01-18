@@ -18,7 +18,7 @@ fn test_variable_declaration_type_annotation() {
             id: SymbolId::new(1),
             pattern: Box::new(node::new!(Identifier("x".to_string()))),
             expression: Box::new(node::new!(Literal(Literal::Integer(1)))),
-            type_annotation: Some(Box::new(node::new!(TypeAnnotation {
+            type_annotation: Box::new(Some(node::new!(TypeAnnotation {
                 name: Box::new(node::new!(Identifier("i64".to_string()))),
                 parameters: vec![]
             })))
@@ -33,7 +33,7 @@ fn test_variable_declaration_type_annotation() {
             id: SymbolId::new(1),
             pattern: Box::new(node::new!(Identifier("x".to_string()))),
             expression: Box::new(node::new!(Literal(Literal::Integer(1)))),
-            type_annotation: Some(Box::new(node::new!(TypeAnnotation {
+            type_annotation: Box::new(Some(node::new!(TypeAnnotation {
                 name: Box::new(node::new!(Identifier("Option".to_string()))),
                 parameters: vec![node::new!(TypeAnnotation {
                     name: Box::new(node::new!(Identifier("i64".to_string()))),
@@ -58,7 +58,7 @@ fn test_variable_declaration_type_annotation() {
                 ]))),
                 arguments: vec![]
             })),
-            type_annotation: Some(Box::new(node::new!(TypeAnnotation {
+            type_annotation: Box::new(Some(node::new!(TypeAnnotation {
                 name: Box::new(node::new!(NestedIdentifier(vec![
                     "std".to_string(),
                     "hash".to_string(),
@@ -90,12 +90,12 @@ fn test_return_type_annotation() {
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
                 parameters: vec![],
-                guard: None,
+                guard: Box::new(None),
                 body: Box::new(node::new!(Block(
                     vec![],
-                    Some(Box::new(node::new!(Literal(Literal::Integer(1)))))
+                    Box::new(Some(node::new!(Literal(Literal::Integer(1)))))
                 ))),
-                return_type_annotation: Some(Box::new(node::new!(TypeAnnotation {
+                return_type_annotation: Box::new(Some(node::new!(TypeAnnotation {
                     name: Box::new(node::new!(Identifier("i64".to_string()))),
                     parameters: vec![]
                 })))
@@ -112,12 +112,12 @@ fn test_return_type_annotation() {
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
                 parameters: vec![],
-                guard: None,
+                guard: Box::new(None),
                 body: Box::new(node::new!(Block(
                     vec![],
-                    Some(Box::new(node::new!(Literal(Literal::Integer(1)))))
+                    Box::new(Some(node::new!(Literal(Literal::Integer(1)))))
                 ))),
-                return_type_annotation: Some(Box::new(node::new!(TypeAnnotation {
+                return_type_annotation: Box::new(Some(node::new!(TypeAnnotation {
                     name: Box::new(node::new!(Identifier("Option".to_string()))),
                     parameters: vec![node::new!(TypeAnnotation {
                         name: Box::new(node::new!(Identifier("i64".to_string()))),
@@ -137,21 +137,21 @@ fn test_return_type_annotation() {
             pattern: Box::new(node::new!(Identifier("expr".to_string()))),
             expression: Box::new(node::new!(FunctionExpression {
                 id: SymbolId::new(1),
-                name: Some(Box::new(node::new!(Identifier("foo".to_string())))),
+                name: Box::new(Some(node::new!(Identifier("foo".to_string())))),
                 declaration: Box::new(FunctionDeclaration {
                     parameters: vec![],
-                    guard: None,
+                    guard: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(node::new!(Literal(Literal::Integer(1)))))
+                        Box::new(Some(node::new!(Literal(Literal::Integer(1)))))
                     ))),
-                    return_type_annotation: Some(Box::new(node::new!(TypeAnnotation {
+                    return_type_annotation: Box::new(Some(node::new!(TypeAnnotation {
                         name: Box::new(node::new!(Identifier("i64".to_string()))),
                         parameters: vec![]
                     })))
                 })
             })),
-            type_annotation: None,
+            type_annotation: Box::new(None),
         })]))
     );
 }
@@ -170,7 +170,7 @@ fn test_function_param_types() {
                     node::new!(FunctionParameter {
                         id: SymbolId::new(1),
                         pattern: Box::new(node::new!(Identifier("x".to_string()))),
-                        type_annotation: Some(Box::new(node::new!(TypeAnnotation {
+                        type_annotation: Box::new(Some(node::new!(TypeAnnotation {
                             name: Box::new(node::new!(Identifier("i64".to_string()))),
                             parameters: vec![]
                         })))
@@ -178,18 +178,18 @@ fn test_function_param_types() {
                     node::new!(FunctionParameter {
                         id: SymbolId::new(2),
                         pattern: Box::new(node::new!(Identifier("y".to_string()))),
-                        type_annotation: Some(Box::new(node::new!(TypeAnnotation {
+                        type_annotation: Box::new(Some(node::new!(TypeAnnotation {
                             name: Box::new(node::new!(Identifier("i64".to_string()))),
                             parameters: vec![]
                         })))
                     })
                 ],
-                guard: None,
+                guard: Box::new(None),
                 body: Box::new(node::new!(Block(
                     vec![],
-                    Some(Box::new(node::new!(Identifier("x".to_string()))))
+                    Box::new(Some(node::new!(Identifier("x".to_string()))))
                 ))),
-                return_type_annotation: Some(Box::new(node::new!(TypeAnnotation {
+                return_type_annotation: Box::new(Some(node::new!(TypeAnnotation {
                     name: Box::new(node::new!(Identifier("i64".to_string()))),
                     parameters: vec![]
                 })))

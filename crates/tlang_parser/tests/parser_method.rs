@@ -69,13 +69,13 @@ fn test_declare_methods_on_option_enum() {
                                 elements: vec![node::new!(Wildcard)],
                                 named_fields: false,
                             })),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         })],
-                        guard: None,
-                        return_type_annotation: None,
+                        guard: Box::new(None),
+                        return_type_annotation: Box::new(None),
                         body: Box::new(node::new!(Block(
                             vec![],
-                            Some(Box::new(node::new!(Literal(Literal::Boolean(true)))))
+                            Box::new(Some(node::new!(Literal(Literal::Boolean(true)))))
                         ))),
                     })),
                     node::new!(FunctionDeclaration(FunctionDeclaration {
@@ -89,26 +89,26 @@ fn test_declare_methods_on_option_enum() {
                                 elements: vec![],
                                 named_fields: false,
                             })),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         })],
-                        guard: None,
-                        return_type_annotation: None,
+                        guard: Box::new(None),
+                        return_type_annotation: Box::new(None),
                         body: Box::new(node::new!(Block(
                             vec![],
-                            Some(Box::new(node::new!(Literal(Literal::Boolean(true)))))
+                            Box::new(Some(node::new!(Literal(Literal::Boolean(true)))))
                         ))),
                     })),
                     node::new!(FunctionDeclaration(FunctionDeclaration {
                         parameters: vec![node::new!(FunctionParameter {
                             id: SymbolId::new(4),
                             pattern: Box::new(node::new!(Wildcard)),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         })],
-                        guard: None,
-                        return_type_annotation: None,
+                        guard: Box::new(None),
+                        return_type_annotation: Box::new(None),
                         body: Box::new(node::new!(Block(
                             vec![],
-                            Some(Box::new(node::new!(Literal(Literal::Boolean(false)))))
+                            Box::new(Some(node::new!(Literal(Literal::Boolean(false)))))
                         ))),
                     }))
                 ]
@@ -131,13 +131,13 @@ fn test_declare_methods_on_option_enum() {
                                 elements: vec![node::new!(Wildcard)],
                                 named_fields: false,
                             })),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         })],
-                        guard: None,
-                        return_type_annotation: None,
+                        guard: Box::new(None),
+                        return_type_annotation: Box::new(None),
                         body: Box::new(node::new!(Block(
                             vec![],
-                            Some(Box::new(node::new!(Literal(Literal::Boolean(true)))))
+                            Box::new(Some(node::new!(Literal(Literal::Boolean(true)))))
                         ))),
                     })),
                     node::new!(FunctionDeclaration(FunctionDeclaration {
@@ -151,13 +151,13 @@ fn test_declare_methods_on_option_enum() {
                                 elements: vec![],
                                 named_fields: false,
                             })),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         })],
-                        guard: None,
-                        return_type_annotation: None,
+                        guard: Box::new(None),
+                        return_type_annotation: Box::new(None),
                         body: Box::new(node::new!(Block(
                             vec![],
-                            Some(Box::new(node::new!(Literal(Literal::Boolean(false)))))
+                            Box::new(Some(node::new!(Literal(Literal::Boolean(false)))))
                         ))),
                     }))
                 ]
@@ -184,19 +184,19 @@ fn test_declare_methods_on_option_enum() {
                                     })],
                                     named_fields: false,
                                 })),
-                                type_annotation: None,
+                                type_annotation: Box::new(None),
                             }),
                             node::new!(FunctionParameter {
                                 id: SymbolId::new(11),
                                 pattern: Box::new(node::new!(Identifier("f".to_string()))),
-                                type_annotation: None,
+                                type_annotation: Box::new(None),
                             })
                         ],
-                        guard: None,
-                        return_type_annotation: None,
+                        guard: Box::new(None),
+                        return_type_annotation: Box::new(None),
                         body: Box::new(node::new!(Block(
                             vec![],
-                            Some(Box::new(node::new!(Call {
+                            Box::new(Some(node::new!(Call {
                                 function: Box::new(node::new!(NestedIdentifier(vec![
                                     "Option".to_string(),
                                     "Some".to_string()
@@ -220,19 +220,19 @@ fn test_declare_methods_on_option_enum() {
                                     elements: vec![],
                                     named_fields: false,
                                 })),
-                                type_annotation: None,
+                                type_annotation: Box::new(None),
                             }),
                             node::new!(FunctionParameter {
                                 id: SymbolId::new(13),
                                 pattern: Box::new(node::new!(Wildcard)),
-                                type_annotation: None,
+                                type_annotation: Box::new(None),
                             })
                         ],
-                        guard: None,
-                        return_type_annotation: None,
+                        guard: Box::new(None),
+                        return_type_annotation: Box::new(None),
                         body: Box::new(node::new!(Block(
                             vec![],
-                            Some(Box::new(node::new!(NestedIdentifier(vec![
+                            Box::new(Some(node::new!(NestedIdentifier(vec![
                                 "Option".to_string(),
                                 "None".to_string()
                             ])))),

@@ -25,13 +25,13 @@ fn test_simple_if_let_statement() {
                     id: SymbolId::new(1),
                     pattern: Box::new(node::new!(Identifier("x".to_string()))),
                     expression: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                    type_annotation: None,
+                    type_annotation: Box::new(None),
                 })),
                 then_branch: Box::new(node::new!(Block(
                     vec![],
-                    Some(Box::new(node::new!(Identifier("x".to_string()))))
+                    Box::new(Some(node::new!(Identifier("x".to_string()))))
                 ))),
-                else_branch: None,
+                else_branch: Box::new(None),
             })
         )))]))
     );
@@ -63,13 +63,13 @@ fn test_if_let_statement_with_enum_matching() {
                         named_fields: false,
                     })),
                     expression: Box::new(node::new!(Identifier("x".to_string()))),
-                    type_annotation: None,
+                    type_annotation: Box::new(None),
                 })),
                 then_branch: Box::new(node::new!(Block(
                     vec![],
-                    Some(Box::new(node::new!(Identifier("y".to_string()))))
+                    Box::new(Some(node::new!(Identifier("y".to_string()))))
                 ))),
-                else_branch: None,
+                else_branch: Box::new(None),
             })
         )))]))
     );

@@ -111,13 +111,13 @@ fn test_simple_arithmetic_with_identifiers() {
                 id: SymbolId::new(1),
                 pattern: Box::new(node::new!(Identifier("x".to_string()))),
                 expression: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                type_annotation: None,
+                type_annotation: Box::new(None),
             }),
             node::new!(VariableDeclaration {
                 id: SymbolId::new(2),
                 pattern: Box::new(node::new!(Identifier("y".to_string()))),
                 expression: Box::new(node::new!(Literal(Literal::Integer(2)))),
-                type_annotation: None,
+                type_annotation: Box::new(None),
             }),
             node::new!(ExpressionStatement(Box::new(node::new!(BinaryOp {
                 op: BinaryOp::Add,
@@ -206,9 +206,9 @@ fn test_block_expression() {
                         rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
                     }
                 ))))],
-                None
+                Box::new(None)
             ))),
-            type_annotation: None,
+            type_annotation: Box::new(None),
         })]))
     );
 }
@@ -234,9 +234,9 @@ fn test_if_statement() {
                             rhs: Box::new(node::new!(Literal(Literal::Integer(4)))),
                         }
                     ))))],
-                    None
+                    Box::new(None)
                 ))),
-                else_branch: None,
+                else_branch: Box::new(None),
             })
         )))]))
     );
@@ -255,13 +255,13 @@ fn test_if_else_statement() {
                     vec![node::new!(ExpressionStatement(Box::new(node::new!(
                         Literal(Literal::Integer(1))
                     ))))],
-                    None
+                    Box::new(None)
                 ))),
-                else_branch: Some(Box::new(node::new!(Block(
+                else_branch: Box::new(Some(node::new!(Block(
                     vec![node::new!(ExpressionStatement(Box::new(node::new!(
                         Literal(Literal::Integer(2))
                     ))))],
-                    None
+                    Box::new(None)
                 )))),
             })
         )))]))
@@ -286,9 +286,9 @@ fn test_if_else_statement() {
                             rhs: Box::new(node::new!(Literal(Literal::Integer(4)))),
                         }
                     ))))],
-                    None
+                    Box::new(None)
                 ))),
-                else_branch: Some(Box::new(node::new!(Block(
+                else_branch: Box::new(Some(node::new!(Block(
                     vec![node::new!(ExpressionStatement(Box::new(node::new!(
                         BinaryOp {
                             op: BinaryOp::Add,
@@ -296,7 +296,7 @@ fn test_if_else_statement() {
                             rhs: Box::new(node::new!(Literal(Literal::Integer(6)))),
                         }
                     ))))],
-                    None
+                    Box::new(None)
                 )))),
             })
         )))]))
@@ -316,17 +316,17 @@ fn test_if_else_if_statement() {
                     vec![node::new!(ExpressionStatement(Box::new(node::new!(
                         Literal(Literal::Integer(1))
                     ))))],
-                    None
+                    Box::new(None)
                 ))),
-                else_branch: Some(Box::new(node::new!(IfElse {
+                else_branch: Box::new(Some(node::new!(IfElse {
                     condition: Box::new(node::new!(Literal(Literal::Boolean(false)))),
                     then_branch: Box::new(node::new!(Block(
                         vec![node::new!(ExpressionStatement(Box::new(node::new!(
                             Literal(Literal::Integer(2))
                         ))))],
-                        None
+                        Box::new(None)
                     ))),
-                    else_branch: None,
+                    else_branch: Box::new(None),
                 }))),
             })
         )))]))
@@ -344,19 +344,19 @@ fn test_if_else_as_last_expression() {
             name: Box::new(node::new!(Identifier("main".to_string()))),
             declaration: Box::new(FunctionDeclaration {
                 parameters: vec![],
-                guard: None,
-                return_type_annotation: None,
+                guard: Box::new(None),
+                return_type_annotation: Box::new(None),
                 body: Box::new(node::new!(Block(
                     vec![],
-                    Some(Box::new(node::new!(IfElse {
+                    Box::new(Some(node::new!(IfElse {
                         condition: Box::new(node::new!(Literal(Literal::Boolean(true)))),
                         then_branch: Box::new(node::new!(Block(
                             vec![],
-                            Some(Box::new(node::new!(Literal(Literal::Integer(1)))))
+                            Box::new(Some(node::new!(Literal(Literal::Integer(1)))))
                         ))),
-                        else_branch: Some(Box::new(node::new!(Block(
+                        else_branch: Box::new(Some(node::new!(Block(
                             vec![],
-                            Some(Box::new(node::new!(Literal(Literal::Integer(2)))))
+                            Box::new(Some(node::new!(Literal(Literal::Integer(2)))))
                         )))),
                     })))
                 )))
@@ -380,16 +380,16 @@ fn test_if_expression() {
                     vec![node::new!(ExpressionStatement(Box::new(node::new!(
                         Literal(Literal::Integer(1))
                     ))))],
-                    None
+                    Box::new(None)
                 ))),
-                else_branch: Some(Box::new(node::new!(Block(
+                else_branch: Box::new(Some(node::new!(Block(
                     vec![node::new!(ExpressionStatement(Box::new(node::new!(
                         Literal(Literal::Integer(2))
                     ))))],
-                    None
+                    Box::new(None)
                 )))),
             })),
-            type_annotation: None,
+            type_annotation: Box::new(None),
         })]))
     );
 }
@@ -490,7 +490,7 @@ fn test_pattern_matching() {
                     })
                 ]
             })),
-            type_annotation: None,
+            type_annotation: Box::new(None),
         })]))
     );
 }
@@ -505,7 +505,7 @@ fn test_list_literal() {
             id: SymbolId::new(1),
             pattern: Box::new(node::new!(Identifier("x".to_string()))),
             expression: Box::new(node::new!(List(vec![]))),
-            type_annotation: None,
+            type_annotation: Box::new(None),
         })]))
     );
 
@@ -521,7 +521,7 @@ fn test_list_literal() {
                 node::new!(Literal(Literal::Integer(2))),
                 node::new!(Literal(Literal::Integer(3))),
             ]))),
-            type_annotation: None,
+            type_annotation: Box::new(None),
         })]))
     );
 }
@@ -540,7 +540,7 @@ fn test_list_literal_with_trailing_comma() {
                 node::new!(Literal(Literal::Integer(2))),
                 node::new!(Literal(Literal::Integer(3))),
             ]))),
-            type_annotation: None,
+            type_annotation: Box::new(None),
         })]))
     );
 }
@@ -620,7 +620,7 @@ fn test_dictionary_literal() {
                     node::new!(Literal(Literal::Integer(2))),
                 )
             ]))),
-            type_annotation: None,
+            type_annotation: Box::new(None),
         })]))
     );
 }
@@ -709,7 +709,7 @@ fn test_dynamic_index_access() {
                 base: Box::new(node::new!(Identifier("foo".to_string()))),
                 index: Box::new(node::new!(Literal(Literal::Integer(1)))),
             })),
-            type_annotation: None,
+            type_annotation: Box::new(None),
         })]))
     );
 
@@ -727,7 +727,7 @@ fn test_dynamic_index_access() {
                 })),
                 index: Box::new(node::new!(Literal(Literal::Integer(2)))),
             })),
-            type_annotation: None,
+            type_annotation: Box::new(None),
         })]))
     );
 }

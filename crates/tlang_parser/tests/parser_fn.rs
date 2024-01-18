@@ -20,8 +20,8 @@ fn test_function_declaration() {
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
                 parameters: vec![],
-                guard: None,
-                return_type_annotation: None,
+                guard: Box::new(None),
+                return_type_annotation: Box::new(None),
                 body: Box::new(node::new!(Block(
                     vec![
                         node::new!(ExpressionStatement(Box::new(node::new!(Call {
@@ -34,7 +34,7 @@ fn test_function_declaration() {
                             rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
                         }))))
                     ],
-                    None
+                    Box::new(None)
                 )))
             })
         })]))
@@ -55,16 +55,16 @@ fn test_function_declaration_with_parameters() {
                     node::new!(FunctionParameter {
                         id: SymbolId::new(1),
                         pattern: Box::new(node::new!(Identifier("x".to_string()))),
-                        type_annotation: None,
+                        type_annotation: Box::new(None),
                     }),
                     node::new!(FunctionParameter {
                         id: SymbolId::new(2),
                         pattern: Box::new(node::new!(Identifier("y".to_string()))),
-                        type_annotation: None,
+                        type_annotation: Box::new(None),
                     }),
                 ],
-                guard: None,
-                return_type_annotation: None,
+                guard: Box::new(None),
+                return_type_annotation: Box::new(None),
                 body: Box::new(node::new!(Block(
                     vec![node::new!(ExpressionStatement(Box::new(node::new!(
                         BinaryOp {
@@ -73,7 +73,7 @@ fn test_function_declaration_with_parameters() {
                             rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
                         }
                     ))))],
-                    None
+                    Box::new(None)
                 )))
             })
         })]))
@@ -91,11 +91,11 @@ fn test_nameless_function_expressions() {
             pattern: Box::new(node::new!(Identifier("x".to_string()))),
             expression: Box::new(node::new!(FunctionExpression {
                 id: SymbolId::new(1),
-                name: None,
+                name: Box::new(None),
                 declaration: Box::new(FunctionDeclaration {
                     parameters: vec![],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![node::new!(ExpressionStatement(Box::new(node::new!(
                             BinaryOp {
@@ -104,11 +104,11 @@ fn test_nameless_function_expressions() {
                                 rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
                             }
                         ))))],
-                        None
+                        Box::new(None)
                     )))
                 })
             })),
-            type_annotation: None,
+            type_annotation: Box::new(None),
         })]))
     );
 
@@ -121,22 +121,22 @@ fn test_nameless_function_expressions() {
             pattern: Box::new(node::new!(Identifier("x".to_string()))),
             expression: Box::new(node::new!(FunctionExpression {
                 id: SymbolId::new(3),
-                name: None,
+                name: Box::new(None),
                 declaration: Box::new(FunctionDeclaration {
                     parameters: vec![
                         node::new!(FunctionParameter {
                             id: SymbolId::new(1),
                             pattern: Box::new(node::new!(Identifier("x".to_string()))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         }),
                         node::new!(FunctionParameter {
                             id: SymbolId::new(2),
                             pattern: Box::new(node::new!(Identifier("y".to_string()))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         }),
                     ],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![node::new!(ExpressionStatement(Box::new(node::new!(
                             BinaryOp {
@@ -145,11 +145,11 @@ fn test_nameless_function_expressions() {
                                 rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
                             }
                         ))))],
-                        None
+                        Box::new(None)
                     )))
                 })
             })),
-            type_annotation: None,
+            type_annotation: Box::new(None),
         })]))
     );
 }
@@ -165,11 +165,11 @@ fn test_function_expression_without_name_no_argument_parenthesis() {
             pattern: Box::new(node::new!(Identifier("x".to_string()))),
             expression: Box::new(node::new!(FunctionExpression {
                 id: SymbolId::new(1),
-                name: None,
+                name: Box::new(None),
                 declaration: Box::new(FunctionDeclaration {
                     parameters: vec![],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![node::new!(ExpressionStatement(Box::new(node::new!(
                             BinaryOp {
@@ -178,11 +178,11 @@ fn test_function_expression_without_name_no_argument_parenthesis() {
                                 rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
                             }
                         ))))],
-                        None
+                        Box::new(None)
                     )))
                 })
             })),
-            type_annotation: None,
+            type_annotation: Box::new(None),
         })]))
     );
 }
@@ -198,11 +198,11 @@ fn test_function_expressions() {
             pattern: Box::new(node::new!(Identifier("x".to_string()))),
             expression: Box::new(node::new!(FunctionExpression {
                 id: SymbolId::new(1),
-                name: Some(Box::new(node::new!(Identifier("foo".to_string())))),
+                name: Box::new(Some(node::new!(Identifier("foo".to_string())))),
                 declaration: Box::new(FunctionDeclaration {
                     parameters: vec![],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![node::new!(ExpressionStatement(Box::new(node::new!(
                             BinaryOp {
@@ -211,11 +211,11 @@ fn test_function_expressions() {
                                 rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
                             }
                         ))))],
-                        None
+                        Box::new(None)
                     )))
                 })
             })),
-            type_annotation: None,
+            type_annotation: Box::new(None),
         })]))
     );
 
@@ -228,22 +228,22 @@ fn test_function_expressions() {
             pattern: Box::new(node::new!(Identifier("x".to_string()))),
             expression: Box::new(node::new!(FunctionExpression {
                 id: SymbolId::new(3),
-                name: Some(Box::new(node::new!(Identifier("foo".to_string())))),
+                name: Box::new(Some(node::new!(Identifier("foo".to_string())))),
                 declaration: Box::new(FunctionDeclaration {
                     parameters: vec![
                         node::new!(FunctionParameter {
                             id: SymbolId::new(1),
                             pattern: Box::new(node::new!(Identifier("x".to_string()))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         }),
                         node::new!(FunctionParameter {
                             id: SymbolId::new(2),
                             pattern: Box::new(node::new!(Identifier("y".to_string()))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         }),
                     ],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![node::new!(ExpressionStatement(Box::new(node::new!(
                             BinaryOp {
@@ -252,11 +252,11 @@ fn test_function_expressions() {
                                 rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
                             }
                         ))))],
-                        None
+                        Box::new(None)
                     )))
                 })
             })),
-            type_annotation: None,
+            type_annotation: Box::new(None),
         })]))
     );
 }
@@ -272,17 +272,17 @@ fn test_explicit_return_statements() {
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
                 parameters: vec![],
-                guard: None,
-                return_type_annotation: None,
+                guard: Box::new(None),
+                return_type_annotation: Box::new(None),
                 body: Box::new(node::new!(Block(
-                    vec![node::new!(ReturnStatement(Some(Box::new(node::new!(
+                    vec![node::new!(ReturnStatement(Box::new(Some(node::new!(
                         BinaryOp {
                             op: BinaryOp::Add,
                             lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
                             rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
                         }
                     )))))],
-                    None
+                    Box::new(None)
                 )))
             })
         })]))
@@ -297,11 +297,11 @@ fn test_explicit_return_statements() {
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
                 parameters: vec![],
-                guard: None,
-                return_type_annotation: None,
+                guard: Box::new(None),
+                return_type_annotation: Box::new(None),
                 body: Box::new(node::new!(Block(
-                    vec![node::new!(ReturnStatement(None))],
-                    None
+                    vec![node::new!(ReturnStatement(Box::new(None)))],
+                    Box::new(None)
                 )))
             })
         })]))
@@ -316,24 +316,24 @@ fn test_explicit_return_statements() {
             pattern: Box::new(node::new!(Identifier("x".to_string()))),
             expression: Box::new(node::new!(FunctionExpression {
                 id: SymbolId::new(1),
-                name: None,
+                name: Box::new(None),
                 declaration: Box::new(FunctionDeclaration {
                     parameters: vec![],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
-                        vec![node::new!(ReturnStatement(Some(Box::new(node::new!(
+                        vec![node::new!(ReturnStatement(Box::new(Some(node::new!(
                             BinaryOp {
                                 op: BinaryOp::Add,
                                 lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
                                 rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
                             }
                         )))))],
-                        None
+                        Box::new(None)
                     )))
                 })
             })),
-            type_annotation: None,
+            type_annotation: Box::new(None),
         })]))
     );
 }
@@ -349,11 +349,11 @@ fn test_implicit_return_expressions() {
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
                 parameters: vec![],
-                guard: None,
-                return_type_annotation: None,
+                guard: Box::new(None),
+                return_type_annotation: Box::new(None),
                 body: Box::new(node::new!(Block(
                     vec![],
-                    Some(Box::new(node::new!(BinaryOp {
+                    Box::new(Some(node::new!(BinaryOp {
                         op: BinaryOp::Add,
                         lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
                         rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
@@ -372,9 +372,9 @@ fn test_implicit_return_expressions() {
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
                 parameters: vec![],
-                guard: None,
-                return_type_annotation: None,
-                body: Box::new(node::new!(Block(vec![], None)))
+                guard: Box::new(None),
+                return_type_annotation: Box::new(None),
+                body: Box::new(node::new!(Block(vec![], Box::new(None))))
             })
         })]))
     );
@@ -388,14 +388,14 @@ fn test_implicit_return_expressions() {
             pattern: Box::new(node::new!(Identifier("x".to_string()))),
             expression: Box::new(node::new!(FunctionExpression {
                 id: SymbolId::new(1),
-                name: None,
+                name: Box::new(None),
                 declaration: Box::new(FunctionDeclaration {
                     parameters: vec![],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(node::new!(BinaryOp {
+                        Box::new(Some(node::new!(BinaryOp {
                             op: BinaryOp::Add,
                             lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
                             rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
@@ -403,7 +403,7 @@ fn test_implicit_return_expressions() {
                     )))
                 })
             })),
-            type_annotation: None,
+            type_annotation: Box::new(None),
         })]))
     );
 
@@ -416,16 +416,16 @@ fn test_implicit_return_expressions() {
             name: Box::new(node::new!(Identifier("foo".to_string()))),
             declaration: Box::new(FunctionDeclaration {
                 parameters: vec![],
-                guard: None,
-                return_type_annotation: None,
+                guard: Box::new(None),
+                return_type_annotation: Box::new(None),
                 body: Box::new(node::new!(Block(
                     vec![node::new!(VariableDeclaration {
                         id: SymbolId::new(1),
                         pattern: Box::new(node::new!(Identifier("x".to_string()))),
                         expression: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                        type_annotation: None,
+                        type_annotation: Box::new(None),
                     })],
-                    Some(Box::new(node::new!(Identifier("x".to_string()))))
+                    Box::new(Some(node::new!(Identifier("x".to_string()))))
                 )))
             })
         })]))
@@ -449,27 +449,27 @@ fn test_recursive_factorial_functional_definition() {
                     parameters: vec![node::new!(FunctionParameter {
                         id: SymbolId::new(1),
                         pattern: Box::new(node::new!(Literal(Literal::Integer(0)))),
-                        type_annotation: None,
+                        type_annotation: Box::new(None),
                     })],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
-                        vec![node::new!(ReturnStatement(Some(Box::new(node::new!(
+                        vec![node::new!(ReturnStatement(Box::new(Some(node::new!(
                             Literal(Literal::Integer(1))
                         )))))],
-                        None
+                        Box::new(None)
                     )))
                 })),
                 node::new!(FunctionDeclaration(FunctionDeclaration {
                     parameters: vec![node::new!(FunctionParameter {
                         id: SymbolId::new(2),
                         pattern: Box::new(node::new!(Identifier("n".to_string()))),
-                        type_annotation: None,
+                        type_annotation: Box::new(None),
                     })],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
-                        vec![node::new!(ReturnStatement(Some(Box::new(node::new!(
+                        vec![node::new!(ReturnStatement(Box::new(Some(node::new!(
                             BinaryOp {
                                 op: BinaryOp::Multiply,
                                 lhs: Box::new(node::new!(Identifier("n".to_string()))),
@@ -485,7 +485,7 @@ fn test_recursive_factorial_functional_definition() {
                                 }))
                             }
                         )))))],
-                        None
+                        Box::new(None)
                     )))
                 }))
             ]
@@ -510,13 +510,13 @@ fn test_recursive_sum() {
                     parameters: vec![node::new!(FunctionParameter {
                         id: SymbolId::new(1),
                         pattern: Box::new(node::new!(ListPattern(vec![]))),
-                        type_annotation: None,
+                        type_annotation: Box::new(None),
                     })],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(node::new!(Literal(Literal::Integer(0))))),
+                        Box::new(Some(node::new!(Literal(Literal::Integer(0))))),
                     )))
                 })),
                 node::new!(FunctionDeclaration(FunctionDeclaration {
@@ -535,13 +535,13 @@ fn test_recursive_sum() {
                                 }))
                             ))
                         ]))),
-                        type_annotation: None,
+                        type_annotation: Box::new(None),
                     })],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(node::new!(BinaryOp {
+                        Box::new(Some(node::new!(BinaryOp {
                             op: BinaryOp::Add,
                             lhs: Box::new(node::new!(Identifier("x".to_string()))),
                             rhs: Box::new(node::new!(Call {
@@ -574,13 +574,13 @@ fn test_functional_function_declaration_with_comments_inbetween() {
                     parameters: vec![node::new!(FunctionParameter {
                         id: SymbolId::new(1),
                         pattern: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                        type_annotation: None,
+                        type_annotation: Box::new(None),
                     })],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(node::new!(Literal(Literal::Integer(1))))),
+                        Box::new(Some(node::new!(Literal(Literal::Integer(1))))),
                     )))
                 })),
                 node::new!(SingleLineComment(" comment".to_string())),
@@ -588,13 +588,13 @@ fn test_functional_function_declaration_with_comments_inbetween() {
                     parameters: vec![node::new!(FunctionParameter {
                         id: SymbolId::new(2),
                         pattern: Box::new(node::new!(Identifier("n".to_string()))),
-                        type_annotation: None,
+                        type_annotation: Box::new(None),
                     })],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(node::new!(BinaryOp {
+                        Box::new(Some(node::new!(BinaryOp {
                             op: BinaryOp::Multiply,
                             lhs: Box::new(node::new!(Identifier("n".to_string()))),
                             rhs: Box::new(node::new!(Literal(Literal::Integer(2))))
@@ -624,13 +624,13 @@ fn test_explicit_tail_recursive_call() {
                     parameters: vec![node::new!(FunctionParameter {
                         id: SymbolId::new(1),
                         pattern: Box::new(node::new!(Identifier("n".to_string()))),
-                        type_annotation: None,
+                        type_annotation: Box::new(None),
                     })],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(node::new!(Call {
+                        Box::new(Some(node::new!(Call {
                             function: Box::new(node::new!(Identifier("factorial".to_string()))),
                             arguments: vec![
                                 node::new!(Identifier("n".to_string())),
@@ -644,19 +644,19 @@ fn test_explicit_tail_recursive_call() {
                         node::new!(FunctionParameter {
                             id: SymbolId::new(2),
                             pattern: Box::new(node::new!(Literal(Literal::Integer(0)))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         }),
                         node::new!(FunctionParameter {
                             id: SymbolId::new(3),
                             pattern: Box::new(node::new!(Identifier("acc".to_string()))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         })
                     ],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(node::new!(Identifier("acc".to_string()))))
+                        Box::new(Some(node::new!(Identifier("acc".to_string()))))
                     ))),
                 })),
                 node::new!(FunctionDeclaration(FunctionDeclaration {
@@ -664,19 +664,19 @@ fn test_explicit_tail_recursive_call() {
                         node::new!(FunctionParameter {
                             id: SymbolId::new(4),
                             pattern: Box::new(node::new!(Identifier("n".to_string()))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         }),
                         node::new!(FunctionParameter {
                             id: SymbolId::new(5),
                             pattern: Box::new(node::new!(Identifier("acc".to_string()))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         })
                     ],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(node::new!(RecursiveCall(Box::new(node::new!(
+                        Box::new(Some(node::new!(RecursiveCall(Box::new(node::new!(
                             Call {
                                 function: Box::new(node::new!(Identifier("factorial".to_string()))),
                                 arguments: vec![
@@ -718,24 +718,24 @@ fn test_foldl_impl() {
                         node::new!(FunctionParameter {
                             id: SymbolId::new(1),
                             pattern: Box::new(node::new!(ListPattern(vec![]))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         }),
                         node::new!(FunctionParameter {
                             id: SymbolId::new(2),
                             pattern: Box::new(node::new!(Identifier("acc".to_string()))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         }),
                         node::new!(FunctionParameter {
                             id: SymbolId::new(3),
                             pattern: Box::new(node::new!(Wildcard)),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         })
                     ],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(node::new!(Identifier("acc".to_string()))))
+                        Box::new(Some(node::new!(Identifier("acc".to_string()))))
                     ))),
                 })),
                 node::new!(FunctionDeclaration(FunctionDeclaration {
@@ -755,24 +755,24 @@ fn test_foldl_impl() {
                                     }))
                                 ))
                             ]))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         }),
                         node::new!(FunctionParameter {
                             id: SymbolId::new(7),
                             pattern: Box::new(node::new!(Identifier("acc".to_string()))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         }),
                         node::new!(FunctionParameter {
                             id: SymbolId::new(8),
                             pattern: Box::new(node::new!(Identifier("f".to_string()))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         })
                     ],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(node::new!(RecursiveCall(Box::new(node::new!(
+                        Box::new(Some(node::new!(RecursiveCall(Box::new(node::new!(
                             Call {
                                 function: Box::new(node::new!(Identifier("foldl".to_string()))),
                                 arguments: vec![
@@ -814,19 +814,19 @@ fn test_function_declarations_with_guard() {
                         node::new!(FunctionParameter {
                             id: SymbolId::new(1),
                             pattern: Box::new(node::new!(ListPattern(vec![]))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         }),
                         node::new!(FunctionParameter {
                             id: SymbolId::new(2),
                             pattern: Box::new(node::new!(Identifier("f".to_string()))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         })
                     ],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(node::new!(List(vec![]))))
+                        Box::new(Some(node::new!(List(vec![]))))
                     )))
                 })),
                 node::new!(FunctionDeclaration(FunctionDeclaration {
@@ -846,22 +846,22 @@ fn test_function_declarations_with_guard() {
                                     }))
                                 ))
                             ]))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         }),
                         node::new!(FunctionParameter {
                             id: SymbolId::new(6),
                             pattern: Box::new(node::new!(Identifier("f".to_string()))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         })
                     ],
-                    guard: Some(Box::new(node::new!(Call {
+                    guard: Box::new(Some(node::new!(Call {
                         function: Box::new(node::new!(Identifier("f".to_string()))),
                         arguments: vec![node::new!(Identifier("x".to_string()))]
                     }))),
-                    return_type_annotation: None,
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(node::new!(List(vec![
+                        Box::new(Some(node::new!(List(vec![
                             node::new!(Identifier("x".to_string())),
                             node::new!(UnaryOp(
                                 UnaryOp::Spread,
@@ -895,19 +895,19 @@ fn test_function_declarations_with_guard() {
                                     }))
                                 ))
                             ]))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         }),
                         node::new!(FunctionParameter {
                             id: SymbolId::new(10),
                             pattern: Box::new(node::new!(Identifier("f".to_string()))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         })
                     ],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(node::new!(RecursiveCall(Box::new(node::new!(
+                        Box::new(Some(node::new!(RecursiveCall(Box::new(node::new!(
                             Call {
                                 function: Box::new(node::new!(Identifier("filter".to_string()))),
                                 arguments: vec![
@@ -942,19 +942,19 @@ fn test_function_declarations_with_let_guard() {
                         node::new!(FunctionParameter {
                             id: SymbolId::new(1),
                             pattern: Box::new(node::new!(ListPattern(vec![]))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         }),
                         node::new!(FunctionParameter {
                             id: SymbolId::new(2),
                             pattern: Box::new(node::new!(Identifier("f".to_string()))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         })
                     ],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(node::new!(List(vec![]))))
+                        Box::new(Some(node::new!(List(vec![]))))
                     )))
                 })),
                 node::new!(FunctionDeclaration(FunctionDeclaration {
@@ -974,27 +974,27 @@ fn test_function_declarations_with_let_guard() {
                                     }))
                                 ))
                             ]))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         }),
                         node::new!(FunctionParameter {
                             id: SymbolId::new(6),
                             pattern: Box::new(node::new!(Identifier("f".to_string()))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         })
                     ],
-                    guard: Some(Box::new(node::new!(VariableDeclaration {
+                    guard: Box::new(Some(node::new!(VariableDeclaration {
                         id: SymbolId::new(7),
                         pattern: Box::new(node::new!(Identifier("y".to_string()))),
                         expression: Box::new(node::new!(Call {
                             function: Box::new(node::new!(Identifier("f".to_string()))),
                             arguments: vec![node::new!(Identifier("x".to_string()))]
                         })),
-                        type_annotation: None
+                        type_annotation: Box::new(None)
                     }))),
-                    return_type_annotation: None,
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(node::new!(List(vec![
+                        Box::new(Some(node::new!(List(vec![
                             node::new!(Identifier("y".to_string())),
                             node::new!(UnaryOp(
                                 UnaryOp::Spread,
@@ -1028,19 +1028,19 @@ fn test_function_declarations_with_let_guard() {
                                     }))
                                 ))
                             ]))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         }),
                         node::new!(FunctionParameter {
                             id: SymbolId::new(11),
                             pattern: Box::new(node::new!(Identifier("f".to_string()))),
-                            type_annotation: None,
+                            type_annotation: Box::new(None),
                         })
                     ],
-                    guard: None,
-                    return_type_annotation: None,
+                    guard: Box::new(None),
+                    return_type_annotation: Box::new(None),
                     body: Box::new(node::new!(Block(
                         vec![],
-                        Some(Box::new(node::new!(RecursiveCall(Box::new(node::new!(
+                        Box::new(Some(node::new!(RecursiveCall(Box::new(node::new!(
                             Call {
                                 function: Box::new(node::new!(Identifier(
                                     "filter_map".to_string()

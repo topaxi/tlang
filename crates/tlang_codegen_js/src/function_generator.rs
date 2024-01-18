@@ -44,7 +44,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
 
     // Declare and output temporary variables for if let guards.
     for declaration in function_declarations.iter() {
-        if let Some(expr) = &declaration.guard {
+        if let Some(ref expr) = *declaration.guard {
             if let AstNode::VariableDeclaration { pattern, .. } = &expr.ast_node {
                 match &pattern.ast_node {
                     AstNode::Identifier(name) => {
@@ -313,13 +313,13 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
         }
 
         if variadic_or_pattern_matching {
-            if let Some(expr) = &declaration.guard {
+            if let Some(ref expr) = *declaration.guard {
                 codegen.push_str(" && ");
                 generate_function_definition_guard(codegen, expr);
             }
             codegen.push_str(") {\n");
         } else {
-            if let Some(expr) = &declaration.guard {
+            if let Some(ref expr) = *declaration.guard {
                 codegen.push_str("if (");
                 generate_function_definition_guard(codegen, expr);
                 codegen.push_str(") {\n");
@@ -492,7 +492,7 @@ pub fn generate_function_declaration(
 
 pub fn generate_function_expression(
     codegen: &mut CodegenJS,
-    name: &Option<Box<Node>>,
+    name: &Option<Node>,
     declaration: &FunctionDeclaration,
 ) {
     codegen.push_scope();
@@ -565,7 +565,7 @@ fn generate_function_body(codegen: &mut CodegenJS, body: &Node, is_tail_recursiv
     codegen.pop_context();
 }
 
-pub fn generate_return_statement(codegen: &mut CodegenJS, expr: &Option<Box<Node>>) {
+pub fn generate_return_statement(codegen: &mut CodegenJS, expr: &Option<Node>) {
     // We do not render a return statement if we are in a tail recursive function body.
     // Which calls the current function recursively.
     if expr.is_some() {
@@ -643,7 +643,7 @@ fn is_function_body_tail_recursive(function_name: &str, node: &Node) -> bool {
                     return true;
                 }
             }
-            if let Some(expression) = expression {
+            if let Some(expression) = expression.as_ref() {
                 return is_function_body_tail_recursive(function_name, expression);
             }
             false
@@ -666,12 +666,13 @@ fn is_function_body_tail_recursive(function_name: &str, node: &Node) -> bool {
         } => {
             is_function_body_tail_recursive(function_name, condition)
                 || is_function_body_tail_recursive(function_name, then_branch)
-                || else_branch.as_ref().map_or(false, |branch| {
-                    is_function_body_tail_recursive(function_name, branch)
+                // TODO: Get rid of clone.
+                || <Option<Node> as Clone>::clone(else_branch.as_ref()).map_or(false, |branch| {
+                    is_function_body_tail_recursive(function_name, &branch)
                 })
         }
         AstNode::ReturnStatement(node) => {
-            if let Some(node) = node {
+            if let Some(node) = node.as_ref() {
                 is_function_body_tail_recursive(function_name, node)
             } else {
                 false

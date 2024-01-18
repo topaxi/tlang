@@ -241,10 +241,10 @@ impl<'src> Parser<'src> {
         self.consume_token(TokenKind::Return);
 
         if self.current_token_kind() == Some(TokenKind::Semicolon) {
-            return node::new!(ReturnStatement(None));
+            return node::new!(ReturnStatement(Box::new(None)));
         }
 
-        node::new!(ReturnStatement(Some(Box::new(self.parse_expression()))))
+        node::new!(ReturnStatement(Box::new(Some(self.parse_expression()))))
     }
 
     fn parse_single_identifier(&mut self) -> Node {
@@ -333,9 +333,9 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_statements(&mut self, may_complete: bool) -> (Vec<Node>, Option<Box<Node>>) {
+    fn parse_statements(&mut self, may_complete: bool) -> (Vec<Node>, Box<Option<Node>>) {
         let mut statements = Vec::new();
-        let mut completion_expression = None;
+        let mut completion_expression = Box::new(None);
 
         while self.current_token_kind() != Some(TokenKind::RBrace)
             && self.current_token_kind() != Some(TokenKind::Eof)
@@ -349,7 +349,7 @@ impl<'src> Parser<'src> {
                         AstNode::ExpressionStatement(expr) => expr,
                         _ => unreachable!(),
                     };
-                    completion_expression = Some(expression);
+                    completion_expression = Box::new(Some(*expression));
                     break;
                 }
 
@@ -426,7 +426,7 @@ impl<'src> Parser<'src> {
             id: self.unique_id(),
             pattern: Box::new(pattern),
             expression: Box::new(value),
-            type_annotation: type_annotation.map(Box::new),
+            type_annotation: Box::new(type_annotation),
         })
     }
 
@@ -618,9 +618,9 @@ impl<'src> Parser<'src> {
             self.advance();
 
             if let Some(TokenKind::If) = self.current_token_kind() {
-                Some(Box::new(self.parse_if_else_expression()))
+                Some(self.parse_if_else_expression())
             } else {
-                Some(Box::new(self.parse_block()))
+                Some(self.parse_block())
             }
         } else {
             None
@@ -629,7 +629,7 @@ impl<'src> Parser<'src> {
         node::new!(IfElse {
             condition: Box::new(condition),
             then_branch: Box::new(then_branch),
-            else_branch: else_branch,
+            else_branch: Box::new(else_branch),
         })
     }
 
@@ -746,7 +746,7 @@ impl<'src> Parser<'src> {
                 parameters.push(node::new!(FunctionParameter {
                     id: self.unique_id(),
                     pattern: Box::new(parameter),
-                    type_annotation: type_annotation.map(Box::new),
+                    type_annotation: Box::new(type_annotation),
                 }));
             }
             self.consume_token(TokenKind::RParen);
@@ -828,12 +828,12 @@ impl<'src> Parser<'src> {
 
         node::new!(FunctionExpression {
             id: self.unique_id(),
-            name: name.map(Box::new),
+            name: Box::new(name),
             declaration: Box::new(FunctionDeclaration {
                 parameters,
-                guard: None,
+                guard: Box::new(None),
                 body: Box::new(body),
-                return_type_annotation: return_type.map(Box::new),
+                return_type_annotation: Box::new(return_type),
             }),
         })
     }
@@ -968,9 +968,9 @@ impl<'src> Parser<'src> {
 
             declarations.push(node::new!(FunctionDeclaration(FunctionDeclaration {
                 parameters,
-                guard: guard.map(Box::new),
+                guard: Box::new(guard),
                 body: Box::new(body),
-                return_type_annotation: return_type.map(Box::new),
+                return_type_annotation: Box::new(return_type),
             })));
         }
 
