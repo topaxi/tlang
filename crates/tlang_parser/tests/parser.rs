@@ -1,3 +1,4 @@
+use insta::assert_debug_snapshot;
 use pretty_assertions::assert_eq;
 
 use tlang_ast::{
@@ -12,15 +13,34 @@ mod common;
 fn test_unary_minus() {
     let program = parse!("-1;");
 
-    assert_eq!(
-        program,
-        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
-            node::new!(UnaryOp(
-                UnaryOp::Minus,
-                Box::new(node::new!(Literal(Literal::Integer(1)))),
-            ))
-        )))]))
-    );
+    assert_debug_snapshot!(program, @r###"
+    Node {
+        ast_node: Program(
+            [
+                Node {
+                    ast_node: ExpressionStatement(
+                        Node {
+                            ast_node: UnaryOp(
+                                Minus,
+                                Node {
+                                    ast_node: Literal(
+                                        Integer(
+                                            1,
+                                        ),
+                                    ),
+                                    symbol_table: None,
+                                },
+                            ),
+                            symbol_table: None,
+                        },
+                    ),
+                    symbol_table: None,
+                },
+            ],
+        ),
+        symbol_table: None,
+    }
+    "###);
 }
 
 #[test]
