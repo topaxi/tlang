@@ -370,3 +370,20 @@ fn test_declare_methods_on_struct() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_and_or_as_keywords() {
+    let output = compile!(indoc! {"
+        fn main() {
+            let x = true and false;
+            let y = true or false;
+        }
+    "});
+    let expected_output = indoc! {"
+        function main() {
+            let x = true && false;
+            let y = true || false;
+        }
+    "};
+    assert_eq!(output, expected_output);
+}

@@ -1057,6 +1057,8 @@ impl<'src> Parser<'src> {
                 | TokenKind::DoublePipe
                 | TokenKind::DoubleAmpersand
                 | TokenKind::Pipeline
+                | TokenKind::And
+                | TokenKind::Or
         )
     }
 
@@ -1080,6 +1082,8 @@ impl<'src> Parser<'src> {
             TokenKind::DoublePipe => BinaryOp::Or,
             TokenKind::DoubleAmpersand => BinaryOp::And,
             TokenKind::Pipeline => BinaryOp::Pipeline,
+            TokenKind::And => BinaryOp::And,
+            TokenKind::Or => BinaryOp::Or,
             _ => {
                 unimplemented!("Expected binary operator, found {:?}", token)
             }
