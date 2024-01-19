@@ -150,7 +150,7 @@ impl<'src> Parser<'src> {
 
     fn advance(&mut self) {
         if self.current_token_kind() == Some(TokenKind::Eof)
-            && self.next_token.as_ref().map(|token| token.kind.clone()) == Some(TokenKind::Eof)
+            && self.peek_token_kind() == Some(TokenKind::Eof)
         {
             // In error recovery we scan ahead and look for the expected token.
             // If we reach the end of the file, we don't want to continue scanning and
@@ -168,6 +168,12 @@ impl<'src> Parser<'src> {
         debug!("Advanced to {:?}", self.current_token);
     }
 
+    #[inline(always)]
+    fn current_token_kind(&self) -> Option<TokenKind> {
+        self.current_token.as_ref().map(|token| token.kind.clone())
+    }
+
+    #[inline(always)]
     pub fn peek_token_kind(&self) -> Option<TokenKind> {
         self.next_token.as_ref().map(|token| token.kind.clone())
     }
@@ -184,11 +190,6 @@ impl<'src> Parser<'src> {
         self.lexer = state.0;
         self.current_token = state.1;
         self.next_token = state.2;
-    }
-
-    #[inline(always)]
-    fn current_token_kind(&self) -> Option<TokenKind> {
-        self.current_token.as_ref().map(|token| token.kind.clone())
     }
 
     fn parse_statement(&mut self) -> (bool, Option<Node>) {
