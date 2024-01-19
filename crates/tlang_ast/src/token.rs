@@ -68,6 +68,8 @@ pub enum TokenKind {
     Match,
     Enum,
     Struct,
+    And,
+    Or,
 
     // Unknown token, unexpected character
     Unknown(String),

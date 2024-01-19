@@ -343,7 +343,7 @@ impl Lexer<'_> {
                 }
             }
             _ if Self::is_alphanumeric(ch) => {
-                let identifier = self.read_identifier().as_ref();
+                let identifier = self.read_identifier();
 
                 match identifier {
                     "let" => self.token(TokenKind::Let, start),
@@ -357,6 +357,8 @@ impl Lexer<'_> {
                     "struct" => self.token(TokenKind::Struct, start),
                     "true" => self.token(TokenKind::Literal(Literal::Boolean(true)), start),
                     "false" => self.token(TokenKind::Literal(Literal::Boolean(false)), start),
+                    "and" => self.token(TokenKind::And, start),
+                    "or" => self.token(TokenKind::Or, start),
                     _ => {
                         let identifier_string = identifier.to_string();
                         self.token(TokenKind::Identifier(identifier_string), start)
