@@ -1,8 +1,8 @@
-use insta::assert_debug_snapshot;
+use insta::assert_ron_snapshot;
 use pretty_assertions::assert_eq;
 
 use tlang_ast::{
-    node::{self, BinaryOp, FunctionDeclaration, UnaryOp},
+    node::{self, BinaryOp, FunctionDeclaration},
     symbols::SymbolId,
     token::Literal,
 };
@@ -11,316 +11,59 @@ mod common;
 
 #[test]
 fn test_unary_minus() {
-    let program = parse!("-1;");
-
-    assert_debug_snapshot!(program, @r###"
-    Node {
-        ast_node: Program(
-            [
-                Node {
-                    ast_node: ExpressionStatement(
-                        Node {
-                            ast_node: UnaryOp(
-                                Minus,
-                                Node {
-                                    ast_node: Literal(
-                                        Integer(
-                                            1,
-                                        ),
-                                    ),
-                                    symbol_table: None,
-                                },
-                            ),
-                            symbol_table: None,
-                        },
-                    ),
-                    symbol_table: None,
-                },
-            ],
-        ),
-        symbol_table: None,
-    }
-    "###);
+    assert_parser_snapshot!(parse!("-1;"));
 }
 
 #[test]
 fn test_simple_arithmetic_calculations() {
-    let program = parse!("1 + 2 + 3;");
-
-    assert_eq!(
-        program,
-        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
-            node::new!(BinaryOp {
-                op: BinaryOp::Add,
-                lhs: Box::new(node::new!(BinaryOp {
-                    op: BinaryOp::Add,
-                    lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                    rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
-                })),
-                rhs: Box::new(node::new!(Literal(Literal::Integer(3)))),
-            })
-        )))]))
-    );
-
-    let program = parse!("1 * 2 + 3;");
-
-    assert_eq!(
-        program,
-        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
-            node::new!(BinaryOp {
-                op: BinaryOp::Add,
-                lhs: Box::new(node::new!(BinaryOp {
-                    op: BinaryOp::Multiply,
-                    lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                    rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
-                })),
-                rhs: Box::new(node::new!(Literal(Literal::Integer(3)))),
-            })
-        )))]))
-    );
+    assert_parser_snapshot!(parse!("1 + 2 + 3;"));
+    assert_parser_snapshot!(parse!("1 * 2 + 3;"));
 }
 
 #[test]
 fn test_simple_arithmetic_sum_mult_precedence() {
-    let program = parse!("1 + 2 * 3;");
-
-    assert_eq!(
-        program,
-        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
-            node::new!(BinaryOp {
-                op: BinaryOp::Add,
-                lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                rhs: Box::new(node::new!(BinaryOp {
-                    op: BinaryOp::Multiply,
-                    lhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
-                    rhs: Box::new(node::new!(Literal(Literal::Integer(3)))),
-                })),
-            })
-        )))]))
-    );
+    assert_parser_snapshot!(parse!("1 + 2 * 3;"));
 }
 
 #[test]
 fn test_simple_arithmetic_sum_mult_precedence_parentheses() {
-    let program = parse!("(1 + 2) * 3;");
-
-    assert_eq!(
-        program,
-        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
-            node::new!(BinaryOp {
-                op: BinaryOp::Multiply,
-                lhs: Box::new(node::new!(BinaryOp {
-                    op: BinaryOp::Add,
-                    lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                    rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
-                })),
-                rhs: Box::new(node::new!(Literal(Literal::Integer(3)))),
-            })
-        )))]))
-    );
+    assert_parser_snapshot!(parse!("(1 + 2) * 3;"));
 }
 
 #[test]
 fn test_simple_arithmetic_with_identifiers() {
-    let program = parse!("let x = 1; let y = 2; x + y;");
-
-    assert_eq!(
-        program,
-        node::new!(Program(vec![
-            node::new!(VariableDeclaration {
-                id: SymbolId::new(1),
-                pattern: Box::new(node::new!(Identifier("x".to_string()))),
-                expression: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                type_annotation: Box::new(None),
-            }),
-            node::new!(VariableDeclaration {
-                id: SymbolId::new(2),
-                pattern: Box::new(node::new!(Identifier("y".to_string()))),
-                expression: Box::new(node::new!(Literal(Literal::Integer(2)))),
-                type_annotation: Box::new(None),
-            }),
-            node::new!(ExpressionStatement(Box::new(node::new!(BinaryOp {
-                op: BinaryOp::Add,
-                lhs: Box::new(node::new!(Identifier("x".to_string()))),
-                rhs: Box::new(node::new!(Identifier("y".to_string()))),
-            })))),
-        ]))
-    );
+    assert_parser_snapshot!(parse!("let x = 1; let y = 2; x + y;"));
 }
 
 #[test]
 fn test_simple_call() {
-    let program = parse!("foo(1, 2);");
-
-    assert_eq!(
-        program,
-        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
-            node::new!(Call {
-                function: Box::new(node::new!(Identifier("foo".to_string()))),
-                arguments: vec![
-                    node::new!(Literal(Literal::Integer(1))),
-                    node::new!(Literal(Literal::Integer(2)))
-                ],
-            })
-        )))]))
-    );
+    assert_parser_snapshot!(parse!("foo(1, 2);"));
 }
 
 #[test]
 fn test_nested_call() {
-    let program = parse!("foo(bar(1), 2);");
-
-    assert_eq!(
-        program,
-        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
-            node::new!(Call {
-                function: Box::new(node::new!(Identifier("foo".to_string()))),
-                arguments: vec![
-                    node::new!(Call {
-                        function: Box::new(node::new!(Identifier("bar".to_string()))),
-                        arguments: vec![node::new!(Literal(Literal::Integer(1)))]
-                    }),
-                    node::new!(Literal(Literal::Integer(2)))
-                ],
-            })
-        )))]))
-    );
+    assert_parser_snapshot!(parse!("foo(bar(1), 2);"));
 }
 
 #[test]
 fn test_call_with_expression() {
-    let program = parse!("foo(1 + 2, 3);");
-
-    assert_eq!(
-        program,
-        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
-            node::new!(Call {
-                function: Box::new(node::new!(Identifier("foo".to_string()))),
-                arguments: vec![
-                    node::new!(BinaryOp {
-                        op: BinaryOp::Add,
-                        lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                        rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
-                    }),
-                    node::new!(Literal(Literal::Integer(3))),
-                ],
-            })
-        )))]))
-    );
+    assert_parser_snapshot!(parse!("foo(1 + 2, 3);"));
 }
 
 #[test]
 fn test_block_expression() {
-    let program = parse!("let x = { 1 + 2; };");
-
-    assert_eq!(
-        program,
-        node::new!(Program(vec![node::new!(VariableDeclaration {
-            id: SymbolId::new(1),
-            pattern: Box::new(node::new!(Identifier("x".to_string()))),
-            expression: Box::new(node::new!(Block(
-                vec![node::new!(ExpressionStatement(Box::new(node::new!(
-                    BinaryOp {
-                        op: BinaryOp::Add,
-                        lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                        rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
-                    }
-                ))))],
-                Box::new(None)
-            ))),
-            type_annotation: Box::new(None),
-        })]))
-    );
+    assert_parser_snapshot!(parse!("let x = { 1 + 2; };"));
 }
 
 #[test]
 fn test_if_statement() {
-    let program = parse!("if (1 + 2) { 3 + 4; }");
-
-    assert_eq!(
-        program,
-        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
-            node::new!(IfElse {
-                condition: Box::new(node::new!(BinaryOp {
-                    op: BinaryOp::Add,
-                    lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                    rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
-                })),
-                then_branch: Box::new(node::new!(Block(
-                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
-                        BinaryOp {
-                            op: BinaryOp::Add,
-                            lhs: Box::new(node::new!(Literal(Literal::Integer(3)))),
-                            rhs: Box::new(node::new!(Literal(Literal::Integer(4)))),
-                        }
-                    ))))],
-                    Box::new(None)
-                ))),
-                else_branch: Box::new(None),
-            })
-        )))]))
-    );
+    assert_parser_snapshot!(parse!("if (1 + 2) { 3 + 4; }"));
 }
 
 #[test]
 fn test_if_else_statement() {
-    let program = parse!("if true { 1; } else { 2; }");
-
-    assert_eq!(
-        program,
-        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
-            node::new!(IfElse {
-                condition: Box::new(node::new!(Literal(Literal::Boolean(true)))),
-                then_branch: Box::new(node::new!(Block(
-                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
-                        Literal(Literal::Integer(1))
-                    ))))],
-                    Box::new(None)
-                ))),
-                else_branch: Box::new(Some(node::new!(Block(
-                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
-                        Literal(Literal::Integer(2))
-                    ))))],
-                    Box::new(None)
-                )))),
-            })
-        )))]))
-    );
-
-    let program = parse!("if (1 + 2) { 3 + 4; } else { 5 + 6; }");
-
-    assert_eq!(
-        program,
-        node::new!(Program(vec![node::new!(ExpressionStatement(Box::new(
-            node::new!(IfElse {
-                condition: Box::new(node::new!(BinaryOp {
-                    op: BinaryOp::Add,
-                    lhs: Box::new(node::new!(Literal(Literal::Integer(1)))),
-                    rhs: Box::new(node::new!(Literal(Literal::Integer(2)))),
-                })),
-                then_branch: Box::new(node::new!(Block(
-                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
-                        BinaryOp {
-                            op: BinaryOp::Add,
-                            lhs: Box::new(node::new!(Literal(Literal::Integer(3)))),
-                            rhs: Box::new(node::new!(Literal(Literal::Integer(4)))),
-                        }
-                    ))))],
-                    Box::new(None)
-                ))),
-                else_branch: Box::new(Some(node::new!(Block(
-                    vec![node::new!(ExpressionStatement(Box::new(node::new!(
-                        BinaryOp {
-                            op: BinaryOp::Add,
-                            lhs: Box::new(node::new!(Literal(Literal::Integer(5)))),
-                            rhs: Box::new(node::new!(Literal(Literal::Integer(6)))),
-                        }
-                    ))))],
-                    Box::new(None)
-                )))),
-            })
-        )))]))
-    );
+    assert_parser_snapshot!(parse!("if true { 1; } else { 2; }"));
+    assert_parser_snapshot!(parse!("if (1 + 2) { 3 + 4; } else { 5 + 6; }"));
 }
 
 #[test]

@@ -1,0 +1,31 @@
+---
+source: crates/tlang_parser/tests/parser.rs
+expression: "parse!(\"foo(1, 2);\")"
+---
+Node(
+  ast_node: Program([
+    Node(
+      ast_node: ExpressionStatement(Node(
+        ast_node: Call(
+          function: Node(
+            ast_node: Identifier("foo"),
+            symbol_table: None,
+          ),
+          arguments: [
+            Node(
+              ast_node: Literal(Integer(1)),
+              symbol_table: None,
+            ),
+            Node(
+              ast_node: Literal(Integer(2)),
+              symbol_table: None,
+            ),
+          ],
+        ),
+        symbol_table: None,
+      )),
+      symbol_table: None,
+    ),
+  ]),
+  symbol_table: None,
+)

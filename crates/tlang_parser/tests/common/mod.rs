@@ -7,3 +7,11 @@ macro_rules! parse {
         parser.parse().unwrap()
     }};
 }
+
+#[macro_export]
+macro_rules! assert_parser_snapshot {
+    ($ast:expr) => {{
+        use insta::assert_ron_snapshot;
+        assert_ron_snapshot!($ast);
+    }};
+}

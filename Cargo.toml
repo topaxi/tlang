@@ -9,10 +9,11 @@ edition = "2021"
 
 [workspace.dependencies]
 anyhow = "1"
-log = "0.4"
 indoc = "2"
+insta = { version = "1", features = ["redactions", "ron"] }
+log = "0.4"
 pretty_assertions = "1"
-insta = "1"
+serde = { version = "1", features = ["derive", "rc"] }
 
 [profile.release]
 opt-level = 's'

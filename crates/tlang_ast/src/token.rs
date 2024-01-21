@@ -1,6 +1,7 @@
 use crate::span::Span;
+use serde::Serialize;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub enum TokenKind {
     // Tokens for binary operators
     Caret,
@@ -78,7 +79,7 @@ pub enum TokenKind {
     Eof,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub enum Literal {
     Boolean(bool),
     Integer(i64),
@@ -88,7 +89,7 @@ pub enum Literal {
     Char(String),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Token {
     pub kind: TokenKind,
     pub span: Span,

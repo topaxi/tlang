@@ -1,3 +1,4 @@
+use serde::Serialize;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -7,13 +8,13 @@ use crate::{
     token::{Literal, TokenKind},
 };
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub enum Associativity {
     Left,
     Right,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct Node {
     pub ast_node: AstNode,
     pub symbol_table: Option<Rc<RefCell<SymbolTable>>>,
@@ -47,7 +48,7 @@ impl<'a> From<&'a TokenKind> for Node {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct FunctionDeclaration {
     pub parameters: Vec<Node>,
     pub guard: Box<Option<Node>>,
@@ -55,7 +56,7 @@ pub struct FunctionDeclaration {
     pub body: Box<Node>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub enum AstNode {
     None,
     Program(Vec<Node>),
@@ -178,20 +179,20 @@ impl<'a> From<&'a TokenKind> for AstNode {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Serialize)]
 pub enum UnaryOp {
     Minus,
     Rest,
     Spread,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize)]
 pub struct OperatorInfo {
     pub precedence: u8,
     pub associativity: Associativity,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Serialize)]
 pub enum BinaryOp {
     Add,
     Subtract,

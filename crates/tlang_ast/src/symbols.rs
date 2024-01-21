@@ -1,8 +1,9 @@
+use serde::Serialize;
 use std::cell::RefCell;
 use std::fmt::Display;
 use std::rc::Rc;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub enum SymbolType {
     Variable,
     Function,
@@ -23,7 +24,7 @@ impl Display for SymbolType {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Serialize)]
 pub struct SymbolId(usize);
 
 impl SymbolId {
@@ -36,7 +37,7 @@ impl SymbolId {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct SymbolInfo {
     pub id: SymbolId,
     pub name: String,
@@ -66,8 +67,9 @@ impl SymbolInfo {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Clone)]
+#[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub struct SymbolTable {
+    #[serde(skip_serializing)]
     parent: Option<Rc<RefCell<SymbolTable>>>,
     symbols: Vec<SymbolInfo>,
 }
