@@ -1,0 +1,75 @@
+---
+source: crates/tlang_parser/tests/parser.rs
+expression: "parse!(\"if (1 + 2) { 3 + 4; } else { 5 + 6; }\")"
+---
+Node(
+  ast_node: Program([
+    Node(
+      ast_node: ExpressionStatement(Node(
+        ast_node: IfElse(
+          condition: Node(
+            ast_node: BinaryOp(
+              op: Add,
+              lhs: Node(
+                ast_node: Literal(Integer(1)),
+                symbol_table: None,
+              ),
+              rhs: Node(
+                ast_node: Literal(Integer(2)),
+                symbol_table: None,
+              ),
+            ),
+            symbol_table: None,
+          ),
+          then_branch: Node(
+            ast_node: Block([
+              Node(
+                ast_node: ExpressionStatement(Node(
+                  ast_node: BinaryOp(
+                    op: Add,
+                    lhs: Node(
+                      ast_node: Literal(Integer(3)),
+                      symbol_table: None,
+                    ),
+                    rhs: Node(
+                      ast_node: Literal(Integer(4)),
+                      symbol_table: None,
+                    ),
+                  ),
+                  symbol_table: None,
+                )),
+                symbol_table: None,
+              ),
+            ], None),
+            symbol_table: None,
+          ),
+          else_branch: Some(Node(
+            ast_node: Block([
+              Node(
+                ast_node: ExpressionStatement(Node(
+                  ast_node: BinaryOp(
+                    op: Add,
+                    lhs: Node(
+                      ast_node: Literal(Integer(5)),
+                      symbol_table: None,
+                    ),
+                    rhs: Node(
+                      ast_node: Literal(Integer(6)),
+                      symbol_table: None,
+                    ),
+                  ),
+                  symbol_table: None,
+                )),
+                symbol_table: None,
+              ),
+            ], None),
+            symbol_table: None,
+          )),
+        ),
+        symbol_table: None,
+      )),
+      symbol_table: None,
+    ),
+  ]),
+  symbol_table: None,
+)
