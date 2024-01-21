@@ -1,0 +1,241 @@
+---
+source: crates/tlang_parser/tests/parser_fn.rs
+expression: "parse!(indoc! {\n        \"\n        fn filter_map([], f) { [] }\n        fn filter_map([x, ...xs], f) if let y = f(x) { [y, ...filter_map(xs, f)] }\n        fn filter_map([x, ...xs], f) { rec filter_map(xs, f) }\n    \"\n    })"
+---
+Node(
+  ast_node: Program([
+    Node(
+      ast_node: FunctionDeclarations(
+        id: SymbolId(12),
+        name: Node(
+          ast_node: Identifier("filter_map"),
+          symbol_table: None,
+        ),
+        declarations: [
+          Node(
+            ast_node: FunctionDeclaration(FunctionDeclaration(
+              parameters: [
+                Node(
+                  ast_node: FunctionParameter(
+                    id: SymbolId(1),
+                    pattern: Node(
+                      ast_node: ListPattern([]),
+                      symbol_table: None,
+                    ),
+                    type_annotation: None,
+                  ),
+                  symbol_table: None,
+                ),
+                Node(
+                  ast_node: FunctionParameter(
+                    id: SymbolId(2),
+                    pattern: Node(
+                      ast_node: Identifier("f"),
+                      symbol_table: None,
+                    ),
+                    type_annotation: None,
+                  ),
+                  symbol_table: None,
+                ),
+              ],
+              guard: None,
+              return_type_annotation: None,
+              body: Node(
+                ast_node: Block([], Some(Node(
+                  ast_node: List([]),
+                  symbol_table: None,
+                ))),
+                symbol_table: None,
+              ),
+            )),
+            symbol_table: None,
+          ),
+          Node(
+            ast_node: FunctionDeclaration(FunctionDeclaration(
+              parameters: [
+                Node(
+                  ast_node: FunctionParameter(
+                    id: SymbolId(5),
+                    pattern: Node(
+                      ast_node: ListPattern([
+                        Node(
+                          ast_node: IdentifierPattern(
+                            id: SymbolId(3),
+                            name: "x",
+                          ),
+                          symbol_table: None,
+                        ),
+                        Node(
+                          ast_node: UnaryOp(Rest, Node(
+                            ast_node: IdentifierPattern(
+                              id: SymbolId(4),
+                              name: "xs",
+                            ),
+                            symbol_table: None,
+                          )),
+                          symbol_table: None,
+                        ),
+                      ]),
+                      symbol_table: None,
+                    ),
+                    type_annotation: None,
+                  ),
+                  symbol_table: None,
+                ),
+                Node(
+                  ast_node: FunctionParameter(
+                    id: SymbolId(6),
+                    pattern: Node(
+                      ast_node: Identifier("f"),
+                      symbol_table: None,
+                    ),
+                    type_annotation: None,
+                  ),
+                  symbol_table: None,
+                ),
+              ],
+              guard: Some(Node(
+                ast_node: VariableDeclaration(
+                  id: SymbolId(7),
+                  pattern: Node(
+                    ast_node: Identifier("y"),
+                    symbol_table: None,
+                  ),
+                  expression: Node(
+                    ast_node: Call(
+                      function: Node(
+                        ast_node: Identifier("f"),
+                        symbol_table: None,
+                      ),
+                      arguments: [
+                        Node(
+                          ast_node: Identifier("x"),
+                          symbol_table: None,
+                        ),
+                      ],
+                    ),
+                    symbol_table: None,
+                  ),
+                  type_annotation: None,
+                ),
+                symbol_table: None,
+              )),
+              return_type_annotation: None,
+              body: Node(
+                ast_node: Block([], Some(Node(
+                  ast_node: List([
+                    Node(
+                      ast_node: Identifier("y"),
+                      symbol_table: None,
+                    ),
+                    Node(
+                      ast_node: UnaryOp(Spread, Node(
+                        ast_node: Call(
+                          function: Node(
+                            ast_node: Identifier("filter_map"),
+                            symbol_table: None,
+                          ),
+                          arguments: [
+                            Node(
+                              ast_node: Identifier("xs"),
+                              symbol_table: None,
+                            ),
+                            Node(
+                              ast_node: Identifier("f"),
+                              symbol_table: None,
+                            ),
+                          ],
+                        ),
+                        symbol_table: None,
+                      )),
+                      symbol_table: None,
+                    ),
+                  ]),
+                  symbol_table: None,
+                ))),
+                symbol_table: None,
+              ),
+            )),
+            symbol_table: None,
+          ),
+          Node(
+            ast_node: FunctionDeclaration(FunctionDeclaration(
+              parameters: [
+                Node(
+                  ast_node: FunctionParameter(
+                    id: SymbolId(10),
+                    pattern: Node(
+                      ast_node: ListPattern([
+                        Node(
+                          ast_node: IdentifierPattern(
+                            id: SymbolId(8),
+                            name: "x",
+                          ),
+                          symbol_table: None,
+                        ),
+                        Node(
+                          ast_node: UnaryOp(Rest, Node(
+                            ast_node: IdentifierPattern(
+                              id: SymbolId(9),
+                              name: "xs",
+                            ),
+                            symbol_table: None,
+                          )),
+                          symbol_table: None,
+                        ),
+                      ]),
+                      symbol_table: None,
+                    ),
+                    type_annotation: None,
+                  ),
+                  symbol_table: None,
+                ),
+                Node(
+                  ast_node: FunctionParameter(
+                    id: SymbolId(11),
+                    pattern: Node(
+                      ast_node: Identifier("f"),
+                      symbol_table: None,
+                    ),
+                    type_annotation: None,
+                  ),
+                  symbol_table: None,
+                ),
+              ],
+              guard: None,
+              return_type_annotation: None,
+              body: Node(
+                ast_node: Block([], Some(Node(
+                  ast_node: RecursiveCall(Node(
+                    ast_node: Call(
+                      function: Node(
+                        ast_node: Identifier("filter_map"),
+                        symbol_table: None,
+                      ),
+                      arguments: [
+                        Node(
+                          ast_node: Identifier("xs"),
+                          symbol_table: None,
+                        ),
+                        Node(
+                          ast_node: Identifier("f"),
+                          symbol_table: None,
+                        ),
+                      ],
+                    ),
+                    symbol_table: None,
+                  )),
+                  symbol_table: None,
+                ))),
+                symbol_table: None,
+              ),
+            )),
+            symbol_table: None,
+          ),
+        ],
+      ),
+      symbol_table: None,
+    ),
+  ]),
+  symbol_table: None,
+)

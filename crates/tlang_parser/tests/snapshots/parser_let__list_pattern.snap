@@ -1,0 +1,66 @@
+---
+source: crates/tlang_parser/tests/parser_let.rs
+expression: "parse!(\"let [x, y, ...z] = [1, 2, 3, 4];\")"
+---
+Node(
+  ast_node: Program([
+    Node(
+      ast_node: VariableDeclaration(
+        id: SymbolId(4),
+        pattern: Node(
+          ast_node: ListPattern([
+            Node(
+              ast_node: IdentifierPattern(
+                id: SymbolId(1),
+                name: "x",
+              ),
+              symbol_table: None,
+            ),
+            Node(
+              ast_node: IdentifierPattern(
+                id: SymbolId(2),
+                name: "y",
+              ),
+              symbol_table: None,
+            ),
+            Node(
+              ast_node: UnaryOp(Rest, Node(
+                ast_node: IdentifierPattern(
+                  id: SymbolId(3),
+                  name: "z",
+                ),
+                symbol_table: None,
+              )),
+              symbol_table: None,
+            ),
+          ]),
+          symbol_table: None,
+        ),
+        expression: Node(
+          ast_node: List([
+            Node(
+              ast_node: Literal(Integer(1)),
+              symbol_table: None,
+            ),
+            Node(
+              ast_node: Literal(Integer(2)),
+              symbol_table: None,
+            ),
+            Node(
+              ast_node: Literal(Integer(3)),
+              symbol_table: None,
+            ),
+            Node(
+              ast_node: Literal(Integer(4)),
+              symbol_table: None,
+            ),
+          ]),
+          symbol_table: None,
+        ),
+        type_annotation: None,
+      ),
+      symbol_table: None,
+    ),
+  ]),
+  symbol_table: None,
+)

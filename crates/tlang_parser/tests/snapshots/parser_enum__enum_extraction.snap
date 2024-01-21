@@ -1,0 +1,144 @@
+---
+source: crates/tlang_parser/tests/parser_enum.rs
+expression: "parse!(indoc! {\n        \"\n        enum Option {\n            Some(value),\n            None,\n        }\n\n        fn unwrap(Option::None) { panic(\\\"Cannot unwrap None\\\") }\n        fn unwrap(Option::Some(value)) { value }\n    \"\n    })"
+---
+Node(
+  ast_node: Program([
+    Node(
+      ast_node: EnumDeclaration(
+        id: SymbolId(1),
+        name: "Option",
+        variants: [
+          Node(
+            ast_node: EnumVariant(
+              name: "Some",
+              named_fields: false,
+              parameters: [
+                Node(
+                  ast_node: Identifier("value"),
+                  symbol_table: None,
+                ),
+              ],
+            ),
+            symbol_table: None,
+          ),
+          Node(
+            ast_node: EnumVariant(
+              name: "None",
+              named_fields: false,
+              parameters: [],
+            ),
+            symbol_table: None,
+          ),
+        ],
+      ),
+      symbol_table: None,
+    ),
+    Node(
+      ast_node: FunctionDeclarations(
+        id: SymbolId(5),
+        name: Node(
+          ast_node: Identifier("unwrap"),
+          symbol_table: None,
+        ),
+        declarations: [
+          Node(
+            ast_node: FunctionDeclaration(FunctionDeclaration(
+              parameters: [
+                Node(
+                  ast_node: FunctionParameter(
+                    id: SymbolId(2),
+                    pattern: Node(
+                      ast_node: EnumPattern(
+                        identifier: Node(
+                          ast_node: NestedIdentifier([
+                            "Option",
+                            "None",
+                          ]),
+                          symbol_table: None,
+                        ),
+                        elements: [],
+                        named_fields: false,
+                      ),
+                      symbol_table: None,
+                    ),
+                    type_annotation: None,
+                  ),
+                  symbol_table: None,
+                ),
+              ],
+              guard: None,
+              return_type_annotation: None,
+              body: Node(
+                ast_node: Block([], Some(Node(
+                  ast_node: Call(
+                    function: Node(
+                      ast_node: Identifier("panic"),
+                      symbol_table: None,
+                    ),
+                    arguments: [
+                      Node(
+                        ast_node: Literal(String("Cannot unwrap None")),
+                        symbol_table: None,
+                      ),
+                    ],
+                  ),
+                  symbol_table: None,
+                ))),
+                symbol_table: None,
+              ),
+            )),
+            symbol_table: None,
+          ),
+          Node(
+            ast_node: FunctionDeclaration(FunctionDeclaration(
+              parameters: [
+                Node(
+                  ast_node: FunctionParameter(
+                    id: SymbolId(4),
+                    pattern: Node(
+                      ast_node: EnumPattern(
+                        identifier: Node(
+                          ast_node: NestedIdentifier([
+                            "Option",
+                            "Some",
+                          ]),
+                          symbol_table: None,
+                        ),
+                        elements: [
+                          Node(
+                            ast_node: IdentifierPattern(
+                              id: SymbolId(3),
+                              name: "value",
+                            ),
+                            symbol_table: None,
+                          ),
+                        ],
+                        named_fields: false,
+                      ),
+                      symbol_table: None,
+                    ),
+                    type_annotation: None,
+                  ),
+                  symbol_table: None,
+                ),
+              ],
+              guard: None,
+              return_type_annotation: None,
+              body: Node(
+                ast_node: Block([], Some(Node(
+                  ast_node: Identifier("value"),
+                  symbol_table: None,
+                ))),
+                symbol_table: None,
+              ),
+            )),
+            symbol_table: None,
+          ),
+        ],
+      ),
+      symbol_table: None,
+    ),
+  ]),
+  symbol_table: None,
+)

@@ -1,0 +1,339 @@
+---
+source: crates/tlang_parser/tests/parser_enum.rs
+expression: "parse!(indoc! {\n        \"\n        enum Tree {\n            Leaf(value),\n            Node { left, right },\n        }\n\n        fn maximum_depth(Tree::Leaf(_)) { 1 }\n        fn maximum_depth(Tree::Node { left, right }) { 1 + max(maximum_depth(left), maximum_depth(right)) }\n\n        fn main() {\n            let x = Tree::Node {\n                left: Tree::Leaf(1),\n                right: Tree::Node {\n                    left: Tree::Leaf(2),\n                    right: Tree::Leaf(3),\n                },\n            };\n        }\n    \"\n    })"
+---
+Node(
+  ast_node: Program([
+    Node(
+      ast_node: EnumDeclaration(
+        id: SymbolId(1),
+        name: "Tree",
+        variants: [
+          Node(
+            ast_node: EnumVariant(
+              name: "Leaf",
+              named_fields: false,
+              parameters: [
+                Node(
+                  ast_node: Identifier("value"),
+                  symbol_table: None,
+                ),
+              ],
+            ),
+            symbol_table: None,
+          ),
+          Node(
+            ast_node: EnumVariant(
+              name: "Node",
+              named_fields: true,
+              parameters: [
+                Node(
+                  ast_node: Identifier("left"),
+                  symbol_table: None,
+                ),
+                Node(
+                  ast_node: Identifier("right"),
+                  symbol_table: None,
+                ),
+              ],
+            ),
+            symbol_table: None,
+          ),
+        ],
+      ),
+      symbol_table: None,
+    ),
+    Node(
+      ast_node: FunctionDeclarations(
+        id: SymbolId(6),
+        name: Node(
+          ast_node: Identifier("maximum_depth"),
+          symbol_table: None,
+        ),
+        declarations: [
+          Node(
+            ast_node: FunctionDeclaration(FunctionDeclaration(
+              parameters: [
+                Node(
+                  ast_node: FunctionParameter(
+                    id: SymbolId(2),
+                    pattern: Node(
+                      ast_node: EnumPattern(
+                        identifier: Node(
+                          ast_node: NestedIdentifier([
+                            "Tree",
+                            "Leaf",
+                          ]),
+                          symbol_table: None,
+                        ),
+                        elements: [
+                          Node(
+                            ast_node: Wildcard,
+                            symbol_table: None,
+                          ),
+                        ],
+                        named_fields: false,
+                      ),
+                      symbol_table: None,
+                    ),
+                    type_annotation: None,
+                  ),
+                  symbol_table: None,
+                ),
+              ],
+              guard: None,
+              return_type_annotation: None,
+              body: Node(
+                ast_node: Block([], Some(Node(
+                  ast_node: Literal(Integer(1)),
+                  symbol_table: None,
+                ))),
+                symbol_table: None,
+              ),
+            )),
+            symbol_table: None,
+          ),
+          Node(
+            ast_node: FunctionDeclaration(FunctionDeclaration(
+              parameters: [
+                Node(
+                  ast_node: FunctionParameter(
+                    id: SymbolId(5),
+                    pattern: Node(
+                      ast_node: EnumPattern(
+                        identifier: Node(
+                          ast_node: NestedIdentifier([
+                            "Tree",
+                            "Node",
+                          ]),
+                          symbol_table: None,
+                        ),
+                        elements: [
+                          Node(
+                            ast_node: IdentifierPattern(
+                              id: SymbolId(3),
+                              name: "left",
+                            ),
+                            symbol_table: None,
+                          ),
+                          Node(
+                            ast_node: IdentifierPattern(
+                              id: SymbolId(4),
+                              name: "right",
+                            ),
+                            symbol_table: None,
+                          ),
+                        ],
+                        named_fields: true,
+                      ),
+                      symbol_table: None,
+                    ),
+                    type_annotation: None,
+                  ),
+                  symbol_table: None,
+                ),
+              ],
+              guard: None,
+              return_type_annotation: None,
+              body: Node(
+                ast_node: Block([], Some(Node(
+                  ast_node: BinaryOp(
+                    op: Add,
+                    lhs: Node(
+                      ast_node: Literal(Integer(1)),
+                      symbol_table: None,
+                    ),
+                    rhs: Node(
+                      ast_node: Call(
+                        function: Node(
+                          ast_node: Identifier("max"),
+                          symbol_table: None,
+                        ),
+                        arguments: [
+                          Node(
+                            ast_node: Call(
+                              function: Node(
+                                ast_node: Identifier("maximum_depth"),
+                                symbol_table: None,
+                              ),
+                              arguments: [
+                                Node(
+                                  ast_node: Identifier("left"),
+                                  symbol_table: None,
+                                ),
+                              ],
+                            ),
+                            symbol_table: None,
+                          ),
+                          Node(
+                            ast_node: Call(
+                              function: Node(
+                                ast_node: Identifier("maximum_depth"),
+                                symbol_table: None,
+                              ),
+                              arguments: [
+                                Node(
+                                  ast_node: Identifier("right"),
+                                  symbol_table: None,
+                                ),
+                              ],
+                            ),
+                            symbol_table: None,
+                          ),
+                        ],
+                      ),
+                      symbol_table: None,
+                    ),
+                  ),
+                  symbol_table: None,
+                ))),
+                symbol_table: None,
+              ),
+            )),
+            symbol_table: None,
+          ),
+        ],
+      ),
+      symbol_table: None,
+    ),
+    Node(
+      ast_node: FunctionSingleDeclaration(
+        id: SymbolId(8),
+        name: Node(
+          ast_node: Identifier("main"),
+          symbol_table: None,
+        ),
+        declaration: Node(
+          ast_node: FunctionDeclaration(FunctionDeclaration(
+            parameters: [],
+            guard: None,
+            return_type_annotation: None,
+            body: Node(
+              ast_node: Block([
+                Node(
+                  ast_node: VariableDeclaration(
+                    id: SymbolId(7),
+                    pattern: Node(
+                      ast_node: Identifier("x"),
+                      symbol_table: None,
+                    ),
+                    expression: Node(
+                      ast_node: Call(
+                        function: Node(
+                          ast_node: NestedIdentifier([
+                            "Tree",
+                            "Node",
+                          ]),
+                          symbol_table: None,
+                        ),
+                        arguments: [
+                          Node(
+                            ast_node: Dict([
+                              (Node(
+                                ast_node: Identifier("left"),
+                                symbol_table: None,
+                              ), Node(
+                                ast_node: Call(
+                                  function: Node(
+                                    ast_node: NestedIdentifier([
+                                      "Tree",
+                                      "Leaf",
+                                    ]),
+                                    symbol_table: None,
+                                  ),
+                                  arguments: [
+                                    Node(
+                                      ast_node: Literal(Integer(1)),
+                                      symbol_table: None,
+                                    ),
+                                  ],
+                                ),
+                                symbol_table: None,
+                              )),
+                              (Node(
+                                ast_node: Identifier("right"),
+                                symbol_table: None,
+                              ), Node(
+                                ast_node: Call(
+                                  function: Node(
+                                    ast_node: NestedIdentifier([
+                                      "Tree",
+                                      "Node",
+                                    ]),
+                                    symbol_table: None,
+                                  ),
+                                  arguments: [
+                                    Node(
+                                      ast_node: Dict([
+                                        (Node(
+                                          ast_node: Identifier("left"),
+                                          symbol_table: None,
+                                        ), Node(
+                                          ast_node: Call(
+                                            function: Node(
+                                              ast_node: NestedIdentifier([
+                                                "Tree",
+                                                "Leaf",
+                                              ]),
+                                              symbol_table: None,
+                                            ),
+                                            arguments: [
+                                              Node(
+                                                ast_node: Literal(Integer(2)),
+                                                symbol_table: None,
+                                              ),
+                                            ],
+                                          ),
+                                          symbol_table: None,
+                                        )),
+                                        (Node(
+                                          ast_node: Identifier("right"),
+                                          symbol_table: None,
+                                        ), Node(
+                                          ast_node: Call(
+                                            function: Node(
+                                              ast_node: NestedIdentifier([
+                                                "Tree",
+                                                "Leaf",
+                                              ]),
+                                              symbol_table: None,
+                                            ),
+                                            arguments: [
+                                              Node(
+                                                ast_node: Literal(Integer(3)),
+                                                symbol_table: None,
+                                              ),
+                                            ],
+                                          ),
+                                          symbol_table: None,
+                                        )),
+                                      ]),
+                                      symbol_table: None,
+                                    ),
+                                  ],
+                                ),
+                                symbol_table: None,
+                              )),
+                            ]),
+                            symbol_table: None,
+                          ),
+                        ],
+                      ),
+                      symbol_table: None,
+                    ),
+                    type_annotation: None,
+                  ),
+                  symbol_table: None,
+                ),
+              ], None),
+              symbol_table: None,
+            ),
+          )),
+          symbol_table: None,
+        ),
+      ),
+      symbol_table: None,
+    ),
+  ]),
+  symbol_table: None,
+)

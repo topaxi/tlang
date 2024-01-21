@@ -1,0 +1,40 @@
+---
+source: crates/tlang_parser/tests/parser_if_let.rs
+expression: "parse!(indoc! { \"\n        if let x = 1 {\n            x\n        }\n    \" })"
+---
+Node(
+  ast_node: Program([
+    Node(
+      ast_node: ExpressionStatement(Node(
+        ast_node: IfElse(
+          condition: Node(
+            ast_node: VariableDeclaration(
+              id: SymbolId(1),
+              pattern: Node(
+                ast_node: Identifier("x"),
+                symbol_table: None,
+              ),
+              expression: Node(
+                ast_node: Literal(Integer(1)),
+                symbol_table: None,
+              ),
+              type_annotation: None,
+            ),
+            symbol_table: None,
+          ),
+          then_branch: Node(
+            ast_node: Block([], Some(Node(
+              ast_node: Identifier("x"),
+              symbol_table: None,
+            ))),
+            symbol_table: None,
+          ),
+          else_branch: None,
+        ),
+        symbol_table: None,
+      )),
+      symbol_table: None,
+    ),
+  ]),
+  symbol_table: None,
+)

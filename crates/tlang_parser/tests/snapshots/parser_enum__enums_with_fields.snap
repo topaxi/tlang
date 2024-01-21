@@ -1,0 +1,76 @@
+---
+source: crates/tlang_parser/tests/parser_enum.rs
+expression: "parse!(indoc! {\n        \"\n        enum Option {\n            Some { x },\n            None,\n        }\n        let x = Option::Some { x: 42 };\n    \"\n    })"
+---
+Node(
+  ast_node: Program([
+    Node(
+      ast_node: EnumDeclaration(
+        id: SymbolId(1),
+        name: "Option",
+        variants: [
+          Node(
+            ast_node: EnumVariant(
+              name: "Some",
+              named_fields: true,
+              parameters: [
+                Node(
+                  ast_node: Identifier("x"),
+                  symbol_table: None,
+                ),
+              ],
+            ),
+            symbol_table: None,
+          ),
+          Node(
+            ast_node: EnumVariant(
+              name: "None",
+              named_fields: false,
+              parameters: [],
+            ),
+            symbol_table: None,
+          ),
+        ],
+      ),
+      symbol_table: None,
+    ),
+    Node(
+      ast_node: VariableDeclaration(
+        id: SymbolId(2),
+        pattern: Node(
+          ast_node: Identifier("x"),
+          symbol_table: None,
+        ),
+        expression: Node(
+          ast_node: Call(
+            function: Node(
+              ast_node: NestedIdentifier([
+                "Option",
+                "Some",
+              ]),
+              symbol_table: None,
+            ),
+            arguments: [
+              Node(
+                ast_node: Dict([
+                  (Node(
+                    ast_node: Identifier("x"),
+                    symbol_table: None,
+                  ), Node(
+                    ast_node: Literal(Integer(42)),
+                    symbol_table: None,
+                  )),
+                ]),
+                symbol_table: None,
+              ),
+            ],
+          ),
+          symbol_table: None,
+        ),
+        type_annotation: None,
+      ),
+      symbol_table: None,
+    ),
+  ]),
+  symbol_table: None,
+)

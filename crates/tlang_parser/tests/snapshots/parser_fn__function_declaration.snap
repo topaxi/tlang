@@ -1,0 +1,62 @@
+---
+source: crates/tlang_parser/tests/parser_fn.rs
+expression: "parse!(\"fn foo() { bar(); 1 + 2; }\")"
+---
+Node(
+  ast_node: Program([
+    Node(
+      ast_node: FunctionSingleDeclaration(
+        id: SymbolId(1),
+        name: Node(
+          ast_node: Identifier("foo"),
+          symbol_table: None,
+        ),
+        declaration: Node(
+          ast_node: FunctionDeclaration(FunctionDeclaration(
+            parameters: [],
+            guard: None,
+            return_type_annotation: None,
+            body: Node(
+              ast_node: Block([
+                Node(
+                  ast_node: ExpressionStatement(Node(
+                    ast_node: Call(
+                      function: Node(
+                        ast_node: Identifier("bar"),
+                        symbol_table: None,
+                      ),
+                      arguments: [],
+                    ),
+                    symbol_table: None,
+                  )),
+                  symbol_table: None,
+                ),
+                Node(
+                  ast_node: ExpressionStatement(Node(
+                    ast_node: BinaryOp(
+                      op: Add,
+                      lhs: Node(
+                        ast_node: Literal(Integer(1)),
+                        symbol_table: None,
+                      ),
+                      rhs: Node(
+                        ast_node: Literal(Integer(2)),
+                        symbol_table: None,
+                      ),
+                    ),
+                    symbol_table: None,
+                  )),
+                  symbol_table: None,
+                ),
+              ], None),
+              symbol_table: None,
+            ),
+          )),
+          symbol_table: None,
+        ),
+      ),
+      symbol_table: None,
+    ),
+  ]),
+  symbol_table: None,
+)

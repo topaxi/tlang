@@ -1,0 +1,50 @@
+---
+source: crates/tlang_parser/tests/parser_fn.rs
+expression: "parse!(\"fn foo() { let x = 1; x }\")"
+---
+Node(
+  ast_node: Program([
+    Node(
+      ast_node: FunctionSingleDeclaration(
+        id: SymbolId(2),
+        name: Node(
+          ast_node: Identifier("foo"),
+          symbol_table: None,
+        ),
+        declaration: Node(
+          ast_node: FunctionDeclaration(FunctionDeclaration(
+            parameters: [],
+            guard: None,
+            return_type_annotation: None,
+            body: Node(
+              ast_node: Block([
+                Node(
+                  ast_node: VariableDeclaration(
+                    id: SymbolId(1),
+                    pattern: Node(
+                      ast_node: Identifier("x"),
+                      symbol_table: None,
+                    ),
+                    expression: Node(
+                      ast_node: Literal(Integer(1)),
+                      symbol_table: None,
+                    ),
+                    type_annotation: None,
+                  ),
+                  symbol_table: None,
+                ),
+              ], Some(Node(
+                ast_node: Identifier("x"),
+                symbol_table: None,
+              ))),
+              symbol_table: None,
+            ),
+          )),
+          symbol_table: None,
+        ),
+      ),
+      symbol_table: None,
+    ),
+  ]),
+  symbol_table: None,
+)

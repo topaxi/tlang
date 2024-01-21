@@ -1,0 +1,58 @@
+---
+source: crates/tlang_parser/tests/parser_if_let.rs
+expression: "parse!(indoc! {\n        \"\n        if let Option::Some(y) = x; {\n            y\n        }\n    \"\n    })"
+---
+Node(
+  ast_node: Program([
+    Node(
+      ast_node: ExpressionStatement(Node(
+        ast_node: IfElse(
+          condition: Node(
+            ast_node: VariableDeclaration(
+              id: SymbolId(2),
+              pattern: Node(
+                ast_node: EnumPattern(
+                  identifier: Node(
+                    ast_node: NestedIdentifier([
+                      "Option",
+                      "Some",
+                    ]),
+                    symbol_table: None,
+                  ),
+                  elements: [
+                    Node(
+                      ast_node: IdentifierPattern(
+                        id: SymbolId(1),
+                        name: "y",
+                      ),
+                      symbol_table: None,
+                    ),
+                  ],
+                  named_fields: false,
+                ),
+                symbol_table: None,
+              ),
+              expression: Node(
+                ast_node: Identifier("x"),
+                symbol_table: None,
+              ),
+              type_annotation: None,
+            ),
+            symbol_table: None,
+          ),
+          then_branch: Node(
+            ast_node: Block([], Some(Node(
+              ast_node: Identifier("y"),
+              symbol_table: None,
+            ))),
+            symbol_table: None,
+          ),
+          else_branch: None,
+        ),
+        symbol_table: None,
+      )),
+      symbol_table: None,
+    ),
+  ]),
+  symbol_table: None,
+)
