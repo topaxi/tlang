@@ -1,0 +1,413 @@
+---
+source: crates/tlang_parser/tests/parser_method.rs
+expression: "parse!(indoc! {\n        \"\n        enum Option {\n            Some(x),\n            None,\n        }\n\n        fn Option::is_option(Option::Some(_)) { true }\n        fn Option::is_option(Option::None) { true }\n        fn Option::is_option(_) { false }\n\n        fn Option.is_some(Option::Some(_)) { true }\n        fn Option.is_some(Option::None) { false }\n\n        fn Option.map(Option::Some(x), f) { Option::Some(f(x)) }\n        fn Option.map(Option::None, _) { Option::None }\n    \"\n    })"
+---
+Node(
+  ast_node: Program([
+    Node(
+      ast_node: EnumDeclaration(
+        id: SymbolId(1),
+        name: "Option",
+        variants: [
+          Node(
+            ast_node: EnumVariant(
+              name: "Some",
+              named_fields: false,
+              parameters: [
+                Node(
+                  ast_node: Identifier("x"),
+                  symbol_table: None,
+                ),
+              ],
+            ),
+            symbol_table: None,
+          ),
+          Node(
+            ast_node: EnumVariant(
+              name: "None",
+              named_fields: false,
+              parameters: [],
+            ),
+            symbol_table: None,
+          ),
+        ],
+      ),
+      symbol_table: None,
+    ),
+    Node(
+      ast_node: FunctionDeclarations(
+        id: SymbolId(5),
+        name: Node(
+          ast_node: NestedIdentifier([
+            "Option",
+            "is_option",
+          ]),
+          symbol_table: None,
+        ),
+        declarations: [
+          Node(
+            ast_node: FunctionDeclaration(FunctionDeclaration(
+              parameters: [
+                Node(
+                  ast_node: FunctionParameter(
+                    id: SymbolId(2),
+                    pattern: Node(
+                      ast_node: EnumPattern(
+                        identifier: Node(
+                          ast_node: NestedIdentifier([
+                            "Option",
+                            "Some",
+                          ]),
+                          symbol_table: None,
+                        ),
+                        elements: [
+                          Node(
+                            ast_node: Wildcard,
+                            symbol_table: None,
+                          ),
+                        ],
+                        named_fields: false,
+                      ),
+                      symbol_table: None,
+                    ),
+                    type_annotation: None,
+                  ),
+                  symbol_table: None,
+                ),
+              ],
+              guard: None,
+              return_type_annotation: None,
+              body: Node(
+                ast_node: Block([], Some(Node(
+                  ast_node: Literal(Boolean(true)),
+                  symbol_table: None,
+                ))),
+                symbol_table: None,
+              ),
+            )),
+            symbol_table: None,
+          ),
+          Node(
+            ast_node: FunctionDeclaration(FunctionDeclaration(
+              parameters: [
+                Node(
+                  ast_node: FunctionParameter(
+                    id: SymbolId(3),
+                    pattern: Node(
+                      ast_node: EnumPattern(
+                        identifier: Node(
+                          ast_node: NestedIdentifier([
+                            "Option",
+                            "None",
+                          ]),
+                          symbol_table: None,
+                        ),
+                        elements: [],
+                        named_fields: false,
+                      ),
+                      symbol_table: None,
+                    ),
+                    type_annotation: None,
+                  ),
+                  symbol_table: None,
+                ),
+              ],
+              guard: None,
+              return_type_annotation: None,
+              body: Node(
+                ast_node: Block([], Some(Node(
+                  ast_node: Literal(Boolean(true)),
+                  symbol_table: None,
+                ))),
+                symbol_table: None,
+              ),
+            )),
+            symbol_table: None,
+          ),
+          Node(
+            ast_node: FunctionDeclaration(FunctionDeclaration(
+              parameters: [
+                Node(
+                  ast_node: FunctionParameter(
+                    id: SymbolId(4),
+                    pattern: Node(
+                      ast_node: Wildcard,
+                      symbol_table: None,
+                    ),
+                    type_annotation: None,
+                  ),
+                  symbol_table: None,
+                ),
+              ],
+              guard: None,
+              return_type_annotation: None,
+              body: Node(
+                ast_node: Block([], Some(Node(
+                  ast_node: Literal(Boolean(false)),
+                  symbol_table: None,
+                ))),
+                symbol_table: None,
+              ),
+            )),
+            symbol_table: None,
+          ),
+        ],
+      ),
+      symbol_table: None,
+    ),
+    Node(
+      ast_node: FunctionDeclarations(
+        id: SymbolId(8),
+        name: Node(
+          ast_node: FieldExpression(
+            base: Node(
+              ast_node: Identifier("Option"),
+              symbol_table: None,
+            ),
+            field: Node(
+              ast_node: Identifier("is_some"),
+              symbol_table: None,
+            ),
+          ),
+          symbol_table: None,
+        ),
+        declarations: [
+          Node(
+            ast_node: FunctionDeclaration(FunctionDeclaration(
+              parameters: [
+                Node(
+                  ast_node: FunctionParameter(
+                    id: SymbolId(6),
+                    pattern: Node(
+                      ast_node: EnumPattern(
+                        identifier: Node(
+                          ast_node: NestedIdentifier([
+                            "Option",
+                            "Some",
+                          ]),
+                          symbol_table: None,
+                        ),
+                        elements: [
+                          Node(
+                            ast_node: Wildcard,
+                            symbol_table: None,
+                          ),
+                        ],
+                        named_fields: false,
+                      ),
+                      symbol_table: None,
+                    ),
+                    type_annotation: None,
+                  ),
+                  symbol_table: None,
+                ),
+              ],
+              guard: None,
+              return_type_annotation: None,
+              body: Node(
+                ast_node: Block([], Some(Node(
+                  ast_node: Literal(Boolean(true)),
+                  symbol_table: None,
+                ))),
+                symbol_table: None,
+              ),
+            )),
+            symbol_table: None,
+          ),
+          Node(
+            ast_node: FunctionDeclaration(FunctionDeclaration(
+              parameters: [
+                Node(
+                  ast_node: FunctionParameter(
+                    id: SymbolId(7),
+                    pattern: Node(
+                      ast_node: EnumPattern(
+                        identifier: Node(
+                          ast_node: NestedIdentifier([
+                            "Option",
+                            "None",
+                          ]),
+                          symbol_table: None,
+                        ),
+                        elements: [],
+                        named_fields: false,
+                      ),
+                      symbol_table: None,
+                    ),
+                    type_annotation: None,
+                  ),
+                  symbol_table: None,
+                ),
+              ],
+              guard: None,
+              return_type_annotation: None,
+              body: Node(
+                ast_node: Block([], Some(Node(
+                  ast_node: Literal(Boolean(false)),
+                  symbol_table: None,
+                ))),
+                symbol_table: None,
+              ),
+            )),
+            symbol_table: None,
+          ),
+        ],
+      ),
+      symbol_table: None,
+    ),
+    Node(
+      ast_node: FunctionDeclarations(
+        id: SymbolId(14),
+        name: Node(
+          ast_node: FieldExpression(
+            base: Node(
+              ast_node: Identifier("Option"),
+              symbol_table: None,
+            ),
+            field: Node(
+              ast_node: Identifier("map"),
+              symbol_table: None,
+            ),
+          ),
+          symbol_table: None,
+        ),
+        declarations: [
+          Node(
+            ast_node: FunctionDeclaration(FunctionDeclaration(
+              parameters: [
+                Node(
+                  ast_node: FunctionParameter(
+                    id: SymbolId(10),
+                    pattern: Node(
+                      ast_node: EnumPattern(
+                        identifier: Node(
+                          ast_node: NestedIdentifier([
+                            "Option",
+                            "Some",
+                          ]),
+                          symbol_table: None,
+                        ),
+                        elements: [
+                          Node(
+                            ast_node: IdentifierPattern(
+                              id: SymbolId(9),
+                              name: "x",
+                            ),
+                            symbol_table: None,
+                          ),
+                        ],
+                        named_fields: false,
+                      ),
+                      symbol_table: None,
+                    ),
+                    type_annotation: None,
+                  ),
+                  symbol_table: None,
+                ),
+                Node(
+                  ast_node: FunctionParameter(
+                    id: SymbolId(11),
+                    pattern: Node(
+                      ast_node: Identifier("f"),
+                      symbol_table: None,
+                    ),
+                    type_annotation: None,
+                  ),
+                  symbol_table: None,
+                ),
+              ],
+              guard: None,
+              return_type_annotation: None,
+              body: Node(
+                ast_node: Block([], Some(Node(
+                  ast_node: Call(
+                    function: Node(
+                      ast_node: NestedIdentifier([
+                        "Option",
+                        "Some",
+                      ]),
+                      symbol_table: None,
+                    ),
+                    arguments: [
+                      Node(
+                        ast_node: Call(
+                          function: Node(
+                            ast_node: Identifier("f"),
+                            symbol_table: None,
+                          ),
+                          arguments: [
+                            Node(
+                              ast_node: Identifier("x"),
+                              symbol_table: None,
+                            ),
+                          ],
+                        ),
+                        symbol_table: None,
+                      ),
+                    ],
+                  ),
+                  symbol_table: None,
+                ))),
+                symbol_table: None,
+              ),
+            )),
+            symbol_table: None,
+          ),
+          Node(
+            ast_node: FunctionDeclaration(FunctionDeclaration(
+              parameters: [
+                Node(
+                  ast_node: FunctionParameter(
+                    id: SymbolId(12),
+                    pattern: Node(
+                      ast_node: EnumPattern(
+                        identifier: Node(
+                          ast_node: NestedIdentifier([
+                            "Option",
+                            "None",
+                          ]),
+                          symbol_table: None,
+                        ),
+                        elements: [],
+                        named_fields: false,
+                      ),
+                      symbol_table: None,
+                    ),
+                    type_annotation: None,
+                  ),
+                  symbol_table: None,
+                ),
+                Node(
+                  ast_node: FunctionParameter(
+                    id: SymbolId(13),
+                    pattern: Node(
+                      ast_node: Wildcard,
+                      symbol_table: None,
+                    ),
+                    type_annotation: None,
+                  ),
+                  symbol_table: None,
+                ),
+              ],
+              guard: None,
+              return_type_annotation: None,
+              body: Node(
+                ast_node: Block([], Some(Node(
+                  ast_node: NestedIdentifier([
+                    "Option",
+                    "None",
+                  ]),
+                  symbol_table: None,
+                ))),
+                symbol_table: None,
+              ),
+            )),
+            symbol_table: None,
+          ),
+        ],
+      ),
+      symbol_table: None,
+    ),
+  ]),
+  symbol_table: None,
+)

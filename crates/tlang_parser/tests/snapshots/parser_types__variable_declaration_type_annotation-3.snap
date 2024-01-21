@@ -1,0 +1,68 @@
+---
+source: crates/tlang_parser/tests/parser_types.rs
+expression: "parse!(\"let x: std::hash::Map<str, i64> = std::hash::Map();\")"
+---
+Node(
+  ast_node: Program([
+    Node(
+      ast_node: VariableDeclaration(
+        id: SymbolId(1),
+        pattern: Node(
+          ast_node: Identifier("x"),
+          symbol_table: None,
+        ),
+        expression: Node(
+          ast_node: Call(
+            function: Node(
+              ast_node: NestedIdentifier([
+                "std",
+                "hash",
+                "Map",
+              ]),
+              symbol_table: None,
+            ),
+            arguments: [],
+          ),
+          symbol_table: None,
+        ),
+        type_annotation: Some(Node(
+          ast_node: TypeAnnotation(
+            name: Node(
+              ast_node: NestedIdentifier([
+                "std",
+                "hash",
+                "Map",
+              ]),
+              symbol_table: None,
+            ),
+            parameters: [
+              Node(
+                ast_node: TypeAnnotation(
+                  name: Node(
+                    ast_node: Identifier("str"),
+                    symbol_table: None,
+                  ),
+                  parameters: [],
+                ),
+                symbol_table: None,
+              ),
+              Node(
+                ast_node: TypeAnnotation(
+                  name: Node(
+                    ast_node: Identifier("i64"),
+                    symbol_table: None,
+                  ),
+                  parameters: [],
+                ),
+                symbol_table: None,
+              ),
+            ],
+          ),
+          symbol_table: None,
+        )),
+      ),
+      symbol_table: None,
+    ),
+  ]),
+  symbol_table: None,
+)

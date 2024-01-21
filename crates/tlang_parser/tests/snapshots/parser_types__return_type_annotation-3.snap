@@ -1,0 +1,54 @@
+---
+source: crates/tlang_parser/tests/parser_types.rs
+expression: "parse!(\"let expr = fn foo() -> i64 { 1 };\")"
+---
+Node(
+  ast_node: Program([
+    Node(
+      ast_node: VariableDeclaration(
+        id: SymbolId(2),
+        pattern: Node(
+          ast_node: Identifier("expr"),
+          symbol_table: None,
+        ),
+        expression: Node(
+          ast_node: FunctionExpression(
+            id: SymbolId(1),
+            name: Some(Node(
+              ast_node: Identifier("foo"),
+              symbol_table: None,
+            )),
+            declaration: Node(
+              ast_node: FunctionDeclaration(FunctionDeclaration(
+                parameters: [],
+                guard: None,
+                return_type_annotation: Some(Node(
+                  ast_node: TypeAnnotation(
+                    name: Node(
+                      ast_node: Identifier("i64"),
+                      symbol_table: None,
+                    ),
+                    parameters: [],
+                  ),
+                  symbol_table: None,
+                )),
+                body: Node(
+                  ast_node: Block([], Some(Node(
+                    ast_node: Literal(Integer(1)),
+                    symbol_table: None,
+                  ))),
+                  symbol_table: None,
+                ),
+              )),
+              symbol_table: None,
+            ),
+          ),
+          symbol_table: None,
+        ),
+        type_annotation: None,
+      ),
+      symbol_table: None,
+    ),
+  ]),
+  symbol_table: None,
+)

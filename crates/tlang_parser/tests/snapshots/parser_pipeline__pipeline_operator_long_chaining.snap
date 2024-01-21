@@ -1,0 +1,253 @@
+---
+source: crates/tlang_parser/tests/parser_pipeline.rs
+expression: "parse!(indoc! {\n        \"\n        [1,2,3]\n        |> map(fn (x) { x ** 2 })\n        |> filter(fn (x) { x % 2 == 0 })\n        |> foldl(fn (acc, x) { acc + x }, 0)\n        |> log();\n    \"\n    })"
+---
+Node(
+  ast_node: Program([
+    Node(
+      ast_node: ExpressionStatement(Node(
+        ast_node: BinaryOp(
+          op: Pipeline,
+          lhs: Node(
+            ast_node: BinaryOp(
+              op: Pipeline,
+              lhs: Node(
+                ast_node: BinaryOp(
+                  op: Pipeline,
+                  lhs: Node(
+                    ast_node: BinaryOp(
+                      op: Pipeline,
+                      lhs: Node(
+                        ast_node: List([
+                          Node(
+                            ast_node: Literal(Integer(1)),
+                            symbol_table: None,
+                          ),
+                          Node(
+                            ast_node: Literal(Integer(2)),
+                            symbol_table: None,
+                          ),
+                          Node(
+                            ast_node: Literal(Integer(3)),
+                            symbol_table: None,
+                          ),
+                        ]),
+                        symbol_table: None,
+                      ),
+                      rhs: Node(
+                        ast_node: Call(
+                          function: Node(
+                            ast_node: Identifier("map"),
+                            symbol_table: None,
+                          ),
+                          arguments: [
+                            Node(
+                              ast_node: FunctionExpression(
+                                id: SymbolId(2),
+                                name: None,
+                                declaration: Node(
+                                  ast_node: FunctionDeclaration(FunctionDeclaration(
+                                    parameters: [
+                                      Node(
+                                        ast_node: FunctionParameter(
+                                          id: SymbolId(1),
+                                          pattern: Node(
+                                            ast_node: Identifier("x"),
+                                            symbol_table: None,
+                                          ),
+                                          type_annotation: None,
+                                        ),
+                                        symbol_table: None,
+                                      ),
+                                    ],
+                                    guard: None,
+                                    return_type_annotation: None,
+                                    body: Node(
+                                      ast_node: Block([], Some(Node(
+                                        ast_node: BinaryOp(
+                                          op: Exponentiation,
+                                          lhs: Node(
+                                            ast_node: Identifier("x"),
+                                            symbol_table: None,
+                                          ),
+                                          rhs: Node(
+                                            ast_node: Literal(Integer(2)),
+                                            symbol_table: None,
+                                          ),
+                                        ),
+                                        symbol_table: None,
+                                      ))),
+                                      symbol_table: None,
+                                    ),
+                                  )),
+                                  symbol_table: None,
+                                ),
+                              ),
+                              symbol_table: None,
+                            ),
+                          ],
+                        ),
+                        symbol_table: None,
+                      ),
+                    ),
+                    symbol_table: None,
+                  ),
+                  rhs: Node(
+                    ast_node: Call(
+                      function: Node(
+                        ast_node: Identifier("filter"),
+                        symbol_table: None,
+                      ),
+                      arguments: [
+                        Node(
+                          ast_node: FunctionExpression(
+                            id: SymbolId(4),
+                            name: None,
+                            declaration: Node(
+                              ast_node: FunctionDeclaration(FunctionDeclaration(
+                                parameters: [
+                                  Node(
+                                    ast_node: FunctionParameter(
+                                      id: SymbolId(3),
+                                      pattern: Node(
+                                        ast_node: Identifier("x"),
+                                        symbol_table: None,
+                                      ),
+                                      type_annotation: None,
+                                    ),
+                                    symbol_table: None,
+                                  ),
+                                ],
+                                guard: None,
+                                return_type_annotation: None,
+                                body: Node(
+                                  ast_node: Block([], Some(Node(
+                                    ast_node: BinaryOp(
+                                      op: Equal,
+                                      lhs: Node(
+                                        ast_node: BinaryOp(
+                                          op: Modulo,
+                                          lhs: Node(
+                                            ast_node: Identifier("x"),
+                                            symbol_table: None,
+                                          ),
+                                          rhs: Node(
+                                            ast_node: Literal(Integer(2)),
+                                            symbol_table: None,
+                                          ),
+                                        ),
+                                        symbol_table: None,
+                                      ),
+                                      rhs: Node(
+                                        ast_node: Literal(Integer(0)),
+                                        symbol_table: None,
+                                      ),
+                                    ),
+                                    symbol_table: None,
+                                  ))),
+                                  symbol_table: None,
+                                ),
+                              )),
+                              symbol_table: None,
+                            ),
+                          ),
+                          symbol_table: None,
+                        ),
+                      ],
+                    ),
+                    symbol_table: None,
+                  ),
+                ),
+                symbol_table: None,
+              ),
+              rhs: Node(
+                ast_node: Call(
+                  function: Node(
+                    ast_node: Identifier("foldl"),
+                    symbol_table: None,
+                  ),
+                  arguments: [
+                    Node(
+                      ast_node: FunctionExpression(
+                        id: SymbolId(7),
+                        name: None,
+                        declaration: Node(
+                          ast_node: FunctionDeclaration(FunctionDeclaration(
+                            parameters: [
+                              Node(
+                                ast_node: FunctionParameter(
+                                  id: SymbolId(5),
+                                  pattern: Node(
+                                    ast_node: Identifier("acc"),
+                                    symbol_table: None,
+                                  ),
+                                  type_annotation: None,
+                                ),
+                                symbol_table: None,
+                              ),
+                              Node(
+                                ast_node: FunctionParameter(
+                                  id: SymbolId(6),
+                                  pattern: Node(
+                                    ast_node: Identifier("x"),
+                                    symbol_table: None,
+                                  ),
+                                  type_annotation: None,
+                                ),
+                                symbol_table: None,
+                              ),
+                            ],
+                            guard: None,
+                            return_type_annotation: None,
+                            body: Node(
+                              ast_node: Block([], Some(Node(
+                                ast_node: BinaryOp(
+                                  op: Add,
+                                  lhs: Node(
+                                    ast_node: Identifier("acc"),
+                                    symbol_table: None,
+                                  ),
+                                  rhs: Node(
+                                    ast_node: Identifier("x"),
+                                    symbol_table: None,
+                                  ),
+                                ),
+                                symbol_table: None,
+                              ))),
+                              symbol_table: None,
+                            ),
+                          )),
+                          symbol_table: None,
+                        ),
+                      ),
+                      symbol_table: None,
+                    ),
+                    Node(
+                      ast_node: Literal(Integer(0)),
+                      symbol_table: None,
+                    ),
+                  ],
+                ),
+                symbol_table: None,
+              ),
+            ),
+            symbol_table: None,
+          ),
+          rhs: Node(
+            ast_node: Call(
+              function: Node(
+                ast_node: Identifier("log"),
+                symbol_table: None,
+              ),
+              arguments: [],
+            ),
+            symbol_table: None,
+          ),
+        ),
+        symbol_table: None,
+      )),
+      symbol_table: None,
+    ),
+  ]),
+  symbol_table: None,
+)

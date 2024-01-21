@@ -1,0 +1,42 @@
+---
+source: crates/tlang_parser/tests/parser_pipeline.rs
+expression: "parse!(\"1 |> foo |> bar();\")"
+---
+Node(
+  ast_node: Program([
+    Node(
+      ast_node: ExpressionStatement(Node(
+        ast_node: BinaryOp(
+          op: Pipeline,
+          lhs: Node(
+            ast_node: BinaryOp(
+              op: Pipeline,
+              lhs: Node(
+                ast_node: Literal(Integer(1)),
+                symbol_table: None,
+              ),
+              rhs: Node(
+                ast_node: Identifier("foo"),
+                symbol_table: None,
+              ),
+            ),
+            symbol_table: None,
+          ),
+          rhs: Node(
+            ast_node: Call(
+              function: Node(
+                ast_node: Identifier("bar"),
+                symbol_table: None,
+              ),
+              arguments: [],
+            ),
+            symbol_table: None,
+          ),
+        ),
+        symbol_table: None,
+      )),
+      symbol_table: None,
+    ),
+  ]),
+  symbol_table: None,
+)
