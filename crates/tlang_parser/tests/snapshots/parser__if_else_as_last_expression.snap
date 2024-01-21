@@ -1,0 +1,53 @@
+---
+source: crates/tlang_parser/tests/parser.rs
+expression: "parse!(\"fn main() { if true { 1 } else { 2 } }\")"
+---
+Node(
+  ast_node: Program([
+    Node(
+      ast_node: FunctionSingleDeclaration(
+        id: SymbolId(1),
+        name: Node(
+          ast_node: Identifier("main"),
+          symbol_table: None,
+        ),
+        declaration: Node(
+          ast_node: FunctionDeclaration(FunctionDeclaration(
+            parameters: [],
+            guard: None,
+            return_type_annotation: None,
+            body: Node(
+              ast_node: Block([], Some(Node(
+                ast_node: IfElse(
+                  condition: Node(
+                    ast_node: Literal(Boolean(true)),
+                    symbol_table: None,
+                  ),
+                  then_branch: Node(
+                    ast_node: Block([], Some(Node(
+                      ast_node: Literal(Integer(1)),
+                      symbol_table: None,
+                    ))),
+                    symbol_table: None,
+                  ),
+                  else_branch: Some(Node(
+                    ast_node: Block([], Some(Node(
+                      ast_node: Literal(Integer(2)),
+                      symbol_table: None,
+                    ))),
+                    symbol_table: None,
+                  )),
+                ),
+                symbol_table: None,
+              ))),
+              symbol_table: None,
+            ),
+          )),
+          symbol_table: None,
+        ),
+      ),
+      symbol_table: None,
+    ),
+  ]),
+  symbol_table: None,
+)

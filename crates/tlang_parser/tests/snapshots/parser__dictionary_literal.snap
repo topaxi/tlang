@@ -1,0 +1,39 @@
+---
+source: crates/tlang_parser/tests/parser.rs
+expression: "parse!(r#\"let x = { foo: 1, bar: 2 };\"#)"
+---
+Node(
+  ast_node: Program([
+    Node(
+      ast_node: VariableDeclaration(
+        id: SymbolId(1),
+        pattern: Node(
+          ast_node: Identifier("x"),
+          symbol_table: None,
+        ),
+        expression: Node(
+          ast_node: Dict([
+            (Node(
+              ast_node: Identifier("foo"),
+              symbol_table: None,
+            ), Node(
+              ast_node: Literal(Integer(1)),
+              symbol_table: None,
+            )),
+            (Node(
+              ast_node: Identifier("bar"),
+              symbol_table: None,
+            ), Node(
+              ast_node: Literal(Integer(2)),
+              symbol_table: None,
+            )),
+          ]),
+          symbol_table: None,
+        ),
+        type_annotation: None,
+      ),
+      symbol_table: None,
+    ),
+  ]),
+  symbol_table: None,
+)

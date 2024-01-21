@@ -1,0 +1,70 @@
+---
+source: crates/tlang_parser/tests/parser.rs
+expression: "parse!(\"let x = match 1 { 1 => 2, 3 => 4, _ => 5 };\")"
+---
+Node(
+  ast_node: Program([
+    Node(
+      ast_node: VariableDeclaration(
+        id: SymbolId(1),
+        pattern: Node(
+          ast_node: Identifier("x"),
+          symbol_table: None,
+        ),
+        expression: Node(
+          ast_node: Match(
+            expression: Node(
+              ast_node: Literal(Integer(1)),
+              symbol_table: None,
+            ),
+            arms: [
+              Node(
+                ast_node: MatchArm(
+                  pattern: Node(
+                    ast_node: Literal(Integer(1)),
+                    symbol_table: None,
+                  ),
+                  expression: Node(
+                    ast_node: Literal(Integer(2)),
+                    symbol_table: None,
+                  ),
+                ),
+                symbol_table: None,
+              ),
+              Node(
+                ast_node: MatchArm(
+                  pattern: Node(
+                    ast_node: Literal(Integer(3)),
+                    symbol_table: None,
+                  ),
+                  expression: Node(
+                    ast_node: Literal(Integer(4)),
+                    symbol_table: None,
+                  ),
+                ),
+                symbol_table: None,
+              ),
+              Node(
+                ast_node: MatchArm(
+                  pattern: Node(
+                    ast_node: Wildcard,
+                    symbol_table: None,
+                  ),
+                  expression: Node(
+                    ast_node: Literal(Integer(5)),
+                    symbol_table: None,
+                  ),
+                ),
+                symbol_table: None,
+              ),
+            ],
+          ),
+          symbol_table: None,
+        ),
+        type_annotation: None,
+      ),
+      symbol_table: None,
+    ),
+  ]),
+  symbol_table: None,
+)

@@ -1,0 +1,34 @@
+---
+source: crates/tlang_parser/tests/parser.rs
+expression: "parse!(\"foo.bar.baz;\")"
+---
+Node(
+  ast_node: Program([
+    Node(
+      ast_node: ExpressionStatement(Node(
+        ast_node: FieldExpression(
+          base: Node(
+            ast_node: FieldExpression(
+              base: Node(
+                ast_node: Identifier("foo"),
+                symbol_table: None,
+              ),
+              field: Node(
+                ast_node: Identifier("bar"),
+                symbol_table: None,
+              ),
+            ),
+            symbol_table: None,
+          ),
+          field: Node(
+            ast_node: Identifier("baz"),
+            symbol_table: None,
+          ),
+        ),
+        symbol_table: None,
+      )),
+      symbol_table: None,
+    ),
+  ]),
+  symbol_table: None,
+)

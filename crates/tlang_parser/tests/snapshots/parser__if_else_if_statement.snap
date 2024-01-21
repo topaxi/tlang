@@ -1,0 +1,55 @@
+---
+source: crates/tlang_parser/tests/parser.rs
+expression: "parse!(\"if true { 1; } else if false { 2; }\")"
+---
+Node(
+  ast_node: Program([
+    Node(
+      ast_node: ExpressionStatement(Node(
+        ast_node: IfElse(
+          condition: Node(
+            ast_node: Literal(Boolean(true)),
+            symbol_table: None,
+          ),
+          then_branch: Node(
+            ast_node: Block([
+              Node(
+                ast_node: ExpressionStatement(Node(
+                  ast_node: Literal(Integer(1)),
+                  symbol_table: None,
+                )),
+                symbol_table: None,
+              ),
+            ], None),
+            symbol_table: None,
+          ),
+          else_branch: Some(Node(
+            ast_node: IfElse(
+              condition: Node(
+                ast_node: Literal(Boolean(false)),
+                symbol_table: None,
+              ),
+              then_branch: Node(
+                ast_node: Block([
+                  Node(
+                    ast_node: ExpressionStatement(Node(
+                      ast_node: Literal(Integer(2)),
+                      symbol_table: None,
+                    )),
+                    symbol_table: None,
+                  ),
+                ], None),
+                symbol_table: None,
+              ),
+              else_branch: None,
+            ),
+            symbol_table: None,
+          )),
+        ),
+        symbol_table: None,
+      )),
+      symbol_table: None,
+    ),
+  ]),
+  symbol_table: None,
+)
