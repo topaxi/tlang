@@ -30,7 +30,7 @@ jobs:
             ~/.cargo/.crates.toml
             ~/.cargo/.crates2.json
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-0
-          restore-keys: ${{ runner.os }}-cargo-0
+          restore-keys: ${{ runner.os }}-cargo-
 
       - name: Install rustup-toolchain-install-master
         if: ${{ steps.cache.outputs.cache-hit != 'true' }}
