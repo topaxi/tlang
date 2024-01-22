@@ -65,6 +65,14 @@ impl<'src> Parser<'src> {
         }
     }
 
+    fn create_span_from_current_token(&self) -> Span {
+        Span::from_start_token(self.current_token.as_ref().unwrap())
+    }
+
+    fn end_span_from_previous_token(&self, span: &mut Span) {
+        span.end_by_token(self.previous_token.as_ref().unwrap());
+    }
+
     fn push_unexpected_token_error(&mut self, expected: &str, actual: Option<Token>) {
         self.errors.push(ParseError {
             msg: format!("Expected {}, found {:?}", expected, actual),
@@ -198,7 +206,8 @@ impl<'src> Parser<'src> {
             return (false, None);
         }
 
-        let node = match self.current_token_kind() {
+        let mut span = self.create_span_from_current_token();
+        let mut node = match self.current_token_kind() {
             Some(TokenKind::Let) => self.parse_variable_declaration(),
             Some(TokenKind::Fn) => self.parse_function_declaration(),
             Some(TokenKind::Return) => self.parse_return_statement(),
@@ -208,6 +217,8 @@ impl<'src> Parser<'src> {
             }
             _ => node::new!(ExpressionStatement(Box::new(self.parse_expression()))),
         };
+        self.end_span_from_previous_token(&mut span);
+        node.span = span;
 
         // FunctionDeclaration statements does not need to be terminated with a semicolon.
         match node.ast_node {
@@ -249,18 +260,23 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_single_identifier(&mut self) -> Node {
-        node::new!(Identifier(self.consume_identifier()))
+        // How do we generalize this? Callbacks come to mind, but I'd rather not.
+        // Adding another stack is also not ideal.
+        let mut span = self.create_span_from_current_token();
+        let identifier = self.consume_identifier();
+        self.end_span_from_previous_token(&mut span);
+        node::new!(Identifier(identifier), span)
     }
 
     fn parse_identifier(&mut self) -> Node {
-        let mut span = Span::from_start_token(self.current_token.as_ref().unwrap());
+        let mut span = self.create_span_from_current_token();
         let mut identifiers = vec![self.consume_identifier()];
         while let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
             self.advance();
             identifiers.push(self.consume_identifier());
         }
 
-        span.end_by_token(self.previous_token.as_ref().unwrap());
+        self.end_span_from_previous_token(&mut span);
 
         if identifiers.len() == 1 {
             node::new!(Identifier(identifiers.pop().unwrap()), span)
@@ -344,7 +360,7 @@ impl<'src> Parser<'src> {
         while self.current_token_kind() != Some(TokenKind::RBrace)
             && self.current_token_kind() != Some(TokenKind::Eof)
         {
-            if let (consume_semicolon, Some(statement)) = self.parse_statement() {
+            if let (consume_semicolon, Some(mut statement)) = self.parse_statement() {
                 if may_complete
                     && self.current_token_kind() == Some(TokenKind::RBrace)
                     && matches!(&statement.ast_node, AstNode::ExpressionStatement(_))
@@ -357,11 +373,13 @@ impl<'src> Parser<'src> {
                     break;
                 }
 
-                statements.push(statement);
-
                 if consume_semicolon {
                     self.consume_token(TokenKind::Semicolon);
+                    // TODO: Do we count the semicolon as part of the statement?
+                    self.end_span_from_previous_token(&mut statement.span);
                 }
+
+                statements.push(statement);
             }
         }
 

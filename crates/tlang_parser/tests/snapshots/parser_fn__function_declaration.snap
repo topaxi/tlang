@@ -63,11 +63,11 @@ Node(
                   span: Span(
                     start: LineColumn(
                       line: 0,
-                      column: 0,
+                      column: 11,
                     ),
                     end: LineColumn(
                       line: 0,
-                      column: 0,
+                      column: 17,
                     ),
                   ),
                 ),
@@ -120,11 +120,11 @@ Node(
                   span: Span(
                     start: LineColumn(
                       line: 0,
-                      column: 0,
+                      column: 18,
                     ),
                     end: LineColumn(
                       line: 0,
-                      column: 0,
+                      column: 24,
                     ),
                   ),
                 ),
@@ -163,7 +163,7 @@ Node(
         ),
         end: LineColumn(
           line: 0,
-          column: 0,
+          column: 26,
         ),
       ),
     ),
