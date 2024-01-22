@@ -70,7 +70,7 @@ Node(
                           ),
                           end: LineColumn(
                             line: 0,
-                            column: 0,
+                            column: 7,
                           ),
                         ),
                       ),
@@ -206,12 +206,12 @@ Node(
                               symbol_table: None,
                               span: Span(
                                 start: LineColumn(
-                                  line: 0,
-                                  column: 0,
+                                  line: 1,
+                                  column: 8,
                                 ),
                                 end: LineColumn(
-                                  line: 0,
-                                  column: 0,
+                                  line: 1,
+                                  column: 25,
                                 ),
                               ),
                             ),
@@ -220,12 +220,12 @@ Node(
                         symbol_table: None,
                         span: Span(
                           start: LineColumn(
-                            line: 0,
-                            column: 0,
+                            line: 1,
+                            column: 4,
                           ),
                           end: LineColumn(
-                            line: 0,
-                            column: 0,
+                            line: 1,
+                            column: 26,
                           ),
                         ),
                       ),
@@ -404,12 +404,12 @@ Node(
                           symbol_table: None,
                           span: Span(
                             start: LineColumn(
-                              line: 0,
-                              column: 0,
+                              line: 2,
+                              column: 11,
                             ),
                             end: LineColumn(
-                              line: 0,
-                              column: 0,
+                              line: 2,
+                              column: 32,
                             ),
                           ),
                         ),
@@ -418,12 +418,12 @@ Node(
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
-                        line: 0,
-                        column: 0,
+                        line: 2,
+                        column: 4,
                       ),
                       end: LineColumn(
-                        line: 0,
-                        column: 0,
+                        line: 2,
+                        column: 33,
                       ),
                     ),
                   ),
@@ -603,12 +603,12 @@ Node(
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
-                          line: 0,
-                          column: 0,
+                          line: 3,
+                          column: 10,
                         ),
                         end: LineColumn(
-                          line: 0,
-                          column: 0,
+                          line: 3,
+                          column: 33,
                         ),
                       ),
                     ),
@@ -631,12 +631,12 @@ Node(
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
-                    line: 0,
-                    column: 0,
+                    line: 3,
+                    column: 4,
                   ),
                   end: LineColumn(
-                    line: 0,
-                    column: 0,
+                    line: 3,
+                    column: 37,
                   ),
                 ),
               ),
@@ -674,12 +674,12 @@ Node(
             symbol_table: None,
             span: Span(
               start: LineColumn(
-                line: 0,
-                column: 0,
+                line: 4,
+                column: 4,
               ),
               end: LineColumn(
-                line: 0,
-                column: 0,
+                line: 4,
+                column: 9,
               ),
             ),
           ),

@@ -664,7 +664,8 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_primary_expression(&mut self) -> Node {
-        match &self.current_token_kind() {
+        let mut span = self.create_span_from_current_token();
+        let mut node = match &self.current_token_kind() {
             Some(TokenKind::Minus) => self.parse_unary_expression(),
             Some(TokenKind::LParen) => {
                 self.advance();
@@ -688,20 +689,24 @@ impl<'src> Parser<'src> {
 
                 if let AstNode::Identifier(identifier) = &node.ast_node {
                     if identifier == "_" {
-                        return node::new!(Wildcard);
-                    }
-
-                    if let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
-                        let mut identifiers = vec![identifier.clone()];
-                        while let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
-                            self.advance();
-                            identifiers.push(self.consume_identifier());
+                        node = node::new!(Wildcard);
+                    } else {
+                        if let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
+                            let mut identifiers = vec![identifier.clone()];
+                            while let Some(TokenKind::NamespaceSeparator) =
+                                self.current_token_kind()
+                            {
+                                self.advance();
+                                identifiers.push(self.consume_identifier());
+                            }
+                            node = node::new!(NestedIdentifier(identifiers));
                         }
-                        node = node::new!(NestedIdentifier(identifiers));
-                    }
 
-                    if let Some(TokenKind::LParen | TokenKind::LBrace) = self.current_token_kind() {
-                        return self.parse_call_expression(node);
+                        if let Some(TokenKind::LParen | TokenKind::LBrace) =
+                            self.current_token_kind()
+                        {
+                            node = self.parse_call_expression(node);
+                        }
                     }
                 }
 
@@ -711,7 +716,11 @@ impl<'src> Parser<'src> {
                 self.panic_unexpected_token("primary expression", self.current_token.clone());
                 unreachable!()
             }
-        }
+        };
+
+        self.end_span_from_previous_token(&mut span);
+        node.span = span;
+        node
     }
 
     fn parse_match_expression(&mut self) -> Node {
