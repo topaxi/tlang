@@ -18,6 +18,16 @@ Node(
                       "Some",
                     ]),
                     symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 0,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 0,
+                      ),
+                    ),
                   ),
                   elements: [
                     Node(
@@ -26,33 +36,123 @@ Node(
                         name: "y",
                       ),
                       symbol_table: None,
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 0,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 0,
+                        ),
+                      ),
                     ),
                   ],
                   named_fields: false,
                 ),
                 symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                ),
               ),
               expression: Node(
                 ast_node: Identifier("x"),
                 symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 25,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 26,
+                  ),
+                ),
               ),
               type_annotation: None,
             ),
             symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+            ),
           ),
           then_branch: Node(
             ast_node: Block([], Some(Node(
               ast_node: Identifier("y"),
               symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 1,
+                  column: 5,
+                ),
+                end: LineColumn(
+                  line: 1,
+                  column: 6,
+                ),
+              ),
             ))),
             symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+            ),
           ),
           else_branch: None,
         ),
         symbol_table: None,
+        span: Span(
+          start: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+          end: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+        ),
       )),
       symbol_table: None,
+      span: Span(
+        start: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+      ),
     ),
   ]),
   symbol_table: None,
+  span: Span(
+    start: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+  ),
 )

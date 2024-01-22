@@ -11,27 +11,97 @@ Node(
           lhs: Node(
             ast_node: Literal(Integer(1)),
             symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 1,
+              ),
+            ),
           ),
           rhs: Node(
             ast_node: Call(
               function: Node(
                 ast_node: Identifier("foo"),
                 symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 5,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 8,
+                  ),
+                ),
               ),
               arguments: [
                 Node(
                   ast_node: Literal(Integer(2)),
                   symbol_table: None,
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 9,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 10,
+                    ),
+                  ),
                 ),
               ],
             ),
             symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+            ),
           ),
         ),
         symbol_table: None,
+        span: Span(
+          start: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+          end: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+        ),
       )),
       symbol_table: None,
+      span: Span(
+        start: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+      ),
     ),
   ]),
   symbol_table: None,
+  span: Span(
+    start: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+  ),
 )

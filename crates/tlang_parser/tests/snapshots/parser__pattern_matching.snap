@@ -10,12 +10,32 @@ Node(
         pattern: Node(
           ast_node: Identifier("x"),
           symbol_table: None,
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 0,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 0,
+            ),
+          ),
         ),
         expression: Node(
           ast_node: Match(
             expression: Node(
               ast_node: Literal(Integer(1)),
               symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 14,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 15,
+                ),
+              ),
             ),
             arms: [
               Node(
@@ -23,48 +43,168 @@ Node(
                   pattern: Node(
                     ast_node: Literal(Integer(1)),
                     symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 18,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 19,
+                      ),
+                    ),
                   ),
                   expression: Node(
                     ast_node: Literal(Integer(2)),
                     symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 23,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 24,
+                      ),
+                    ),
                   ),
                 ),
                 symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                ),
               ),
               Node(
                 ast_node: MatchArm(
                   pattern: Node(
                     ast_node: Literal(Integer(3)),
                     symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 26,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 27,
+                      ),
+                    ),
                   ),
                   expression: Node(
                     ast_node: Literal(Integer(4)),
                     symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 31,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 32,
+                      ),
+                    ),
                   ),
                 ),
                 symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                ),
               ),
               Node(
                 ast_node: MatchArm(
                   pattern: Node(
                     ast_node: Wildcard,
                     symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 0,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 0,
+                      ),
+                    ),
                   ),
                   expression: Node(
                     ast_node: Literal(Integer(5)),
                     symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 39,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 40,
+                      ),
+                    ),
                   ),
                 ),
                 symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                ),
               ),
             ],
           ),
           symbol_table: None,
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 0,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 0,
+            ),
+          ),
         ),
         type_annotation: None,
       ),
       symbol_table: None,
+      span: Span(
+        start: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+      ),
     ),
   ]),
   symbol_table: None,
+  span: Span(
+    start: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+  ),
 )

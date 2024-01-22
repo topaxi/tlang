@@ -7,7 +7,27 @@ Node(
     Node(
       ast_node: MultiLineComment(" this is a comment "),
       symbol_table: None,
+      span: Span(
+        start: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end: LineColumn(
+          line: 0,
+          column: 23,
+        ),
+      ),
     ),
   ]),
   symbol_table: None,
+  span: Span(
+    start: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+  ),
 )

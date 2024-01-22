@@ -237,7 +237,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_comment(&mut self) -> Node {
-        let comment: Node = (&self.current_token_kind().unwrap()).into();
+        let comment: Node = self.current_token.as_ref().unwrap().into();
         self.advance();
         comment
     }
@@ -664,8 +664,8 @@ impl<'src> Parser<'src> {
                 node::new!(RecursiveCall(Box::new(self.parse_expression())))
             }
             Some(TokenKind::Match) => self.parse_match_expression(),
-            Some(token) => {
-                let mut node: Node = token.into();
+            Some(_) => {
+                let mut node: Node = self.current_token.as_ref().unwrap().into();
 
                 self.advance();
 
@@ -923,7 +923,7 @@ impl<'src> Parser<'src> {
                 self.current_token_kind(),
                 Some(TokenKind::SingleLineComment(_)) | Some(TokenKind::MultiLineComment(_))
             ) {
-                comments.push(self.current_token_kind().as_ref().unwrap().into());
+                comments.push(self.current_token.as_ref().unwrap().into());
                 self.advance();
             }
 

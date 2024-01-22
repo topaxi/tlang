@@ -10,22 +10,82 @@ Node(
           function: Node(
             ast_node: Identifier("foo"),
             symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 3,
+              ),
+            ),
           ),
           arguments: [
             Node(
               ast_node: Literal(Integer(1)),
               symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 4,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 5,
+                ),
+              ),
             ),
             Node(
               ast_node: Literal(Integer(2)),
               symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 7,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 8,
+                ),
+              ),
             ),
           ],
         ),
         symbol_table: None,
+        span: Span(
+          start: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+          end: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+        ),
       )),
       symbol_table: None,
+      span: Span(
+        start: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+      ),
     ),
   ]),
   symbol_table: None,
+  span: Span(
+    start: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+  ),
 )

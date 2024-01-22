@@ -3,9 +3,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::{
-    // span::Span,
+    span::Span,
     symbols::{SymbolId, SymbolTable},
-    token::{Literal, TokenKind},
+    token::{Literal, Token, TokenKind},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -18,14 +18,15 @@ pub enum Associativity {
 pub struct Node {
     pub ast_node: AstNode,
     pub symbol_table: Option<Rc<RefCell<SymbolTable>>>,
-    // pub span: Span,
+    pub span: Span,
 }
 
 impl Node {
-    pub fn new(ast_node: AstNode) -> Self {
+    pub fn new(ast_node: AstNode, span: Span) -> Self {
         Node {
             ast_node,
             symbol_table: None,
+            span,
         }
     }
 }
@@ -35,15 +36,17 @@ impl From<AstNode> for Node {
         Node {
             ast_node,
             symbol_table: None,
+            span: Span::default(),
         }
     }
 }
 
-impl<'a> From<&'a TokenKind> for Node {
-    fn from(token: &TokenKind) -> Self {
+impl<'a> From<&'a Token> for Node {
+    fn from(token: &Token) -> Self {
         Node {
-            ast_node: AstNode::from(token),
+            ast_node: AstNode::from(&token.kind),
             symbol_table: None,
+            span: Span::from_token(token),
         }
     }
 }
@@ -218,20 +221,41 @@ pub enum BinaryOp {
 macro_rules! new {
     ($node:ident) => {{
         use tlang_ast::node::{Node, AstNode};
+        use tlang_ast::span::Span;
 
-        Node::new(AstNode::$node)
+        Node::new(AstNode::$node, Span::default())
     }};
 
     ($node:ident($( $arg:expr ),* $(,)? )) => {{
         use tlang_ast::node::{Node, AstNode};
+        use tlang_ast::span::Span;
 
-        Node::new(AstNode::$node( $( $arg ),* ))
+        Node::new(AstNode::$node( $( $arg ),* ), Span::default())
     }};
 
     ($node:ident { $( $field:ident : $value:expr ),* $(,)? }) => {{
         use tlang_ast::node::{Node, AstNode};
+        use tlang_ast::span::Span;
 
-        Node::new(AstNode::$node { $( $field : $value ),* })
+        Node::new(AstNode::$node { $( $field : $value ),* }, Span::default())
+    }};
+
+    ($node:ident, $span:expr) => {{
+        use tlang_ast::node::{Node, AstNode};
+
+        Node::new(AstNode::$node, $span)
+    }};
+
+    ($node:ident($( $arg:expr ),* $(,)? ), $span:expr) => {{
+        use tlang_ast::node::{Node, AstNode};
+
+        Node::new(AstNode::$node( $( $arg ),* ), $span)
+    }};
+
+    ($node:ident { $( $field:ident : $value:expr ),* $(,)? }, $span:expr) => {{
+        use tlang_ast::node::{Node, AstNode};
+
+        Node::new(AstNode::$node { $( $field : $value ),* }, $span)
     }};
 }
 

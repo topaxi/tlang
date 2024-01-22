@@ -322,14 +322,14 @@ fn test_token_span() {
     let mut lexer = Lexer::new("let x = 1 + 2;");
 
     let token = lexer.next_token();
-    assert_eq!(token.span.start.line, 1);
-    assert_eq!(token.span.start.column, 1);
-    assert_eq!(token.span.end.line, 1);
-    assert_eq!(token.span.end.column, 4);
+    assert_eq!(token.span.start.line, 0);
+    assert_eq!(token.span.start.column, 0);
+    assert_eq!(token.span.end.line, 0);
+    assert_eq!(token.span.end.column, 3);
 
     let token = lexer.next_token();
-    assert_eq!(token.span.start.line, 1);
-    assert_eq!(token.span.start.column, 5);
-    assert_eq!(token.span.end.line, 1);
-    assert_eq!(token.span.end.column, 6);
+    assert_eq!(token.span.start.line, 0);
+    assert_eq!(token.span.start.column, 4);
+    assert_eq!(token.span.end.line, 0);
+    assert_eq!(token.span.end.column, 5);
 }

@@ -10,28 +10,98 @@ Node(
         pattern: Node(
           ast_node: Identifier("x"),
           symbol_table: None,
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 0,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 0,
+            ),
+          ),
         ),
         expression: Node(
           ast_node: List([
             Node(
               ast_node: Literal(Integer(1)),
               symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 9,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 10,
+                ),
+              ),
             ),
             Node(
               ast_node: Literal(Integer(2)),
               symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 12,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 13,
+                ),
+              ),
             ),
             Node(
               ast_node: Literal(Integer(3)),
               symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 15,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 16,
+                ),
+              ),
             ),
           ]),
           symbol_table: None,
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 0,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 0,
+            ),
+          ),
         ),
         type_annotation: None,
       ),
       symbol_table: None,
+      span: Span(
+        start: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+      ),
     ),
   ]),
   symbol_table: None,
+  span: Span(
+    start: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+  ),
 )

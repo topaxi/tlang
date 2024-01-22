@@ -10,6 +10,16 @@ Node(
           condition: Node(
             ast_node: Literal(Boolean(true)),
             symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 3,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 7,
+              ),
+            ),
           ),
           then_branch: Node(
             ast_node: Block([
@@ -17,11 +27,41 @@ Node(
                 ast_node: ExpressionStatement(Node(
                   ast_node: Literal(Integer(1)),
                   symbol_table: None,
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 10,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 11,
+                    ),
+                  ),
                 )),
                 symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                ),
               ),
             ], None),
             symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+            ),
           ),
           else_branch: Some(Node(
             ast_node: Block([
@@ -29,17 +69,77 @@ Node(
                 ast_node: ExpressionStatement(Node(
                   ast_node: Literal(Integer(2)),
                   symbol_table: None,
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 22,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 23,
+                    ),
+                  ),
                 )),
                 symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                ),
               ),
             ], None),
             symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+            ),
           )),
         ),
         symbol_table: None,
+        span: Span(
+          start: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+          end: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+        ),
       )),
       symbol_table: None,
+      span: Span(
+        start: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+      ),
     ),
   ]),
   symbol_table: None,
+  span: Span(
+    start: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+  ),
 )

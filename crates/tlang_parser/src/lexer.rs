@@ -17,8 +17,8 @@ impl Lexer<'_> {
         Lexer {
             source,
             position: 0,
-            current_line: 1,
-            current_column: 1,
+            current_line: 0,
+            current_column: 0,
             current_token: None,
         }
     }

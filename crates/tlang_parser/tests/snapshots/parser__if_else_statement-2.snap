@@ -13,13 +13,43 @@ Node(
               lhs: Node(
                 ast_node: Literal(Integer(1)),
                 symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 4,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 5,
+                  ),
+                ),
               ),
               rhs: Node(
                 ast_node: Literal(Integer(2)),
                 symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 8,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 9,
+                  ),
+                ),
               ),
             ),
             symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+            ),
           ),
           then_branch: Node(
             ast_node: Block([
@@ -30,18 +60,68 @@ Node(
                     lhs: Node(
                       ast_node: Literal(Integer(3)),
                       symbol_table: None,
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 13,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 14,
+                        ),
+                      ),
                     ),
                     rhs: Node(
                       ast_node: Literal(Integer(4)),
                       symbol_table: None,
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 17,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 18,
+                        ),
+                      ),
                     ),
                   ),
                   symbol_table: None,
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                  ),
                 )),
                 symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                ),
               ),
             ], None),
             symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+            ),
           ),
           else_branch: Some(Node(
             ast_node: Block([
@@ -52,24 +132,104 @@ Node(
                     lhs: Node(
                       ast_node: Literal(Integer(5)),
                       symbol_table: None,
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 29,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 30,
+                        ),
+                      ),
                     ),
                     rhs: Node(
                       ast_node: Literal(Integer(6)),
                       symbol_table: None,
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 33,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 34,
+                        ),
+                      ),
                     ),
                   ),
                   symbol_table: None,
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                  ),
                 )),
                 symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                ),
               ),
             ], None),
             symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+            ),
           )),
         ),
         symbol_table: None,
+        span: Span(
+          start: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+          end: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+        ),
       )),
       symbol_table: None,
+      span: Span(
+        start: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+      ),
     ),
   ]),
   symbol_table: None,
+  span: Span(
+    start: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+  ),
 )
