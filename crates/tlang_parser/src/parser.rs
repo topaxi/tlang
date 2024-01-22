@@ -1,6 +1,7 @@
 use tlang_ast::node::{
     self, Associativity, AstNode, BinaryOp, FunctionDeclaration, Node, OperatorInfo, UnaryOp,
 };
+use tlang_ast::span::Span;
 use tlang_ast::symbols::SymbolId;
 use tlang_ast::token::{Token, TokenKind};
 
@@ -10,6 +11,7 @@ use log::debug;
 
 pub struct Parser<'src> {
     lexer: Lexer<'src>,
+    previous_token: Option<Token>,
     current_token: Option<Token>,
     next_token: Option<Token>,
 
@@ -27,6 +29,7 @@ impl<'src> Parser<'src> {
     pub fn new(lexer: Lexer<'src>) -> Parser {
         Parser {
             lexer,
+            previous_token: None,
             current_token: None,
             next_token: None,
             unique_id: SymbolId::new(0),
@@ -153,6 +156,7 @@ impl<'src> Parser<'src> {
             return;
         }
 
+        self.previous_token = self.current_token.clone();
         self.current_token = self.next_token.clone();
         self.current_column = self.lexer.current_column();
         self.current_line = self.lexer.current_line();
@@ -249,16 +253,19 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_identifier(&mut self) -> Node {
+        let mut span = Span::from_start_token(self.current_token.as_ref().unwrap());
         let mut identifiers = vec![self.consume_identifier()];
         while let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
             self.advance();
             identifiers.push(self.consume_identifier());
         }
 
+        span.end_by_token(self.previous_token.as_ref().unwrap());
+
         if identifiers.len() == 1 {
-            node::new!(Identifier(identifiers.pop().unwrap()))
+            node::new!(Identifier(identifiers.pop().unwrap()), span)
         } else {
-            node::new!(NestedIdentifier(identifiers))
+            node::new!(NestedIdentifier(identifiers), span)
         }
     }
 
