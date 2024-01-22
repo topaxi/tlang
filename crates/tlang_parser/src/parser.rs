@@ -73,13 +73,8 @@ impl<'src> Parser<'src> {
     fn panic_unexpected_token(&self, expected: &str, actual: Option<Token>) {
         let token = actual.as_ref().unwrap();
         let start_span = &token.span.start;
-        let source_line = self
-            .lexer
-            .source()
-            .lines()
-            .nth(start_span.line - 1)
-            .unwrap();
-        let caret = " ".repeat(start_span.column - 1) + "^";
+        let source_line = self.lexer.source().lines().nth(start_span.line).unwrap();
+        let caret = " ".repeat(start_span.column) + "^";
 
         panic!(
             "Expected {} on line {}, column {}, found {:?} instead\n{}\n{}",
@@ -89,16 +84,13 @@ impl<'src> Parser<'src> {
 
     fn panic_unexpected_node(&self, expected: &str, actual: Option<Node>) {
         let node = actual.as_ref().unwrap();
-        // Node does not have a span yet.
-        // let start_span = token.span.start;
-        let line = self.current_line;
-        let column = self.current_column;
-        let source_line = self.lexer.source().lines().nth(line - 1).unwrap();
-        let caret = " ".repeat(column - 1) + "^";
+        let start_span = &node.span.start;
+        let source_line = self.lexer.source().lines().nth(start_span.line).unwrap();
+        let caret = " ".repeat(start_span.column) + "^";
 
         panic!(
             "Expected {} on line {}, column {}, found {:?} instead\n{}\n{}",
-            expected, line, column, node.ast_node, source_line, caret
+            expected, start_span.line, start_span.column, node.ast_node, source_line, caret
         );
     }
 
