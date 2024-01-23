@@ -1186,6 +1186,7 @@ impl<'src> Parser<'src> {
         precedence: u8,
         associativity: Associativity,
     ) -> Node {
+        let mut span = self.create_span_from_current_token();
         let mut lhs = self.parse_primary_expression();
 
         loop {
@@ -1239,6 +1240,15 @@ impl<'src> Parser<'src> {
                 }
                 _ => break,
             }
+        }
+
+        // TODO: We might want to refactor this into a more explicit and
+        //       generic way of handling spans.
+        // If we have overwritten lhs and the new node has not assigned a span,
+        // we end the span here.
+        if lhs.span == Span::default() {
+            self.end_span_from_previous_token(&mut span);
+            lhs.span = span;
         }
 
         lhs
