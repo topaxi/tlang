@@ -77,7 +77,7 @@ impl SemanticAnalyzer {
         self.declaration_analyzer.analyze(ast);
     }
 
-    fn mark_as_used_by_name(&mut self, name: &str) {
+    fn mark_as_used_by_name(&mut self, name: &str, node: &Node) {
         let symbol_info = self.get_last_symbol_table().borrow().get_by_name(name);
 
         if let Some(symbol_info) = symbol_info {
@@ -99,11 +99,13 @@ impl SemanticAnalyzer {
                         name, suggestion.symbol_type, suggestion.name
                     ),
                     Severity::Error,
+                    node.span.clone(),
                 ));
             } else {
                 self.diagnostics.push(Diagnostic::new(
                     format!("Use of undeclared variable `{}`", name),
                     Severity::Error,
+                    node.span.clone(),
                 ));
             }
         }
@@ -182,10 +184,10 @@ impl SemanticAnalyzer {
                 self.analyze_optional_node(else_branch);
             }
             AstNode::Identifier(_) if self.identifier_is_declaration => {}
-            AstNode::Identifier(name) => self.mark_as_used_by_name(name),
+            AstNode::Identifier(name) => self.mark_as_used_by_name(name, ast),
             AstNode::NestedIdentifier(idents) => {
                 if let Some(first_ident) = idents.first() {
-                    self.mark_as_used_by_name(first_ident);
+                    self.mark_as_used_by_name(first_ident, ast);
                 }
 
                 // TODO: Handle nested identifiers
@@ -272,6 +274,8 @@ impl SemanticAnalyzer {
                         unused_symbol.symbol_type, unused_symbol.name, unused_symbol.name
                     ),
                     Severity::Warning,
+                    // TODO: Properly track and find definition of symbol
+                    ast.span.clone()
                 ));
             }
 

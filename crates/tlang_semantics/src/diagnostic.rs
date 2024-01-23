@@ -1,5 +1,7 @@
 use std::fmt::{Display, Formatter};
 
+use tlang_ast::span::Span;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Severity {
     Error,
@@ -20,16 +22,16 @@ pub struct Diagnostic {
     /// The message to display to the user.
     message: String,
     /// The location of the error.
-    //span: Span,
+    span: Span,
     /// The severity of the error.
     severity: Severity,
 }
 
 impl Diagnostic {
-    pub fn new(message: String, severity: Severity) -> Self {
+    pub fn new(message: String, severity: Severity, span: Span) -> Self {
         Diagnostic {
             message,
-            // span,
+            span,
             severity,
         }
     }
@@ -51,9 +53,10 @@ impl Display for Diagnostic {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(
             f,
-            "{}: {}",
+            "{}: {} on line {}",
             self.severity.to_string().to_uppercase(),
-            self.message
+            self.message,
+            self.span.start.line
         )
     }
 }

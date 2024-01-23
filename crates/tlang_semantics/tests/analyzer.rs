@@ -2,6 +2,7 @@ use indoc::indoc;
 use pretty_assertions::assert_eq;
 use tlang_ast::{
     node::AstNode,
+    span::{LineColumn, Span},
     symbols::{SymbolId, SymbolInfo, SymbolType},
 };
 use tlang_parser::parser::Parser;
@@ -40,7 +41,11 @@ fn test_should_error_on_undefined_symbol() {
         diagnostics,
         vec![Diagnostic::new(
             "Use of undeclared variable `a`".to_string(),
-            Severity::Error
+            Severity::Error,
+            Span::new(
+                LineColumn { line: 0, column: 0 },
+                LineColumn { line: 0, column: 1 }
+            ),
         )]
     );
 }
@@ -53,7 +58,11 @@ fn test_should_error_on_undefined_symbol_in_variable_declaration() {
         diagnostics[..1],
         vec![Diagnostic::new(
             "Use of undeclared variable `b`".to_string(),
-            Severity::Error
+            Severity::Error,
+            Span::new(
+                LineColumn { line: 1, column: 8 },
+                LineColumn { line: 1, column: 9 }
+            ),
         )]
     );
 }
@@ -66,7 +75,11 @@ fn test_should_error_on_undefined_function() {
         diagnostics,
         vec![Diagnostic::new(
             "Use of undeclared variable `b`".to_string(),
-            Severity::Error
+            Severity::Error,
+            Span::new(
+                LineColumn { line: 1, column: 0 },
+                LineColumn { line: 1, column: 1 }
+            ),
         )]
     );
 }
@@ -79,7 +92,11 @@ fn test_should_error_on_self_referencing_symbol() {
         diagnostics[..1],
         vec![Diagnostic::new(
             "Use of undeclared variable `a`".to_string(),
-            Severity::Error
+            Severity::Error,
+            Span::new(
+                LineColumn { line: 0, column: 8 },
+                LineColumn { line: 0, column: 9 }
+            ),
         )]
     );
 }
@@ -162,7 +179,17 @@ fn test_should_error_on_unused_identifier_in_function_definition() {
         diagnostics[..1],
         vec![Diagnostic::new(
             "Use of undeclared variable `c`, did you mean the parameter `a`".to_string(),
-            Severity::Error
+            Severity::Error,
+            Span::new(
+                LineColumn {
+                    line: 1,
+                    column: 12
+                },
+                LineColumn {
+                    line: 1,
+                    column: 13
+                }
+            ),
         )]
     );
 }
@@ -265,9 +292,17 @@ fn should_warn_about_unused_variables() {
         vec![
             // TODO: Might be nicer to have them report in order. This currently happens
             //       due to us reinserting variables in the beginning of the symbol table.
-            Diagnostic::new("Unused variable `b`, if this is intentional, prefix the name with an underscore: `_b`".to_string(), Severity::Warning),
-            Diagnostic::new("Unused variable `a`, if this is intentional, prefix the name with an underscore: `_a`".to_string(), Severity::Warning),
-        ]
+            Diagnostic::new(
+                "Unused variable `b`, if this is intentional, prefix the name with an underscore: `_b`".to_string(),
+                Severity::Warning,
+                Span::new(LineColumn { line: 1, column: 8 }, LineColumn { line: 1, column: 9 }),
+            ),
+            Diagnostic::new(
+                "Unused variable `a`, if this is intentional, prefix the name with an underscore: `_a`".to_string(),
+                Severity::Warning,
+                Span::new(LineColumn { line: 0, column: 8 }, LineColumn { line: 0, column: 9 }),
+            ),
+        ],
     );
 }
 
@@ -281,10 +316,25 @@ fn should_warn_about_unused_function_and_parameters() {
     assert_eq!(
         diagnostics,
         vec![
-            Diagnostic::new("Unused variable `c`, if this is intentional, prefix the name with an underscore: `_c`".to_string(), Severity::Warning),
-            Diagnostic::new("Unused parameter `a`, if this is intentional, prefix the name with an underscore: `_a`".to_string(), Severity::Warning),
-            Diagnostic::new("Unused parameter `b`, if this is intentional, prefix the name with an underscore: `_b`".to_string(), Severity::Warning),
-            Diagnostic::new("Unused function `add`, if this is intentional, prefix the name with an underscore: `_add`".to_string(), Severity::Warning),
+            Diagnostic::new(
+                "Unused variable `c`, if this is intentional, prefix the name with an underscore: `_c`".to_string(), Severity::Warning,
+                Span::new(LineColumn { line: 0, column: 12 }, LineColumn { line: 0, column: 13 }),
+            ),
+            Diagnostic::new(
+                "Unused parameter `a`, if this is intentional, prefix the name with an underscore: `_a`".to_string(),
+                Severity::Warning,
+                Span::new(LineColumn { line: 0, column: 8 }, LineColumn { line: 0, column: 9 }),
+            ),
+            Diagnostic::new(
+                "Unused parameter `b`, if this is intentional, prefix the name with an underscore: `_b`".to_string(),
+                Severity::Warning,
+                Span::new(LineColumn { line: 0, column: 11 }, LineColumn { line: 0, column: 12 }),
+            ),
+            Diagnostic::new(
+                "Unused function `add`, if this is intentional, prefix the name with an underscore: `_add`".to_string(),
+                Severity::Warning,
+                Span::new(LineColumn { line: 0, column: 3 }, LineColumn { line: 0, column: 6 }),
+            ),
         ]
     );
 }
