@@ -274,8 +274,7 @@ impl SemanticAnalyzer {
                         unused_symbol.symbol_type, unused_symbol.name, unused_symbol.name
                     ),
                     Severity::Warning,
-                    // TODO: Properly track and find definition of symbol
-                    ast.span.clone()
+                    unused_symbol.defined_at.clone().unwrap_or_else(|| ast.span.clone()).clone()
                 ));
             }
 

@@ -60,6 +60,7 @@ impl DeclarationAnalyzer {
                     SymbolId::new(0), // Builtins have ID 0 for now.
                     name,
                     symbol_type.clone(),
+                    None,
                 ));
         }
     }
@@ -85,7 +86,12 @@ impl DeclarationAnalyzer {
                 self.collect_block_declarations(node, nodes, return_value)
             }
             AstNode::IdentifierPattern { id, name } => {
-                self.collect_identifier_pattern(*id, name);
+                self.declare_symbol(SymbolInfo::new(
+                    *id,
+                    name,
+                    SymbolType::Variable,
+                    Some(node.span.clone()),
+                ));
             }
             AstNode::VariableDeclaration {
                 id,
@@ -119,7 +125,12 @@ impl DeclarationAnalyzer {
                 node.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
                 if let Some(name) = name.as_ref() {
                     let name_as_str = self.fn_identifier_to_string(name);
-                    self.declare_symbol(SymbolInfo::new(*id, &name_as_str, SymbolType::Function));
+                    self.declare_symbol(SymbolInfo::new(
+                        *id,
+                        &name_as_str,
+                        SymbolType::Function,
+                        Some(name.span.clone()),
+                    ));
                 }
 
                 self.collect_declarations(declaration);
@@ -183,7 +194,12 @@ impl DeclarationAnalyzer {
                 self.collect_declarations(index);
             }
             AstNode::EnumDeclaration { id, name, variants } => {
-                self.declare_symbol(SymbolInfo::new(*id, name, SymbolType::Enum));
+                self.declare_symbol(SymbolInfo::new(
+                    *id,
+                    name,
+                    SymbolType::Enum,
+                    Some(node.span.clone()),
+                ));
 
                 for variant in variants {
                     self.collect_declarations(variant);
@@ -259,7 +275,12 @@ impl DeclarationAnalyzer {
 
         match pattern.ast_node {
             AstNode::Identifier(ref name) => {
-                self.declare_symbol(SymbolInfo::new(id, name, SymbolType::Variable));
+                self.declare_symbol(SymbolInfo::new(
+                    id,
+                    name,
+                    SymbolType::Variable,
+                    Some(pattern.span.clone()),
+                ));
             }
             AstNode::ListPattern(_) => self.collect_declarations(pattern),
             AstNode::EnumPattern { .. } => self.collect_declarations(pattern),
@@ -311,7 +332,12 @@ impl DeclarationAnalyzer {
     ) {
         let name_as_str = self.fn_identifier_to_string(name);
 
-        self.declare_symbol(SymbolInfo::new(id, &name_as_str, SymbolType::Function));
+        self.declare_symbol(SymbolInfo::new(
+            id,
+            &name_as_str,
+            SymbolType::Function,
+            Some(name.span.clone()),
+        ));
 
         // Function arguments have their own scope.
         node.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
@@ -328,7 +354,12 @@ impl DeclarationAnalyzer {
         declarations: &mut [Node],
     ) {
         let name_as_str = self.fn_identifier_to_string(name);
-        self.declare_symbol(SymbolInfo::new(id, &name_as_str, SymbolType::Function));
+        self.declare_symbol(SymbolInfo::new(
+            id,
+            &name_as_str,
+            SymbolType::Function,
+            Some(name.span.clone()),
+        ));
 
         for declaration_node in declarations {
             node.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
@@ -337,14 +368,15 @@ impl DeclarationAnalyzer {
         }
     }
 
-    fn collect_identifier_pattern(&mut self, id: SymbolId, name: &str) {
-        self.declare_symbol(SymbolInfo::new(id, name, SymbolType::Variable));
-    }
-
     fn collect_function_parameter(&mut self, _node: &mut Node, id: SymbolId, pattern: &mut Node) {
         match pattern.ast_node {
             AstNode::Identifier(ref name) => {
-                self.declare_symbol(SymbolInfo::new(id, name, SymbolType::Parameter));
+                self.declare_symbol(SymbolInfo::new(
+                    id,
+                    name,
+                    SymbolType::Parameter,
+                    Some(pattern.span.clone()),
+                ));
             }
             AstNode::IdentifierPattern { .. } => self.collect_declarations(pattern),
             AstNode::ListPattern(_) => self.collect_declarations(pattern),

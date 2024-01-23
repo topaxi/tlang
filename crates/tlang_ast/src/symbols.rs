@@ -3,6 +3,8 @@ use std::cell::RefCell;
 use std::fmt::Display;
 use std::rc::Rc;
 
+use crate::span::Span;
+
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub enum SymbolType {
     Variable,
@@ -42,6 +44,7 @@ pub struct SymbolInfo {
     pub id: SymbolId,
     pub name: String,
     pub symbol_type: SymbolType,
+    pub defined_at: Option<Span>,
     pub used: bool,
 }
 
@@ -51,17 +54,24 @@ impl Default for SymbolInfo {
             id: SymbolId::new(0),
             name: "".to_string(),
             symbol_type: SymbolType::Variable,
+            defined_at: None,
             used: false,
         }
     }
 }
 
 impl SymbolInfo {
-    pub fn new(id: SymbolId, name: &str, symbol_type: SymbolType) -> Self {
+    pub fn new(
+        id: SymbolId,
+        name: &str,
+        symbol_type: SymbolType,
+        defined_at: Option<Span>,
+    ) -> Self {
         SymbolInfo {
             id,
             name: name.to_string(),
             symbol_type,
+            defined_at,
             ..Default::default()
         }
     }

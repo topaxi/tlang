@@ -47,9 +47,7 @@ export class TCodeMirror extends LitElement {
           severity: d.severity,
           from: d.from,
           to: d.to,
-        }))
-        // TODO: Use of undeclared variable spans are not correct and span the whole block.
-        .filter((d: Diagnostic) => d.message.startsWith('Use of undeclared'));
+        }));
 
       return diagnostics;
     });

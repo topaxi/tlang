@@ -82,12 +82,12 @@ Node(
           symbol_table: None,
           span: Span(
             start: LineColumn(
-              line: 0,
-              column: 0,
+              line: 4,
+              column: 5,
             ),
             end: LineColumn(
-              line: 0,
-              column: 0,
+              line: 4,
+              column: 6,
             ),
           ),
         ),

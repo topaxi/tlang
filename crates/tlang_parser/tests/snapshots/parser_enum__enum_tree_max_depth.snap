@@ -111,12 +111,12 @@ Node(
           symbol_table: None,
           span: Span(
             start: LineColumn(
-              line: 0,
-              column: 0,
+              line: 6,
+              column: 4,
             ),
             end: LineColumn(
-              line: 0,
-              column: 0,
+              line: 6,
+              column: 17,
             ),
           ),
         ),
@@ -167,12 +167,12 @@ Node(
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
-                          line: 0,
-                          column: 0,
+                          line: 5,
+                          column: 18,
                         ),
                         end: LineColumn(
-                          line: 0,
-                          column: 0,
+                          line: 5,
+                          column: 31,
                         ),
                       ),
                     ),
@@ -299,12 +299,12 @@ Node(
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
-                          line: 0,
-                          column: 0,
+                          line: 6,
+                          column: 18,
                         ),
                         end: LineColumn(
-                          line: 0,
-                          column: 0,
+                          line: 6,
+                          column: 44,
                         ),
                       ),
                     ),
@@ -524,12 +524,12 @@ Node(
           symbol_table: None,
           span: Span(
             start: LineColumn(
-              line: 0,
-              column: 0,
+              line: 8,
+              column: 4,
             ),
             end: LineColumn(
-              line: 0,
-              column: 0,
+              line: 8,
+              column: 8,
             ),
           ),
         ),
@@ -548,12 +548,12 @@ Node(
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
-                          line: 0,
-                          column: 0,
+                          line: 9,
+                          column: 9,
                         ),
                         end: LineColumn(
-                          line: 0,
-                          column: 0,
+                          line: 9,
+                          column: 10,
                         ),
                       ),
                     ),

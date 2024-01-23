@@ -406,7 +406,8 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_variable_declaration_pattern(&mut self) -> Node {
-        match self.current_token_kind() {
+        let mut span = self.create_span_from_current_token();
+        let mut node = match self.current_token_kind() {
             // Literal values will be pattern matched
             Some(TokenKind::Literal(_)) => self.parse_primary_expression(),
             Some(TokenKind::Identifier(ref identifier)) if identifier == "_" => {
@@ -432,7 +433,11 @@ impl<'src> Parser<'src> {
                 );
                 unreachable!()
             }
-        }
+        };
+
+        self.end_span_from_previous_token(&mut span);
+        node.span = span;
+        node
     }
 
     fn parse_variable_declaration(&mut self) -> Node {
@@ -608,9 +613,10 @@ impl<'src> Parser<'src> {
 
     /// Can be a Identifier, NestedIdentifier or FieldExpression with a single field name.
     fn parse_function_name(&mut self) -> Node {
+        let mut span = self.create_span_from_current_token();
         let mut identifiers = vec![self.consume_identifier()];
 
-        if let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
+        let mut node = if let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
             while let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
                 self.advance();
                 identifiers.push(self.consume_identifier());
@@ -625,7 +631,11 @@ impl<'src> Parser<'src> {
             })
         } else {
             node::new!(Identifier(identifiers.pop().unwrap()))
-        }
+        };
+
+        self.end_span_from_previous_token(&mut span);
+        node.span = span;
+        node
     }
 
     fn parse_if_else_expression(&mut self) -> Node {
