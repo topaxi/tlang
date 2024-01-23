@@ -1,6 +1,6 @@
 import { EditorView, basicSetup } from 'codemirror';
 import { EditorState } from '@codemirror/state';
-import { linter } from "@codemirror/lint"
+import { linter, lintGutter } from "@codemirror/lint"
 import { catppuccin } from 'codemirror-theme-catppuccin';
 import { tlangLanguageSupport } from 'codemirror-lang-tlang';
 import { javascript } from '@codemirror/lang-javascript';
@@ -58,7 +58,7 @@ export class TCodeMirror extends LitElement {
         catppuccin('macchiato'),
         this.language === 'javascript' ? javascript() : tlangLanguageSupport(),
         this.readonly ? EditorState.readOnly.of(true) : updateListener,
-        ...(this.language === 'tlang' ? [tlangLint] : []),
+        ...(this.language === 'tlang' ? [tlangLint, lintGutter()] : []),
       ],
       parent: this.shadowRoot as DocumentFragment,
     });
