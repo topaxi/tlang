@@ -59,7 +59,6 @@ function filter(...args) {
             return [x, ...filter(xs, f)];
         } else if (args[0].length >= 1) {
             let f = args[1];
-            let x = args[0][0];
             let xs = args[0].slice(1);
             let $tmp$b = xs;
             let $tmp$c = f;
@@ -128,7 +127,6 @@ function filter_map(...args) {
             return [$tmp$b, ...filter_map(xs, f)];
         } else if (args[0].length >= 1) {
             let f = args[1];
-            let x = args[0][0];
             let xs = args[0].slice(1);
             let $tmp$b = xs;
             let $tmp$c = f;

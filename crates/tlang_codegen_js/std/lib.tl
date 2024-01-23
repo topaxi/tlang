@@ -27,7 +27,7 @@ fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
 // filter(a[], fn(a) -> bool) -> a[]
 fn filter([], _) { [] }
 fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
-fn filter([x, ...xs], f) { rec filter(xs, f) }
+fn filter([_, ...xs], f) { rec filter(xs, f) }
 
 // partition(a[], fn(a) -> bool) -> (a[], a[])
 fn partition([], _) { [[], []] }
@@ -44,7 +44,7 @@ fn partition([x, ...xs], predicate, satisfies, does_not_satisfy) {
 // filter_map(a[], fn(a) -> Option(b)) -> b[]
 fn filter_map([], _) { [] }
 fn filter_map([x, ...xs], f) if let Option::Some(y) = f(x) { [y, ...filter_map(xs, f)] }
-fn filter_map([x, ...xs], f) { rec filter_map(xs, f) }
+fn filter_map([_, ...xs], f) { rec filter_map(xs, f) }
 
 // foldl(a[], b, fn(b, a) -> b) -> b
 fn foldl([], acc, _) { acc }
