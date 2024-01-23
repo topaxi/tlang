@@ -1174,7 +1174,11 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_expression(&mut self) -> Node {
-        self.parse_expression_with_precedence(0, Associativity::Left)
+        let mut span = self.create_span_from_current_token();
+        let mut node = self.parse_expression_with_precedence(0, Associativity::Left);
+        self.end_span_from_previous_token(&mut span);
+        node.span = span;
+        node
     }
 
     fn parse_expression_with_precedence(
