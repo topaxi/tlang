@@ -183,11 +183,11 @@ fn test_should_error_on_unused_identifier_in_function_definition() {
             Span::new(
                 LineColumn {
                     line: 1,
-                    column: 12
+                    column: 13
                 },
                 LineColumn {
                     line: 1,
-                    column: 13
+                    column: 14
                 }
             ),
         )]
