@@ -1,6 +1,8 @@
 use indoc::indoc;
+use pretty_assertions::assert_eq;
 use tlang_ast::{
     node::AstNode,
+    span::{LineColumn, Span},
     symbols::{SymbolId, SymbolInfo, SymbolType},
 };
 use tlang_parser::parser::Parser;
@@ -29,6 +31,10 @@ fn test_analyze_variable_declaration() {
             id: SymbolId::new(1),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
+            defined_at: Some(Span::new(
+                LineColumn { line: 0, column: 4 },
+                LineColumn { line: 0, column: 5 }
+            )),
             ..Default::default()
         })
     );
@@ -59,6 +65,16 @@ fn test_block_scope() {
             id: SymbolId::new(1),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
+            defined_at: Some(Span::new(
+                LineColumn {
+                    line: 1,
+                    column: 13
+                },
+                LineColumn {
+                    line: 1,
+                    column: 14
+                }
+            )),
             ..Default::default()
         })
     );
@@ -87,6 +103,16 @@ fn test_block_scope() {
             id: SymbolId::new(1),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
+            defined_at: Some(Span::new(
+                LineColumn {
+                    line: 1,
+                    column: 13
+                },
+                LineColumn {
+                    line: 1,
+                    column: 14
+                }
+            )),
             ..Default::default()
         })
     );
@@ -96,6 +122,16 @@ fn test_block_scope() {
             id: SymbolId::new(2),
             name: "b".to_string(),
             symbol_type: SymbolType::Variable,
+            defined_at: Some(Span::new(
+                LineColumn {
+                    line: 3,
+                    column: 17
+                },
+                LineColumn {
+                    line: 3,
+                    column: 18
+                }
+            )),
             ..Default::default()
         })
     );
@@ -123,6 +159,16 @@ fn test_block_scope() {
             id: SymbolId::new(1),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
+            defined_at: Some(Span::new(
+                LineColumn {
+                    line: 1,
+                    column: 13
+                },
+                LineColumn {
+                    line: 1,
+                    column: 14
+                }
+            )),
             ..Default::default()
         })
     );
@@ -132,6 +178,16 @@ fn test_block_scope() {
             id: SymbolId::new(2),
             name: "b".to_string(),
             symbol_type: SymbolType::Variable,
+            defined_at: Some(Span::new(
+                LineColumn {
+                    line: 3,
+                    column: 17
+                },
+                LineColumn {
+                    line: 3,
+                    column: 18
+                }
+            )),
             ..Default::default()
         })
     );
@@ -141,6 +197,16 @@ fn test_block_scope() {
             id: SymbolId::new(3),
             name: "c".to_string(),
             symbol_type: SymbolType::Variable,
+            defined_at: Some(Span::new(
+                LineColumn {
+                    line: 5,
+                    column: 21
+                },
+                LineColumn {
+                    line: 5,
+                    column: 22
+                }
+            )),
             ..Default::default()
         })
     );
@@ -165,6 +231,10 @@ fn test_should_collect_function_definitions() {
             id: SymbolId::new(3),
             name: "add".to_string(),
             symbol_type: SymbolType::Function,
+            defined_at: Some(Span::new(
+                LineColumn { line: 0, column: 3 },
+                LineColumn { line: 0, column: 6 }
+            )),
             ..Default::default()
         })
     );
@@ -189,6 +259,10 @@ fn test_should_collect_list_destructuring_symbols_in_function_arguments() {
             id: SymbolId::new(4),
             name: "add".to_string(),
             symbol_type: SymbolType::Function,
+            defined_at: Some(Span::new(
+                LineColumn { line: 0, column: 3 },
+                LineColumn { line: 0, column: 6 }
+            )),
             ..Default::default()
         })
     );
@@ -213,6 +287,10 @@ fn test_should_collect_list_destructuring_with_rest_symbols_in_function_argument
             id: SymbolId::new(4),
             name: "sum".to_string(),
             symbol_type: SymbolType::Function,
+            defined_at: Some(Span::new(
+                LineColumn { line: 0, column: 3 },
+                LineColumn { line: 0, column: 6 }
+            )),
             used: true,
             ..Default::default()
         })
@@ -237,6 +315,13 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
             id: SymbolId::new(5),
             name: "factorial".to_string(),
             symbol_type: SymbolType::Function,
+            defined_at: Some(Span::new(
+                LineColumn { line: 1, column: 4 },
+                LineColumn {
+                    line: 1,
+                    column: 13
+                }
+            )),
             used: true,
             ..Default::default()
         })
@@ -266,6 +351,13 @@ fn should_collect_function_arguments_with_enum_extraction() {
             id: SymbolId::new(5),
             name: "unwrap".to_string(),
             symbol_type: SymbolType::Function,
+            defined_at: Some(Span::new(
+                LineColumn { line: 6, column: 4 },
+                LineColumn {
+                    line: 6,
+                    column: 10
+                }
+            )),
             ..Default::default()
         })
     );
