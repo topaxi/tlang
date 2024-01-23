@@ -475,12 +475,15 @@ impl<'src> Parser<'src> {
             arguments.push(self.parse_block_or_dict());
         } else {
             self.consume_token(TokenKind::LParen);
+            let mut is_first_argument = true;
             while self.current_token_kind() != Some(TokenKind::RParen) {
-                arguments.push(self.parse_expression());
-
-                if let Some(TokenKind::Comma) = self.current_token_kind() {
-                    self.advance();
+                if !is_first_argument {
+                    self.consume_token(TokenKind::Comma);
+                } else {
+                    is_first_argument = false;
                 }
+
+                arguments.push(self.parse_expression());
             }
 
             self.consume_token(TokenKind::RParen);
@@ -767,8 +770,9 @@ impl<'src> Parser<'src> {
             while self.current_token_kind() != Some(TokenKind::RParen) {
                 if !is_first_parameter {
                     self.consume_token(TokenKind::Comma);
+                } else {
+                    is_first_parameter = false;
                 }
-                is_first_parameter = false;
 
                 let parameter = self.parse_variable_declaration_pattern();
 

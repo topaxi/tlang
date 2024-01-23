@@ -36,6 +36,12 @@ fn test_simple_call() {
 }
 
 #[test]
+#[should_panic]
+fn test_call_list_mandatory_comma() {
+    assert_parses!("foo(1 2);");
+}
+
+#[test]
 fn test_nested_call() {
     assert_parser_snapshot!("foo(bar(1), 2);");
 }

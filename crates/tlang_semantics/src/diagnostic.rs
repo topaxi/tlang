@@ -53,10 +53,11 @@ impl Display for Diagnostic {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(
             f,
-            "{}: {} on line {}",
+            "{}: {} on {}:{}",
             self.severity.to_string().to_uppercase(),
             self.message,
-            self.span.start.line
+            self.span.start.line + 1,
+            self.span.start.column + 1
         )
     }
 }
