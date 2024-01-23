@@ -39,11 +39,11 @@ Node(
                       span: Span(
                         start: LineColumn(
                           line: 0,
-                          column: 0,
+                          column: 20,
                         ),
                         end: LineColumn(
                           line: 0,
-                          column: 0,
+                          column: 21,
                         ),
                       ),
                     ),

@@ -502,16 +502,21 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_identifier_pattern(&mut self) -> Node {
+        let mut span = self.create_span_from_current_token();
         let name = self.consume_identifier();
 
-        if name == "_" {
-            return node::new!(Wildcard);
-        }
+        let mut node = if name == "_" {
+            node::new!(Wildcard)
+        } else {
+            node::new!(IdentifierPattern {
+                id: self.unique_id(),
+                name: name,
+            })
+        };
 
-        node::new!(IdentifierPattern {
-            id: self.unique_id(),
-            name: name,
-        })
+        self.end_span_from_previous_token(&mut span);
+        node.span = span;
+        node
     }
 
     fn parse_list_extraction(&mut self) -> Node {
@@ -784,7 +789,8 @@ impl<'src> Parser<'src> {
                     is_first_parameter = false;
                 }
 
-                let parameter = self.parse_variable_declaration_pattern();
+                let mut parameter_span = self.create_span_from_current_token();
+                let parameter_pattern = self.parse_variable_declaration_pattern();
 
                 let type_annotation = match self.current_token_kind() {
                     Some(TokenKind::Colon) => {
@@ -794,12 +800,16 @@ impl<'src> Parser<'src> {
                     _ => None,
                 };
 
-                log::debug!("Parsed parameter: {:?}", parameter);
-                parameters.push(node::new!(FunctionParameter {
-                    id: self.unique_id(),
-                    pattern: Box::new(parameter),
-                    type_annotation: Box::new(type_annotation),
-                }));
+                self.end_span_from_previous_token(&mut parameter_span);
+
+                parameters.push(node::new!(
+                    FunctionParameter {
+                        id: self.unique_id(),
+                        pattern: Box::new(parameter_pattern),
+                        type_annotation: Box::new(type_annotation),
+                    },
+                    parameter_span
+                ));
             }
             self.consume_token(TokenKind::RParen);
         }
@@ -867,6 +877,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_function_expression(&mut self) -> Node {
+        let mut span = self.create_span_from_current_token();
         self.consume_token(TokenKind::Fn);
         let name = if let Some(TokenKind::Identifier(_)) = &self.current_token_kind() {
             Some(self.parse_single_identifier())
@@ -878,16 +889,21 @@ impl<'src> Parser<'src> {
         let return_type = self.parse_return_type();
         let body = self.parse_block();
 
-        node::new!(FunctionExpression {
-            id: self.unique_id(),
-            name: Box::new(name),
-            declaration: Box::new(node::new!(FunctionDeclaration(FunctionDeclaration {
-                parameters,
-                guard: Box::new(None),
-                body: Box::new(body),
-                return_type_annotation: Box::new(return_type),
-            }))),
-        })
+        self.end_span_from_previous_token(&mut span);
+
+        node::new!(
+            FunctionExpression {
+                id: self.unique_id(),
+                name: Box::new(name),
+                declaration: Box::new(node::new!(FunctionDeclaration(FunctionDeclaration {
+                    parameters,
+                    guard: Box::new(None),
+                    body: Box::new(body),
+                    return_type_annotation: Box::new(return_type),
+                }))),
+            },
+            span
+        )
     }
 
     /// Parses an enum extraction, e.g. `Foo(bar, baz)` and `Foo { bar, baz }` within
