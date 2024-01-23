@@ -1,6 +1,6 @@
 import { EditorView, basicSetup } from 'codemirror';
 import { EditorState } from '@codemirror/state';
-import { linter, Diagnostic, setDiagnostics } from "@codemirror/lint"
+import { linter } from "@codemirror/lint"
 import { catppuccin } from 'codemirror-theme-catppuccin';
 import { tlangLanguageSupport } from 'codemirror-lang-tlang';
 import { javascript } from '@codemirror/lang-javascript';
