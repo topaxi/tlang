@@ -40,6 +40,14 @@ impl Diagnostic {
         &self.message
     }
 
+    pub fn severity(&self) -> &Severity {
+        &self.severity
+    }
+
+    pub fn span(&self) -> &Span {
+        &self.span
+    }
+
     pub fn is_error(&self) -> bool {
         self.severity == Severity::Error
     }

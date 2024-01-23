@@ -177,9 +177,9 @@ export class TlangPlayground extends LitElement {
   private compile(source: string) {
     let parser = new TlangCompiler(source);
     parser.compile();
-    let { output, parseErrors, ast, diagnostics } = parser;
+    let { output, parseErrors, ast, diagnostics, codemirrorDiagnostics } = parser;
     parser.free();
-    return { output, parseErrors, ast, diagnostics };
+    return { output, parseErrors, ast, diagnostics, codemirrorDiagnostics };
   }
 
   run() {
@@ -229,11 +229,11 @@ export class TlangPlayground extends LitElement {
     if (changedProperties.has('source')) {
       try {
         this.error = '';
-        let { output, parseErrors, ast, diagnostics } = this.compile(
+        let { output, parseErrors, ast, diagnostics, codemirrorDiagnostics } = this.compile(
           this.source,
         );
 
-        console.log({ output, parseErrors, ast, diagnostics });
+        this.codemirror.diagnostics = codemirrorDiagnostics;
 
         let diagnosticsErrors = diagnostics.filter((diagnostic) =>
           diagnostic.startsWith('ERROR:'),
@@ -293,8 +293,8 @@ export class TlangPlayground extends LitElement {
     return html`
       <div class="log-message">
         ${typeof args === 'string'
-          ? args
-          : args.map((arg) => JSON.stringify(arg)).join(', ')}
+        ? args
+        : args.map((arg) => JSON.stringify(arg)).join(', ')}
       </div>
     `;
   }
@@ -309,8 +309,8 @@ export class TlangPlayground extends LitElement {
         </select>
         <select
           @change=${(event: Event) =>
-            (this.display = (event.target as HTMLSelectElement)
-              .value as typeof this.display)}
+      (this.display = (event.target as HTMLSelectElement)
+        .value as typeof this.display)}
         >
           <option value="output">code</option>
           <option value="ast">ast</option>
@@ -324,16 +324,16 @@ export class TlangPlayground extends LitElement {
       </div>
       <div class="output">
         ${this.display === 'ast'
-          ? html`<pre class="output-ast">${this.ast}</pre>`
-          : ''}
+        ? html`<pre class="output-ast">${this.ast}</pre>`
+        : ''}
         ${this.display === 'output'
-          ? html`<t-codemirror
+        ? html`<t-codemirror
               class="output-code"
               language="javascript"
               .source=${this.output}
               readonly
             ></t-codemirror>`
-          : ''}
+        : ''}
         ${this.error ? html`<pre class="output-error">${this.error}</pre>` : ''}
       </div>
       <div class="console">

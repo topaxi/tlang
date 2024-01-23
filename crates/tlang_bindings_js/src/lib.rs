@@ -7,6 +7,8 @@ use tlang_parser::{error::ParseError, parser::Parser};
 use tlang_semantics::{diagnostic::Diagnostic, SemanticAnalyzer};
 use wasm_bindgen::prelude::*;
 
+pub mod codemirror;
+
 #[wasm_bindgen]
 pub struct TlangCompiler {
     source: String,
@@ -89,14 +91,28 @@ impl TlangCompiler {
         format!("{:#?}", self.ast)
     }
 
-    #[wasm_bindgen(getter)]
-    pub fn diagnostics(&self) -> Vec<String> {
+    #[wasm_bindgen(getter, js_name = "diagnostics")]
+    pub fn diagnostic_messages(&self) -> Vec<String> {
         self.diagnostics.iter().map(|d| d.to_string()).collect()
     }
 
     #[wasm_bindgen(getter, js_name = "parseErrors")]
-    pub fn parse_errors(&self) -> Vec<String> {
+    pub fn parse_error_messages(&self) -> Vec<String> {
         self.parse_errors.iter().map(|e| e.to_string()).collect()
+    }
+
+    #[wasm_bindgen(getter, js_name = "codemirrorDiagnostics")]
+    pub fn codemirror_diagnostics(&self) -> Vec<codemirror::CodemirrorDiagnostic> {
+        let parse_errors = self
+            .parse_errors
+            .iter()
+            .map(|e| codemirror::from_parse_error(&self.source, e));
+        let diagnostics = self
+            .diagnostics
+            .iter()
+            .map(|d| codemirror::from_tlang_diagnostic(&self.source, d));
+
+        parse_errors.chain(diagnostics).collect()
     }
 
     #[wasm_bindgen(getter, js_name = "standardLibrarySource")]
