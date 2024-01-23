@@ -33,12 +33,12 @@ Node(
             symbol_table: None,
             span: Span(
               start: LineColumn(
-                line: 0,
-                column: 0,
+                line: 1,
+                column: 5,
               ),
               end: LineColumn(
-                line: 0,
-                column: 0,
+                line: 1,
+                column: 16,
               ),
             ),
           ),
@@ -80,12 +80,12 @@ Node(
             symbol_table: None,
             span: Span(
               start: LineColumn(
-                line: 0,
-                column: 0,
+                line: 2,
+                column: 5,
               ),
               end: LineColumn(
-                line: 0,
-                column: 0,
+                line: 2,
+                column: 25,
               ),
             ),
           ),
@@ -468,12 +468,12 @@ Node(
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
-                      line: 0,
-                      column: 0,
+                      line: 6,
+                      column: 48,
                     ),
                     end: LineColumn(
-                      line: 0,
-                      column: 0,
+                      line: 6,
+                      column: 98,
                     ),
                   ),
                 ))),

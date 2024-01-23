@@ -307,9 +307,10 @@ impl<'src> Parser<'src> {
     /// Parses an enum variant, e.g. `Foo`, `Foo(1, 2, 3)` and
     /// `Foo { bar, baz }`.
     fn parse_enum_variant(&mut self) -> Node {
+        let mut span = self.create_span_from_current_token();
         let name = self.consume_identifier();
         log::debug!("Parsing enum variant {}", name);
-        match self.current_token_kind() {
+        let mut node: Node = match self.current_token_kind() {
             Some(TokenKind::LParen) => {
                 self.advance();
                 let mut parameters = Vec::new();
@@ -350,7 +351,11 @@ impl<'src> Parser<'src> {
                 parameters: Vec::new(),
             }
             .into(),
-        }
+        };
+
+        self.end_span_from_previous_token(&mut span);
+        node.span = span;
+        node
     }
 
     fn parse_statements(&mut self, may_complete: bool) -> (Vec<Node>, Box<Option<Node>>) {
@@ -365,10 +370,12 @@ impl<'src> Parser<'src> {
                     && self.current_token_kind() == Some(TokenKind::RBrace)
                     && matches!(&statement.ast_node, AstNode::ExpressionStatement(_))
                 {
-                    let expression = match statement.ast_node {
+                    let mut expression = match statement.ast_node {
                         AstNode::ExpressionStatement(expr) => expr,
                         _ => unreachable!(),
                     };
+                    self.end_span_from_previous_token(&mut statement.span);
+                    expression.span = statement.span;
                     completion_expression = Box::new(Some(*expression));
                     break;
                 }
