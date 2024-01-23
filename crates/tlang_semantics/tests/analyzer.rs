@@ -60,8 +60,8 @@ fn test_should_error_on_undefined_symbol_in_variable_declaration() {
             "Use of undeclared variable `b`".to_string(),
             Severity::Error,
             Span::new(
-                LineColumn { line: 1, column: 8 },
-                LineColumn { line: 1, column: 9 }
+                LineColumn { line: 0, column: 8 },
+                LineColumn { line: 0, column: 9 }
             ),
         )]
     );
@@ -77,8 +77,8 @@ fn test_should_error_on_undefined_function() {
             "Use of undeclared variable `b`".to_string(),
             Severity::Error,
             Span::new(
-                LineColumn { line: 1, column: 0 },
-                LineColumn { line: 1, column: 1 }
+                LineColumn { line: 0, column: 0 },
+                LineColumn { line: 0, column: 1 }
             ),
         )]
     );
@@ -119,6 +119,10 @@ fn test_should_allow_shadowing_of_single_variable() {
             id: SymbolId::new(1),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
+            defined_at: Some(Span::new(
+                LineColumn { line: 0, column: 4 },
+                LineColumn { line: 0, column: 5 }
+            )),
             ..Default::default()
         })
     );
@@ -128,6 +132,10 @@ fn test_should_allow_shadowing_of_single_variable() {
             id: SymbolId::new(2),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
+            defined_at: Some(Span::new(
+                LineColumn { line: 1, column: 5 },
+                LineColumn { line: 1, column: 6 }
+            )),
             ..Default::default()
         })
     );
@@ -151,6 +159,10 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
             id: SymbolId::new(1),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
+            defined_at: Some(Span::new(
+                LineColumn { line: 0, column: 4 },
+                LineColumn { line: 0, column: 5 }
+            )),
             used: true,
             ..Default::default()
         })
@@ -161,6 +173,10 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
             id: SymbolId::new(2),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
+            defined_at: Some(Span::new(
+                LineColumn { line: 1, column: 5 },
+                LineColumn { line: 1, column: 6 }
+            )),
             used: false,
             ..Default::default()
         })
@@ -215,6 +231,10 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
             id: SymbolId::new(3),
             name: "add".to_string(),
             symbol_type: SymbolType::Function,
+            defined_at: Some(Span::new(
+                LineColumn { line: 0, column: 3 },
+                LineColumn { line: 0, column: 6 }
+            )),
             ..Default::default()
         })
     );
@@ -248,6 +268,10 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
             id: SymbolId::new(4),
             name: "c".to_string(),
             symbol_type: SymbolType::Variable,
+            defined_at: Some(Span::new(
+                LineColumn { line: 4, column: 5 },
+                LineColumn { line: 4, column: 6 }
+            )),
             used: true,
             ..Default::default()
         })
@@ -266,6 +290,10 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
             id: SymbolId::new(4),
             name: "c".to_string(),
             symbol_type: SymbolType::Variable,
+            defined_at: Some(Span::new(
+                LineColumn { line: 4, column: 5 },
+                LineColumn { line: 4, column: 6 }
+            )),
             used: true,
             ..Default::default()
         })
@@ -295,12 +323,12 @@ fn should_warn_about_unused_variables() {
             Diagnostic::new(
                 "Unused variable `b`, if this is intentional, prefix the name with an underscore: `_b`".to_string(),
                 Severity::Warning,
-                Span::new(LineColumn { line: 1, column: 8 }, LineColumn { line: 1, column: 9 }),
+                Span::new(LineColumn { line: 1, column: 5 }, LineColumn { line: 1, column: 6 }),
             ),
             Diagnostic::new(
                 "Unused variable `a`, if this is intentional, prefix the name with an underscore: `_a`".to_string(),
                 Severity::Warning,
-                Span::new(LineColumn { line: 0, column: 8 }, LineColumn { line: 0, column: 9 }),
+                Span::new(LineColumn { line: 0, column: 4 }, LineColumn { line: 0, column: 5 }),
             ),
         ],
     );
@@ -318,17 +346,17 @@ fn should_warn_about_unused_function_and_parameters() {
         vec![
             Diagnostic::new(
                 "Unused variable `c`, if this is intentional, prefix the name with an underscore: `_c`".to_string(), Severity::Warning,
-                Span::new(LineColumn { line: 0, column: 12 }, LineColumn { line: 0, column: 13 }),
+                Span::new(LineColumn { line: 1, column: 9 }, LineColumn { line: 1, column: 10 }),
             ),
             Diagnostic::new(
                 "Unused parameter `a`, if this is intentional, prefix the name with an underscore: `_a`".to_string(),
                 Severity::Warning,
-                Span::new(LineColumn { line: 0, column: 8 }, LineColumn { line: 0, column: 9 }),
+                Span::new(LineColumn { line: 0, column: 7 }, LineColumn { line: 0, column: 8 }),
             ),
             Diagnostic::new(
                 "Unused parameter `b`, if this is intentional, prefix the name with an underscore: `_b`".to_string(),
                 Severity::Warning,
-                Span::new(LineColumn { line: 0, column: 11 }, LineColumn { line: 0, column: 12 }),
+                Span::new(LineColumn { line: 0, column: 10 }, LineColumn { line: 0, column: 11 }),
             ),
             Diagnostic::new(
                 "Unused function `add`, if this is intentional, prefix the name with an underscore: `_add`".to_string(),
