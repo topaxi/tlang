@@ -108,7 +108,7 @@ export class TlangPlayground extends LitElement {
       overflow: hidden;
     }
 
-    @media (min-width: 760px) {
+    @media (min-width: 1000px) {
       .output {
         padding-left: 1ch;
         border-left: 1px solid var(--ctp-macchiato-surface0);
