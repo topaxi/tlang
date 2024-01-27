@@ -24,8 +24,18 @@ command = "wasm-bindgen"
 args = ["--target", "web", "../../target/wasm32-unknown-unknown/release/tlang_bindings_js.wasm", "--out-dir", "wasm"]
 
 [tasks.wasm-opt-prepare]
+linux_alias = "wasm-opt-prepare-unix"
+mac_alias = "wasm-opt-prepare-unix"
+windows_alias = "wasm-opt-prepare-win32"
+
+[tasks.wasm-opt-prepare-unix]
 command = "mv"
 args = ["wasm/tlang_bindings_js_bg.wasm", "wasm/tlang_bindings_js_bg.unoptimized.wasm"]
+
+[tasks.wasm-opt-prepare-win32]
+script_runner = "powershell"
+script_extension = "ps1"
+script = "mv -force wasm/tlang_bindings_js_bg.wasm wasm/tlang_bindings_js_bg.unoptimized.wasm"
 
 [tasks.wasm-opt]
 command = "wasm-opt"
@@ -33,8 +43,18 @@ args = ["-Oz", "-o", "wasm/tlang_bindings_js_bg.wasm", "wasm/tlang_bindings_js_b
 dependencies = ["wasm-opt-prepare"]
 
 [tasks.wasm-opt-cleanup]
+linux_alias = "wasm-opt-cleanup-unix"
+mac_alias = "wasm-opt-cleanup-unix"
+windows_alias = "wasm-opt-cleanup-win32"
+
+[tasks.wasm-opt-cleanup-unix]
 command = "rm"
 args = ["wasm/tlang_bindings_js_bg.unoptimized.wasm"]
+
+[tasks.wasm-opt-cleanup-win32]
+script_runner = "powershell"
+script_extension = "ps1"
+script = "rm wasm/tlang_bindings_js_bg.unoptimized.wasm"
 
 [tasks.custom-default]
 dependencies = ["build", "wasm-bindgen", "wasm-opt", "wasm-opt-cleanup"]
