@@ -1008,8 +1008,8 @@ impl<'src> Parser<'src> {
                 let node = self.parse_function_name();
 
                 if name.is_some()
-                    && self.identifier_to_string(name.as_ref().unwrap())
-                        != self.identifier_to_string(&node)
+                    && self.fn_name_identifier_to_string(name.as_ref().unwrap())
+                        != self.fn_name_identifier_to_string(&node)
                 {
                     // Not the same identifier, stop parsing function declarations and rewind the
                     // lexer.
@@ -1292,20 +1292,20 @@ impl<'src> Parser<'src> {
         lhs
     }
 
-    fn identifier_to_string(&self, identifier: &Node) -> String {
+    fn fn_name_identifier_to_string(&self, identifier: &Node) -> String {
         match &identifier.ast_node {
             AstNode::Identifier(identifier) => identifier.clone(),
             AstNode::NestedIdentifier(identifiers) => identifiers.join("::"),
             AstNode::FieldExpression { base, field } => {
                 format!(
                     "{}.{}",
-                    self.identifier_to_string(base),
-                    self.identifier_to_string(field)
+                    self.fn_name_identifier_to_string(base),
+                    self.fn_name_identifier_to_string(field)
                 )
             }
             _ => {
                 self.panic_unexpected_node(
-                    "identifier or nested identifier",
+                    "identifier, nested identifier or field expression",
                     Some(identifier.clone()),
                 );
                 unreachable!()
