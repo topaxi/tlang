@@ -79,6 +79,15 @@ pub enum TokenKind {
     Eof,
 }
 
+impl TokenKind {
+    pub fn get_identifier(&self) -> Option<&String> {
+        match self {
+            TokenKind::Identifier(identifier) => Some(identifier),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub enum Literal {
     Boolean(bool),

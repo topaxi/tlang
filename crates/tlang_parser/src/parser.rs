@@ -9,6 +9,44 @@ use crate::error::{ParseError, ParseErrorKind};
 use crate::lexer::Lexer;
 use log::debug;
 
+macro_rules! expect_token_matches {
+    ($parser:ident, $pattern:pat $(if $guard:expr)? $(,)?) => {
+        match $parser.current_token_kind().as_ref() {
+            Some($pattern) $(if $guard)? => (),
+            _ => {
+                $parser.push_unexpected_token_error(
+                    &format!("{:?}", stringify!($pattern)),
+                    $parser.current_token.clone(),
+                );
+                advance_until!($parser, $pattern);
+            }
+        }
+    };
+    ($parser:ident, $message:expr, $pattern:pat $(if $guard:expr)? $(,)?) => {
+        match $parser.current_token_kind().as_ref() {
+            Some($pattern) $(if $guard)? => (),
+            _ => {
+                $parser.push_unexpected_token_error(
+                    $message,
+                    $parser.current_token.clone(),
+                );
+                advance_until!($parser, $pattern);
+            }
+        }
+    };
+}
+
+macro_rules! advance_until {
+    ($parser:ident, $pattern:pat) => {
+        while let Some(token) = $parser.current_token.as_ref() {
+            if matches!(&token.kind, $pattern) {
+                break;
+            }
+            $parser.advance();
+        }
+    };
+}
+
 pub struct Parser<'src> {
     lexer: Lexer<'src>,
     previous_token: Option<Token>,
@@ -106,18 +144,7 @@ impl<'src> Parser<'src> {
     }
 
     fn expect_token(&mut self, expected: TokenKind) {
-        let actual = self.current_token.as_ref().unwrap();
-        if actual.kind != expected {
-            self.push_unexpected_token_error(&format!("{:?}", expected), Some(actual.clone()));
-
-            while let Some(token) = self.current_token.as_ref() {
-                if token.kind == expected {
-                    break;
-                }
-
-                self.advance();
-            }
-        }
+        expect_token_matches!(self, _kind if *_kind == expected);
     }
 
     fn consume_token(&mut self, expected: TokenKind) {
@@ -126,29 +153,17 @@ impl<'src> Parser<'src> {
     }
 
     fn consume_identifier(&mut self) -> String {
-        let actual = self.current_token.as_ref().unwrap();
-        match &actual.kind {
-            TokenKind::Identifier(name) => {
-                let name = name.clone();
-                self.advance();
-                name
-            }
-            _ => {
-                self.push_unexpected_token_error("identifier", Some(actual.clone()));
-
-                while let Some(token) = self.current_token.as_ref() {
-                    if let TokenKind::Identifier(name) = &token.kind {
-                        let name = name.clone();
-                        self.advance();
-                        return name;
-                    }
-
-                    self.advance();
-                }
-
-                unreachable!()
-            }
-        }
+        expect_token_matches!(self, TokenKind::Identifier(_));
+        let identifier = self
+            .current_token
+            .as_ref()
+            .unwrap()
+            .kind
+            .get_identifier()
+            .unwrap()
+            .to_owned();
+        self.advance();
+        identifier
     }
 
     fn advance(&mut self) {
@@ -393,7 +408,13 @@ impl<'src> Parser<'src> {
                             name: Box::new(Some(*name)),
                             declaration: declaration,
                         })),
-                        _ => unreachable!(),
+                        _ => {
+                            self.panic_unexpected_node(
+                                "expression statement or function declaration",
+                                Some(statement),
+                            );
+                            unreachable!()
+                        }
                     };
                     self.end_span_from_previous_token(&mut statement.span);
                     expression.span = statement.span;
@@ -427,6 +448,12 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_variable_declaration_pattern(&mut self) -> Node {
+        expect_token_matches!(
+            self,
+            "literal, identifier or list extraction",
+            TokenKind::Literal(_) | TokenKind::Identifier(_) | TokenKind::LBracket
+        );
+
         let mut span = self.create_span_from_current_token();
         let mut node = match self.current_token_kind() {
             // Literal values will be pattern matched
@@ -447,13 +474,7 @@ impl<'src> Parser<'src> {
                 }
             }
             Some(TokenKind::LBracket) => self.parse_list_extraction(),
-            _ => {
-                self.panic_unexpected_token(
-                    "literal, identifier or list extraction",
-                    self.current_token.clone(),
-                );
-                unreachable!()
-            }
+            _ => unreachable!("Expected pattern, found {:?}", self.current_token_kind()),
         };
 
         self.end_span_from_previous_token(&mut span);
@@ -550,6 +571,15 @@ impl<'src> Parser<'src> {
         let mut elements = Vec::new();
         // Only allow literal values, identifiers and and rest params for now.
         while self.current_token_kind() != Some(TokenKind::RBracket) {
+            expect_token_matches!(
+                self,
+                "identifier, literal or rest parameter",
+                TokenKind::Identifier(_)
+                    | TokenKind::Literal(_)
+                    | TokenKind::DotDotDot
+                    | TokenKind::LBracket
+            );
+
             let element = match self.current_token_kind() {
                 Some(TokenKind::Identifier(_)) => self.parse_identifier_pattern(),
                 Some(TokenKind::Literal(_) | TokenKind::LBracket) => {
@@ -562,13 +592,7 @@ impl<'src> Parser<'src> {
                         Box::new(self.parse_identifier_pattern())
                     ))
                 }
-                _ => {
-                    self.panic_unexpected_token(
-                        "identifier, literal or rest parameter",
-                        self.current_token.clone(),
-                    );
-                    unreachable!()
-                }
+                _ => unreachable!("Expected identifier, literal or rest parameter"),
             };
 
             elements.push(element);
@@ -714,6 +738,21 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_primary_expression(&mut self) -> Node {
+        expect_token_matches!(
+            self,
+            "primary expression",
+            TokenKind::Minus
+                | TokenKind::LParen
+                | TokenKind::LBrace
+                | TokenKind::LBracket
+                | TokenKind::If
+                | TokenKind::Fn
+                | TokenKind::Rec
+                | TokenKind::Match
+                | TokenKind::Identifier(_)
+                | TokenKind::Literal(_)
+        );
+
         let mut span = self.create_span_from_current_token();
         let mut node = match &self.current_token_kind() {
             Some(TokenKind::Minus) => self.parse_unary_expression(),
@@ -762,10 +801,7 @@ impl<'src> Parser<'src> {
 
                 node
             }
-            _ => {
-                self.panic_unexpected_token("primary expression", self.current_token.clone());
-                unreachable!()
-            }
+            _ => unreachable!("Expected primary expression"),
         };
 
         self.end_span_from_previous_token(&mut span);
@@ -859,6 +895,8 @@ impl<'src> Parser<'src> {
             return None;
         }
 
+        expect_token_matches!(self, "type annotation", TokenKind::Identifier(_));
+
         match token {
             TokenKind::Identifier(_) => {
                 let identifier = self.parse_identifier();
@@ -869,7 +907,7 @@ impl<'src> Parser<'src> {
                     parameters: parameters,
                 }))
             }
-            _ => panic!("Expected type annotation, found {:?}", token),
+            _ => unreachable!("Expected type annotation, found {:?}", token),
         }
     }
 
@@ -1051,6 +1089,7 @@ impl<'src> Parser<'src> {
                         // Stop parsing function declarations and rewind the lexer and panic.
                         self.restore_state(saved_state);
                         self.panic_unexpected_token("identifier", self.current_token.clone());
+                        unreachable!();
                     }
                 }
             }
@@ -1080,7 +1119,7 @@ impl<'src> Parser<'src> {
                     declaration: Box::new(declaration)
                 });
             } else {
-                unreachable!();
+                unreachable!("Expected function declaration, found {:?}", declaration);
             }
         }
 
