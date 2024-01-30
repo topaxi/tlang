@@ -36,6 +36,11 @@ fn test_simple_call() {
 }
 
 #[test]
+fn test_call_trailing_comma() {
+    assert_parses!("foo(1, 2,);");
+}
+
+#[test]
 #[should_panic]
 fn test_call_list_mandatory_comma() {
     assert_parses!("foo(1 2);");

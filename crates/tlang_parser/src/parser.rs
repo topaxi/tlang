@@ -488,6 +488,10 @@ impl<'src> Parser<'src> {
                     is_first_argument = false;
                 }
 
+                if self.current_token_kind() == Some(TokenKind::RParen) {
+                    break;
+                }
+
                 arguments.push(self.parse_expression());
             }
 
