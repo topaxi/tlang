@@ -260,7 +260,8 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_single_identifier(&mut self) -> Node {
-        // How do we generalize this? Callbacks come to mind, but I'd rather not.
+        // How do we generalize this span handling?
+        // Callbacks come to mind, but I'd rather not.
         // Adding another stack is also not ideal.
         let mut span = self.create_span_from_current_token();
         let identifier = self.consume_identifier();
@@ -315,7 +316,7 @@ impl<'src> Parser<'src> {
                 self.advance();
                 let mut parameters = Vec::new();
                 while self.current_token_kind() != Some(TokenKind::RParen) {
-                    parameters.push(node::new!(Identifier(self.consume_identifier())));
+                    parameters.push(self.parse_single_identifier());
                     if let Some(TokenKind::Comma) = self.current_token_kind() {
                         self.advance();
                     }
@@ -332,7 +333,7 @@ impl<'src> Parser<'src> {
                 self.advance();
                 let mut parameters = Vec::new();
                 while self.current_token_kind() != Some(TokenKind::RBrace) {
-                    parameters.push(node::new!(Identifier(self.consume_identifier())));
+                    parameters.push(self.parse_single_identifier());
                     if let Some(TokenKind::Comma) = self.current_token_kind() {
                         self.advance();
                     }
@@ -422,7 +423,7 @@ impl<'src> Parser<'src> {
                 } else if let Some(TokenKind::LParen | TokenKind::LBrace) = self.peek_token_kind() {
                     self.parse_enum_extraction()
                 } else {
-                    node::new!(Identifier(self.consume_identifier()))
+                    self.parse_single_identifier()
                 }
             }
             Some(TokenKind::LBracket) => self.parse_list_extraction(),
@@ -636,7 +637,7 @@ impl<'src> Parser<'src> {
             self.advance();
             node::new!(FieldExpression {
                 base: Box::new(node::new!(Identifier(identifiers.pop().unwrap()))),
-                field: Box::new(node::new!(Identifier(self.consume_identifier()))),
+                field: Box::new(self.parse_single_identifier()),
             })
         } else {
             node::new!(Identifier(identifiers.pop().unwrap()))
@@ -1006,7 +1007,10 @@ impl<'src> Parser<'src> {
             if let Some(TokenKind::Identifier(_)) = self.current_token_kind() {
                 let node = self.parse_function_name();
 
-                if name.is_some() && name.as_ref().unwrap().ast_node != node.ast_node {
+                if name.is_some()
+                    && self.identifier_to_string(name.as_ref().unwrap())
+                        != self.identifier_to_string(&node)
+                {
                     // Not the same identifier, stop parsing function declarations and rewind the
                     // lexer.
                     self.restore_state(saved_state);
@@ -1286,5 +1290,26 @@ impl<'src> Parser<'src> {
         }
 
         lhs
+    }
+
+    fn identifier_to_string(&self, identifier: &Node) -> String {
+        match &identifier.ast_node {
+            AstNode::Identifier(identifier) => identifier.clone(),
+            AstNode::NestedIdentifier(identifiers) => identifiers.join("::"),
+            AstNode::FieldExpression { base, field } => {
+                format!(
+                    "{}.{}",
+                    self.identifier_to_string(base),
+                    self.identifier_to_string(field)
+                )
+            }
+            _ => {
+                self.panic_unexpected_node(
+                    "identifier or nested identifier",
+                    Some(identifier.clone()),
+                );
+                unreachable!()
+            }
+        }
     }
 }
