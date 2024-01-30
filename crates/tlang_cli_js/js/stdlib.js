@@ -31,7 +31,6 @@ function random_int(max) {
 }
 // compose(fn(a) -> b, fn(b) -> c) -> fn(a) -> c
 function compose(f, g) {
-// FIXME: Function expression in completion position
     return function(x) {
         return f(g(x));
     };

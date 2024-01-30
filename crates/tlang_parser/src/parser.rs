@@ -209,7 +209,13 @@ impl<'src> Parser<'src> {
         let mut span = self.create_span_from_current_token();
         let mut node = match self.current_token_kind() {
             Some(TokenKind::Let) => self.parse_variable_declaration(),
-            Some(TokenKind::Fn) => self.parse_function_declaration(),
+            Some(TokenKind::Fn)
+                // If the next token is an identifier, we assume a function declaration.
+                // If it's not, we assume a function expression which is handled as a primary expression.
+                if matches!(self.peek_token_kind(), Some(TokenKind::Identifier(_))) =>
+            {
+                self.parse_function_declaration()
+            }
             Some(TokenKind::Return) => self.parse_return_statement(),
             Some(TokenKind::Enum) => self.parse_enum_declaration(),
             Some(TokenKind::SingleLineComment(_) | TokenKind::MultiLineComment(_)) => {
@@ -369,10 +375,24 @@ impl<'src> Parser<'src> {
             if let (consume_semicolon, Some(mut statement)) = self.parse_statement() {
                 if may_complete
                     && self.current_token_kind() == Some(TokenKind::RBrace)
-                    && matches!(&statement.ast_node, AstNode::ExpressionStatement(_))
+                    && matches!(
+                        &statement.ast_node,
+                        AstNode::ExpressionStatement(_) | AstNode::FunctionSingleDeclaration { .. }
+                    )
                 {
                     let mut expression = match statement.ast_node {
                         AstNode::ExpressionStatement(expr) => expr,
+                        // Function declaration as completion expression.
+                        // We remap the function declaration node to a function expression.
+                        AstNode::FunctionSingleDeclaration {
+                            id,
+                            name,
+                            declaration,
+                        } => Box::new(node::new!(FunctionExpression {
+                            id: id,
+                            name: Box::new(Some(*name)),
+                            declaration: declaration,
+                        })),
                         _ => unreachable!(),
                     };
                     self.end_span_from_previous_token(&mut statement.span);

@@ -1,6 +1,6 @@
 ---
 source: crates/tlang_parser/tests/parser_fn.rs
-expression: "parse!(\"fn foo() { (fn bar() {}) }\")"
+expression: "parse!(\"fn foo() { fn bar() {} }\")"
 ---
 Node(
   ast_node: Program([
@@ -36,11 +36,11 @@ Node(
                     span: Span(
                       start: LineColumn(
                         line: 0,
-                        column: 15,
+                        column: 14,
                       ),
                       end: LineColumn(
                         line: 0,
-                        column: 18,
+                        column: 17,
                       ),
                     ),
                   )),
@@ -85,7 +85,7 @@ Node(
                   ),
                   end: LineColumn(
                     line: 0,
-                    column: 24,
+                    column: 22,
                   ),
                 ),
               ))),
@@ -123,7 +123,7 @@ Node(
         ),
         end: LineColumn(
           line: 0,
-          column: 26,
+          column: 24,
         ),
       ),
     ),

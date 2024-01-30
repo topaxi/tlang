@@ -15,10 +15,7 @@ fn len(list) { list.length }
 fn random_int(max) { random() * max |> floor() }
 
 // compose(fn(a) -> b, fn(b) -> c) -> fn(a) -> c
-fn compose(f, g) {
-  // FIXME: Function expression in completion position
-  return fn(x) { f(g(x)) };
-}
+fn compose(f, g) { fn(x) { f(g(x)) } }
 
 // map(a[], fn(a) -> b) -> b[]
 fn map([], _) { [] }
