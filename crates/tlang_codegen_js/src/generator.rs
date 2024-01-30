@@ -500,6 +500,7 @@ impl CodegenJS {
             AstNode::EnumDeclaration { id: _, name, variants } => self.generate_enum_declaration(name, variants),
             AstNode::EnumVariant { name, named_fields, parameters } => self.generate_enum_variant(name, *named_fields, parameters),
             AstNode::EnumPattern { identifier, elements, named_fields } => self.generate_enum_extraction(identifier, elements, *named_fields),
+            AstNode::None => {},
             // Allow unreachable path, as we add new AST nodes, we do not want to automatically
             // start failing tests while we are still implementing the codegen.
             #[allow(unreachable_patterns)]

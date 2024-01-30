@@ -1,3 +1,5 @@
+extern crate console_error_panic_hook;
+
 use tlang_ast::{
     node::{AstNode, Node},
     symbols::SymbolType,
@@ -24,6 +26,8 @@ pub struct TlangCompiler {
 impl TlangCompiler {
     #[wasm_bindgen(constructor)]
     pub fn new(source: &str) -> Self {
+        console_error_panic_hook::set_once();
+
         TlangCompiler {
             source: source.to_string(),
             codegen: CodegenJS::default(),

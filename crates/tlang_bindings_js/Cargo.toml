@@ -10,6 +10,7 @@ forced-target = "wasm32-unknown-unknown"
 crate-type = ["cdylib"]
 
 [dependencies]
+console_error_panic_hook = "0.1"
 wasm-bindgen = "0.2"
 tlang_ast = { path = "../tlang_ast" }  # Adjust the path as necessary
 tlang_parser = { path = "../tlang_parser" }

@@ -144,7 +144,11 @@ impl<'src> Parser<'src> {
     }
 
     fn expect_token(&mut self, expected: TokenKind) {
-        expect_token_matches!(self, _kind if *_kind == expected);
+        expect_token_matches!(
+            self,
+            &format!("{:?}", expected),
+            _kind if *_kind == expected
+        );
     }
 
     fn consume_token(&mut self, expected: TokenKind) {
