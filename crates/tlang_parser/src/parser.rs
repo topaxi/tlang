@@ -113,7 +113,11 @@ impl<'src> Parser<'src> {
 
     fn push_unexpected_token_error(&mut self, expected: &str, actual: Option<Token>) {
         self.errors.push(ParseError {
-            msg: format!("Expected {}, found {:?}", expected, actual),
+            msg: format!(
+                "Expected {}, found {:?}",
+                expected,
+                actual.as_ref().unwrap().kind
+            ),
             kind: ParseErrorKind::UnexpectedToken(actual.clone().unwrap()),
             span: actual.as_ref().unwrap().span.clone(),
         });
