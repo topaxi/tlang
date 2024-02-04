@@ -110,3 +110,126 @@ pub fn walk_expression<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'as
         _ => todo!(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::node::AstNode;
+    use crate::node::Node;
+    use crate::span::Span;
+
+    struct TestVisitor {
+        visited: Vec<&'static str>,
+    }
+
+    impl<'ast> Visitor<'ast> for TestVisitor {
+        fn visit_module(&mut self, statements: &'ast [Node]) {
+            self.visited.push("visit_module");
+            walk_module(self, statements);
+        }
+        fn visit_block(&mut self, statements: &'ast [Node], expression: &'ast Option<Node>) {
+            self.visited.push("visit_block");
+            walk_block(self, statements, expression);
+        }
+        fn visit_statement(&mut self, statement: &'ast Node) {
+            self.visited.push("visit_statement");
+            walk_statement(self, statement);
+        }
+        fn visit_function_declaration(&mut self, declaration: &'ast node::FunctionDeclaration) {
+            self.visited.push("visit_function_declaration");
+            walk_function_declaration(self, declaration);
+        }
+        fn visit_expression(&mut self, expression: &'ast Node) {
+            self.visited.push("visit_expression");
+            walk_expression(self, expression);
+        }
+        fn visit_function_parameter(&mut self, _parameter: &'ast Node) {
+            self.visited.push("visit_function_parameter");
+        }
+        fn visit_function_guard(&mut self, _guard: &'ast Node) {
+            self.visited.push("visit_function_guard");
+        }
+        fn visit_function_return_type_annotation(&mut self, _annotation: &'ast Node) {
+            self.visited.push("visit_function_return_type_annotation");
+        }
+        fn visit_function_body(&mut self, body: &'ast Node) {
+            self.visited.push("visit_function_body");
+            walk_function_body(self, body);
+        }
+    }
+
+    #[test]
+    fn test_walk_module() {
+        let statements = vec![Node {
+            ast_node: AstNode::None,
+            symbol_table: None,
+            span: Span::default(),
+        }];
+        let mut visitor = TestVisitor { visited: vec![] };
+        walk_module(&mut visitor, &statements);
+        assert_eq!(visitor.visited, vec!["visit_statement"]);
+    }
+
+    #[test]
+    fn test_walk_block() {
+        let statements = vec![Node {
+            ast_node: AstNode::None,
+            symbol_table: None,
+            span: Span::default(),
+        }];
+        let expression = Some(Node {
+            ast_node: AstNode::None,
+            symbol_table: None,
+            span: Span::default(),
+        });
+        let mut visitor = TestVisitor { visited: vec![] };
+        walk_block(&mut visitor, &statements, &expression);
+        assert_eq!(visitor.visited, vec!["visit_statement", "visit_expression"]);
+    }
+
+    #[test]
+    fn test_walk_statement() {
+        let statement = Node {
+            ast_node: AstNode::Block(vec![], Box::new(None)),
+            symbol_table: None,
+            span: Span::default(),
+        };
+        let mut visitor = TestVisitor { visited: vec![] };
+        walk_statement(&mut visitor, &statement);
+        assert_eq!(visitor.visited, vec!["visit_block"]);
+    }
+
+    #[test]
+    fn test_walk_function_declaration() {
+        let declaration = node::FunctionDeclaration {
+            parameters: vec![Node {
+                ast_node: AstNode::None,
+                symbol_table: None,
+                span: Span::default(),
+            }],
+            guard: Box::new(Some(Node {
+                ast_node: AstNode::None,
+                symbol_table: None,
+                span: Span::default(),
+            })),
+            return_type_annotation: Box::new(None),
+            body: Box::new(Node {
+                ast_node: AstNode::Block(vec![], Box::new(None)),
+                symbol_table: None,
+                span: Span::default(),
+            }),
+        };
+        let mut visitor = TestVisitor { visited: vec![] };
+        walk_function_declaration(&mut visitor, &declaration);
+        assert_eq!(
+            visitor.visited,
+            vec![
+                "visit_function_parameter",
+                "visit_function_guard",
+                "visit_function_body",
+                "visit_expression",
+                "visit_block"
+            ]
+        );
+    }
+}
