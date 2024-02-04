@@ -95,7 +95,6 @@ pub fn walk_function_declaration<'ast, V: Visitor<'ast>>(
 }
 
 pub fn walk_expression<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'ast node::Node) {
-    visitor.visit_expression(expression);
     match &expression.ast_node {
         node::AstNode::None => {}
         node::AstNode::Block(statements, expression) => {
