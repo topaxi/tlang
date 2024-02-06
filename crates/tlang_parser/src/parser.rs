@@ -1,5 +1,5 @@
 use tlang_ast::node::{
-    self, Associativity, AstNode, BinaryOp, FunctionDeclaration, Node, OperatorInfo, UnaryOp,
+    self, Associativity, AstNode, BinaryOpKind, FunctionDeclaration, Node, OperatorInfo, UnaryOp,
 };
 use tlang_ast::span::Span;
 use tlang_ast::symbols::SymbolId;
@@ -1200,70 +1200,72 @@ impl<'src> Parser<'src> {
         )
     }
 
-    fn map_binary_op(token: &TokenKind) -> BinaryOp {
+    fn map_binary_op(token: &TokenKind) -> BinaryOpKind {
         match token {
-            TokenKind::Plus => BinaryOp::Add,
-            TokenKind::Minus => BinaryOp::Subtract,
-            TokenKind::Asterisk => BinaryOp::Multiply,
-            TokenKind::AsteriskAsterisk => BinaryOp::Exponentiation,
-            TokenKind::Slash => BinaryOp::Divide,
-            TokenKind::Percent => BinaryOp::Modulo,
-            TokenKind::EqualEqual => BinaryOp::Equal,
-            TokenKind::NotEqual => BinaryOp::NotEqual,
-            TokenKind::LessThan => BinaryOp::LessThan,
-            TokenKind::LessThanOrEqual => BinaryOp::LessThanOrEqual,
-            TokenKind::GreaterThan => BinaryOp::GreaterThan,
-            TokenKind::GreaterThanOrEqual => BinaryOp::GreaterThanOrEqual,
-            TokenKind::Pipe => BinaryOp::BitwiseOr,
-            TokenKind::Ampersand => BinaryOp::BitwiseAnd,
-            TokenKind::Caret => BinaryOp::BitwiseXor,
-            TokenKind::DoublePipe => BinaryOp::Or,
-            TokenKind::DoubleAmpersand => BinaryOp::And,
-            TokenKind::Pipeline => BinaryOp::Pipeline,
-            TokenKind::And => BinaryOp::And,
-            TokenKind::Or => BinaryOp::Or,
+            TokenKind::Plus => BinaryOpKind::Add,
+            TokenKind::Minus => BinaryOpKind::Subtract,
+            TokenKind::Asterisk => BinaryOpKind::Multiply,
+            TokenKind::AsteriskAsterisk => BinaryOpKind::Exponentiation,
+            TokenKind::Slash => BinaryOpKind::Divide,
+            TokenKind::Percent => BinaryOpKind::Modulo,
+            TokenKind::EqualEqual => BinaryOpKind::Equal,
+            TokenKind::NotEqual => BinaryOpKind::NotEqual,
+            TokenKind::LessThan => BinaryOpKind::LessThan,
+            TokenKind::LessThanOrEqual => BinaryOpKind::LessThanOrEqual,
+            TokenKind::GreaterThan => BinaryOpKind::GreaterThan,
+            TokenKind::GreaterThanOrEqual => BinaryOpKind::GreaterThanOrEqual,
+            TokenKind::Pipe => BinaryOpKind::BitwiseOr,
+            TokenKind::Ampersand => BinaryOpKind::BitwiseAnd,
+            TokenKind::Caret => BinaryOpKind::BitwiseXor,
+            TokenKind::DoublePipe => BinaryOpKind::Or,
+            TokenKind::DoubleAmpersand => BinaryOpKind::And,
+            TokenKind::Pipeline => BinaryOpKind::Pipeline,
+            TokenKind::And => BinaryOpKind::And,
+            TokenKind::Or => BinaryOpKind::Or,
             _ => {
                 unimplemented!("Expected binary operator, found {:?}", token)
             }
         }
     }
 
-    fn map_operator_info(operator: &BinaryOp) -> OperatorInfo {
+    fn map_operator_info(operator: &BinaryOpKind) -> OperatorInfo {
         match operator {
-            BinaryOp::Add | BinaryOp::Subtract => OperatorInfo {
+            BinaryOpKind::Add | BinaryOpKind::Subtract => OperatorInfo {
                 precedence: 6,
                 associativity: Associativity::Left,
             },
-            BinaryOp::Multiply | BinaryOp::Divide | BinaryOp::Modulo => OperatorInfo {
+            BinaryOpKind::Multiply | BinaryOpKind::Divide | BinaryOpKind::Modulo => OperatorInfo {
                 precedence: 7,
                 associativity: Associativity::Left,
             },
-            BinaryOp::Equal
-            | BinaryOp::NotEqual
-            | BinaryOp::LessThan
-            | BinaryOp::LessThanOrEqual
-            | BinaryOp::GreaterThan
-            | BinaryOp::GreaterThanOrEqual => OperatorInfo {
+            BinaryOpKind::Equal
+            | BinaryOpKind::NotEqual
+            | BinaryOpKind::LessThan
+            | BinaryOpKind::LessThanOrEqual
+            | BinaryOpKind::GreaterThan
+            | BinaryOpKind::GreaterThanOrEqual => OperatorInfo {
                 precedence: 5,
                 associativity: Associativity::Left,
             },
-            BinaryOp::And => OperatorInfo {
+            BinaryOpKind::And => OperatorInfo {
                 precedence: 3,
                 associativity: Associativity::Left,
             },
-            BinaryOp::Or => OperatorInfo {
+            BinaryOpKind::Or => OperatorInfo {
                 precedence: 2,
                 associativity: Associativity::Left,
             },
-            BinaryOp::BitwiseAnd | BinaryOp::BitwiseOr | BinaryOp::BitwiseXor => OperatorInfo {
-                precedence: 8,
-                associativity: Associativity::Left,
-            },
-            BinaryOp::Exponentiation => OperatorInfo {
+            BinaryOpKind::BitwiseAnd | BinaryOpKind::BitwiseOr | BinaryOpKind::BitwiseXor => {
+                OperatorInfo {
+                    precedence: 8,
+                    associativity: Associativity::Left,
+                }
+            }
+            BinaryOpKind::Exponentiation => OperatorInfo {
                 precedence: 9,
                 associativity: Associativity::Right,
             },
-            BinaryOp::Pipeline => OperatorInfo {
+            BinaryOpKind::Pipeline => OperatorInfo {
                 precedence: 1,
                 associativity: Associativity::Left,
             },

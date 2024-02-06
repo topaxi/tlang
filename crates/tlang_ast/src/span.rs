@@ -49,3 +49,9 @@ impl Default for Span {
         }
     }
 }
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct Spanned<T> {
+    pub node: T,
+    pub span: Span,
+}

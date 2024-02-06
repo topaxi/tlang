@@ -8,7 +8,7 @@ use crate::{
     scope::Scope,
 };
 use tlang_ast::{
-    node::{AstNode, BinaryOp, Node, UnaryOp},
+    node::{AstNode, BinaryOpKind, Node, UnaryOp},
     token::Literal,
 };
 
@@ -390,7 +390,7 @@ impl CodegenJS {
         }
     }
 
-    pub fn generate_node(&mut self, node: &Node, parent_op: Option<&BinaryOp>) {
+    pub fn generate_node(&mut self, node: &Node, parent_op: Option<&BinaryOpKind>) {
         // TODO: Split into generate_statement and generate_expression.
         //       This should also help setting proper block contexts.
         match &node.ast_node {
@@ -767,7 +767,11 @@ impl CodegenJS {
         self.push_char(')');
     }
 
-    fn generate_recursive_call_expression(&mut self, node: &Node, parent_op: Option<&BinaryOp>) {
+    fn generate_recursive_call_expression(
+        &mut self,
+        node: &Node,
+        parent_op: Option<&BinaryOpKind>,
+    ) {
         // If call expression is referencing the current function, all we do is update the arguments,
         // as we are in a while loop.
         if let AstNode::Call {
