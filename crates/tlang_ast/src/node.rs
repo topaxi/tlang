@@ -167,6 +167,12 @@ pub enum AstNode {
     },
 }
 
+impl Default for AstNode {
+    fn default() -> Self {
+        AstNode::None
+    }
+}
+
 impl<'a> From<&'a TokenKind> for AstNode {
     fn from(token: &TokenKind) -> Self {
         match token {

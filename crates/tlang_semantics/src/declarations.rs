@@ -77,7 +77,7 @@ impl DeclarationAnalyzer {
     }
 
     fn collect_declarations(&mut self, node: &mut Node) {
-        let mut ast_node = std::mem::replace(&mut node.ast_node, AstNode::None);
+        let mut ast_node = std::mem::take(&mut node.ast_node);
 
         match &mut ast_node {
             AstNode::Program(nodes) => self.collect_program_declarations(node, nodes),
