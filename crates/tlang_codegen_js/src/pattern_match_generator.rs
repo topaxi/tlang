@@ -1,14 +1,14 @@
-use tlang_ast::node::{AstNode, Node};
+use tlang_ast::node::{AstNode, Node, NodeKind};
 
 use crate::generator::{BlockContext, CodegenJS};
 
 fn match_args_have_completions(arms: &[Node]) -> bool {
     arms.iter().any(|arm| match &arm.ast_node {
-        AstNode::MatchArm {
+        NodeKind::Legacy(AstNode::MatchArm {
             pattern: _,
             expression,
-        } => match &expression.ast_node {
-            AstNode::Block(_, expr) => expr.is_some(),
+        }) => match &expression.ast_node {
+            NodeKind::Legacy(AstNode::Block(_, expr)) => expr.is_some(),
             _ => true,
         },
         _ => unreachable!(),
@@ -16,11 +16,11 @@ fn match_args_have_completions(arms: &[Node]) -> bool {
 }
 
 fn is_wildcard_pattern(pattern: &Node) -> bool {
-    matches!(pattern.ast_node, AstNode::Wildcard)
+    matches!(pattern.ast_node, NodeKind::Legacy(AstNode::Wildcard))
 }
 
 fn generate_match_arm_expression(codegen: &mut CodegenJS, expression: &Node) {
-    if let AstNode::Block(_, _) = &expression.ast_node {
+    if let NodeKind::Legacy(AstNode::Block(_, _)) = &expression.ast_node {
         codegen.generate_node(expression, None);
     } else {
         let completion_tmp_var = codegen.current_completion_variable().clone().unwrap();
@@ -51,10 +51,10 @@ pub fn generate_match_expression(codegen: &mut CodegenJS, expression: &Node, arm
 
     for (i, arm) in arms.iter().enumerate() {
         match &arm.ast_node {
-            AstNode::MatchArm {
+            NodeKind::Legacy(AstNode::MatchArm {
                 pattern,
                 expression,
-            } => {
+            }) => {
                 if !is_wildcard_pattern(pattern) {
                     codegen.push_str("if (");
                     codegen.push_str(&match_value_tmp_var);

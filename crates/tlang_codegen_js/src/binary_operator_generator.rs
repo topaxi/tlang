@@ -1,4 +1,4 @@
-use tlang_ast::node::{AstNode, BinaryOpKind, Node};
+use tlang_ast::node::{AstNode, BinaryOpKind, Node, NodeKind};
 
 use crate::generator::CodegenJS;
 
@@ -30,16 +30,16 @@ pub fn generate_binary_op(
 
     if let BinaryOpKind::Pipeline = op {
         // If rhs was an identifier, we just pass lhs it as an argument to a function call.
-        if let AstNode::Identifier(_) = rhs.ast_node {
+        if let NodeKind::Legacy(AstNode::Identifier(_)) = rhs.ast_node {
             codegen.generate_node(rhs, None);
             codegen.push_char('(');
             codegen.generate_node(lhs, None);
             codegen.push_char(')');
         // If rhs is a Call node and we prepend the lhs to the argument list.
-        } else if let AstNode::Call {
+        } else if let NodeKind::Legacy(AstNode::Call {
             function,
             arguments,
-        } = &rhs.ast_node
+        }) = &rhs.ast_node
         {
             codegen.generate_node(function, None);
             codegen.push_char('(');
@@ -48,14 +48,14 @@ pub fn generate_binary_op(
             // Otherwise we prepend the lhs to the argument list.
             let has_wildcard = arguments
                 .iter()
-                .any(|arg| matches!(arg.ast_node, AstNode::Wildcard));
+                .any(|arg| matches!(arg.ast_node, NodeKind::Legacy(AstNode::Wildcard)));
             if has_wildcard {
                 for (i, arg) in arguments.iter().enumerate() {
                     if i > 0 {
                         codegen.push_str(", ");
                     }
 
-                    if let AstNode::Wildcard = arg.ast_node {
+                    if let NodeKind::Legacy(AstNode::Wildcard) = arg.ast_node {
                         codegen.generate_node(lhs, None);
                     } else {
                         codegen.generate_node(arg, None);

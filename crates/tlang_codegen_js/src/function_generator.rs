@@ -1,10 +1,10 @@
-use tlang_ast::node::{AstNode, FunctionDeclaration, Node, UnaryOp};
+use tlang_ast::node::{AstNode, FunctionDeclaration, Node, NodeKind, UnaryOp};
 
 use crate::generator::{BlockContext, CodegenJS};
 
 fn map_to_function_declaration(node: &Node) -> Option<&FunctionDeclaration> {
     match &node.ast_node {
-        AstNode::FunctionDeclaration(declaration) => Some(declaration),
+        NodeKind::Legacy(AstNode::FunctionDeclaration(declaration)) => Some(declaration),
         _ => None,
     }
 }
@@ -12,13 +12,13 @@ fn map_to_function_declaration(node: &Node) -> Option<&FunctionDeclaration> {
 fn filter_comments(node: &Node) -> bool {
     matches!(
         node.ast_node,
-        AstNode::SingleLineComment(_) | AstNode::MultiLineComment(_)
+        NodeKind::Legacy(AstNode::SingleLineComment(_) | AstNode::MultiLineComment(_))
     )
 }
 
 pub fn get_function_declaration_from_node(node: &Node) -> &FunctionDeclaration {
     match &node.ast_node {
-        AstNode::FunctionDeclaration(declaration) => declaration,
+        NodeKind::Legacy(AstNode::FunctionDeclaration(declaration)) => declaration,
         _ => panic!("Unexpected node in function declarations."),
     }
 }
@@ -52,9 +52,9 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
     // Declare and output temporary variables for if let guards.
     for declaration in function_declarations.iter() {
         if let Some(ref expr) = *declaration.guard {
-            if let AstNode::VariableDeclaration { pattern, .. } = &expr.ast_node {
+            if let NodeKind::Legacy(AstNode::VariableDeclaration { pattern, .. }) = &expr.ast_node {
                 match &pattern.ast_node {
-                    AstNode::Identifier(name) => {
+                    NodeKind::Legacy(AstNode::Identifier(name)) => {
                         let tmp_variable = codegen.current_scope().declare_tmp_variable();
                         codegen.push_indent();
                         codegen.push_str(&format!("let {};\n", tmp_variable));
@@ -62,9 +62,11 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                             .current_scope()
                             .declare_variable_alias(name, &tmp_variable);
                     }
-                    AstNode::ListPattern(patterns) => {
+                    NodeKind::Legacy(AstNode::ListPattern(patterns)) => {
                         for pattern in patterns {
-                            if let AstNode::IdentifierPattern { name, .. } = &pattern.ast_node {
+                            if let NodeKind::Legacy(AstNode::IdentifierPattern { name, .. }) =
+                                &pattern.ast_node
+                            {
                                 let tmp_variable = codegen.current_scope().declare_tmp_variable();
                                 codegen.push_indent();
                                 codegen.push_str(&format!("let {};\n", tmp_variable));
@@ -74,16 +76,20 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                             }
                         }
                     }
-                    AstNode::EnumPattern {
+                    NodeKind::Legacy(AstNode::EnumPattern {
                         identifier,
                         elements,
                         named_fields: _,
-                    } => {
+                    }) => {
                         let tmp_variable_enum = codegen.current_scope().declare_tmp_variable();
                         let enum_name = match &identifier.ast_node {
-                            AstNode::Identifier(name) => name.clone(),
-                            AstNode::IdentifierPattern { name, .. } => name.clone(),
-                            AstNode::NestedIdentifier(names) => names.clone().pop().unwrap(),
+                            NodeKind::Legacy(AstNode::Identifier(name)) => name.clone(),
+                            NodeKind::Legacy(AstNode::IdentifierPattern { name, .. }) => {
+                                name.clone()
+                            }
+                            NodeKind::Legacy(AstNode::NestedIdentifier(names)) => {
+                                names.clone().pop().unwrap()
+                            }
                             _ => unreachable!(),
                         };
                         codegen.push_indent();
@@ -93,11 +99,13 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                             .declare_variable_alias(&enum_name, &tmp_variable_enum);
                         for element in elements {
                             // Skip any Wildcards
-                            if let AstNode::Wildcard = element.ast_node {
+                            if let NodeKind::Legacy(AstNode::Wildcard) = element.ast_node {
                                 continue;
                             }
                             let identifier = match &element.ast_node {
-                                AstNode::IdentifierPattern { name, .. } => name.clone(),
+                                NodeKind::Legacy(AstNode::IdentifierPattern { name, .. }) => {
+                                    name.clone()
+                                }
                                 _ => unreachable!(),
                             };
                             let tmp_variable = codegen.current_scope().declare_tmp_variable();
@@ -127,14 +135,14 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
     for declaration in declarations.iter() {
         if matches!(
             &declaration.ast_node,
-            AstNode::SingleLineComment(_) | AstNode::MultiLineComment(_)
+            NodeKind::Legacy(AstNode::SingleLineComment(_) | AstNode::MultiLineComment(_))
         ) {
             comments.push(declaration);
             continue;
         }
 
         let declaration = match &declaration.ast_node {
-            AstNode::FunctionDeclaration(declaration) => declaration,
+            NodeKind::Legacy(AstNode::FunctionDeclaration(declaration)) => declaration,
             _ => unreachable!("Unexpected node in function declarations."),
         };
 
@@ -147,21 +155,23 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
         first_declaration = false;
 
         for (j, param) in declaration.parameters.iter().enumerate() {
-            if let AstNode::FunctionParameter {
+            if let NodeKind::Legacy(AstNode::FunctionParameter {
                 id: _,
                 pattern,
                 type_annotation: _,
-            } = &param.ast_node
+            }) = &param.ast_node
             {
                 match &pattern.ast_node {
-                    AstNode::Identifier(name) => {
+                    NodeKind::Legacy(AstNode::Identifier(name)) => {
                         codegen
                             .current_scope()
                             .declare_variable_alias(name, &format!("args[{}]", j));
                     }
-                    AstNode::ListPattern(patterns) => {
+                    NodeKind::Legacy(AstNode::ListPattern(patterns)) => {
                         for (i, pattern) in patterns.iter().enumerate() {
-                            if let AstNode::IdentifierPattern { name, .. } = &pattern.ast_node {
+                            if let NodeKind::Legacy(AstNode::IdentifierPattern { name, .. }) =
+                                &pattern.ast_node
+                            {
                                 codegen
                                     .current_scope()
                                     .declare_variable_alias(name, &format!("args[{}][{}]", j, i));
@@ -185,17 +195,19 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                 .iter()
                 .enumerate()
                 .filter(|(_, param)| {
-                    if let AstNode::FunctionParameter {
+                    if let NodeKind::Legacy(AstNode::FunctionParameter {
                         id: _,
                         pattern,
                         type_annotation: _,
-                    } = &param.ast_node
+                    }) = &param.ast_node
                     {
                         matches!(
                             pattern.ast_node,
-                            AstNode::Literal(_)
-                                | AstNode::ListPattern(_)
-                                | AstNode::EnumPattern { .. }
+                            NodeKind::Legacy(
+                                AstNode::Literal(_)
+                                    | AstNode::ListPattern(_)
+                                    | AstNode::EnumPattern { .. }
+                            )
                         )
                     } else {
                         false
@@ -222,18 +234,18 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                     codegen.push_str(" && ");
                 }
 
-                if let AstNode::FunctionParameter {
+                if let NodeKind::Legacy(AstNode::FunctionParameter {
                     id: _,
                     pattern,
                     type_annotation: _,
-                } = &param.ast_node
+                }) = &param.ast_node
                 {
                     match &pattern.ast_node {
-                        AstNode::Identifier(_) | AstNode::Literal(_) => {
+                        NodeKind::Legacy(AstNode::Identifier(_) | AstNode::Literal(_)) => {
                             codegen.push_str(&format!("args[{}] === ", k));
                             codegen.generate_node(param, None);
                         }
-                        AstNode::ListPattern(patterns) => {
+                        NodeKind::Legacy(AstNode::ListPattern(patterns)) => {
                             if patterns.is_empty() {
                                 codegen.push_str(&format!("args[{}].length === 0", k));
                                 continue;
@@ -247,13 +259,18 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                                 }
 
                                 match &pattern.ast_node {
-                                    AstNode::Literal(_) => {
+                                    NodeKind::Legacy(AstNode::Literal(_)) => {
                                         codegen.push_str(&format!("args[{}][{}] === ", k, i));
                                         codegen.generate_node(pattern, None);
                                     }
-                                    AstNode::UnaryOp(UnaryOp::Rest, identified) => {
-                                        if let AstNode::IdentifierPattern { ref name, .. } =
-                                            identified.ast_node
+                                    NodeKind::Legacy(AstNode::UnaryOp(
+                                        UnaryOp::Rest,
+                                        identified,
+                                    )) => {
+                                        if let NodeKind::Legacy(AstNode::IdentifierPattern {
+                                            ref name,
+                                            ..
+                                        }) = identified.ast_node
                                         {
                                             codegen
                                                 .push_str(&format!("args[{}].length >= {}", k, i));
@@ -265,38 +282,46 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                                             unreachable!();
                                         }
                                     }
-                                    AstNode::IdentifierPattern { name, .. } => {
+                                    NodeKind::Legacy(AstNode::IdentifierPattern {
+                                        name, ..
+                                    }) => {
                                         codegen.declare_function_pre_body_variable(
                                             name,
                                             &format!("args[{}][{}]", k, i),
                                         );
                                     }
-                                    AstNode::Wildcard => {}
+                                    NodeKind::Legacy(AstNode::Wildcard) => {}
                                     _ => unreachable!(),
                                 }
                             }
                         }
-                        AstNode::EnumPattern {
+                        NodeKind::Legacy(AstNode::EnumPattern {
                             identifier,
                             elements,
                             named_fields,
-                        } => {
+                        }) => {
                             let identifier = match &identifier.ast_node {
-                                AstNode::Identifier(name) => name.clone(),
-                                AstNode::IdentifierPattern { name, .. } => name.clone(),
-                                AstNode::NestedIdentifier(names) => names.clone().pop().unwrap(),
+                                NodeKind::Legacy(AstNode::Identifier(name)) => name.clone(),
+                                NodeKind::Legacy(AstNode::IdentifierPattern { name, .. }) => {
+                                    name.clone()
+                                }
+                                NodeKind::Legacy(AstNode::NestedIdentifier(names)) => {
+                                    names.clone().pop().unwrap()
+                                }
                                 _ => unreachable!(),
                             };
                             codegen.push_str(&format!("args[{}].tag === \"{}\"", k, identifier));
                             for (i, element) in elements.iter().enumerate() {
                                 // Skip any Wildcards
-                                if let AstNode::Wildcard = element.ast_node {
+                                if let NodeKind::Legacy(AstNode::Wildcard) = element.ast_node {
                                     continue;
                                 }
                                 let identifier = match &element.ast_node {
-                                    AstNode::Identifier(name) => name.clone(),
-                                    AstNode::IdentifierPattern { name, .. } => name.clone(),
-                                    AstNode::NestedIdentifier(names) => {
+                                    NodeKind::Legacy(AstNode::Identifier(name)) => name.clone(),
+                                    NodeKind::Legacy(AstNode::IdentifierPattern {
+                                        name, ..
+                                    }) => name.clone(),
+                                    NodeKind::Legacy(AstNode::NestedIdentifier(names)) => {
                                         names.clone().pop().unwrap()
                                     }
                                     _ => unreachable!(),
@@ -345,13 +370,13 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
 
         // Alias identifier args back to the parameter names for readability of generated code.
         for (j, param) in declaration.parameters.iter().enumerate() {
-            if let AstNode::FunctionParameter {
+            if let NodeKind::Legacy(AstNode::FunctionParameter {
                 id: _,
                 pattern,
                 type_annotation: _,
-            } = &param.ast_node
+            }) = &param.ast_node
             {
-                if let AstNode::Identifier(ref name) = pattern.ast_node {
+                if let NodeKind::Legacy(AstNode::Identifier(ref name)) = pattern.ast_node {
                     codegen.push_indent();
                     codegen.push_str(&format!("let {} = args[{}];\n", name, j));
                     codegen.current_scope().declare_variable_alias(name, name);
@@ -388,28 +413,30 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
 }
 
 fn generate_function_definition_guard(codegen: &mut CodegenJS, node: &Node) {
-    if let AstNode::VariableDeclaration {
+    if let NodeKind::Legacy(AstNode::VariableDeclaration {
         pattern,
         expression,
         ..
-    } = &node.ast_node
+    }) = &node.ast_node
     {
         match &pattern.ast_node {
-            AstNode::Identifier(name) => {
+            NodeKind::Legacy(AstNode::Identifier(name)) => {
                 let guard_variable = codegen.current_scope().resolve_variable(name);
                 codegen.push_str(&format!("({} = ", guard_variable.unwrap()));
                 codegen.generate_node(expression, None);
                 codegen.push_char(')');
             }
-            AstNode::EnumPattern {
+            NodeKind::Legacy(AstNode::EnumPattern {
                 identifier,
                 elements,
                 named_fields,
-            } => {
+            }) => {
                 let enum_name = match &identifier.ast_node {
-                    AstNode::Identifier(name) => name.clone(),
-                    AstNode::IdentifierPattern { name, .. } => name.clone(),
-                    AstNode::NestedIdentifier(names) => names.clone().pop().unwrap(),
+                    NodeKind::Legacy(AstNode::Identifier(name)) => name.clone(),
+                    NodeKind::Legacy(AstNode::IdentifierPattern { name, .. }) => name.clone(),
+                    NodeKind::Legacy(AstNode::NestedIdentifier(names)) => {
+                        names.clone().pop().unwrap()
+                    }
                     _ => unreachable!(),
                 };
                 let guard_variable = codegen.current_scope().resolve_variable(&enum_name);
@@ -426,13 +453,15 @@ fn generate_function_definition_guard(codegen: &mut CodegenJS, node: &Node) {
                         ));
                     }
                     // Skip any Wildcards
-                    if let AstNode::Wildcard = element.ast_node {
+                    if let NodeKind::Legacy(AstNode::Wildcard) = element.ast_node {
                         continue;
                     }
                     let identifier = match &element.ast_node {
-                        AstNode::Identifier(name) => name.clone(),
-                        AstNode::IdentifierPattern { name, .. } => name.clone(),
-                        AstNode::NestedIdentifier(names) => names.clone().pop().unwrap(),
+                        NodeKind::Legacy(AstNode::Identifier(name)) => name.clone(),
+                        NodeKind::Legacy(AstNode::IdentifierPattern { name, .. }) => name.clone(),
+                        NodeKind::Legacy(AstNode::NestedIdentifier(names)) => {
+                            names.clone().pop().unwrap()
+                        }
                         _ => unreachable!(),
                     };
                     codegen.push_str(" && ((");
@@ -535,14 +564,16 @@ pub fn generate_function_expression(codegen: &mut CodegenJS, name: &Option<Node>
 pub fn generate_function_parameter(codegen: &mut CodegenJS, pattern: &Node) {
     match &pattern.ast_node {
         // Do not run generate_identifier, as that would resolve the parameter as a variable.
-        AstNode::Identifier(ident) => {
+        NodeKind::Legacy(AstNode::Identifier(ident)) => {
             codegen.current_scope().declare_variable(ident);
             codegen.push_str(ident);
         }
-        AstNode::Literal(_) => codegen.generate_node(pattern, None),
-        AstNode::ListPattern(_) => todo!(),
+        NodeKind::Legacy(AstNode::Literal(_)) => codegen.generate_node(pattern, None),
+        NodeKind::Legacy(AstNode::ListPattern(_)) => todo!(),
         // Wildcards are handled within pipeline and call expressions,
-        AstNode::Wildcard => unreachable!("Unexpected wildcard in function parameter."),
+        NodeKind::Legacy(AstNode::Wildcard) => {
+            unreachable!("Unexpected wildcard in function parameter.")
+        }
         _ => todo!(),
     }
 }
@@ -568,13 +599,14 @@ pub fn generate_return_statement(codegen: &mut CodegenJS, expr: &Option<Node>) {
     // We do not render a return statement if we are in a tail recursive function body.
     // Which calls the current function recursively.
     if expr.is_some() {
-        if let AstNode::RecursiveCall(call_exp) = &expr.as_ref().unwrap().ast_node {
+        if let NodeKind::Legacy(AstNode::RecursiveCall(call_exp)) = &expr.as_ref().unwrap().ast_node
+        {
             let call_identifier = match &call_exp.ast_node {
-                AstNode::Call {
+                NodeKind::Legacy(AstNode::Call {
                     function,
                     arguments: _,
-                } => {
-                    if let AstNode::Identifier(name) = &function.ast_node {
+                }) => {
+                    if let NodeKind::Legacy(AstNode::Identifier(name)) = &function.ast_node {
                         Some(name)
                     } else {
                         None
@@ -620,15 +652,15 @@ fn is_function_body_tail_recursive(function_name: &str, node: &Node) -> bool {
     // We currently only support tail recursion to the function itself, not any other function.
     // Therefore we look for RecursiveCall nodes which reference the current function name.
     match &node.ast_node {
-        AstNode::RecursiveCall(node) => {
+        NodeKind::Legacy(AstNode::RecursiveCall(node)) => {
             // Node is a Call expression, unwrap first.
-            if let AstNode::Call {
+            if let NodeKind::Legacy(AstNode::Call {
                 function,
                 arguments: _,
-            } = &node.ast_node
+            }) = &node.ast_node
             {
                 // If the function is an identifier, check if it's the same as the current function name.
-                if let AstNode::Identifier(name) = &function.ast_node {
+                if let NodeKind::Legacy(AstNode::Identifier(name)) = &function.ast_node {
                     if name == function_name {
                         return true;
                     }
@@ -636,7 +668,7 @@ fn is_function_body_tail_recursive(function_name: &str, node: &Node) -> bool {
             }
             false
         }
-        AstNode::Block(statements, expression) => {
+        NodeKind::Legacy(AstNode::Block(statements, expression)) => {
             for statement in statements {
                 if is_function_body_tail_recursive(function_name, statement) {
                     return true;
@@ -647,22 +679,22 @@ fn is_function_body_tail_recursive(function_name: &str, node: &Node) -> bool {
             }
             false
         }
-        AstNode::ExpressionStatement(expression) => {
+        NodeKind::Legacy(AstNode::ExpressionStatement(expression)) => {
             is_function_body_tail_recursive(function_name, expression)
         }
-        AstNode::Match {
+        NodeKind::Legacy(AstNode::Match {
             expression,
             arms: _,
-        } => is_function_body_tail_recursive(function_name, expression),
-        AstNode::MatchArm {
+        }) => is_function_body_tail_recursive(function_name, expression),
+        NodeKind::Legacy(AstNode::MatchArm {
             pattern: _,
             expression,
-        } => is_function_body_tail_recursive(function_name, expression),
-        AstNode::IfElse {
+        }) => is_function_body_tail_recursive(function_name, expression),
+        NodeKind::Legacy(AstNode::IfElse {
             condition,
             then_branch,
             else_branch,
-        } => {
+        }) => {
             is_function_body_tail_recursive(function_name, condition)
                 || is_function_body_tail_recursive(function_name, then_branch)
                 // TODO: Get rid of clone.
@@ -670,7 +702,7 @@ fn is_function_body_tail_recursive(function_name: &str, node: &Node) -> bool {
                     is_function_body_tail_recursive(function_name, &branch)
                 })
         }
-        AstNode::ReturnStatement(node) => {
+        NodeKind::Legacy(AstNode::ReturnStatement(node)) => {
             if let Some(node) = node.as_ref() {
                 is_function_body_tail_recursive(function_name, node)
             } else {
@@ -683,7 +715,7 @@ fn is_function_body_tail_recursive(function_name: &str, node: &Node) -> bool {
 
 fn fn_identifier_to_string(name: &Node) -> String {
     match &name.ast_node {
-        AstNode::Identifier(name) => name.clone(),
+        NodeKind::Legacy(AstNode::Identifier(name)) => name.clone(),
         _ => todo!(),
     }
 }

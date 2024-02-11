@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use tlang_ast::{
-    node::{AstNode, FunctionDeclaration, Node},
+    node::{AstNode, FunctionDeclaration, Node, NodeKind},
     symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
 };
 
@@ -80,12 +80,15 @@ impl DeclarationAnalyzer {
         let mut ast_node = std::mem::take(&mut node.ast_node);
 
         match &mut ast_node {
-            AstNode::Module(nodes) => self.collect_module_declarations(node, nodes),
-            AstNode::ExpressionStatement(node) => self.collect_declarations(node),
-            AstNode::Block(nodes, return_value) => {
+            NodeKind::Expr(_) => todo!(),
+            NodeKind::Legacy(AstNode::Module(nodes)) => {
+                self.collect_module_declarations(node, nodes)
+            }
+            NodeKind::Legacy(AstNode::ExpressionStatement(node)) => self.collect_declarations(node),
+            NodeKind::Legacy(AstNode::Block(nodes, return_value)) => {
                 self.collect_block_declarations(node, nodes, return_value)
             }
-            AstNode::IdentifierPattern { id, name } => {
+            NodeKind::Legacy(AstNode::IdentifierPattern { id, name }) => {
                 self.declare_symbol(SymbolInfo::new(
                     *id,
                     name,
@@ -93,35 +96,35 @@ impl DeclarationAnalyzer {
                     Some(node.span.clone()),
                 ));
             }
-            AstNode::VariableDeclaration {
+            NodeKind::Legacy(AstNode::VariableDeclaration {
                 id,
                 pattern,
                 expression,
                 type_annotation: _,
-            } => self.collect_variable_declaration(node, *id, pattern, expression),
-            AstNode::FunctionDeclaration(declaration) => {
+            }) => self.collect_variable_declaration(node, *id, pattern, expression),
+            NodeKind::Legacy(AstNode::FunctionDeclaration(declaration)) => {
                 self.collect_function_declaration(declaration);
             }
-            AstNode::FunctionSingleDeclaration {
+            NodeKind::Legacy(AstNode::FunctionSingleDeclaration {
                 id,
                 name,
                 declaration,
-            } => self.collect_function_single_declaration(node, *id, name, declaration),
-            AstNode::FunctionDeclarations {
+            }) => self.collect_function_single_declaration(node, *id, name, declaration),
+            NodeKind::Legacy(AstNode::FunctionDeclarations {
                 id,
                 name,
                 declarations,
-            } => self.collect_function_declarations(node, *id, name, declarations),
-            AstNode::FunctionParameter {
+            }) => self.collect_function_declarations(node, *id, name, declarations),
+            NodeKind::Legacy(AstNode::FunctionParameter {
                 id,
                 pattern,
                 type_annotation: _,
-            } => self.collect_function_parameter(node, *id, pattern),
-            AstNode::FunctionExpression {
+            }) => self.collect_function_parameter(node, *id, pattern),
+            NodeKind::Legacy(AstNode::FunctionExpression {
                 id,
                 name,
                 declaration,
-            } => {
+            }) => {
                 node.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
                 if let Some(name) = name.as_ref() {
                     let name_as_str = self.fn_identifier_to_string(name);
@@ -136,64 +139,64 @@ impl DeclarationAnalyzer {
                 self.collect_declarations(declaration);
                 self.pop_symbol_table();
             }
-            AstNode::ReturnStatement(expr) => {
+            NodeKind::Legacy(AstNode::ReturnStatement(expr)) => {
                 self.collect_optional_declarations(expr);
             }
-            AstNode::ListPattern(patterns) => {
+            NodeKind::Legacy(AstNode::ListPattern(patterns)) => {
                 self.collect_list_pattern(patterns);
             }
-            AstNode::EnumPattern {
+            NodeKind::Legacy(AstNode::EnumPattern {
                 identifier,
                 elements,
                 named_fields,
-            } => self.collect_enum_pattern(node, identifier, elements, *named_fields),
-            AstNode::Call {
+            }) => self.collect_enum_pattern(node, identifier, elements, *named_fields),
+            NodeKind::Legacy(AstNode::Call {
                 function,
                 arguments,
-            } => {
+            }) => {
                 self.collect_declarations(function);
                 for argument in arguments {
                     self.collect_declarations(argument);
                 }
             }
-            AstNode::RecursiveCall(expr) => {
+            NodeKind::Legacy(AstNode::RecursiveCall(expr)) => {
                 self.collect_declarations(expr);
             }
-            AstNode::UnaryOp(_, node) => self.collect_declarations(node),
-            AstNode::BinaryOp { op: _, lhs, rhs } => {
+            NodeKind::Legacy(AstNode::UnaryOp(_, node)) => self.collect_declarations(node),
+            NodeKind::Legacy(AstNode::BinaryOp { op: _, lhs, rhs }) => {
                 self.collect_declarations(lhs);
                 self.collect_declarations(rhs);
             }
-            AstNode::List(values) => {
+            NodeKind::Legacy(AstNode::List(values)) => {
                 for value in values {
                     self.collect_declarations(value);
                 }
             }
-            AstNode::Dict(kvs) => {
+            NodeKind::Legacy(AstNode::Dict(kvs)) => {
                 for (key, value) in kvs {
                     // TODO: Undecided what kind of values dict keys can be.
                     self.collect_declarations(key);
                     self.collect_declarations(value);
                 }
             }
-            AstNode::IfElse {
+            NodeKind::Legacy(AstNode::IfElse {
                 condition,
                 then_branch,
                 else_branch,
-            } => {
+            }) => {
                 self.collect_declarations(condition);
                 self.collect_declarations(then_branch);
                 self.collect_optional_declarations(else_branch);
             }
-            AstNode::FieldExpression { base, field } => {
+            NodeKind::Legacy(AstNode::FieldExpression { base, field }) => {
                 self.collect_declarations(base);
                 self.collect_declarations(field);
             }
-            AstNode::IndexExpression { base, index } => {
+            NodeKind::Legacy(AstNode::IndexExpression { base, index }) => {
                 self.collect_declarations(base);
                 self.collect_declarations(index);
             }
-            AstNode::EnumDeclaration { id, name, variants } => {
+            NodeKind::Legacy(AstNode::EnumDeclaration { id, name, variants }) => {
                 self.declare_symbol(SymbolInfo::new(
                     *id,
                     name,
@@ -205,11 +208,11 @@ impl DeclarationAnalyzer {
                     self.collect_declarations(variant);
                 }
             }
-            AstNode::EnumVariant {
+            NodeKind::Legacy(AstNode::EnumVariant {
                 name: _,
                 parameters,
                 ..
-            } => {
+            }) => {
                 // TODO: We need the parent enum name here.
                 // self.collect_declarations(name)
 
@@ -217,19 +220,24 @@ impl DeclarationAnalyzer {
                     self.collect_declarations(param);
                 }
             }
-            AstNode::Match { .. }
-            | AstNode::MatchArm { .. }
-            | AstNode::Range { .. }
-            | AstNode::TypeAnnotation { .. } => {
+            NodeKind::Legacy(
+                AstNode::Match { .. }
+                | AstNode::MatchArm { .. }
+                | AstNode::Range { .. }
+                | AstNode::TypeAnnotation { .. },
+            ) => {
                 // TODO
             }
-            AstNode::None
-            | AstNode::Wildcard
-            | AstNode::Identifier(_)
-            | AstNode::NestedIdentifier(_)
-            | AstNode::Literal(_)
-            | AstNode::SingleLineComment(_)
-            | AstNode::MultiLineComment(_) => {
+            NodeKind::None
+            | NodeKind::Legacy(
+                AstNode::None
+                | AstNode::Wildcard
+                | AstNode::Identifier(_)
+                | AstNode::NestedIdentifier(_)
+                | AstNode::Literal(_)
+                | AstNode::SingleLineComment(_)
+                | AstNode::MultiLineComment(_),
+            ) => {
                 // Nothing to do here
             }
         }
@@ -274,7 +282,7 @@ impl DeclarationAnalyzer {
         self.collect_declarations(expr);
 
         match pattern.ast_node {
-            AstNode::Identifier(ref name) => {
+            NodeKind::Legacy(AstNode::Identifier(ref name)) => {
                 self.declare_symbol(SymbolInfo::new(
                     id,
                     name,
@@ -282,9 +290,11 @@ impl DeclarationAnalyzer {
                     Some(pattern.span.clone()),
                 ));
             }
-            AstNode::ListPattern(_) => self.collect_declarations(pattern),
-            AstNode::EnumPattern { .. } => self.collect_declarations(pattern),
-            AstNode::VariableDeclaration { .. } => self.collect_declarations(pattern),
+            NodeKind::Legacy(AstNode::ListPattern(_)) => self.collect_declarations(pattern),
+            NodeKind::Legacy(AstNode::EnumPattern { .. }) => self.collect_declarations(pattern),
+            NodeKind::Legacy(AstNode::VariableDeclaration { .. }) => {
+                self.collect_declarations(pattern)
+            }
             _ => panic!("Expected identifier, found {:?}", pattern.ast_node),
         };
     }
@@ -292,19 +302,19 @@ impl DeclarationAnalyzer {
     /// TODO: This is a temporary solution. We need to find a better way to handle this.
     fn fn_identifier_to_string(&self, identifier: &Node) -> String {
         match identifier.ast_node {
-            AstNode::Identifier(ref name) => name.to_string(),
-            AstNode::NestedIdentifier(ref names) => names.join("::"),
-            AstNode::FieldExpression {
+            NodeKind::Legacy(AstNode::Identifier(ref name)) => name.to_string(),
+            NodeKind::Legacy(AstNode::NestedIdentifier(ref names)) => names.join("::"),
+            NodeKind::Legacy(AstNode::FieldExpression {
                 ref base,
                 ref field,
-            } => {
+            }) => {
                 let base_name = match base.ast_node {
-                    AstNode::Identifier(ref name) => name.to_string(),
+                    NodeKind::Legacy(AstNode::Identifier(ref name)) => name.to_string(),
                     _ => panic!("Expected identifier, found {:?}", base),
                 };
 
                 let field_name = match field.ast_node {
-                    AstNode::Identifier(ref name) => name.to_string(),
+                    NodeKind::Legacy(AstNode::Identifier(ref name)) => name.to_string(),
                     _ => panic!("Expected identifier, found {:?}", field),
                 };
 
@@ -370,7 +380,7 @@ impl DeclarationAnalyzer {
 
     fn collect_function_parameter(&mut self, _node: &mut Node, id: SymbolId, pattern: &mut Node) {
         match pattern.ast_node {
-            AstNode::Identifier(ref name) => {
+            NodeKind::Legacy(AstNode::Identifier(ref name)) => {
                 self.declare_symbol(SymbolInfo::new(
                     id,
                     name,
@@ -378,11 +388,13 @@ impl DeclarationAnalyzer {
                     Some(pattern.span.clone()),
                 ));
             }
-            AstNode::IdentifierPattern { .. } => self.collect_declarations(pattern),
-            AstNode::ListPattern(_) => self.collect_declarations(pattern),
-            AstNode::EnumPattern { .. } => self.collect_declarations(pattern),
-            AstNode::Wildcard => {} // Wildcard discards values, nothing to do here.
-            AstNode::Literal(_) => {} // Literal patterns don't need to be declared.
+            NodeKind::Legacy(AstNode::IdentifierPattern { .. }) => {
+                self.collect_declarations(pattern)
+            }
+            NodeKind::Legacy(AstNode::ListPattern(_)) => self.collect_declarations(pattern),
+            NodeKind::Legacy(AstNode::EnumPattern { .. }) => self.collect_declarations(pattern),
+            NodeKind::Legacy(AstNode::Wildcard) => {} // Wildcard discards values, nothing to do here.
+            NodeKind::Legacy(AstNode::Literal(_)) => {} // Literal patterns don't need to be declared.
             _ => panic!(
                 "Expected identifier, list or enum pattern, found {:?}",
                 pattern.ast_node
@@ -407,8 +419,10 @@ impl DeclarationAnalyzer {
             println!("Collecting enum pattern {:?}", element);
 
             match element.ast_node {
-                AstNode::IdentifierPattern { .. } => self.collect_declarations(element),
-                AstNode::Wildcard => {} // Wildcard discards values, nothing to do here.
+                NodeKind::Legacy(AstNode::IdentifierPattern { .. }) => {
+                    self.collect_declarations(element)
+                }
+                NodeKind::Legacy(AstNode::Wildcard) => {} // Wildcard discards values, nothing to do here.
                 _ => panic!("Expected identifier, found {:?}", element.ast_node),
             }
         }

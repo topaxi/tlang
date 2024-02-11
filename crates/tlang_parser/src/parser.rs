@@ -1,5 +1,6 @@
 use tlang_ast::node::{
-    self, Associativity, AstNode, BinaryOpKind, FunctionDeclaration, Node, OperatorInfo, UnaryOp,
+    self, Associativity, AstNode, BinaryOpKind, FunctionDeclaration, Node, NodeKind, OperatorInfo,
+    UnaryOp,
 };
 use tlang_ast::span::Span;
 use tlang_ast::symbols::SymbolId;
@@ -251,20 +252,20 @@ impl<'src> Parser<'src> {
 
         // FunctionDeclaration statements does not need to be terminated with a semicolon.
         match node.ast_node {
-            AstNode::FunctionSingleDeclaration { .. } | AstNode::FunctionDeclarations { .. } => {
-                return (false, Some(node))
-            }
+            NodeKind::Legacy(
+                AstNode::FunctionSingleDeclaration { .. } | AstNode::FunctionDeclarations { .. },
+            ) => return (false, Some(node)),
             _ => (),
         }
 
         // Neither do EnumDeclaration statements.
-        if let AstNode::EnumDeclaration { .. } = node.ast_node {
+        if let NodeKind::Legacy(AstNode::EnumDeclaration { .. }) = node.ast_node {
             return (false, Some(node));
         }
 
         // Expressions like IfElse as statements also do not need to be terminated with a semicolon.
-        if let AstNode::ExpressionStatement(ref expr) = node.ast_node {
-            if let AstNode::IfElse { .. } = expr.ast_node {
+        if let NodeKind::Legacy(AstNode::ExpressionStatement(ref expr)) = node.ast_node {
+            if let NodeKind::Legacy(AstNode::IfElse { .. }) = expr.ast_node {
                 return (false, Some(node));
             }
         }
@@ -400,18 +401,21 @@ impl<'src> Parser<'src> {
                     && self.current_token_kind() == Some(TokenKind::RBrace)
                     && matches!(
                         &statement.ast_node,
-                        AstNode::ExpressionStatement(_) | AstNode::FunctionSingleDeclaration { .. }
+                        NodeKind::Legacy(
+                            AstNode::ExpressionStatement(_)
+                                | AstNode::FunctionSingleDeclaration { .. }
+                        )
                     )
                 {
                     let mut expression = match statement.ast_node {
-                        AstNode::ExpressionStatement(expr) => expr,
+                        NodeKind::Legacy(AstNode::ExpressionStatement(expr)) => expr,
                         // Function declaration as completion expression.
                         // We remap the function declaration node to a function expression.
-                        AstNode::FunctionSingleDeclaration {
+                        NodeKind::Legacy(AstNode::FunctionSingleDeclaration {
                             id,
                             name,
                             declaration,
-                        } => Box::new(node::new!(FunctionExpression {
+                        }) => Box::new(node::new!(FunctionExpression {
                             id: id,
                             name: Box::new(Some(*name)),
                             declaration: declaration,
@@ -784,7 +788,7 @@ impl<'src> Parser<'src> {
 
                 self.advance();
 
-                if let AstNode::Identifier(identifier) = &node.ast_node {
+                if let NodeKind::Legacy(AstNode::Identifier(identifier)) = &node.ast_node {
                     if identifier == "_" {
                         node = node::new!(Wildcard);
                     } else {
@@ -1005,7 +1009,7 @@ impl<'src> Parser<'src> {
                 let mut identifier = self.parse_identifier_pattern();
 
                 // Remap identifier of _ to Wildcard
-                if let AstNode::Identifier(ref ident) = identifier.ast_node {
+                if let NodeKind::Legacy(AstNode::Identifier(ref ident)) = identifier.ast_node {
                     if ident == "_" {
                         identifier = node::new!(Wildcard);
                     }
@@ -1084,11 +1088,11 @@ impl<'src> Parser<'src> {
                 }
 
                 match node.ast_node {
-                    AstNode::Identifier(_) | AstNode::NestedIdentifier(_) => {
+                    NodeKind::Legacy(AstNode::Identifier(_) | AstNode::NestedIdentifier(_)) => {
                         // We found a simple identifier, which we can use as the name of the function.
                         name = Some(node);
                     }
-                    AstNode::FieldExpression { .. } => {
+                    NodeKind::Legacy(AstNode::FieldExpression { .. }) => {
                         // We found a field expression, which we can use as the name of the function.
                         name = Some(node);
                     }
@@ -1120,7 +1124,7 @@ impl<'src> Parser<'src> {
         if declarations.len() == 1 {
             let declaration = declarations.pop().unwrap();
 
-            if let AstNode::FunctionDeclaration(_) = declaration.ast_node {
+            if let NodeKind::Legacy(AstNode::FunctionDeclaration(_)) = declaration.ast_node {
                 return node::new!(FunctionSingleDeclaration {
                     id: self.unique_id(),
                     name: Box::new(name.unwrap()),
@@ -1154,7 +1158,9 @@ impl<'src> Parser<'src> {
             let expression = self.parse_expression();
 
             match expression.ast_node {
-                AstNode::Call { .. } | AstNode::BinaryOp { .. } | AstNode::UnaryOp { .. } => (),
+                NodeKind::Legacy(
+                    AstNode::Call { .. } | AstNode::BinaryOp { .. } | AstNode::UnaryOp { .. },
+                ) => (),
                 _ => {
                     self.panic_unexpected_node(
                         "function call, binary logical expression or unary logical expression",
@@ -1363,9 +1369,9 @@ impl<'src> Parser<'src> {
 
     fn fn_name_identifier_to_string(&self, identifier: &Node) -> String {
         match &identifier.ast_node {
-            AstNode::Identifier(identifier) => identifier.clone(),
-            AstNode::NestedIdentifier(identifiers) => identifiers.join("::"),
-            AstNode::FieldExpression { base, field } => {
+            NodeKind::Legacy(AstNode::Identifier(identifier)) => identifier.clone(),
+            NodeKind::Legacy(AstNode::NestedIdentifier(identifiers)) => identifiers.join("::"),
+            NodeKind::Legacy(AstNode::FieldExpression { base, field }) => {
                 format!(
                     "{}.{}",
                     self.fn_name_identifier_to_string(base),

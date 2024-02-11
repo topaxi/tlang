@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use tlang_ast::{
-    node::{AstNode, Node},
+    node::{AstNode, ExprKind, Node, NodeKind},
     symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
 };
 
@@ -123,134 +123,151 @@ impl SemanticAnalyzer {
             self.push_symbol_table(symbol_table);
         }
 
-        let mut ast_node = std::mem::replace(&mut ast.ast_node, AstNode::None);
+        let mut ast_node = std::mem::take(&mut ast.ast_node);
 
         match &mut ast_node {
-            AstNode::Module(nodes) => nodes.iter_mut().for_each(|node| self.analyze_node(node)),
-            AstNode::ExpressionStatement(node) => self.analyze_node(node),
-            AstNode::Block(nodes, return_value) => {
+            NodeKind::Expr(expr) => match &mut expr.kind {
+                ExprKind::Block(nodes, return_value) => {
+                    for node in nodes.iter_mut() {
+                        self.analyze_node(node)
+                    }
+
+                    self.analyze_optional_node(return_value);
+                }
+                _ => todo!(),
+            },
+            NodeKind::Legacy(AstNode::Module(nodes)) => {
+                nodes.iter_mut().for_each(|node| self.analyze_node(node))
+            }
+            NodeKind::Legacy(AstNode::ExpressionStatement(node)) => self.analyze_node(node),
+            NodeKind::Legacy(AstNode::Block(nodes, return_value)) => {
                 for node in nodes.iter_mut() {
                     self.analyze_node(node)
                 }
 
                 self.analyze_optional_node(return_value);
             }
-            AstNode::VariableDeclaration {
+            NodeKind::Legacy(AstNode::VariableDeclaration {
                 id,
                 pattern,
                 expression,
                 type_annotation: _,
-            } => self.analyze_variable_declaration(*id, pattern, expression),
-            AstNode::FunctionSingleDeclaration {
+            }) => self.analyze_variable_declaration(*id, pattern, expression),
+            NodeKind::Legacy(AstNode::FunctionSingleDeclaration {
                 id: _,
                 name,
                 declaration,
-            } => self.analyze_function_declaration(ast, name, declaration),
-            AstNode::FunctionDeclarations {
+            }) => self.analyze_function_declaration(ast, name, declaration),
+            NodeKind::Legacy(AstNode::FunctionDeclarations {
                 id: _,
                 name,
                 declarations,
-            } => self.analyze_function_declarations(ast, name, declarations),
-            AstNode::FunctionDeclaration(declaration) => {
+            }) => self.analyze_function_declarations(ast, name, declarations),
+            NodeKind::Legacy(AstNode::FunctionDeclaration(declaration)) => {
                 for parameter in &mut declaration.parameters {
                     self.analyze_node(parameter);
                 }
 
                 self.analyze_node(&mut declaration.body);
             }
-            AstNode::FunctionExpression {
+            NodeKind::Legacy(AstNode::FunctionExpression {
                 id: _,
                 name,
                 declaration,
-            } => {
+            }) => {
                 self.analyze_optional_node(name);
                 self.analyze_node(declaration);
             }
-            AstNode::FunctionParameter {
+            NodeKind::Legacy(AstNode::FunctionParameter {
                 id: _,
                 pattern: node,
                 type_annotation: _,
-            } => self.analyze_function_parameter(ast, node),
-            AstNode::ReturnStatement(expr) => {
+            }) => self.analyze_function_parameter(ast, node),
+            NodeKind::Legacy(AstNode::ReturnStatement(expr)) => {
                 self.analyze_optional_node(expr);
             }
-            AstNode::IfElse {
+            NodeKind::Legacy(AstNode::IfElse {
                 condition,
                 then_branch,
                 else_branch,
-            } => {
+            }) => {
                 self.analyze_node(condition);
                 self.analyze_node(then_branch);
                 self.analyze_optional_node(else_branch);
             }
-            AstNode::Identifier(_) if self.identifier_is_declaration => {}
-            AstNode::Identifier(name) => self.mark_as_used_by_name(name, ast),
-            AstNode::NestedIdentifier(idents) => {
+            NodeKind::Legacy(AstNode::Identifier(_)) if self.identifier_is_declaration => {}
+            NodeKind::Legacy(AstNode::Identifier(name)) => self.mark_as_used_by_name(name, ast),
+            NodeKind::Legacy(AstNode::NestedIdentifier(idents)) => {
                 if let Some(first_ident) = idents.first() {
                     self.mark_as_used_by_name(first_ident, ast);
                 }
 
                 // TODO: Handle nested identifiers
             }
-            AstNode::Call {
+            NodeKind::Legacy(AstNode::Call {
                 function,
                 arguments,
-            } => {
+            }) => {
                 self.analyze_call(function, arguments);
             }
-            AstNode::RecursiveCall(node) => {
+            NodeKind::Legacy(AstNode::RecursiveCall(node)) => {
                 self.analyze_node(node);
             }
-            AstNode::BinaryOp { op: _, lhs, rhs } => {
+            NodeKind::Legacy(AstNode::BinaryOp { op: _, lhs, rhs }) => {
                 self.analyze_node(lhs);
                 self.analyze_node(rhs);
             }
-            AstNode::UnaryOp(_, node) => {
+            NodeKind::Legacy(AstNode::UnaryOp(_, node)) => {
                 self.analyze_node(node);
             }
-            AstNode::List(values) => {
+            NodeKind::Legacy(AstNode::List(values)) => {
                 for value in values {
                     self.analyze_node(value);
                 }
             }
-            AstNode::IndexExpression { base, index } => {
+            NodeKind::Legacy(AstNode::IndexExpression { base, index }) => {
                 self.analyze_node(base);
                 self.analyze_node(index);
             }
-            AstNode::FieldExpression { base, field: _ } => {
+            NodeKind::Legacy(AstNode::FieldExpression { base, field: _ }) => {
                 self.analyze_node(base);
                 // TODO: We are checking for unused variables, this should be refactored into
                 //       it's own pass. Skipping analyzing field of variable as we do not have
                 //       any type information yet.
                 // self.analyze_node(field);
             }
-            AstNode::ListPattern(patterns) => {
+            NodeKind::Legacy(AstNode::ListPattern(patterns)) => {
                 for pattern in patterns {
                     self.analyze_declaration_node(pattern);
                 }
             }
-            AstNode::EnumPattern {
+            NodeKind::Legacy(AstNode::EnumPattern {
                 identifier,
                 elements: _,
                 ..
-            } => {
+            }) => {
                 self.analyze_node(identifier);
             }
-            AstNode::Dict(_)
-            | AstNode::EnumDeclaration { .. }
-            | AstNode::EnumVariant { .. }
-            | AstNode::IdentifierPattern { .. }
-            | AstNode::Range { .. }
-            | AstNode::Match { .. }
-            | AstNode::MatchArm { .. }
-            | AstNode::TypeAnnotation { .. } => {
+            NodeKind::Legacy(
+                AstNode::Dict(_)
+                | AstNode::EnumDeclaration { .. }
+                | AstNode::EnumVariant { .. }
+                | AstNode::IdentifierPattern { .. }
+                | AstNode::Range { .. }
+                | AstNode::Match { .. }
+                | AstNode::MatchArm { .. }
+                | AstNode::TypeAnnotation { .. },
+            ) => {
                 // TODO
             }
-            AstNode::None
-            | AstNode::Wildcard
-            | AstNode::Literal(_)
-            | AstNode::SingleLineComment(_)
-            | AstNode::MultiLineComment(_) => {
+            NodeKind::None
+            | NodeKind::Legacy(
+                AstNode::None
+                | AstNode::Wildcard
+                | AstNode::Literal(_)
+                | AstNode::SingleLineComment(_)
+                | AstNode::MultiLineComment(_),
+            ) => {
                 // Nothing to do here
             }
         }

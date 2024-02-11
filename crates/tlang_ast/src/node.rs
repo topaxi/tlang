@@ -14,8 +14,19 @@ pub enum Associativity {
     Right,
 }
 
+// Backwards compatible with the old AST, while migrating to the new AST
 #[derive(Debug, PartialEq, Clone, Serialize)]
-pub enum NodeKind {}
+pub enum NodeKind {
+    None,
+    Legacy(AstNode),
+    Expr(Expr),
+}
+
+impl Default for NodeKind {
+    fn default() -> Self {
+        NodeKind::None
+    }
+}
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct Node<N = NodeKind> {
@@ -37,7 +48,7 @@ impl Node {
 impl From<AstNode> for Node {
     fn from(ast_node: AstNode) -> Self {
         Node {
-            ast_node,
+            ast_node: NodeKind::Legacy(ast_node),
             symbol_table: None,
             span: Span::default(),
         }
@@ -47,7 +58,7 @@ impl From<AstNode> for Node {
 impl<'a> From<&'a Token> for Node {
     fn from(token: &Token) -> Self {
         Node {
-            ast_node: AstNode::from(&token.kind),
+            ast_node: NodeKind::Legacy(AstNode::from(&token.kind)),
             symbol_table: None,
             span: Span::from_token(token),
         }
@@ -127,7 +138,17 @@ impl<'a> From<&'a TokenKind> for ExprKind {
 pub enum AstNode {
     None,
     Module(Vec<Node>),
+    Block(Vec<Node>, Box<Option<Node>>),
+    Literal(Literal),
+    List(Vec<Node>),
     ListPattern(Vec<Node>),
+    Dict(Vec<(Node, Node)>),
+    UnaryOp(UnaryOp, Box<Node>),
+    BinaryOp {
+        op: BinaryOpKind,
+        lhs: Box<Node>,
+        rhs: Box<Node>,
+    },
     ExpressionStatement(Box<Node>),
     VariableDeclaration {
         // Unique identifier for the variable, used to reference it in the symbol table and
@@ -149,21 +170,40 @@ pub enum AstNode {
         name: Box<Node>,
         declarations: Vec<Node>,
     },
+    FunctionExpression {
+        id: SymbolId,
+        name: Box<Option<Node>>,
+        declaration: Box<Node>,
+    },
     FunctionParameter {
         id: SymbolId,
         pattern: Box<Node>,
         type_annotation: Box<Option<Node>>,
     },
     ReturnStatement(Box<Option<Node>>),
+    Match {
+        expression: Box<Node>,
+        arms: Vec<Node>,
+    },
     MatchArm {
         pattern: Box<Node>,
         expression: Box<Node>,
     },
     Wildcard,
+    IfElse {
+        condition: Box<Node>,
+        then_branch: Box<Node>,
+        else_branch: Box<Option<Node>>,
+    },
     Identifier(String),
     IdentifierPattern {
         id: SymbolId,
         name: String,
+    },
+    NestedIdentifier(Vec<String>),
+    Call {
+        function: Box<Node>,
+        arguments: Vec<Node>,
     },
     RecursiveCall(Box<Node>),
     SingleLineComment(String),
@@ -182,6 +222,14 @@ pub enum AstNode {
         identifier: Box<Node>,
         elements: Vec<Node>,
         named_fields: bool,
+    },
+    FieldExpression {
+        base: Box<Node>,
+        field: Box<Node>,
+    },
+    IndexExpression {
+        base: Box<Node>,
+        index: Box<Node>,
     },
     Range {
         start: Box<Node>,
@@ -254,42 +302,42 @@ pub type BinaryOp = Spanned<BinaryOpKind>;
 #[macro_export]
 macro_rules! new {
     ($node:ident) => {{
-        use tlang_ast::node::{Node, AstNode};
+        use tlang_ast::node::{Node, NodeKind, AstNode};
         use tlang_ast::span::Span;
 
-        Node::new(AstNode::$node, Span::default())
+        Node::new(NodeKind::Legacy(AstNode::$node), Span::default())
     }};
 
     ($node:ident($( $arg:expr ),* $(,)? )) => {{
-        use tlang_ast::node::{Node, AstNode};
+        use tlang_ast::node::{Node, NodeKind, AstNode};
         use tlang_ast::span::Span;
 
-        Node::new(AstNode::$node( $( $arg ),* ), Span::default())
+        Node::new(NodeKind::Legacy(AstNode::$node( $( $arg ),* )), Span::default())
     }};
 
     ($node:ident { $( $field:ident : $value:expr ),* $(,)? }) => {{
-        use tlang_ast::node::{Node, AstNode};
+        use tlang_ast::node::{Node, NodeKind, AstNode};
         use tlang_ast::span::Span;
 
-        Node::new(AstNode::$node { $( $field : $value ),* }, Span::default())
+        Node::new(NodeKind::Legacy(AstNode::$node { $( $field : $value ),* }), Span::default())
     }};
 
     ($node:ident, $span:expr) => {{
-        use tlang_ast::node::{Node, AstNode};
+        use tlang_ast::node::{Node, NodeKind, AstNode};
 
-        Node::new(AstNode::$node, $span)
+        Node::new(NodeKind::Legacy(AstNode::$node), $span)
     }};
 
     ($node:ident($( $arg:expr ),* $(,)? ), $span:expr) => {{
-        use tlang_ast::node::{Node, AstNode};
+        use tlang_ast::node::{Node, NodeKind, AstNode};
 
-        Node::new(AstNode::$node( $( $arg ),* ), $span)
+        Node::new(NodeKind::Legacy(AstNode::$node( $( $arg ),* )), $span)
     }};
 
     ($node:ident { $( $field:ident : $value:expr ),* $(,)? }, $span:expr) => {{
-        use tlang_ast::node::{Node, AstNode};
+        use tlang_ast::node::{Node, NodeKind, AstNode};
 
-        Node::new(AstNode::$node { $( $field : $value ),* }, $span)
+        Node::new(NodeKind::Legacy(AstNode::$node { $( $field : $value ),* }), $span)
     }};
 }
 

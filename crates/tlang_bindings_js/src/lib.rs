@@ -1,7 +1,7 @@
 extern crate console_error_panic_hook;
 
 use tlang_ast::{
-    node::{AstNode, Node},
+    node::{Node, NodeKind},
     symbols::SymbolType,
 };
 use tlang_codegen_js::generator::CodegenJS;
@@ -32,7 +32,7 @@ impl TlangCompiler {
             source: source.to_string(),
             codegen: CodegenJS::default(),
             analyzer: SemanticAnalyzer::default(),
-            ast: Node::new(AstNode::None, Default::default()),
+            ast: Node::new(NodeKind::None, Default::default()),
             diagnostics: Vec::new(),
             parse_errors: Vec::new(),
         }
