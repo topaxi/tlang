@@ -3,12 +3,12 @@ source: crates/tlang_parser/tests/parser_types.rs
 expression: "parse!(\"let x: std::hash::Map<str, i64> = std::hash::Map();\")"
 ---
 Node(
-  ast_node: Module([
+  ast_node: Legacy(Module([
     Node(
-      ast_node: VariableDeclaration(
+      ast_node: Legacy(VariableDeclaration(
         id: SymbolId(1),
         pattern: Node(
-          ast_node: Identifier("x"),
+          ast_node: Legacy(Identifier("x")),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -22,13 +22,13 @@ Node(
           ),
         ),
         expression: Node(
-          ast_node: Call(
+          ast_node: Legacy(Call(
             function: Node(
-              ast_node: NestedIdentifier([
+              ast_node: Legacy(NestedIdentifier([
                 "std",
                 "hash",
                 "Map",
-              ]),
+              ])),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -42,7 +42,7 @@ Node(
               ),
             ),
             arguments: [],
-          ),
+          )),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -56,13 +56,13 @@ Node(
           ),
         ),
         type_annotation: Some(Node(
-          ast_node: TypeAnnotation(
+          ast_node: Legacy(TypeAnnotation(
             name: Node(
-              ast_node: NestedIdentifier([
+              ast_node: Legacy(NestedIdentifier([
                 "std",
                 "hash",
                 "Map",
-              ]),
+              ])),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -77,9 +77,9 @@ Node(
             ),
             parameters: [
               Node(
-                ast_node: TypeAnnotation(
+                ast_node: Legacy(TypeAnnotation(
                   name: Node(
-                    ast_node: Identifier("str"),
+                    ast_node: Legacy(Identifier("str")),
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
@@ -93,7 +93,7 @@ Node(
                     ),
                   ),
                   parameters: [],
-                ),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -107,9 +107,9 @@ Node(
                 ),
               ),
               Node(
-                ast_node: TypeAnnotation(
+                ast_node: Legacy(TypeAnnotation(
                   name: Node(
-                    ast_node: Identifier("i64"),
+                    ast_node: Legacy(Identifier("i64")),
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
@@ -123,7 +123,7 @@ Node(
                     ),
                   ),
                   parameters: [],
-                ),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -137,7 +137,7 @@ Node(
                 ),
               ),
             ],
-          ),
+          )),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -150,7 +150,7 @@ Node(
             ),
           ),
         )),
-      ),
+      )),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -163,7 +163,7 @@ Node(
         ),
       ),
     ),
-  ]),
+  ])),
   symbol_table: None,
   span: Span(
     start: LineColumn(

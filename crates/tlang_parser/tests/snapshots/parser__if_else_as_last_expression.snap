@@ -3,12 +3,12 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse!(\"fn main() { if true { 1 } else { 2 } }\")"
 ---
 Node(
-  ast_node: Module([
+  ast_node: Legacy(Module([
     Node(
-      ast_node: FunctionSingleDeclaration(
+      ast_node: Legacy(FunctionSingleDeclaration(
         id: SymbolId(1),
         name: Node(
-          ast_node: Identifier("main"),
+          ast_node: Legacy(Identifier("main")),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -22,15 +22,15 @@ Node(
           ),
         ),
         declaration: Node(
-          ast_node: FunctionDeclaration(FunctionDeclaration(
+          ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
             parameters: [],
             guard: None,
             return_type_annotation: None,
             body: Node(
-              ast_node: Block([], Some(Node(
-                ast_node: IfElse(
+              ast_node: Legacy(Block([], Some(Node(
+                ast_node: Legacy(IfElse(
                   condition: Node(
-                    ast_node: Literal(Boolean(true)),
+                    ast_node: Legacy(Literal(Boolean(true))),
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
@@ -44,8 +44,8 @@ Node(
                     ),
                   ),
                   then_branch: Node(
-                    ast_node: Block([], Some(Node(
-                      ast_node: Literal(Integer(1)),
+                    ast_node: Legacy(Block([], Some(Node(
+                      ast_node: Legacy(Literal(Integer(1))),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -57,7 +57,7 @@ Node(
                           column: 23,
                         ),
                       ),
-                    ))),
+                    )))),
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
@@ -71,8 +71,8 @@ Node(
                     ),
                   ),
                   else_branch: Some(Node(
-                    ast_node: Block([], Some(Node(
-                      ast_node: Literal(Integer(2)),
+                    ast_node: Legacy(Block([], Some(Node(
+                      ast_node: Legacy(Literal(Integer(2))),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -84,7 +84,7 @@ Node(
                           column: 34,
                         ),
                       ),
-                    ))),
+                    )))),
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
@@ -97,7 +97,7 @@ Node(
                       ),
                     ),
                   )),
-                ),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -109,7 +109,7 @@ Node(
                     column: 36,
                   ),
                 ),
-              ))),
+              )))),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -122,7 +122,7 @@ Node(
                 ),
               ),
             ),
-          )),
+          ))),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -135,7 +135,7 @@ Node(
             ),
           ),
         ),
-      ),
+      )),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -148,7 +148,7 @@ Node(
         ),
       ),
     ),
-  ]),
+  ])),
   symbol_table: None,
   span: Span(
     start: LineColumn(

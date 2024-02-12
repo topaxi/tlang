@@ -3,12 +3,12 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse!(\"foo(1, 2);\")"
 ---
 Node(
-  ast_node: Module([
+  ast_node: Legacy(Module([
     Node(
-      ast_node: ExpressionStatement(Node(
-        ast_node: Call(
+      ast_node: Legacy(ExpressionStatement(Node(
+        ast_node: Legacy(Call(
           function: Node(
-            ast_node: Identifier("foo"),
+            ast_node: Legacy(Identifier("foo")),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -23,7 +23,7 @@ Node(
           ),
           arguments: [
             Node(
-              ast_node: Literal(Integer(1)),
+              ast_node: Legacy(Literal(Integer(1))),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -37,7 +37,7 @@ Node(
               ),
             ),
             Node(
-              ast_node: Literal(Integer(2)),
+              ast_node: Legacy(Literal(Integer(2))),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -51,7 +51,7 @@ Node(
               ),
             ),
           ],
-        ),
+        )),
         symbol_table: None,
         span: Span(
           start: LineColumn(
@@ -63,7 +63,7 @@ Node(
             column: 9,
           ),
         ),
-      )),
+      ))),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -76,7 +76,7 @@ Node(
         ),
       ),
     ),
-  ]),
+  ])),
   symbol_table: None,
   span: Span(
     start: LineColumn(

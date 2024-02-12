@@ -32,7 +32,7 @@ impl TlangCompiler {
             source: source.to_string(),
             codegen: CodegenJS::default(),
             analyzer: SemanticAnalyzer::default(),
-            ast: Node::new(NodeKind::None, Default::default()),
+            ast: Node::default(),
             diagnostics: Vec::new(),
             parse_errors: Vec::new(),
         }

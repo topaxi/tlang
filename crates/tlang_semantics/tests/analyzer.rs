@@ -1,7 +1,7 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
 use tlang_ast::{
-    node::AstNode,
+    node::{AstNode, NodeKind},
     span::{LineColumn, Span},
     symbols::{SymbolId, SymbolInfo, SymbolType},
 };
@@ -240,13 +240,13 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
     );
 
     let (function_node, function_declaration) = match ast.ast_node {
-        AstNode::Module(ref nodes) => match &nodes[0].ast_node {
-            AstNode::FunctionSingleDeclaration {
+        NodeKind::Legacy(AstNode::Module(ref nodes)) => match &nodes[0].ast_node {
+            NodeKind::Legacy(AstNode::FunctionSingleDeclaration {
                 id: _,
                 name: _,
                 declaration,
-            } => match &declaration.ast_node {
-                AstNode::FunctionDeclaration(declaration) => {
+            }) => match &declaration.ast_node {
+                NodeKind::Legacy(AstNode::FunctionDeclaration(declaration)) => {
                     (nodes[0].clone(), declaration.clone())
                 }
                 _ => panic!("Expected function declaration {:?}", declaration),

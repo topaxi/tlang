@@ -3,12 +3,12 @@ source: crates/tlang_parser/tests/parser_fn.rs
 expression: "parse!(indoc! {\n        \"\n        fn foo(1) { 1 }\n        // comment\n        fn foo(n) { n * 2 }\n    \"\n    })"
 ---
 Node(
-  ast_node: Module([
+  ast_node: Legacy(Module([
     Node(
-      ast_node: FunctionDeclarations(
+      ast_node: Legacy(FunctionDeclarations(
         id: SymbolId(3),
         name: Node(
-          ast_node: Identifier("foo"),
+          ast_node: Legacy(Identifier("foo")),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -23,13 +23,13 @@ Node(
         ),
         declarations: [
           Node(
-            ast_node: FunctionDeclaration(FunctionDeclaration(
+            ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
               parameters: [
                 Node(
-                  ast_node: FunctionParameter(
+                  ast_node: Legacy(FunctionParameter(
                     id: SymbolId(1),
                     pattern: Node(
-                      ast_node: Literal(Integer(1)),
+                      ast_node: Legacy(Literal(Integer(1))),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -43,7 +43,7 @@ Node(
                       ),
                     ),
                     type_annotation: None,
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -60,8 +60,8 @@ Node(
               guard: None,
               return_type_annotation: None,
               body: Node(
-                ast_node: Block([], Some(Node(
-                  ast_node: Literal(Integer(1)),
+                ast_node: Legacy(Block([], Some(Node(
+                  ast_node: Legacy(Literal(Integer(1))),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -73,7 +73,7 @@ Node(
                       column: 13,
                     ),
                   ),
-                ))),
+                )))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -86,7 +86,7 @@ Node(
                   ),
                 ),
               ),
-            )),
+            ))),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -100,7 +100,7 @@ Node(
             ),
           ),
           Node(
-            ast_node: SingleLineComment(" comment"),
+            ast_node: Legacy(SingleLineComment(" comment")),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -114,13 +114,13 @@ Node(
             ),
           ),
           Node(
-            ast_node: FunctionDeclaration(FunctionDeclaration(
+            ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
               parameters: [
                 Node(
-                  ast_node: FunctionParameter(
+                  ast_node: Legacy(FunctionParameter(
                     id: SymbolId(2),
                     pattern: Node(
-                      ast_node: Identifier("n"),
+                      ast_node: Legacy(Identifier("n")),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -134,7 +134,7 @@ Node(
                       ),
                     ),
                     type_annotation: None,
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -151,11 +151,11 @@ Node(
               guard: None,
               return_type_annotation: None,
               body: Node(
-                ast_node: Block([], Some(Node(
-                  ast_node: BinaryOp(
+                ast_node: Legacy(Block([], Some(Node(
+                  ast_node: Legacy(BinaryOp(
                     op: Multiply,
                     lhs: Node(
-                      ast_node: Identifier("n"),
+                      ast_node: Legacy(Identifier("n")),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -169,7 +169,7 @@ Node(
                       ),
                     ),
                     rhs: Node(
-                      ast_node: Literal(Integer(2)),
+                      ast_node: Legacy(Literal(Integer(2))),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -182,7 +182,7 @@ Node(
                         ),
                       ),
                     ),
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -194,7 +194,7 @@ Node(
                       column: 18,
                     ),
                   ),
-                ))),
+                )))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -207,7 +207,7 @@ Node(
                   ),
                 ),
               ),
-            )),
+            ))),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -221,7 +221,7 @@ Node(
             ),
           ),
         ],
-      ),
+      )),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -234,7 +234,7 @@ Node(
         ),
       ),
     ),
-  ]),
+  ])),
   symbol_table: None,
   span: Span(
     start: LineColumn(

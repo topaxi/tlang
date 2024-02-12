@@ -3,12 +3,12 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse!(\"if true { 1; } else if false { 2; }\")"
 ---
 Node(
-  ast_node: Module([
+  ast_node: Legacy(Module([
     Node(
-      ast_node: ExpressionStatement(Node(
-        ast_node: IfElse(
+      ast_node: Legacy(ExpressionStatement(Node(
+        ast_node: Legacy(IfElse(
           condition: Node(
-            ast_node: Literal(Boolean(true)),
+            ast_node: Legacy(Literal(Boolean(true))),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -22,10 +22,10 @@ Node(
             ),
           ),
           then_branch: Node(
-            ast_node: Block([
+            ast_node: Legacy(Block([
               Node(
-                ast_node: ExpressionStatement(Node(
-                  ast_node: Literal(Integer(1)),
+                ast_node: Legacy(ExpressionStatement(Node(
+                  ast_node: Legacy(Literal(Integer(1))),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -37,7 +37,7 @@ Node(
                       column: 11,
                     ),
                   ),
-                )),
+                ))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -50,7 +50,7 @@ Node(
                   ),
                 ),
               ),
-            ], None),
+            ], None)),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -64,9 +64,9 @@ Node(
             ),
           ),
           else_branch: Some(Node(
-            ast_node: IfElse(
+            ast_node: Legacy(IfElse(
               condition: Node(
-                ast_node: Literal(Boolean(false)),
+                ast_node: Legacy(Literal(Boolean(false))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -80,10 +80,10 @@ Node(
                 ),
               ),
               then_branch: Node(
-                ast_node: Block([
+                ast_node: Legacy(Block([
                   Node(
-                    ast_node: ExpressionStatement(Node(
-                      ast_node: Literal(Integer(2)),
+                    ast_node: Legacy(ExpressionStatement(Node(
+                      ast_node: Legacy(Literal(Integer(2))),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -95,7 +95,7 @@ Node(
                           column: 32,
                         ),
                       ),
-                    )),
+                    ))),
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
@@ -108,7 +108,7 @@ Node(
                       ),
                     ),
                   ),
-                ], None),
+                ], None)),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -122,7 +122,7 @@ Node(
                 ),
               ),
               else_branch: None,
-            ),
+            )),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -135,7 +135,7 @@ Node(
               ),
             ),
           )),
-        ),
+        )),
         symbol_table: None,
         span: Span(
           start: LineColumn(
@@ -147,7 +147,7 @@ Node(
             column: 35,
           ),
         ),
-      )),
+      ))),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -160,7 +160,7 @@ Node(
         ),
       ),
     ),
-  ]),
+  ])),
   symbol_table: None,
   span: Span(
     start: LineColumn(

@@ -3,17 +3,17 @@ source: crates/tlang_parser/tests/parser_let.rs
 expression: "parse!(\"let [x, y, ...z] = [1, 2, 3, 4];\")"
 ---
 Node(
-  ast_node: Module([
+  ast_node: Legacy(Module([
     Node(
-      ast_node: VariableDeclaration(
+      ast_node: Legacy(VariableDeclaration(
         id: SymbolId(4),
         pattern: Node(
-          ast_node: ListPattern([
+          ast_node: Legacy(ListPattern([
             Node(
-              ast_node: IdentifierPattern(
+              ast_node: Legacy(IdentifierPattern(
                 id: SymbolId(1),
                 name: "x",
-              ),
+              )),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -27,10 +27,10 @@ Node(
               ),
             ),
             Node(
-              ast_node: IdentifierPattern(
+              ast_node: Legacy(IdentifierPattern(
                 id: SymbolId(2),
                 name: "y",
-              ),
+              )),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -44,11 +44,11 @@ Node(
               ),
             ),
             Node(
-              ast_node: UnaryOp(Rest, Node(
-                ast_node: IdentifierPattern(
+              ast_node: Legacy(UnaryOp(Rest, Node(
+                ast_node: Legacy(IdentifierPattern(
                   id: SymbolId(3),
                   name: "z",
-                ),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -60,7 +60,7 @@ Node(
                     column: 15,
                   ),
                 ),
-              )),
+              ))),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -73,7 +73,7 @@ Node(
                 ),
               ),
             ),
-          ]),
+          ])),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -87,9 +87,9 @@ Node(
           ),
         ),
         expression: Node(
-          ast_node: List([
+          ast_node: Legacy(List([
             Node(
-              ast_node: Literal(Integer(1)),
+              ast_node: Legacy(Literal(Integer(1))),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -103,7 +103,7 @@ Node(
               ),
             ),
             Node(
-              ast_node: Literal(Integer(2)),
+              ast_node: Legacy(Literal(Integer(2))),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -117,7 +117,7 @@ Node(
               ),
             ),
             Node(
-              ast_node: Literal(Integer(3)),
+              ast_node: Legacy(Literal(Integer(3))),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -131,7 +131,7 @@ Node(
               ),
             ),
             Node(
-              ast_node: Literal(Integer(4)),
+              ast_node: Legacy(Literal(Integer(4))),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -144,7 +144,7 @@ Node(
                 ),
               ),
             ),
-          ]),
+          ])),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -158,7 +158,7 @@ Node(
           ),
         ),
         type_annotation: None,
-      ),
+      )),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -171,7 +171,7 @@ Node(
         ),
       ),
     ),
-  ]),
+  ])),
   symbol_table: None,
   span: Span(
     start: LineColumn(

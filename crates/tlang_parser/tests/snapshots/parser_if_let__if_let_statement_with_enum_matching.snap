@@ -3,20 +3,20 @@ source: crates/tlang_parser/tests/parser_if_let.rs
 expression: "parse!(indoc! {\n        \"\n        if let Option::Some(y) = x; {\n            y\n        }\n    \"\n    })"
 ---
 Node(
-  ast_node: Module([
+  ast_node: Legacy(Module([
     Node(
-      ast_node: ExpressionStatement(Node(
-        ast_node: IfElse(
+      ast_node: Legacy(ExpressionStatement(Node(
+        ast_node: Legacy(IfElse(
           condition: Node(
-            ast_node: VariableDeclaration(
+            ast_node: Legacy(VariableDeclaration(
               id: SymbolId(2),
               pattern: Node(
-                ast_node: EnumPattern(
+                ast_node: Legacy(EnumPattern(
                   identifier: Node(
-                    ast_node: NestedIdentifier([
+                    ast_node: Legacy(NestedIdentifier([
                       "Option",
                       "Some",
-                    ]),
+                    ])),
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
@@ -31,10 +31,10 @@ Node(
                   ),
                   elements: [
                     Node(
-                      ast_node: IdentifierPattern(
+                      ast_node: Legacy(IdentifierPattern(
                         id: SymbolId(1),
                         name: "y",
-                      ),
+                      )),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -49,7 +49,7 @@ Node(
                     ),
                   ],
                   named_fields: false,
-                ),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -63,7 +63,7 @@ Node(
                 ),
               ),
               expression: Node(
-                ast_node: Identifier("x"),
+                ast_node: Legacy(Identifier("x")),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -77,7 +77,7 @@ Node(
                 ),
               ),
               type_annotation: None,
-            ),
+            )),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -91,8 +91,8 @@ Node(
             ),
           ),
           then_branch: Node(
-            ast_node: Block([], Some(Node(
-              ast_node: Identifier("y"),
+            ast_node: Legacy(Block([], Some(Node(
+              ast_node: Legacy(Identifier("y")),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -104,7 +104,7 @@ Node(
                   column: 6,
                 ),
               ),
-            ))),
+            )))),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -118,7 +118,7 @@ Node(
             ),
           ),
           else_branch: None,
-        ),
+        )),
         symbol_table: None,
         span: Span(
           start: LineColumn(
@@ -130,7 +130,7 @@ Node(
             column: 2,
           ),
         ),
-      )),
+      ))),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -143,7 +143,7 @@ Node(
         ),
       ),
     ),
-  ]),
+  ])),
   symbol_table: None,
   span: Span(
     start: LineColumn(

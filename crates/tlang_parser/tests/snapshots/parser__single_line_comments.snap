@@ -3,9 +3,9 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse!(\"// this is a comment\")"
 ---
 Node(
-  ast_node: Module([
+  ast_node: Legacy(Module([
     Node(
-      ast_node: SingleLineComment(" this is a comment"),
+      ast_node: Legacy(SingleLineComment(" this is a comment")),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -18,7 +18,7 @@ Node(
         ),
       ),
     ),
-  ]),
+  ])),
   symbol_table: None,
   span: Span(
     start: LineColumn(

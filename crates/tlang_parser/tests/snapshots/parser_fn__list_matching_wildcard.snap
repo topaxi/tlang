@@ -3,12 +3,12 @@ source: crates/tlang_parser/tests/parser_fn.rs
 expression: "parse!(\"fn tail([_, ...xs]) { xs }\")"
 ---
 Node(
-  ast_node: Module([
+  ast_node: Legacy(Module([
     Node(
-      ast_node: FunctionSingleDeclaration(
+      ast_node: Legacy(FunctionSingleDeclaration(
         id: SymbolId(3),
         name: Node(
-          ast_node: Identifier("tail"),
+          ast_node: Legacy(Identifier("tail")),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -22,15 +22,15 @@ Node(
           ),
         ),
         declaration: Node(
-          ast_node: FunctionDeclaration(FunctionDeclaration(
+          ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
             parameters: [
               Node(
-                ast_node: FunctionParameter(
+                ast_node: Legacy(FunctionParameter(
                   id: SymbolId(2),
                   pattern: Node(
-                    ast_node: ListPattern([
+                    ast_node: Legacy(ListPattern([
                       Node(
-                        ast_node: Wildcard,
+                        ast_node: Legacy(Wildcard),
                         symbol_table: None,
                         span: Span(
                           start: LineColumn(
@@ -44,11 +44,11 @@ Node(
                         ),
                       ),
                       Node(
-                        ast_node: UnaryOp(Rest, Node(
-                          ast_node: IdentifierPattern(
+                        ast_node: Legacy(UnaryOp(Rest, Node(
+                          ast_node: Legacy(IdentifierPattern(
                             id: SymbolId(1),
                             name: "xs",
-                          ),
+                          )),
                           symbol_table: None,
                           span: Span(
                             start: LineColumn(
@@ -60,7 +60,7 @@ Node(
                               column: 17,
                             ),
                           ),
-                        )),
+                        ))),
                         symbol_table: None,
                         span: Span(
                           start: LineColumn(
@@ -73,7 +73,7 @@ Node(
                           ),
                         ),
                       ),
-                    ]),
+                    ])),
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
@@ -87,7 +87,7 @@ Node(
                     ),
                   ),
                   type_annotation: None,
-                ),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -104,8 +104,8 @@ Node(
             guard: None,
             return_type_annotation: None,
             body: Node(
-              ast_node: Block([], Some(Node(
-                ast_node: Identifier("xs"),
+              ast_node: Legacy(Block([], Some(Node(
+                ast_node: Legacy(Identifier("xs")),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -117,7 +117,7 @@ Node(
                     column: 24,
                   ),
                 ),
-              ))),
+              )))),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -130,7 +130,7 @@ Node(
                 ),
               ),
             ),
-          )),
+          ))),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -143,7 +143,7 @@ Node(
             ),
           ),
         ),
-      ),
+      )),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -156,7 +156,7 @@ Node(
         ),
       ),
     ),
-  ]),
+  ])),
   symbol_table: None,
   span: Span(
     start: LineColumn(

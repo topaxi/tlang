@@ -3,12 +3,12 @@ source: crates/tlang_parser/tests/parser_fn.rs
 expression: "parse!(\"fn foo() { let x = 1; x }\")"
 ---
 Node(
-  ast_node: Module([
+  ast_node: Legacy(Module([
     Node(
-      ast_node: FunctionSingleDeclaration(
+      ast_node: Legacy(FunctionSingleDeclaration(
         id: SymbolId(2),
         name: Node(
-          ast_node: Identifier("foo"),
+          ast_node: Legacy(Identifier("foo")),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -22,17 +22,17 @@ Node(
           ),
         ),
         declaration: Node(
-          ast_node: FunctionDeclaration(FunctionDeclaration(
+          ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
             parameters: [],
             guard: None,
             return_type_annotation: None,
             body: Node(
-              ast_node: Block([
+              ast_node: Legacy(Block([
                 Node(
-                  ast_node: VariableDeclaration(
+                  ast_node: Legacy(VariableDeclaration(
                     id: SymbolId(1),
                     pattern: Node(
-                      ast_node: Identifier("x"),
+                      ast_node: Legacy(Identifier("x")),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -46,7 +46,7 @@ Node(
                       ),
                     ),
                     expression: Node(
-                      ast_node: Literal(Integer(1)),
+                      ast_node: Legacy(Literal(Integer(1))),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -60,7 +60,7 @@ Node(
                       ),
                     ),
                     type_annotation: None,
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -74,7 +74,7 @@ Node(
                   ),
                 ),
               ], Some(Node(
-                ast_node: Identifier("x"),
+                ast_node: Legacy(Identifier("x")),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -86,7 +86,7 @@ Node(
                     column: 23,
                   ),
                 ),
-              ))),
+              )))),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -99,7 +99,7 @@ Node(
                 ),
               ),
             ),
-          )),
+          ))),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -112,7 +112,7 @@ Node(
             ),
           ),
         ),
-      ),
+      )),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -125,7 +125,7 @@ Node(
         ),
       ),
     ),
-  ]),
+  ])),
   symbol_table: None,
   span: Span(
     start: LineColumn(

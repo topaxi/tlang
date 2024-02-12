@@ -3,12 +3,12 @@ source: crates/tlang_parser/tests/parser_fn.rs
 expression: "parse!(\"fn foo() { fn bar() {} }\")"
 ---
 Node(
-  ast_node: Module([
+  ast_node: Legacy(Module([
     Node(
-      ast_node: FunctionSingleDeclaration(
+      ast_node: Legacy(FunctionSingleDeclaration(
         id: SymbolId(2),
         name: Node(
-          ast_node: Identifier("foo"),
+          ast_node: Legacy(Identifier("foo")),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -22,16 +22,16 @@ Node(
           ),
         ),
         declaration: Node(
-          ast_node: FunctionDeclaration(FunctionDeclaration(
+          ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
             parameters: [],
             guard: None,
             return_type_annotation: None,
             body: Node(
-              ast_node: Block([], Some(Node(
-                ast_node: FunctionExpression(
+              ast_node: Legacy(Block([], Some(Node(
+                ast_node: Legacy(FunctionExpression(
                   id: SymbolId(1),
                   name: Some(Node(
-                    ast_node: Identifier("bar"),
+                    ast_node: Legacy(Identifier("bar")),
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
@@ -45,12 +45,12 @@ Node(
                     ),
                   )),
                   declaration: Node(
-                    ast_node: FunctionDeclaration(FunctionDeclaration(
+                    ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
                       parameters: [],
                       guard: None,
                       return_type_annotation: None,
                       body: Node(
-                        ast_node: Block([], None),
+                        ast_node: Legacy(Block([], None)),
                         symbol_table: None,
                         span: Span(
                           start: LineColumn(
@@ -63,7 +63,7 @@ Node(
                           ),
                         ),
                       ),
-                    )),
+                    ))),
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
@@ -76,7 +76,7 @@ Node(
                       ),
                     ),
                   ),
-                ),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -88,7 +88,7 @@ Node(
                     column: 22,
                   ),
                 ),
-              ))),
+              )))),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -101,7 +101,7 @@ Node(
                 ),
               ),
             ),
-          )),
+          ))),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -114,7 +114,7 @@ Node(
             ),
           ),
         ),
-      ),
+      )),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -127,7 +127,7 @@ Node(
         ),
       ),
     ),
-  ]),
+  ])),
   symbol_table: None,
   span: Span(
     start: LineColumn(

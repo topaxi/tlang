@@ -3,14 +3,14 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse!(\"foo.bar.baz;\")"
 ---
 Node(
-  ast_node: Module([
+  ast_node: Legacy(Module([
     Node(
-      ast_node: ExpressionStatement(Node(
-        ast_node: FieldExpression(
+      ast_node: Legacy(ExpressionStatement(Node(
+        ast_node: Legacy(FieldExpression(
           base: Node(
-            ast_node: FieldExpression(
+            ast_node: Legacy(FieldExpression(
               base: Node(
-                ast_node: Identifier("foo"),
+                ast_node: Legacy(Identifier("foo")),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -24,7 +24,7 @@ Node(
                 ),
               ),
               field: Node(
-                ast_node: Identifier("bar"),
+                ast_node: Legacy(Identifier("bar")),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -37,7 +37,7 @@ Node(
                   ),
                 ),
               ),
-            ),
+            )),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -51,7 +51,7 @@ Node(
             ),
           ),
           field: Node(
-            ast_node: Identifier("baz"),
+            ast_node: Legacy(Identifier("baz")),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -64,7 +64,7 @@ Node(
               ),
             ),
           ),
-        ),
+        )),
         symbol_table: None,
         span: Span(
           start: LineColumn(
@@ -76,7 +76,7 @@ Node(
             column: 11,
           ),
         ),
-      )),
+      ))),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -89,7 +89,7 @@ Node(
         ),
       ),
     ),
-  ]),
+  ])),
   symbol_table: None,
   span: Span(
     start: LineColumn(

@@ -3,12 +3,12 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse!(\"let x = match 1 { 1 => 2, 3 => 4, _ => 5 };\")"
 ---
 Node(
-  ast_node: Module([
+  ast_node: Legacy(Module([
     Node(
-      ast_node: VariableDeclaration(
+      ast_node: Legacy(VariableDeclaration(
         id: SymbolId(1),
         pattern: Node(
-          ast_node: Identifier("x"),
+          ast_node: Legacy(Identifier("x")),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -22,9 +22,9 @@ Node(
           ),
         ),
         expression: Node(
-          ast_node: Match(
+          ast_node: Legacy(Match(
             expression: Node(
-              ast_node: Literal(Integer(1)),
+              ast_node: Legacy(Literal(Integer(1))),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -39,9 +39,9 @@ Node(
             ),
             arms: [
               Node(
-                ast_node: MatchArm(
+                ast_node: Legacy(MatchArm(
                   pattern: Node(
-                    ast_node: Literal(Integer(1)),
+                    ast_node: Legacy(Literal(Integer(1))),
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
@@ -55,7 +55,7 @@ Node(
                     ),
                   ),
                   expression: Node(
-                    ast_node: Literal(Integer(2)),
+                    ast_node: Legacy(Literal(Integer(2))),
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
@@ -68,7 +68,7 @@ Node(
                       ),
                     ),
                   ),
-                ),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -82,9 +82,9 @@ Node(
                 ),
               ),
               Node(
-                ast_node: MatchArm(
+                ast_node: Legacy(MatchArm(
                   pattern: Node(
-                    ast_node: Literal(Integer(3)),
+                    ast_node: Legacy(Literal(Integer(3))),
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
@@ -98,7 +98,7 @@ Node(
                     ),
                   ),
                   expression: Node(
-                    ast_node: Literal(Integer(4)),
+                    ast_node: Legacy(Literal(Integer(4))),
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
@@ -111,7 +111,7 @@ Node(
                       ),
                     ),
                   ),
-                ),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -125,9 +125,9 @@ Node(
                 ),
               ),
               Node(
-                ast_node: MatchArm(
+                ast_node: Legacy(MatchArm(
                   pattern: Node(
-                    ast_node: Wildcard,
+                    ast_node: Legacy(Wildcard),
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
@@ -141,7 +141,7 @@ Node(
                     ),
                   ),
                   expression: Node(
-                    ast_node: Literal(Integer(5)),
+                    ast_node: Legacy(Literal(Integer(5))),
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
@@ -154,7 +154,7 @@ Node(
                       ),
                     ),
                   ),
-                ),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -168,7 +168,7 @@ Node(
                 ),
               ),
             ],
-          ),
+          )),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -182,7 +182,7 @@ Node(
           ),
         ),
         type_annotation: None,
-      ),
+      )),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -195,7 +195,7 @@ Node(
         ),
       ),
     ),
-  ]),
+  ])),
   symbol_table: None,
   span: Span(
     start: LineColumn(

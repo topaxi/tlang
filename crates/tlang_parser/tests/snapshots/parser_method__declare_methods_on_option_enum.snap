@@ -3,19 +3,19 @@ source: crates/tlang_parser/tests/parser_method.rs
 expression: "parse!(indoc! {\n        \"\n        enum Option {\n            Some(x),\n            None,\n        }\n\n        fn Option::is_option(Option::Some(_)) { true }\n        fn Option::is_option(Option::None) { true }\n        fn Option::is_option(_) { false }\n\n        fn Option.is_some(Option::Some(_)) { true }\n        fn Option.is_some(Option::None) { false }\n\n        fn Option.map(Option::Some(x), f) { Option::Some(f(x)) }\n        fn Option.map(Option::None, _) { Option::None }\n    \"\n    })"
 ---
 Node(
-  ast_node: Module([
+  ast_node: Legacy(Module([
     Node(
-      ast_node: EnumDeclaration(
+      ast_node: Legacy(EnumDeclaration(
         id: SymbolId(1),
         name: "Option",
         variants: [
           Node(
-            ast_node: EnumVariant(
+            ast_node: Legacy(EnumVariant(
               name: "Some",
               named_fields: false,
               parameters: [
                 Node(
-                  ast_node: Identifier("x"),
+                  ast_node: Legacy(Identifier("x")),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -29,7 +29,7 @@ Node(
                   ),
                 ),
               ],
-            ),
+            )),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -43,11 +43,11 @@ Node(
             ),
           ),
           Node(
-            ast_node: EnumVariant(
+            ast_node: Legacy(EnumVariant(
               name: "None",
               named_fields: false,
               parameters: [],
-            ),
+            )),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -61,7 +61,7 @@ Node(
             ),
           ),
         ],
-      ),
+      )),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -75,13 +75,13 @@ Node(
       ),
     ),
     Node(
-      ast_node: FunctionDeclarations(
+      ast_node: Legacy(FunctionDeclarations(
         id: SymbolId(5),
         name: Node(
-          ast_node: NestedIdentifier([
+          ast_node: Legacy(NestedIdentifier([
             "Option",
             "is_option",
-          ]),
+          ])),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -96,18 +96,18 @@ Node(
         ),
         declarations: [
           Node(
-            ast_node: FunctionDeclaration(FunctionDeclaration(
+            ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
               parameters: [
                 Node(
-                  ast_node: FunctionParameter(
+                  ast_node: Legacy(FunctionParameter(
                     id: SymbolId(2),
                     pattern: Node(
-                      ast_node: EnumPattern(
+                      ast_node: Legacy(EnumPattern(
                         identifier: Node(
-                          ast_node: NestedIdentifier([
+                          ast_node: Legacy(NestedIdentifier([
                             "Option",
                             "Some",
-                          ]),
+                          ])),
                           symbol_table: None,
                           span: Span(
                             start: LineColumn(
@@ -122,7 +122,7 @@ Node(
                         ),
                         elements: [
                           Node(
-                            ast_node: Wildcard,
+                            ast_node: Legacy(Wildcard),
                             symbol_table: None,
                             span: Span(
                               start: LineColumn(
@@ -137,7 +137,7 @@ Node(
                           ),
                         ],
                         named_fields: false,
-                      ),
+                      )),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -151,7 +151,7 @@ Node(
                       ),
                     ),
                     type_annotation: None,
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -168,8 +168,8 @@ Node(
               guard: None,
               return_type_annotation: None,
               body: Node(
-                ast_node: Block([], Some(Node(
-                  ast_node: Literal(Boolean(true)),
+                ast_node: Legacy(Block([], Some(Node(
+                  ast_node: Legacy(Literal(Boolean(true))),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -181,7 +181,7 @@ Node(
                       column: 45,
                     ),
                   ),
-                ))),
+                )))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -194,7 +194,7 @@ Node(
                   ),
                 ),
               ),
-            )),
+            ))),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -208,18 +208,18 @@ Node(
             ),
           ),
           Node(
-            ast_node: FunctionDeclaration(FunctionDeclaration(
+            ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
               parameters: [
                 Node(
-                  ast_node: FunctionParameter(
+                  ast_node: Legacy(FunctionParameter(
                     id: SymbolId(3),
                     pattern: Node(
-                      ast_node: EnumPattern(
+                      ast_node: Legacy(EnumPattern(
                         identifier: Node(
-                          ast_node: NestedIdentifier([
+                          ast_node: Legacy(NestedIdentifier([
                             "Option",
                             "None",
-                          ]),
+                          ])),
                           symbol_table: None,
                           span: Span(
                             start: LineColumn(
@@ -234,7 +234,7 @@ Node(
                         ),
                         elements: [],
                         named_fields: false,
-                      ),
+                      )),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -248,7 +248,7 @@ Node(
                       ),
                     ),
                     type_annotation: None,
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -265,8 +265,8 @@ Node(
               guard: None,
               return_type_annotation: None,
               body: Node(
-                ast_node: Block([], Some(Node(
-                  ast_node: Literal(Boolean(true)),
+                ast_node: Legacy(Block([], Some(Node(
+                  ast_node: Legacy(Literal(Boolean(true))),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -278,7 +278,7 @@ Node(
                       column: 42,
                     ),
                   ),
-                ))),
+                )))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -291,7 +291,7 @@ Node(
                   ),
                 ),
               ),
-            )),
+            ))),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -305,13 +305,13 @@ Node(
             ),
           ),
           Node(
-            ast_node: FunctionDeclaration(FunctionDeclaration(
+            ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
               parameters: [
                 Node(
-                  ast_node: FunctionParameter(
+                  ast_node: Legacy(FunctionParameter(
                     id: SymbolId(4),
                     pattern: Node(
-                      ast_node: Wildcard,
+                      ast_node: Legacy(Wildcard),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -325,7 +325,7 @@ Node(
                       ),
                     ),
                     type_annotation: None,
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -342,8 +342,8 @@ Node(
               guard: None,
               return_type_annotation: None,
               body: Node(
-                ast_node: Block([], Some(Node(
-                  ast_node: Literal(Boolean(false)),
+                ast_node: Legacy(Block([], Some(Node(
+                  ast_node: Legacy(Literal(Boolean(false))),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -355,7 +355,7 @@ Node(
                       column: 32,
                     ),
                   ),
-                ))),
+                )))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -368,7 +368,7 @@ Node(
                   ),
                 ),
               ),
-            )),
+            ))),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -382,7 +382,7 @@ Node(
             ),
           ),
         ],
-      ),
+      )),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -396,12 +396,12 @@ Node(
       ),
     ),
     Node(
-      ast_node: FunctionDeclarations(
+      ast_node: Legacy(FunctionDeclarations(
         id: SymbolId(8),
         name: Node(
-          ast_node: FieldExpression(
+          ast_node: Legacy(FieldExpression(
             base: Node(
-              ast_node: Identifier("Option"),
+              ast_node: Legacy(Identifier("Option")),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -415,7 +415,7 @@ Node(
               ),
             ),
             field: Node(
-              ast_node: Identifier("is_some"),
+              ast_node: Legacy(Identifier("is_some")),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -428,7 +428,7 @@ Node(
                 ),
               ),
             ),
-          ),
+          )),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -443,18 +443,18 @@ Node(
         ),
         declarations: [
           Node(
-            ast_node: FunctionDeclaration(FunctionDeclaration(
+            ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
               parameters: [
                 Node(
-                  ast_node: FunctionParameter(
+                  ast_node: Legacy(FunctionParameter(
                     id: SymbolId(6),
                     pattern: Node(
-                      ast_node: EnumPattern(
+                      ast_node: Legacy(EnumPattern(
                         identifier: Node(
-                          ast_node: NestedIdentifier([
+                          ast_node: Legacy(NestedIdentifier([
                             "Option",
                             "Some",
-                          ]),
+                          ])),
                           symbol_table: None,
                           span: Span(
                             start: LineColumn(
@@ -469,7 +469,7 @@ Node(
                         ),
                         elements: [
                           Node(
-                            ast_node: Wildcard,
+                            ast_node: Legacy(Wildcard),
                             symbol_table: None,
                             span: Span(
                               start: LineColumn(
@@ -484,7 +484,7 @@ Node(
                           ),
                         ],
                         named_fields: false,
-                      ),
+                      )),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -498,7 +498,7 @@ Node(
                       ),
                     ),
                     type_annotation: None,
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -515,8 +515,8 @@ Node(
               guard: None,
               return_type_annotation: None,
               body: Node(
-                ast_node: Block([], Some(Node(
-                  ast_node: Literal(Boolean(true)),
+                ast_node: Legacy(Block([], Some(Node(
+                  ast_node: Legacy(Literal(Boolean(true))),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -528,7 +528,7 @@ Node(
                       column: 42,
                     ),
                   ),
-                ))),
+                )))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -541,7 +541,7 @@ Node(
                   ),
                 ),
               ),
-            )),
+            ))),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -555,18 +555,18 @@ Node(
             ),
           ),
           Node(
-            ast_node: FunctionDeclaration(FunctionDeclaration(
+            ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
               parameters: [
                 Node(
-                  ast_node: FunctionParameter(
+                  ast_node: Legacy(FunctionParameter(
                     id: SymbolId(7),
                     pattern: Node(
-                      ast_node: EnumPattern(
+                      ast_node: Legacy(EnumPattern(
                         identifier: Node(
-                          ast_node: NestedIdentifier([
+                          ast_node: Legacy(NestedIdentifier([
                             "Option",
                             "None",
-                          ]),
+                          ])),
                           symbol_table: None,
                           span: Span(
                             start: LineColumn(
@@ -581,7 +581,7 @@ Node(
                         ),
                         elements: [],
                         named_fields: false,
-                      ),
+                      )),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -595,7 +595,7 @@ Node(
                       ),
                     ),
                     type_annotation: None,
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -612,8 +612,8 @@ Node(
               guard: None,
               return_type_annotation: None,
               body: Node(
-                ast_node: Block([], Some(Node(
-                  ast_node: Literal(Boolean(false)),
+                ast_node: Legacy(Block([], Some(Node(
+                  ast_node: Legacy(Literal(Boolean(false))),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -625,7 +625,7 @@ Node(
                       column: 40,
                     ),
                   ),
-                ))),
+                )))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -638,7 +638,7 @@ Node(
                   ),
                 ),
               ),
-            )),
+            ))),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -652,7 +652,7 @@ Node(
             ),
           ),
         ],
-      ),
+      )),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -666,12 +666,12 @@ Node(
       ),
     ),
     Node(
-      ast_node: FunctionDeclarations(
+      ast_node: Legacy(FunctionDeclarations(
         id: SymbolId(14),
         name: Node(
-          ast_node: FieldExpression(
+          ast_node: Legacy(FieldExpression(
             base: Node(
-              ast_node: Identifier("Option"),
+              ast_node: Legacy(Identifier("Option")),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -685,7 +685,7 @@ Node(
               ),
             ),
             field: Node(
-              ast_node: Identifier("map"),
+              ast_node: Legacy(Identifier("map")),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -698,7 +698,7 @@ Node(
                 ),
               ),
             ),
-          ),
+          )),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -713,18 +713,18 @@ Node(
         ),
         declarations: [
           Node(
-            ast_node: FunctionDeclaration(FunctionDeclaration(
+            ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
               parameters: [
                 Node(
-                  ast_node: FunctionParameter(
+                  ast_node: Legacy(FunctionParameter(
                     id: SymbolId(10),
                     pattern: Node(
-                      ast_node: EnumPattern(
+                      ast_node: Legacy(EnumPattern(
                         identifier: Node(
-                          ast_node: NestedIdentifier([
+                          ast_node: Legacy(NestedIdentifier([
                             "Option",
                             "Some",
-                          ]),
+                          ])),
                           symbol_table: None,
                           span: Span(
                             start: LineColumn(
@@ -739,10 +739,10 @@ Node(
                         ),
                         elements: [
                           Node(
-                            ast_node: IdentifierPattern(
+                            ast_node: Legacy(IdentifierPattern(
                               id: SymbolId(9),
                               name: "x",
-                            ),
+                            )),
                             symbol_table: None,
                             span: Span(
                               start: LineColumn(
@@ -757,7 +757,7 @@ Node(
                           ),
                         ],
                         named_fields: false,
-                      ),
+                      )),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -771,7 +771,7 @@ Node(
                       ),
                     ),
                     type_annotation: None,
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -785,10 +785,10 @@ Node(
                   ),
                 ),
                 Node(
-                  ast_node: FunctionParameter(
+                  ast_node: Legacy(FunctionParameter(
                     id: SymbolId(11),
                     pattern: Node(
-                      ast_node: Identifier("f"),
+                      ast_node: Legacy(Identifier("f")),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -802,7 +802,7 @@ Node(
                       ),
                     ),
                     type_annotation: None,
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -819,13 +819,13 @@ Node(
               guard: None,
               return_type_annotation: None,
               body: Node(
-                ast_node: Block([], Some(Node(
-                  ast_node: Call(
+                ast_node: Legacy(Block([], Some(Node(
+                  ast_node: Legacy(Call(
                     function: Node(
-                      ast_node: NestedIdentifier([
+                      ast_node: Legacy(NestedIdentifier([
                         "Option",
                         "Some",
-                      ]),
+                      ])),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -840,9 +840,9 @@ Node(
                     ),
                     arguments: [
                       Node(
-                        ast_node: Call(
+                        ast_node: Legacy(Call(
                           function: Node(
-                            ast_node: Identifier("f"),
+                            ast_node: Legacy(Identifier("f")),
                             symbol_table: None,
                             span: Span(
                               start: LineColumn(
@@ -857,7 +857,7 @@ Node(
                           ),
                           arguments: [
                             Node(
-                              ast_node: Identifier("x"),
+                              ast_node: Legacy(Identifier("x")),
                               symbol_table: None,
                               span: Span(
                                 start: LineColumn(
@@ -871,7 +871,7 @@ Node(
                               ),
                             ),
                           ],
-                        ),
+                        )),
                         symbol_table: None,
                         span: Span(
                           start: LineColumn(
@@ -885,7 +885,7 @@ Node(
                         ),
                       ),
                     ],
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -897,7 +897,7 @@ Node(
                       column: 55,
                     ),
                   ),
-                ))),
+                )))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -910,7 +910,7 @@ Node(
                   ),
                 ),
               ),
-            )),
+            ))),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -924,18 +924,18 @@ Node(
             ),
           ),
           Node(
-            ast_node: FunctionDeclaration(FunctionDeclaration(
+            ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
               parameters: [
                 Node(
-                  ast_node: FunctionParameter(
+                  ast_node: Legacy(FunctionParameter(
                     id: SymbolId(12),
                     pattern: Node(
-                      ast_node: EnumPattern(
+                      ast_node: Legacy(EnumPattern(
                         identifier: Node(
-                          ast_node: NestedIdentifier([
+                          ast_node: Legacy(NestedIdentifier([
                             "Option",
                             "None",
-                          ]),
+                          ])),
                           symbol_table: None,
                           span: Span(
                             start: LineColumn(
@@ -950,7 +950,7 @@ Node(
                         ),
                         elements: [],
                         named_fields: false,
-                      ),
+                      )),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -964,7 +964,7 @@ Node(
                       ),
                     ),
                     type_annotation: None,
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -978,10 +978,10 @@ Node(
                   ),
                 ),
                 Node(
-                  ast_node: FunctionParameter(
+                  ast_node: Legacy(FunctionParameter(
                     id: SymbolId(13),
                     pattern: Node(
-                      ast_node: Wildcard,
+                      ast_node: Legacy(Wildcard),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -995,7 +995,7 @@ Node(
                       ),
                     ),
                     type_annotation: None,
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -1012,11 +1012,11 @@ Node(
               guard: None,
               return_type_annotation: None,
               body: Node(
-                ast_node: Block([], Some(Node(
-                  ast_node: NestedIdentifier([
+                ast_node: Legacy(Block([], Some(Node(
+                  ast_node: Legacy(NestedIdentifier([
                     "Option",
                     "None",
-                  ]),
+                  ])),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -1028,7 +1028,7 @@ Node(
                       column: 46,
                     ),
                   ),
-                ))),
+                )))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -1041,7 +1041,7 @@ Node(
                   ),
                 ),
               ),
-            )),
+            ))),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -1055,7 +1055,7 @@ Node(
             ),
           ),
         ],
-      ),
+      )),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -1068,7 +1068,7 @@ Node(
         ),
       ),
     ),
-  ]),
+  ])),
   symbol_table: None,
   span: Span(
     start: LineColumn(

@@ -3,16 +3,16 @@ source: crates/tlang_parser/tests/parser_pipeline.rs
 expression: "parse!(\"1 |> foo |> bar();\")"
 ---
 Node(
-  ast_node: Module([
+  ast_node: Legacy(Module([
     Node(
-      ast_node: ExpressionStatement(Node(
-        ast_node: BinaryOp(
+      ast_node: Legacy(ExpressionStatement(Node(
+        ast_node: Legacy(BinaryOp(
           op: Pipeline,
           lhs: Node(
-            ast_node: BinaryOp(
+            ast_node: Legacy(BinaryOp(
               op: Pipeline,
               lhs: Node(
-                ast_node: Literal(Integer(1)),
+                ast_node: Legacy(Literal(Integer(1))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -26,7 +26,7 @@ Node(
                 ),
               ),
               rhs: Node(
-                ast_node: Identifier("foo"),
+                ast_node: Legacy(Identifier("foo")),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -39,7 +39,7 @@ Node(
                   ),
                 ),
               ),
-            ),
+            )),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -53,9 +53,9 @@ Node(
             ),
           ),
           rhs: Node(
-            ast_node: Call(
+            ast_node: Legacy(Call(
               function: Node(
-                ast_node: Identifier("bar"),
+                ast_node: Legacy(Identifier("bar")),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -69,7 +69,7 @@ Node(
                 ),
               ),
               arguments: [],
-            ),
+            )),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -82,7 +82,7 @@ Node(
               ),
             ),
           ),
-        ),
+        )),
         symbol_table: None,
         span: Span(
           start: LineColumn(
@@ -94,7 +94,7 @@ Node(
             column: 17,
           ),
         ),
-      )),
+      ))),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -107,7 +107,7 @@ Node(
         ),
       ),
     ),
-  ]),
+  ])),
   symbol_table: None,
   span: Span(
     start: LineColumn(

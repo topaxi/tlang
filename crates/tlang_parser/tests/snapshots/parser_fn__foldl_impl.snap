@@ -3,12 +3,12 @@ source: crates/tlang_parser/tests/parser_fn.rs
 expression: "parse!(indoc! {\n        \"\n        fn foldl([], acc, _) { acc }\n        fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }\n    \"\n    })"
 ---
 Node(
-  ast_node: Module([
+  ast_node: Legacy(Module([
     Node(
-      ast_node: FunctionDeclarations(
+      ast_node: Legacy(FunctionDeclarations(
         id: SymbolId(9),
         name: Node(
-          ast_node: Identifier("foldl"),
+          ast_node: Legacy(Identifier("foldl")),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -23,13 +23,13 @@ Node(
         ),
         declarations: [
           Node(
-            ast_node: FunctionDeclaration(FunctionDeclaration(
+            ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
               parameters: [
                 Node(
-                  ast_node: FunctionParameter(
+                  ast_node: Legacy(FunctionParameter(
                     id: SymbolId(1),
                     pattern: Node(
-                      ast_node: ListPattern([]),
+                      ast_node: Legacy(ListPattern([])),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -43,7 +43,7 @@ Node(
                       ),
                     ),
                     type_annotation: None,
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -57,10 +57,10 @@ Node(
                   ),
                 ),
                 Node(
-                  ast_node: FunctionParameter(
+                  ast_node: Legacy(FunctionParameter(
                     id: SymbolId(2),
                     pattern: Node(
-                      ast_node: Identifier("acc"),
+                      ast_node: Legacy(Identifier("acc")),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -74,7 +74,7 @@ Node(
                       ),
                     ),
                     type_annotation: None,
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -88,10 +88,10 @@ Node(
                   ),
                 ),
                 Node(
-                  ast_node: FunctionParameter(
+                  ast_node: Legacy(FunctionParameter(
                     id: SymbolId(3),
                     pattern: Node(
-                      ast_node: Wildcard,
+                      ast_node: Legacy(Wildcard),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -105,7 +105,7 @@ Node(
                       ),
                     ),
                     type_annotation: None,
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -122,8 +122,8 @@ Node(
               guard: None,
               return_type_annotation: None,
               body: Node(
-                ast_node: Block([], Some(Node(
-                  ast_node: Identifier("acc"),
+                ast_node: Legacy(Block([], Some(Node(
+                  ast_node: Legacy(Identifier("acc")),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -135,7 +135,7 @@ Node(
                       column: 26,
                     ),
                   ),
-                ))),
+                )))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -148,7 +148,7 @@ Node(
                   ),
                 ),
               ),
-            )),
+            ))),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -162,18 +162,18 @@ Node(
             ),
           ),
           Node(
-            ast_node: FunctionDeclaration(FunctionDeclaration(
+            ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
               parameters: [
                 Node(
-                  ast_node: FunctionParameter(
+                  ast_node: Legacy(FunctionParameter(
                     id: SymbolId(6),
                     pattern: Node(
-                      ast_node: ListPattern([
+                      ast_node: Legacy(ListPattern([
                         Node(
-                          ast_node: IdentifierPattern(
+                          ast_node: Legacy(IdentifierPattern(
                             id: SymbolId(4),
                             name: "x",
-                          ),
+                          )),
                           symbol_table: None,
                           span: Span(
                             start: LineColumn(
@@ -187,11 +187,11 @@ Node(
                           ),
                         ),
                         Node(
-                          ast_node: UnaryOp(Rest, Node(
-                            ast_node: IdentifierPattern(
+                          ast_node: Legacy(UnaryOp(Rest, Node(
+                            ast_node: Legacy(IdentifierPattern(
                               id: SymbolId(5),
                               name: "xs",
-                            ),
+                            )),
                             symbol_table: None,
                             span: Span(
                               start: LineColumn(
@@ -203,7 +203,7 @@ Node(
                                 column: 19,
                               ),
                             ),
-                          )),
+                          ))),
                           symbol_table: None,
                           span: Span(
                             start: LineColumn(
@@ -216,7 +216,7 @@ Node(
                             ),
                           ),
                         ),
-                      ]),
+                      ])),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -230,7 +230,7 @@ Node(
                       ),
                     ),
                     type_annotation: None,
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -244,10 +244,10 @@ Node(
                   ),
                 ),
                 Node(
-                  ast_node: FunctionParameter(
+                  ast_node: Legacy(FunctionParameter(
                     id: SymbolId(7),
                     pattern: Node(
-                      ast_node: Identifier("acc"),
+                      ast_node: Legacy(Identifier("acc")),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -261,7 +261,7 @@ Node(
                       ),
                     ),
                     type_annotation: None,
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -275,10 +275,10 @@ Node(
                   ),
                 ),
                 Node(
-                  ast_node: FunctionParameter(
+                  ast_node: Legacy(FunctionParameter(
                     id: SymbolId(8),
                     pattern: Node(
-                      ast_node: Identifier("f"),
+                      ast_node: Legacy(Identifier("f")),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -292,7 +292,7 @@ Node(
                       ),
                     ),
                     type_annotation: None,
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -309,11 +309,11 @@ Node(
               guard: None,
               return_type_annotation: None,
               body: Node(
-                ast_node: Block([], Some(Node(
-                  ast_node: RecursiveCall(Node(
-                    ast_node: Call(
+                ast_node: Legacy(Block([], Some(Node(
+                  ast_node: Legacy(RecursiveCall(Node(
+                    ast_node: Legacy(Call(
                       function: Node(
-                        ast_node: Identifier("foldl"),
+                        ast_node: Legacy(Identifier("foldl")),
                         symbol_table: None,
                         span: Span(
                           start: LineColumn(
@@ -328,7 +328,7 @@ Node(
                       ),
                       arguments: [
                         Node(
-                          ast_node: Identifier("xs"),
+                          ast_node: Legacy(Identifier("xs")),
                           symbol_table: None,
                           span: Span(
                             start: LineColumn(
@@ -342,9 +342,9 @@ Node(
                           ),
                         ),
                         Node(
-                          ast_node: Call(
+                          ast_node: Legacy(Call(
                             function: Node(
-                              ast_node: Identifier("f"),
+                              ast_node: Legacy(Identifier("f")),
                               symbol_table: None,
                               span: Span(
                                 start: LineColumn(
@@ -359,7 +359,7 @@ Node(
                             ),
                             arguments: [
                               Node(
-                                ast_node: Identifier("acc"),
+                                ast_node: Legacy(Identifier("acc")),
                                 symbol_table: None,
                                 span: Span(
                                   start: LineColumn(
@@ -373,7 +373,7 @@ Node(
                                 ),
                               ),
                               Node(
-                                ast_node: Identifier("x"),
+                                ast_node: Legacy(Identifier("x")),
                                 symbol_table: None,
                                 span: Span(
                                   start: LineColumn(
@@ -387,7 +387,7 @@ Node(
                                 ),
                               ),
                             ],
-                          ),
+                          )),
                           symbol_table: None,
                           span: Span(
                             start: LineColumn(
@@ -401,7 +401,7 @@ Node(
                           ),
                         ),
                         Node(
-                          ast_node: Identifier("f"),
+                          ast_node: Legacy(Identifier("f")),
                           symbol_table: None,
                           span: Span(
                             start: LineColumn(
@@ -415,7 +415,7 @@ Node(
                           ),
                         ),
                       ],
-                    ),
+                    )),
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
@@ -427,7 +427,7 @@ Node(
                         column: 59,
                       ),
                     ),
-                  )),
+                  ))),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -439,7 +439,7 @@ Node(
                       column: 59,
                     ),
                   ),
-                ))),
+                )))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -452,7 +452,7 @@ Node(
                   ),
                 ),
               ),
-            )),
+            ))),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -466,7 +466,7 @@ Node(
             ),
           ),
         ],
-      ),
+      )),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -479,7 +479,7 @@ Node(
         ),
       ),
     ),
-  ]),
+  ])),
   symbol_table: None,
   span: Span(
     start: LineColumn(

@@ -3,14 +3,14 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse!(\"foo()();\")"
 ---
 Node(
-  ast_node: Module([
+  ast_node: Legacy(Module([
     Node(
-      ast_node: ExpressionStatement(Node(
-        ast_node: Call(
+      ast_node: Legacy(ExpressionStatement(Node(
+        ast_node: Legacy(Call(
           function: Node(
-            ast_node: Call(
+            ast_node: Legacy(Call(
               function: Node(
-                ast_node: Identifier("foo"),
+                ast_node: Legacy(Identifier("foo")),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -24,7 +24,7 @@ Node(
                 ),
               ),
               arguments: [],
-            ),
+            )),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -38,7 +38,7 @@ Node(
             ),
           ),
           arguments: [],
-        ),
+        )),
         symbol_table: None,
         span: Span(
           start: LineColumn(
@@ -50,7 +50,7 @@ Node(
             column: 7,
           ),
         ),
-      )),
+      ))),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -63,7 +63,7 @@ Node(
         ),
       ),
     ),
-  ]),
+  ])),
   symbol_table: None,
   span: Span(
     start: LineColumn(

@@ -3,12 +3,12 @@ source: crates/tlang_parser/tests/parser_types.rs
 expression: "parse!(\"let expr = fn foo() -> i64 { 1 };\")"
 ---
 Node(
-  ast_node: Module([
+  ast_node: Legacy(Module([
     Node(
-      ast_node: VariableDeclaration(
+      ast_node: Legacy(VariableDeclaration(
         id: SymbolId(2),
         pattern: Node(
-          ast_node: Identifier("expr"),
+          ast_node: Legacy(Identifier("expr")),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -22,10 +22,10 @@ Node(
           ),
         ),
         expression: Node(
-          ast_node: FunctionExpression(
+          ast_node: Legacy(FunctionExpression(
             id: SymbolId(1),
             name: Some(Node(
-              ast_node: Identifier("foo"),
+              ast_node: Legacy(Identifier("foo")),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -39,13 +39,13 @@ Node(
               ),
             )),
             declaration: Node(
-              ast_node: FunctionDeclaration(FunctionDeclaration(
+              ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
                 parameters: [],
                 guard: None,
                 return_type_annotation: Some(Node(
-                  ast_node: TypeAnnotation(
+                  ast_node: Legacy(TypeAnnotation(
                     name: Node(
-                      ast_node: Identifier("i64"),
+                      ast_node: Legacy(Identifier("i64")),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -59,7 +59,7 @@ Node(
                       ),
                     ),
                     parameters: [],
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -73,8 +73,8 @@ Node(
                   ),
                 )),
                 body: Node(
-                  ast_node: Block([], Some(Node(
-                    ast_node: Literal(Integer(1)),
+                  ast_node: Legacy(Block([], Some(Node(
+                    ast_node: Legacy(Literal(Integer(1))),
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
@@ -86,7 +86,7 @@ Node(
                         column: 30,
                       ),
                     ),
-                  ))),
+                  )))),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -99,7 +99,7 @@ Node(
                     ),
                   ),
                 ),
-              )),
+              ))),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -112,7 +112,7 @@ Node(
                 ),
               ),
             ),
-          ),
+          )),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -126,7 +126,7 @@ Node(
           ),
         ),
         type_annotation: None,
-      ),
+      )),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -139,7 +139,7 @@ Node(
         ),
       ),
     ),
-  ]),
+  ])),
   symbol_table: None,
   span: Span(
     start: LineColumn(

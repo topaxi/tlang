@@ -15,17 +15,12 @@ pub enum Associativity {
 }
 
 // Backwards compatible with the old AST, while migrating to the new AST
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub enum NodeKind {
+    #[default]
     None,
     Legacy(AstNode),
     Expr(Expr),
-}
-
-impl Default for NodeKind {
-    fn default() -> Self {
-        NodeKind::None
-    }
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
@@ -33,6 +28,16 @@ pub struct Node<N = NodeKind> {
     pub ast_node: N,
     pub symbol_table: Option<Rc<RefCell<SymbolTable>>>,
     pub span: Span,
+}
+
+impl Default for Node {
+    fn default() -> Self {
+        Node {
+            ast_node: NodeKind::None,
+            symbol_table: None,
+            span: Span::default(),
+        }
+    }
 }
 
 impl Node {
@@ -134,8 +139,9 @@ impl<'a> From<&'a TokenKind> for ExprKind {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub enum AstNode {
+    #[default]
     None,
     Module(Vec<Node>),
     Block(Vec<Node>, Box<Option<Node>>),
@@ -242,15 +248,10 @@ pub enum AstNode {
     },
 }
 
-impl Default for AstNode {
-    fn default() -> Self {
-        AstNode::None
-    }
-}
-
 impl<'a> From<&'a TokenKind> for AstNode {
     fn from(token: &TokenKind) -> Self {
         match token {
+            TokenKind::Literal(literal) => AstNode::Literal(literal.clone()),
             TokenKind::Identifier(name) => AstNode::Identifier(name.clone()),
             TokenKind::SingleLineComment(comment) => AstNode::SingleLineComment(comment.clone()),
             TokenKind::MultiLineComment(comment) => AstNode::MultiLineComment(comment.clone()),

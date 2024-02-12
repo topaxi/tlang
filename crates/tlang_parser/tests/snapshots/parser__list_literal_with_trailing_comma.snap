@@ -3,12 +3,12 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse!(\"let x = [1, 2, 3,];\")"
 ---
 Node(
-  ast_node: Module([
+  ast_node: Legacy(Module([
     Node(
-      ast_node: VariableDeclaration(
+      ast_node: Legacy(VariableDeclaration(
         id: SymbolId(1),
         pattern: Node(
-          ast_node: Identifier("x"),
+          ast_node: Legacy(Identifier("x")),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -22,9 +22,9 @@ Node(
           ),
         ),
         expression: Node(
-          ast_node: List([
+          ast_node: Legacy(List([
             Node(
-              ast_node: Literal(Integer(1)),
+              ast_node: Legacy(Literal(Integer(1))),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -38,7 +38,7 @@ Node(
               ),
             ),
             Node(
-              ast_node: Literal(Integer(2)),
+              ast_node: Legacy(Literal(Integer(2))),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -52,7 +52,7 @@ Node(
               ),
             ),
             Node(
-              ast_node: Literal(Integer(3)),
+              ast_node: Legacy(Literal(Integer(3))),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -65,7 +65,7 @@ Node(
                 ),
               ),
             ),
-          ]),
+          ])),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -79,7 +79,7 @@ Node(
           ),
         ),
         type_annotation: None,
-      ),
+      )),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -92,7 +92,7 @@ Node(
         ),
       ),
     ),
-  ]),
+  ])),
   symbol_table: None,
   span: Span(
     start: LineColumn(

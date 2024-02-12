@@ -3,12 +3,12 @@ source: crates/tlang_parser/tests/parser_fn.rs
 expression: "parse!(indoc! {\n        \"\n        fn factorial(0) { return 1; }\n        fn factorial(n) { return n * factorial(n - 1); }\n    \"\n    })"
 ---
 Node(
-  ast_node: Module([
+  ast_node: Legacy(Module([
     Node(
-      ast_node: FunctionDeclarations(
+      ast_node: Legacy(FunctionDeclarations(
         id: SymbolId(3),
         name: Node(
-          ast_node: Identifier("factorial"),
+          ast_node: Legacy(Identifier("factorial")),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -23,13 +23,13 @@ Node(
         ),
         declarations: [
           Node(
-            ast_node: FunctionDeclaration(FunctionDeclaration(
+            ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
               parameters: [
                 Node(
-                  ast_node: FunctionParameter(
+                  ast_node: Legacy(FunctionParameter(
                     id: SymbolId(1),
                     pattern: Node(
-                      ast_node: Literal(Integer(0)),
+                      ast_node: Legacy(Literal(Integer(0))),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -43,7 +43,7 @@ Node(
                       ),
                     ),
                     type_annotation: None,
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -60,10 +60,10 @@ Node(
               guard: None,
               return_type_annotation: None,
               body: Node(
-                ast_node: Block([
+                ast_node: Legacy(Block([
                   Node(
-                    ast_node: ReturnStatement(Some(Node(
-                      ast_node: Literal(Integer(1)),
+                    ast_node: Legacy(ReturnStatement(Some(Node(
+                      ast_node: Legacy(Literal(Integer(1))),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -75,7 +75,7 @@ Node(
                           column: 26,
                         ),
                       ),
-                    ))),
+                    )))),
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
@@ -88,7 +88,7 @@ Node(
                       ),
                     ),
                   ),
-                ], None),
+                ], None)),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -101,7 +101,7 @@ Node(
                   ),
                 ),
               ),
-            )),
+            ))),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -115,13 +115,13 @@ Node(
             ),
           ),
           Node(
-            ast_node: FunctionDeclaration(FunctionDeclaration(
+            ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
               parameters: [
                 Node(
-                  ast_node: FunctionParameter(
+                  ast_node: Legacy(FunctionParameter(
                     id: SymbolId(2),
                     pattern: Node(
-                      ast_node: Identifier("n"),
+                      ast_node: Legacy(Identifier("n")),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -135,7 +135,7 @@ Node(
                       ),
                     ),
                     type_annotation: None,
-                  ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -152,13 +152,13 @@ Node(
               guard: None,
               return_type_annotation: None,
               body: Node(
-                ast_node: Block([
+                ast_node: Legacy(Block([
                   Node(
-                    ast_node: ReturnStatement(Some(Node(
-                      ast_node: BinaryOp(
+                    ast_node: Legacy(ReturnStatement(Some(Node(
+                      ast_node: Legacy(BinaryOp(
                         op: Multiply,
                         lhs: Node(
-                          ast_node: Identifier("n"),
+                          ast_node: Legacy(Identifier("n")),
                           symbol_table: None,
                           span: Span(
                             start: LineColumn(
@@ -172,9 +172,9 @@ Node(
                           ),
                         ),
                         rhs: Node(
-                          ast_node: Call(
+                          ast_node: Legacy(Call(
                             function: Node(
-                              ast_node: Identifier("factorial"),
+                              ast_node: Legacy(Identifier("factorial")),
                               symbol_table: None,
                               span: Span(
                                 start: LineColumn(
@@ -189,10 +189,10 @@ Node(
                             ),
                             arguments: [
                               Node(
-                                ast_node: BinaryOp(
+                                ast_node: Legacy(BinaryOp(
                                   op: Subtract,
                                   lhs: Node(
-                                    ast_node: Identifier("n"),
+                                    ast_node: Legacy(Identifier("n")),
                                     symbol_table: None,
                                     span: Span(
                                       start: LineColumn(
@@ -206,7 +206,7 @@ Node(
                                     ),
                                   ),
                                   rhs: Node(
-                                    ast_node: Literal(Integer(1)),
+                                    ast_node: Legacy(Literal(Integer(1))),
                                     symbol_table: None,
                                     span: Span(
                                       start: LineColumn(
@@ -219,7 +219,7 @@ Node(
                                       ),
                                     ),
                                   ),
-                                ),
+                                )),
                                 symbol_table: None,
                                 span: Span(
                                   start: LineColumn(
@@ -233,7 +233,7 @@ Node(
                                 ),
                               ),
                             ],
-                          ),
+                          )),
                           symbol_table: None,
                           span: Span(
                             start: LineColumn(
@@ -246,7 +246,7 @@ Node(
                             ),
                           ),
                         ),
-                      ),
+                      )),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -258,7 +258,7 @@ Node(
                           column: 46,
                         ),
                       ),
-                    ))),
+                    )))),
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
@@ -271,7 +271,7 @@ Node(
                       ),
                     ),
                   ),
-                ], None),
+                ], None)),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -284,7 +284,7 @@ Node(
                   ),
                 ),
               ),
-            )),
+            ))),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -298,7 +298,7 @@ Node(
             ),
           ),
         ],
-      ),
+      )),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -311,7 +311,7 @@ Node(
         ),
       ),
     ),
-  ]),
+  ])),
   symbol_table: None,
   span: Span(
     start: LineColumn(

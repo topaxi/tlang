@@ -3,16 +3,16 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse!(\"1 ** 2 * 3;\")"
 ---
 Node(
-  ast_node: Module([
+  ast_node: Legacy(Module([
     Node(
-      ast_node: ExpressionStatement(Node(
-        ast_node: BinaryOp(
+      ast_node: Legacy(ExpressionStatement(Node(
+        ast_node: Legacy(BinaryOp(
           op: Multiply,
           lhs: Node(
-            ast_node: BinaryOp(
+            ast_node: Legacy(BinaryOp(
               op: Exponentiation,
               lhs: Node(
-                ast_node: Literal(Integer(1)),
+                ast_node: Legacy(Literal(Integer(1))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -26,7 +26,7 @@ Node(
                 ),
               ),
               rhs: Node(
-                ast_node: Literal(Integer(2)),
+                ast_node: Legacy(Literal(Integer(2))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -39,7 +39,7 @@ Node(
                   ),
                 ),
               ),
-            ),
+            )),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -53,7 +53,7 @@ Node(
             ),
           ),
           rhs: Node(
-            ast_node: Literal(Integer(3)),
+            ast_node: Legacy(Literal(Integer(3))),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -66,7 +66,7 @@ Node(
               ),
             ),
           ),
-        ),
+        )),
         symbol_table: None,
         span: Span(
           start: LineColumn(
@@ -78,7 +78,7 @@ Node(
             column: 10,
           ),
         ),
-      )),
+      ))),
       symbol_table: None,
       span: Span(
         start: LineColumn(
@@ -91,7 +91,7 @@ Node(
         ),
       ),
     ),
-  ]),
+  ])),
   symbol_table: None,
   span: Span(
     start: LineColumn(
