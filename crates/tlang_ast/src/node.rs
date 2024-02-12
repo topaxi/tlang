@@ -41,12 +41,25 @@ impl Default for Node {
 }
 
 impl Node {
-    pub fn new(ast_node: NodeKind, span: Span) -> Self {
+    pub fn new(ast_node: NodeKind) -> Self {
+        Node {
+            ast_node,
+            symbol_table: None,
+            span: Span::default(),
+        }
+    }
+
+    pub fn new_with_span(ast_node: NodeKind, span: Span) -> Self {
         Node {
             ast_node,
             symbol_table: None,
             span,
         }
+    }
+
+    pub fn with_span(mut self, span: Span) -> Self {
+        self.span = span;
+        self
     }
 }
 
@@ -306,39 +319,39 @@ macro_rules! new {
         use tlang_ast::node::{Node, NodeKind, AstNode};
         use tlang_ast::span::Span;
 
-        Node::new(NodeKind::Legacy(AstNode::$node), Span::default())
+        Node::new(NodeKind::Legacy(AstNode::$node))
     }};
 
     ($node:ident($( $arg:expr ),* $(,)? )) => {{
         use tlang_ast::node::{Node, NodeKind, AstNode};
         use tlang_ast::span::Span;
 
-        Node::new(NodeKind::Legacy(AstNode::$node( $( $arg ),* )), Span::default())
+        Node::new(NodeKind::Legacy(AstNode::$node( $( $arg ),* )))
     }};
 
     ($node:ident { $( $field:ident : $value:expr ),* $(,)? }) => {{
         use tlang_ast::node::{Node, NodeKind, AstNode};
         use tlang_ast::span::Span;
 
-        Node::new(NodeKind::Legacy(AstNode::$node { $( $field : $value ),* }), Span::default())
+        Node::new(NodeKind::Legacy(AstNode::$node { $( $field : $value ),* }))
     }};
 
     ($node:ident, $span:expr) => {{
         use tlang_ast::node::{Node, NodeKind, AstNode};
 
-        Node::new(NodeKind::Legacy(AstNode::$node), $span)
+        Node::new_with_span(NodeKind::Legacy(AstNode::$node), $span)
     }};
 
     ($node:ident($( $arg:expr ),* $(,)? ), $span:expr) => {{
         use tlang_ast::node::{Node, NodeKind, AstNode};
 
-        Node::new(NodeKind::Legacy(AstNode::$node( $( $arg ),* )), $span)
+        Node::new_with_span(NodeKind::Legacy(AstNode::$node( $( $arg ),* )), $span)
     }};
 
     ($node:ident { $( $field:ident : $value:expr ),* $(,)? }, $span:expr) => {{
         use tlang_ast::node::{Node, NodeKind, AstNode};
 
-        Node::new(NodeKind::Legacy(AstNode::$node { $( $field : $value ),* }), $span)
+        Node::new_with_span(NodeKind::Legacy(AstNode::$node { $( $field : $value ),* }), $span)
     }};
 }
 
