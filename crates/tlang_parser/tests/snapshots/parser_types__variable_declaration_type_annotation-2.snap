@@ -6,10 +6,24 @@ Node(
   ast_node: Legacy(Module([
     Node(
       ast_node: Legacy(VariableDeclaration(
-        id: SymbolId(1),
-        pattern: Node(
-          ast_node: Legacy(Identifier("x")),
-          symbol_table: None,
+        id: SymbolId(2),
+        pattern: Pattern(
+          kind: Identifier(
+            id: SymbolId(1),
+            name: Ident(
+              name: "x",
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 4,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 5,
+                ),
+              ),
+            ),
+          ),
           span: Span(
             start: LineColumn(
               line: 0,
@@ -21,9 +35,8 @@ Node(
             ),
           ),
         ),
-        expression: Node(
-          ast_node: Legacy(Literal(Integer(1))),
-          symbol_table: None,
+        expression: Expr(
+          kind: Literal(Integer(1)),
           span: Span(
             start: LineColumn(
               line: 0,
@@ -37,9 +50,20 @@ Node(
         ),
         type_annotation: Some(Node(
           ast_node: Legacy(TypeAnnotation(
-            name: Node(
-              ast_node: Legacy(Identifier("Option")),
-              symbol_table: None,
+            name: Expr(
+              kind: Identifier(Ident(
+                name: "Option",
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 7,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 13,
+                  ),
+                ),
+              )),
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -54,9 +78,20 @@ Node(
             parameters: [
               Node(
                 ast_node: Legacy(TypeAnnotation(
-                  name: Node(
-                    ast_node: Legacy(Identifier("i64")),
-                    symbol_table: None,
+                  name: Expr(
+                    kind: Identifier(Ident(
+                      name: "i64",
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 14,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 17,
+                        ),
+                      ),
+                    )),
                     span: Span(
                       start: LineColumn(
                         line: 0,

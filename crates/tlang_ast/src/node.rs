@@ -1,12 +1,33 @@
 use serde::Serialize;
-use std::cell::RefCell;
 use std::rc::Rc;
+use std::{cell::RefCell, fmt::Display};
 
 use crate::{
     span::{Span, Spanned},
     symbols::{SymbolId, SymbolTable},
     token::{Literal, Token, TokenKind},
 };
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct Ident {
+    pub name: String,
+    pub span: Span,
+}
+
+impl Ident {
+    pub fn new(name: &str, span: Span) -> Self {
+        Ident {
+            name: name.to_string(),
+            span,
+        }
+    }
+}
+
+impl Display for Ident {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub enum Associativity {
@@ -83,12 +104,22 @@ impl<'a> From<&'a Token> for Node {
     }
 }
 
+impl<'a> From<&'a Expr> for Node {
+    fn from(expr: &Expr) -> Self {
+        Node {
+            ast_node: NodeKind::Expr(expr.clone()),
+            symbol_table: None,
+            span: expr.span.clone(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct FunctionDeclaration {
     pub parameters: Vec<Node>,
-    pub guard: Box<Option<Node>>,
+    pub guard: Box<Option<Expr>>,
     pub return_type_annotation: Box<Option<Node>>,
-    pub body: Box<Node>,
+    pub body: Box<Expr>,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
@@ -97,35 +128,54 @@ pub struct Expr {
     pub span: Span,
 }
 
+impl Expr {
+    pub fn new(kind: ExprKind) -> Self {
+        Expr {
+            kind,
+            span: Span::default(),
+        }
+    }
+
+    pub fn with_span(mut self, span: Span) -> Self {
+        self.span = span;
+        self
+    }
+}
+
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub enum ExprKind {
-    Block(Vec<Node>, Box<Option<Node>>),
+    Block(Vec<Node>, Box<Option<Expr>>),
     Call {
         function: Box<Expr>,
         arguments: Vec<Expr>,
     },
-    Dict(Vec<(Node, Node)>),
+    Dict(Vec<(Expr, Expr)>),
     FunctionExpression {
         id: SymbolId,
-        name: Box<Option<Node>>,
+        // TODO: This should/could be Box<Option<Ident>>
+        name: Box<Option<Expr>>,
         declaration: Box<Node>,
     },
     FieldExpression {
-        base: Box<Node>,
-        field: Box<Node>,
+        base: Box<Expr>,
+        field: Box<Expr>,
     },
     IndexExpression {
-        base: Box<Node>,
-        index: Box<Node>,
+        base: Box<Expr>,
+        index: Box<Expr>,
     },
+    // Let expression, only valid within if conditions and guards
+    Let(Box<Pattern>, Box<Expr>),
     IfElse {
-        condition: Box<Node>,
-        then_branch: Box<Node>,
-        else_branch: Box<Option<Node>>,
+        condition: Box<Expr>,
+        then_branch: Box<Expr>,
+        else_branch: Box<Option<Expr>>,
     },
-    List(Vec<Node>),
+    List(Vec<Expr>),
     Literal(Literal),
-    Identifier(String),
+    // Identifier might not be necessary as that can be covered by the NestedIdentifier
+    Identifier(Ident),
+    NestedIdentifier(Vec<Ident>),
     UnaryOp(UnaryOp, Box<Expr>),
     BinaryOp {
         op: BinaryOpKind,
@@ -133,17 +183,25 @@ pub enum ExprKind {
         rhs: Box<Expr>,
     },
     Match {
-        expression: Box<Node>,
+        expression: Box<Expr>,
         arms: Vec<Node>,
     },
-    NestedIdentifier(Vec<String>),
+    RecursiveCall(Box<Expr>),
+    Range {
+        start: Box<Expr>,
+        end: Box<Expr>,
+        inclusive: bool,
+    },
+    Wildcard,
 }
 
 impl<'a> From<&'a TokenKind> for ExprKind {
     fn from(token: &TokenKind) -> Self {
         match token {
             TokenKind::Literal(literal) => ExprKind::Literal(literal.clone()),
-            TokenKind::Identifier(name) => ExprKind::Identifier(name.clone()),
+            TokenKind::Identifier(name) => {
+                ExprKind::Identifier(Ident::new(name, Default::default()))
+            }
             _ => unimplemented!(
                 "Expected token to be a literal or identifier, found {:?}",
                 token
@@ -152,111 +210,94 @@ impl<'a> From<&'a TokenKind> for ExprKind {
     }
 }
 
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct Pattern {
+    pub kind: PatternKind,
+    pub span: Span,
+}
+
+impl Pattern {
+    pub fn new(kind: PatternKind) -> Self {
+        Pattern {
+            kind,
+            span: Span::default(),
+        }
+    }
+
+    pub fn with_span(mut self, span: Span) -> Self {
+        self.span = span;
+        self
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub enum PatternKind {
+    Identifier {
+        id: SymbolId,
+        name: Ident,
+    },
+    Literal(Literal),
+    List(Vec<Pattern>),
+    Rest(Box<Pattern>),
+    EnumPattern {
+        identifier: Box<Expr>,
+        elements: Vec<Pattern>,
+        named_fields: bool,
+    },
+    Wildcard,
+}
+
 #[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub enum AstNode {
     #[default]
     None,
     Module(Vec<Node>),
-    Block(Vec<Node>, Box<Option<Node>>),
-    Literal(Literal),
-    List(Vec<Node>),
-    ListPattern(Vec<Node>),
-    Dict(Vec<(Node, Node)>),
-    UnaryOp(UnaryOp, Box<Node>),
-    BinaryOp {
-        op: BinaryOpKind,
-        lhs: Box<Node>,
-        rhs: Box<Node>,
-    },
-    ExpressionStatement(Box<Node>),
+    ExpressionStatement(Box<Expr>),
     VariableDeclaration {
         // Unique identifier for the variable, used to reference it in the symbol table and
         // distinguish it from other variables with the same name.
         id: SymbolId,
-        pattern: Box<Node>,
-        expression: Box<Node>,
+        pattern: Box<Pattern>,
+        expression: Box<Expr>,
         type_annotation: Box<Option<Node>>,
     },
     // Do we still need this to wrap a struct or could we inline?
     FunctionDeclaration(FunctionDeclaration),
     FunctionSingleDeclaration {
         id: SymbolId,
-        name: Box<Node>,
+        name: Box<Expr>,
         declaration: Box<Node>,
     },
     FunctionDeclarations {
         id: SymbolId,
-        name: Box<Node>,
+        name: Box<Expr>,
         declarations: Vec<Node>,
-    },
-    FunctionExpression {
-        id: SymbolId,
-        name: Box<Option<Node>>,
-        declaration: Box<Node>,
     },
     FunctionParameter {
         id: SymbolId,
-        pattern: Box<Node>,
+        pattern: Box<Pattern>,
         type_annotation: Box<Option<Node>>,
     },
-    ReturnStatement(Box<Option<Node>>),
-    Match {
-        expression: Box<Node>,
-        arms: Vec<Node>,
-    },
+    ReturnStatement(Box<Option<Expr>>),
     MatchArm {
-        pattern: Box<Node>,
-        expression: Box<Node>,
+        pattern: Box<Pattern>,
+        expression: Box<Expr>,
     },
     Wildcard,
-    IfElse {
-        condition: Box<Node>,
-        then_branch: Box<Node>,
-        else_branch: Box<Option<Node>>,
-    },
-    Identifier(String),
-    IdentifierPattern {
-        id: SymbolId,
-        name: String,
-    },
-    NestedIdentifier(Vec<String>),
-    Call {
-        function: Box<Node>,
-        arguments: Vec<Node>,
-    },
-    RecursiveCall(Box<Node>),
     SingleLineComment(String),
     MultiLineComment(String),
     EnumDeclaration {
         id: SymbolId,
-        name: String,
+        name: Ident,
         variants: Vec<Node>,
     },
     EnumVariant {
-        name: String,
+        name: Ident,
         named_fields: bool,
-        parameters: Vec<Node>,
-    },
-    EnumPattern {
-        identifier: Box<Node>,
-        elements: Vec<Node>,
-        named_fields: bool,
-    },
-    FieldExpression {
-        base: Box<Node>,
-        field: Box<Node>,
-    },
-    IndexExpression {
-        base: Box<Node>,
-        index: Box<Node>,
-    },
-    Range {
-        start: Box<Node>,
-        end: Box<Node>,
-        inclusive: bool,
+        parameters: Vec<Expr>,
     },
     TypeAnnotation {
-        name: Box<Node>,
+        name: Box<Expr>,
         parameters: Vec<Node>,
     },
 }
@@ -264,8 +305,6 @@ pub enum AstNode {
 impl<'a> From<&'a TokenKind> for AstNode {
     fn from(token: &TokenKind) -> Self {
         match token {
-            TokenKind::Literal(literal) => AstNode::Literal(literal.clone()),
-            TokenKind::Identifier(name) => AstNode::Identifier(name.clone()),
             TokenKind::SingleLineComment(comment) => AstNode::SingleLineComment(comment.clone()),
             TokenKind::MultiLineComment(comment) => AstNode::MultiLineComment(comment.clone()),
             _ => unimplemented!(
@@ -355,4 +394,47 @@ macro_rules! new {
     }};
 }
 
+#[macro_export]
+macro_rules! expr {
+    ($kind:ident) => {{
+        use tlang_ast::node::{Expr, ExprKind};
+
+        Expr::new(ExprKind::$kind)
+    }};
+
+    ($kind:ident($($arg:expr),* $(,)?)) => {{
+        use tlang_ast::node::{Expr, ExprKind};
+
+        Expr::new(ExprKind::$kind($($arg),*))
+    }};
+
+    ($kind:ident { $( $field:ident : $value:expr ),* $(,)? }) => {{
+        use tlang_ast::node::{Expr, ExprKind};
+        Expr::new(ExprKind::$kind { $( $field : $value ),* })
+    }};
+}
+
+#[macro_export]
+macro_rules! pat {
+    ($kind:ident) => {{
+        use tlang_ast::node::{Pattern, PatternKind};
+
+        Pattern::new(PatternKind::$kind)
+    }};
+
+    ($kind:ident($($arg:expr),* $(,)?)) => {{
+        use tlang_ast::node::{Pattern, PatternKind};
+
+        Pattern::new(PatternKind::$kind($($arg),*))
+    }};
+
+    ($kind:ident { $( $field:ident : $value:expr ),* $(,)? }) => {{
+        use tlang_ast::node::{Pattern, PatternKind};
+
+        Pattern::new(PatternKind::$kind { $( $field : $value ),* })
+    }};
+}
+
+pub use expr;
 pub use new;
+pub use pat;

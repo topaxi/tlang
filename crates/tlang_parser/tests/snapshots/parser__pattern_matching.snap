@@ -6,10 +6,24 @@ Node(
   ast_node: Legacy(Module([
     Node(
       ast_node: Legacy(VariableDeclaration(
-        id: SymbolId(1),
-        pattern: Node(
-          ast_node: Legacy(Identifier("x")),
-          symbol_table: None,
+        id: SymbolId(2),
+        pattern: Pattern(
+          kind: Identifier(
+            id: SymbolId(1),
+            name: Ident(
+              name: "x",
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 4,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 5,
+                ),
+              ),
+            ),
+          ),
           span: Span(
             start: LineColumn(
               line: 0,
@@ -21,11 +35,10 @@ Node(
             ),
           ),
         ),
-        expression: Node(
-          ast_node: Legacy(Match(
-            expression: Node(
-              ast_node: Legacy(Literal(Integer(1))),
-              symbol_table: None,
+        expression: Expr(
+          kind: Match(
+            expression: Expr(
+              kind: Literal(Integer(1)),
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -40,9 +53,8 @@ Node(
             arms: [
               Node(
                 ast_node: Legacy(MatchArm(
-                  pattern: Node(
-                    ast_node: Legacy(Literal(Integer(1))),
-                    symbol_table: None,
+                  pattern: Pattern(
+                    kind: Literal(Integer(1)),
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -54,9 +66,8 @@ Node(
                       ),
                     ),
                   ),
-                  expression: Node(
-                    ast_node: Legacy(Literal(Integer(2))),
-                    symbol_table: None,
+                  expression: Expr(
+                    kind: Literal(Integer(2)),
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -83,9 +94,8 @@ Node(
               ),
               Node(
                 ast_node: Legacy(MatchArm(
-                  pattern: Node(
-                    ast_node: Legacy(Literal(Integer(3))),
-                    symbol_table: None,
+                  pattern: Pattern(
+                    kind: Literal(Integer(3)),
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -97,9 +107,8 @@ Node(
                       ),
                     ),
                   ),
-                  expression: Node(
-                    ast_node: Legacy(Literal(Integer(4))),
-                    symbol_table: None,
+                  expression: Expr(
+                    kind: Literal(Integer(4)),
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -126,9 +135,8 @@ Node(
               ),
               Node(
                 ast_node: Legacy(MatchArm(
-                  pattern: Node(
-                    ast_node: Legacy(Wildcard),
-                    symbol_table: None,
+                  pattern: Pattern(
+                    kind: Wildcard,
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -140,9 +148,8 @@ Node(
                       ),
                     ),
                   ),
-                  expression: Node(
-                    ast_node: Legacy(Literal(Integer(5))),
-                    symbol_table: None,
+                  expression: Expr(
+                    kind: Literal(Integer(5)),
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -168,8 +175,7 @@ Node(
                 ),
               ),
             ],
-          )),
-          symbol_table: None,
+          ),
           span: Span(
             start: LineColumn(
               line: 0,

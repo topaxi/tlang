@@ -5,14 +5,13 @@ expression: "parse!(\"if (1 + 2) { 3 + 4; }\")"
 Node(
   ast_node: Legacy(Module([
     Node(
-      ast_node: Legacy(ExpressionStatement(Node(
-        ast_node: Legacy(IfElse(
-          condition: Node(
-            ast_node: Legacy(BinaryOp(
+      ast_node: Legacy(ExpressionStatement(Expr(
+        kind: IfElse(
+          condition: Expr(
+            kind: BinaryOp(
               op: Add,
-              lhs: Node(
-                ast_node: Legacy(Literal(Integer(1))),
-                symbol_table: None,
+              lhs: Expr(
+                kind: Literal(Integer(1)),
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -24,9 +23,8 @@ Node(
                   ),
                 ),
               ),
-              rhs: Node(
-                ast_node: Legacy(Literal(Integer(2))),
-                symbol_table: None,
+              rhs: Expr(
+                kind: Literal(Integer(2)),
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -38,8 +36,7 @@ Node(
                   ),
                 ),
               ),
-            )),
-            symbol_table: None,
+            ),
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -51,15 +48,14 @@ Node(
               ),
             ),
           ),
-          then_branch: Node(
-            ast_node: Legacy(Block([
+          then_branch: Expr(
+            kind: Block([
               Node(
-                ast_node: Legacy(ExpressionStatement(Node(
-                  ast_node: Legacy(BinaryOp(
+                ast_node: Legacy(ExpressionStatement(Expr(
+                  kind: BinaryOp(
                     op: Add,
-                    lhs: Node(
-                      ast_node: Legacy(Literal(Integer(3))),
-                      symbol_table: None,
+                    lhs: Expr(
+                      kind: Literal(Integer(3)),
                       span: Span(
                         start: LineColumn(
                           line: 0,
@@ -71,9 +67,8 @@ Node(
                         ),
                       ),
                     ),
-                    rhs: Node(
-                      ast_node: Legacy(Literal(Integer(4))),
-                      symbol_table: None,
+                    rhs: Expr(
+                      kind: Literal(Integer(4)),
                       span: Span(
                         start: LineColumn(
                           line: 0,
@@ -85,8 +80,7 @@ Node(
                         ),
                       ),
                     ),
-                  )),
-                  symbol_table: None,
+                  ),
                   span: Span(
                     start: LineColumn(
                       line: 0,
@@ -110,8 +104,7 @@ Node(
                   ),
                 ),
               ),
-            ], None)),
-            symbol_table: None,
+            ], None),
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -124,8 +117,7 @@ Node(
             ),
           ),
           else_branch: None,
-        )),
-        symbol_table: None,
+        ),
         span: Span(
           start: LineColumn(
             line: 0,

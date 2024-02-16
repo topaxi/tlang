@@ -5,12 +5,11 @@ expression: "parse!(\"1 + 2 * 3;\")"
 Node(
   ast_node: Legacy(Module([
     Node(
-      ast_node: Legacy(ExpressionStatement(Node(
-        ast_node: Legacy(BinaryOp(
+      ast_node: Legacy(ExpressionStatement(Expr(
+        kind: BinaryOp(
           op: Add,
-          lhs: Node(
-            ast_node: Legacy(Literal(Integer(1))),
-            symbol_table: None,
+          lhs: Expr(
+            kind: Literal(Integer(1)),
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -22,12 +21,11 @@ Node(
               ),
             ),
           ),
-          rhs: Node(
-            ast_node: Legacy(BinaryOp(
+          rhs: Expr(
+            kind: BinaryOp(
               op: Multiply,
-              lhs: Node(
-                ast_node: Legacy(Literal(Integer(2))),
-                symbol_table: None,
+              lhs: Expr(
+                kind: Literal(Integer(2)),
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -39,9 +37,8 @@ Node(
                   ),
                 ),
               ),
-              rhs: Node(
-                ast_node: Legacy(Literal(Integer(3))),
-                symbol_table: None,
+              rhs: Expr(
+                kind: Literal(Integer(3)),
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -53,8 +50,7 @@ Node(
                   ),
                 ),
               ),
-            )),
-            symbol_table: None,
+            ),
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -66,8 +62,7 @@ Node(
               ),
             ),
           ),
-        )),
-        symbol_table: None,
+        ),
         span: Span(
           start: LineColumn(
             line: 0,

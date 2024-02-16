@@ -7,14 +7,25 @@ Node(
     Node(
       ast_node: Legacy(VariableDeclaration(
         id: SymbolId(4),
-        pattern: Node(
-          ast_node: Legacy(ListPattern([
-            Node(
-              ast_node: Legacy(IdentifierPattern(
+        pattern: Pattern(
+          kind: List([
+            Pattern(
+              kind: Identifier(
                 id: SymbolId(1),
-                name: "x",
-              )),
-              symbol_table: None,
+                name: Ident(
+                  name: "x",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 5,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 6,
+                    ),
+                  ),
+                ),
+              ),
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -26,12 +37,23 @@ Node(
                 ),
               ),
             ),
-            Node(
-              ast_node: Legacy(IdentifierPattern(
+            Pattern(
+              kind: Identifier(
                 id: SymbolId(2),
-                name: "y",
-              )),
-              symbol_table: None,
+                name: Ident(
+                  name: "y",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 8,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 9,
+                    ),
+                  ),
+                ),
+              ),
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -43,13 +65,24 @@ Node(
                 ),
               ),
             ),
-            Node(
-              ast_node: Legacy(UnaryOp(Rest, Node(
-                ast_node: Legacy(IdentifierPattern(
+            Pattern(
+              kind: Rest(Pattern(
+                kind: Identifier(
                   id: SymbolId(3),
-                  name: "z",
-                )),
-                symbol_table: None,
+                  name: Ident(
+                    name: "z",
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 14,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 15,
+                      ),
+                    ),
+                  ),
+                ),
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -60,8 +93,7 @@ Node(
                     column: 15,
                   ),
                 ),
-              ))),
-              symbol_table: None,
+              )),
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -73,8 +105,7 @@ Node(
                 ),
               ),
             ),
-          ])),
-          symbol_table: None,
+          ]),
           span: Span(
             start: LineColumn(
               line: 0,
@@ -86,11 +117,10 @@ Node(
             ),
           ),
         ),
-        expression: Node(
-          ast_node: Legacy(List([
-            Node(
-              ast_node: Legacy(Literal(Integer(1))),
-              symbol_table: None,
+        expression: Expr(
+          kind: List([
+            Expr(
+              kind: Literal(Integer(1)),
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -102,9 +132,8 @@ Node(
                 ),
               ),
             ),
-            Node(
-              ast_node: Legacy(Literal(Integer(2))),
-              symbol_table: None,
+            Expr(
+              kind: Literal(Integer(2)),
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -116,9 +145,8 @@ Node(
                 ),
               ),
             ),
-            Node(
-              ast_node: Legacy(Literal(Integer(3))),
-              symbol_table: None,
+            Expr(
+              kind: Literal(Integer(3)),
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -130,9 +158,8 @@ Node(
                 ),
               ),
             ),
-            Node(
-              ast_node: Legacy(Literal(Integer(4))),
-              symbol_table: None,
+            Expr(
+              kind: Literal(Integer(4)),
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -144,8 +171,7 @@ Node(
                 ),
               ),
             ),
-          ])),
-          symbol_table: None,
+          ]),
           span: Span(
             start: LineColumn(
               line: 0,

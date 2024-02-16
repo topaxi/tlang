@@ -7,9 +7,20 @@ Node(
     Node(
       ast_node: Legacy(FunctionSingleDeclaration(
         id: SymbolId(1),
-        name: Node(
-          ast_node: Legacy(Identifier("foo")),
-          symbol_table: None,
+        name: Expr(
+          kind: Identifier(Ident(
+            name: "foo",
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 3,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 6,
+              ),
+            ),
+          )),
           span: Span(
             start: LineColumn(
               line: 0,
@@ -27,9 +38,20 @@ Node(
             guard: None,
             return_type_annotation: Some(Node(
               ast_node: Legacy(TypeAnnotation(
-                name: Node(
-                  ast_node: Legacy(Identifier("Option")),
-                  symbol_table: None,
+                name: Expr(
+                  kind: Identifier(Ident(
+                    name: "Option",
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 12,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 18,
+                      ),
+                    ),
+                  )),
                   span: Span(
                     start: LineColumn(
                       line: 0,
@@ -44,9 +66,20 @@ Node(
                 parameters: [
                   Node(
                     ast_node: Legacy(TypeAnnotation(
-                      name: Node(
-                        ast_node: Legacy(Identifier("i64")),
-                        symbol_table: None,
+                      name: Expr(
+                        kind: Identifier(Ident(
+                          name: "i64",
+                          span: Span(
+                            start: LineColumn(
+                              line: 0,
+                              column: 19,
+                            ),
+                            end: LineColumn(
+                              line: 0,
+                              column: 22,
+                            ),
+                          ),
+                        )),
                         span: Span(
                           start: LineColumn(
                             line: 0,
@@ -86,10 +119,9 @@ Node(
                 ),
               ),
             )),
-            body: Node(
-              ast_node: Legacy(Block([], Some(Node(
-                ast_node: Legacy(Literal(Integer(1))),
-                symbol_table: None,
+            body: Expr(
+              kind: Block([], Some(Expr(
+                kind: Literal(Integer(1)),
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -100,8 +132,7 @@ Node(
                     column: 27,
                   ),
                 ),
-              )))),
-              symbol_table: None,
+              ))),
               span: Span(
                 start: LineColumn(
                   line: 0,
