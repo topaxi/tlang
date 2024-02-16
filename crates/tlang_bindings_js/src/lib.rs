@@ -1,9 +1,6 @@
 extern crate console_error_panic_hook;
 
-use tlang_ast::{
-    node::{Node, NodeKind},
-    symbols::SymbolType,
-};
+use tlang_ast::{node::Node, symbols::SymbolType};
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_parser::{error::ParseError, parser::Parser};
 use tlang_semantics::{diagnostic::Diagnostic, SemanticAnalyzer};
