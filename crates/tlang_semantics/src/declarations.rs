@@ -7,6 +7,7 @@ use tlang_ast::{
 
 pub struct DeclarationAnalyzer {
     symbol_table_stack: Vec<Rc<RefCell<SymbolTable>>>,
+    symbol_type: Vec<SymbolType>,
 }
 
 impl Default for DeclarationAnalyzer {
@@ -19,6 +20,7 @@ impl DeclarationAnalyzer {
     pub fn new() -> Self {
         DeclarationAnalyzer {
             symbol_table_stack: vec![Rc::new(RefCell::new(SymbolTable::default()))],
+            symbol_type: vec![],
         }
     }
 
@@ -302,9 +304,11 @@ impl DeclarationAnalyzer {
     }
 
     fn collect_function_declaration(&mut self, declaration: &mut FunctionDeclaration) {
+        self.symbol_type.push(SymbolType::Parameter);
         for param in &mut declaration.parameters {
             self.collect_declarations(param);
         }
+        self.symbol_type.pop();
 
         self.collect_optional_declarations_expr(&mut declaration.guard);
         self.collect_declarations_expr(&mut declaration.body);
@@ -361,7 +365,10 @@ impl DeclarationAnalyzer {
                 self.declare_symbol(SymbolInfo::new(
                     *id,
                     &name.to_string(),
-                    SymbolType::Variable,
+                    self.symbol_type
+                        .last()
+                        .unwrap_or(&SymbolType::Variable)
+                        .clone(),
                     Some(pattern.span.clone()),
                 ));
             }
@@ -370,6 +377,9 @@ impl DeclarationAnalyzer {
                     self.collect_pattern(pattern);
                 }
             }
+            PatternKind::Rest(pattern) => {
+                self.collect_pattern(pattern);
+            }
             PatternKind::EnumPattern { elements, .. } => {
                 for element in elements.iter_mut() {
                     self.collect_pattern(element);
@@ -377,10 +387,6 @@ impl DeclarationAnalyzer {
             }
             PatternKind::Wildcard => {} // Wildcard discards values, nothing to do here.
             PatternKind::Literal(_) => {} // Literal patterns don't need to be declared.
-            _ => panic!(
-                "Expected identifier, list or enum pattern, found {:?}",
-                pattern.kind
-            ),
         }
     }
 }
