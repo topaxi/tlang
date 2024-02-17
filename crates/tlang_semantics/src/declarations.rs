@@ -137,6 +137,10 @@ impl DeclarationAnalyzer {
                     self.collect_declarations_expr(value);
                 }
             }
+            ExprKind::Let(pattern, expr) => {
+                self.collect_declarations_expr(expr);
+                self.collect_pattern(pattern);
+            }
             ExprKind::IfElse {
                 condition,
                 then_branch,
@@ -164,13 +168,13 @@ impl DeclarationAnalyzer {
                 self.collect_declarations_expr(start);
                 self.collect_declarations_expr(end);
             }
-            ExprKind::Identifier(_) | ExprKind::NestedIdentifier(_) => {
+            ExprKind::Identifier(_)
+            | ExprKind::NestedIdentifier(_)
+            | ExprKind::Literal(_)
+            | ExprKind::Wildcard
+            | ExprKind::None => {
                 // Nothing to do here
             }
-            ExprKind::Literal(_) => {
-                // Nothing to do here
-            }
-            _ => panic!("Unexpected expression {:?}", expr.kind),
         }
     }
 
@@ -186,11 +190,10 @@ impl DeclarationAnalyzer {
                 self.collect_declarations_expr(node)
             }
             NodeKind::Legacy(AstNode::VariableDeclaration {
-                id,
                 pattern,
                 expression,
-                type_annotation: _,
-            }) => self.collect_variable_declaration(*id, pattern, expression),
+                ..
+            }) => self.collect_variable_declaration(pattern, expression),
             NodeKind::Legacy(AstNode::FunctionDeclaration(declaration)) => {
                 self.collect_function_declaration(declaration);
             }
@@ -264,12 +267,7 @@ impl DeclarationAnalyzer {
         self.pop_symbol_table();
     }
 
-    fn collect_variable_declaration(
-        &mut self,
-        _id: SymbolId,
-        pattern: &mut Pattern,
-        expr: &mut Expr,
-    ) {
+    fn collect_variable_declaration(&mut self, pattern: &mut Pattern, expr: &mut Expr) {
         self.collect_declarations_expr(expr);
         self.collect_pattern(pattern);
     }

@@ -127,9 +127,9 @@ fn test_should_allow_shadowing_of_single_variable() {
         })
     );
     assert_eq!(
-        program_symbols.borrow().get(SymbolId::new(2)),
+        program_symbols.borrow().get(SymbolId::new(3)),
         Some(SymbolInfo {
-            id: SymbolId::new(2),
+            id: SymbolId::new(3),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
             defined_at: Some(Span::new(
@@ -168,9 +168,9 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
         })
     );
     assert_eq!(
-        program_symbols.borrow().get(SymbolId::new(2)),
+        program_symbols.borrow().get(SymbolId::new(3)),
         Some(SymbolInfo {
-            id: SymbolId::new(2),
+            id: SymbolId::new(3),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
             defined_at: Some(Span::new(
