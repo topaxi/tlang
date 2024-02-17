@@ -378,7 +378,7 @@ impl DeclarationAnalyzer {
             PatternKind::Rest(pattern) => {
                 self.collect_pattern(pattern);
             }
-            PatternKind::EnumPattern { elements, .. } => {
+            PatternKind::Enum { elements, .. } => {
                 for element in elements.iter_mut() {
                     self.collect_pattern(element);
                 }

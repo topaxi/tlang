@@ -32,7 +32,7 @@ impl Span {
     pub fn from_start_token(start: &Token) -> Self {
         Self {
             start: start.span.start.clone(),
-            end: LineColumn::default(),
+            end: start.span.end.clone(),
         }
     }
 

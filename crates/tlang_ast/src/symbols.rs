@@ -156,6 +156,7 @@ impl SymbolTable {
     }
 
     pub fn remove(&mut self, id: SymbolId) -> Option<SymbolInfo> {
+        println!("Removing symbol with id: {:?}", id);
         self.symbols
             .iter()
             .position(|s| s.id == id)

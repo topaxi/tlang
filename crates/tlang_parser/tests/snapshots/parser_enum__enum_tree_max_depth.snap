@@ -212,7 +212,7 @@ Node(
                   ast_node: Legacy(FunctionParameter(
                     id: SymbolId(2),
                     pattern: Pattern(
-                      kind: EnumPattern(
+                      kind: Enum(
                         identifier: Expr(
                           kind: NestedIdentifier([
                             Ident(
@@ -346,7 +346,7 @@ Node(
                   ast_node: Legacy(FunctionParameter(
                     id: SymbolId(5),
                     pattern: Pattern(
-                      kind: EnumPattern(
+                      kind: Enum(
                         identifier: Expr(
                           kind: NestedIdentifier([
                             Ident(
@@ -501,12 +501,12 @@ Node(
                             name: "max",
                             span: Span(
                               start: LineColumn(
-                                line: 0,
-                                column: 0,
+                                line: 6,
+                                column: 52,
                               ),
                               end: LineColumn(
-                                line: 0,
-                                column: 0,
+                                line: 6,
+                                column: 55,
                               ),
                             ),
                           )),
@@ -530,12 +530,12 @@ Node(
                                   name: "maximum_depth",
                                   span: Span(
                                     start: LineColumn(
-                                      line: 0,
-                                      column: 0,
+                                      line: 6,
+                                      column: 56,
                                     ),
                                     end: LineColumn(
-                                      line: 0,
-                                      column: 0,
+                                      line: 6,
+                                      column: 69,
                                     ),
                                   ),
                                 )),
@@ -557,12 +557,12 @@ Node(
                                     name: "left",
                                     span: Span(
                                       start: LineColumn(
-                                        line: 0,
-                                        column: 0,
+                                        line: 6,
+                                        column: 70,
                                       ),
                                       end: LineColumn(
-                                        line: 0,
-                                        column: 0,
+                                        line: 6,
+                                        column: 74,
                                       ),
                                     ),
                                   )),
@@ -599,12 +599,12 @@ Node(
                                   name: "maximum_depth",
                                   span: Span(
                                     start: LineColumn(
-                                      line: 0,
-                                      column: 0,
+                                      line: 6,
+                                      column: 77,
                                     ),
                                     end: LineColumn(
-                                      line: 0,
-                                      column: 0,
+                                      line: 6,
+                                      column: 90,
                                     ),
                                   ),
                                 )),
@@ -626,12 +626,12 @@ Node(
                                     name: "right",
                                     span: Span(
                                       start: LineColumn(
-                                        line: 0,
-                                        column: 0,
+                                        line: 6,
+                                        column: 91,
                                       ),
                                       end: LineColumn(
-                                        line: 0,
-                                        column: 0,
+                                        line: 6,
+                                        column: 96,
                                       ),
                                     ),
                                   )),
@@ -802,12 +802,12 @@ Node(
                               name: "Tree",
                               span: Span(
                                 start: LineColumn(
-                                  line: 0,
-                                  column: 0,
+                                  line: 9,
+                                  column: 13,
                                 ),
                                 end: LineColumn(
-                                  line: 0,
-                                  column: 0,
+                                  line: 9,
+                                  column: 17,
                                 ),
                               ),
                             ),
@@ -845,12 +845,12 @@ Node(
                                   name: "left",
                                   span: Span(
                                     start: LineColumn(
-                                      line: 0,
-                                      column: 0,
+                                      line: 10,
+                                      column: 9,
                                     ),
                                     end: LineColumn(
-                                      line: 0,
-                                      column: 0,
+                                      line: 10,
+                                      column: 13,
                                     ),
                                   ),
                                 )),
@@ -873,12 +873,12 @@ Node(
                                         name: "Tree",
                                         span: Span(
                                           start: LineColumn(
-                                            line: 0,
-                                            column: 0,
+                                            line: 10,
+                                            column: 15,
                                           ),
                                           end: LineColumn(
-                                            line: 0,
-                                            column: 0,
+                                            line: 10,
+                                            column: 19,
                                           ),
                                         ),
                                       ),
@@ -942,12 +942,12 @@ Node(
                                   name: "right",
                                   span: Span(
                                     start: LineColumn(
-                                      line: 0,
-                                      column: 0,
+                                      line: 11,
+                                      column: 9,
                                     ),
                                     end: LineColumn(
-                                      line: 0,
-                                      column: 0,
+                                      line: 11,
+                                      column: 14,
                                     ),
                                   ),
                                 )),
@@ -970,12 +970,12 @@ Node(
                                         name: "Tree",
                                         span: Span(
                                           start: LineColumn(
-                                            line: 0,
-                                            column: 0,
+                                            line: 11,
+                                            column: 16,
                                           ),
                                           end: LineColumn(
-                                            line: 0,
-                                            column: 0,
+                                            line: 11,
+                                            column: 20,
                                           ),
                                         ),
                                       ),
@@ -1013,12 +1013,12 @@ Node(
                                             name: "left",
                                             span: Span(
                                               start: LineColumn(
-                                                line: 0,
-                                                column: 0,
+                                                line: 12,
+                                                column: 13,
                                               ),
                                               end: LineColumn(
-                                                line: 0,
-                                                column: 0,
+                                                line: 12,
+                                                column: 17,
                                               ),
                                             ),
                                           )),
@@ -1041,12 +1041,12 @@ Node(
                                                   name: "Tree",
                                                   span: Span(
                                                     start: LineColumn(
-                                                      line: 0,
-                                                      column: 0,
+                                                      line: 12,
+                                                      column: 19,
                                                     ),
                                                     end: LineColumn(
-                                                      line: 0,
-                                                      column: 0,
+                                                      line: 12,
+                                                      column: 23,
                                                     ),
                                                   ),
                                                 ),
@@ -1110,12 +1110,12 @@ Node(
                                             name: "right",
                                             span: Span(
                                               start: LineColumn(
-                                                line: 0,
-                                                column: 0,
+                                                line: 13,
+                                                column: 13,
                                               ),
                                               end: LineColumn(
-                                                line: 0,
-                                                column: 0,
+                                                line: 13,
+                                                column: 18,
                                               ),
                                             ),
                                           )),
@@ -1138,12 +1138,12 @@ Node(
                                                   name: "Tree",
                                                   span: Span(
                                                     start: LineColumn(
-                                                      line: 0,
-                                                      column: 0,
+                                                      line: 13,
+                                                      column: 20,
                                                     ),
                                                     end: LineColumn(
-                                                      line: 0,
-                                                      column: 0,
+                                                      line: 13,
+                                                      column: 24,
                                                     ),
                                                   ),
                                                 ),

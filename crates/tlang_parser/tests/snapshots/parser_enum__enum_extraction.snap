@@ -159,7 +159,7 @@ Node(
                   ast_node: Legacy(FunctionParameter(
                     id: SymbolId(2),
                     pattern: Pattern(
-                      kind: EnumPattern(
+                      kind: Enum(
                         identifier: Expr(
                           kind: NestedIdentifier([
                             Ident(
@@ -240,12 +240,12 @@ Node(
                         name: "panic",
                         span: Span(
                           start: LineColumn(
-                            line: 0,
-                            column: 0,
+                            line: 5,
+                            column: 27,
                           ),
                           end: LineColumn(
-                            line: 0,
-                            column: 0,
+                            line: 5,
+                            column: 32,
                           ),
                         ),
                       )),
@@ -322,7 +322,7 @@ Node(
                   ast_node: Legacy(FunctionParameter(
                     id: SymbolId(4),
                     pattern: Pattern(
-                      kind: EnumPattern(
+                      kind: Enum(
                         identifier: Expr(
                           kind: NestedIdentifier([
                             Ident(
@@ -430,12 +430,12 @@ Node(
                     name: "value",
                     span: Span(
                       start: LineColumn(
-                        line: 0,
-                        column: 0,
+                        line: 6,
+                        column: 34,
                       ),
                       end: LineColumn(
-                        line: 0,
-                        column: 0,
+                        line: 6,
+                        column: 39,
                       ),
                     ),
                   )),

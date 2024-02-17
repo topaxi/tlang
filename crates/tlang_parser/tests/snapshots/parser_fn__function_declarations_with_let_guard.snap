@@ -338,12 +338,12 @@ Node(
                         name: "f",
                         span: Span(
                           start: LineColumn(
-                            line: 0,
-                            column: 0,
+                            line: 1,
+                            column: 41,
                           ),
                           end: LineColumn(
-                            line: 0,
-                            column: 0,
+                            line: 1,
+                            column: 42,
                           ),
                         ),
                       )),
@@ -365,12 +365,12 @@ Node(
                           name: "x",
                           span: Span(
                             start: LineColumn(
-                              line: 0,
-                              column: 0,
+                              line: 1,
+                              column: 43,
                             ),
                             end: LineColumn(
-                              line: 0,
-                              column: 0,
+                              line: 1,
+                              column: 44,
                             ),
                           ),
                         )),
@@ -421,12 +421,12 @@ Node(
                         name: "y",
                         span: Span(
                           start: LineColumn(
-                            line: 0,
-                            column: 0,
+                            line: 1,
+                            column: 49,
                           ),
                           end: LineColumn(
-                            line: 0,
-                            column: 0,
+                            line: 1,
+                            column: 50,
                           ),
                         ),
                       )),
@@ -450,12 +450,12 @@ Node(
                               name: "filter_map",
                               span: Span(
                                 start: LineColumn(
-                                  line: 0,
-                                  column: 0,
+                                  line: 1,
+                                  column: 55,
                                 ),
                                 end: LineColumn(
-                                  line: 0,
-                                  column: 0,
+                                  line: 1,
+                                  column: 65,
                                 ),
                               ),
                             )),
@@ -477,12 +477,12 @@ Node(
                                 name: "xs",
                                 span: Span(
                                   start: LineColumn(
-                                    line: 0,
-                                    column: 0,
+                                    line: 1,
+                                    column: 66,
                                   ),
                                   end: LineColumn(
-                                    line: 0,
-                                    column: 0,
+                                    line: 1,
+                                    column: 68,
                                   ),
                                 ),
                               )),
@@ -503,12 +503,12 @@ Node(
                                 name: "f",
                                 span: Span(
                                   start: LineColumn(
-                                    line: 0,
-                                    column: 0,
+                                    line: 1,
+                                    column: 70,
                                   ),
                                   end: LineColumn(
-                                    line: 0,
-                                    column: 0,
+                                    line: 1,
+                                    column: 71,
                                   ),
                                 ),
                               )),
@@ -747,12 +747,12 @@ Node(
                           name: "filter_map",
                           span: Span(
                             start: LineColumn(
-                              line: 0,
-                              column: 0,
+                              line: 2,
+                              column: 36,
                             ),
                             end: LineColumn(
-                              line: 0,
-                              column: 0,
+                              line: 2,
+                              column: 46,
                             ),
                           ),
                         )),
@@ -774,12 +774,12 @@ Node(
                             name: "xs",
                             span: Span(
                               start: LineColumn(
-                                line: 0,
-                                column: 0,
+                                line: 2,
+                                column: 47,
                               ),
                               end: LineColumn(
-                                line: 0,
-                                column: 0,
+                                line: 2,
+                                column: 49,
                               ),
                             ),
                           )),
@@ -800,12 +800,12 @@ Node(
                             name: "f",
                             span: Span(
                               start: LineColumn(
-                                line: 0,
-                                column: 0,
+                                line: 2,
+                                column: 51,
                               ),
                               end: LineColumn(
-                                line: 0,
-                                column: 0,
+                                line: 2,
+                                column: 52,
                               ),
                             ),
                           )),

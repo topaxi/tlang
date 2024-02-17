@@ -81,12 +81,12 @@ Node(
                               name: "map",
                               span: Span(
                                 start: LineColumn(
-                                  line: 0,
-                                  column: 0,
+                                  line: 1,
+                                  column: 4,
                                 ),
                                 end: LineColumn(
-                                  line: 0,
-                                  column: 0,
+                                  line: 1,
+                                  column: 7,
                                 ),
                               ),
                             )),
@@ -167,12 +167,12 @@ Node(
                                               name: "x",
                                               span: Span(
                                                 start: LineColumn(
-                                                  line: 0,
-                                                  column: 0,
+                                                  line: 1,
+                                                  column: 17,
                                                 ),
                                                 end: LineColumn(
-                                                  line: 0,
-                                                  column: 0,
+                                                  line: 1,
+                                                  column: 18,
                                                 ),
                                               ),
                                             )),
@@ -287,12 +287,12 @@ Node(
                           name: "filter",
                           span: Span(
                             start: LineColumn(
-                              line: 0,
-                              column: 0,
+                              line: 2,
+                              column: 4,
                             ),
                             end: LineColumn(
-                              line: 0,
-                              column: 0,
+                              line: 2,
+                              column: 10,
                             ),
                           ),
                         )),
@@ -376,12 +376,12 @@ Node(
                                               name: "x",
                                               span: Span(
                                                 start: LineColumn(
-                                                  line: 0,
-                                                  column: 0,
+                                                  line: 2,
+                                                  column: 20,
                                                 ),
                                                 end: LineColumn(
-                                                  line: 0,
-                                                  column: 0,
+                                                  line: 2,
+                                                  column: 21,
                                                 ),
                                               ),
                                             )),
@@ -523,12 +523,12 @@ Node(
                       name: "foldl",
                       span: Span(
                         start: LineColumn(
-                          line: 0,
-                          column: 0,
+                          line: 3,
+                          column: 4,
                         ),
                         end: LineColumn(
-                          line: 0,
-                          column: 0,
+                          line: 3,
+                          column: 9,
                         ),
                       ),
                     )),
@@ -654,12 +654,12 @@ Node(
                                       name: "acc",
                                       span: Span(
                                         start: LineColumn(
-                                          line: 0,
-                                          column: 0,
+                                          line: 3,
+                                          column: 24,
                                         ),
                                         end: LineColumn(
-                                          line: 0,
-                                          column: 0,
+                                          line: 3,
+                                          column: 27,
                                         ),
                                       ),
                                     )),
@@ -680,12 +680,12 @@ Node(
                                       name: "x",
                                       span: Span(
                                         start: LineColumn(
-                                          line: 0,
-                                          column: 0,
+                                          line: 3,
+                                          column: 30,
                                         ),
                                         end: LineColumn(
-                                          line: 0,
-                                          column: 0,
+                                          line: 3,
+                                          column: 31,
                                         ),
                                       ),
                                     )),
@@ -800,12 +800,12 @@ Node(
                   name: "log",
                   span: Span(
                     start: LineColumn(
-                      line: 0,
-                      column: 0,
+                      line: 4,
+                      column: 4,
                     ),
                     end: LineColumn(
-                      line: 0,
-                      column: 0,
+                      line: 4,
+                      column: 7,
                     ),
                   ),
                 )),

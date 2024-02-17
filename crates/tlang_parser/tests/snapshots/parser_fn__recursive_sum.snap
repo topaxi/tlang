@@ -224,12 +224,12 @@ Node(
                         name: "x",
                         span: Span(
                           start: LineColumn(
-                            line: 0,
-                            column: 0,
+                            line: 1,
+                            column: 22,
                           ),
                           end: LineColumn(
-                            line: 0,
-                            column: 0,
+                            line: 1,
+                            column: 23,
                           ),
                         ),
                       )),
@@ -252,12 +252,12 @@ Node(
                             name: "sum",
                             span: Span(
                               start: LineColumn(
-                                line: 0,
-                                column: 0,
+                                line: 1,
+                                column: 26,
                               ),
                               end: LineColumn(
-                                line: 0,
-                                column: 0,
+                                line: 1,
+                                column: 29,
                               ),
                             ),
                           )),
@@ -279,12 +279,12 @@ Node(
                               name: "xs",
                               span: Span(
                                 start: LineColumn(
-                                  line: 0,
-                                  column: 0,
+                                  line: 1,
+                                  column: 30,
                                 ),
                                 end: LineColumn(
-                                  line: 0,
-                                  column: 0,
+                                  line: 1,
+                                  column: 32,
                                 ),
                               ),
                             )),

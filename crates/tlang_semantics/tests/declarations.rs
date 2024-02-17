@@ -119,7 +119,7 @@ fn test_block_scope() {
     assert_eq!(
         block1_symbols.borrow().get_by_name("b"),
         Some(SymbolInfo {
-            id: SymbolId::new(2),
+            id: SymbolId::new(3),
             name: "b".to_string(),
             symbol_type: SymbolType::Variable,
             defined_at: Some(Span::new(
@@ -175,7 +175,7 @@ fn test_block_scope() {
     assert_eq!(
         block2_symbols.borrow().get_by_name("b"),
         Some(SymbolInfo {
-            id: SymbolId::new(2),
+            id: SymbolId::new(3),
             name: "b".to_string(),
             symbol_type: SymbolType::Variable,
             defined_at: Some(Span::new(
@@ -194,7 +194,7 @@ fn test_block_scope() {
     assert_eq!(
         block2_symbols.borrow().get_by_name("c"),
         Some(SymbolInfo {
-            id: SymbolId::new(3),
+            id: SymbolId::new(5),
             name: "c".to_string(),
             symbol_type: SymbolType::Variable,
             defined_at: Some(Span::new(
@@ -228,7 +228,7 @@ fn test_should_collect_function_definitions() {
     assert_eq!(
         program_symbols.borrow().get_by_name("add"),
         Some(SymbolInfo {
-            id: SymbolId::new(3),
+            id: SymbolId::new(5),
             name: "add".to_string(),
             symbol_type: SymbolType::Function,
             defined_at: Some(Span::new(
@@ -312,7 +312,7 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
     assert_eq!(
         program_symbols.borrow().get_by_name("factorial"),
         Some(SymbolInfo {
-            id: SymbolId::new(5),
+            id: SymbolId::new(8),
             name: "factorial".to_string(),
             symbol_type: SymbolType::Function,
             defined_at: Some(Span::new(

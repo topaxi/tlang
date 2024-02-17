@@ -143,6 +143,7 @@ impl SemanticAnalyzer {
                 arguments,
             } => {
                 self.analyze_expr(function);
+
                 for argument in arguments {
                     self.analyze_expr(argument);
                 }
@@ -187,14 +188,16 @@ impl SemanticAnalyzer {
             }
             ExprKind::FunctionExpression {
                 id: _,
-                name,
+                name: _,
                 declaration,
             } => {
-                self.analyze_optional_expr(name);
+                // TODO: Distinguish function names from expressions, otherwise this marks the
+                // function name as used.
+                // self.analyze_optional_expr(name);
                 self.analyze_node(declaration);
             }
             ExprKind::Identifier(ident) => {
-                self.mark_as_used_by_name(&ident.to_string(), &expr.span);
+                self.mark_as_used_by_name(&ident.to_string(), &ident.span);
             }
             ExprKind::NestedIdentifier(idents) => {
                 if let Some(first_ident) = idents.first() {
@@ -252,7 +255,7 @@ impl SemanticAnalyzer {
                 }
             }
             PatternKind::Rest(pattern) => self.analyze_pat(pattern),
-            PatternKind::EnumPattern {
+            PatternKind::Enum {
                 identifier: _,
                 elements,
                 ..
@@ -359,7 +362,7 @@ impl SemanticAnalyzer {
 
     fn analyze_variable_declaration(
         &mut self,
-        id: SymbolId,
+        _id: SymbolId,
         pattern: &mut Pattern,
         expression: &mut Expr,
     ) {
@@ -370,11 +373,15 @@ impl SemanticAnalyzer {
         // E.g. `let a = a;` is not allowed. But `let a = 1; let a = a;` is.
         // By removing the symbol from the table while analyzing the expression, we can check
         // whether the expression references any symbols that were not declared before.
-        let symbol = self.get_last_symbol_table().borrow_mut().remove(id);
+        let pattern_symbols = pattern
+            .get_all_symbol_ids()
+            .iter()
+            .filter_map(|id| self.get_last_symbol_table().borrow_mut().remove(*id))
+            .collect::<Vec<_>>();
 
         self.analyze_expr(expression);
 
-        if let Some(symbol) = symbol {
+        for symbol in pattern_symbols {
             self.get_last_symbol_table()
                 .borrow_mut()
                 .insert_beginning(symbol);
@@ -396,10 +403,13 @@ impl SemanticAnalyzer {
     fn analyze_function_declarations(
         &mut self,
         _node: &mut Node,
-        name: &mut Expr,
+        _name: &mut Expr,
         declarations: &mut Vec<Node>,
     ) {
-        self.analyze_expr(name);
+        // TODO: Distinguish function names from expressions, otherwise this marks the
+        //       function name as used.
+        // self.analyze_expr(name);
+
         for declaration in declarations {
             self.analyze_node(declaration);
         }

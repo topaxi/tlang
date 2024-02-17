@@ -161,12 +161,12 @@ Node(
                   name: "Option",
                   span: Span(
                     start: LineColumn(
-                      line: 0,
-                      column: 0,
+                      line: 5,
+                      column: 9,
                     ),
                     end: LineColumn(
-                      line: 0,
-                      column: 0,
+                      line: 5,
+                      column: 15,
                     ),
                   ),
                 ),

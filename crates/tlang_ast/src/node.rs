@@ -232,6 +232,34 @@ impl Pattern {
         self.span = span;
         self
     }
+
+    pub fn get_symbol_id(&self) -> Option<SymbolId> {
+        match &self.kind {
+            PatternKind::Identifier { id, .. } => Some(*id),
+            _ => None,
+        }
+    }
+
+    pub fn get_all_symbol_ids(&self) -> Vec<SymbolId> {
+        match &self.kind {
+            PatternKind::Identifier { id, .. } => vec![*id],
+            PatternKind::List(patterns) => patterns
+                .iter()
+                .map(|pattern| pattern.get_all_symbol_ids())
+                .flatten()
+                .collect(),
+            PatternKind::Rest(pattern) => pattern.get_all_symbol_ids(),
+            PatternKind::Enum { elements, .. } => elements
+                .iter()
+                .map(|pattern| pattern.get_all_symbol_ids())
+                .flatten()
+                .collect(),
+            _ => todo!(
+                "Getting symbol ids for pattern kind {:?} not implemented yet",
+                self.kind
+            ),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
@@ -243,7 +271,7 @@ pub enum PatternKind {
     Literal(Literal),
     List(Vec<Pattern>),
     Rest(Box<Pattern>),
-    EnumPattern {
+    Enum {
         identifier: Box<Expr>,
         elements: Vec<Pattern>,
         named_fields: bool,

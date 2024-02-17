@@ -521,7 +521,7 @@ impl<'src> Parser<'src> {
 
     /// Parses a function call expression, e.g. `foo()`, `foo(1, 2, 3)` and
     /// `foo { bar, baz }`.
-    fn parse_call_expression(&mut self, function: Expr) -> Expr {
+    fn parse_call_expression(&mut self, expr: Expr) -> Expr {
         log::debug!(
             "Parsing call expression, current token: {:?}",
             self.current_token
@@ -554,7 +554,7 @@ impl<'src> Parser<'src> {
         }
 
         node::expr!(Call {
-            function: Box::new(function),
+            function: Box::new(expr),
             arguments: arguments,
         })
     }
@@ -786,30 +786,31 @@ impl<'src> Parser<'src> {
                 node::expr!(Literal(literal.clone()))
             }
             Some(TokenKind::Identifier(identifier)) => {
+                let identifier_span = self.create_span_from_current_token();
                 self.advance();
 
                 if identifier == "_" {
                     node::expr!(Wildcard)
                 } else {
-                    let mut node = Expr::new(ExprKind::Identifier(Ident::new(
+                    let mut expr = Expr::new(ExprKind::Identifier(Ident::new(
                         identifier,
-                        Default::default(),
+                        identifier_span.clone(),
                     )));
 
                     if let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
-                        let mut identifiers = vec![Ident::new(identifier, Default::default())];
+                        let mut identifiers = vec![Ident::new(identifier, identifier_span.clone())];
                         while let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
                             self.advance();
                             identifiers.push(self.consume_identifier());
                         }
-                        node = node::expr!(NestedIdentifier(identifiers));
+                        expr = node::expr!(NestedIdentifier(identifiers));
                     }
 
                     if let Some(TokenKind::LParen | TokenKind::LBrace) = self.current_token_kind() {
-                        node = self.parse_call_expression(node);
+                        expr = self.parse_call_expression(expr);
                     }
 
-                    node
+                    expr
                 }
             }
             _ => {
@@ -997,7 +998,7 @@ impl<'src> Parser<'src> {
                 }
             }
             self.consume_token(TokenKind::RBrace);
-            node::pat!(EnumPattern {
+            node::pat!(Enum {
                 identifier: identifier,
                 elements: elements,
                 named_fields: true,
@@ -1021,13 +1022,13 @@ impl<'src> Parser<'src> {
                 }
             }
             self.consume_token(TokenKind::RParen);
-            node::pat!(EnumPattern {
+            node::pat!(Enum {
                 identifier: identifier,
                 elements: elements,
                 named_fields: false,
             })
         } else {
-            node::pat!(EnumPattern {
+            node::pat!(Enum {
                 identifier: identifier,
                 elements: Vec::new(),
                 named_fields: false,

@@ -9,7 +9,7 @@ Node(
         kind: IfElse(
           condition: Expr(
             kind: Let(Pattern(
-              kind: EnumPattern(
+              kind: Enum(
                 identifier: Expr(
                   kind: NestedIdentifier([
                     Ident(
@@ -99,11 +99,11 @@ Node(
                 span: Span(
                   start: LineColumn(
                     line: 0,
-                    column: 0,
+                    column: 25,
                   ),
                   end: LineColumn(
                     line: 0,
-                    column: 0,
+                    column: 26,
                   ),
                 ),
               )),
@@ -137,12 +137,12 @@ Node(
                 name: "y",
                 span: Span(
                   start: LineColumn(
-                    line: 0,
-                    column: 0,
+                    line: 1,
+                    column: 5,
                   ),
                   end: LineColumn(
-                    line: 0,
-                    column: 0,
+                    line: 1,
+                    column: 6,
                   ),
                 ),
               )),

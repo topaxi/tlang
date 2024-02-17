@@ -174,7 +174,7 @@ Node(
                   ast_node: Legacy(FunctionParameter(
                     id: SymbolId(2),
                     pattern: Pattern(
-                      kind: EnumPattern(
+                      kind: Enum(
                         identifier: Expr(
                           kind: NestedIdentifier([
                             Ident(
@@ -308,7 +308,7 @@ Node(
                   ast_node: Legacy(FunctionParameter(
                     id: SymbolId(3),
                     pattern: Pattern(
-                      kind: EnumPattern(
+                      kind: Enum(
                         identifier: Expr(
                           kind: NestedIdentifier([
                             Ident(
@@ -589,7 +589,7 @@ Node(
                   ast_node: Legacy(FunctionParameter(
                     id: SymbolId(6),
                     pattern: Pattern(
-                      kind: EnumPattern(
+                      kind: Enum(
                         identifier: Expr(
                           kind: NestedIdentifier([
                             Ident(
@@ -723,7 +723,7 @@ Node(
                   ast_node: Legacy(FunctionParameter(
                     id: SymbolId(7),
                     pattern: Pattern(
-                      kind: EnumPattern(
+                      kind: Enum(
                         identifier: Expr(
                           kind: NestedIdentifier([
                             Ident(
@@ -928,7 +928,7 @@ Node(
                   ast_node: Legacy(FunctionParameter(
                     id: SymbolId(10),
                     pattern: Pattern(
-                      kind: EnumPattern(
+                      kind: Enum(
                         identifier: Expr(
                           kind: NestedIdentifier([
                             Ident(
@@ -1084,12 +1084,12 @@ Node(
                           name: "Option",
                           span: Span(
                             start: LineColumn(
-                              line: 0,
-                              column: 0,
+                              line: 12,
+                              column: 37,
                             ),
                             end: LineColumn(
-                              line: 0,
-                              column: 0,
+                              line: 12,
+                              column: 43,
                             ),
                           ),
                         ),
@@ -1127,12 +1127,12 @@ Node(
                               name: "f",
                               span: Span(
                                 start: LineColumn(
-                                  line: 0,
-                                  column: 0,
+                                  line: 12,
+                                  column: 50,
                                 ),
                                 end: LineColumn(
-                                  line: 0,
-                                  column: 0,
+                                  line: 12,
+                                  column: 51,
                                 ),
                               ),
                             )),
@@ -1154,12 +1154,12 @@ Node(
                                 name: "x",
                                 span: Span(
                                   start: LineColumn(
-                                    line: 0,
-                                    column: 0,
+                                    line: 12,
+                                    column: 52,
                                   ),
                                   end: LineColumn(
-                                    line: 0,
-                                    column: 0,
+                                    line: 12,
+                                    column: 53,
                                   ),
                                 ),
                               )),
@@ -1235,7 +1235,7 @@ Node(
                   ast_node: Legacy(FunctionParameter(
                     id: SymbolId(13),
                     pattern: Pattern(
-                      kind: EnumPattern(
+                      kind: Enum(
                         identifier: Expr(
                           kind: NestedIdentifier([
                             Ident(
@@ -1345,12 +1345,12 @@ Node(
                       name: "Option",
                       span: Span(
                         start: LineColumn(
-                          line: 0,
-                          column: 0,
+                          line: 13,
+                          column: 34,
                         ),
                         end: LineColumn(
-                          line: 0,
-                          column: 0,
+                          line: 13,
+                          column: 40,
                         ),
                       ),
                     ),

@@ -187,12 +187,12 @@ Node(
                             name: "n",
                             span: Span(
                               start: LineColumn(
-                                line: 0,
-                                column: 0,
+                                line: 1,
+                                column: 26,
                               ),
                               end: LineColumn(
-                                line: 0,
-                                column: 0,
+                                line: 1,
+                                column: 27,
                               ),
                             ),
                           )),
@@ -215,12 +215,12 @@ Node(
                                 name: "factorial",
                                 span: Span(
                                   start: LineColumn(
-                                    line: 0,
-                                    column: 0,
+                                    line: 1,
+                                    column: 30,
                                   ),
                                   end: LineColumn(
-                                    line: 0,
-                                    column: 0,
+                                    line: 1,
+                                    column: 39,
                                   ),
                                 ),
                               )),
@@ -245,12 +245,12 @@ Node(
                                       name: "n",
                                       span: Span(
                                         start: LineColumn(
-                                          line: 0,
-                                          column: 0,
+                                          line: 1,
+                                          column: 40,
                                         ),
                                         end: LineColumn(
-                                          line: 0,
-                                          column: 0,
+                                          line: 1,
+                                          column: 41,
                                         ),
                                       ),
                                     )),

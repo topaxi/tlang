@@ -94,11 +94,11 @@ Node(
                         span: Span(
                           start: LineColumn(
                             line: 0,
-                            column: 0,
+                            column: 18,
                           ),
                           end: LineColumn(
                             line: 0,
-                            column: 0,
+                            column: 27,
                           ),
                         ),
                       )),
@@ -121,11 +121,11 @@ Node(
                           span: Span(
                             start: LineColumn(
                               line: 0,
-                              column: 0,
+                              column: 28,
                             ),
                             end: LineColumn(
                               line: 0,
-                              column: 0,
+                              column: 29,
                             ),
                           ),
                         )),
@@ -281,12 +281,12 @@ Node(
                     name: "acc",
                     span: Span(
                       start: LineColumn(
-                        line: 0,
-                        column: 0,
+                        line: 1,
+                        column: 24,
                       ),
                       end: LineColumn(
-                        line: 0,
-                        column: 0,
+                        line: 1,
+                        column: 27,
                       ),
                     ),
                   )),
@@ -432,12 +432,12 @@ Node(
                           name: "factorial",
                           span: Span(
                             start: LineColumn(
-                              line: 0,
-                              column: 0,
+                              line: 2,
+                              column: 28,
                             ),
                             end: LineColumn(
-                              line: 0,
-                              column: 0,
+                              line: 2,
+                              column: 37,
                             ),
                           ),
                         )),
@@ -462,12 +462,12 @@ Node(
                                 name: "n",
                                 span: Span(
                                   start: LineColumn(
-                                    line: 0,
-                                    column: 0,
+                                    line: 2,
+                                    column: 38,
                                   ),
                                   end: LineColumn(
-                                    line: 0,
-                                    column: 0,
+                                    line: 2,
+                                    column: 39,
                                   ),
                                 ),
                               )),
@@ -518,12 +518,12 @@ Node(
                                 name: "n",
                                 span: Span(
                                   start: LineColumn(
-                                    line: 0,
-                                    column: 0,
+                                    line: 2,
+                                    column: 45,
                                   ),
                                   end: LineColumn(
-                                    line: 0,
-                                    column: 0,
+                                    line: 2,
+                                    column: 46,
                                   ),
                                 ),
                               )),
@@ -544,12 +544,12 @@ Node(
                                 name: "acc",
                                 span: Span(
                                   start: LineColumn(
-                                    line: 0,
-                                    column: 0,
+                                    line: 2,
+                                    column: 49,
                                   ),
                                   end: LineColumn(
-                                    line: 0,
-                                    column: 0,
+                                    line: 2,
+                                    column: 52,
                                   ),
                                 ),
                               )),
