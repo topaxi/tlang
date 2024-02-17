@@ -8,7 +8,9 @@ use crate::{
     scope::Scope,
 };
 use tlang_ast::{
-    node::{AstNode, BinaryOpKind, Expr, ExprKind, Node, NodeKind, Pattern, PatternKind, UnaryOp},
+    node::{
+        AstNode, BinaryOpKind, Expr, ExprKind, Ident, Node, NodeKind, Pattern, PatternKind, UnaryOp,
+    },
     token::Literal,
 };
 
@@ -392,22 +394,49 @@ impl CodegenJS {
 
     pub fn generate_expr(&mut self, expr: &Expr, parent_op: Option<&BinaryOpKind>) {
         match &expr.kind {
+            ExprKind::None => {}
             ExprKind::Block(stmts, expr) if self.current_context() == BlockContext::Expression => {
                 self.generate_block_expression(stmts, expr);
             }
             ExprKind::Block(stmts, expr) => {
                 self.generate_block(stmts, expr);
             }
+            ExprKind::Call {
+                function,
+                arguments,
+            } => self.generate_call_expression(function, arguments),
+            ExprKind::FieldExpression { base, field } => {
+                self.generate_expr(base, None);
+                self.push_char('.');
+                self.generate_expr(field, None);
+            }
+            ExprKind::Identifier(ident) => self.generate_identifier(ident),
+            ExprKind::NestedIdentifier(idents) => {
+                self.push_str(
+                    &idents
+                        .iter()
+                        .map(|ident| ident.to_string())
+                        .collect::<Vec<_>>()
+                        .join("."),
+                );
+            }
+            ExprKind::IndexExpression { base, index } => {
+                self.generate_expr(base, None);
+                self.push_char('[');
+                self.generate_expr(index, None);
+                self.push_char(']');
+            }
+            ExprKind::Let(pattern, expr) => todo!("Let expression not implemented yet."),
             ExprKind::Literal(literal) => self.generate_literal(literal),
             ExprKind::List(items) => {
-                self.push_str("[");
+                self.push_char('[');
                 for (i, item) in items.iter().enumerate() {
                     if i > 0 {
                         self.push_str(", ");
                     }
                     self.generate_expr(item, None);
                 }
-                self.push_str("]");
+                self.push_char(']');
             }
             ExprKind::Dict(kvs) => {
                 self.push_str("{\n");
@@ -447,12 +476,32 @@ impl CodegenJS {
             } => {
                 self.generate_if_else(condition, then_branch, else_branch);
             }
-            _ => todo!(),
+            ExprKind::FunctionExpression {
+                name, declaration, ..
+            } => {
+                generate_function_expression(self, name, declaration);
+            }
+            ExprKind::RecursiveCall(expr) => {
+                self.generate_recursive_call_expression(expr, parent_op);
+            }
+            ExprKind::Range {
+                start: _,
+                end: _,
+                inclusive: _,
+            } => todo!("Range expression not implemented yet."),
+            ExprKind::Wildcard => {}
         }
     }
 
     pub fn generate_pat(&mut self, pattern: &Pattern) {
-        todo!()
+        match &pattern.kind {
+            PatternKind::Enum {
+                identifier,
+                elements,
+                named_fields,
+            } => self.generate_enum_extraction(identifier, elements, *named_fields),
+            _ => unimplemented!("Pattern matching not implemented yet."),
+        }
     }
 
     pub fn generate_node(&mut self, node: &Node, parent_op: Option<&BinaryOpKind>) {
@@ -489,30 +538,9 @@ impl CodegenJS {
                 generate_function_declaration(self, name, declaration),
             NodeKind::Legacy(AstNode::FunctionDeclarations { id: _, name, declarations }) =>
                 generate_function_declarations(self, name, declarations),
-            NodeKind::Legacy(AstNode::FunctionExpression { id: _, name, declaration }) =>
-                generate_function_expression(self, name, declaration),
             NodeKind::Legacy(AstNode::ReturnStatement(expr)) => generate_return_statement(self, expr),
-            NodeKind::Legacy(AstNode::Identifier(name)) => self.generate_identifier(name),
-            NodeKind::Legacy(AstNode::NestedIdentifier(identifiers)) => self.push_str(&identifiers.join(".")),
-            NodeKind::Legacy(AstNode::Call { function, arguments }) =>
-                self.generate_call_expression(function, arguments),
-            NodeKind::Legacy(AstNode::RecursiveCall(node)) => {
-                self.generate_recursive_call_expression(node, parent_op)
-            },
-            NodeKind::Legacy(AstNode::FieldExpression { base, field }) => {
-                self.generate_node(base, None);
-                self.push_str(".");
-                self.generate_node(field, None);
-            }
-            NodeKind::Legacy(AstNode::IndexExpression { base,  index }) => {
-                self.generate_node(base, None);
-                self.push_str("[");
-                self.generate_node(index, None);
-                self.push_str("]");
-            }
             NodeKind::Legacy(AstNode::EnumDeclaration { id: _, name, variants }) => self.generate_enum_declaration(&name.to_string(), variants),
             NodeKind::Legacy(AstNode::EnumVariant { name, named_fields, parameters }) => self.generate_enum_variant(&name.to_string(), *named_fields, parameters),
-            NodeKind::Legacy(AstNode::EnumPattern { identifier, elements, named_fields }) => self.generate_enum_extraction(identifier, elements, *named_fields),
             NodeKind::Legacy(AstNode::None) => {},
             // Allow unreachable path, as we add new AST nodes, we do not want to automatically
             // start failing tests while we are still implementing the codegen.
@@ -521,11 +549,12 @@ impl CodegenJS {
         }
     }
 
-    fn generate_identifier(&mut self, name: &str) {
+    fn generate_identifier(&mut self, name: &Ident) {
+        let name_string = name.to_string();
         let identifier = &self
             .current_scope()
-            .resolve_variable(name)
-            .unwrap_or(name.to_string());
+            .resolve_variable(&name_string)
+            .unwrap_or(name_string);
         self.push_str(identifier);
     }
 
@@ -728,24 +757,24 @@ impl CodegenJS {
 
     fn generate_enum_extraction(
         &mut self,
-        _identifier: &Node,
-        _elements: &[Node],
+        _identifier: &Expr,
+        _elements: &[Pattern],
         _named_fields: bool,
     ) {
         todo!("enum extraction outside of function parameters is not implemented yet.")
     }
 
-    fn generate_call_expression(&mut self, function: &Node, arguments: &[Node]) {
+    fn generate_call_expression(&mut self, function: &Expr, arguments: &[Expr]) {
         let has_wildcards = arguments
             .iter()
-            .any(|arg| matches!(arg.ast_node, NodeKind::Legacy(AstNode::Wildcard)));
+            .any(|arg| matches!(arg.kind, ExprKind::Wildcard));
 
         if has_wildcards {
             self.push_str("function(...args) {\n");
             self.indent_level += 1;
             self.push_str(&self.get_indent());
             self.push_str("return ");
-            self.generate_node(function, None);
+            self.generate_expr(function, None);
             self.push_char('(');
 
             let mut wildcard_index = 0;
@@ -754,11 +783,11 @@ impl CodegenJS {
                     self.push_str(", ");
                 }
 
-                if let NodeKind::Legacy(AstNode::Wildcard) = arg.ast_node {
+                if let ExprKind::Wildcard = arg.kind {
                     self.push_str(format!("args[{}]", wildcard_index).as_str());
                     wildcard_index += 1;
                 } else {
-                    self.generate_node(arg, None);
+                    self.generate_expr(arg, None);
                 }
             }
 
@@ -769,14 +798,14 @@ impl CodegenJS {
             return;
         }
 
-        self.generate_node(function, None);
+        self.generate_expr(function, None);
         self.push_char('(');
 
         for (i, arg) in arguments.iter().enumerate() {
             if i > 0 {
                 self.push_str(", ");
             }
-            self.generate_node(arg, None);
+            self.generate_expr(arg, None);
         }
         self.push_char(')');
     }

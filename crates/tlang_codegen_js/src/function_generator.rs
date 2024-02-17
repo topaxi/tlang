@@ -25,7 +25,7 @@ pub fn get_function_declaration_from_node(node: &Node) -> &FunctionDeclaration {
     }
 }
 
-pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, declarations: &[Node]) {
+pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Expr, declarations: &[Node]) {
     let name_as_str = fn_identifier_to_string(name);
 
     let function_declarations = declarations
@@ -54,43 +54,38 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
     // Declare and output temporary variables for if let guards.
     for declaration in function_declarations.iter() {
         if let Some(ref expr) = *declaration.guard {
-            if let NodeKind::Legacy(AstNode::VariableDeclaration { pattern, .. }) = &expr.ast_node {
-                match &pattern.ast_node {
-                    NodeKind::Legacy(AstNode::Identifier(name)) => {
+            if let ExprKind::Let(pattern, gexpr) = &expr.kind {
+                match &pattern.kind {
+                    PatternKind::Identifier { name, .. } => {
                         let tmp_variable = codegen.current_scope().declare_tmp_variable();
                         codegen.push_indent();
                         codegen.push_str(&format!("let {};\n", tmp_variable));
                         codegen
                             .current_scope()
-                            .declare_variable_alias(name, &tmp_variable);
+                            .declare_variable_alias(&name.to_string(), &tmp_variable);
                     }
-                    NodeKind::Legacy(AstNode::ListPattern(patterns)) => {
+                    PatternKind::List(patterns) => {
                         for pattern in patterns {
-                            if let NodeKind::Legacy(AstNode::IdentifierPattern { name, .. }) =
-                                &pattern.ast_node
-                            {
+                            if let PatternKind::Identifier { name, .. } = &pattern.kind {
                                 let tmp_variable = codegen.current_scope().declare_tmp_variable();
                                 codegen.push_indent();
                                 codegen.push_str(&format!("let {};\n", tmp_variable));
                                 codegen
                                     .current_scope()
-                                    .declare_variable_alias(name, &tmp_variable);
+                                    .declare_variable_alias(&name.to_string(), &tmp_variable);
                             }
                         }
                     }
-                    NodeKind::Legacy(AstNode::EnumPattern {
+                    PatternKind::Enum {
                         identifier,
                         elements,
                         named_fields: _,
-                    }) => {
+                    } => {
                         let tmp_variable_enum = codegen.current_scope().declare_tmp_variable();
-                        let enum_name = match &identifier.ast_node {
-                            NodeKind::Legacy(AstNode::Identifier(name)) => name.clone(),
-                            NodeKind::Legacy(AstNode::IdentifierPattern { name, .. }) => {
-                                name.clone()
-                            }
-                            NodeKind::Legacy(AstNode::NestedIdentifier(names)) => {
-                                names.clone().pop().unwrap()
+                        let enum_name = match &identifier.kind {
+                            ExprKind::Identifier(name) => name.to_string(),
+                            ExprKind::NestedIdentifier(names) => {
+                                names.clone().pop().unwrap().to_string()
                             }
                             _ => unreachable!(),
                         };
@@ -100,14 +95,10 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                             .current_scope()
                             .declare_variable_alias(&enum_name, &tmp_variable_enum);
                         for element in elements {
-                            // Skip any Wildcards
-                            if let NodeKind::Legacy(AstNode::Wildcard) = element.ast_node {
-                                continue;
-                            }
-                            let identifier = match &element.ast_node {
-                                NodeKind::Legacy(AstNode::IdentifierPattern { name, .. }) => {
-                                    name.clone()
-                                }
+                            let identifier = match &element.kind {
+                                // Skip any Wildcards
+                                PatternKind::Wildcard => continue,
+                                PatternKind::Identifier { name, .. } => name.to_string(),
                                 _ => unreachable!(),
                             };
                             let tmp_variable = codegen.current_scope().declare_tmp_variable();
@@ -163,20 +154,19 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                 type_annotation: _,
             }) = &param.ast_node
             {
-                match &pattern.ast_node {
-                    NodeKind::Legacy(AstNode::Identifier(name)) => {
+                match &pattern.kind {
+                    PatternKind::Identifier { name, .. } => {
                         codegen
                             .current_scope()
-                            .declare_variable_alias(name, &format!("args[{}]", j));
+                            .declare_variable_alias(&name.to_string(), &format!("args[{}]", j));
                     }
-                    NodeKind::Legacy(AstNode::ListPattern(patterns)) => {
+                    PatternKind::List(patterns) => {
                         for (i, pattern) in patterns.iter().enumerate() {
-                            if let NodeKind::Legacy(AstNode::IdentifierPattern { name, .. }) =
-                                &pattern.ast_node
-                            {
-                                codegen
-                                    .current_scope()
-                                    .declare_variable_alias(name, &format!("args[{}][{}]", j, i));
+                            if let PatternKind::Identifier { name, .. } = &pattern.kind {
+                                codegen.current_scope().declare_variable_alias(
+                                    &name.to_string(),
+                                    &format!("args[{}][{}]", j, i),
+                                );
                             }
                         }
                     }
@@ -204,12 +194,10 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                     }) = &param.ast_node
                     {
                         matches!(
-                            pattern.ast_node,
-                            NodeKind::Legacy(
-                                AstNode::Literal(_)
-                                    | AstNode::ListPattern(_)
-                                    | AstNode::EnumPattern { .. }
-                            )
+                            pattern.kind,
+                            PatternKind::Literal(_)
+                                | PatternKind::List(_)
+                                | PatternKind::Enum { .. }
                         )
                     } else {
                         false
@@ -242,12 +230,12 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                     type_annotation: _,
                 }) = &param.ast_node
                 {
-                    match &pattern.ast_node {
-                        NodeKind::Legacy(AstNode::Identifier(_) | AstNode::Literal(_)) => {
+                    match &pattern.kind {
+                        PatternKind::Identifier { .. } | PatternKind::Literal(_) => {
                             codegen.push_str(&format!("args[{}] === ", k));
                             codegen.generate_node(param, None);
                         }
-                        NodeKind::Legacy(AstNode::ListPattern(patterns)) => {
+                        PatternKind::List(patterns) => {
                             if patterns.is_empty() {
                                 codegen.push_str(&format!("args[{}].length === 0", k));
                                 continue;
@@ -260,72 +248,54 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                                     codegen.push_str(" && ");
                                 }
 
-                                match &pattern.ast_node {
-                                    NodeKind::Legacy(AstNode::Literal(_)) => {
+                                match &pattern.kind {
+                                    PatternKind::Literal(_) => {
                                         codegen.push_str(&format!("args[{}][{}] === ", k, i));
-                                        codegen.generate_node(pattern, None);
+                                        codegen.generate_pat(pattern);
                                     }
-                                    NodeKind::Legacy(AstNode::UnaryOp(
-                                        UnaryOp::Rest,
-                                        identified,
-                                    )) => {
-                                        if let NodeKind::Legacy(AstNode::IdentifierPattern {
-                                            ref name,
-                                            ..
-                                        }) = identified.ast_node
+                                    PatternKind::Rest(identified) => {
+                                        if let PatternKind::Identifier { ref name, .. } =
+                                            identified.kind
                                         {
                                             codegen
                                                 .push_str(&format!("args[{}].length >= {}", k, i));
                                             codegen.declare_function_pre_body_variable(
-                                                name,
+                                                &name.to_string(),
                                                 &format!("args[{}].slice({})", k, i),
                                             );
                                         } else {
                                             unreachable!();
                                         }
                                     }
-                                    NodeKind::Legacy(AstNode::IdentifierPattern {
-                                        name, ..
-                                    }) => {
+                                    PatternKind::Identifier { name, .. } => {
                                         codegen.declare_function_pre_body_variable(
-                                            name,
+                                            &name.to_string(),
                                             &format!("args[{}][{}]", k, i),
                                         );
                                     }
-                                    NodeKind::Legacy(AstNode::Wildcard) => {}
+                                    PatternKind::Wildcard => {}
                                     _ => unreachable!(),
                                 }
                             }
                         }
-                        NodeKind::Legacy(AstNode::EnumPattern {
+                        PatternKind::Enum {
                             identifier,
                             elements,
                             named_fields,
-                        }) => {
-                            let identifier = match &identifier.ast_node {
-                                NodeKind::Legacy(AstNode::Identifier(name)) => name.clone(),
-                                NodeKind::Legacy(AstNode::IdentifierPattern { name, .. }) => {
-                                    name.clone()
-                                }
-                                NodeKind::Legacy(AstNode::NestedIdentifier(names)) => {
-                                    names.clone().pop().unwrap()
+                        } => {
+                            let identifier = match &identifier.kind {
+                                ExprKind::Identifier(ident) => ident.to_string(),
+                                ExprKind::NestedIdentifier(names) => {
+                                    names.clone().pop().unwrap().to_string()
                                 }
                                 _ => unreachable!(),
                             };
                             codegen.push_str(&format!("args[{}].tag === \"{}\"", k, identifier));
                             for (i, element) in elements.iter().enumerate() {
-                                // Skip any Wildcards
-                                if let NodeKind::Legacy(AstNode::Wildcard) = element.ast_node {
-                                    continue;
-                                }
-                                let identifier = match &element.ast_node {
-                                    NodeKind::Legacy(AstNode::Identifier(name)) => name.clone(),
-                                    NodeKind::Legacy(AstNode::IdentifierPattern {
-                                        name, ..
-                                    }) => name.clone(),
-                                    NodeKind::Legacy(AstNode::NestedIdentifier(names)) => {
-                                        names.clone().pop().unwrap()
-                                    }
+                                let identifier = match &element.kind {
+                                    // Skip any Wildcards
+                                    PatternKind::Wildcard => continue,
+                                    PatternKind::Identifier { name, .. } => name.to_string(),
                                     _ => unreachable!(),
                                 };
                                 if *named_fields {
@@ -378,10 +348,12 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Node, decl
                 type_annotation: _,
             }) = &param.ast_node
             {
-                if let NodeKind::Legacy(AstNode::Identifier(ref name)) = pattern.ast_node {
+                if let PatternKind::Identifier { ref name, .. } = pattern.kind {
                     codegen.push_indent();
                     codegen.push_str(&format!("let {} = args[{}];\n", name, j));
-                    codegen.current_scope().declare_variable_alias(name, name);
+                    codegen
+                        .current_scope()
+                        .declare_variable_alias(&name.to_string(), &name.to_string());
                 }
             }
         }
