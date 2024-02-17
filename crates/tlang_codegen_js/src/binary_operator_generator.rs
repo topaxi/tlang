@@ -1,4 +1,4 @@
-use tlang_ast::node::{AstNode, BinaryOpKind, Node, NodeKind};
+use tlang_ast::node::{BinaryOpKind, Expr, ExprKind};
 
 use crate::generator::CodegenJS;
 
@@ -17,8 +17,8 @@ struct JSOperatorInfo {
 pub fn generate_binary_op(
     codegen: &mut CodegenJS,
     op: &BinaryOpKind,
-    lhs: &Node,
-    rhs: &Node,
+    lhs: &Expr,
+    rhs: &Expr,
     parent_op: Option<&BinaryOpKind>,
 ) {
     let needs_parentheses =
@@ -30,50 +30,50 @@ pub fn generate_binary_op(
 
     if let BinaryOpKind::Pipeline = op {
         // If rhs was an identifier, we just pass lhs it as an argument to a function call.
-        if let NodeKind::Legacy(AstNode::Identifier(_)) = rhs.ast_node {
-            codegen.generate_node(rhs, None);
+        if let ExprKind::Identifier(_) = rhs.kind {
+            codegen.generate_expr(rhs, None);
             codegen.push_char('(');
-            codegen.generate_node(lhs, None);
+            codegen.generate_expr(lhs, None);
             codegen.push_char(')');
         // If rhs is a Call node and we prepend the lhs to the argument list.
-        } else if let NodeKind::Legacy(AstNode::Call {
+        } else if let ExprKind::Call {
             function,
             arguments,
-        }) = &rhs.ast_node
+        } = &rhs.kind
         {
-            codegen.generate_node(function, None);
+            codegen.generate_expr(function, None);
             codegen.push_char('(');
 
             // If we have a wildcard in the argument list, we instead replace the wildcard with the lhs.
             // Otherwise we prepend the lhs to the argument list.
             let has_wildcard = arguments
                 .iter()
-                .any(|arg| matches!(arg.ast_node, NodeKind::Legacy(AstNode::Wildcard)));
+                .any(|arg| matches!(arg.kind, ExprKind::Wildcard));
             if has_wildcard {
                 for (i, arg) in arguments.iter().enumerate() {
                     if i > 0 {
                         codegen.push_str(", ");
                     }
 
-                    if let NodeKind::Legacy(AstNode::Wildcard) = arg.ast_node {
-                        codegen.generate_node(lhs, None);
+                    if let ExprKind::Wildcard = arg.kind {
+                        codegen.generate_expr(lhs, None);
                     } else {
-                        codegen.generate_node(arg, None);
+                        codegen.generate_expr(arg, None);
                     }
                 }
             } else {
-                codegen.generate_node(lhs, None);
+                codegen.generate_expr(lhs, None);
                 for arg in arguments.iter() {
                     codegen.push_str(", ");
-                    codegen.generate_node(arg, None);
+                    codegen.generate_expr(arg, None);
                 }
             };
             codegen.push_char(')');
         }
     } else {
-        codegen.generate_node(lhs, Some(op));
+        codegen.generate_expr(lhs, Some(op));
         generate_binary_operator_token(codegen, op);
-        codegen.generate_node(rhs, Some(op));
+        codegen.generate_expr(rhs, Some(op));
     }
 
     if needs_parentheses {

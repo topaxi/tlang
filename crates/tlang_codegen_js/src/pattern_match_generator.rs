@@ -1,4 +1,4 @@
-use tlang_ast::node::{AstNode, Node, NodeKind};
+use tlang_ast::node::{AstNode, Expr, ExprKind, Node, NodeKind, Pattern, PatternKind};
 
 use crate::generator::{BlockContext, CodegenJS};
 
@@ -7,37 +7,37 @@ fn match_args_have_completions(arms: &[Node]) -> bool {
         NodeKind::Legacy(AstNode::MatchArm {
             pattern: _,
             expression,
-        }) => match &expression.ast_node {
-            NodeKind::Legacy(AstNode::Block(_, expr)) => expr.is_some(),
+        }) => match &expression.kind {
+            ExprKind::Block(_, expr) => expr.is_some(),
             _ => true,
         },
         _ => unreachable!(),
     })
 }
 
-fn is_wildcard_pattern(pattern: &Node) -> bool {
-    matches!(pattern.ast_node, NodeKind::Legacy(AstNode::Wildcard))
+fn is_wildcard_pattern(pattern: &Pattern) -> bool {
+    matches!(pattern.kind, PatternKind::Wildcard)
 }
 
-fn generate_match_arm_expression(codegen: &mut CodegenJS, expression: &Node) {
-    if let NodeKind::Legacy(AstNode::Block(_, _)) = &expression.ast_node {
-        codegen.generate_node(expression, None);
+fn generate_match_arm_expression(codegen: &mut CodegenJS, expression: &Expr) {
+    if let ExprKind::Block(_, _) = &expression.kind {
+        codegen.generate_expr(expression, None);
     } else {
         let completion_tmp_var = codegen.current_completion_variable().clone().unwrap();
         codegen.push_indent();
         codegen.push_str(&format!("{} = ", completion_tmp_var));
-        codegen.generate_node(expression, None);
+        codegen.generate_expr(expression, None);
         codegen.push_str(";\n");
     }
 }
 
-pub fn generate_match_expression(codegen: &mut CodegenJS, expression: &Node, arms: &[Node]) {
+pub fn generate_match_expression(codegen: &mut CodegenJS, expression: &Expr, arms: &[Node]) {
     // TODO: A lot here is copied from the if statement generator.
     let lhs = codegen.replace_statement_buffer(String::new());
     let has_block_completions = match_args_have_completions(arms);
     let match_value_tmp_var = codegen.current_scope().declare_tmp_variable();
     codegen.push_str(&format!("let {} = ", match_value_tmp_var));
-    codegen.generate_node(expression, None);
+    codegen.generate_expr(expression, None);
     if has_block_completions {
         let completion_tmp_var = codegen.current_scope().declare_tmp_variable();
         codegen.push_indent();
@@ -59,7 +59,7 @@ pub fn generate_match_expression(codegen: &mut CodegenJS, expression: &Node, arm
                     codegen.push_str("if (");
                     codegen.push_str(&match_value_tmp_var);
                     codegen.push_str(" === ");
-                    codegen.generate_node(pattern, None);
+                    codegen.generate_pat(pattern);
                     codegen.push_str(") {\n");
                     codegen.inc_indent();
                     codegen.push_context(BlockContext::Expression);
