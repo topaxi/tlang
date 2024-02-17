@@ -384,10 +384,12 @@ impl SemanticAnalyzer {
     fn analyze_function_declaration(
         &mut self,
         _node: &mut Node,
-        name: &mut Expr,
+        _name: &mut Expr,
         declaration: &mut Node,
     ) {
-        self.analyze_expr(name);
+        // TODO: Function names might now want to be expressions, or at least excluded
+        //       from marking as used.
+        // self.analyze_expr(name);
         self.analyze_node(declaration);
     }
 

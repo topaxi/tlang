@@ -78,6 +78,14 @@ impl DeclarationAnalyzer {
 
     fn collect_declarations_expr(&mut self, expr: &mut Expr) {
         match &mut expr.kind {
+            ExprKind::Block(stmts, cexpr) => {
+                expr.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
+                for stmt in stmts {
+                    self.collect_declarations(stmt);
+                }
+                self.collect_optional_declarations_expr(cexpr);
+                self.pop_symbol_table();
+            }
             ExprKind::FunctionExpression {
                 id,
                 name,
