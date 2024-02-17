@@ -1,7 +1,8 @@
 use std::{cell::RefCell, rc::Rc};
 
 use tlang_ast::{
-    node::{AstNode, ExprKind, Node, NodeKind},
+    node::{AstNode, Expr, ExprKind, Node, NodeKind, Pattern, PatternKind},
+    span::Span,
     symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
 };
 
@@ -14,7 +15,6 @@ pub struct SemanticAnalyzer {
     declaration_analyzer: DeclarationAnalyzer,
     symbol_table_stack: Vec<Rc<RefCell<SymbolTable>>>,
     diagnostics: Vec<Diagnostic>,
-    identifier_is_declaration: bool,
 }
 
 impl Default for SemanticAnalyzer {
@@ -29,7 +29,6 @@ impl SemanticAnalyzer {
             declaration_analyzer,
             symbol_table_stack: vec![],
             diagnostics: vec![],
-            identifier_is_declaration: false,
         }
     }
 
@@ -77,7 +76,7 @@ impl SemanticAnalyzer {
         self.declaration_analyzer.analyze(ast);
     }
 
-    fn mark_as_used_by_name(&mut self, name: &str, node: &Node) {
+    fn mark_as_used_by_name(&mut self, name: &str, span: &Span) {
         let symbol_info = self.get_last_symbol_table().borrow().get_by_name(name);
 
         if let Some(symbol_info) = symbol_info {
@@ -99,22 +98,172 @@ impl SemanticAnalyzer {
                         name, suggestion.symbol_type, suggestion.name
                     ),
                     Severity::Error,
-                    node.span.clone(),
+                    span.clone(),
                 ));
             } else {
                 self.diagnostics.push(Diagnostic::new(
                     format!("Use of undeclared variable `{}`", name),
                     Severity::Error,
-                    node.span.clone(),
+                    span.clone(),
                 ));
             }
         }
     }
 
     #[inline(always)]
-    fn analyze_optional_node(&mut self, ast: &mut Option<Node>) {
-        if let Some(node) = ast {
-            self.analyze_node(node);
+    fn analyze_optional_expr(&mut self, expr: &mut Option<Expr>) {
+        if let Some(expr) = expr {
+            self.analyze_expr(expr);
+        }
+    }
+
+    fn analyze_expr(&mut self, expr: &mut Expr) {
+        if let Some(symbol_table) = &expr.symbol_table {
+            self.push_symbol_table(symbol_table);
+        }
+
+        let mut kind = std::mem::take(&mut expr.kind);
+
+        match &mut kind {
+            ExprKind::BinaryOp { op: _, lhs, rhs } => {
+                self.analyze_expr(lhs);
+                self.analyze_expr(rhs);
+            }
+            ExprKind::Block(stmts, expr) => {
+                for stmt in stmts.iter_mut() {
+                    self.analyze_node(stmt);
+                }
+                self.analyze_optional_expr(expr);
+            }
+            ExprKind::UnaryOp(_, node) => {
+                self.analyze_expr(node);
+            }
+            ExprKind::Call {
+                function,
+                arguments,
+            } => {
+                self.analyze_expr(function);
+                for argument in arguments {
+                    self.analyze_expr(argument);
+                }
+            }
+            ExprKind::IfElse {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                self.analyze_expr(condition);
+                self.analyze_expr(then_branch);
+                self.analyze_optional_expr(else_branch);
+            }
+            ExprKind::RecursiveCall(node) => {
+                self.analyze_expr(node);
+            }
+            ExprKind::Let(pat, expr) => {
+                self.analyze_pat(pat);
+                self.analyze_expr(expr);
+            }
+            ExprKind::List(values) => {
+                for value in values {
+                    self.analyze_expr(value);
+                }
+            }
+            ExprKind::Dict(kvs) => {
+                for (key, value) in kvs {
+                    self.analyze_expr(key);
+                    self.analyze_expr(value);
+                }
+            }
+            ExprKind::IndexExpression { base, index } => {
+                self.analyze_expr(base);
+                self.analyze_expr(index);
+            }
+            ExprKind::FieldExpression { base, field: _ } => {
+                self.analyze_expr(base);
+                // TODO: We are checking for unused variables, this should be refactored into
+                //       it's own pass. Skipping analyzing field of variable as we do not have
+                //       any type information yet.
+                // self.analyze_node(field);
+            }
+            ExprKind::FunctionExpression {
+                id: _,
+                name,
+                declaration,
+            } => {
+                self.analyze_optional_expr(name);
+                self.analyze_node(declaration);
+            }
+            ExprKind::Identifier(ident) => {
+                self.mark_as_used_by_name(&ident.to_string(), &expr.span);
+            }
+            ExprKind::NestedIdentifier(idents) => {
+                if let Some(first_ident) = idents.first() {
+                    self.mark_as_used_by_name(&first_ident.to_string(), &expr.span);
+                }
+
+                // TODO: Handle nested identifiers
+            }
+            ExprKind::Match { expression, arms } => {
+                self.analyze_expr(expression);
+
+                for arm in arms {
+                    self.analyze_node(arm);
+                }
+            }
+            ExprKind::Range { start, end, .. } => {
+                self.analyze_expr(start);
+                self.analyze_expr(end);
+            }
+            ExprKind::None | ExprKind::Literal(_) | ExprKind::Wildcard => {}
+        }
+
+        expr.kind = kind;
+
+        if let Some(symbol_table) = &expr.symbol_table {
+            let symbol_table = symbol_table.borrow();
+            let local_symbols = symbol_table.get_all_local_symbols();
+            let mut unused_symbols = local_symbols
+                .iter()
+                .filter(|symbol| symbol.id != SymbolId::new(0))
+                .filter(|symbol| !symbol.used)
+                .filter(|symbol| !symbol.name.starts_with('_'))
+                .collect::<Vec<_>>();
+
+            for unused_symbol in unused_symbols.iter_mut() {
+                self.diagnostics.push(Diagnostic::new(
+                    format!(
+                        "Unused {} `{}`, if this is intentional, prefix the name with an underscore: `_{}`",
+                        unused_symbol.symbol_type, unused_symbol.name, unused_symbol.name
+                    ),
+                    Severity::Warning,
+                    unused_symbol.defined_at.clone().unwrap_or_else(|| expr.span.clone()).clone()
+                ));
+            }
+
+            self.pop_symbol_table();
+        }
+    }
+
+    fn analyze_pat(&mut self, pat: &mut Pattern) {
+        match &mut pat.kind {
+            PatternKind::List(patterns) => {
+                for pattern in patterns {
+                    self.analyze_pat(pattern);
+                }
+            }
+            PatternKind::Rest(pattern) => self.analyze_pat(pattern),
+            PatternKind::EnumPattern {
+                identifier: _,
+                elements,
+                ..
+            } => {
+                // self.mark_as_used_by_name(&identifier.to_string(), &pat.span);
+
+                for element in elements {
+                    self.analyze_pat(element);
+                }
+            }
+            PatternKind::Wildcard | PatternKind::Identifier { .. } | PatternKind::Literal(_) => {}
         }
     }
 
@@ -126,33 +275,19 @@ impl SemanticAnalyzer {
         let mut ast_node = std::mem::take(&mut ast.ast_node);
 
         match &mut ast_node {
-            NodeKind::Expr(expr) => match &mut expr.kind {
-                ExprKind::Block(nodes, return_value) => {
-                    for node in nodes.iter_mut() {
-                        self.analyze_node(node)
-                    }
-
-                    self.analyze_optional_node(return_value);
-                }
-                _ => todo!(),
-            },
+            NodeKind::Expr(expr) => self.analyze_expr(expr),
             NodeKind::Legacy(AstNode::Module(nodes)) => {
                 nodes.iter_mut().for_each(|node| self.analyze_node(node))
             }
-            NodeKind::Legacy(AstNode::ExpressionStatement(node)) => self.analyze_node(node),
-            NodeKind::Legacy(AstNode::Block(nodes, return_value)) => {
-                for node in nodes.iter_mut() {
-                    self.analyze_node(node)
-                }
-
-                self.analyze_optional_node(return_value);
-            }
+            NodeKind::Legacy(AstNode::ExpressionStatement(expr)) => self.analyze_expr(expr),
             NodeKind::Legacy(AstNode::VariableDeclaration {
                 id,
                 pattern,
                 expression,
                 type_annotation: _,
-            }) => self.analyze_variable_declaration(*id, pattern, expression),
+            }) => {
+                self.analyze_variable_declaration(*id, pattern, expression);
+            }
             NodeKind::Legacy(AstNode::FunctionSingleDeclaration {
                 id: _,
                 name,
@@ -168,93 +303,17 @@ impl SemanticAnalyzer {
                     self.analyze_node(parameter);
                 }
 
-                self.analyze_node(&mut declaration.body);
+                self.analyze_expr(&mut declaration.body);
             }
-            NodeKind::Legacy(AstNode::FunctionExpression {
-                id: _,
-                name,
-                declaration,
-            }) => {
-                self.analyze_optional_node(name);
-                self.analyze_node(declaration);
+            NodeKind::Legacy(AstNode::FunctionParameter { pattern: node, .. }) => {
+                self.analyze_pat(node)
             }
-            NodeKind::Legacy(AstNode::FunctionParameter {
-                id: _,
-                pattern: node,
-                type_annotation: _,
-            }) => self.analyze_function_parameter(ast, node),
             NodeKind::Legacy(AstNode::ReturnStatement(expr)) => {
-                self.analyze_optional_node(expr);
-            }
-            NodeKind::Legacy(AstNode::IfElse {
-                condition,
-                then_branch,
-                else_branch,
-            }) => {
-                self.analyze_node(condition);
-                self.analyze_node(then_branch);
-                self.analyze_optional_node(else_branch);
-            }
-            NodeKind::Legacy(AstNode::Identifier(_)) if self.identifier_is_declaration => {}
-            NodeKind::Legacy(AstNode::Identifier(name)) => self.mark_as_used_by_name(name, ast),
-            NodeKind::Legacy(AstNode::NestedIdentifier(idents)) => {
-                if let Some(first_ident) = idents.first() {
-                    self.mark_as_used_by_name(first_ident, ast);
-                }
-
-                // TODO: Handle nested identifiers
-            }
-            NodeKind::Legacy(AstNode::Call {
-                function,
-                arguments,
-            }) => {
-                self.analyze_call(function, arguments);
-            }
-            NodeKind::Legacy(AstNode::RecursiveCall(node)) => {
-                self.analyze_node(node);
-            }
-            NodeKind::Legacy(AstNode::BinaryOp { op: _, lhs, rhs }) => {
-                self.analyze_node(lhs);
-                self.analyze_node(rhs);
-            }
-            NodeKind::Legacy(AstNode::UnaryOp(_, node)) => {
-                self.analyze_node(node);
-            }
-            NodeKind::Legacy(AstNode::List(values)) => {
-                for value in values {
-                    self.analyze_node(value);
-                }
-            }
-            NodeKind::Legacy(AstNode::IndexExpression { base, index }) => {
-                self.analyze_node(base);
-                self.analyze_node(index);
-            }
-            NodeKind::Legacy(AstNode::FieldExpression { base, field: _ }) => {
-                self.analyze_node(base);
-                // TODO: We are checking for unused variables, this should be refactored into
-                //       it's own pass. Skipping analyzing field of variable as we do not have
-                //       any type information yet.
-                // self.analyze_node(field);
-            }
-            NodeKind::Legacy(AstNode::ListPattern(patterns)) => {
-                for pattern in patterns {
-                    self.analyze_declaration_node(pattern);
-                }
-            }
-            NodeKind::Legacy(AstNode::EnumPattern {
-                identifier,
-                elements: _,
-                ..
-            }) => {
-                self.analyze_node(identifier);
+                self.analyze_optional_expr(expr);
             }
             NodeKind::Legacy(
-                AstNode::Dict(_)
-                | AstNode::EnumDeclaration { .. }
+                AstNode::EnumDeclaration { .. }
                 | AstNode::EnumVariant { .. }
-                | AstNode::IdentifierPattern { .. }
-                | AstNode::Range { .. }
-                | AstNode::Match { .. }
                 | AstNode::MatchArm { .. }
                 | AstNode::TypeAnnotation { .. },
             ) => {
@@ -264,7 +323,6 @@ impl SemanticAnalyzer {
             | NodeKind::Legacy(
                 AstNode::None
                 | AstNode::Wildcard
-                | AstNode::Literal(_)
                 | AstNode::SingleLineComment(_)
                 | AstNode::MultiLineComment(_),
             ) => {
@@ -299,19 +357,13 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn analyze_declaration_node(&mut self, ast: &mut Node) {
-        self.identifier_is_declaration = true;
-        self.analyze_node(ast);
-        self.identifier_is_declaration = false;
-    }
-
     fn analyze_variable_declaration(
         &mut self,
         id: SymbolId,
-        pattern: &mut Node,
-        expression: &mut Node,
+        pattern: &mut Pattern,
+        expression: &mut Expr,
     ) {
-        self.analyze_declaration_node(pattern);
+        self.analyze_pat(pattern);
 
         // When declaring a variable, we can only reference symbols that were declared before.
         // This includes our own variable name.
@@ -320,7 +372,7 @@ impl SemanticAnalyzer {
         // whether the expression references any symbols that were not declared before.
         let symbol = self.get_last_symbol_table().borrow_mut().remove(id);
 
-        self.analyze_node(expression);
+        self.analyze_expr(expression);
 
         if let Some(symbol) = symbol {
             self.get_last_symbol_table()
@@ -332,33 +384,22 @@ impl SemanticAnalyzer {
     fn analyze_function_declaration(
         &mut self,
         _node: &mut Node,
-        name: &mut Node,
+        name: &mut Expr,
         declaration: &mut Node,
     ) {
-        self.analyze_declaration_node(name);
+        self.analyze_expr(name);
         self.analyze_node(declaration);
     }
 
     fn analyze_function_declarations(
         &mut self,
         _node: &mut Node,
-        name: &mut Node,
+        name: &mut Expr,
         declarations: &mut Vec<Node>,
     ) {
-        self.analyze_declaration_node(name);
+        self.analyze_expr(name);
         for declaration in declarations {
             self.analyze_node(declaration);
-        }
-    }
-
-    fn analyze_function_parameter(&mut self, _node: &mut Node, name: &mut Node) {
-        self.analyze_declaration_node(name);
-    }
-
-    fn analyze_call(&mut self, function: &mut Box<Node>, arguments: &mut [Node]) {
-        self.analyze_node(function);
-        for argument in arguments {
-            self.analyze_node(argument);
         }
     }
 }

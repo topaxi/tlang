@@ -144,8 +144,10 @@ impl Expr {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub enum ExprKind {
+    #[default]
+    None,
     Block(Vec<Node>, Box<Option<Expr>>),
     Call {
         function: Box<Expr>,
