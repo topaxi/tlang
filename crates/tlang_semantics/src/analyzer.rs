@@ -170,8 +170,9 @@ impl SemanticAnalyzer {
                 }
             }
             ExprKind::Dict(kvs) => {
-                for (key, value) in kvs {
-                    self.analyze_expr(key);
+                for (_key, value) in kvs {
+                    // TODO: Keys are currently not properly analyzed
+                    // self.analyze_expr(key);
                     self.analyze_expr(value);
                 }
             }

@@ -168,7 +168,7 @@ impl CodegenJS {
     }
 
     pub fn generate_code(&mut self, node: &Node) {
-        self.generate_node(node, None)
+        self.generate_node(node)
     }
 
     pub fn declare_function_pre_body_variable(&mut self, name: &str, value: &str) {
@@ -387,7 +387,7 @@ impl CodegenJS {
     #[inline(always)]
     fn generate_statements(&mut self, statements: &[Node]) {
         for statement in statements {
-            self.generate_node(statement, None);
+            self.generate_node(statement);
             self.flush_statement_buffer();
         }
     }
@@ -500,11 +500,12 @@ impl CodegenJS {
                 elements,
                 named_fields,
             } => self.generate_enum_extraction(identifier, elements, *named_fields),
+            PatternKind::Literal(literal) => self.generate_literal(literal),
             _ => unimplemented!("Pattern matching not implemented yet."),
         }
     }
 
-    pub fn generate_node(&mut self, node: &Node, parent_op: Option<&BinaryOpKind>) {
+    pub fn generate_node(&mut self, node: &Node) {
         // TODO: Split into generate_statement and generate_expression.
         //       This should also help setting proper block contexts.
         match &node.ast_node {
@@ -700,7 +701,7 @@ impl CodegenJS {
         self.push_str(&format!("const {} = {{\n", name));
         self.indent_level += 1;
         for variant in variants {
-            self.generate_node(variant, None);
+            self.generate_node(variant);
         }
         self.indent_level -= 1;
         self.push_str(&self.get_indent());

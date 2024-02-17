@@ -1,5 +1,5 @@
 use tlang_ast::node::{
-    AstNode, Expr, ExprKind, FunctionDeclaration, Node, NodeKind, Pattern, PatternKind, UnaryOp,
+    AstNode, Expr, ExprKind, FunctionDeclaration, Node, NodeKind, Pattern, PatternKind,
 };
 
 use crate::generator::{BlockContext, CodegenJS};
@@ -43,7 +43,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Expr, decl
         .any(|declaration| is_function_body_tail_recursive(&name_as_str, &declaration.body));
 
     for comment in function_comments {
-        codegen.generate_node(comment, None);
+        codegen.generate_node(comment);
     }
     codegen.push_indent();
     codegen.push_str(&format!("function {}(...args) {{\n", name_as_str));
@@ -233,7 +233,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Expr, decl
                     match &pattern.kind {
                         PatternKind::Identifier { .. } | PatternKind::Literal(_) => {
                             codegen.push_str(&format!("args[{}] === ", k));
-                            codegen.generate_node(param, None);
+                            codegen.generate_node(param);
                         }
                         PatternKind::List(patterns) => {
                             if patterns.is_empty() {
@@ -336,7 +336,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Expr, decl
 
         for comment in comments.iter() {
             codegen.push_indent();
-            codegen.generate_node(comment, None);
+            codegen.generate_node(comment);
         }
         comments.clear();
 
@@ -457,7 +457,7 @@ pub fn generate_function_parameter_list(codegen: &mut CodegenJS, parameters: &[N
         if i > 0 {
             codegen.push_str(", ");
         }
-        codegen.generate_node(param, None);
+        codegen.generate_node(param);
     }
     codegen.push_str(")");
 }
@@ -606,72 +606,76 @@ fn flush_function_pre_body(codegen: &mut CodegenJS) {
     codegen.flush_statement_buffer();
 }
 
+fn is_function_body_tail_recursive_node(function_name: &str, node: &Node) -> bool {
+    match &node.ast_node {
+        NodeKind::Legacy(AstNode::ExpressionStatement(expression)) => {
+            is_function_body_tail_recursive(function_name, expression)
+        }
+        NodeKind::Legacy(AstNode::MatchArm {
+            pattern: _,
+            expression,
+        }) => is_function_body_tail_recursive(function_name, expression),
+        NodeKind::Legacy(AstNode::ReturnStatement(node)) => {
+            if let Some(node) = node.as_ref() {
+                is_function_body_tail_recursive(function_name, node)
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
+}
+
 fn is_function_body_tail_recursive(function_name: &str, node: &Expr) -> bool {
-    return false;
     // Recursively traverse nodes to check for tail recursive calls to the function itself.
     // We currently only support tail recursion to the function itself, not any other function.
     // Therefore we look for RecursiveCall nodes which reference the current function name.
-    //match &node.kind {
-    //    ExprKind::RecursiveCall(node) => {
-    //        // Node is a Call expression, unwrap first.
-    //        if let ExprKind::Call {
-    //            function,
-    //            arguments: _,
-    //        } = &node.kind
-    //        {
-    //            // If the function is an identifier, check if it's the same as the current function name.
-    //            if let ExprKind::Identifier(name) = &function.kind {
-    //                if name == function_name {
-    //                    return true;
-    //                }
-    //            }
-    //        }
-    //        false
-    //    }
-    //    ExprKind::Block(statements, expression) => {
-    //        for statement in statements {
-    //            if is_function_body_tail_recursive(function_name, statement) {
-    //                return true;
-    //            }
-    //        }
-    //        if let Some(expression) = expression.as_ref() {
-    //            return is_function_body_tail_recursive(function_name, expression);
-    //        }
-    //        false
-    //    }
-    //    // :poop:
-    //    NodeKind::Legacy(AstNode::ExpressionStatement(expression)) => {
-    //        is_function_body_tail_recursive(function_name, expression)
-    //    }
-    //    NodeKind::Legacy(AstNode::Match {
-    //        expression,
-    //        arms: _,
-    //    }) => is_function_body_tail_recursive(function_name, expression),
-    //    NodeKind::Legacy(AstNode::MatchArm {
-    //        pattern: _,
-    //        expression,
-    //    }) => is_function_body_tail_recursive(function_name, expression),
-    //    NodeKind::Legacy(AstNode::IfElse {
-    //        condition,
-    //        then_branch,
-    //        else_branch,
-    //    }) => {
-    //        is_function_body_tail_recursive(function_name, condition)
-    //            || is_function_body_tail_recursive(function_name, then_branch)
-    //            // TODO: Get rid of clone.
-    //            || <Option<Node> as Clone>::clone(else_branch.as_ref()).map_or(false, |branch| {
-    //                is_function_body_tail_recursive(function_name, &branch)
-    //            })
-    //    }
-    //    NodeKind::Legacy(AstNode::ReturnStatement(node)) => {
-    //        if let Some(node) = node.as_ref() {
-    //            is_function_body_tail_recursive(function_name, node)
-    //        } else {
-    //            false
-    //        }
-    //    }
-    //    _ => false,
-    //}
+    match &node.kind {
+        ExprKind::RecursiveCall(node) => {
+            // Node is a Call expression, unwrap first.
+            if let ExprKind::Call {
+                function,
+                arguments: _,
+            } = &node.kind
+            {
+                // If the function is an identifier, check if it's the same as the current function name.
+                if let ExprKind::Identifier(name) = &function.kind {
+                    if name.to_string() == function_name {
+                        return true;
+                    }
+                }
+            }
+            false
+        }
+        ExprKind::Block(statements, expression) => {
+            for statement in statements {
+                if is_function_body_tail_recursive_node(function_name, statement) {
+                    return true;
+                }
+            }
+            if let Some(expression) = expression.as_ref() {
+                return is_function_body_tail_recursive(function_name, expression);
+            }
+            false
+        }
+        ExprKind::Match {
+            expression,
+            arms: _,
+        } => is_function_body_tail_recursive(function_name, expression),
+        ExprKind::IfElse {
+            condition,
+            then_branch,
+            else_branch,
+        } => {
+            is_function_body_tail_recursive(function_name, condition)
+                || is_function_body_tail_recursive(function_name, then_branch)
+                // TODO: Get rid of clone.
+                || <Option<Expr> as Clone>::clone(else_branch.as_ref()).map_or(false, |branch| {
+                    is_function_body_tail_recursive(function_name, &branch)
+                })
+        }
+        _ => false,
+    }
 }
 
 fn fn_identifier_to_string(expr: &Expr) -> String {
