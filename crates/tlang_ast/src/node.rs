@@ -125,6 +125,7 @@ pub struct FunctionDeclaration {
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct Expr {
     pub kind: ExprKind,
+    pub symbol_table: Option<Rc<RefCell<SymbolTable>>>,
     pub span: Span,
 }
 
@@ -132,6 +133,7 @@ impl Expr {
     pub fn new(kind: ExprKind) -> Self {
         Expr {
             kind,
+            symbol_table: None,
             span: Span::default(),
         }
     }

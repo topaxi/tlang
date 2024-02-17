@@ -5,78 +5,119 @@ expression: "parse!(indoc! {\n        \"\n        if let Option::Some(y) = x; {\
 Node(
   ast_node: Legacy(Module([
     Node(
-      ast_node: Legacy(ExpressionStatement(Node(
-        ast_node: Legacy(IfElse(
-          condition: Node(
-            ast_node: Legacy(VariableDeclaration(
-              id: SymbolId(2),
-              pattern: Node(
-                ast_node: Legacy(EnumPattern(
-                  identifier: Node(
-                    ast_node: Legacy(NestedIdentifier([
-                      "Option",
-                      "Some",
-                    ])),
-                    symbol_table: None,
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 7,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 19,
-                      ),
-                    ),
-                  ),
-                  elements: [
-                    Node(
-                      ast_node: Legacy(IdentifierPattern(
-                        id: SymbolId(1),
-                        name: "y",
-                      )),
-                      symbol_table: None,
+      ast_node: Legacy(ExpressionStatement(Expr(
+        kind: IfElse(
+          condition: Expr(
+            kind: Let(Pattern(
+              kind: EnumPattern(
+                identifier: Expr(
+                  kind: NestedIdentifier([
+                    Ident(
+                      name: "Option",
                       span: Span(
                         start: LineColumn(
                           line: 0,
-                          column: 20,
+                          column: 7,
                         ),
                         end: LineColumn(
                           line: 0,
-                          column: 21,
+                          column: 13,
                         ),
                       ),
                     ),
-                  ],
-                  named_fields: false,
-                )),
-                symbol_table: None,
+                    Ident(
+                      name: "Some",
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 15,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 19,
+                        ),
+                      ),
+                    ),
+                  ]),
+                  symbol_table: None,
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 7,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 19,
+                    ),
+                  ),
+                ),
+                elements: [
+                  Pattern(
+                    kind: Identifier(
+                      id: SymbolId(1),
+                      name: Ident(
+                        name: "y",
+                        span: Span(
+                          start: LineColumn(
+                            line: 0,
+                            column: 20,
+                          ),
+                          end: LineColumn(
+                            line: 0,
+                            column: 21,
+                          ),
+                        ),
+                      ),
+                    ),
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 20,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 21,
+                      ),
+                    ),
+                  ),
+                ],
+                named_fields: false,
+              ),
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 7,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 22,
+                ),
+              ),
+            ), Expr(
+              kind: Identifier(Ident(
+                name: "x",
                 span: Span(
                   start: LineColumn(
                     line: 0,
-                    column: 7,
+                    column: 0,
                   ),
                   end: LineColumn(
                     line: 0,
-                    column: 22,
+                    column: 0,
                   ),
                 ),
-              ),
-              expression: Node(
-                ast_node: Legacy(Identifier("x")),
-                symbol_table: None,
-                span: Span(
-                  start: LineColumn(
-                    line: 0,
-                    column: 25,
-                  ),
-                  end: LineColumn(
-                    line: 0,
-                    column: 26,
-                  ),
+              )),
+              symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 25,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 26,
                 ),
               ),
-              type_annotation: None,
             )),
             symbol_table: None,
             span: Span(
@@ -90,9 +131,21 @@ Node(
               ),
             ),
           ),
-          then_branch: Node(
-            ast_node: Legacy(Block([], Some(Node(
-              ast_node: Legacy(Identifier("y")),
+          then_branch: Expr(
+            kind: Block([], Some(Expr(
+              kind: Identifier(Ident(
+                name: "y",
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                ),
+              )),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -104,7 +157,7 @@ Node(
                   column: 6,
                 ),
               ),
-            )))),
+            ))),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -118,7 +171,7 @@ Node(
             ),
           ),
           else_branch: None,
-        )),
+        ),
         symbol_table: None,
         span: Span(
           start: LineColumn(

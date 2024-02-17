@@ -15,6 +15,10 @@ macro_rules! expect_token_matches {
         match $parser.current_token_kind().as_ref() {
             Some($pattern) $(if $guard)? => (),
             _ => {
+                if !$parser.recoverable() {
+                    $parser.panic_unexpected_token(&format!("{:?}", stringify!($pattern)), $parser.current_token.clone());
+                }
+
                 $parser.push_unexpected_token_error(
                     &format!("{:?}", stringify!($pattern)),
                     $parser.current_token.clone(),
@@ -27,6 +31,10 @@ macro_rules! expect_token_matches {
         match $parser.current_token_kind().as_ref() {
             Some($pattern) $(if $guard)? => (),
             _ => {
+                if !$parser.recoverable() {
+                    $parser.panic_unexpected_token($message, $parser.current_token.clone());
+                }
+
                 $parser.push_unexpected_token_error(
                     $message,
                     $parser.current_token.clone(),
@@ -54,6 +62,8 @@ pub struct Parser<'src> {
     current_token: Option<Token>,
     next_token: Option<Token>,
 
+    recoverable: bool,
+
     // Id to identifiy symbols, e.g. functions and variables.
     unique_id: SymbolId,
 
@@ -75,7 +85,17 @@ impl<'src> Parser<'src> {
             current_line: 0,
             current_column: 0,
             errors: Vec::new(),
+            recoverable: false,
         }
+    }
+
+    pub fn set_recoverable(&mut self, recoverable: bool) -> &mut Self {
+        self.recoverable = recoverable;
+        self
+    }
+
+    pub fn recoverable(&self) -> bool {
+        self.recoverable
     }
 
     pub fn errors(&self) -> Vec<ParseError> {
@@ -475,6 +495,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_variable_declaration(&mut self) -> Node {
+        debug!("Parsing variable declaration");
         self.consume_token(TokenKind::Let);
 
         // We probably want to know whether we are parsing a plain declaration of `if let`.
@@ -725,6 +746,8 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_primary_expression(&mut self) -> Expr {
+        debug!("Parsing primary expression {:?}", self.current_token);
+
         expect_token_matches!(
             self,
             "primary expression",
@@ -763,6 +786,8 @@ impl<'src> Parser<'src> {
                 node::expr!(Literal(literal.clone()))
             }
             Some(TokenKind::Identifier(identifier)) => {
+                self.advance();
+
                 if identifier == "_" {
                     node::expr!(Wildcard)
                 } else {
@@ -1308,11 +1333,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_expression(&mut self) -> Expr {
-        let mut span = self.create_span_from_current_token();
-        let mut node = self.parse_expression_with_precedence(0, Associativity::Left);
-        self.end_span_from_previous_token(&mut span);
-        node.span = span;
-        node
+        self.parse_expression_with_precedence(0, Associativity::Left)
     }
 
     fn parse_expression_with_precedence(
@@ -1320,6 +1341,10 @@ impl<'src> Parser<'src> {
         precedence: u8,
         associativity: Associativity,
     ) -> Expr {
+        debug!(
+            "Parsing expression with precedence {} {:#?}",
+            precedence, associativity
+        );
         let mut span = self.create_span_from_current_token();
         let mut lhs = self.parse_primary_expression();
 

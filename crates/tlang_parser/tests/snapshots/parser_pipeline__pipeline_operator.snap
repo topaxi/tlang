@@ -5,14 +5,14 @@ expression: "parse!(\"1 |> foo |> bar();\")"
 Node(
   ast_node: Legacy(Module([
     Node(
-      ast_node: Legacy(ExpressionStatement(Node(
-        ast_node: Legacy(BinaryOp(
+      ast_node: Legacy(ExpressionStatement(Expr(
+        kind: BinaryOp(
           op: Pipeline,
-          lhs: Node(
-            ast_node: Legacy(BinaryOp(
+          lhs: Expr(
+            kind: BinaryOp(
               op: Pipeline,
-              lhs: Node(
-                ast_node: Legacy(Literal(Integer(1))),
+              lhs: Expr(
+                kind: Literal(Integer(1)),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -25,8 +25,20 @@ Node(
                   ),
                 ),
               ),
-              rhs: Node(
-                ast_node: Legacy(Identifier("foo")),
+              rhs: Expr(
+                kind: Identifier(Ident(
+                  name: "foo",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                  ),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -39,7 +51,7 @@ Node(
                   ),
                 ),
               ),
-            )),
+            ),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -52,24 +64,36 @@ Node(
               ),
             ),
           ),
-          rhs: Node(
-            ast_node: Legacy(Call(
-              function: Node(
-                ast_node: Legacy(Identifier("bar")),
+          rhs: Expr(
+            kind: Call(
+              function: Expr(
+                kind: Identifier(Ident(
+                  name: "bar",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                  ),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
                     line: 0,
-                    column: 12,
+                    column: 0,
                   ),
                   end: LineColumn(
                     line: 0,
-                    column: 15,
+                    column: 0,
                   ),
                 ),
               ),
               arguments: [],
-            )),
+            ),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -82,7 +106,7 @@ Node(
               ),
             ),
           ),
-        )),
+        ),
         symbol_table: None,
         span: Span(
           start: LineColumn(

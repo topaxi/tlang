@@ -5,12 +5,24 @@ expression: "parse!(\"foo.bar.baz;\")"
 Node(
   ast_node: Legacy(Module([
     Node(
-      ast_node: Legacy(ExpressionStatement(Node(
-        ast_node: Legacy(FieldExpression(
-          base: Node(
-            ast_node: Legacy(FieldExpression(
-              base: Node(
-                ast_node: Legacy(Identifier("foo")),
+      ast_node: Legacy(ExpressionStatement(Expr(
+        kind: FieldExpression(
+          base: Expr(
+            kind: FieldExpression(
+              base: Expr(
+                kind: Identifier(Ident(
+                  name: "foo",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                  ),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -23,8 +35,20 @@ Node(
                   ),
                 ),
               ),
-              field: Node(
-                ast_node: Legacy(Identifier("bar")),
+              field: Expr(
+                kind: Identifier(Ident(
+                  name: "bar",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 4,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 7,
+                    ),
+                  ),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -35,6 +59,32 @@ Node(
                     line: 0,
                     column: 0,
                   ),
+                ),
+              ),
+            ),
+            symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+            ),
+          ),
+          field: Expr(
+            kind: Identifier(Ident(
+              name: "baz",
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 8,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 11,
                 ),
               ),
             )),
@@ -50,21 +100,7 @@ Node(
               ),
             ),
           ),
-          field: Node(
-            ast_node: Legacy(Identifier("baz")),
-            symbol_table: None,
-            span: Span(
-              start: LineColumn(
-                line: 0,
-                column: 0,
-              ),
-              end: LineColumn(
-                line: 0,
-                column: 0,
-              ),
-            ),
-          ),
-        )),
+        ),
         symbol_table: None,
         span: Span(
           start: LineColumn(

@@ -7,15 +7,51 @@ Node(
     Node(
       ast_node: Legacy(EnumDeclaration(
         id: SymbolId(1),
-        name: "Option",
+        name: Ident(
+          name: "Option",
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 5,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 11,
+            ),
+          ),
+        ),
         variants: [
           Node(
             ast_node: Legacy(EnumVariant(
-              name: "Some",
+              name: Ident(
+                name: "Some",
+                span: Span(
+                  start: LineColumn(
+                    line: 1,
+                    column: 5,
+                  ),
+                  end: LineColumn(
+                    line: 1,
+                    column: 9,
+                  ),
+                ),
+              ),
               named_fields: false,
               parameters: [
-                Node(
-                  ast_node: Legacy(Identifier("x")),
+                Expr(
+                  kind: Identifier(Ident(
+                    name: "x",
+                    span: Span(
+                      start: LineColumn(
+                        line: 1,
+                        column: 10,
+                      ),
+                      end: LineColumn(
+                        line: 1,
+                        column: 11,
+                      ),
+                    ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -44,7 +80,19 @@ Node(
           ),
           Node(
             ast_node: Legacy(EnumVariant(
-              name: "None",
+              name: Ident(
+                name: "None",
+                span: Span(
+                  start: LineColumn(
+                    line: 2,
+                    column: 5,
+                  ),
+                  end: LineColumn(
+                    line: 2,
+                    column: 9,
+                  ),
+                ),
+              ),
               named_fields: false,
               parameters: [],
             )),
@@ -77,11 +125,35 @@ Node(
     Node(
       ast_node: Legacy(FunctionDeclarations(
         id: SymbolId(5),
-        name: Node(
-          ast_node: Legacy(NestedIdentifier([
-            "Option",
-            "is_option",
-          ])),
+        name: Expr(
+          kind: NestedIdentifier([
+            Ident(
+              name: "Option",
+              span: Span(
+                start: LineColumn(
+                  line: 7,
+                  column: 4,
+                ),
+                end: LineColumn(
+                  line: 7,
+                  column: 10,
+                ),
+              ),
+            ),
+            Ident(
+              name: "is_option",
+              span: Span(
+                start: LineColumn(
+                  line: 7,
+                  column: 12,
+                ),
+                end: LineColumn(
+                  line: 7,
+                  column: 21,
+                ),
+              ),
+            ),
+          ]),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -101,13 +173,37 @@ Node(
                 Node(
                   ast_node: Legacy(FunctionParameter(
                     id: SymbolId(2),
-                    pattern: Node(
-                      ast_node: Legacy(EnumPattern(
-                        identifier: Node(
-                          ast_node: Legacy(NestedIdentifier([
-                            "Option",
-                            "Some",
-                          ])),
+                    pattern: Pattern(
+                      kind: EnumPattern(
+                        identifier: Expr(
+                          kind: NestedIdentifier([
+                            Ident(
+                              name: "Option",
+                              span: Span(
+                                start: LineColumn(
+                                  line: 5,
+                                  column: 22,
+                                ),
+                                end: LineColumn(
+                                  line: 5,
+                                  column: 28,
+                                ),
+                              ),
+                            ),
+                            Ident(
+                              name: "Some",
+                              span: Span(
+                                start: LineColumn(
+                                  line: 5,
+                                  column: 30,
+                                ),
+                                end: LineColumn(
+                                  line: 5,
+                                  column: 34,
+                                ),
+                              ),
+                            ),
+                          ]),
                           symbol_table: None,
                           span: Span(
                             start: LineColumn(
@@ -121,9 +217,8 @@ Node(
                           ),
                         ),
                         elements: [
-                          Node(
-                            ast_node: Legacy(Wildcard),
-                            symbol_table: None,
+                          Pattern(
+                            kind: Wildcard,
                             span: Span(
                               start: LineColumn(
                                 line: 5,
@@ -137,8 +232,7 @@ Node(
                           ),
                         ],
                         named_fields: false,
-                      )),
-                      symbol_table: None,
+                      ),
                       span: Span(
                         start: LineColumn(
                           line: 5,
@@ -167,9 +261,9 @@ Node(
               ],
               guard: None,
               return_type_annotation: None,
-              body: Node(
-                ast_node: Legacy(Block([], Some(Node(
-                  ast_node: Legacy(Literal(Boolean(true))),
+              body: Expr(
+                kind: Block([], Some(Expr(
+                  kind: Literal(Boolean(true)),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -181,7 +275,7 @@ Node(
                       column: 45,
                     ),
                   ),
-                )))),
+                ))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -213,13 +307,37 @@ Node(
                 Node(
                   ast_node: Legacy(FunctionParameter(
                     id: SymbolId(3),
-                    pattern: Node(
-                      ast_node: Legacy(EnumPattern(
-                        identifier: Node(
-                          ast_node: Legacy(NestedIdentifier([
-                            "Option",
-                            "None",
-                          ])),
+                    pattern: Pattern(
+                      kind: EnumPattern(
+                        identifier: Expr(
+                          kind: NestedIdentifier([
+                            Ident(
+                              name: "Option",
+                              span: Span(
+                                start: LineColumn(
+                                  line: 6,
+                                  column: 22,
+                                ),
+                                end: LineColumn(
+                                  line: 6,
+                                  column: 28,
+                                ),
+                              ),
+                            ),
+                            Ident(
+                              name: "None",
+                              span: Span(
+                                start: LineColumn(
+                                  line: 6,
+                                  column: 30,
+                                ),
+                                end: LineColumn(
+                                  line: 6,
+                                  column: 34,
+                                ),
+                              ),
+                            ),
+                          ]),
                           symbol_table: None,
                           span: Span(
                             start: LineColumn(
@@ -234,8 +352,7 @@ Node(
                         ),
                         elements: [],
                         named_fields: false,
-                      )),
-                      symbol_table: None,
+                      ),
                       span: Span(
                         start: LineColumn(
                           line: 6,
@@ -264,9 +381,9 @@ Node(
               ],
               guard: None,
               return_type_annotation: None,
-              body: Node(
-                ast_node: Legacy(Block([], Some(Node(
-                  ast_node: Legacy(Literal(Boolean(true))),
+              body: Expr(
+                kind: Block([], Some(Expr(
+                  kind: Literal(Boolean(true)),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -278,7 +395,7 @@ Node(
                       column: 42,
                     ),
                   ),
-                )))),
+                ))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -310,9 +427,8 @@ Node(
                 Node(
                   ast_node: Legacy(FunctionParameter(
                     id: SymbolId(4),
-                    pattern: Node(
-                      ast_node: Legacy(Wildcard),
-                      symbol_table: None,
+                    pattern: Pattern(
+                      kind: Wildcard,
                       span: Span(
                         start: LineColumn(
                           line: 7,
@@ -341,9 +457,9 @@ Node(
               ],
               guard: None,
               return_type_annotation: None,
-              body: Node(
-                ast_node: Legacy(Block([], Some(Node(
-                  ast_node: Legacy(Literal(Boolean(false))),
+              body: Expr(
+                kind: Block([], Some(Expr(
+                  kind: Literal(Boolean(false)),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -355,7 +471,7 @@ Node(
                       column: 32,
                     ),
                   ),
-                )))),
+                ))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -398,10 +514,22 @@ Node(
     Node(
       ast_node: Legacy(FunctionDeclarations(
         id: SymbolId(8),
-        name: Node(
-          ast_node: Legacy(FieldExpression(
-            base: Node(
-              ast_node: Legacy(Identifier("Option")),
+        name: Expr(
+          kind: FieldExpression(
+            base: Expr(
+              kind: Identifier(Ident(
+                name: "Option",
+                span: Span(
+                  start: LineColumn(
+                    line: 10,
+                    column: 4,
+                  ),
+                  end: LineColumn(
+                    line: 10,
+                    column: 10,
+                  ),
+                ),
+              )),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -414,8 +542,20 @@ Node(
                 ),
               ),
             ),
-            field: Node(
-              ast_node: Legacy(Identifier("is_some")),
+            field: Expr(
+              kind: Identifier(Ident(
+                name: "is_some",
+                span: Span(
+                  start: LineColumn(
+                    line: 10,
+                    column: 11,
+                  ),
+                  end: LineColumn(
+                    line: 10,
+                    column: 18,
+                  ),
+                ),
+              )),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -428,7 +568,7 @@ Node(
                 ),
               ),
             ),
-          )),
+          ),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -448,13 +588,37 @@ Node(
                 Node(
                   ast_node: Legacy(FunctionParameter(
                     id: SymbolId(6),
-                    pattern: Node(
-                      ast_node: Legacy(EnumPattern(
-                        identifier: Node(
-                          ast_node: Legacy(NestedIdentifier([
-                            "Option",
-                            "Some",
-                          ])),
+                    pattern: Pattern(
+                      kind: EnumPattern(
+                        identifier: Expr(
+                          kind: NestedIdentifier([
+                            Ident(
+                              name: "Option",
+                              span: Span(
+                                start: LineColumn(
+                                  line: 9,
+                                  column: 19,
+                                ),
+                                end: LineColumn(
+                                  line: 9,
+                                  column: 25,
+                                ),
+                              ),
+                            ),
+                            Ident(
+                              name: "Some",
+                              span: Span(
+                                start: LineColumn(
+                                  line: 9,
+                                  column: 27,
+                                ),
+                                end: LineColumn(
+                                  line: 9,
+                                  column: 31,
+                                ),
+                              ),
+                            ),
+                          ]),
                           symbol_table: None,
                           span: Span(
                             start: LineColumn(
@@ -468,9 +632,8 @@ Node(
                           ),
                         ),
                         elements: [
-                          Node(
-                            ast_node: Legacy(Wildcard),
-                            symbol_table: None,
+                          Pattern(
+                            kind: Wildcard,
                             span: Span(
                               start: LineColumn(
                                 line: 9,
@@ -484,8 +647,7 @@ Node(
                           ),
                         ],
                         named_fields: false,
-                      )),
-                      symbol_table: None,
+                      ),
                       span: Span(
                         start: LineColumn(
                           line: 9,
@@ -514,9 +676,9 @@ Node(
               ],
               guard: None,
               return_type_annotation: None,
-              body: Node(
-                ast_node: Legacy(Block([], Some(Node(
-                  ast_node: Legacy(Literal(Boolean(true))),
+              body: Expr(
+                kind: Block([], Some(Expr(
+                  kind: Literal(Boolean(true)),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -528,7 +690,7 @@ Node(
                       column: 42,
                     ),
                   ),
-                )))),
+                ))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -560,13 +722,37 @@ Node(
                 Node(
                   ast_node: Legacy(FunctionParameter(
                     id: SymbolId(7),
-                    pattern: Node(
-                      ast_node: Legacy(EnumPattern(
-                        identifier: Node(
-                          ast_node: Legacy(NestedIdentifier([
-                            "Option",
-                            "None",
-                          ])),
+                    pattern: Pattern(
+                      kind: EnumPattern(
+                        identifier: Expr(
+                          kind: NestedIdentifier([
+                            Ident(
+                              name: "Option",
+                              span: Span(
+                                start: LineColumn(
+                                  line: 10,
+                                  column: 19,
+                                ),
+                                end: LineColumn(
+                                  line: 10,
+                                  column: 25,
+                                ),
+                              ),
+                            ),
+                            Ident(
+                              name: "None",
+                              span: Span(
+                                start: LineColumn(
+                                  line: 10,
+                                  column: 27,
+                                ),
+                                end: LineColumn(
+                                  line: 10,
+                                  column: 31,
+                                ),
+                              ),
+                            ),
+                          ]),
                           symbol_table: None,
                           span: Span(
                             start: LineColumn(
@@ -581,8 +767,7 @@ Node(
                         ),
                         elements: [],
                         named_fields: false,
-                      )),
-                      symbol_table: None,
+                      ),
                       span: Span(
                         start: LineColumn(
                           line: 10,
@@ -611,9 +796,9 @@ Node(
               ],
               guard: None,
               return_type_annotation: None,
-              body: Node(
-                ast_node: Legacy(Block([], Some(Node(
-                  ast_node: Legacy(Literal(Boolean(false))),
+              body: Expr(
+                kind: Block([], Some(Expr(
+                  kind: Literal(Boolean(false)),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -625,7 +810,7 @@ Node(
                       column: 40,
                     ),
                   ),
-                )))),
+                ))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -667,11 +852,23 @@ Node(
     ),
     Node(
       ast_node: Legacy(FunctionDeclarations(
-        id: SymbolId(14),
-        name: Node(
-          ast_node: Legacy(FieldExpression(
-            base: Node(
-              ast_node: Legacy(Identifier("Option")),
+        id: SymbolId(15),
+        name: Expr(
+          kind: FieldExpression(
+            base: Expr(
+              kind: Identifier(Ident(
+                name: "Option",
+                span: Span(
+                  start: LineColumn(
+                    line: 13,
+                    column: 4,
+                  ),
+                  end: LineColumn(
+                    line: 13,
+                    column: 10,
+                  ),
+                ),
+              )),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -684,8 +881,20 @@ Node(
                 ),
               ),
             ),
-            field: Node(
-              ast_node: Legacy(Identifier("map")),
+            field: Expr(
+              kind: Identifier(Ident(
+                name: "map",
+                span: Span(
+                  start: LineColumn(
+                    line: 13,
+                    column: 11,
+                  ),
+                  end: LineColumn(
+                    line: 13,
+                    column: 14,
+                  ),
+                ),
+              )),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -698,7 +907,7 @@ Node(
                 ),
               ),
             ),
-          )),
+          ),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -718,13 +927,37 @@ Node(
                 Node(
                   ast_node: Legacy(FunctionParameter(
                     id: SymbolId(10),
-                    pattern: Node(
-                      ast_node: Legacy(EnumPattern(
-                        identifier: Node(
-                          ast_node: Legacy(NestedIdentifier([
-                            "Option",
-                            "Some",
-                          ])),
+                    pattern: Pattern(
+                      kind: EnumPattern(
+                        identifier: Expr(
+                          kind: NestedIdentifier([
+                            Ident(
+                              name: "Option",
+                              span: Span(
+                                start: LineColumn(
+                                  line: 12,
+                                  column: 15,
+                                ),
+                                end: LineColumn(
+                                  line: 12,
+                                  column: 21,
+                                ),
+                              ),
+                            ),
+                            Ident(
+                              name: "Some",
+                              span: Span(
+                                start: LineColumn(
+                                  line: 12,
+                                  column: 23,
+                                ),
+                                end: LineColumn(
+                                  line: 12,
+                                  column: 27,
+                                ),
+                              ),
+                            ),
+                          ]),
                           symbol_table: None,
                           span: Span(
                             start: LineColumn(
@@ -738,12 +971,23 @@ Node(
                           ),
                         ),
                         elements: [
-                          Node(
-                            ast_node: Legacy(IdentifierPattern(
+                          Pattern(
+                            kind: Identifier(
                               id: SymbolId(9),
-                              name: "x",
-                            )),
-                            symbol_table: None,
+                              name: Ident(
+                                name: "x",
+                                span: Span(
+                                  start: LineColumn(
+                                    line: 12,
+                                    column: 28,
+                                  ),
+                                  end: LineColumn(
+                                    line: 12,
+                                    column: 29,
+                                  ),
+                                ),
+                              ),
+                            ),
                             span: Span(
                               start: LineColumn(
                                 line: 12,
@@ -757,8 +1001,7 @@ Node(
                           ),
                         ],
                         named_fields: false,
-                      )),
-                      symbol_table: None,
+                      ),
                       span: Span(
                         start: LineColumn(
                           line: 12,
@@ -786,10 +1029,24 @@ Node(
                 ),
                 Node(
                   ast_node: Legacy(FunctionParameter(
-                    id: SymbolId(11),
-                    pattern: Node(
-                      ast_node: Legacy(Identifier("f")),
-                      symbol_table: None,
+                    id: SymbolId(12),
+                    pattern: Pattern(
+                      kind: Identifier(
+                        id: SymbolId(11),
+                        name: Ident(
+                          name: "f",
+                          span: Span(
+                            start: LineColumn(
+                              line: 12,
+                              column: 32,
+                            ),
+                            end: LineColumn(
+                              line: 12,
+                              column: 33,
+                            ),
+                          ),
+                        ),
+                      ),
                       span: Span(
                         start: LineColumn(
                           line: 12,
@@ -818,14 +1075,38 @@ Node(
               ],
               guard: None,
               return_type_annotation: None,
-              body: Node(
-                ast_node: Legacy(Block([], Some(Node(
-                  ast_node: Legacy(Call(
-                    function: Node(
-                      ast_node: Legacy(NestedIdentifier([
-                        "Option",
-                        "Some",
-                      ])),
+              body: Expr(
+                kind: Block([], Some(Expr(
+                  kind: Call(
+                    function: Expr(
+                      kind: NestedIdentifier([
+                        Ident(
+                          name: "Option",
+                          span: Span(
+                            start: LineColumn(
+                              line: 0,
+                              column: 0,
+                            ),
+                            end: LineColumn(
+                              line: 0,
+                              column: 0,
+                            ),
+                          ),
+                        ),
+                        Ident(
+                          name: "Some",
+                          span: Span(
+                            start: LineColumn(
+                              line: 12,
+                              column: 45,
+                            ),
+                            end: LineColumn(
+                              line: 12,
+                              column: 49,
+                            ),
+                          ),
+                        ),
+                      ]),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -839,25 +1120,49 @@ Node(
                       ),
                     ),
                     arguments: [
-                      Node(
-                        ast_node: Legacy(Call(
-                          function: Node(
-                            ast_node: Legacy(Identifier("f")),
+                      Expr(
+                        kind: Call(
+                          function: Expr(
+                            kind: Identifier(Ident(
+                              name: "f",
+                              span: Span(
+                                start: LineColumn(
+                                  line: 0,
+                                  column: 0,
+                                ),
+                                end: LineColumn(
+                                  line: 0,
+                                  column: 0,
+                                ),
+                              ),
+                            )),
                             symbol_table: None,
                             span: Span(
                               start: LineColumn(
-                                line: 12,
-                                column: 50,
+                                line: 0,
+                                column: 0,
                               ),
                               end: LineColumn(
-                                line: 12,
-                                column: 51,
+                                line: 0,
+                                column: 0,
                               ),
                             ),
                           ),
                           arguments: [
-                            Node(
-                              ast_node: Legacy(Identifier("x")),
+                            Expr(
+                              kind: Identifier(Ident(
+                                name: "x",
+                                span: Span(
+                                  start: LineColumn(
+                                    line: 0,
+                                    column: 0,
+                                  ),
+                                  end: LineColumn(
+                                    line: 0,
+                                    column: 0,
+                                  ),
+                                ),
+                              )),
                               symbol_table: None,
                               span: Span(
                                 start: LineColumn(
@@ -871,7 +1176,7 @@ Node(
                               ),
                             ),
                           ],
-                        )),
+                        ),
                         symbol_table: None,
                         span: Span(
                           start: LineColumn(
@@ -885,7 +1190,7 @@ Node(
                         ),
                       ),
                     ],
-                  )),
+                  ),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -897,7 +1202,7 @@ Node(
                       column: 55,
                     ),
                   ),
-                )))),
+                ))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -928,14 +1233,38 @@ Node(
               parameters: [
                 Node(
                   ast_node: Legacy(FunctionParameter(
-                    id: SymbolId(12),
-                    pattern: Node(
-                      ast_node: Legacy(EnumPattern(
-                        identifier: Node(
-                          ast_node: Legacy(NestedIdentifier([
-                            "Option",
-                            "None",
-                          ])),
+                    id: SymbolId(13),
+                    pattern: Pattern(
+                      kind: EnumPattern(
+                        identifier: Expr(
+                          kind: NestedIdentifier([
+                            Ident(
+                              name: "Option",
+                              span: Span(
+                                start: LineColumn(
+                                  line: 13,
+                                  column: 15,
+                                ),
+                                end: LineColumn(
+                                  line: 13,
+                                  column: 21,
+                                ),
+                              ),
+                            ),
+                            Ident(
+                              name: "None",
+                              span: Span(
+                                start: LineColumn(
+                                  line: 13,
+                                  column: 23,
+                                ),
+                                end: LineColumn(
+                                  line: 13,
+                                  column: 27,
+                                ),
+                              ),
+                            ),
+                          ]),
                           symbol_table: None,
                           span: Span(
                             start: LineColumn(
@@ -950,8 +1279,7 @@ Node(
                         ),
                         elements: [],
                         named_fields: false,
-                      )),
-                      symbol_table: None,
+                      ),
                       span: Span(
                         start: LineColumn(
                           line: 13,
@@ -979,10 +1307,9 @@ Node(
                 ),
                 Node(
                   ast_node: Legacy(FunctionParameter(
-                    id: SymbolId(13),
-                    pattern: Node(
-                      ast_node: Legacy(Wildcard),
-                      symbol_table: None,
+                    id: SymbolId(14),
+                    pattern: Pattern(
+                      kind: Wildcard,
                       span: Span(
                         start: LineColumn(
                           line: 13,
@@ -1011,12 +1338,36 @@ Node(
               ],
               guard: None,
               return_type_annotation: None,
-              body: Node(
-                ast_node: Legacy(Block([], Some(Node(
-                  ast_node: Legacy(NestedIdentifier([
-                    "Option",
-                    "None",
-                  ])),
+              body: Expr(
+                kind: Block([], Some(Expr(
+                  kind: NestedIdentifier([
+                    Ident(
+                      name: "Option",
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 0,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 0,
+                        ),
+                      ),
+                    ),
+                    Ident(
+                      name: "None",
+                      span: Span(
+                        start: LineColumn(
+                          line: 13,
+                          column: 42,
+                        ),
+                        end: LineColumn(
+                          line: 13,
+                          column: 46,
+                        ),
+                      ),
+                    ),
+                  ]),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -1028,7 +1379,7 @@ Node(
                       column: 46,
                     ),
                   ),
-                )))),
+                ))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(

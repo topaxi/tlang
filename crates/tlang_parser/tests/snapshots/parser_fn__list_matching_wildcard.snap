@@ -7,8 +7,20 @@ Node(
     Node(
       ast_node: Legacy(FunctionSingleDeclaration(
         id: SymbolId(3),
-        name: Node(
-          ast_node: Legacy(Identifier("tail")),
+        name: Expr(
+          kind: Identifier(Ident(
+            name: "tail",
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 3,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 7,
+              ),
+            ),
+          )),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -27,11 +39,10 @@ Node(
               Node(
                 ast_node: Legacy(FunctionParameter(
                   id: SymbolId(2),
-                  pattern: Node(
-                    ast_node: Legacy(ListPattern([
-                      Node(
-                        ast_node: Legacy(Wildcard),
-                        symbol_table: None,
+                  pattern: Pattern(
+                    kind: List([
+                      Pattern(
+                        kind: Wildcard,
                         span: Span(
                           start: LineColumn(
                             line: 0,
@@ -43,13 +54,24 @@ Node(
                           ),
                         ),
                       ),
-                      Node(
-                        ast_node: Legacy(UnaryOp(Rest, Node(
-                          ast_node: Legacy(IdentifierPattern(
+                      Pattern(
+                        kind: Rest(Pattern(
+                          kind: Identifier(
                             id: SymbolId(1),
-                            name: "xs",
-                          )),
-                          symbol_table: None,
+                            name: Ident(
+                              name: "xs",
+                              span: Span(
+                                start: LineColumn(
+                                  line: 0,
+                                  column: 15,
+                                ),
+                                end: LineColumn(
+                                  line: 0,
+                                  column: 17,
+                                ),
+                              ),
+                            ),
+                          ),
                           span: Span(
                             start: LineColumn(
                               line: 0,
@@ -60,8 +82,7 @@ Node(
                               column: 17,
                             ),
                           ),
-                        ))),
-                        symbol_table: None,
+                        )),
                         span: Span(
                           start: LineColumn(
                             line: 0,
@@ -73,8 +94,7 @@ Node(
                           ),
                         ),
                       ),
-                    ])),
-                    symbol_table: None,
+                    ]),
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -103,9 +123,21 @@ Node(
             ],
             guard: None,
             return_type_annotation: None,
-            body: Node(
-              ast_node: Legacy(Block([], Some(Node(
-                ast_node: Legacy(Identifier("xs")),
+            body: Expr(
+              kind: Block([], Some(Expr(
+                kind: Identifier(Ident(
+                  name: "xs",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                  ),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -117,7 +149,7 @@ Node(
                     column: 24,
                   ),
                 ),
-              )))),
+              ))),
               symbol_table: None,
               span: Span(
                 start: LineColumn(

@@ -1,3 +1,8 @@
+#[ctor::ctor]
+fn before_all() {
+    env_logger::init();
+}
+
 #[macro_export]
 macro_rules! parse {
     ($source:expr) => {{

@@ -39,6 +39,7 @@ Node(
           kind: Match(
             expression: Expr(
               kind: Literal(Integer(1)),
+              symbol_table: None,
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -68,6 +69,7 @@ Node(
                   ),
                   expression: Expr(
                     kind: Literal(Integer(2)),
+                    symbol_table: None,
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -109,6 +111,7 @@ Node(
                   ),
                   expression: Expr(
                     kind: Literal(Integer(4)),
+                    symbol_table: None,
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -150,6 +153,7 @@ Node(
                   ),
                   expression: Expr(
                     kind: Literal(Integer(5)),
+                    symbol_table: None,
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -176,6 +180,7 @@ Node(
               ),
             ],
           ),
+          symbol_table: None,
           span: Span(
             start: LineColumn(
               line: 0,

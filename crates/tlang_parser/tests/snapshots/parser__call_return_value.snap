@@ -5,12 +5,24 @@ expression: "parse!(\"foo()();\")"
 Node(
   ast_node: Legacy(Module([
     Node(
-      ast_node: Legacy(ExpressionStatement(Node(
-        ast_node: Legacy(Call(
-          function: Node(
-            ast_node: Legacy(Call(
-              function: Node(
-                ast_node: Legacy(Identifier("foo")),
+      ast_node: Legacy(ExpressionStatement(Expr(
+        kind: Call(
+          function: Expr(
+            kind: Call(
+              function: Expr(
+                kind: Identifier(Ident(
+                  name: "foo",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                  ),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -19,12 +31,12 @@ Node(
                   ),
                   end: LineColumn(
                     line: 0,
-                    column: 3,
+                    column: 0,
                   ),
                 ),
               ),
               arguments: [],
-            )),
+            ),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -38,7 +50,7 @@ Node(
             ),
           ),
           arguments: [],
-        )),
+        ),
         symbol_table: None,
         span: Span(
           start: LineColumn(

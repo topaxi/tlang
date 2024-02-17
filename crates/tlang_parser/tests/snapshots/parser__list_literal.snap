@@ -37,6 +37,7 @@ Node(
         ),
         expression: Expr(
           kind: List([]),
+          symbol_table: None,
           span: Span(
             start: LineColumn(
               line: 0,

@@ -9,6 +9,7 @@ Node(
         kind: IfElse(
           condition: Expr(
             kind: Literal(Boolean(true)),
+            symbol_table: None,
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -25,6 +26,7 @@ Node(
               Node(
                 ast_node: Legacy(ExpressionStatement(Expr(
                   kind: Literal(Integer(1)),
+                  symbol_table: None,
                   span: Span(
                     start: LineColumn(
                       line: 0,
@@ -49,6 +51,7 @@ Node(
                 ),
               ),
             ], None),
+            symbol_table: None,
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -65,6 +68,7 @@ Node(
               Node(
                 ast_node: Legacy(ExpressionStatement(Expr(
                   kind: Literal(Integer(2)),
+                  symbol_table: None,
                   span: Span(
                     start: LineColumn(
                       line: 0,
@@ -89,6 +93,7 @@ Node(
                 ),
               ),
             ], None),
+            symbol_table: None,
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -101,6 +106,7 @@ Node(
             ),
           )),
         ),
+        symbol_table: None,
         span: Span(
           start: LineColumn(
             line: 0,

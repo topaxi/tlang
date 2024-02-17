@@ -21,6 +21,7 @@ Node(
               ),
             ),
           )),
+          symbol_table: None,
           span: Span(
             start: LineColumn(
               line: 0,
@@ -55,6 +56,7 @@ Node(
                         ),
                       ),
                     )),
+                    symbol_table: None,
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -73,6 +75,7 @@ Node(
                       return_type_annotation: None,
                       body: Expr(
                         kind: Block([], None),
+                        symbol_table: None,
                         span: Span(
                           start: LineColumn(
                             line: 0,
@@ -98,6 +101,7 @@ Node(
                     ),
                   ),
                 ),
+                symbol_table: None,
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -109,6 +113,7 @@ Node(
                   ),
                 ),
               ))),
+              symbol_table: None,
               span: Span(
                 start: LineColumn(
                   line: 0,

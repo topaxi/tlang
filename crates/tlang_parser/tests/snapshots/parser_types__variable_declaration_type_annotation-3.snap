@@ -6,10 +6,24 @@ Node(
   ast_node: Legacy(Module([
     Node(
       ast_node: Legacy(VariableDeclaration(
-        id: SymbolId(1),
-        pattern: Node(
-          ast_node: Legacy(Identifier("x")),
-          symbol_table: None,
+        id: SymbolId(2),
+        pattern: Pattern(
+          kind: Identifier(
+            id: SymbolId(1),
+            name: Ident(
+              name: "x",
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 4,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 5,
+                ),
+              ),
+            ),
+          ),
           span: Span(
             start: LineColumn(
               line: 0,
@@ -21,14 +35,50 @@ Node(
             ),
           ),
         ),
-        expression: Node(
-          ast_node: Legacy(Call(
-            function: Node(
-              ast_node: Legacy(NestedIdentifier([
-                "std",
-                "hash",
-                "Map",
-              ])),
+        expression: Expr(
+          kind: Call(
+            function: Expr(
+              kind: NestedIdentifier([
+                Ident(
+                  name: "std",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                  ),
+                ),
+                Ident(
+                  name: "hash",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 39,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 43,
+                    ),
+                  ),
+                ),
+                Ident(
+                  name: "Map",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 45,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 48,
+                    ),
+                  ),
+                ),
+              ]),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -42,7 +92,7 @@ Node(
               ),
             ),
             arguments: [],
-          )),
+          ),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -57,12 +107,48 @@ Node(
         ),
         type_annotation: Some(Node(
           ast_node: Legacy(TypeAnnotation(
-            name: Node(
-              ast_node: Legacy(NestedIdentifier([
-                "std",
-                "hash",
-                "Map",
-              ])),
+            name: Expr(
+              kind: NestedIdentifier([
+                Ident(
+                  name: "std",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 7,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 10,
+                    ),
+                  ),
+                ),
+                Ident(
+                  name: "hash",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 12,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 16,
+                    ),
+                  ),
+                ),
+                Ident(
+                  name: "Map",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 18,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 21,
+                    ),
+                  ),
+                ),
+              ]),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -78,8 +164,20 @@ Node(
             parameters: [
               Node(
                 ast_node: Legacy(TypeAnnotation(
-                  name: Node(
-                    ast_node: Legacy(Identifier("str")),
+                  name: Expr(
+                    kind: Identifier(Ident(
+                      name: "str",
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 22,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 25,
+                        ),
+                      ),
+                    )),
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
@@ -108,8 +206,20 @@ Node(
               ),
               Node(
                 ast_node: Legacy(TypeAnnotation(
-                  name: Node(
-                    ast_node: Legacy(Identifier("i64")),
+                  name: Expr(
+                    kind: Identifier(Ident(
+                      name: "i64",
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 27,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 30,
+                        ),
+                      ),
+                    )),
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(

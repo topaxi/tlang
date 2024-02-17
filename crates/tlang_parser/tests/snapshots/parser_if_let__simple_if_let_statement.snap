@@ -5,40 +5,49 @@ expression: "parse!(indoc! { \"\n        if let x = 1 {\n            x\n        
 Node(
   ast_node: Legacy(Module([
     Node(
-      ast_node: Legacy(ExpressionStatement(Node(
-        ast_node: Legacy(IfElse(
-          condition: Node(
-            ast_node: Legacy(VariableDeclaration(
-              id: SymbolId(1),
-              pattern: Node(
-                ast_node: Legacy(Identifier("x")),
-                symbol_table: None,
-                span: Span(
-                  start: LineColumn(
-                    line: 0,
-                    column: 7,
-                  ),
-                  end: LineColumn(
-                    line: 0,
-                    column: 8,
-                  ),
-                ),
-              ),
-              expression: Node(
-                ast_node: Legacy(Literal(Integer(1))),
-                symbol_table: None,
-                span: Span(
-                  start: LineColumn(
-                    line: 0,
-                    column: 11,
-                  ),
-                  end: LineColumn(
-                    line: 0,
-                    column: 12,
+      ast_node: Legacy(ExpressionStatement(Expr(
+        kind: IfElse(
+          condition: Expr(
+            kind: Let(Pattern(
+              kind: Identifier(
+                id: SymbolId(1),
+                name: Ident(
+                  name: "x",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 7,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 8,
+                    ),
                   ),
                 ),
               ),
-              type_annotation: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 7,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 8,
+                ),
+              ),
+            ), Expr(
+              kind: Literal(Integer(1)),
+              symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 11,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 12,
+                ),
+              ),
             )),
             symbol_table: None,
             span: Span(
@@ -52,9 +61,21 @@ Node(
               ),
             ),
           ),
-          then_branch: Node(
-            ast_node: Legacy(Block([], Some(Node(
-              ast_node: Legacy(Identifier("x")),
+          then_branch: Expr(
+            kind: Block([], Some(Expr(
+              kind: Identifier(Ident(
+                name: "x",
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                ),
+              )),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -66,7 +87,7 @@ Node(
                   column: 6,
                 ),
               ),
-            )))),
+            ))),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -80,7 +101,7 @@ Node(
             ),
           ),
           else_branch: None,
-        )),
+        ),
         symbol_table: None,
         span: Span(
           start: LineColumn(

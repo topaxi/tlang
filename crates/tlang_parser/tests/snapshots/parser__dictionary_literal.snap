@@ -6,10 +6,24 @@ Node(
   ast_node: Legacy(Module([
     Node(
       ast_node: Legacy(VariableDeclaration(
-        id: SymbolId(1),
-        pattern: Node(
-          ast_node: Legacy(Identifier("x")),
-          symbol_table: None,
+        id: SymbolId(2),
+        pattern: Pattern(
+          kind: Identifier(
+            id: SymbolId(1),
+            name: Ident(
+              name: "x",
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 4,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 5,
+                ),
+              ),
+            ),
+          ),
           span: Span(
             start: LineColumn(
               line: 0,
@@ -21,10 +35,22 @@ Node(
             ),
           ),
         ),
-        expression: Node(
-          ast_node: Legacy(Dict([
-            (Node(
-              ast_node: Legacy(Identifier("foo")),
+        expression: Expr(
+          kind: Dict([
+            (Expr(
+              kind: Identifier(Ident(
+                name: "foo",
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                ),
+              )),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -36,8 +62,8 @@ Node(
                   column: 13,
                 ),
               ),
-            ), Node(
-              ast_node: Legacy(Literal(Integer(1))),
+            ), Expr(
+              kind: Literal(Integer(1)),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -50,8 +76,20 @@ Node(
                 ),
               ),
             )),
-            (Node(
-              ast_node: Legacy(Identifier("bar")),
+            (Expr(
+              kind: Identifier(Ident(
+                name: "bar",
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                ),
+              )),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -63,8 +101,8 @@ Node(
                   column: 21,
                 ),
               ),
-            ), Node(
-              ast_node: Legacy(Literal(Integer(2))),
+            ), Expr(
+              kind: Literal(Integer(2)),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -77,7 +115,7 @@ Node(
                 ),
               ),
             )),
-          ])),
+          ]),
           symbol_table: None,
           span: Span(
             start: LineColumn(

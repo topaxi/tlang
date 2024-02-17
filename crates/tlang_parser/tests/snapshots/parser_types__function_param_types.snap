@@ -6,9 +6,21 @@ Node(
   ast_node: Legacy(Module([
     Node(
       ast_node: Legacy(FunctionSingleDeclaration(
-        id: SymbolId(3),
-        name: Node(
-          ast_node: Legacy(Identifier("foo")),
+        id: SymbolId(5),
+        name: Expr(
+          kind: Identifier(Ident(
+            name: "foo",
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 3,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 6,
+              ),
+            ),
+          )),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -26,10 +38,24 @@ Node(
             parameters: [
               Node(
                 ast_node: Legacy(FunctionParameter(
-                  id: SymbolId(1),
-                  pattern: Node(
-                    ast_node: Legacy(Identifier("x")),
-                    symbol_table: None,
+                  id: SymbolId(2),
+                  pattern: Pattern(
+                    kind: Identifier(
+                      id: SymbolId(1),
+                      name: Ident(
+                        name: "x",
+                        span: Span(
+                          start: LineColumn(
+                            line: 0,
+                            column: 7,
+                          ),
+                          end: LineColumn(
+                            line: 0,
+                            column: 8,
+                          ),
+                        ),
+                      ),
+                    ),
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -43,8 +69,20 @@ Node(
                   ),
                   type_annotation: Some(Node(
                     ast_node: Legacy(TypeAnnotation(
-                      name: Node(
-                        ast_node: Legacy(Identifier("i64")),
+                      name: Expr(
+                        kind: Identifier(Ident(
+                          name: "i64",
+                          span: Span(
+                            start: LineColumn(
+                              line: 0,
+                              column: 10,
+                            ),
+                            end: LineColumn(
+                              line: 0,
+                              column: 13,
+                            ),
+                          ),
+                        )),
                         symbol_table: None,
                         span: Span(
                           start: LineColumn(
@@ -86,10 +124,24 @@ Node(
               ),
               Node(
                 ast_node: Legacy(FunctionParameter(
-                  id: SymbolId(2),
-                  pattern: Node(
-                    ast_node: Legacy(Identifier("y")),
-                    symbol_table: None,
+                  id: SymbolId(4),
+                  pattern: Pattern(
+                    kind: Identifier(
+                      id: SymbolId(3),
+                      name: Ident(
+                        name: "y",
+                        span: Span(
+                          start: LineColumn(
+                            line: 0,
+                            column: 15,
+                          ),
+                          end: LineColumn(
+                            line: 0,
+                            column: 16,
+                          ),
+                        ),
+                      ),
+                    ),
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -103,8 +155,20 @@ Node(
                   ),
                   type_annotation: Some(Node(
                     ast_node: Legacy(TypeAnnotation(
-                      name: Node(
-                        ast_node: Legacy(Identifier("i64")),
+                      name: Expr(
+                        kind: Identifier(Ident(
+                          name: "i64",
+                          span: Span(
+                            start: LineColumn(
+                              line: 0,
+                              column: 18,
+                            ),
+                            end: LineColumn(
+                              line: 0,
+                              column: 21,
+                            ),
+                          ),
+                        )),
                         symbol_table: None,
                         span: Span(
                           start: LineColumn(
@@ -148,8 +212,20 @@ Node(
             guard: None,
             return_type_annotation: Some(Node(
               ast_node: Legacy(TypeAnnotation(
-                name: Node(
-                  ast_node: Legacy(Identifier("i64")),
+                name: Expr(
+                  kind: Identifier(Ident(
+                    name: "i64",
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 26,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 29,
+                      ),
+                    ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -176,9 +252,21 @@ Node(
                 ),
               ),
             )),
-            body: Node(
-              ast_node: Legacy(Block([], Some(Node(
-                ast_node: Legacy(Identifier("x")),
+            body: Expr(
+              kind: Block([], Some(Expr(
+                kind: Identifier(Ident(
+                  name: "x",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                  ),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -190,7 +278,7 @@ Node(
                     column: 33,
                   ),
                 ),
-              )))),
+              ))),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
