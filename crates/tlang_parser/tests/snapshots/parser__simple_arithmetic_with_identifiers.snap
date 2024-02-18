@@ -4,9 +4,8 @@ expression: "parse!(\"let x = 1; let y = 2; x + y;\")"
 ---
 Node(
   ast_node: Legacy(Module([
-    Node(
-      ast_node: Legacy(VariableDeclaration(
-        id: SymbolId(2),
+    Stmt(
+      kind: Let(
         pattern: Pattern(
           kind: Identifier(
             id: SymbolId(1),
@@ -50,8 +49,7 @@ Node(
           ),
         ),
         type_annotation: None,
-      )),
-      symbol_table: None,
+      ),
       span: Span(
         start: LineColumn(
           line: 0,
@@ -62,13 +60,13 @@ Node(
           column: 10,
         ),
       ),
+      symbol_table: None,
     ),
-    Node(
-      ast_node: Legacy(VariableDeclaration(
-        id: SymbolId(4),
+    Stmt(
+      kind: Let(
         pattern: Pattern(
           kind: Identifier(
-            id: SymbolId(3),
+            id: SymbolId(2),
             name: Ident(
               name: "y",
               span: Span(
@@ -109,8 +107,7 @@ Node(
           ),
         ),
         type_annotation: None,
-      )),
-      symbol_table: None,
+      ),
       span: Span(
         start: LineColumn(
           line: 0,
@@ -121,9 +118,10 @@ Node(
           column: 21,
         ),
       ),
+      symbol_table: None,
     ),
-    Node(
-      ast_node: Legacy(ExpressionStatement(Expr(
+    Stmt(
+      kind: Expr(Expr(
         kind: BinaryOp(
           op: Add,
           lhs: Expr(
@@ -190,8 +188,7 @@ Node(
             column: 27,
           ),
         ),
-      ))),
-      symbol_table: None,
+      )),
       span: Span(
         start: LineColumn(
           line: 0,
@@ -202,6 +199,7 @@ Node(
           column: 28,
         ),
       ),
+      symbol_table: None,
     ),
   ])),
   symbol_table: None,

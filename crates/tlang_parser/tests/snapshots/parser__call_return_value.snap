@@ -4,8 +4,8 @@ expression: "parse!(\"foo()();\")"
 ---
 Node(
   ast_node: Legacy(Module([
-    Node(
-      ast_node: Legacy(ExpressionStatement(Expr(
+    Stmt(
+      kind: Expr(Expr(
         kind: Call(
           function: Expr(
             kind: Call(
@@ -62,8 +62,7 @@ Node(
             column: 7,
           ),
         ),
-      ))),
-      symbol_table: None,
+      )),
       span: Span(
         start: LineColumn(
           line: 0,
@@ -74,6 +73,7 @@ Node(
           column: 8,
         ),
       ),
+      symbol_table: None,
     ),
   ])),
   symbol_table: None,

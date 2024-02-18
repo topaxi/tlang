@@ -4,9 +4,8 @@ expression: "parse!(\"fn foo() { let x = 1; x }\")"
 ---
 Node(
   ast_node: Legacy(Module([
-    Node(
-      ast_node: Legacy(FunctionSingleDeclaration(
-        id: SymbolId(3),
+    Stmt(
+      kind: FunctionDeclaration(FunctionDeclaration(
         name: Expr(
           kind: Identifier(Ident(
             name: "foo",
@@ -33,33 +32,18 @@ Node(
             ),
           ),
         ),
-        declaration: Node(
-          ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
-            parameters: [],
-            guard: None,
-            return_type_annotation: None,
-            body: Expr(
-              kind: Block([
-                Node(
-                  ast_node: Legacy(VariableDeclaration(
-                    id: SymbolId(2),
-                    pattern: Pattern(
-                      kind: Identifier(
-                        id: SymbolId(1),
-                        name: Ident(
-                          name: "x",
-                          span: Span(
-                            start: LineColumn(
-                              line: 0,
-                              column: 15,
-                            ),
-                            end: LineColumn(
-                              line: 0,
-                              column: 16,
-                            ),
-                          ),
-                        ),
-                      ),
+        parameters: [],
+        guard: None,
+        return_type_annotation: None,
+        body: Expr(
+          kind: Block([
+            Stmt(
+              kind: Let(
+                pattern: Pattern(
+                  kind: Identifier(
+                    id: SymbolId(1),
+                    name: Ident(
+                      name: "x",
                       span: Span(
                         start: LineColumn(
                           line: 0,
@@ -71,70 +55,69 @@ Node(
                         ),
                       ),
                     ),
-                    expression: Expr(
-                      kind: Literal(Integer(1)),
-                      symbol_table: None,
-                      span: Span(
-                        start: LineColumn(
-                          line: 0,
-                          column: 19,
-                        ),
-                        end: LineColumn(
-                          line: 0,
-                          column: 20,
-                        ),
-                      ),
+                  ),
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 15,
                     ),
-                    type_annotation: None,
-                  )),
+                    end: LineColumn(
+                      line: 0,
+                      column: 16,
+                    ),
+                  ),
+                ),
+                expression: Expr(
+                  kind: Literal(Integer(1)),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
                       line: 0,
-                      column: 11,
+                      column: 19,
                     ),
                     end: LineColumn(
                       line: 0,
-                      column: 21,
+                      column: 20,
                     ),
                   ),
                 ),
-              ], Some(Expr(
-                kind: Identifier(Ident(
-                  name: "x",
-                  span: Span(
-                    start: LineColumn(
-                      line: 0,
-                      column: 22,
-                    ),
-                    end: LineColumn(
-                      line: 0,
-                      column: 23,
-                    ),
-                  ),
-                )),
-                symbol_table: None,
-                span: Span(
-                  start: LineColumn(
-                    line: 0,
-                    column: 22,
-                  ),
-                  end: LineColumn(
-                    line: 0,
-                    column: 23,
-                  ),
-                ),
-              ))),
-              symbol_table: None,
+                type_annotation: None,
+              ),
               span: Span(
                 start: LineColumn(
                   line: 0,
-                  column: 0,
+                  column: 11,
                 ),
                 end: LineColumn(
                   line: 0,
-                  column: 0,
+                  column: 21,
                 ),
+              ),
+              symbol_table: None,
+            ),
+          ], Some(Expr(
+            kind: Identifier(Ident(
+              name: "x",
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 22,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 23,
+                ),
+              ),
+            )),
+            symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 22,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 23,
               ),
             ),
           ))),
@@ -151,7 +134,6 @@ Node(
           ),
         ),
       )),
-      symbol_table: None,
       span: Span(
         start: LineColumn(
           line: 0,
@@ -162,6 +144,7 @@ Node(
           column: 25,
         ),
       ),
+      symbol_table: None,
     ),
   ])),
   symbol_table: None,

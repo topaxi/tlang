@@ -4,9 +4,8 @@ expression: "parse!(\"fn foo() { fn bar() {} }\")"
 ---
 Node(
   ast_node: Legacy(Module([
-    Node(
-      ast_node: Legacy(FunctionSingleDeclaration(
-        id: SymbolId(2),
+    Stmt(
+      kind: FunctionDeclaration(FunctionDeclaration(
         name: Expr(
           kind: Identifier(Ident(
             name: "foo",
@@ -33,96 +32,65 @@ Node(
             ),
           ),
         ),
-        declaration: Node(
-          ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
-            parameters: [],
-            guard: None,
-            return_type_annotation: None,
-            body: Expr(
-              kind: Block([], Some(Expr(
-                kind: FunctionExpression(
-                  id: SymbolId(1),
-                  name: Some(Expr(
-                    kind: Identifier(Ident(
-                      name: "bar",
-                      span: Span(
-                        start: LineColumn(
-                          line: 0,
-                          column: 14,
-                        ),
-                        end: LineColumn(
-                          line: 0,
-                          column: 17,
-                        ),
-                      ),
-                    )),
-                    symbol_table: None,
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 14,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 17,
-                      ),
+        parameters: [],
+        guard: None,
+        return_type_annotation: None,
+        body: Expr(
+          kind: Block([], Some(Expr(
+            kind: FunctionExpression(FunctionDeclaration(
+              name: Expr(
+                kind: Identifier(Ident(
+                  name: "bar",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 14,
                     ),
-                  )),
-                  declaration: Node(
-                    ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
-                      parameters: [],
-                      guard: None,
-                      return_type_annotation: None,
-                      body: Expr(
-                        kind: Block([], None),
-                        symbol_table: None,
-                        span: Span(
-                          start: LineColumn(
-                            line: 0,
-                            column: 0,
-                          ),
-                          end: LineColumn(
-                            line: 0,
-                            column: 0,
-                          ),
-                        ),
-                      ),
-                    ))),
-                    symbol_table: None,
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 0,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 0,
-                      ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 17,
                     ),
                   ),
-                ),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
                     line: 0,
-                    column: 11,
+                    column: 14,
                   ),
                   end: LineColumn(
                     line: 0,
-                    column: 22,
+                    column: 17,
                   ),
                 ),
-              ))),
-              symbol_table: None,
-              span: Span(
-                start: LineColumn(
-                  line: 0,
-                  column: 0,
+              ),
+              parameters: [],
+              guard: None,
+              return_type_annotation: None,
+              body: Expr(
+                kind: Block([], None),
+                symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
                 ),
-                end: LineColumn(
-                  line: 0,
-                  column: 0,
-                ),
+              ),
+            )),
+            symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 11,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 22,
               ),
             ),
           ))),
@@ -139,7 +107,6 @@ Node(
           ),
         ),
       )),
-      symbol_table: None,
       span: Span(
         start: LineColumn(
           line: 0,
@@ -150,6 +117,7 @@ Node(
           column: 24,
         ),
       ),
+      symbol_table: None,
     ),
   ])),
   symbol_table: None,

@@ -4,9 +4,8 @@ expression: "parse!(\"let x = if (true) { 1; } else { 2; };\")"
 ---
 Node(
   ast_node: Legacy(Module([
-    Node(
-      ast_node: Legacy(VariableDeclaration(
-        id: SymbolId(2),
+    Stmt(
+      kind: Let(
         pattern: Pattern(
           kind: Identifier(
             id: SymbolId(1),
@@ -53,8 +52,8 @@ Node(
             ),
             then_branch: Expr(
               kind: Block([
-                Node(
-                  ast_node: Legacy(ExpressionStatement(Expr(
+                Stmt(
+                  kind: Expr(Expr(
                     kind: Literal(Integer(1)),
                     symbol_table: None,
                     span: Span(
@@ -67,8 +66,7 @@ Node(
                         column: 21,
                       ),
                     ),
-                  ))),
-                  symbol_table: None,
+                  )),
                   span: Span(
                     start: LineColumn(
                       line: 0,
@@ -79,6 +77,7 @@ Node(
                       column: 22,
                     ),
                   ),
+                  symbol_table: None,
                 ),
               ], None),
               symbol_table: None,
@@ -95,8 +94,8 @@ Node(
             ),
             else_branch: Some(Expr(
               kind: Block([
-                Node(
-                  ast_node: Legacy(ExpressionStatement(Expr(
+                Stmt(
+                  kind: Expr(Expr(
                     kind: Literal(Integer(2)),
                     symbol_table: None,
                     span: Span(
@@ -109,8 +108,7 @@ Node(
                         column: 33,
                       ),
                     ),
-                  ))),
-                  symbol_table: None,
+                  )),
                   span: Span(
                     start: LineColumn(
                       line: 0,
@@ -121,6 +119,7 @@ Node(
                       column: 34,
                     ),
                   ),
+                  symbol_table: None,
                 ),
               ], None),
               symbol_table: None,
@@ -149,8 +148,7 @@ Node(
           ),
         ),
         type_annotation: None,
-      )),
-      symbol_table: None,
+      ),
       span: Span(
         start: LineColumn(
           line: 0,
@@ -161,6 +159,7 @@ Node(
           column: 37,
         ),
       ),
+      symbol_table: None,
     ),
   ])),
   symbol_table: None,

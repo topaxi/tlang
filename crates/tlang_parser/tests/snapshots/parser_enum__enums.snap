@@ -4,9 +4,8 @@ expression: "parse!(indoc! {\n        \"\n        enum Option {\n            Som
 ---
 Node(
   ast_node: Legacy(Module([
-    Node(
-      ast_node: Legacy(EnumDeclaration(
-        id: SymbolId(1),
+    Stmt(
+      kind: EnumDeclaration(EnumDeclaration(
         name: Ident(
           name: "Option",
           span: Span(
@@ -21,52 +20,36 @@ Node(
           ),
         ),
         variants: [
-          Node(
-            ast_node: Legacy(EnumVariant(
-              name: Ident(
-                name: "Some",
+          EnumVariant(
+            name: Ident(
+              name: "Some",
+              span: Span(
+                start: LineColumn(
+                  line: 1,
+                  column: 5,
+                ),
+                end: LineColumn(
+                  line: 1,
+                  column: 9,
+                ),
+              ),
+            ),
+            named_fields: false,
+            parameters: [
+              Ident(
+                name: "x",
                 span: Span(
                   start: LineColumn(
                     line: 1,
-                    column: 5,
+                    column: 10,
                   ),
                   end: LineColumn(
                     line: 1,
-                    column: 9,
+                    column: 11,
                   ),
                 ),
               ),
-              named_fields: false,
-              parameters: [
-                Expr(
-                  kind: Identifier(Ident(
-                    name: "x",
-                    span: Span(
-                      start: LineColumn(
-                        line: 1,
-                        column: 10,
-                      ),
-                      end: LineColumn(
-                        line: 1,
-                        column: 11,
-                      ),
-                    ),
-                  )),
-                  symbol_table: None,
-                  span: Span(
-                    start: LineColumn(
-                      line: 1,
-                      column: 10,
-                    ),
-                    end: LineColumn(
-                      line: 1,
-                      column: 11,
-                    ),
-                  ),
-                ),
-              ],
-            )),
-            symbol_table: None,
+            ],
             span: Span(
               start: LineColumn(
                 line: 1,
@@ -78,25 +61,22 @@ Node(
               ),
             ),
           ),
-          Node(
-            ast_node: Legacy(EnumVariant(
-              name: Ident(
-                name: "None",
-                span: Span(
-                  start: LineColumn(
-                    line: 2,
-                    column: 5,
-                  ),
-                  end: LineColumn(
-                    line: 2,
-                    column: 9,
-                  ),
+          EnumVariant(
+            name: Ident(
+              name: "None",
+              span: Span(
+                start: LineColumn(
+                  line: 2,
+                  column: 5,
+                ),
+                end: LineColumn(
+                  line: 2,
+                  column: 9,
                 ),
               ),
-              named_fields: false,
-              parameters: [],
-            )),
-            symbol_table: None,
+            ),
+            named_fields: false,
+            parameters: [],
             span: Span(
               start: LineColumn(
                 line: 2,
@@ -110,7 +90,6 @@ Node(
           ),
         ],
       )),
-      symbol_table: None,
       span: Span(
         start: LineColumn(
           line: 0,
@@ -121,13 +100,13 @@ Node(
           column: 2,
         ),
       ),
+      symbol_table: None,
     ),
-    Node(
-      ast_node: Legacy(VariableDeclaration(
-        id: SymbolId(3),
+    Stmt(
+      kind: Let(
         pattern: Pattern(
           kind: Identifier(
-            id: SymbolId(2),
+            id: SymbolId(1),
             name: Ident(
               name: "x",
               span: Span(
@@ -226,8 +205,7 @@ Node(
           ),
         ),
         type_annotation: None,
-      )),
-      symbol_table: None,
+      ),
       span: Span(
         start: LineColumn(
           line: 5,
@@ -238,6 +216,7 @@ Node(
           column: 26,
         ),
       ),
+      symbol_table: None,
     ),
   ])),
   symbol_table: None,

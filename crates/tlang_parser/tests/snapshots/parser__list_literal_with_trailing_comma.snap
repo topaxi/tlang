@@ -4,9 +4,8 @@ expression: "parse!(\"let x = [1, 2, 3,];\")"
 ---
 Node(
   ast_node: Legacy(Module([
-    Node(
-      ast_node: Legacy(VariableDeclaration(
-        id: SymbolId(2),
+    Stmt(
+      kind: Let(
         pattern: Pattern(
           kind: Identifier(
             id: SymbolId(1),
@@ -93,8 +92,7 @@ Node(
           ),
         ),
         type_annotation: None,
-      )),
-      symbol_table: None,
+      ),
       span: Span(
         start: LineColumn(
           line: 0,
@@ -105,6 +103,7 @@ Node(
           column: 19,
         ),
       ),
+      symbol_table: None,
     ),
   ])),
   symbol_table: None,

@@ -4,8 +4,8 @@ expression: "parse!(r#\"foo { foo: 1, bar: 2 };\"#)"
 ---
 Node(
   ast_node: Legacy(Module([
-    Node(
-      ast_node: Legacy(ExpressionStatement(Expr(
+    Stmt(
+      kind: Expr(Expr(
         kind: Call(
           function: Expr(
             kind: Identifier(Ident(
@@ -140,8 +140,7 @@ Node(
             column: 22,
           ),
         ),
-      ))),
-      symbol_table: None,
+      )),
       span: Span(
         start: LineColumn(
           line: 0,
@@ -152,6 +151,7 @@ Node(
           column: 23,
         ),
       ),
+      symbol_table: None,
     ),
   ])),
   symbol_table: None,

@@ -4,8 +4,8 @@ expression: "parse!(\"foo.bar.baz;\")"
 ---
 Node(
   ast_node: Legacy(Module([
-    Node(
-      ast_node: Legacy(ExpressionStatement(Expr(
+    Stmt(
+      kind: Expr(Expr(
         kind: FieldExpression(
           base: Expr(
             kind: FieldExpression(
@@ -112,8 +112,7 @@ Node(
             column: 11,
           ),
         ),
-      ))),
-      symbol_table: None,
+      )),
       span: Span(
         start: LineColumn(
           line: 0,
@@ -124,6 +123,7 @@ Node(
           column: 12,
         ),
       ),
+      symbol_table: None,
     ),
   ])),
   symbol_table: None,

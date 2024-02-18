@@ -4,9 +4,8 @@ expression: "parse!(\"let x: Option<i64> = 1;\")"
 ---
 Node(
   ast_node: Legacy(Module([
-    Node(
-      ast_node: Legacy(VariableDeclaration(
-        id: SymbolId(2),
+    Stmt(
+      kind: Let(
         pattern: Pattern(
           kind: Identifier(
             id: SymbolId(1),
@@ -50,7 +49,7 @@ Node(
           ),
         ),
         type_annotation: Some(Node(
-          ast_node: Legacy(TypeAnnotation(
+          ast_node: Legacy(TypeAnnotation(Ty(
             name: Expr(
               kind: Identifier(Ident(
                 name: "Option",
@@ -79,7 +78,7 @@ Node(
             ),
             parameters: [
               Node(
-                ast_node: Legacy(TypeAnnotation(
+                ast_node: Legacy(TypeAnnotation(Ty(
                   name: Expr(
                     kind: Identifier(Ident(
                       name: "i64",
@@ -107,7 +106,7 @@ Node(
                     ),
                   ),
                   parameters: [],
-                )),
+                ))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -121,7 +120,7 @@ Node(
                 ),
               ),
             ],
-          )),
+          ))),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -134,8 +133,7 @@ Node(
             ),
           ),
         )),
-      )),
-      symbol_table: None,
+      ),
       span: Span(
         start: LineColumn(
           line: 0,
@@ -146,6 +144,7 @@ Node(
           column: 23,
         ),
       ),
+      symbol_table: None,
     ),
   ])),
   symbol_table: None,

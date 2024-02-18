@@ -4,9 +4,8 @@ expression: "parse!(indoc! {\n        \"\n        enum Option {\n            Som
 ---
 Node(
   ast_node: Legacy(Module([
-    Node(
-      ast_node: Legacy(EnumDeclaration(
-        id: SymbolId(1),
+    Stmt(
+      kind: EnumDeclaration(EnumDeclaration(
         name: Ident(
           name: "Option",
           span: Span(
@@ -21,52 +20,36 @@ Node(
           ),
         ),
         variants: [
-          Node(
-            ast_node: Legacy(EnumVariant(
-              name: Ident(
-                name: "Some",
+          EnumVariant(
+            name: Ident(
+              name: "Some",
+              span: Span(
+                start: LineColumn(
+                  line: 1,
+                  column: 5,
+                ),
+                end: LineColumn(
+                  line: 1,
+                  column: 9,
+                ),
+              ),
+            ),
+            named_fields: false,
+            parameters: [
+              Ident(
+                name: "value",
                 span: Span(
                   start: LineColumn(
                     line: 1,
-                    column: 5,
+                    column: 10,
                   ),
                   end: LineColumn(
                     line: 1,
-                    column: 9,
+                    column: 15,
                   ),
                 ),
               ),
-              named_fields: false,
-              parameters: [
-                Expr(
-                  kind: Identifier(Ident(
-                    name: "value",
-                    span: Span(
-                      start: LineColumn(
-                        line: 1,
-                        column: 10,
-                      ),
-                      end: LineColumn(
-                        line: 1,
-                        column: 15,
-                      ),
-                    ),
-                  )),
-                  symbol_table: None,
-                  span: Span(
-                    start: LineColumn(
-                      line: 1,
-                      column: 10,
-                    ),
-                    end: LineColumn(
-                      line: 1,
-                      column: 15,
-                    ),
-                  ),
-                ),
-              ],
-            )),
-            symbol_table: None,
+            ],
             span: Span(
               start: LineColumn(
                 line: 1,
@@ -78,25 +61,22 @@ Node(
               ),
             ),
           ),
-          Node(
-            ast_node: Legacy(EnumVariant(
-              name: Ident(
-                name: "None",
-                span: Span(
-                  start: LineColumn(
-                    line: 2,
-                    column: 5,
-                  ),
-                  end: LineColumn(
-                    line: 2,
-                    column: 9,
-                  ),
+          EnumVariant(
+            name: Ident(
+              name: "None",
+              span: Span(
+                start: LineColumn(
+                  line: 2,
+                  column: 5,
+                ),
+                end: LineColumn(
+                  line: 2,
+                  column: 9,
                 ),
               ),
-              named_fields: false,
-              parameters: [],
-            )),
-            symbol_table: None,
+            ),
+            named_fields: false,
+            parameters: [],
             span: Span(
               start: LineColumn(
                 line: 2,
@@ -110,7 +90,6 @@ Node(
           ),
         ],
       )),
-      symbol_table: None,
       span: Span(
         start: LineColumn(
           line: 0,
@@ -121,75 +100,46 @@ Node(
           column: 2,
         ),
       ),
+      symbol_table: None,
     ),
-    Node(
-      ast_node: Legacy(FunctionDeclarations(
-        id: SymbolId(5),
-        name: Expr(
-          kind: Identifier(Ident(
-            name: "unwrap",
-            span: Span(
-              start: LineColumn(
-                line: 6,
-                column: 4,
+    Stmt(
+      kind: FunctionDeclarations([
+        Stmt(
+          kind: FunctionDeclaration(FunctionDeclaration(
+            name: Expr(
+              kind: Identifier(Ident(
+                name: "unwrap",
+                span: Span(
+                  start: LineColumn(
+                    line: 5,
+                    column: 4,
+                  ),
+                  end: LineColumn(
+                    line: 5,
+                    column: 10,
+                  ),
+                ),
+              )),
+              symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 5,
+                  column: 4,
+                ),
+                end: LineColumn(
+                  line: 5,
+                  column: 10,
+                ),
               ),
-              end: LineColumn(
-                line: 6,
-                column: 10,
-              ),
             ),
-          )),
-          symbol_table: None,
-          span: Span(
-            start: LineColumn(
-              line: 6,
-              column: 4,
-            ),
-            end: LineColumn(
-              line: 6,
-              column: 10,
-            ),
-          ),
-        ),
-        declarations: [
-          Node(
-            ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
-              parameters: [
-                Node(
-                  ast_node: Legacy(FunctionParameter(
-                    id: SymbolId(2),
-                    pattern: Pattern(
-                      kind: Enum(
-                        identifier: Expr(
-                          kind: NestedIdentifier([
-                            Ident(
-                              name: "Option",
-                              span: Span(
-                                start: LineColumn(
-                                  line: 5,
-                                  column: 11,
-                                ),
-                                end: LineColumn(
-                                  line: 5,
-                                  column: 17,
-                                ),
-                              ),
-                            ),
-                            Ident(
-                              name: "None",
-                              span: Span(
-                                start: LineColumn(
-                                  line: 5,
-                                  column: 19,
-                                ),
-                                end: LineColumn(
-                                  line: 5,
-                                  column: 23,
-                                ),
-                              ),
-                            ),
-                          ]),
-                          symbol_table: None,
+            parameters: [
+              FunctionParameter(
+                pattern: Pattern(
+                  kind: Enum(
+                    identifier: Expr(
+                      kind: NestedIdentifier([
+                        Ident(
+                          name: "Option",
                           span: Span(
                             start: LineColumn(
                               line: 5,
@@ -197,13 +147,25 @@ Node(
                             ),
                             end: LineColumn(
                               line: 5,
+                              column: 17,
+                            ),
+                          ),
+                        ),
+                        Ident(
+                          name: "None",
+                          span: Span(
+                            start: LineColumn(
+                              line: 5,
+                              column: 19,
+                            ),
+                            end: LineColumn(
+                              line: 5,
                               column: 23,
                             ),
                           ),
                         ),
-                        elements: [],
-                        named_fields: false,
-                      ),
+                      ]),
+                      symbol_table: None,
                       span: Span(
                         start: LineColumn(
                           line: 5,
@@ -215,9 +177,9 @@ Node(
                         ),
                       ),
                     ),
-                    type_annotation: None,
-                  )),
-                  symbol_table: None,
+                    elements: [],
+                    named_fields: false,
+                  ),
                   span: Span(
                     start: LineColumn(
                       line: 5,
@@ -229,130 +191,140 @@ Node(
                     ),
                   ),
                 ),
-              ],
-              guard: None,
-              return_type_annotation: None,
-              body: Expr(
-                kind: Block([], Some(Expr(
-                  kind: Call(
-                    function: Expr(
-                      kind: Identifier(Ident(
-                        name: "panic",
-                        span: Span(
-                          start: LineColumn(
-                            line: 5,
-                            column: 27,
-                          ),
-                          end: LineColumn(
-                            line: 5,
-                            column: 32,
-                          ),
-                        ),
-                      )),
-                      symbol_table: None,
-                      span: Span(
-                        start: LineColumn(
-                          line: 0,
-                          column: 0,
-                        ),
-                        end: LineColumn(
-                          line: 0,
-                          column: 0,
-                        ),
-                      ),
-                    ),
-                    arguments: [
-                      Expr(
-                        kind: Literal(String("Cannot unwrap None")),
-                        symbol_table: None,
-                        span: Span(
-                          start: LineColumn(
-                            line: 5,
-                            column: 33,
-                          ),
-                          end: LineColumn(
-                            line: 5,
-                            column: 53,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  symbol_table: None,
-                  span: Span(
-                    start: LineColumn(
-                      line: 5,
-                      column: 27,
-                    ),
-                    end: LineColumn(
-                      line: 5,
-                      column: 54,
-                    ),
-                  ),
-                ))),
-                symbol_table: None,
+                type_annotation: None,
                 span: Span(
                   start: LineColumn(
-                    line: 0,
-                    column: 0,
+                    line: 5,
+                    column: 11,
                   ),
                   end: LineColumn(
-                    line: 0,
-                    column: 0,
+                    line: 5,
+                    column: 23,
                   ),
                 ),
               ),
-            ))),
-            symbol_table: None,
-            span: Span(
-              start: LineColumn(
-                line: 0,
-                column: 0,
-              ),
-              end: LineColumn(
-                line: 0,
-                column: 0,
+            ],
+            guard: None,
+            return_type_annotation: None,
+            body: Expr(
+              kind: Block([], Some(Expr(
+                kind: Call(
+                  function: Expr(
+                    kind: Identifier(Ident(
+                      name: "panic",
+                      span: Span(
+                        start: LineColumn(
+                          line: 5,
+                          column: 27,
+                        ),
+                        end: LineColumn(
+                          line: 5,
+                          column: 32,
+                        ),
+                      ),
+                    )),
+                    symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 0,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 0,
+                      ),
+                    ),
+                  ),
+                  arguments: [
+                    Expr(
+                      kind: Literal(String("Cannot unwrap None")),
+                      symbol_table: None,
+                      span: Span(
+                        start: LineColumn(
+                          line: 5,
+                          column: 33,
+                        ),
+                        end: LineColumn(
+                          line: 5,
+                          column: 53,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 5,
+                    column: 27,
+                  ),
+                  end: LineColumn(
+                    line: 5,
+                    column: 54,
+                  ),
+                ),
+              ))),
+              symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
               ),
             ),
+          )),
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 0,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 0,
+            ),
           ),
-          Node(
-            ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
-              parameters: [
-                Node(
-                  ast_node: Legacy(FunctionParameter(
-                    id: SymbolId(4),
-                    pattern: Pattern(
-                      kind: Enum(
-                        identifier: Expr(
-                          kind: NestedIdentifier([
-                            Ident(
-                              name: "Option",
-                              span: Span(
-                                start: LineColumn(
-                                  line: 6,
-                                  column: 11,
-                                ),
-                                end: LineColumn(
-                                  line: 6,
-                                  column: 17,
-                                ),
-                              ),
-                            ),
-                            Ident(
-                              name: "Some",
-                              span: Span(
-                                start: LineColumn(
-                                  line: 6,
-                                  column: 19,
-                                ),
-                                end: LineColumn(
-                                  line: 6,
-                                  column: 23,
-                                ),
-                              ),
-                            ),
-                          ]),
-                          symbol_table: None,
+          symbol_table: None,
+        ),
+        Stmt(
+          kind: FunctionDeclaration(FunctionDeclaration(
+            name: Expr(
+              kind: Identifier(Ident(
+                name: "unwrap",
+                span: Span(
+                  start: LineColumn(
+                    line: 6,
+                    column: 4,
+                  ),
+                  end: LineColumn(
+                    line: 6,
+                    column: 10,
+                  ),
+                ),
+              )),
+              symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 6,
+                  column: 4,
+                ),
+                end: LineColumn(
+                  line: 6,
+                  column: 10,
+                ),
+              ),
+            ),
+            parameters: [
+              FunctionParameter(
+                pattern: Pattern(
+                  kind: Enum(
+                    identifier: Expr(
+                      kind: NestedIdentifier([
+                        Ident(
+                          name: "Option",
                           span: Span(
                             start: LineColumn(
                               line: 6,
@@ -360,28 +332,42 @@ Node(
                             ),
                             end: LineColumn(
                               line: 6,
+                              column: 17,
+                            ),
+                          ),
+                        ),
+                        Ident(
+                          name: "Some",
+                          span: Span(
+                            start: LineColumn(
+                              line: 6,
+                              column: 19,
+                            ),
+                            end: LineColumn(
+                              line: 6,
                               column: 23,
                             ),
                           ),
                         ),
-                        elements: [
-                          Pattern(
-                            kind: Identifier(
-                              id: SymbolId(3),
-                              name: Ident(
-                                name: "value",
-                                span: Span(
-                                  start: LineColumn(
-                                    line: 6,
-                                    column: 24,
-                                  ),
-                                  end: LineColumn(
-                                    line: 6,
-                                    column: 29,
-                                  ),
-                                ),
-                              ),
-                            ),
+                      ]),
+                      symbol_table: None,
+                      span: Span(
+                        start: LineColumn(
+                          line: 6,
+                          column: 11,
+                        ),
+                        end: LineColumn(
+                          line: 6,
+                          column: 23,
+                        ),
+                      ),
+                    ),
+                    elements: [
+                      Pattern(
+                        kind: Identifier(
+                          id: SymbolId(1),
+                          name: Ident(
+                            name: "value",
                             span: Span(
                               start: LineColumn(
                                 line: 6,
@@ -393,23 +379,21 @@ Node(
                               ),
                             ),
                           ),
-                        ],
-                        named_fields: false,
-                      ),
-                      span: Span(
-                        start: LineColumn(
-                          line: 6,
-                          column: 11,
                         ),
-                        end: LineColumn(
-                          line: 6,
-                          column: 30,
+                        span: Span(
+                          start: LineColumn(
+                            line: 6,
+                            column: 24,
+                          ),
+                          end: LineColumn(
+                            line: 6,
+                            column: 29,
+                          ),
                         ),
                       ),
-                    ),
-                    type_annotation: None,
-                  )),
-                  symbol_table: None,
+                    ],
+                    named_fields: false,
+                  ),
                   span: Span(
                     start: LineColumn(
                       line: 6,
@@ -421,25 +405,25 @@ Node(
                     ),
                   ),
                 ),
-              ],
-              guard: None,
-              return_type_annotation: None,
-              body: Expr(
-                kind: Block([], Some(Expr(
-                  kind: Identifier(Ident(
-                    name: "value",
-                    span: Span(
-                      start: LineColumn(
-                        line: 6,
-                        column: 34,
-                      ),
-                      end: LineColumn(
-                        line: 6,
-                        column: 39,
-                      ),
-                    ),
-                  )),
-                  symbol_table: None,
+                type_annotation: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 6,
+                    column: 11,
+                  ),
+                  end: LineColumn(
+                    line: 6,
+                    column: 30,
+                  ),
+                ),
+              ),
+            ],
+            guard: None,
+            return_type_annotation: None,
+            body: Expr(
+              kind: Block([], Some(Expr(
+                kind: Identifier(Ident(
+                  name: "value",
                   span: Span(
                     start: LineColumn(
                       line: 6,
@@ -450,35 +434,45 @@ Node(
                       column: 39,
                     ),
                   ),
-                ))),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
-                    line: 0,
-                    column: 0,
+                    line: 6,
+                    column: 34,
                   ),
                   end: LineColumn(
-                    line: 0,
-                    column: 0,
+                    line: 6,
+                    column: 39,
                   ),
                 ),
-              ),
-            ))),
-            symbol_table: None,
-            span: Span(
-              start: LineColumn(
-                line: 0,
-                column: 0,
-              ),
-              end: LineColumn(
-                line: 0,
-                column: 0,
+              ))),
+              symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
               ),
             ),
+          )),
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 0,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 0,
+            ),
           ),
-        ],
-      )),
-      symbol_table: None,
+          symbol_table: None,
+        ),
+      ]),
       span: Span(
         start: LineColumn(
           line: 5,
@@ -489,6 +483,7 @@ Node(
           column: 41,
         ),
       ),
+      symbol_table: None,
     ),
   ])),
   symbol_table: None,

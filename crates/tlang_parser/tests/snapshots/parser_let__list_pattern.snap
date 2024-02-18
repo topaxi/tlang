@@ -4,9 +4,8 @@ expression: "parse!(\"let [x, y, ...z] = [1, 2, 3, 4];\")"
 ---
 Node(
   ast_node: Legacy(Module([
-    Node(
-      ast_node: Legacy(VariableDeclaration(
-        id: SymbolId(4),
+    Stmt(
+      kind: Let(
         pattern: Pattern(
           kind: List([
             Pattern(
@@ -189,8 +188,7 @@ Node(
           ),
         ),
         type_annotation: None,
-      )),
-      symbol_table: None,
+      ),
       span: Span(
         start: LineColumn(
           line: 0,
@@ -201,6 +199,7 @@ Node(
           column: 32,
         ),
       ),
+      symbol_table: None,
     ),
   ])),
   symbol_table: None,

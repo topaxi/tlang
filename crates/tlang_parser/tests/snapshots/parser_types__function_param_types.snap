@@ -4,9 +4,8 @@ expression: "parse!(\"fn foo(x: i64, y: i64) -> i64 { x }\")"
 ---
 Node(
   ast_node: Legacy(Module([
-    Node(
-      ast_node: Legacy(FunctionSingleDeclaration(
-        id: SymbolId(5),
+    Stmt(
+      kind: FunctionDeclaration(FunctionDeclaration(
         name: Expr(
           kind: Identifier(Ident(
             name: "foo",
@@ -33,196 +32,49 @@ Node(
             ),
           ),
         ),
-        declaration: Node(
-          ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
-            parameters: [
-              Node(
-                ast_node: Legacy(FunctionParameter(
-                  id: SymbolId(2),
-                  pattern: Pattern(
-                    kind: Identifier(
-                      id: SymbolId(1),
-                      name: Ident(
-                        name: "x",
-                        span: Span(
-                          start: LineColumn(
-                            line: 0,
-                            column: 7,
-                          ),
-                          end: LineColumn(
-                            line: 0,
-                            column: 8,
-                          ),
-                        ),
-                      ),
+        parameters: [
+          FunctionParameter(
+            pattern: Pattern(
+              kind: Identifier(
+                id: SymbolId(1),
+                name: Ident(
+                  name: "x",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 7,
                     ),
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 7,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 8,
-                      ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 8,
                     ),
-                  ),
-                  type_annotation: Some(Node(
-                    ast_node: Legacy(TypeAnnotation(
-                      name: Expr(
-                        kind: Identifier(Ident(
-                          name: "i64",
-                          span: Span(
-                            start: LineColumn(
-                              line: 0,
-                              column: 10,
-                            ),
-                            end: LineColumn(
-                              line: 0,
-                              column: 13,
-                            ),
-                          ),
-                        )),
-                        symbol_table: None,
-                        span: Span(
-                          start: LineColumn(
-                            line: 0,
-                            column: 10,
-                          ),
-                          end: LineColumn(
-                            line: 0,
-                            column: 13,
-                          ),
-                        ),
-                      ),
-                      parameters: [],
-                    )),
-                    symbol_table: None,
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 0,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 0,
-                      ),
-                    ),
-                  )),
-                )),
-                symbol_table: None,
-                span: Span(
-                  start: LineColumn(
-                    line: 0,
-                    column: 7,
-                  ),
-                  end: LineColumn(
-                    line: 0,
-                    column: 13,
                   ),
                 ),
               ),
-              Node(
-                ast_node: Legacy(FunctionParameter(
-                  id: SymbolId(4),
-                  pattern: Pattern(
-                    kind: Identifier(
-                      id: SymbolId(3),
-                      name: Ident(
-                        name: "y",
-                        span: Span(
-                          start: LineColumn(
-                            line: 0,
-                            column: 15,
-                          ),
-                          end: LineColumn(
-                            line: 0,
-                            column: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 15,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 16,
-                      ),
-                    ),
-                  ),
-                  type_annotation: Some(Node(
-                    ast_node: Legacy(TypeAnnotation(
-                      name: Expr(
-                        kind: Identifier(Ident(
-                          name: "i64",
-                          span: Span(
-                            start: LineColumn(
-                              line: 0,
-                              column: 18,
-                            ),
-                            end: LineColumn(
-                              line: 0,
-                              column: 21,
-                            ),
-                          ),
-                        )),
-                        symbol_table: None,
-                        span: Span(
-                          start: LineColumn(
-                            line: 0,
-                            column: 18,
-                          ),
-                          end: LineColumn(
-                            line: 0,
-                            column: 21,
-                          ),
-                        ),
-                      ),
-                      parameters: [],
-                    )),
-                    symbol_table: None,
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 0,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 0,
-                      ),
-                    ),
-                  )),
-                )),
-                symbol_table: None,
-                span: Span(
-                  start: LineColumn(
-                    line: 0,
-                    column: 15,
-                  ),
-                  end: LineColumn(
-                    line: 0,
-                    column: 21,
-                  ),
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 7,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 8,
                 ),
               ),
-            ],
-            guard: None,
-            return_type_annotation: Some(Node(
-              ast_node: Legacy(TypeAnnotation(
+            ),
+            type_annotation: Some(Node(
+              ast_node: Legacy(TypeAnnotation(Ty(
                 name: Expr(
                   kind: Identifier(Ident(
                     name: "i64",
                     span: Span(
                       start: LineColumn(
                         line: 0,
-                        column: 26,
+                        column: 10,
                       ),
                       end: LineColumn(
                         line: 0,
-                        column: 29,
+                        column: 13,
                       ),
                     ),
                   )),
@@ -230,16 +82,16 @@ Node(
                   span: Span(
                     start: LineColumn(
                       line: 0,
-                      column: 26,
+                      column: 10,
                     ),
                     end: LineColumn(
                       line: 0,
-                      column: 29,
+                      column: 13,
                     ),
                   ),
                 ),
                 parameters: [],
-              )),
+              ))),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -252,32 +104,75 @@ Node(
                 ),
               ),
             )),
-            body: Expr(
-              kind: Block([], Some(Expr(
-                kind: Identifier(Ident(
-                  name: "x",
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 7,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 13,
+              ),
+            ),
+          ),
+          FunctionParameter(
+            pattern: Pattern(
+              kind: Identifier(
+                id: SymbolId(2),
+                name: Ident(
+                  name: "y",
                   span: Span(
                     start: LineColumn(
                       line: 0,
-                      column: 32,
+                      column: 15,
                     ),
                     end: LineColumn(
                       line: 0,
-                      column: 33,
+                      column: 16,
                     ),
                   ),
-                )),
-                symbol_table: None,
-                span: Span(
-                  start: LineColumn(
-                    line: 0,
-                    column: 32,
-                  ),
-                  end: LineColumn(
-                    line: 0,
-                    column: 33,
+                ),
+              ),
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 15,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 16,
+                ),
+              ),
+            ),
+            type_annotation: Some(Node(
+              ast_node: Legacy(TypeAnnotation(Ty(
+                name: Expr(
+                  kind: Identifier(Ident(
+                    name: "i64",
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 18,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 21,
+                      ),
+                    ),
+                  )),
+                  symbol_table: None,
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 18,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 21,
+                    ),
                   ),
                 ),
+                parameters: [],
               ))),
               symbol_table: None,
               span: Span(
@@ -289,6 +184,87 @@ Node(
                   line: 0,
                   column: 0,
                 ),
+              ),
+            )),
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 15,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 21,
+              ),
+            ),
+          ),
+        ],
+        guard: None,
+        return_type_annotation: Some(Node(
+          ast_node: Legacy(TypeAnnotation(Ty(
+            name: Expr(
+              kind: Identifier(Ident(
+                name: "i64",
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 26,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 29,
+                  ),
+                ),
+              )),
+              symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 26,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 29,
+                ),
+              ),
+            ),
+            parameters: [],
+          ))),
+          symbol_table: None,
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 0,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 0,
+            ),
+          ),
+        )),
+        body: Expr(
+          kind: Block([], Some(Expr(
+            kind: Identifier(Ident(
+              name: "x",
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 32,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 33,
+                ),
+              ),
+            )),
+            symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 32,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 33,
               ),
             ),
           ))),
@@ -305,7 +281,6 @@ Node(
           ),
         ),
       )),
-      symbol_table: None,
       span: Span(
         start: LineColumn(
           line: 0,
@@ -316,6 +291,7 @@ Node(
           column: 35,
         ),
       ),
+      symbol_table: None,
     ),
   ])),
   symbol_table: None,

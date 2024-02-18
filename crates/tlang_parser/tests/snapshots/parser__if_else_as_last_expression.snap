@@ -4,9 +4,8 @@ expression: "parse!(\"fn main() { if true { 1 } else { 2 } }\")"
 ---
 Node(
   ast_node: Legacy(Module([
-    Node(
-      ast_node: Legacy(FunctionSingleDeclaration(
-        id: SymbolId(1),
+    Stmt(
+      kind: FunctionDeclaration(FunctionDeclaration(
         name: Expr(
           kind: Identifier(Ident(
             name: "main",
@@ -33,105 +32,90 @@ Node(
             ),
           ),
         ),
-        declaration: Node(
-          ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
-            parameters: [],
-            guard: None,
-            return_type_annotation: None,
-            body: Expr(
-              kind: Block([], Some(Expr(
-                kind: IfElse(
-                  condition: Expr(
-                    kind: Literal(Boolean(true)),
-                    symbol_table: None,
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 15,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 19,
-                      ),
-                    ),
-                  ),
-                  then_branch: Expr(
-                    kind: Block([], Some(Expr(
-                      kind: Literal(Integer(1)),
-                      symbol_table: None,
-                      span: Span(
-                        start: LineColumn(
-                          line: 0,
-                          column: 22,
-                        ),
-                        end: LineColumn(
-                          line: 0,
-                          column: 23,
-                        ),
-                      ),
-                    ))),
-                    symbol_table: None,
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 0,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 0,
-                      ),
-                    ),
-                  ),
-                  else_branch: Some(Expr(
-                    kind: Block([], Some(Expr(
-                      kind: Literal(Integer(2)),
-                      symbol_table: None,
-                      span: Span(
-                        start: LineColumn(
-                          line: 0,
-                          column: 33,
-                        ),
-                        end: LineColumn(
-                          line: 0,
-                          column: 34,
-                        ),
-                      ),
-                    ))),
-                    symbol_table: None,
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 0,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 0,
-                      ),
-                    ),
-                  )),
-                ),
+        parameters: [],
+        guard: None,
+        return_type_annotation: None,
+        body: Expr(
+          kind: Block([], Some(Expr(
+            kind: IfElse(
+              condition: Expr(
+                kind: Literal(Boolean(true)),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
                     line: 0,
-                    column: 12,
+                    column: 15,
                   ),
                   end: LineColumn(
                     line: 0,
-                    column: 36,
+                    column: 19,
                   ),
                 ),
-              ))),
-              symbol_table: None,
-              span: Span(
-                start: LineColumn(
-                  line: 0,
-                  column: 0,
+              ),
+              then_branch: Expr(
+                kind: Block([], Some(Expr(
+                  kind: Literal(Integer(1)),
+                  symbol_table: None,
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 22,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 23,
+                    ),
+                  ),
+                ))),
+                symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
                 ),
-                end: LineColumn(
-                  line: 0,
-                  column: 0,
+              ),
+              else_branch: Some(Expr(
+                kind: Block([], Some(Expr(
+                  kind: Literal(Integer(2)),
+                  symbol_table: None,
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 33,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 34,
+                    ),
+                  ),
+                ))),
+                symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
                 ),
+              )),
+            ),
+            symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 12,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 36,
               ),
             ),
           ))),
@@ -148,7 +132,6 @@ Node(
           ),
         ),
       )),
-      symbol_table: None,
       span: Span(
         start: LineColumn(
           line: 0,
@@ -159,6 +142,7 @@ Node(
           column: 38,
         ),
       ),
+      symbol_table: None,
     ),
   ])),
   symbol_table: None,

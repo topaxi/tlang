@@ -4,9 +4,8 @@ expression: "parse!(\"let x: std::hash::Map<str, i64> = std::hash::Map();\")"
 ---
 Node(
   ast_node: Legacy(Module([
-    Node(
-      ast_node: Legacy(VariableDeclaration(
-        id: SymbolId(2),
+    Stmt(
+      kind: Let(
         pattern: Pattern(
           kind: Identifier(
             id: SymbolId(1),
@@ -106,7 +105,7 @@ Node(
           ),
         ),
         type_annotation: Some(Node(
-          ast_node: Legacy(TypeAnnotation(
+          ast_node: Legacy(TypeAnnotation(Ty(
             name: Expr(
               kind: NestedIdentifier([
                 Ident(
@@ -163,7 +162,7 @@ Node(
             ),
             parameters: [
               Node(
-                ast_node: Legacy(TypeAnnotation(
+                ast_node: Legacy(TypeAnnotation(Ty(
                   name: Expr(
                     kind: Identifier(Ident(
                       name: "str",
@@ -191,7 +190,7 @@ Node(
                     ),
                   ),
                   parameters: [],
-                )),
+                ))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -205,7 +204,7 @@ Node(
                 ),
               ),
               Node(
-                ast_node: Legacy(TypeAnnotation(
+                ast_node: Legacy(TypeAnnotation(Ty(
                   name: Expr(
                     kind: Identifier(Ident(
                       name: "i64",
@@ -233,7 +232,7 @@ Node(
                     ),
                   ),
                   parameters: [],
-                )),
+                ))),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -247,7 +246,7 @@ Node(
                 ),
               ),
             ],
-          )),
+          ))),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -260,8 +259,7 @@ Node(
             ),
           ),
         )),
-      )),
-      symbol_table: None,
+      ),
       span: Span(
         start: LineColumn(
           line: 0,
@@ -272,6 +270,7 @@ Node(
           column: 51,
         ),
       ),
+      symbol_table: None,
     ),
   ])),
   symbol_table: None,

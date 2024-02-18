@@ -104,8 +104,36 @@ impl<'a> From<&'a Token> for Node {
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct FunctionParameter {
+    pub pattern: Box<Pattern>,
+    pub type_annotation: Box<Option<Node>>,
+    pub span: Span,
+}
+
+impl FunctionParameter {
+    pub fn new(pattern: Pattern) -> Self {
+        FunctionParameter {
+            pattern: Box::new(pattern),
+            type_annotation: Box::new(None),
+            span: Span::default(),
+        }
+    }
+
+    pub fn with_span(mut self, span: Span) -> Self {
+        self.span = span;
+        self
+    }
+
+    pub fn with_type_annotation(mut self, type_annotation: Node) -> Self {
+        self.type_annotation = Box::new(Some(type_annotation));
+        self
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct FunctionDeclaration {
-    pub parameters: Vec<Node>,
+    pub name: Box<Expr>,
+    pub parameters: Vec<FunctionParameter>,
     pub guard: Box<Option<Expr>>,
     pub return_type_annotation: Box<Option<Node>>,
     pub body: Box<Expr>,
@@ -137,18 +165,13 @@ impl Expr {
 pub enum ExprKind {
     #[default]
     None,
-    Block(Vec<Node>, Box<Option<Expr>>),
+    Block(Vec<Stmt>, Box<Option<Expr>>),
     Call {
         function: Box<Expr>,
         arguments: Vec<Expr>,
     },
     Dict(Vec<(Expr, Expr)>),
-    FunctionExpression {
-        id: SymbolId,
-        // TODO: This should/could be Box<Option<Ident>>
-        name: Box<Option<Expr>>,
-        declaration: Box<Node>,
-    },
+    FunctionExpression(FunctionDeclaration),
     FieldExpression {
         base: Box<Expr>,
         field: Box<Expr>,
@@ -268,38 +291,82 @@ pub enum PatternKind {
     Wildcard,
 }
 
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct EnumVariant {
+    pub name: Ident,
+    pub named_fields: bool,
+    pub parameters: Vec<Ident>,
+    pub span: Span,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct EnumDeclaration {
+    pub name: Ident,
+    pub variants: Vec<EnumVariant>,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct Stmt {
+    pub kind: StmtKind,
+    pub span: Span,
+    pub symbol_table: Option<Rc<RefCell<SymbolTable>>>,
+}
+
+impl Stmt {
+    pub fn new(kind: StmtKind) -> Self {
+        Stmt {
+            kind,
+            span: Span::default(),
+            symbol_table: None,
+        }
+    }
+
+    pub fn with_span(mut self, span: Span) -> Self {
+        self.span = span;
+        self
+    }
+}
+
+impl<'a> From<&'a Token> for Stmt {
+    fn from(token: &Token) -> Self {
+        Stmt {
+            kind: StmtKind::None,
+            span: Span::from_token(token),
+            symbol_table: None,
+        }
+    }
+}
+
 #[derive(Debug, Default, PartialEq, Clone, Serialize)]
-pub enum AstNode {
+pub enum StmtKind {
     #[default]
     None,
-    Module(Vec<Node>),
-    ExpressionStatement(Box<Expr>),
-    VariableDeclaration {
-        // Unique identifier for the variable, used to reference it in the symbol table and
-        // distinguish it from other variables with the same name.
-        id: SymbolId,
+    Expr(Box<Expr>),
+    Let {
         pattern: Box<Pattern>,
         expression: Box<Expr>,
         type_annotation: Box<Option<Node>>,
     },
-    // Do we still need this to wrap a struct or could we inline?
     FunctionDeclaration(FunctionDeclaration),
-    FunctionSingleDeclaration {
-        id: SymbolId,
-        name: Box<Expr>,
-        declaration: Box<Node>,
-    },
-    FunctionDeclarations {
-        id: SymbolId,
-        name: Box<Expr>,
-        declarations: Vec<Node>,
-    },
-    FunctionParameter {
-        id: SymbolId,
-        pattern: Box<Pattern>,
-        type_annotation: Box<Option<Node>>,
-    },
-    ReturnStatement(Box<Option<Expr>>),
+    // Should this really be handled within the parser or should this be done in later stages?
+    FunctionDeclarations(Vec<Stmt>),
+    Return(Box<Option<Expr>>),
+    SingleLineComment(String),
+    MultiLineComment(String),
+    EnumDeclaration(EnumDeclaration),
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct Ty {
+    pub name: Box<Expr>,
+    pub parameters: Vec<Node>,
+}
+
+#[derive(Debug, Default, PartialEq, Clone, Serialize)]
+pub enum AstNode {
+    #[default]
+    None,
+    Module(Vec<Stmt>),
     MatchArm {
         pattern: Box<Pattern>,
         expression: Box<Expr>,
@@ -307,20 +374,7 @@ pub enum AstNode {
     Wildcard,
     SingleLineComment(String),
     MultiLineComment(String),
-    EnumDeclaration {
-        id: SymbolId,
-        name: Ident,
-        variants: Vec<Node>,
-    },
-    EnumVariant {
-        name: Ident,
-        named_fields: bool,
-        parameters: Vec<Expr>,
-    },
-    TypeAnnotation {
-        name: Box<Expr>,
-        parameters: Vec<Node>,
-    },
+    TypeAnnotation(Ty),
 }
 
 impl<'a> From<&'a TokenKind> for AstNode {
@@ -456,6 +510,25 @@ macro_rules! pat {
     }};
 }
 
+#[macro_export]
+macro_rules! stmt {
+    ($kind:ident) => {{
+        use tlang_ast::node::{Stmt, StmtKind};
+        Stmt::new(StmtKind::$kind)
+    }};
+
+    ($kind:ident($($arg:expr),* $(,)?)) => {{
+        use tlang_ast::node::{Stmt, StmtKind};
+        Stmt::new(StmtKind::$kind($($arg),*))
+    }};
+
+    ($kind:ident { $( $field:ident : $value:expr ),* $(,)? }) => {{
+        use tlang_ast::node::{Stmt, StmtKind};
+        Stmt::new(StmtKind::$kind { $( $field : $value ),* })
+    }};
+}
+
 pub use expr;
 pub use new;
 pub use pat;
+pub use stmt;

@@ -4,8 +4,8 @@ expression: "parse!(indoc! {\n        \"\n        if let Option::Some(y) = x; {\
 ---
 Node(
   ast_node: Legacy(Module([
-    Node(
-      ast_node: Legacy(ExpressionStatement(Expr(
+    Stmt(
+      kind: Expr(Expr(
         kind: IfElse(
           condition: Expr(
             kind: Let(Pattern(
@@ -183,8 +183,7 @@ Node(
             column: 2,
           ),
         ),
-      ))),
-      symbol_table: None,
+      )),
       span: Span(
         start: LineColumn(
           line: 0,
@@ -195,6 +194,7 @@ Node(
           column: 2,
         ),
       ),
+      symbol_table: None,
     ),
   ])),
   symbol_table: None,

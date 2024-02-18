@@ -4,8 +4,8 @@ expression: "parse!(\"1 |> foo |> bar();\")"
 ---
 Node(
   ast_node: Legacy(Module([
-    Node(
-      ast_node: Legacy(ExpressionStatement(Expr(
+    Stmt(
+      kind: Expr(Expr(
         kind: BinaryOp(
           op: Pipeline,
           lhs: Expr(
@@ -118,8 +118,7 @@ Node(
             column: 17,
           ),
         ),
-      ))),
-      symbol_table: None,
+      )),
       span: Span(
         start: LineColumn(
           line: 0,
@@ -130,6 +129,7 @@ Node(
           column: 18,
         ),
       ),
+      symbol_table: None,
     ),
   ])),
   symbol_table: None,

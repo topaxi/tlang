@@ -4,8 +4,8 @@ expression: "parse!(\"1 + 2 + 3;\")"
 ---
 Node(
   ast_node: Legacy(Module([
-    Node(
-      ast_node: Legacy(ExpressionStatement(Expr(
+    Stmt(
+      kind: Expr(Expr(
         kind: BinaryOp(
           op: Add,
           lhs: Expr(
@@ -78,8 +78,7 @@ Node(
             column: 9,
           ),
         ),
-      ))),
-      symbol_table: None,
+      )),
       span: Span(
         start: LineColumn(
           line: 0,
@@ -90,6 +89,7 @@ Node(
           column: 10,
         ),
       ),
+      symbol_table: None,
     ),
   ])),
   symbol_table: None,

@@ -4,8 +4,8 @@ expression: "parse!(\"if (1 + 2) { 3 + 4; } else { 5 + 6; }\")"
 ---
 Node(
   ast_node: Legacy(Module([
-    Node(
-      ast_node: Legacy(ExpressionStatement(Expr(
+    Stmt(
+      kind: Expr(Expr(
         kind: IfElse(
           condition: Expr(
             kind: BinaryOp(
@@ -53,8 +53,8 @@ Node(
           ),
           then_branch: Expr(
             kind: Block([
-              Node(
-                ast_node: Legacy(ExpressionStatement(Expr(
+              Stmt(
+                kind: Expr(Expr(
                   kind: BinaryOp(
                     op: Add,
                     lhs: Expr(
@@ -97,8 +97,7 @@ Node(
                       column: 18,
                     ),
                   ),
-                ))),
-                symbol_table: None,
+                )),
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -109,6 +108,7 @@ Node(
                     column: 19,
                   ),
                 ),
+                symbol_table: None,
               ),
             ], None),
             symbol_table: None,
@@ -125,8 +125,8 @@ Node(
           ),
           else_branch: Some(Expr(
             kind: Block([
-              Node(
-                ast_node: Legacy(ExpressionStatement(Expr(
+              Stmt(
+                kind: Expr(Expr(
                   kind: BinaryOp(
                     op: Add,
                     lhs: Expr(
@@ -169,8 +169,7 @@ Node(
                       column: 34,
                     ),
                   ),
-                ))),
-                symbol_table: None,
+                )),
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -181,6 +180,7 @@ Node(
                     column: 35,
                   ),
                 ),
+                symbol_table: None,
               ),
             ], None),
             symbol_table: None,
@@ -207,8 +207,7 @@ Node(
             column: 37,
           ),
         ),
-      ))),
-      symbol_table: None,
+      )),
       span: Span(
         start: LineColumn(
           line: 0,
@@ -219,6 +218,7 @@ Node(
           column: 37,
         ),
       ),
+      symbol_table: None,
     ),
   ])),
   symbol_table: None,

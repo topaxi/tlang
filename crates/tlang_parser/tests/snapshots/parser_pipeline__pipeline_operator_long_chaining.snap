@@ -4,8 +4,8 @@ expression: "parse!(indoc! {\n        \"\n        [1,2,3]\n        |> map(fn (x)
 ---
 Node(
   ast_node: Legacy(Module([
-    Node(
-      ast_node: Legacy(ExpressionStatement(Expr(
+    Stmt(
+      kind: Expr(Expr(
         kind: BinaryOp(
           op: Pipeline,
           lhs: Expr(
@@ -104,105 +104,96 @@ Node(
                           ),
                           arguments: [
                             Expr(
-                              kind: FunctionExpression(
-                                id: SymbolId(3),
-                                name: None,
-                                declaration: Node(
-                                  ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
-                                    parameters: [
-                                      Node(
-                                        ast_node: Legacy(FunctionParameter(
-                                          id: SymbolId(2),
-                                          pattern: Pattern(
-                                            kind: Identifier(
-                                              id: SymbolId(1),
-                                              name: Ident(
-                                                name: "x",
-                                                span: Span(
-                                                  start: LineColumn(
-                                                    line: 1,
-                                                    column: 12,
-                                                  ),
-                                                  end: LineColumn(
-                                                    line: 1,
-                                                    column: 13,
-                                                  ),
-                                                ),
-                                              ),
+                              kind: FunctionExpression(FunctionDeclaration(
+                                name: Expr(
+                                  kind: Identifier(Ident(
+                                    name: "anonymous",
+                                    span: Span(
+                                      start: LineColumn(
+                                        line: 0,
+                                        column: 0,
+                                      ),
+                                      end: LineColumn(
+                                        line: 0,
+                                        column: 0,
+                                      ),
+                                    ),
+                                  )),
+                                  symbol_table: None,
+                                  span: Span(
+                                    start: LineColumn(
+                                      line: 0,
+                                      column: 0,
+                                    ),
+                                    end: LineColumn(
+                                      line: 0,
+                                      column: 0,
+                                    ),
+                                  ),
+                                ),
+                                parameters: [
+                                  FunctionParameter(
+                                    pattern: Pattern(
+                                      kind: Identifier(
+                                        id: SymbolId(1),
+                                        name: Ident(
+                                          name: "x",
+                                          span: Span(
+                                            start: LineColumn(
+                                              line: 1,
+                                              column: 12,
                                             ),
-                                            span: Span(
-                                              start: LineColumn(
-                                                line: 1,
-                                                column: 12,
-                                              ),
-                                              end: LineColumn(
-                                                line: 1,
-                                                column: 13,
-                                              ),
+                                            end: LineColumn(
+                                              line: 1,
+                                              column: 13,
                                             ),
-                                          ),
-                                          type_annotation: None,
-                                        )),
-                                        symbol_table: None,
-                                        span: Span(
-                                          start: LineColumn(
-                                            line: 1,
-                                            column: 12,
-                                          ),
-                                          end: LineColumn(
-                                            line: 1,
-                                            column: 13,
                                           ),
                                         ),
                                       ),
-                                    ],
-                                    guard: None,
-                                    return_type_annotation: None,
-                                    body: Expr(
-                                      kind: Block([], Some(Expr(
-                                        kind: BinaryOp(
-                                          op: Exponentiation,
-                                          lhs: Expr(
-                                            kind: Identifier(Ident(
-                                              name: "x",
-                                              span: Span(
-                                                start: LineColumn(
-                                                  line: 1,
-                                                  column: 17,
-                                                ),
-                                                end: LineColumn(
-                                                  line: 1,
-                                                  column: 18,
-                                                ),
-                                              ),
-                                            )),
-                                            symbol_table: None,
-                                            span: Span(
-                                              start: LineColumn(
-                                                line: 1,
-                                                column: 17,
-                                              ),
-                                              end: LineColumn(
-                                                line: 1,
-                                                column: 18,
-                                              ),
-                                            ),
-                                          ),
-                                          rhs: Expr(
-                                            kind: Literal(Integer(2)),
-                                            symbol_table: None,
-                                            span: Span(
-                                              start: LineColumn(
-                                                line: 1,
-                                                column: 22,
-                                              ),
-                                              end: LineColumn(
-                                                line: 1,
-                                                column: 23,
-                                              ),
-                                            ),
-                                          ),
+                                      span: Span(
+                                        start: LineColumn(
+                                          line: 1,
+                                          column: 12,
                                         ),
+                                        end: LineColumn(
+                                          line: 1,
+                                          column: 13,
+                                        ),
+                                      ),
+                                    ),
+                                    type_annotation: None,
+                                    span: Span(
+                                      start: LineColumn(
+                                        line: 1,
+                                        column: 12,
+                                      ),
+                                      end: LineColumn(
+                                        line: 1,
+                                        column: 13,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                guard: None,
+                                return_type_annotation: None,
+                                body: Expr(
+                                  kind: Block([], Some(Expr(
+                                    kind: BinaryOp(
+                                      op: Exponentiation,
+                                      lhs: Expr(
+                                        kind: Identifier(Ident(
+                                          name: "x",
+                                          span: Span(
+                                            start: LineColumn(
+                                              line: 1,
+                                              column: 17,
+                                            ),
+                                            end: LineColumn(
+                                              line: 1,
+                                              column: 18,
+                                            ),
+                                          ),
+                                        )),
                                         symbol_table: None,
                                         span: Span(
                                           start: LineColumn(
@@ -211,20 +202,34 @@ Node(
                                           ),
                                           end: LineColumn(
                                             line: 1,
+                                            column: 18,
+                                          ),
+                                        ),
+                                      ),
+                                      rhs: Expr(
+                                        kind: Literal(Integer(2)),
+                                        symbol_table: None,
+                                        span: Span(
+                                          start: LineColumn(
+                                            line: 1,
+                                            column: 22,
+                                          ),
+                                          end: LineColumn(
+                                            line: 1,
                                             column: 23,
                                           ),
                                         ),
-                                      ))),
-                                      symbol_table: None,
-                                      span: Span(
-                                        start: LineColumn(
-                                          line: 0,
-                                          column: 0,
-                                        ),
-                                        end: LineColumn(
-                                          line: 0,
-                                          column: 0,
-                                        ),
+                                      ),
+                                    ),
+                                    symbol_table: None,
+                                    span: Span(
+                                      start: LineColumn(
+                                        line: 1,
+                                        column: 17,
+                                      ),
+                                      end: LineColumn(
+                                        line: 1,
+                                        column: 23,
                                       ),
                                     ),
                                   ))),
@@ -240,7 +245,7 @@ Node(
                                     ),
                                   ),
                                 ),
-                              ),
+                              )),
                               symbol_table: None,
                               span: Span(
                                 start: LineColumn(
@@ -310,131 +315,122 @@ Node(
                       ),
                       arguments: [
                         Expr(
-                          kind: FunctionExpression(
-                            id: SymbolId(6),
-                            name: None,
-                            declaration: Node(
-                              ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
-                                parameters: [
-                                  Node(
-                                    ast_node: Legacy(FunctionParameter(
-                                      id: SymbolId(5),
-                                      pattern: Pattern(
-                                        kind: Identifier(
-                                          id: SymbolId(4),
-                                          name: Ident(
-                                            name: "x",
-                                            span: Span(
-                                              start: LineColumn(
-                                                line: 2,
-                                                column: 15,
-                                              ),
-                                              end: LineColumn(
-                                                line: 2,
-                                                column: 16,
-                                              ),
-                                            ),
-                                          ),
+                          kind: FunctionExpression(FunctionDeclaration(
+                            name: Expr(
+                              kind: Identifier(Ident(
+                                name: "anonymous",
+                                span: Span(
+                                  start: LineColumn(
+                                    line: 0,
+                                    column: 0,
+                                  ),
+                                  end: LineColumn(
+                                    line: 0,
+                                    column: 0,
+                                  ),
+                                ),
+                              )),
+                              symbol_table: None,
+                              span: Span(
+                                start: LineColumn(
+                                  line: 0,
+                                  column: 0,
+                                ),
+                                end: LineColumn(
+                                  line: 0,
+                                  column: 0,
+                                ),
+                              ),
+                            ),
+                            parameters: [
+                              FunctionParameter(
+                                pattern: Pattern(
+                                  kind: Identifier(
+                                    id: SymbolId(2),
+                                    name: Ident(
+                                      name: "x",
+                                      span: Span(
+                                        start: LineColumn(
+                                          line: 2,
+                                          column: 15,
                                         ),
-                                        span: Span(
-                                          start: LineColumn(
-                                            line: 2,
-                                            column: 15,
-                                          ),
-                                          end: LineColumn(
-                                            line: 2,
-                                            column: 16,
-                                          ),
+                                        end: LineColumn(
+                                          line: 2,
+                                          column: 16,
                                         ),
-                                      ),
-                                      type_annotation: None,
-                                    )),
-                                    symbol_table: None,
-                                    span: Span(
-                                      start: LineColumn(
-                                        line: 2,
-                                        column: 15,
-                                      ),
-                                      end: LineColumn(
-                                        line: 2,
-                                        column: 16,
                                       ),
                                     ),
                                   ),
-                                ],
-                                guard: None,
-                                return_type_annotation: None,
-                                body: Expr(
-                                  kind: Block([], Some(Expr(
+                                  span: Span(
+                                    start: LineColumn(
+                                      line: 2,
+                                      column: 15,
+                                    ),
+                                    end: LineColumn(
+                                      line: 2,
+                                      column: 16,
+                                    ),
+                                  ),
+                                ),
+                                type_annotation: None,
+                                span: Span(
+                                  start: LineColumn(
+                                    line: 2,
+                                    column: 15,
+                                  ),
+                                  end: LineColumn(
+                                    line: 2,
+                                    column: 16,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            guard: None,
+                            return_type_annotation: None,
+                            body: Expr(
+                              kind: Block([], Some(Expr(
+                                kind: BinaryOp(
+                                  op: Equal,
+                                  lhs: Expr(
                                     kind: BinaryOp(
-                                      op: Equal,
+                                      op: Modulo,
                                       lhs: Expr(
-                                        kind: BinaryOp(
-                                          op: Modulo,
-                                          lhs: Expr(
-                                            kind: Identifier(Ident(
-                                              name: "x",
-                                              span: Span(
-                                                start: LineColumn(
-                                                  line: 2,
-                                                  column: 20,
-                                                ),
-                                                end: LineColumn(
-                                                  line: 2,
-                                                  column: 21,
-                                                ),
-                                              ),
-                                            )),
-                                            symbol_table: None,
-                                            span: Span(
-                                              start: LineColumn(
-                                                line: 2,
-                                                column: 20,
-                                              ),
-                                              end: LineColumn(
-                                                line: 2,
-                                                column: 21,
-                                              ),
+                                        kind: Identifier(Ident(
+                                          name: "x",
+                                          span: Span(
+                                            start: LineColumn(
+                                              line: 2,
+                                              column: 20,
+                                            ),
+                                            end: LineColumn(
+                                              line: 2,
+                                              column: 21,
                                             ),
                                           ),
-                                          rhs: Expr(
-                                            kind: Literal(Integer(2)),
-                                            symbol_table: None,
-                                            span: Span(
-                                              start: LineColumn(
-                                                line: 2,
-                                                column: 24,
-                                              ),
-                                              end: LineColumn(
-                                                line: 2,
-                                                column: 25,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
+                                        )),
                                         symbol_table: None,
                                         span: Span(
                                           start: LineColumn(
-                                            line: 0,
-                                            column: 0,
+                                            line: 2,
+                                            column: 20,
                                           ),
                                           end: LineColumn(
-                                            line: 0,
-                                            column: 0,
+                                            line: 2,
+                                            column: 21,
                                           ),
                                         ),
                                       ),
                                       rhs: Expr(
-                                        kind: Literal(Integer(0)),
+                                        kind: Literal(Integer(2)),
                                         symbol_table: None,
                                         span: Span(
                                           start: LineColumn(
                                             line: 2,
-                                            column: 29,
+                                            column: 24,
                                           ),
                                           end: LineColumn(
                                             line: 2,
-                                            column: 30,
+                                            column: 25,
                                           ),
                                         ),
                                       ),
@@ -442,25 +438,39 @@ Node(
                                     symbol_table: None,
                                     span: Span(
                                       start: LineColumn(
+                                        line: 0,
+                                        column: 0,
+                                      ),
+                                      end: LineColumn(
+                                        line: 0,
+                                        column: 0,
+                                      ),
+                                    ),
+                                  ),
+                                  rhs: Expr(
+                                    kind: Literal(Integer(0)),
+                                    symbol_table: None,
+                                    span: Span(
+                                      start: LineColumn(
                                         line: 2,
-                                        column: 20,
+                                        column: 29,
                                       ),
                                       end: LineColumn(
                                         line: 2,
                                         column: 30,
                                       ),
                                     ),
-                                  ))),
-                                  symbol_table: None,
-                                  span: Span(
-                                    start: LineColumn(
-                                      line: 0,
-                                      column: 0,
-                                    ),
-                                    end: LineColumn(
-                                      line: 0,
-                                      column: 0,
-                                    ),
+                                  ),
+                                ),
+                                symbol_table: None,
+                                span: Span(
+                                  start: LineColumn(
+                                    line: 2,
+                                    column: 20,
+                                  ),
+                                  end: LineColumn(
+                                    line: 2,
+                                    column: 30,
                                   ),
                                 ),
                               ))),
@@ -476,7 +486,7 @@ Node(
                                 ),
                               ),
                             ),
-                          ),
+                          )),
                           symbol_table: None,
                           span: Span(
                             start: LineColumn(
@@ -546,162 +556,137 @@ Node(
                   ),
                   arguments: [
                     Expr(
-                      kind: FunctionExpression(
-                        id: SymbolId(11),
-                        name: None,
-                        declaration: Node(
-                          ast_node: Legacy(FunctionDeclaration(FunctionDeclaration(
-                            parameters: [
-                              Node(
-                                ast_node: Legacy(FunctionParameter(
-                                  id: SymbolId(8),
-                                  pattern: Pattern(
-                                    kind: Identifier(
-                                      id: SymbolId(7),
-                                      name: Ident(
-                                        name: "acc",
-                                        span: Span(
-                                          start: LineColumn(
-                                            line: 3,
-                                            column: 14,
-                                          ),
-                                          end: LineColumn(
-                                            line: 3,
-                                            column: 17,
-                                          ),
-                                        ),
-                                      ),
+                      kind: FunctionExpression(FunctionDeclaration(
+                        name: Expr(
+                          kind: Identifier(Ident(
+                            name: "anonymous",
+                            span: Span(
+                              start: LineColumn(
+                                line: 0,
+                                column: 0,
+                              ),
+                              end: LineColumn(
+                                line: 0,
+                                column: 0,
+                              ),
+                            ),
+                          )),
+                          symbol_table: None,
+                          span: Span(
+                            start: LineColumn(
+                              line: 0,
+                              column: 0,
+                            ),
+                            end: LineColumn(
+                              line: 0,
+                              column: 0,
+                            ),
+                          ),
+                        ),
+                        parameters: [
+                          FunctionParameter(
+                            pattern: Pattern(
+                              kind: Identifier(
+                                id: SymbolId(3),
+                                name: Ident(
+                                  name: "acc",
+                                  span: Span(
+                                    start: LineColumn(
+                                      line: 3,
+                                      column: 14,
                                     ),
-                                    span: Span(
-                                      start: LineColumn(
-                                        line: 3,
-                                        column: 14,
-                                      ),
-                                      end: LineColumn(
-                                        line: 3,
-                                        column: 17,
-                                      ),
+                                    end: LineColumn(
+                                      line: 3,
+                                      column: 17,
                                     ),
-                                  ),
-                                  type_annotation: None,
-                                )),
-                                symbol_table: None,
-                                span: Span(
-                                  start: LineColumn(
-                                    line: 3,
-                                    column: 14,
-                                  ),
-                                  end: LineColumn(
-                                    line: 3,
-                                    column: 17,
                                   ),
                                 ),
                               ),
-                              Node(
-                                ast_node: Legacy(FunctionParameter(
-                                  id: SymbolId(10),
-                                  pattern: Pattern(
-                                    kind: Identifier(
-                                      id: SymbolId(9),
-                                      name: Ident(
-                                        name: "x",
-                                        span: Span(
-                                          start: LineColumn(
-                                            line: 3,
-                                            column: 19,
-                                          ),
-                                          end: LineColumn(
-                                            line: 3,
-                                            column: 20,
-                                          ),
-                                        ),
-                                      ),
+                              span: Span(
+                                start: LineColumn(
+                                  line: 3,
+                                  column: 14,
+                                ),
+                                end: LineColumn(
+                                  line: 3,
+                                  column: 17,
+                                ),
+                              ),
+                            ),
+                            type_annotation: None,
+                            span: Span(
+                              start: LineColumn(
+                                line: 3,
+                                column: 14,
+                              ),
+                              end: LineColumn(
+                                line: 3,
+                                column: 17,
+                              ),
+                            ),
+                          ),
+                          FunctionParameter(
+                            pattern: Pattern(
+                              kind: Identifier(
+                                id: SymbolId(4),
+                                name: Ident(
+                                  name: "x",
+                                  span: Span(
+                                    start: LineColumn(
+                                      line: 3,
+                                      column: 19,
                                     ),
-                                    span: Span(
-                                      start: LineColumn(
-                                        line: 3,
-                                        column: 19,
-                                      ),
-                                      end: LineColumn(
-                                        line: 3,
-                                        column: 20,
-                                      ),
+                                    end: LineColumn(
+                                      line: 3,
+                                      column: 20,
                                     ),
-                                  ),
-                                  type_annotation: None,
-                                )),
-                                symbol_table: None,
-                                span: Span(
-                                  start: LineColumn(
-                                    line: 3,
-                                    column: 19,
-                                  ),
-                                  end: LineColumn(
-                                    line: 3,
-                                    column: 20,
                                   ),
                                 ),
                               ),
-                            ],
-                            guard: None,
-                            return_type_annotation: None,
-                            body: Expr(
-                              kind: Block([], Some(Expr(
-                                kind: BinaryOp(
-                                  op: Add,
-                                  lhs: Expr(
-                                    kind: Identifier(Ident(
-                                      name: "acc",
-                                      span: Span(
-                                        start: LineColumn(
-                                          line: 3,
-                                          column: 24,
-                                        ),
-                                        end: LineColumn(
-                                          line: 3,
-                                          column: 27,
-                                        ),
-                                      ),
-                                    )),
-                                    symbol_table: None,
-                                    span: Span(
-                                      start: LineColumn(
-                                        line: 3,
-                                        column: 24,
-                                      ),
-                                      end: LineColumn(
-                                        line: 3,
-                                        column: 27,
-                                      ),
-                                    ),
-                                  ),
-                                  rhs: Expr(
-                                    kind: Identifier(Ident(
-                                      name: "x",
-                                      span: Span(
-                                        start: LineColumn(
-                                          line: 3,
-                                          column: 30,
-                                        ),
-                                        end: LineColumn(
-                                          line: 3,
-                                          column: 31,
-                                        ),
-                                      ),
-                                    )),
-                                    symbol_table: None,
-                                    span: Span(
-                                      start: LineColumn(
-                                        line: 3,
-                                        column: 30,
-                                      ),
-                                      end: LineColumn(
-                                        line: 3,
-                                        column: 31,
-                                      ),
-                                    ),
-                                  ),
+                              span: Span(
+                                start: LineColumn(
+                                  line: 3,
+                                  column: 19,
                                 ),
+                                end: LineColumn(
+                                  line: 3,
+                                  column: 20,
+                                ),
+                              ),
+                            ),
+                            type_annotation: None,
+                            span: Span(
+                              start: LineColumn(
+                                line: 3,
+                                column: 19,
+                              ),
+                              end: LineColumn(
+                                line: 3,
+                                column: 20,
+                              ),
+                            ),
+                          ),
+                        ],
+                        guard: None,
+                        return_type_annotation: None,
+                        body: Expr(
+                          kind: Block([], Some(Expr(
+                            kind: BinaryOp(
+                              op: Add,
+                              lhs: Expr(
+                                kind: Identifier(Ident(
+                                  name: "acc",
+                                  span: Span(
+                                    start: LineColumn(
+                                      line: 3,
+                                      column: 24,
+                                    ),
+                                    end: LineColumn(
+                                      line: 3,
+                                      column: 27,
+                                    ),
+                                  ),
+                                )),
                                 symbol_table: None,
                                 span: Span(
                                   start: LineColumn(
@@ -710,20 +695,46 @@ Node(
                                   ),
                                   end: LineColumn(
                                     line: 3,
+                                    column: 27,
+                                  ),
+                                ),
+                              ),
+                              rhs: Expr(
+                                kind: Identifier(Ident(
+                                  name: "x",
+                                  span: Span(
+                                    start: LineColumn(
+                                      line: 3,
+                                      column: 30,
+                                    ),
+                                    end: LineColumn(
+                                      line: 3,
+                                      column: 31,
+                                    ),
+                                  ),
+                                )),
+                                symbol_table: None,
+                                span: Span(
+                                  start: LineColumn(
+                                    line: 3,
+                                    column: 30,
+                                  ),
+                                  end: LineColumn(
+                                    line: 3,
                                     column: 31,
                                   ),
                                 ),
-                              ))),
-                              symbol_table: None,
-                              span: Span(
-                                start: LineColumn(
-                                  line: 0,
-                                  column: 0,
-                                ),
-                                end: LineColumn(
-                                  line: 0,
-                                  column: 0,
-                                ),
+                              ),
+                            ),
+                            symbol_table: None,
+                            span: Span(
+                              start: LineColumn(
+                                line: 3,
+                                column: 24,
+                              ),
+                              end: LineColumn(
+                                line: 3,
+                                column: 31,
                               ),
                             ),
                           ))),
@@ -739,7 +750,7 @@ Node(
                             ),
                           ),
                         ),
-                      ),
+                      )),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -847,8 +858,7 @@ Node(
             column: 9,
           ),
         ),
-      ))),
-      symbol_table: None,
+      )),
       span: Span(
         start: LineColumn(
           line: 0,
@@ -859,6 +869,7 @@ Node(
           column: 10,
         ),
       ),
+      symbol_table: None,
     ),
   ])),
   symbol_table: None,

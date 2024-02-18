@@ -4,9 +4,8 @@ expression: "parse!(\"/* this is a comment\\n   spanning multiple lines */\")"
 ---
 Node(
   ast_node: Legacy(Module([
-    Node(
-      ast_node: Legacy(MultiLineComment(" this is a comment\n   spanning multiple lines ")),
-      symbol_table: None,
+    Stmt(
+      kind: None,
       span: Span(
         start: LineColumn(
           line: 0,
@@ -17,6 +16,7 @@ Node(
           column: 30,
         ),
       ),
+      symbol_table: None,
     ),
   ])),
   symbol_table: None,

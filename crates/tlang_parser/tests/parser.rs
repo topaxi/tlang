@@ -132,18 +132,16 @@ fn test_string_literal() {
 
     assert_eq!(
         program,
-        node::new!(Module(vec![node::new!(
-            ExpressionStatement(Box::new(
-                node::expr!(Literal(Literal::String("foo".to_string()))).with_span(Span::new(
-                    LineColumn { line: 0, column: 0 },
-                    LineColumn { line: 0, column: 5 }
-                ))
-            )),
-            Span::new(
+        node::new!(Module(vec![node::stmt!(Expr(Box::new(
+            node::expr!(Literal(Literal::String("foo".to_string()))).with_span(Span::new(
                 LineColumn { line: 0, column: 0 },
-                LineColumn { line: 0, column: 6 }
-            )
-        )]))
+                LineColumn { line: 0, column: 5 }
+            ))
+        )))
+        .with_span(Span::new(
+            LineColumn { line: 0, column: 0 },
+            LineColumn { line: 0, column: 6 }
+        ))]))
     );
 }
 
@@ -153,18 +151,16 @@ fn test_char_literal() {
 
     assert_eq!(
         program,
-        node::new!(Module(vec![node::new!(
-            ExpressionStatement(Box::new(
-                node::expr!(Literal(Literal::Char("a".to_string()))).with_span(Span::new(
-                    LineColumn { line: 0, column: 0 },
-                    LineColumn { line: 0, column: 3 }
-                ))
-            )),
-            Span::new(
+        node::new!(Module(vec![node::stmt!(Expr(Box::new(
+            node::expr!(Literal(Literal::Char("a".to_string()))).with_span(Span::new(
                 LineColumn { line: 0, column: 0 },
-                LineColumn { line: 0, column: 4 }
-            )
-        )]))
+                LineColumn { line: 0, column: 3 }
+            ))
+        )))
+        .with_span(Span::new(
+            LineColumn { line: 0, column: 0 },
+            LineColumn { line: 0, column: 4 }
+        ))]))
     );
 }
 
