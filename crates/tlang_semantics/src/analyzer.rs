@@ -121,6 +121,10 @@ impl SemanticAnalyzer {
     }
 
     fn analyze_stmt(&mut self, stmt: &mut Stmt) {
+        if let Some(symbol_table) = &stmt.symbol_table {
+            self.push_symbol_table(symbol_table);
+        }
+
         match &mut stmt.kind {
             StmtKind::None => {}
             StmtKind::Expr(expr) => self.analyze_expr(expr),
@@ -140,6 +144,11 @@ impl SemanticAnalyzer {
                 // TODO
             }
             StmtKind::SingleLineComment(_) | StmtKind::MultiLineComment(_) => {}
+        }
+
+        if let Some(symbol_table) = &stmt.symbol_table {
+            self.report_unused_symbols(symbol_table, &stmt.span);
+            self.pop_symbol_table();
         }
     }
 
@@ -255,26 +264,7 @@ impl SemanticAnalyzer {
         expr.kind = kind;
 
         if let Some(symbol_table) = &expr.symbol_table {
-            let symbol_table = symbol_table.borrow();
-            let local_symbols = symbol_table.get_all_local_symbols();
-            let mut unused_symbols = local_symbols
-                .iter()
-                .filter(|symbol| symbol.id != SymbolId::new(0))
-                .filter(|symbol| !symbol.used)
-                .filter(|symbol| !symbol.name.starts_with('_'))
-                .collect::<Vec<_>>();
-
-            for unused_symbol in unused_symbols.iter_mut() {
-                self.diagnostics.push(Diagnostic::new(
-                    format!(
-                        "Unused {} `{}`, if this is intentional, prefix the name with an underscore: `_{}`",
-                        unused_symbol.symbol_type, unused_symbol.name, unused_symbol.name
-                    ),
-                    Severity::Warning,
-                    unused_symbol.defined_at.clone().unwrap_or_else(|| expr.span.clone()).clone()
-                ));
-            }
-
+            self.report_unused_symbols(symbol_table, &expr.span);
             self.pop_symbol_table();
         }
     }
@@ -330,27 +320,30 @@ impl SemanticAnalyzer {
         ast.ast_node = ast_node;
 
         if let Some(symbol_table) = &ast.symbol_table {
-            let symbol_table = symbol_table.borrow();
-            let local_symbols = symbol_table.get_all_local_symbols();
-            let mut unused_symbols = local_symbols
-                .iter()
-                .filter(|symbol| symbol.id != SymbolId::new(0))
-                .filter(|symbol| !symbol.used)
-                .filter(|symbol| !symbol.name.starts_with('_'))
-                .collect::<Vec<_>>();
+            self.report_unused_symbols(symbol_table, &ast.span);
+            self.pop_symbol_table();
+        }
+    }
 
-            for unused_symbol in unused_symbols.iter_mut() {
-                self.diagnostics.push(Diagnostic::new(
+    fn report_unused_symbols(&mut self, symbol_table: &Rc<RefCell<SymbolTable>>, span: &Span) {
+        let symbol_table = symbol_table.borrow();
+        let local_symbols = symbol_table.get_all_local_symbols();
+        let mut unused_symbols = local_symbols
+            .iter()
+            .filter(|symbol| symbol.id != SymbolId::new(0))
+            .filter(|symbol| !symbol.used)
+            .filter(|symbol| !symbol.name.starts_with('_'))
+            .collect::<Vec<_>>();
+
+        for unused_symbol in unused_symbols.iter_mut() {
+            self.diagnostics.push(Diagnostic::new(
                     format!(
                         "Unused {} `{}`, if this is intentional, prefix the name with an underscore: `_{}`",
                         unused_symbol.symbol_type, unused_symbol.name, unused_symbol.name
                     ),
                     Severity::Warning,
-                    unused_symbol.defined_at.clone().unwrap_or_else(|| ast.span.clone()).clone()
+                    unused_symbol.defined_at.clone().unwrap_or_else(|| span.clone()).clone()
                 ));
-            }
-
-            self.pop_symbol_table();
         }
     }
 

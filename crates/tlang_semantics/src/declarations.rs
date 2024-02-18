@@ -82,7 +82,9 @@ impl DeclarationAnalyzer {
     }
 
     fn collect_declarations_stmt(&mut self, stmt: &mut Stmt) {
-        match &mut stmt.kind {
+        let mut kind = std::mem::take(&mut stmt.kind);
+
+        match &mut kind {
             StmtKind::None => {
                 // Nothing to do here
             }
@@ -93,7 +95,7 @@ impl DeclarationAnalyzer {
                 type_annotation: _,
             } => self.collect_variable_declaration(pattern, expression),
             StmtKind::FunctionDeclaration(declaration) => {
-                self.collect_function_declaration(declaration)
+                self.collect_function_declaration(stmt, declaration)
             }
             StmtKind::FunctionDeclarations(declarations) => {
                 for declaration in declarations {
@@ -113,6 +115,8 @@ impl DeclarationAnalyzer {
                 // Nothing to do here
             }
         }
+
+        stmt.kind = kind;
     }
 
     fn collect_declarations_from_fn(&mut self, function_decl: &mut FunctionDeclaration) {
@@ -292,7 +296,23 @@ impl DeclarationAnalyzer {
         }
     }
 
-    fn collect_function_declaration(&mut self, declaration: &mut FunctionDeclaration) {
+    fn collect_function_declaration(
+        &mut self,
+        stmt: &mut Stmt,
+        declaration: &mut FunctionDeclaration,
+    ) {
+        let name_as_str = self.fn_identifier_to_string(&declaration.name);
+
+        self.declare_symbol(SymbolInfo::new(
+            declaration.id,
+            &name_as_str,
+            SymbolType::Function,
+            Some(declaration.name.span.clone()),
+        ));
+
+        // Function arguments have their own scope.
+        stmt.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
+
         self.symbol_type.push(SymbolType::Parameter);
         for param in &mut declaration.parameters {
             self.collect_declarations_from_fn_param(param);
@@ -301,28 +321,7 @@ impl DeclarationAnalyzer {
 
         self.collect_optional_declarations_expr(&mut declaration.guard);
         self.collect_declarations_expr(&mut declaration.body);
-    }
 
-    fn collect_function_single_declaration(
-        &mut self,
-        node: &mut Node,
-        id: SymbolId,
-        name: &Expr,
-        declaration: &mut Node,
-    ) {
-        let name_as_str = self.fn_identifier_to_string(name);
-
-        self.declare_symbol(SymbolInfo::new(
-            id,
-            &name_as_str,
-            SymbolType::Function,
-            Some(name.span.clone()),
-        ));
-
-        // Function arguments have their own scope.
-        node.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
-
-        self.collect_declarations(declaration);
         self.pop_symbol_table();
     }
 

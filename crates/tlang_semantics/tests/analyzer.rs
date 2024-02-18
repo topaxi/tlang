@@ -127,9 +127,9 @@ fn test_should_allow_shadowing_of_single_variable() {
         })
     );
     assert_eq!(
-        program_symbols.borrow().get(SymbolId::new(3)),
+        program_symbols.borrow().get(SymbolId::new(2)),
         Some(SymbolInfo {
-            id: SymbolId::new(3),
+            id: SymbolId::new(2),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
             defined_at: Some(Span::new(
@@ -168,9 +168,9 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
         })
     );
     assert_eq!(
-        program_symbols.borrow().get(SymbolId::new(3)),
+        program_symbols.borrow().get(SymbolId::new(2)),
         Some(SymbolInfo {
-            id: SymbolId::new(3),
+            id: SymbolId::new(2),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
             defined_at: Some(Span::new(
@@ -228,7 +228,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
     assert_eq!(
         program_symbols.borrow().get_by_name("add"),
         Some(SymbolInfo {
-            id: SymbolId::new(5),
+            id: SymbolId::new(3),
             name: "add".to_string(),
             symbol_type: SymbolType::Function,
             defined_at: Some(Span::new(
@@ -256,7 +256,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
             .borrow()
             .get_by_name("c"),
         Some(SymbolInfo {
-            id: SymbolId::new(6),
+            id: SymbolId::new(4),
             name: "c".to_string(),
             symbol_type: SymbolType::Variable,
             defined_at: Some(Span::new(
@@ -278,7 +278,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
             .borrow()
             .get_by_name("c"),
         Some(SymbolInfo {
-            id: SymbolId::new(6),
+            id: SymbolId::new(4),
             name: "c".to_string(),
             symbol_type: SymbolType::Variable,
             defined_at: Some(Span::new(
