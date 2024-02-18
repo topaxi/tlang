@@ -107,6 +107,7 @@ Node(
       kind: FunctionDeclarations([
         Stmt(
           kind: FunctionDeclaration(FunctionDeclaration(
+            id: SymbolId(2),
             name: Expr(
               kind: NestedIdentifier([
                 Ident(
@@ -278,6 +279,7 @@ Node(
         ),
         Stmt(
           kind: FunctionDeclaration(FunctionDeclaration(
+            id: SymbolId(2),
             name: Expr(
               kind: NestedIdentifier([
                 Ident(
@@ -435,6 +437,7 @@ Node(
         ),
         Stmt(
           kind: FunctionDeclaration(FunctionDeclaration(
+            id: SymbolId(2),
             name: Expr(
               kind: NestedIdentifier([
                 Ident(
@@ -563,6 +566,7 @@ Node(
       kind: FunctionDeclarations([
         Stmt(
           kind: FunctionDeclaration(FunctionDeclaration(
+            id: SymbolId(3),
             name: Expr(
               kind: FieldExpression(
                 base: Expr(
@@ -760,6 +764,7 @@ Node(
         ),
         Stmt(
           kind: FunctionDeclaration(FunctionDeclaration(
+            id: SymbolId(3),
             name: Expr(
               kind: FieldExpression(
                 base: Expr(
@@ -958,6 +963,7 @@ Node(
       kind: FunctionDeclarations([
         Stmt(
           kind: FunctionDeclaration(FunctionDeclaration(
+            id: SymbolId(4),
             name: Expr(
               kind: FieldExpression(
                 base: Expr(
@@ -1073,7 +1079,7 @@ Node(
                     elements: [
                       Pattern(
                         kind: Identifier(
-                          id: SymbolId(2),
+                          id: SymbolId(5),
                           name: Ident(
                             name: "x",
                             span: Span(
@@ -1128,7 +1134,7 @@ Node(
               FunctionParameter(
                 pattern: Pattern(
                   kind: Identifier(
-                    id: SymbolId(3),
+                    id: SymbolId(6),
                     name: Ident(
                       name: "f",
                       span: Span(
@@ -1324,6 +1330,7 @@ Node(
         ),
         Stmt(
           kind: FunctionDeclaration(FunctionDeclaration(
+            id: SymbolId(4),
             name: Expr(
               kind: FieldExpression(
                 base: Expr(

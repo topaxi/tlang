@@ -157,18 +157,6 @@ impl<'src> Parser<'src> {
         );
     }
 
-    fn panic_unexpected_node(&self, expected: &str, actual: Option<Node>) {
-        let node = actual.as_ref().unwrap();
-        let start_span = &node.span.start;
-        let source_line = self.lexer.source().lines().nth(start_span.line).unwrap();
-        let caret = " ".repeat(start_span.column) + "^";
-
-        panic!(
-            "Expected {} on line {}, column {}, found {:?} instead\n{}\n{}",
-            expected, start_span.line, start_span.column, node.ast_node, source_line, caret
-        );
-    }
-
     fn panic_unexpected_stmt(&self, expected: &str, actual: Option<Stmt>) {
         let node = actual.as_ref().unwrap();
         let start_span = &node.span.start;
@@ -1040,6 +1028,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_function_declaration(&mut self) -> Stmt {
+        let id = self.unique_id();
         let mut name: Option<Expr> = None;
         let mut declarations: Vec<Stmt> = Vec::new();
 
@@ -1119,7 +1108,7 @@ impl<'src> Parser<'src> {
             let body = self.parse_block();
 
             declarations.push(node::stmt!(FunctionDeclaration(FunctionDeclaration {
-                id: self.unique_id(),
+                id,
                 name: Box::new(name.clone().unwrap()),
                 parameters,
                 guard: Box::new(guard),

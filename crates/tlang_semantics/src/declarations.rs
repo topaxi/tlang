@@ -50,11 +50,21 @@ impl DeclarationAnalyzer {
 
     #[inline(always)]
     fn declare_symbol(&mut self, symbol_info: SymbolInfo) {
-        self.symbol_table_stack
-            .last_mut()
+        // Multiple function declarations with the same name result in SymbolInfo with the same ID.
+        if self
+            .symbol_table_stack
+            .last()
             .unwrap()
-            .borrow_mut()
-            .insert(symbol_info);
+            .borrow()
+            .get(symbol_info.id)
+            .is_none()
+        {
+            self.symbol_table_stack
+                .last_mut()
+                .unwrap()
+                .borrow_mut()
+                .insert(symbol_info);
+        }
     }
 
     pub fn add_builtin_symbols(&mut self, symbols: &[(&str, SymbolType)]) {
@@ -98,9 +108,7 @@ impl DeclarationAnalyzer {
                 self.collect_function_declaration(stmt, declaration)
             }
             StmtKind::FunctionDeclarations(declarations) => {
-                for declaration in declarations {
-                    self.collect_declarations_stmt(declaration);
-                }
+                self.collect_function_declarations(declarations);
             }
             StmtKind::Return(expr) => self.collect_optional_declarations_expr(expr),
             StmtKind::EnumDeclaration(decl) => {
@@ -325,25 +333,9 @@ impl DeclarationAnalyzer {
         self.pop_symbol_table();
     }
 
-    fn collect_function_declarations(
-        &mut self,
-        node: &mut Node,
-        id: SymbolId,
-        name: &Expr,
-        declarations: &mut [Node],
-    ) {
-        let name_as_str = self.fn_identifier_to_string(name);
-        self.declare_symbol(SymbolInfo::new(
-            id,
-            &name_as_str,
-            SymbolType::Function,
-            Some(name.span.clone()),
-        ));
-
+    fn collect_function_declarations(&mut self, declarations: &mut [Stmt]) {
         for declaration_node in declarations {
-            node.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
-            self.collect_declarations(declaration_node);
-            self.pop_symbol_table();
+            self.collect_declarations_stmt(declaration_node);
         }
     }
 

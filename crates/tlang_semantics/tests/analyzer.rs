@@ -228,7 +228,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
     assert_eq!(
         program_symbols.borrow().get_by_name("add"),
         Some(SymbolInfo {
-            id: SymbolId::new(3),
+            id: SymbolId::new(1),
             name: "add".to_string(),
             symbol_type: SymbolType::Function,
             defined_at: Some(Span::new(
@@ -368,6 +368,16 @@ fn should_not_warn_about_used_function_and_parameters() {
         add(1, 2);
     "});
     assert_eq!(diagnostics, vec![]);
+
+    let diagnostic = analyze_diag!(indoc! {"
+        fn fib(n) {
+            if n < 2 { n }
+            else { fib(n - 1) + fib(n - 2) }
+        }
+
+        fib(5);
+    "});
+    assert_eq!(diagnostic, vec![]);
 
     let diagnostics = analyze_diag!(indoc! {"
         fn factorial(n) { factorial(n, 1) }

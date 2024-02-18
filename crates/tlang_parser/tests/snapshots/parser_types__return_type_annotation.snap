@@ -6,6 +6,7 @@ Node(
   ast_node: Legacy(Module([
     Stmt(
       kind: FunctionDeclaration(FunctionDeclaration(
+        id: SymbolId(1),
         name: Expr(
           kind: Identifier(Ident(
             name: "foo",

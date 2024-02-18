@@ -105,6 +105,7 @@ Node(
                           arguments: [
                             Expr(
                               kind: FunctionExpression(FunctionDeclaration(
+                                id: SymbolId(2),
                                 name: Expr(
                                   kind: Identifier(Ident(
                                     name: "anonymous",
@@ -316,6 +317,7 @@ Node(
                       arguments: [
                         Expr(
                           kind: FunctionExpression(FunctionDeclaration(
+                            id: SymbolId(4),
                             name: Expr(
                               kind: Identifier(Ident(
                                 name: "anonymous",
@@ -346,7 +348,7 @@ Node(
                               FunctionParameter(
                                 pattern: Pattern(
                                   kind: Identifier(
-                                    id: SymbolId(2),
+                                    id: SymbolId(3),
                                     name: Ident(
                                       name: "x",
                                       span: Span(
@@ -557,6 +559,7 @@ Node(
                   arguments: [
                     Expr(
                       kind: FunctionExpression(FunctionDeclaration(
+                        id: SymbolId(7),
                         name: Expr(
                           kind: Identifier(Ident(
                             name: "anonymous",
@@ -587,7 +590,7 @@ Node(
                           FunctionParameter(
                             pattern: Pattern(
                               kind: Identifier(
-                                id: SymbolId(3),
+                                id: SymbolId(5),
                                 name: Ident(
                                   name: "acc",
                                   span: Span(
@@ -628,7 +631,7 @@ Node(
                           FunctionParameter(
                             pattern: Pattern(
                               kind: Identifier(
-                                id: SymbolId(4),
+                                id: SymbolId(6),
                                 name: Ident(
                                   name: "x",
                                   span: Span(

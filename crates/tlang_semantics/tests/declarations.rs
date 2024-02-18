@@ -119,7 +119,7 @@ fn test_block_scope() {
     assert_eq!(
         block1_symbols.borrow().get_by_name("b"),
         Some(SymbolInfo {
-            id: SymbolId::new(3),
+            id: SymbolId::new(2),
             name: "b".to_string(),
             symbol_type: SymbolType::Variable,
             defined_at: Some(Span::new(
@@ -175,7 +175,7 @@ fn test_block_scope() {
     assert_eq!(
         block2_symbols.borrow().get_by_name("b"),
         Some(SymbolInfo {
-            id: SymbolId::new(3),
+            id: SymbolId::new(2),
             name: "b".to_string(),
             symbol_type: SymbolType::Variable,
             defined_at: Some(Span::new(
@@ -194,7 +194,7 @@ fn test_block_scope() {
     assert_eq!(
         block2_symbols.borrow().get_by_name("c"),
         Some(SymbolInfo {
-            id: SymbolId::new(5),
+            id: SymbolId::new(3),
             name: "c".to_string(),
             symbol_type: SymbolType::Variable,
             defined_at: Some(Span::new(
@@ -228,7 +228,7 @@ fn test_should_collect_function_definitions() {
     assert_eq!(
         program_symbols.borrow().get_by_name("add"),
         Some(SymbolInfo {
-            id: SymbolId::new(5),
+            id: SymbolId::new(1),
             name: "add".to_string(),
             symbol_type: SymbolType::Function,
             defined_at: Some(Span::new(
@@ -256,7 +256,7 @@ fn test_should_collect_list_destructuring_symbols_in_function_arguments() {
     assert_eq!(
         program_symbols.borrow().get_by_name("add"),
         Some(SymbolInfo {
-            id: SymbolId::new(4),
+            id: SymbolId::new(1),
             name: "add".to_string(),
             symbol_type: SymbolType::Function,
             defined_at: Some(Span::new(
@@ -284,7 +284,7 @@ fn test_should_collect_list_destructuring_with_rest_symbols_in_function_argument
     assert_eq!(
         program_symbols.borrow().get_by_name("sum"),
         Some(SymbolInfo {
-            id: SymbolId::new(4),
+            id: SymbolId::new(1),
             name: "sum".to_string(),
             symbol_type: SymbolType::Function,
             defined_at: Some(Span::new(
@@ -312,14 +312,14 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
     assert_eq!(
         program_symbols.borrow().get_by_name("factorial"),
         Some(SymbolInfo {
-            id: SymbolId::new(8),
+            id: SymbolId::new(1),
             name: "factorial".to_string(),
             symbol_type: SymbolType::Function,
             defined_at: Some(Span::new(
-                LineColumn { line: 1, column: 4 },
+                LineColumn { line: 0, column: 3 },
                 LineColumn {
-                    line: 1,
-                    column: 13
+                    line: 0,
+                    column: 12
                 }
             )),
             used: true,
@@ -348,13 +348,13 @@ fn should_collect_function_arguments_with_enum_extraction() {
     assert_eq!(
         program_symbols.borrow().get_by_name("unwrap"),
         Some(SymbolInfo {
-            id: SymbolId::new(5),
+            id: SymbolId::new(2),
             name: "unwrap".to_string(),
             symbol_type: SymbolType::Function,
             defined_at: Some(Span::new(
-                LineColumn { line: 6, column: 4 },
+                LineColumn { line: 5, column: 4 },
                 LineColumn {
-                    line: 6,
+                    line: 5,
                     column: 10
                 }
             )),
