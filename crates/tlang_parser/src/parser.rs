@@ -1,7 +1,7 @@
 use tlang_ast::node::{
-    self, Associativity, AstNode, BinaryOpKind, EnumDeclaration, EnumVariant, Expr, ExprKind,
-    FunctionDeclaration, FunctionParameter, Ident, Node, NodeKind, OperatorInfo, Pattern,
-    PatternKind, Stmt, StmtKind, Ty, UnaryOp,
+    self, Associativity, BinaryOpKind, EnumDeclaration, EnumVariant, Expr, ExprKind,
+    FunctionDeclaration, FunctionParameter, Ident, Node, OperatorInfo, Pattern, PatternKind, Stmt,
+    StmtKind, Ty, UnaryOp,
 };
 use tlang_ast::span::Span;
 use tlang_ast::symbols::SymbolId;
@@ -369,6 +369,7 @@ impl<'src> Parser<'src> {
         }
         self.consume_token(TokenKind::RBrace);
         node::stmt!(EnumDeclaration(EnumDeclaration {
+            id: self.unique_id(),
             name: name,
             variants: variants,
         }))
@@ -974,6 +975,7 @@ impl<'src> Parser<'src> {
         self.end_span_from_previous_token(&mut span);
 
         node::expr!(FunctionExpression(FunctionDeclaration {
+            id: self.unique_id(),
             name: Box::new(name),
             parameters,
             guard: Box::new(None),
@@ -1117,6 +1119,7 @@ impl<'src> Parser<'src> {
             let body = self.parse_block();
 
             declarations.push(node::stmt!(FunctionDeclaration(FunctionDeclaration {
+                id: self.unique_id(),
                 name: Box::new(name.clone().unwrap()),
                 parameters,
                 guard: Box::new(guard),

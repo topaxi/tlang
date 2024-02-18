@@ -1,7 +1,10 @@
 use std::{cell::RefCell, rc::Rc};
 
 use tlang_ast::{
-    node::{AstNode, Expr, ExprKind, Node, NodeKind, Pattern, PatternKind},
+    node::{
+        AstNode, Expr, ExprKind, FunctionDeclaration, FunctionParameter, Node, NodeKind, Pattern,
+        PatternKind, Stmt, StmtKind,
+    },
     span::Span,
     symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
 };
@@ -117,6 +120,41 @@ impl SemanticAnalyzer {
         }
     }
 
+    fn analyze_stmt(&mut self, stmt: &mut Stmt) {
+        match &mut stmt.kind {
+            StmtKind::None => {}
+            StmtKind::Expr(expr) => self.analyze_expr(expr),
+            StmtKind::Let {
+                pattern,
+                expression,
+                type_annotation: _,
+            } => self.analyze_variable_declaration(pattern, expression),
+            StmtKind::FunctionDeclaration(decl) => self.analyze_fn_decl(decl),
+            StmtKind::FunctionDeclarations(decls) => {
+                for decl in decls {
+                    self.analyze_stmt(decl);
+                }
+            }
+            StmtKind::Return(expr) => self.analyze_optional_expr(expr),
+            StmtKind::EnumDeclaration(_decl) => {
+                // TODO
+            }
+            StmtKind::SingleLineComment(_) | StmtKind::MultiLineComment(_) => {}
+        }
+    }
+
+    fn analyze_fn_param(&mut self, param: &mut FunctionParameter) {
+        self.analyze_pat(&mut param.pattern);
+    }
+
+    fn analyze_fn_decl(&mut self, decl: &mut FunctionDeclaration) {
+        for parameter in &mut decl.parameters {
+            self.analyze_fn_param(parameter);
+        }
+
+        self.analyze_expr(&mut decl.body);
+    }
+
     fn analyze_expr(&mut self, expr: &mut Expr) {
         if let Some(symbol_table) = &expr.symbol_table {
             self.push_symbol_table(symbol_table);
@@ -131,7 +169,7 @@ impl SemanticAnalyzer {
             }
             ExprKind::Block(stmts, expr) => {
                 for stmt in stmts.iter_mut() {
-                    self.analyze_node(stmt);
+                    self.analyze_stmt(stmt);
                 }
                 self.analyze_optional_expr(expr);
             }
@@ -187,15 +225,8 @@ impl SemanticAnalyzer {
                 //       any type information yet.
                 // self.analyze_node(field);
             }
-            ExprKind::FunctionExpression {
-                id: _,
-                name: _,
-                declaration,
-            } => {
-                // TODO: Distinguish function names from expressions, otherwise this marks the
-                // function name as used.
-                // self.analyze_optional_expr(name);
-                self.analyze_node(declaration);
+            ExprKind::FunctionExpression(decl) => {
+                self.analyze_fn_decl(decl);
             }
             ExprKind::Identifier(ident) => {
                 self.mark_as_used_by_name(&ident.to_string(), &ident.span);
@@ -280,46 +311,9 @@ impl SemanticAnalyzer {
 
         match &mut ast_node {
             NodeKind::Legacy(AstNode::Module(nodes)) => {
-                nodes.iter_mut().for_each(|node| self.analyze_node(node))
+                nodes.iter_mut().for_each(|node| self.analyze_stmt(node))
             }
-            NodeKind::Legacy(AstNode::ExpressionStatement(expr)) => self.analyze_expr(expr),
-            NodeKind::Legacy(AstNode::VariableDeclaration {
-                id,
-                pattern,
-                expression,
-                type_annotation: _,
-            }) => {
-                self.analyze_variable_declaration(*id, pattern, expression);
-            }
-            NodeKind::Legacy(AstNode::FunctionSingleDeclaration {
-                id: _,
-                name,
-                declaration,
-            }) => self.analyze_function_declaration(ast, name, declaration),
-            NodeKind::Legacy(AstNode::FunctionDeclarations {
-                id: _,
-                name,
-                declarations,
-            }) => self.analyze_function_declarations(ast, name, declarations),
-            NodeKind::Legacy(AstNode::FunctionDeclaration(declaration)) => {
-                for parameter in &mut declaration.parameters {
-                    self.analyze_node(parameter);
-                }
-
-                self.analyze_expr(&mut declaration.body);
-            }
-            NodeKind::Legacy(AstNode::FunctionParameter { pattern: node, .. }) => {
-                self.analyze_pat(node)
-            }
-            NodeKind::Legacy(AstNode::ReturnStatement(expr)) => {
-                self.analyze_optional_expr(expr);
-            }
-            NodeKind::Legacy(
-                AstNode::EnumDeclaration { .. }
-                | AstNode::EnumVariant { .. }
-                | AstNode::MatchArm { .. }
-                | AstNode::TypeAnnotation { .. },
-            ) => {
+            NodeKind::Legacy(AstNode::MatchArm { .. } | AstNode::TypeAnnotation { .. }) => {
                 // TODO
             }
             NodeKind::None
@@ -360,12 +354,7 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn analyze_variable_declaration(
-        &mut self,
-        _id: SymbolId,
-        pattern: &mut Pattern,
-        expression: &mut Expr,
-    ) {
+    fn analyze_variable_declaration(&mut self, pattern: &mut Pattern, expression: &mut Expr) {
         self.analyze_pat(pattern);
 
         // When declaring a variable, we can only reference symbols that were declared before.
@@ -385,33 +374,6 @@ impl SemanticAnalyzer {
             self.get_last_symbol_table()
                 .borrow_mut()
                 .insert_beginning(symbol);
-        }
-    }
-
-    fn analyze_function_declaration(
-        &mut self,
-        _node: &mut Node,
-        _name: &mut Expr,
-        declaration: &mut Node,
-    ) {
-        // TODO: Function names might now want to be expressions, or at least excluded
-        //       from marking as used.
-        // self.analyze_expr(name);
-        self.analyze_node(declaration);
-    }
-
-    fn analyze_function_declarations(
-        &mut self,
-        _node: &mut Node,
-        _name: &mut Expr,
-        declarations: &mut Vec<Node>,
-    ) {
-        // TODO: Distinguish function names from expressions, otherwise this marks the
-        //       function name as used.
-        // self.analyze_expr(name);
-
-        for declaration in declarations {
-            self.analyze_node(declaration);
         }
     }
 }

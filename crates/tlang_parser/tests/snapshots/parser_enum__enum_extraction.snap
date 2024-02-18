@@ -6,6 +6,7 @@ Node(
   ast_node: Legacy(Module([
     Stmt(
       kind: EnumDeclaration(EnumDeclaration(
+        id: SymbolId(1),
         name: Ident(
           name: "Option",
           span: Span(
@@ -365,7 +366,7 @@ Node(
                     elements: [
                       Pattern(
                         kind: Identifier(
-                          id: SymbolId(1),
+                          id: SymbolId(2),
                           name: Ident(
                             name: "value",
                             span: Span(

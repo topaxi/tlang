@@ -1,7 +1,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use tlang_ast::{
-    node::{AstNode, Expr, ExprKind, FunctionDeclaration, Node, NodeKind, Pattern, PatternKind},
+    node::{
+        AstNode, Expr, ExprKind, FunctionDeclaration, FunctionParameter, Node, NodeKind, Pattern,
+        PatternKind, Stmt, StmtKind,
+    },
     symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
 };
 
@@ -78,33 +81,76 @@ impl DeclarationAnalyzer {
         }
     }
 
+    fn collect_declarations_stmt(&mut self, stmt: &mut Stmt) {
+        match &mut stmt.kind {
+            StmtKind::None => {
+                // Nothing to do here
+            }
+            StmtKind::Expr(expr) => self.collect_declarations_expr(expr),
+            StmtKind::Let {
+                pattern,
+                expression,
+                type_annotation: _,
+            } => self.collect_variable_declaration(pattern, expression),
+            StmtKind::FunctionDeclaration(declaration) => {
+                self.collect_function_declaration(declaration)
+            }
+            StmtKind::FunctionDeclarations(declarations) => {
+                for declaration in declarations {
+                    self.collect_declarations_stmt(declaration);
+                }
+            }
+            StmtKind::Return(expr) => self.collect_optional_declarations_expr(expr),
+            StmtKind::EnumDeclaration(decl) => {
+                self.declare_symbol(SymbolInfo::new(
+                    decl.id,
+                    &decl.name.to_string(),
+                    SymbolType::Enum,
+                    Some(stmt.span.clone()),
+                ));
+            }
+            StmtKind::SingleLineComment(_) | StmtKind::MultiLineComment(_) => {
+                // Nothing to do here
+            }
+        }
+    }
+
+    fn collect_declarations_from_fn(&mut self, function_decl: &mut FunctionDeclaration) {
+        self.symbol_type.push(SymbolType::Parameter);
+        for param in &mut function_decl.parameters {
+            self.collect_declarations_from_fn_param(param);
+        }
+        self.symbol_type.pop();
+        self.collect_optional_declarations_expr(&mut function_decl.guard);
+        self.collect_declarations_expr(&mut function_decl.body);
+    }
+
+    fn collect_declarations_from_fn_param(&mut self, param: &mut FunctionParameter) {
+        self.collect_pattern(&mut param.pattern);
+    }
+
     fn collect_declarations_expr(&mut self, expr: &mut Expr) {
         match &mut expr.kind {
             ExprKind::Block(stmts, cexpr) => {
                 expr.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
                 for stmt in stmts {
-                    self.collect_declarations(stmt);
+                    self.collect_declarations_stmt(stmt);
                 }
                 self.collect_optional_declarations_expr(cexpr);
                 self.pop_symbol_table();
             }
-            ExprKind::FunctionExpression {
-                id,
-                name,
-                declaration,
-            } => {
+            ExprKind::FunctionExpression(decl) => {
                 expr.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
-                if let Some(name) = name.as_ref() {
-                    let name_as_str = self.fn_identifier_to_string(name);
-                    self.declare_symbol(SymbolInfo::new(
-                        *id,
-                        &name_as_str,
-                        SymbolType::Function,
-                        Some(name.span.clone()),
-                    ));
-                }
+                let name = decl.name.as_ref();
+                let name_as_str = self.fn_identifier_to_string(name);
+                self.declare_symbol(SymbolInfo::new(
+                    decl.id,
+                    &name_as_str,
+                    SymbolType::Function,
+                    Some(name.span.clone()),
+                ));
 
-                self.collect_declarations(declaration);
+                self.collect_declarations_from_fn(decl);
                 self.pop_symbol_table();
             }
             ExprKind::Call {
@@ -185,60 +231,6 @@ impl DeclarationAnalyzer {
             NodeKind::Legacy(AstNode::Module(nodes)) => {
                 self.collect_module_declarations(node, nodes)
             }
-            NodeKind::Legacy(AstNode::ExpressionStatement(node)) => {
-                self.collect_declarations_expr(node)
-            }
-            NodeKind::Legacy(AstNode::VariableDeclaration {
-                pattern,
-                expression,
-                ..
-            }) => self.collect_variable_declaration(pattern, expression),
-            NodeKind::Legacy(AstNode::FunctionDeclaration(declaration)) => {
-                self.collect_function_declaration(declaration);
-            }
-            NodeKind::Legacy(AstNode::FunctionSingleDeclaration {
-                id,
-                name,
-                declaration,
-            }) => self.collect_function_single_declaration(node, *id, name, declaration),
-            NodeKind::Legacy(AstNode::FunctionDeclarations {
-                id,
-                name,
-                declarations,
-            }) => self.collect_function_declarations(node, *id, name, declarations),
-            NodeKind::Legacy(AstNode::FunctionParameter {
-                id: _, // TODO: Do we still need an id for fn params, now that they are on the
-                // pattern?
-                pattern,
-                type_annotation: _,
-            }) => self.collect_pattern(pattern),
-            NodeKind::Legacy(AstNode::ReturnStatement(expr)) => {
-                self.collect_optional_declarations_expr(expr);
-            }
-            NodeKind::Legacy(AstNode::EnumDeclaration { id, name, variants }) => {
-                self.declare_symbol(SymbolInfo::new(
-                    *id,
-                    &name.to_string(),
-                    SymbolType::Enum,
-                    Some(node.span.clone()),
-                ));
-
-                for variant in variants {
-                    self.collect_declarations(variant);
-                }
-            }
-            NodeKind::Legacy(AstNode::EnumVariant {
-                name: _,
-                parameters,
-                ..
-            }) => {
-                // TODO: We need the parent enum name here.
-                // self.collect_declarations(name)
-
-                for param in parameters {
-                    self.collect_declarations_expr(param);
-                }
-            }
             NodeKind::Legacy(AstNode::MatchArm { .. } | AstNode::TypeAnnotation { .. }) => {
                 // TODO
             }
@@ -256,11 +248,11 @@ impl DeclarationAnalyzer {
         node.ast_node = ast_node;
     }
 
-    fn collect_module_declarations(&mut self, node: &mut Node, nodes: &mut [Node]) {
+    fn collect_module_declarations(&mut self, node: &mut Node, nodes: &mut [Stmt]) {
         node.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
 
         for node in nodes {
-            self.collect_declarations(node);
+            self.collect_declarations_stmt(node);
         }
 
         self.pop_symbol_table();
@@ -303,7 +295,7 @@ impl DeclarationAnalyzer {
     fn collect_function_declaration(&mut self, declaration: &mut FunctionDeclaration) {
         self.symbol_type.push(SymbolType::Parameter);
         for param in &mut declaration.parameters {
-            self.collect_declarations(param);
+            self.collect_declarations_from_fn_param(param);
         }
         self.symbol_type.pop();
 

@@ -132,6 +132,7 @@ impl FunctionParameter {
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct FunctionDeclaration {
+    pub id: SymbolId,
     pub name: Box<Expr>,
     pub parameters: Vec<FunctionParameter>,
     pub guard: Box<Option<Expr>>,
@@ -301,6 +302,7 @@ pub struct EnumVariant {
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct EnumDeclaration {
+    pub id: SymbolId,
     pub name: Ident,
     pub variants: Vec<EnumVariant>,
 }
