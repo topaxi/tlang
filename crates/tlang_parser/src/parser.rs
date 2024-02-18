@@ -302,6 +302,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_comment(&mut self) -> Stmt {
+        // TODO: Implement conversion for comments
         let comment: Stmt = self.current_token.as_ref().unwrap().into();
         self.advance();
         comment

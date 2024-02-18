@@ -1,49 +1,44 @@
 use tlang_ast::node::{
-    AstNode, Expr, ExprKind, FunctionDeclaration, Node, NodeKind, Pattern, PatternKind,
+    AstNode, Expr, ExprKind, FunctionDeclaration, FunctionParameter, Node, NodeKind, Pattern,
+    PatternKind, Stmt, StmtKind,
 };
 
 use crate::generator::{BlockContext, CodegenJS};
 
-fn map_to_function_declaration(node: &Node) -> Option<&FunctionDeclaration> {
-    match &node.ast_node {
-        NodeKind::Legacy(AstNode::FunctionDeclaration(declaration)) => Some(declaration),
+fn map_to_function_declaration(stmt: &Stmt) -> Option<&FunctionDeclaration> {
+    match &stmt.kind {
+        StmtKind::FunctionDeclaration(declaration) => Some(declaration),
         _ => None,
     }
 }
 
-fn filter_comments(node: &Node) -> bool {
+fn filter_comments(stmt: &Stmt) -> bool {
     matches!(
-        node.ast_node,
-        NodeKind::Legacy(AstNode::SingleLineComment(_) | AstNode::MultiLineComment(_))
+        stmt.kind,
+        StmtKind::SingleLineComment(_) | StmtKind::MultiLineComment(_)
     )
 }
 
-pub fn get_function_declaration_from_node(node: &Node) -> &FunctionDeclaration {
-    match &node.ast_node {
-        NodeKind::Legacy(AstNode::FunctionDeclaration(declaration)) => declaration,
-        _ => panic!("Unexpected node in function declarations."),
-    }
-}
-
-pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Expr, declarations: &[Node]) {
-    let name_as_str = fn_identifier_to_string(name);
-
+pub fn generate_function_declarations(codegen: &mut CodegenJS, declarations: &[Stmt]) {
     let function_declarations = declarations
         .iter()
         .filter_map(map_to_function_declaration)
         .collect::<Vec<&FunctionDeclaration>>();
 
+    let first_declaration = function_declarations.first().unwrap();
+    let name_as_str = fn_identifier_to_string(&first_declaration.name);
+
     let function_comments = declarations
         .iter()
         .filter(|node| filter_comments(node))
-        .collect::<Vec<&Node>>();
+        .collect::<Vec<&Stmt>>();
 
     let is_any_definition_tail_recursive = function_declarations
         .iter()
         .any(|declaration| is_function_body_tail_recursive(&name_as_str, &declaration.body));
 
     for comment in function_comments {
-        codegen.generate_node(comment);
+        codegen.generate_stmt(comment);
     }
     codegen.push_indent();
     codegen.push_str(&format!("function {}(...args) {{\n", name_as_str));
@@ -54,7 +49,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Expr, decl
     // Declare and output temporary variables for if let guards.
     for declaration in function_declarations.iter() {
         if let Some(ref expr) = *declaration.guard {
-            if let ExprKind::Let(pattern, gexpr) = &expr.kind {
+            if let ExprKind::Let(pattern, _) = &expr.kind {
                 match &pattern.kind {
                     PatternKind::Identifier { name, .. } => {
                         let tmp_variable = codegen.current_scope().declare_tmp_variable();
@@ -127,15 +122,15 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Expr, decl
     let mut first_declaration = true;
     for declaration in declarations.iter() {
         if matches!(
-            &declaration.ast_node,
-            NodeKind::Legacy(AstNode::SingleLineComment(_) | AstNode::MultiLineComment(_))
+            &declaration.kind,
+            StmtKind::SingleLineComment(_) | StmtKind::MultiLineComment(_)
         ) {
             comments.push(declaration);
             continue;
         }
 
-        let declaration = match &declaration.ast_node {
-            NodeKind::Legacy(AstNode::FunctionDeclaration(declaration)) => declaration,
+        let declaration = match &declaration.kind {
+            StmtKind::FunctionDeclaration(declaration) => declaration,
             _ => unreachable!("Unexpected node in function declarations."),
         };
 
@@ -148,30 +143,23 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Expr, decl
         first_declaration = false;
 
         for (j, param) in declaration.parameters.iter().enumerate() {
-            if let NodeKind::Legacy(AstNode::FunctionParameter {
-                id: _,
-                pattern,
-                type_annotation: _,
-            }) = &param.ast_node
-            {
-                match &pattern.kind {
-                    PatternKind::Identifier { name, .. } => {
-                        codegen
-                            .current_scope()
-                            .declare_variable_alias(&name.to_string(), &format!("args[{}]", j));
-                    }
-                    PatternKind::List(patterns) => {
-                        for (i, pattern) in patterns.iter().enumerate() {
-                            if let PatternKind::Identifier { name, .. } = &pattern.kind {
-                                codegen.current_scope().declare_variable_alias(
-                                    &name.to_string(),
-                                    &format!("args[{}][{}]", j, i),
-                                );
-                            }
+            match &param.pattern.kind {
+                PatternKind::Identifier { name, .. } => {
+                    codegen
+                        .current_scope()
+                        .declare_variable_alias(&name.to_string(), &format!("args[{}]", j));
+                }
+                PatternKind::List(patterns) => {
+                    for (i, pattern) in patterns.iter().enumerate() {
+                        if let PatternKind::Identifier { name, .. } = &pattern.kind {
+                            codegen.current_scope().declare_variable_alias(
+                                &name.to_string(),
+                                &format!("args[{}][{}]", j, i),
+                            );
                         }
                     }
-                    _ => {}
                 }
+                _ => {}
             }
         }
 
@@ -187,21 +175,10 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Expr, decl
                 .iter()
                 .enumerate()
                 .filter(|(_, param)| {
-                    if let NodeKind::Legacy(AstNode::FunctionParameter {
-                        id: _,
-                        pattern,
-                        type_annotation: _,
-                    }) = &param.ast_node
-                    {
-                        matches!(
-                            pattern.kind,
-                            PatternKind::Literal(_)
-                                | PatternKind::List(_)
-                                | PatternKind::Enum { .. }
-                        )
-                    } else {
-                        false
-                    }
+                    matches!(
+                        param.pattern.kind,
+                        PatternKind::Literal(_) | PatternKind::List(_) | PatternKind::Enum { .. }
+                    )
                 });
 
         let variadic_or_pattern_matching =
@@ -224,95 +201,87 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Expr, decl
                     codegen.push_str(" && ");
                 }
 
-                if let NodeKind::Legacy(AstNode::FunctionParameter {
-                    id: _,
-                    pattern,
-                    type_annotation: _,
-                }) = &param.ast_node
-                {
-                    match &pattern.kind {
-                        PatternKind::Identifier { .. } | PatternKind::Literal(_) => {
-                            codegen.push_str(&format!("args[{}] === ", k));
-                            codegen.generate_node(param);
+                match &param.pattern.kind {
+                    PatternKind::Identifier { .. } | PatternKind::Literal(_) => {
+                        codegen.push_str(&format!("args[{}] === ", k));
+                        generate_function_parameter(codegen, &param.pattern);
+                    }
+                    PatternKind::List(patterns) => {
+                        if patterns.is_empty() {
+                            codegen.push_str(&format!("args[{}].length === 0", k));
+                            continue;
                         }
-                        PatternKind::List(patterns) => {
-                            if patterns.is_empty() {
-                                codegen.push_str(&format!("args[{}].length === 0", k));
-                                continue;
+
+                        // TODO: Handle multiple patterns, for now a simple recursive sum was the test case :D
+                        let should_and = false;
+                        for (i, pattern) in patterns.iter().enumerate() {
+                            if should_and {
+                                codegen.push_str(" && ");
                             }
 
-                            // TODO: Handle multiple patterns, for now a simple recursive sum was the test case :D
-                            let should_and = false;
-                            for (i, pattern) in patterns.iter().enumerate() {
-                                if should_and {
-                                    codegen.push_str(" && ");
+                            match &pattern.kind {
+                                PatternKind::Literal(_) => {
+                                    codegen.push_str(&format!("args[{}][{}] === ", k, i));
+                                    codegen.generate_pat(pattern);
                                 }
-
-                                match &pattern.kind {
-                                    PatternKind::Literal(_) => {
-                                        codegen.push_str(&format!("args[{}][{}] === ", k, i));
-                                        codegen.generate_pat(pattern);
-                                    }
-                                    PatternKind::Rest(identified) => {
-                                        if let PatternKind::Identifier { ref name, .. } =
-                                            identified.kind
-                                        {
-                                            codegen
-                                                .push_str(&format!("args[{}].length >= {}", k, i));
-                                            codegen.declare_function_pre_body_variable(
-                                                &name.to_string(),
-                                                &format!("args[{}].slice({})", k, i),
-                                            );
-                                        } else {
-                                            unreachable!();
-                                        }
-                                    }
-                                    PatternKind::Identifier { name, .. } => {
+                                PatternKind::Rest(identified) => {
+                                    if let PatternKind::Identifier { ref name, .. } =
+                                        identified.kind
+                                    {
+                                        codegen.push_str(&format!("args[{}].length >= {}", k, i));
                                         codegen.declare_function_pre_body_variable(
                                             &name.to_string(),
-                                            &format!("args[{}][{}]", k, i),
+                                            &format!("args[{}].slice({})", k, i),
                                         );
+                                    } else {
+                                        unreachable!();
                                     }
-                                    PatternKind::Wildcard => {}
-                                    _ => unreachable!(),
                                 }
+                                PatternKind::Identifier { name, .. } => {
+                                    codegen.declare_function_pre_body_variable(
+                                        &name.to_string(),
+                                        &format!("args[{}][{}]", k, i),
+                                    );
+                                }
+                                PatternKind::Wildcard => {}
+                                _ => unreachable!(),
                             }
                         }
-                        PatternKind::Enum {
-                            identifier,
-                            elements,
-                            named_fields,
-                        } => {
-                            let identifier = match &identifier.kind {
-                                ExprKind::Identifier(ident) => ident.to_string(),
-                                ExprKind::NestedIdentifier(names) => {
-                                    names.clone().pop().unwrap().to_string()
-                                }
+                    }
+                    PatternKind::Enum {
+                        identifier,
+                        elements,
+                        named_fields,
+                    } => {
+                        let identifier = match &identifier.kind {
+                            ExprKind::Identifier(ident) => ident.to_string(),
+                            ExprKind::NestedIdentifier(names) => {
+                                names.clone().pop().unwrap().to_string()
+                            }
+                            _ => unreachable!(),
+                        };
+                        codegen.push_str(&format!("args[{}].tag === \"{}\"", k, identifier));
+                        for (i, element) in elements.iter().enumerate() {
+                            let identifier = match &element.kind {
+                                // Skip any Wildcards
+                                PatternKind::Wildcard => continue,
+                                PatternKind::Identifier { name, .. } => name.to_string(),
                                 _ => unreachable!(),
                             };
-                            codegen.push_str(&format!("args[{}].tag === \"{}\"", k, identifier));
-                            for (i, element) in elements.iter().enumerate() {
-                                let identifier = match &element.kind {
-                                    // Skip any Wildcards
-                                    PatternKind::Wildcard => continue,
-                                    PatternKind::Identifier { name, .. } => name.to_string(),
-                                    _ => unreachable!(),
-                                };
-                                if *named_fields {
-                                    codegen.declare_function_pre_body_variable(
-                                        &identifier,
-                                        &format!("args[{}].{}", k, identifier),
-                                    );
-                                } else {
-                                    codegen.declare_function_pre_body_variable(
-                                        &identifier,
-                                        &format!("args[{}][{}]", k, i),
-                                    )
-                                }
+                            if *named_fields {
+                                codegen.declare_function_pre_body_variable(
+                                    &identifier,
+                                    &format!("args[{}].{}", k, identifier),
+                                );
+                            } else {
+                                codegen.declare_function_pre_body_variable(
+                                    &identifier,
+                                    &format!("args[{}][{}]", k, i),
+                                )
                             }
                         }
-                        _ => unreachable!(),
                     }
+                    _ => unreachable!(),
                 }
             }
         }
@@ -336,25 +305,18 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, name: &Expr, decl
 
         for comment in comments.iter() {
             codegen.push_indent();
-            codegen.generate_node(comment);
+            codegen.generate_stmt(comment);
         }
         comments.clear();
 
         // Alias identifier args back to the parameter names for readability of generated code.
         for (j, param) in declaration.parameters.iter().enumerate() {
-            if let NodeKind::Legacy(AstNode::FunctionParameter {
-                id: _,
-                pattern,
-                type_annotation: _,
-            }) = &param.ast_node
-            {
-                if let PatternKind::Identifier { ref name, .. } = pattern.kind {
-                    codegen.push_indent();
-                    codegen.push_str(&format!("let {} = args[{}];\n", name, j));
-                    codegen
-                        .current_scope()
-                        .declare_variable_alias(&name.to_string(), &name.to_string());
-                }
+            if let PatternKind::Identifier { ref name, .. } = param.pattern.kind {
+                codegen.push_indent();
+                codegen.push_str(&format!("let {} = args[{}];\n", name, j));
+                codegen
+                    .current_scope()
+                    .declare_variable_alias(&name.to_string(), &name.to_string());
             }
         }
         // We handle the tail recursion case in multiple function body declarations ourselves higher up.
@@ -451,20 +413,19 @@ fn generate_function_definition_guard(codegen: &mut CodegenJS, node: &Expr) {
     }
 }
 
-pub fn generate_function_parameter_list(codegen: &mut CodegenJS, parameters: &[Node]) {
+pub fn generate_function_parameter_list(codegen: &mut CodegenJS, parameters: &[FunctionParameter]) {
     codegen.push_str("(");
     for (i, param) in parameters.iter().enumerate() {
         if i > 0 {
             codegen.push_str(", ");
         }
-        codegen.generate_node(param);
+        codegen.generate_pat(&param.pattern);
     }
     codegen.push_str(")");
 }
 
-pub fn generate_function_declaration(codegen: &mut CodegenJS, name: &Expr, node: &Node) {
-    let declaration = get_function_declaration_from_node(node);
-    let name_as_str = fn_identifier_to_string(name);
+pub fn generate_function_declaration(codegen: &mut CodegenJS, declaration: &FunctionDeclaration) {
+    let name_as_str = fn_identifier_to_string(&declaration.name);
     let is_tail_recursive = is_function_body_tail_recursive(&name_as_str, &declaration.body);
     codegen.push_function_context(
         &name_as_str,
@@ -488,14 +449,9 @@ pub fn generate_function_declaration(codegen: &mut CodegenJS, name: &Expr, node:
     codegen.pop_function_context();
 }
 
-pub fn generate_function_expression(codegen: &mut CodegenJS, name: &Option<Expr>, node: &Node) {
-    let declaration = get_function_declaration_from_node(node);
+pub fn generate_function_expression(codegen: &mut CodegenJS, declaration: &FunctionDeclaration) {
     codegen.push_scope();
-    let name_as_str = if name.is_some() {
-        fn_identifier_to_string(&name.clone().unwrap())
-    } else {
-        "".to_string()
-    };
+    let name_as_str = fn_identifier_to_string(&declaration.name);
     let is_tail_recursive = is_function_body_tail_recursive(&name_as_str, &declaration.body);
     codegen.push_function_context(
         &name_as_str,
@@ -504,7 +460,7 @@ pub fn generate_function_expression(codegen: &mut CodegenJS, name: &Option<Expr>
         false,
     );
     let function_keyword = match name_as_str.as_str() {
-        "" => "function".to_string(),
+        "anonymous" => "function".to_string(),
         _ => format!("function {}", name_as_str),
     };
 
@@ -608,16 +564,20 @@ fn flush_function_pre_body(codegen: &mut CodegenJS) {
 
 fn is_function_body_tail_recursive_node(function_name: &str, node: &Node) -> bool {
     match &node.ast_node {
-        NodeKind::Legacy(AstNode::ExpressionStatement(expression)) => {
-            is_function_body_tail_recursive(function_name, expression)
-        }
         NodeKind::Legacy(AstNode::MatchArm {
             pattern: _,
             expression,
         }) => is_function_body_tail_recursive(function_name, expression),
-        NodeKind::Legacy(AstNode::ReturnStatement(node)) => {
-            if let Some(node) = node.as_ref() {
-                is_function_body_tail_recursive(function_name, node)
+        _ => false,
+    }
+}
+
+fn is_function_body_tail_recursive_stmt(function_name: &str, stmt: &Stmt) -> bool {
+    match &stmt.kind {
+        StmtKind::Expr(expr) => is_function_body_tail_recursive(function_name, expr),
+        StmtKind::Return(expr) => {
+            if let Some(expr) = expr.as_ref() {
+                is_function_body_tail_recursive(function_name, expr)
             } else {
                 false
             }
@@ -649,7 +609,7 @@ fn is_function_body_tail_recursive(function_name: &str, node: &Expr) -> bool {
         }
         ExprKind::Block(statements, expression) => {
             for statement in statements {
-                if is_function_body_tail_recursive_node(function_name, statement) {
+                if is_function_body_tail_recursive_stmt(function_name, statement) {
                     return true;
                 }
             }

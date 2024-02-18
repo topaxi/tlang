@@ -9,7 +9,8 @@ use crate::{
 };
 use tlang_ast::{
     node::{
-        AstNode, BinaryOpKind, Expr, ExprKind, Ident, Node, NodeKind, Pattern, PatternKind, UnaryOp,
+        AstNode, BinaryOpKind, EnumDeclaration, Expr, ExprKind, FunctionParameter, Ident, Node,
+        NodeKind, Pattern, PatternKind, Stmt, StmtKind, UnaryOp,
     },
     token::Literal,
 };
@@ -187,7 +188,7 @@ impl CodegenJS {
     pub fn push_function_context(
         &mut self,
         name: &str,
-        parameters: &[Node],
+        parameters: &[FunctionParameter],
         is_tail_recursive: bool,
         remap_to_rest_args: bool,
     ) {
@@ -196,21 +197,12 @@ impl CodegenJS {
             params: parameters
                 .iter()
                 .map(|param| {
-                    if let NodeKind::Legacy(AstNode::FunctionParameter {
-                        id: _,
-                        pattern,
-                        type_annotation: _,
-                    }) = &param.ast_node
-                    {
-                        if let PatternKind::Identifier { ref name, .. } = pattern.kind {
-                            name.to_string()
-                        } else {
-                            // Encountered destructuring/pattern matching or wildcard, declare
-                            // tmp variable to potentially dereference from. Unused at the moment.
-                            self.scopes.declare_tmp_variable()
-                        }
+                    if let PatternKind::Identifier { ref name, .. } = param.pattern.kind {
+                        name.to_string()
                     } else {
-                        panic!("Expected FunctionParameter, got {:?}", param);
+                        // Encountered destructuring/pattern matching or wildcard, declare
+                        // tmp variable to potentially dereference from. Unused at the moment.
+                        self.scopes.declare_tmp_variable()
                     }
                 })
                 .collect(),
@@ -285,7 +277,7 @@ impl CodegenJS {
     }
 
     /// Generates blocks in expression position.
-    fn generate_block_expression(&mut self, statements: &[Node], expression: &Option<Expr>) {
+    fn generate_block_expression(&mut self, statements: &[Stmt], expression: &Option<Expr>) {
         let has_completion_var = self.completion_variables.last().unwrap().is_some();
         let completion_tmp_var = self
             .completion_variables
@@ -343,7 +335,7 @@ impl CodegenJS {
         self.pop_scope();
     }
 
-    fn generate_block(&mut self, statements: &[Node], expression: &Option<Expr>) {
+    fn generate_block(&mut self, statements: &[Stmt], expression: &Option<Expr>) {
         // Functions handle their scoping themselves
         if self.current_context() != BlockContext::FunctionBody {
             self.push_scope();
@@ -385,10 +377,50 @@ impl CodegenJS {
     }
 
     #[inline(always)]
-    fn generate_statements(&mut self, statements: &[Node]) {
+    fn generate_statements(&mut self, statements: &[Stmt]) {
         for statement in statements {
-            self.generate_node(statement);
+            self.generate_stmt(statement);
             self.flush_statement_buffer();
+        }
+    }
+
+    pub fn generate_stmt(&mut self, statement: &Stmt) {
+        match &statement.kind {
+            StmtKind::None => {}
+            StmtKind::Expr(expr) => {
+                self.push_str(&self.get_indent());
+                self.context_stack.push(BlockContext::Statement);
+                self.generate_expr(expr, None);
+                self.context_stack.pop();
+
+                if let ExprKind::IfElse { .. } = expr.kind {
+                    self.push_char('\n');
+                    return;
+                }
+
+                self.push_str(";\n");
+            }
+            StmtKind::Let {
+                pattern,
+                expression,
+                ..
+            } => {
+                self.generate_variable_declaration(pattern, expression);
+            }
+            StmtKind::FunctionDeclaration(decl) => generate_function_declaration(self, decl),
+            StmtKind::FunctionDeclarations(decls) => generate_function_declarations(self, decls),
+            StmtKind::Return(expr) => generate_return_statement(self, expr),
+            StmtKind::EnumDeclaration(decl) => self.generate_enum_declaration(decl),
+            StmtKind::SingleLineComment(str) => {
+                self.push_str("//");
+                self.push_str(str);
+                self.push_char('\n');
+            }
+            StmtKind::MultiLineComment(str) => {
+                self.push_str("/*");
+                self.push_str(str);
+                self.push_str("*/\n");
+            }
         }
     }
 
@@ -476,10 +508,8 @@ impl CodegenJS {
             } => {
                 self.generate_if_else(condition, then_branch, else_branch);
             }
-            ExprKind::FunctionExpression {
-                name, declaration, ..
-            } => {
-                generate_function_expression(self, name, declaration);
+            ExprKind::FunctionExpression(decl) => {
+                generate_function_expression(self, decl);
             }
             ExprKind::RecursiveCall(expr) => {
                 self.generate_recursive_call_expression(expr, parent_op);
@@ -516,32 +546,8 @@ impl CodegenJS {
                 self.generate_statements(statements);
                 self.flush_statement_buffer();
             }
-            NodeKind::Legacy(AstNode::ExpressionStatement(expression)) => {
-                self.push_str(&self.get_indent());
-                self.context_stack.push(BlockContext::Statement);
-                self.generate_expr(expression, None);
-                self.context_stack.pop();
-
-                if let ExprKind::IfElse { .. } = expression.kind {
-                    self.push_char('\n');
-                    return;
-                }
-
-                self.push_str(";\n");
-            }
-            NodeKind::Legacy(AstNode::VariableDeclaration { id: _, pattern, expression , type_annotation: _}) => {
-                self.generate_variable_declaration(pattern, expression);
-            }
             NodeKind::Legacy(AstNode::MatchArm { .. }) => unreachable!("MatchArm is being generated in generate_match_expression."),
             NodeKind::Legacy(AstNode::Wildcard) => unreachable!("Stray wildcard expression, you can only use _ wildcards in function declarations, pipelines and pattern matching."),
-            NodeKind::Legacy(AstNode::FunctionParameter{ id: _, pattern, type_annotation: _ }) => generate_function_parameter(self, pattern),
-            NodeKind::Legacy(AstNode::FunctionSingleDeclaration { id: _, name, declaration }) =>
-                generate_function_declaration(self, name, declaration),
-            NodeKind::Legacy(AstNode::FunctionDeclarations { id: _, name, declarations }) =>
-                generate_function_declarations(self, name, declarations),
-            NodeKind::Legacy(AstNode::ReturnStatement(expr)) => generate_return_statement(self, expr),
-            NodeKind::Legacy(AstNode::EnumDeclaration { id: _, name, variants }) => self.generate_enum_declaration(&name.to_string(), variants),
-            NodeKind::Legacy(AstNode::EnumVariant { name, named_fields, parameters }) => self.generate_enum_variant(&name.to_string(), *named_fields, parameters),
             NodeKind::Legacy(AstNode::None) => {},
             // Allow unreachable path, as we add new AST nodes, we do not want to automatically
             // start failing tests while we are still implementing the codegen.
@@ -696,19 +702,19 @@ impl CodegenJS {
         self.completion_variables.pop();
     }
 
-    fn generate_enum_declaration(&mut self, name: &str, variants: &[Node]) {
+    fn generate_enum_declaration(&mut self, decl: &EnumDeclaration) {
         self.push_str(&self.get_indent());
-        self.push_str(&format!("const {} = {{\n", name));
+        self.push_str(&format!("const {} = {{\n", decl.name));
         self.indent_level += 1;
-        for variant in variants {
-            self.generate_node(variant);
+        for variant in &decl.variants {
+            self.generate_enum_variant(&variant.name, variant.named_fields, &variant.parameters)
         }
         self.indent_level -= 1;
         self.push_str(&self.get_indent());
         self.push_str("};\n");
     }
 
-    fn generate_enum_variant(&mut self, name: &str, named_fields: bool, parameters: &[Expr]) {
+    fn generate_enum_variant(&mut self, name: &Ident, named_fields: bool, parameters: &[Ident]) {
         self.push_str(&self.get_indent());
 
         if parameters.is_empty() {
@@ -724,7 +730,7 @@ impl CodegenJS {
             if i > 0 {
                 self.push_str(", ");
             }
-            self.generate_expr(param, None);
+            self.push_str(&param.to_string());
         }
         if named_fields {
             self.push_str(" }");
@@ -739,12 +745,10 @@ impl CodegenJS {
         for (i, param) in parameters.iter().enumerate() {
             self.push_str(&self.get_indent());
             if named_fields {
-                if let ExprKind::Identifier(i) = &param.kind {
-                    self.push_str(&i.to_string());
-                }
+                self.push_str(&param.to_string());
             } else {
                 self.push_str(&format!("[{}]: ", i));
-                self.generate_expr(param, None);
+                self.push_str(&param.to_string());
             }
             self.push_str(",\n");
         }
