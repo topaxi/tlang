@@ -279,7 +279,6 @@ impl SemanticAnalyzer {
         let mut ast_node = std::mem::take(&mut ast.ast_node);
 
         match &mut ast_node {
-            NodeKind::Expr(expr) => self.analyze_expr(expr),
             NodeKind::Legacy(AstNode::Module(nodes)) => {
                 nodes.iter_mut().for_each(|node| self.analyze_node(node))
             }

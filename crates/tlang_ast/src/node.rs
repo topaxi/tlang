@@ -41,7 +41,6 @@ pub enum NodeKind {
     #[default]
     None,
     Legacy(AstNode),
-    Expr(Expr),
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
@@ -100,16 +99,6 @@ impl<'a> From<&'a Token> for Node {
             ast_node: NodeKind::Legacy(AstNode::from(&token.kind)),
             symbol_table: None,
             span: Span::from_token(token),
-        }
-    }
-}
-
-impl<'a> From<&'a Expr> for Node {
-    fn from(expr: &Expr) -> Self {
-        Node {
-            ast_node: NodeKind::Expr(expr.clone()),
-            symbol_table: None,
-            span: expr.span.clone(),
         }
     }
 }

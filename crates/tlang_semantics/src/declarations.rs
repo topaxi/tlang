@@ -182,7 +182,6 @@ impl DeclarationAnalyzer {
         let mut ast_node = std::mem::take(&mut node.ast_node);
 
         match &mut ast_node {
-            NodeKind::Expr(expr) => self.collect_declarations_expr(expr),
             NodeKind::Legacy(AstNode::Module(nodes)) => {
                 self.collect_module_declarations(node, nodes)
             }
