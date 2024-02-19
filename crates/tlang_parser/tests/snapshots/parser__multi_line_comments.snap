@@ -5,7 +5,7 @@ expression: "parse!(\"/* this is a comment */\")"
 Node(
   ast_node: Legacy(Module([
     Stmt(
-      kind: None,
+      kind: MultiLineComment(" this is a comment "),
       span: Span(
         start: LineColumn(
           line: 0,

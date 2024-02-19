@@ -525,13 +525,22 @@ impl CodegenJS {
 
     pub fn generate_pat(&mut self, pattern: &Pattern) {
         match &pattern.kind {
+            PatternKind::Identifier { name, .. } => {
+                let var_name = self.current_scope().declare_variable(&name.to_string());
+                self.push_str(&var_name);
+                self.current_scope()
+                    .declare_variable_alias(&name.to_string(), &var_name);
+            }
             PatternKind::Enum {
                 identifier,
                 elements,
                 named_fields,
             } => self.generate_enum_extraction(identifier, elements, *named_fields),
             PatternKind::Literal(literal) => self.generate_literal(literal),
-            _ => unimplemented!("Pattern matching not implemented yet."),
+            patternKind => unimplemented!(
+                "Pattern matching not for {:?} implemented yet.",
+                patternKind
+            ),
         }
     }
 
