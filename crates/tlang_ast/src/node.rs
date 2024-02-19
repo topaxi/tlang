@@ -83,26 +83,6 @@ impl Node {
     }
 }
 
-impl From<AstNode> for Node {
-    fn from(ast_node: AstNode) -> Self {
-        Node {
-            ast_node: NodeKind::Legacy(ast_node),
-            symbol_table: None,
-            span: Span::default(),
-        }
-    }
-}
-
-impl<'a> From<&'a Token> for Node {
-    fn from(token: &Token) -> Self {
-        Node {
-            ast_node: NodeKind::Legacy(AstNode::from(&token.kind)),
-            symbol_table: None,
-            span: Span::from_token(token),
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct FunctionParameter {
     pub pattern: Box<Pattern>,
@@ -390,19 +370,6 @@ pub enum AstNode {
     SingleLineComment(String),
     MultiLineComment(String),
     TypeAnnotation(Ty),
-}
-
-impl<'a> From<&'a TokenKind> for AstNode {
-    fn from(token: &TokenKind) -> Self {
-        match token {
-            TokenKind::SingleLineComment(comment) => AstNode::SingleLineComment(comment.clone()),
-            TokenKind::MultiLineComment(comment) => AstNode::MultiLineComment(comment.clone()),
-            _ => unimplemented!(
-                "Expected token to be a literal or identifier, found {:?}",
-                token
-            ),
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Clone, Copy, Serialize)]
