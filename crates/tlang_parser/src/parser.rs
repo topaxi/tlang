@@ -563,8 +563,8 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_identifier_pattern(&mut self) -> Pattern {
-        let mut span = self.create_span_from_current_token();
         let name = self.consume_identifier();
+        let mut span = name.span;
 
         let mut node = if name.name == "_" {
             node::pat!(Wildcard)
@@ -678,8 +678,8 @@ impl<'src> Parser<'src> {
 
     /// Can be a Identifier, NestedIdentifier or FieldExpression with a single field name.
     fn parse_function_name(&mut self) -> Expr {
-        let mut span = self.create_span_from_current_token();
         let path = self.parse_identifier();
+        let mut span = path.span;
 
         let mut expr = if let Some(TokenKind::Dot) = self.current_token_kind() {
             self.advance();
