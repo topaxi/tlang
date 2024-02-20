@@ -302,13 +302,7 @@ impl SemanticAnalyzer {
             NodeKind::Legacy(AstNode::Module(nodes)) => {
                 nodes.iter_mut().for_each(|node| self.analyze_stmt(node))
             }
-            NodeKind::None
-            | NodeKind::Legacy(
-                AstNode::None
-                | AstNode::Wildcard
-                | AstNode::SingleLineComment(_)
-                | AstNode::MultiLineComment(_),
-            ) => {
+            NodeKind::None | NodeKind::Legacy(AstNode::None) => {
                 // Nothing to do here
             }
         }

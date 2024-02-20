@@ -260,22 +260,6 @@ impl CodegenJS {
         }
     }
 
-    fn generate_comment(&mut self, node: &Node) {
-        match &node.ast_node {
-            NodeKind::Legacy(AstNode::SingleLineComment(comment)) => {
-                self.push_str("//");
-                self.push_str(comment);
-                self.push_char('\n');
-            }
-            NodeKind::Legacy(AstNode::MultiLineComment(comment)) => {
-                self.push_str("/*");
-                self.push_str(comment);
-                self.push_str("*/\n");
-            }
-            _ => unreachable!(),
-        }
-    }
-
     /// Generates blocks in expression position.
     fn generate_block_expression(&mut self, statements: &[Stmt], expression: &Option<Expr>) {
         let has_completion_var = self.completion_variables.last().unwrap().is_some();
@@ -552,15 +536,11 @@ impl CodegenJS {
         // TODO: Split into generate_statement and generate_expression.
         //       This should also help setting proper block contexts.
         match &node.ast_node {
-            NodeKind::Legacy(AstNode::SingleLineComment(_) | AstNode::MultiLineComment(_)) => {
-                self.generate_comment(node);
-            }
             NodeKind::Legacy(AstNode::Module(statements)) => {
                 self.generate_statements(statements);
                 self.flush_statement_buffer();
             }
-            NodeKind::Legacy(AstNode::Wildcard) => unreachable!("Stray wildcard expression, you can only use _ wildcards in function declarations, pipelines and pattern matching."),
-            NodeKind::Legacy(AstNode::None) => {},
+            NodeKind::Legacy(AstNode::None) => {}
             // Allow unreachable path, as we add new AST nodes, we do not want to automatically
             // start failing tests while we are still implementing the codegen.
             #[allow(unreachable_patterns)]

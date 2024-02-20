@@ -239,13 +239,7 @@ impl DeclarationAnalyzer {
             NodeKind::Legacy(AstNode::Module(nodes)) => {
                 self.collect_module_declarations(node, nodes)
             }
-            NodeKind::None
-            | NodeKind::Legacy(
-                AstNode::None
-                | AstNode::Wildcard
-                | AstNode::SingleLineComment(_)
-                | AstNode::MultiLineComment(_),
-            ) => {
+            NodeKind::None | NodeKind::Legacy(AstNode::None) => {
                 // Nothing to do here
             }
         }

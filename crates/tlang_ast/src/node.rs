@@ -416,9 +416,6 @@ pub enum AstNode {
     #[default]
     None,
     Module(Vec<Stmt>),
-    Wildcard,
-    SingleLineComment(String),
-    MultiLineComment(String),
 }
 
 #[derive(Debug, PartialEq, Clone, Copy, Serialize)]
