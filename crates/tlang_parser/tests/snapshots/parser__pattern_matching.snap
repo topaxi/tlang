@@ -51,129 +51,90 @@ Node(
               ),
             ),
             arms: [
-              Node(
-                ast_node: Legacy(MatchArm(
-                  pattern: Pattern(
-                    kind: Literal(Integer(1)),
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 18,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 19,
-                      ),
+              MatchArm(
+                pattern: Pattern(
+                  kind: Literal(Integer(1)),
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 18,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 19,
                     ),
                   ),
-                  expression: Expr(
-                    kind: Literal(Integer(2)),
-                    symbol_table: None,
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 23,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 24,
-                      ),
+                ),
+                expression: Expr(
+                  kind: Literal(Integer(2)),
+                  symbol_table: None,
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 23,
                     ),
-                  ),
-                )),
-                symbol_table: None,
-                span: Span(
-                  start: LineColumn(
-                    line: 0,
-                    column: 0,
-                  ),
-                  end: LineColumn(
-                    line: 0,
-                    column: 0,
+                    end: LineColumn(
+                      line: 0,
+                      column: 24,
+                    ),
                   ),
                 ),
               ),
-              Node(
-                ast_node: Legacy(MatchArm(
-                  pattern: Pattern(
-                    kind: Literal(Integer(3)),
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 26,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 27,
-                      ),
+              MatchArm(
+                pattern: Pattern(
+                  kind: Literal(Integer(3)),
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 26,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 27,
                     ),
                   ),
-                  expression: Expr(
-                    kind: Literal(Integer(4)),
-                    symbol_table: None,
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 31,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 32,
-                      ),
+                ),
+                expression: Expr(
+                  kind: Literal(Integer(4)),
+                  symbol_table: None,
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 31,
                     ),
-                  ),
-                )),
-                symbol_table: None,
-                span: Span(
-                  start: LineColumn(
-                    line: 0,
-                    column: 0,
-                  ),
-                  end: LineColumn(
-                    line: 0,
-                    column: 0,
+                    end: LineColumn(
+                      line: 0,
+                      column: 32,
+                    ),
                   ),
                 ),
               ),
-              Node(
-                ast_node: Legacy(MatchArm(
-                  pattern: Pattern(
-                    kind: Wildcard,
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 34,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 35,
-                      ),
+              MatchArm(
+                pattern: Pattern(
+                  kind: Wildcard,
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 34,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 35,
                     ),
                   ),
-                  expression: Expr(
-                    kind: Literal(Integer(5)),
-                    symbol_table: None,
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 39,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 40,
-                      ),
+                ),
+                expression: Expr(
+                  kind: Literal(Integer(5)),
+                  symbol_table: None,
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 39,
                     ),
-                  ),
-                )),
-                symbol_table: None,
-                span: Span(
-                  start: LineColumn(
-                    line: 0,
-                    column: 0,
-                  ),
-                  end: LineColumn(
-                    line: 0,
-                    column: 0,
+                    end: LineColumn(
+                      line: 0,
+                      column: 40,
+                    ),
                   ),
                 ),
               ),

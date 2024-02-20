@@ -1,7 +1,7 @@
 use tlang_ast::node::{
     self, Associativity, BinaryOpKind, EnumDeclaration, EnumVariant, Expr, ExprKind,
-    FunctionDeclaration, FunctionParameter, Ident, Node, OperatorInfo, Path, Pattern, PatternKind,
-    Stmt, StmtKind, Ty, UnaryOp,
+    FunctionDeclaration, FunctionParameter, Ident, MatchArm, Node, OperatorInfo, Path, Pattern,
+    PatternKind, Stmt, StmtKind, Ty, UnaryOp,
 };
 use tlang_ast::span::Span;
 use tlang_ast::symbols::SymbolId;
@@ -828,10 +828,10 @@ impl<'src> Parser<'src> {
             let pattern = self.parse_pattern();
             self.consume_token(TokenKind::FatArrow);
             let expression = self.parse_expression();
-            arms.push(node::new!(MatchArm {
-                pattern: Box::new(pattern),
-                expression: Box::new(expression),
-            }));
+            arms.push(MatchArm {
+                pattern,
+                expression,
+            });
             if let Some(TokenKind::Comma) = self.current_token_kind() {
                 self.advance();
             }

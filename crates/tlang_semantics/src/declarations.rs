@@ -218,7 +218,8 @@ impl DeclarationAnalyzer {
             ExprKind::Match { expression, arms } => {
                 self.collect_declarations_expr(expression);
                 for arm in arms {
-                    self.collect_declarations(arm);
+                    self.collect_pattern(&mut arm.pattern);
+                    self.collect_declarations_expr(&mut arm.expression);
                 }
             }
             ExprKind::Range { start, end, .. } => {
@@ -237,9 +238,6 @@ impl DeclarationAnalyzer {
         match &mut ast_node {
             NodeKind::Legacy(AstNode::Module(nodes)) => {
                 self.collect_module_declarations(node, nodes)
-            }
-            NodeKind::Legacy(AstNode::MatchArm { .. }) => {
-                // TODO
             }
             NodeKind::None
             | NodeKind::Legacy(

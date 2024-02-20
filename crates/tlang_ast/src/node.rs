@@ -179,7 +179,7 @@ pub enum ExprKind {
     },
     Match {
         expression: Box<Expr>,
-        arms: Vec<Node>,
+        arms: Vec<MatchArm>,
     },
     RecursiveCall(Box<Expr>),
     Range {
@@ -380,7 +380,7 @@ impl<'a> From<&'a TokenKind> for StmtKind {
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct Ty {
-    pub name: Box<Path>,
+    pub name: Path,
     pub parameters: Vec<Ty>,
     pub span: Span,
 }
@@ -388,7 +388,7 @@ pub struct Ty {
 impl Ty {
     pub fn new(name: Path) -> Self {
         Ty {
-            name: Box::new(name),
+            name,
             parameters: vec![],
             span: Span::default(),
         }
@@ -405,15 +405,17 @@ impl Ty {
     }
 }
 
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct MatchArm {
+    pub pattern: Pattern,
+    pub expression: Expr,
+}
+
 #[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub enum AstNode {
     #[default]
     None,
     Module(Vec<Stmt>),
-    MatchArm {
-        pattern: Box<Pattern>,
-        expression: Box<Expr>,
-    },
     Wildcard,
     SingleLineComment(String),
     MultiLineComment(String),

@@ -559,7 +559,6 @@ impl CodegenJS {
                 self.generate_statements(statements);
                 self.flush_statement_buffer();
             }
-            NodeKind::Legacy(AstNode::MatchArm { .. }) => unreachable!("MatchArm is being generated in generate_match_expression."),
             NodeKind::Legacy(AstNode::Wildcard) => unreachable!("Stray wildcard expression, you can only use _ wildcards in function declarations, pipelines and pattern matching."),
             NodeKind::Legacy(AstNode::None) => {},
             // Allow unreachable path, as we add new AST nodes, we do not want to automatically

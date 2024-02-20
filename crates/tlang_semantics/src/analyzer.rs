@@ -248,7 +248,8 @@ impl SemanticAnalyzer {
                 self.analyze_expr(expression);
 
                 for arm in arms {
-                    self.analyze_node(arm);
+                    self.analyze_pat(&mut arm.pattern);
+                    self.analyze_expr(&mut arm.expression)
                 }
             }
             ExprKind::Range { start, end, .. } => {
@@ -300,9 +301,6 @@ impl SemanticAnalyzer {
         match &mut ast_node {
             NodeKind::Legacy(AstNode::Module(nodes)) => {
                 nodes.iter_mut().for_each(|node| self.analyze_stmt(node))
-            }
-            NodeKind::Legacy(AstNode::MatchArm { .. }) => {
-                // TODO
             }
             NodeKind::None
             | NodeKind::Legacy(

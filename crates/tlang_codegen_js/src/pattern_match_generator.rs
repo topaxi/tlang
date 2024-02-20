@@ -1,17 +1,11 @@
-use tlang_ast::node::{AstNode, Expr, ExprKind, Node, NodeKind, Pattern, PatternKind};
+use tlang_ast::node::{Expr, ExprKind, MatchArm, Pattern, PatternKind};
 
 use crate::generator::{BlockContext, CodegenJS};
 
-fn match_args_have_completions(arms: &[Node]) -> bool {
-    arms.iter().any(|arm| match &arm.ast_node {
-        NodeKind::Legacy(AstNode::MatchArm {
-            pattern: _,
-            expression,
-        }) => match &expression.kind {
-            ExprKind::Block(_, expr) => expr.is_some(),
-            _ => true,
-        },
-        _ => unreachable!(),
+fn match_args_have_completions(arms: &[MatchArm]) -> bool {
+    arms.iter().any(|arm| match &arm.expression.kind {
+        ExprKind::Block(_, expr) => expr.is_some(),
+        _ => true,
     })
 }
 
@@ -31,7 +25,7 @@ fn generate_match_arm_expression(codegen: &mut CodegenJS, expression: &Expr) {
     }
 }
 
-pub fn generate_match_expression(codegen: &mut CodegenJS, expression: &Expr, arms: &[Node]) {
+pub fn generate_match_expression(codegen: &mut CodegenJS, expression: &Expr, arms: &[MatchArm]) {
     // TODO: A lot here is copied from the if statement generator.
     let lhs = codegen.replace_statement_buffer(String::new());
     let has_block_completions = match_args_have_completions(arms);
@@ -49,41 +43,40 @@ pub fn generate_match_expression(codegen: &mut CodegenJS, expression: &Expr, arm
 
     codegen.push_indent();
 
-    for (i, arm) in arms.iter().enumerate() {
-        match &arm.ast_node {
-            NodeKind::Legacy(AstNode::MatchArm {
-                pattern,
-                expression,
-            }) => {
-                if !is_wildcard_pattern(pattern) {
-                    codegen.push_str("if (");
-                    codegen.push_str(&match_value_tmp_var);
-                    codegen.push_str(" === ");
-                    codegen.generate_pat(pattern);
-                    codegen.push_str(") {\n");
-                    codegen.inc_indent();
-                    codegen.push_context(BlockContext::Expression);
-                    generate_match_arm_expression(codegen, expression);
-                    codegen.pop_context();
-                    codegen.dec_indent();
-                    codegen.push_indent();
-                    if i == arms.len() - 1 {
-                        codegen.push_str("}");
-                    } else {
-                        codegen.push_str("} else ");
-                    }
-                } else {
-                    codegen.push_str("{\n");
-                    codegen.inc_indent();
-                    codegen.push_context(BlockContext::Expression);
-                    generate_match_arm_expression(codegen, expression);
-                    codegen.pop_context();
-                    codegen.dec_indent();
-                    codegen.push_indent();
-                    codegen.push_str("}");
-                }
+    for (
+        i,
+        MatchArm {
+            pattern,
+            expression,
+        },
+    ) in arms.iter().enumerate()
+    {
+        if !is_wildcard_pattern(pattern) {
+            codegen.push_str("if (");
+            codegen.push_str(&match_value_tmp_var);
+            codegen.push_str(" === ");
+            codegen.generate_pat(pattern);
+            codegen.push_str(") {\n");
+            codegen.inc_indent();
+            codegen.push_context(BlockContext::Expression);
+            generate_match_arm_expression(codegen, expression);
+            codegen.pop_context();
+            codegen.dec_indent();
+            codegen.push_indent();
+            if i == arms.len() - 1 {
+                codegen.push_str("}");
+            } else {
+                codegen.push_str("} else ");
             }
-            _ => unreachable!(),
+        } else {
+            codegen.push_str("{\n");
+            codegen.inc_indent();
+            codegen.push_context(BlockContext::Expression);
+            generate_match_arm_expression(codegen, expression);
+            codegen.pop_context();
+            codegen.dec_indent();
+            codegen.push_indent();
+            codegen.push_str("}");
         }
     }
 
