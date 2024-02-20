@@ -8,7 +8,7 @@ use crate::{
     token::{Literal, Token, TokenKind},
 };
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Ident {
     pub name: String,
     pub span: Span,

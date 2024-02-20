@@ -101,13 +101,13 @@ impl SemanticAnalyzer {
                         name, suggestion.symbol_type, suggestion.name
                     ),
                     Severity::Error,
-                    span.clone(),
+                    *span,
                 ));
             } else {
                 self.diagnostics.push(Diagnostic::new(
                     format!("Use of undeclared variable `{}`", name),
                     Severity::Error,
-                    span.clone(),
+                    *span,
                 ));
             }
         }
@@ -342,7 +342,7 @@ impl SemanticAnalyzer {
                         unused_symbol.symbol_type, unused_symbol.name, unused_symbol.name
                     ),
                     Severity::Warning,
-                    unused_symbol.defined_at.clone().unwrap_or_else(|| span.clone()).clone()
+                    unused_symbol.defined_at.clone().unwrap_or_else(|| *span)
                 ));
         }
     }

@@ -141,7 +141,7 @@ impl<'src> Parser<'src> {
                 actual.as_ref().unwrap().kind
             ),
             kind: ParseErrorKind::UnexpectedToken(actual.clone().unwrap()),
-            span: actual.as_ref().unwrap().span.clone(),
+            span: actual.as_ref().unwrap().span,
         });
     }
 
@@ -198,7 +198,7 @@ impl<'src> Parser<'src> {
         expect_token_matches!(self, TokenKind::Identifier(_));
         let current_token = self.current_token.as_ref().unwrap();
         let name = current_token.kind.get_identifier().unwrap().clone();
-        let span = current_token.span.clone();
+        let span = current_token.span;
         self.advance();
         Ident::new(&name, span)
     }
@@ -514,7 +514,7 @@ impl<'src> Parser<'src> {
     /// Parses a function call expression, e.g. `foo()`, `foo(1, 2, 3)` and
     /// `foo { bar, baz }`.
     fn parse_call_expression(&mut self, expr: Expr) -> Expr {
-        let mut span = expr.span.clone();
+        let mut span = expr.span;
         log::debug!(
             "Parsing call expression, current token: {:?}",
             self.current_token
@@ -791,11 +791,11 @@ impl<'src> Parser<'src> {
                 } else {
                     let mut expr = Expr::new(ExprKind::Identifier(Ident::new(
                         identifier,
-                        identifier_span.clone(),
+                        identifier_span,
                     )));
 
                     if let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
-                        let mut identifiers = vec![Ident::new(identifier, identifier_span.clone())];
+                        let mut identifiers = vec![Ident::new(identifier, identifier_span)];
                         while let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
                             self.advance();
                             identifiers.push(self.consume_identifier());

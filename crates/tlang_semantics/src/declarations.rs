@@ -116,7 +116,7 @@ impl DeclarationAnalyzer {
                     decl.id,
                     &decl.name.to_string(),
                     SymbolType::Enum,
-                    Some(stmt.span.clone()),
+                    Some(stmt.span),
                 ));
             }
             StmtKind::SingleLineComment(_) | StmtKind::MultiLineComment(_) => {
@@ -159,7 +159,7 @@ impl DeclarationAnalyzer {
                     decl.id,
                     &name_as_str,
                     SymbolType::Function,
-                    Some(name.span.clone()),
+                    Some(name.span),
                 ));
 
                 self.collect_declarations_from_fn(decl);
@@ -315,7 +315,7 @@ impl DeclarationAnalyzer {
             declaration.id,
             &name_as_str,
             SymbolType::Function,
-            Some(declaration.name.span.clone()),
+            Some(declaration.name.span),
         ));
 
         // Function arguments have their own scope.
@@ -349,7 +349,7 @@ impl DeclarationAnalyzer {
                         .last()
                         .unwrap_or(&SymbolType::Variable)
                         .clone(),
-                    Some(pattern.span.clone()),
+                    Some(pattern.span),
                 ));
             }
             PatternKind::List(patterns) => {
