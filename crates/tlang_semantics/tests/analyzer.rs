@@ -11,11 +11,17 @@ use tlang_semantics::{
     diagnostic::{Diagnostic, Severity},
 };
 
+fn create_analyzer(builtin_symbols: &[(&str, SymbolType)]) -> SemanticAnalyzer {
+    let mut analyzer = SemanticAnalyzer::default();
+    analyzer.add_builtin_symbols(builtin_symbols);
+    analyzer
+}
+
 macro_rules! analyze {
     ($source:expr) => {{
         let mut parser = Parser::from_source($source);
         let mut ast = parser.parse().unwrap();
-        let mut analyzer = SemanticAnalyzer::default();
+        let mut analyzer = $crate::create_analyzer(&[]);
         match analyzer.analyze(&mut ast) {
             Ok(_) => ast,
             Err(diagnostics) => panic!("Expected no error diagnostics, got {:#?}", diagnostics),
@@ -25,9 +31,13 @@ macro_rules! analyze {
 
 macro_rules! analyze_diag {
     ($source:expr) => {{
+        analyze_diag!($source, &vec![])
+    }};
+
+    ($source:expr, $builtin_symbols:expr) => {{
         let mut parser = Parser::from_source($source);
         let mut ast = parser.parse().unwrap();
-        let mut analyzer = SemanticAnalyzer::default();
+        let mut analyzer = $crate::create_analyzer(&$builtin_symbols);
         let _ = analyzer.analyze(&mut ast);
         analyzer.get_diagnostics().to_owned()
     }};
@@ -400,5 +410,38 @@ fn should_not_warn_about_unused_variables_prefixed_with_underscore() {
         let _a = 1;
         let _b = 2;
     "});
+    assert_eq!(diagnostics, vec![]);
+}
+
+#[test]
+fn should_handle_fn_guard_variables() {
+    let diagnostics = analyze_diag!(indoc! {"
+        fn fib(n) if n < 2 { n }
+        fn fib(n) { fib(n - 1) + fib(n - 2) }
+    "});
+    assert_eq!(diagnostics, vec![]);
+
+    let diagnostics = analyze_diag!(
+        indoc! {"
+        fn binary_search(list, target) { binary_search(list, target, 0, len(list) - 1) }
+        fn binary_search(_, _, low, high) if low > high; { -1 }
+        fn binary_search(list, target, low, high) {
+            let mid = floor((low + high) / 2);
+            let midValue = list[mid];
+
+            if midValue == target; {
+                mid
+            } else if midValue < target; {
+                binary_search(list, target, mid + 1, high)
+            } else {
+                binary_search(list, target, low, mid - 1)
+            }
+        }
+    "},
+        [
+            ("len", SymbolType::Function),
+            ("floor", SymbolType::Function)
+        ]
+    );
     assert_eq!(diagnostics, vec![]);
 }
