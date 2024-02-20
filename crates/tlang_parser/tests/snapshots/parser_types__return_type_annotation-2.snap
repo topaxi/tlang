@@ -8,8 +8,22 @@ Node(
       kind: FunctionDeclaration(FunctionDeclaration(
         id: SymbolId(1),
         name: Expr(
-          kind: Identifier(Ident(
-            name: "foo",
+          kind: Path(Path(
+            segments: [
+              Ident(
+                name: "foo",
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 3,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 6,
+                  ),
+                ),
+              ),
+            ],
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -38,8 +52,22 @@ Node(
         return_type_annotation: Some(Node(
           ast_node: Legacy(TypeAnnotation(Ty(
             name: Expr(
-              kind: Identifier(Ident(
-                name: "Option",
+              kind: Path(Path(
+                segments: [
+                  Ident(
+                    name: "Option",
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 12,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 18,
+                      ),
+                    ),
+                  ),
+                ],
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -67,8 +95,22 @@ Node(
               Node(
                 ast_node: Legacy(TypeAnnotation(Ty(
                   name: Expr(
-                    kind: Identifier(Ident(
-                      name: "i64",
+                    kind: Path(Path(
+                      segments: [
+                        Ident(
+                          name: "i64",
+                          span: Span(
+                            start: LineColumn(
+                              line: 0,
+                              column: 19,
+                            ),
+                            end: LineColumn(
+                              line: 0,
+                              column: 22,
+                            ),
+                          ),
+                        ),
+                      ],
                       span: Span(
                         start: LineColumn(
                           line: 0,

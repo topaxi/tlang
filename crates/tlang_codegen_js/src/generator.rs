@@ -1,8 +1,8 @@
 use crate::{
     binary_operator_generator::generate_binary_op,
     function_generator::{
-        generate_function_declaration, generate_function_declarations,
-        generate_function_expression, generate_function_parameter, generate_return_statement,
+        fn_identifier_to_string, generate_function_declaration, generate_function_declarations,
+        generate_function_expression, generate_return_statement,
     },
     pattern_match_generator::generate_match_expression,
     scope::Scope,
@@ -440,17 +440,21 @@ impl CodegenJS {
             ExprKind::FieldExpression { base, field } => {
                 self.generate_expr(base, None);
                 self.push_char('.');
-                self.generate_expr(field, None);
+                self.push_str(&field.to_string());
             }
-            ExprKind::Identifier(ident) => self.generate_identifier(ident),
-            ExprKind::NestedIdentifier(idents) => {
-                self.push_str(
-                    &idents
-                        .iter()
-                        .map(|ident| ident.to_string())
-                        .collect::<Vec<_>>()
-                        .join("."),
-                );
+            ExprKind::Path(path) => {
+                if path.segments.len() == 1 {
+                    self.generate_identifier(&path.segments.first().unwrap());
+                } else {
+                    self.push_str(
+                        &path
+                            .segments
+                            .iter()
+                            .map(|ident| ident.to_string())
+                            .collect::<Vec<_>>()
+                            .join("."),
+                    );
+                }
             }
             ExprKind::IndexExpression { base, index } => {
                 self.generate_expr(base, None);
@@ -836,11 +840,11 @@ impl CodegenJS {
             arguments,
         } = &node.kind
         {
-            if let ExprKind::Identifier(ident) = &function.kind {
+            if let ExprKind::Path(_) = &function.kind {
                 if let Some(function_context) = self.function_context_stack.last() {
                     if function_context.is_tail_recursive
                         // TODO: Comparing identifier by string might not be the best idea.
-                        && function_context.name == ident.to_string()
+                        && function_context.name == fn_identifier_to_string(function)
                     {
                         let params = function_context.params.clone();
                         let remap_to_rest_args = function_context.remap_to_rest_args;

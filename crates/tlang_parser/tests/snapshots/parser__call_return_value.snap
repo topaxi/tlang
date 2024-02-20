@@ -10,8 +10,22 @@ Node(
           function: Expr(
             kind: Call(
               function: Expr(
-                kind: Identifier(Ident(
-                  name: "foo",
+                kind: Path(Path(
+                  segments: [
+                    Ident(
+                      name: "foo",
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 0,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 3,
+                        ),
+                      ),
+                    ),
+                  ],
                   span: Span(
                     start: LineColumn(
                       line: 0,
@@ -31,7 +45,7 @@ Node(
                   ),
                   end: LineColumn(
                     line: 0,
-                    column: 0,
+                    column: 3,
                   ),
                 ),
               ),

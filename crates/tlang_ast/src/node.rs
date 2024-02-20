@@ -155,7 +155,7 @@ pub enum ExprKind {
     FunctionExpression(FunctionDeclaration),
     FieldExpression {
         base: Box<Expr>,
-        field: Box<Expr>,
+        field: Box<Ident>,
     },
     IndexExpression {
         base: Box<Expr>,
@@ -170,9 +170,7 @@ pub enum ExprKind {
     },
     List(Vec<Expr>),
     Literal(Literal),
-    // Identifier might not be necessary as that can be covered by the NestedIdentifier
-    Identifier(Ident),
-    NestedIdentifier(Vec<Ident>),
+    Path(Path),
     UnaryOp(UnaryOp, Box<Expr>),
     BinaryOp {
         op: BinaryOpKind,
@@ -197,13 +195,44 @@ impl<'a> From<&'a TokenKind> for ExprKind {
         match token {
             TokenKind::Literal(literal) => ExprKind::Literal(literal.clone()),
             TokenKind::Identifier(name) => {
-                ExprKind::Identifier(Ident::new(name, Default::default()))
+                ExprKind::Path(Path::from_ident(Ident::new(name, Default::default())))
             }
             _ => unimplemented!(
                 "Expected token to be a literal or identifier, found {:?}",
                 token
             ),
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct Path {
+    pub segments: Vec<Ident>,
+    pub span: Span,
+}
+
+impl Path {
+    pub fn new(segments: Vec<Ident>) -> Self {
+        Path {
+            segments,
+            span: Span::default(),
+        }
+    }
+
+    pub fn from_ident(ident: Ident) -> Self {
+        Path {
+            segments: vec![ident.clone()],
+            span: ident.span,
+        }
+    }
+
+    pub fn with_span(mut self, span: Span) -> Self {
+        self.span = span;
+        self
+    }
+
+    pub fn push(&mut self, ident: Ident) {
+        self.segments.push(ident);
     }
 }
 

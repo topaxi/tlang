@@ -8,8 +8,22 @@ Node(
       kind: FunctionDeclaration(FunctionDeclaration(
         id: SymbolId(1),
         name: Expr(
-          kind: Identifier(Ident(
-            name: "foo",
+          kind: Path(Path(
+            segments: [
+              Ident(
+                name: "foo",
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 3,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 6,
+                  ),
+                ),
+              ),
+            ],
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -66,8 +80,22 @@ Node(
             type_annotation: Some(Node(
               ast_node: Legacy(TypeAnnotation(Ty(
                 name: Expr(
-                  kind: Identifier(Ident(
-                    name: "i64",
+                  kind: Path(Path(
+                    segments: [
+                      Ident(
+                        name: "i64",
+                        span: Span(
+                          start: LineColumn(
+                            line: 0,
+                            column: 10,
+                          ),
+                          end: LineColumn(
+                            line: 0,
+                            column: 13,
+                          ),
+                        ),
+                      ),
+                    ],
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -148,8 +176,22 @@ Node(
             type_annotation: Some(Node(
               ast_node: Legacy(TypeAnnotation(Ty(
                 name: Expr(
-                  kind: Identifier(Ident(
-                    name: "i64",
+                  kind: Path(Path(
+                    segments: [
+                      Ident(
+                        name: "i64",
+                        span: Span(
+                          start: LineColumn(
+                            line: 0,
+                            column: 18,
+                          ),
+                          end: LineColumn(
+                            line: 0,
+                            column: 21,
+                          ),
+                        ),
+                      ),
+                    ],
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -203,8 +245,22 @@ Node(
         return_type_annotation: Some(Node(
           ast_node: Legacy(TypeAnnotation(Ty(
             name: Expr(
-              kind: Identifier(Ident(
-                name: "i64",
+              kind: Path(Path(
+                segments: [
+                  Ident(
+                    name: "i64",
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 26,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 29,
+                      ),
+                    ),
+                  ),
+                ],
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -244,8 +300,22 @@ Node(
         )),
         body: Expr(
           kind: Block([], Some(Expr(
-            kind: Identifier(Ident(
-              name: "x",
+            kind: Path(Path(
+              segments: [
+                Ident(
+                  name: "x",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 32,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 33,
+                    ),
+                  ),
+                ),
+              ],
               span: Span(
                 start: LineColumn(
                   line: 0,

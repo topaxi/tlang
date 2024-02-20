@@ -1,7 +1,7 @@
 use tlang_ast::node::{
     self, Associativity, BinaryOpKind, EnumDeclaration, EnumVariant, Expr, ExprKind,
-    FunctionDeclaration, FunctionParameter, Ident, Node, OperatorInfo, Pattern, PatternKind, Stmt,
-    StmtKind, Ty, UnaryOp,
+    FunctionDeclaration, FunctionParameter, Ident, Node, OperatorInfo, Path, Pattern, PatternKind,
+    Stmt, StmtKind, Ty, UnaryOp,
 };
 use tlang_ast::span::Span;
 use tlang_ast::symbols::SymbolId;
@@ -319,30 +319,25 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_single_identifier(&mut self) -> Expr {
+        let path = Path::from_ident(self.consume_identifier());
+        let span = path.span;
+        node::expr!(Path(path)).with_span(span)
+    }
+
+    fn parse_identifier(&mut self) -> Expr {
         // How do we generalize this span handling?
         // Callbacks come to mind, but I'd rather not.
         // Adding another stack is also not ideal.
         let mut span = self.create_span_from_current_token();
-        let identifier = self.consume_identifier();
-        self.end_span_from_previous_token(&mut span);
-        node::expr!(Identifier(identifier)).with_span(span)
-    }
-
-    fn parse_identifier(&mut self) -> Expr {
-        let mut span = self.create_span_from_current_token();
-        let mut identifiers = vec![self.consume_identifier()];
+        let mut path = Path::from_ident(self.consume_identifier());
         while let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
             self.advance();
-            identifiers.push(self.consume_identifier());
+            path.push(self.consume_identifier());
         }
 
         self.end_span_from_previous_token(&mut span);
 
-        if identifiers.len() == 1 {
-            node::expr!(Identifier(identifiers.pop().unwrap())).with_span(span)
-        } else {
-            node::expr!(NestedIdentifier(identifiers)).with_span(span)
-        }
+        node::expr!(Path(path)).with_span(span)
     }
 
     fn parse_enum_declaration(&mut self) -> Stmt {
@@ -359,8 +354,8 @@ impl<'src> Parser<'src> {
         self.consume_token(TokenKind::RBrace);
         node::stmt!(EnumDeclaration(EnumDeclaration {
             id: self.unique_id(),
-            name: name,
-            variants: variants,
+            name,
+            variants,
         }))
     }
 
@@ -548,7 +543,6 @@ impl<'src> Parser<'src> {
 
         self.end_span_from_previous_token(&mut span);
 
-        // TODO: Call expr does not have proper span
         node::expr!(Call {
             function: Box::new(expr),
             arguments: arguments,
@@ -673,28 +667,21 @@ impl<'src> Parser<'src> {
     /// Can be a Identifier, NestedIdentifier or FieldExpression with a single field name.
     fn parse_function_name(&mut self) -> Expr {
         let mut span = self.create_span_from_current_token();
-        let mut identifiers = vec![self.consume_identifier()];
+        let path = self.parse_identifier();
 
-        let mut node = if let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
-            while let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
-                self.advance();
-                identifiers.push(self.consume_identifier());
-            }
-
-            node::expr!(NestedIdentifier(identifiers))
-        } else if let Some(TokenKind::Dot) = self.current_token_kind() {
+        let mut expr = if let Some(TokenKind::Dot) = self.current_token_kind() {
             self.advance();
             node::expr!(FieldExpression {
-                base: Box::new(node::expr!(Identifier(identifiers.pop().unwrap()))),
-                field: Box::new(self.parse_single_identifier()),
+                base: Box::new(path),
+                field: Box::new(self.consume_identifier()),
             })
         } else {
-            node::expr!(Identifier(identifiers.pop().unwrap()))
+            path
         };
 
         self.end_span_from_previous_token(&mut span);
-        node.span = span;
-        node
+        expr.span = span;
+        expr
     }
 
     fn parse_if_else_expression(&mut self) -> Expr {
@@ -789,19 +776,19 @@ impl<'src> Parser<'src> {
                 if identifier == "_" {
                     node::expr!(Wildcard)
                 } else {
-                    let mut expr = Expr::new(ExprKind::Identifier(Ident::new(
-                        identifier,
-                        identifier_span,
-                    )));
+                    let mut path = Path::from_ident(Ident::new(identifier, identifier_span));
+                    let mut span = path.span;
 
                     if let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
-                        let mut identifiers = vec![Ident::new(identifier, identifier_span)];
                         while let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
                             self.advance();
-                            identifiers.push(self.consume_identifier());
+                            path.push(self.consume_identifier());
                         }
-                        expr = node::expr!(NestedIdentifier(identifiers));
                     }
+
+                    self.end_span_from_previous_token(&mut span);
+
+                    let mut expr = Expr::new(ExprKind::Path(path)).with_span(span);
 
                     if let Some(TokenKind::LParen | TokenKind::LBrace) = self.current_token_kind() {
                         expr = self.parse_call_expression(expr);
@@ -913,7 +900,7 @@ impl<'src> Parser<'src> {
 
                 Some(node::new!(TypeAnnotation(Ty {
                     name: Box::new(identifier),
-                    parameters: parameters,
+                    parameters,
                 })))
             }
             _ => unreachable!("Expected type annotation, found {:?}", token),
@@ -954,7 +941,10 @@ impl<'src> Parser<'src> {
         let name = if let Some(TokenKind::Identifier(_)) = &self.current_token_kind() {
             self.parse_single_identifier()
         } else {
-            node::expr!(Identifier(Ident::new("anonymous", Default::default())))
+            node::expr!(Path(Path::from_ident(Ident::new(
+                "anonymous",
+                Default::default()
+            ))))
         };
 
         let parameters = self.parse_parameter_list();
@@ -1083,7 +1073,7 @@ impl<'src> Parser<'src> {
                 }
 
                 match node.kind {
-                    ExprKind::Identifier(_) | ExprKind::NestedIdentifier(_) => {
+                    ExprKind::Path(_) => {
                         // We found a simple identifier, which we can use as the name of the function.
                         name = Some(node);
                     }
@@ -1123,9 +1113,9 @@ impl<'src> Parser<'src> {
 
             if let StmtKind::FunctionDeclaration(_) = declaration.kind {
                 return declaration;
-            } else {
-                unreachable!("Expected function declaration, found {:?}", declaration);
             }
+
+            unreachable!("Expected function declaration, found {:?}", declaration);
         }
 
         node::stmt!(FunctionDeclarations(declarations))
@@ -1345,7 +1335,7 @@ impl<'src> Parser<'src> {
                     let field_name = self.consume_identifier();
                     lhs = node::expr!(FieldExpression {
                         base: Box::new(lhs),
-                        field: Box::new(node::expr!(Identifier(field_name))),
+                        field: Box::new(field_name),
                     });
                 }
                 Some(TokenKind::LBracket) => {
@@ -1405,8 +1395,8 @@ impl<'src> Parser<'src> {
 
     fn fn_name_identifier_to_string(&self, identifier: &Expr) -> String {
         match &identifier.kind {
-            ExprKind::Identifier(identifier) => identifier.to_string(),
-            ExprKind::NestedIdentifier(identifiers) => identifiers
+            ExprKind::Path(path) => path
+                .segments
                 .iter()
                 .map(|ident| ident.to_string())
                 .collect::<Vec<_>>()
@@ -1415,7 +1405,7 @@ impl<'src> Parser<'src> {
                 format!(
                     "{}.{}",
                     self.fn_name_identifier_to_string(base),
-                    self.fn_name_identifier_to_string(field)
+                    field.to_string()
                 )
             }
             _ => {

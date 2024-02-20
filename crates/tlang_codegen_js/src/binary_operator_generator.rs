@@ -30,7 +30,7 @@ pub fn generate_binary_op(
 
     if let BinaryOpKind::Pipeline = op {
         // If rhs was an identifier, we just pass lhs it as an argument to a function call.
-        if let ExprKind::Identifier(_) = rhs.kind {
+        if let ExprKind::Path(_) = rhs.kind {
             codegen.generate_expr(rhs, None);
             codegen.push_char('(');
             codegen.generate_expr(lhs, None);

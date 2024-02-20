@@ -38,8 +38,22 @@ Node(
           kind: FunctionExpression(FunctionDeclaration(
             id: SymbolId(2),
             name: Expr(
-              kind: Identifier(Ident(
-                name: "foo",
+              kind: Path(Path(
+                segments: [
+                  Ident(
+                    name: "foo",
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 14,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 17,
+                      ),
+                    ),
+                  ),
+                ],
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -68,8 +82,22 @@ Node(
             return_type_annotation: Some(Node(
               ast_node: Legacy(TypeAnnotation(Ty(
                 name: Expr(
-                  kind: Identifier(Ident(
-                    name: "i64",
+                  kind: Path(Path(
+                    segments: [
+                      Ident(
+                        name: "i64",
+                        span: Span(
+                          start: LineColumn(
+                            line: 0,
+                            column: 23,
+                          ),
+                          end: LineColumn(
+                            line: 0,
+                            column: 26,
+                          ),
+                        ),
+                      ),
+                    ],
                     span: Span(
                       start: LineColumn(
                         line: 0,

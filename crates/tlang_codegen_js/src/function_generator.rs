@@ -78,10 +78,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, declarations: &[S
                     } => {
                         let tmp_variable_enum = codegen.current_scope().declare_tmp_variable();
                         let enum_name = match &identifier.kind {
-                            ExprKind::Identifier(name) => name.to_string(),
-                            ExprKind::NestedIdentifier(names) => {
-                                names.clone().pop().unwrap().to_string()
-                            }
+                            ExprKind::Path(path) => path.segments.last().unwrap().to_string(),
                             _ => unreachable!(),
                         };
                         codegen.push_indent();
@@ -254,10 +251,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, declarations: &[S
                         named_fields,
                     } => {
                         let identifier = match &identifier.kind {
-                            ExprKind::Identifier(ident) => ident.to_string(),
-                            ExprKind::NestedIdentifier(names) => {
-                                names.clone().pop().unwrap().to_string()
-                            }
+                            ExprKind::Path(path) => path.segments.last().unwrap().to_string(),
                             _ => unreachable!(),
                         };
                         codegen.push_str(&format!("args[{}].tag === \"{}\"", k, identifier));
@@ -363,8 +357,7 @@ fn generate_function_definition_guard(codegen: &mut CodegenJS, node: &Expr) {
                 named_fields,
             } => {
                 let enum_name = match &identifier.kind {
-                    ExprKind::Identifier(name) => name.to_string(),
-                    ExprKind::NestedIdentifier(names) => names.clone().pop().unwrap().to_string(),
+                    ExprKind::Path(path) => path.segments.last().unwrap().to_string(),
                     _ => unreachable!(),
                 };
                 let guard_variable = codegen.current_scope().resolve_variable(&enum_name);
@@ -477,7 +470,7 @@ pub fn generate_function_expression(codegen: &mut CodegenJS, declaration: &Funct
     codegen.pop_scope();
 }
 
-pub fn generate_function_parameter(codegen: &mut CodegenJS, pattern: &Pattern) {
+fn generate_function_parameter(codegen: &mut CodegenJS, pattern: &Pattern) {
     match &pattern.kind {
         // Do not run generate_identifier, as that would resolve the parameter as a variable.
         PatternKind::Identifier { name, .. } => {
@@ -521,8 +514,8 @@ pub fn generate_return_statement(codegen: &mut CodegenJS, expr: &Option<Expr>) {
                     function,
                     arguments: _,
                 } => {
-                    if let ExprKind::Identifier(name) = &function.kind {
-                        Some(name.to_string())
+                    if let ExprKind::Path(_) = &function.kind {
+                        Some(fn_identifier_to_string(function))
                     } else {
                         None
                     }
@@ -599,8 +592,8 @@ fn is_function_body_tail_recursive(function_name: &str, node: &Expr) -> bool {
             } = &node.kind
             {
                 // If the function is an identifier, check if it's the same as the current function name.
-                if let ExprKind::Identifier(name) = &function.kind {
-                    if name.to_string() == function_name {
+                if let ExprKind::Path(_) = &function.kind {
+                    if fn_identifier_to_string(function) == function_name {
                         return true;
                     }
                 }
@@ -638,9 +631,14 @@ fn is_function_body_tail_recursive(function_name: &str, node: &Expr) -> bool {
     }
 }
 
-fn fn_identifier_to_string(expr: &Expr) -> String {
+pub fn fn_identifier_to_string(expr: &Expr) -> String {
     match &expr.kind {
-        ExprKind::Identifier(name) => name.to_string(),
+        ExprKind::Path(path) => path
+            .segments
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+            .join("."),
         _ => todo!(),
     }
 }

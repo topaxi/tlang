@@ -208,9 +208,8 @@ impl DeclarationAnalyzer {
                 self.collect_declarations_expr(then_branch);
                 self.collect_optional_declarations_expr(else_branch);
             }
-            ExprKind::FieldExpression { base, field } => {
+            ExprKind::FieldExpression { base, .. } => {
                 self.collect_declarations_expr(base);
-                self.collect_declarations_expr(field);
             }
             ExprKind::IndexExpression { base, index } => {
                 self.collect_declarations_expr(base);
@@ -226,11 +225,7 @@ impl DeclarationAnalyzer {
                 self.collect_declarations_expr(start);
                 self.collect_declarations_expr(end);
             }
-            ExprKind::Identifier(_)
-            | ExprKind::NestedIdentifier(_)
-            | ExprKind::Literal(_)
-            | ExprKind::Wildcard
-            | ExprKind::None => {
+            ExprKind::Path(_) | ExprKind::Literal(_) | ExprKind::Wildcard | ExprKind::None => {
                 // Nothing to do here
             }
         }
@@ -278,8 +273,8 @@ impl DeclarationAnalyzer {
     /// TODO: This is a temporary solution. We need to find a better way to handle this.
     fn fn_identifier_to_string(&self, identifier: &Expr) -> String {
         match identifier.kind {
-            ExprKind::Identifier(ref ident) => ident.to_string(),
-            ExprKind::NestedIdentifier(ref idents) => idents
+            ExprKind::Path(ref path) => path
+                .segments
                 .iter()
                 .map(|ident| ident.to_string())
                 .collect::<Vec<_>>()
@@ -288,17 +283,9 @@ impl DeclarationAnalyzer {
                 ref base,
                 ref field,
             } => {
-                let base_name = match base.kind {
-                    ExprKind::Identifier(ref ident) => ident.to_string(),
-                    _ => panic!("Expected identifier, found {:?}", base),
-                };
+                let base_name = self.fn_identifier_to_string(base);
 
-                let field_name = match field.kind {
-                    ExprKind::Identifier(ref ident) => ident.to_string(),
-                    _ => panic!("Expected identifier, found {:?}", field),
-                };
-
-                format!("{}.{}", base_name, field_name)
+                format!("{}.{}", base_name, field)
             }
             _ => panic!("Expected identifier, found {:?}", identifier.kind),
         }

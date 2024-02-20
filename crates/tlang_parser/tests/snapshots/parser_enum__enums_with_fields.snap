@@ -136,43 +136,55 @@ Node(
         expression: Expr(
           kind: Call(
             function: Expr(
-              kind: NestedIdentifier([
-                Ident(
-                  name: "Option",
-                  span: Span(
-                    start: LineColumn(
-                      line: 4,
-                      column: 9,
-                    ),
-                    end: LineColumn(
-                      line: 4,
-                      column: 15,
-                    ),
-                  ),
-                ),
-                Ident(
-                  name: "Some",
-                  span: Span(
-                    start: LineColumn(
-                      line: 4,
-                      column: 17,
-                    ),
-                    end: LineColumn(
-                      line: 4,
-                      column: 21,
+              kind: Path(Path(
+                segments: [
+                  Ident(
+                    name: "Option",
+                    span: Span(
+                      start: LineColumn(
+                        line: 4,
+                        column: 9,
+                      ),
+                      end: LineColumn(
+                        line: 4,
+                        column: 15,
+                      ),
                     ),
                   ),
+                  Ident(
+                    name: "Some",
+                    span: Span(
+                      start: LineColumn(
+                        line: 4,
+                        column: 17,
+                      ),
+                      end: LineColumn(
+                        line: 4,
+                        column: 21,
+                      ),
+                    ),
+                  ),
+                ],
+                span: Span(
+                  start: LineColumn(
+                    line: 4,
+                    column: 9,
+                  ),
+                  end: LineColumn(
+                    line: 4,
+                    column: 15,
+                  ),
                 ),
-              ]),
+              )),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
-                  line: 0,
-                  column: 0,
+                  line: 4,
+                  column: 9,
                 ),
                 end: LineColumn(
-                  line: 0,
-                  column: 0,
+                  line: 4,
+                  column: 21,
                 ),
               ),
             ),
@@ -180,8 +192,22 @@ Node(
               Expr(
                 kind: Dict([
                   (Expr(
-                    kind: Identifier(Ident(
-                      name: "x",
+                    kind: Path(Path(
+                      segments: [
+                        Ident(
+                          name: "x",
+                          span: Span(
+                            start: LineColumn(
+                              line: 4,
+                              column: 24,
+                            ),
+                            end: LineColumn(
+                              line: 4,
+                              column: 25,
+                            ),
+                          ),
+                        ),
+                      ],
                       span: Span(
                         start: LineColumn(
                           line: 4,

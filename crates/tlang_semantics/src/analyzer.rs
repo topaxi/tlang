@@ -237,11 +237,8 @@ impl SemanticAnalyzer {
             ExprKind::FunctionExpression(decl) => {
                 self.analyze_fn_decl(decl);
             }
-            ExprKind::Identifier(ident) => {
-                self.mark_as_used_by_name(&ident.to_string(), &ident.span);
-            }
-            ExprKind::NestedIdentifier(idents) => {
-                if let Some(first_ident) = idents.first() {
+            ExprKind::Path(path) => {
+                if let Some(first_ident) = path.segments.first() {
                     self.mark_as_used_by_name(&first_ident.to_string(), &expr.span);
                 }
 
