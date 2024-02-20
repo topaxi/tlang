@@ -1,7 +1,7 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
 use tlang_ast::{
-    node::{AstNode, ExprKind, NodeKind, StmtKind},
+    node::{ExprKind, StmtKind},
     span::{LineColumn, Span},
     symbols::{SymbolId, SymbolInfo, SymbolType},
 };
@@ -81,15 +81,12 @@ fn test_block_scope() {
     assert_eq!(program_symbols.borrow().get_by_name("b"), None);
     assert_eq!(program_symbols.borrow().get_by_name("c"), None);
 
-    let block1 = match ast.ast_node {
-        NodeKind::Legacy(AstNode::Module(ref nodes)) => match nodes[1].kind {
-            StmtKind::Expr(ref expr) => match expr.kind {
-                ExprKind::Block(_, _) => expr,
-                _ => panic!("Expected block {:?}", expr.kind),
-            },
-            _ => panic!("Expected expression statement {:?}", nodes[1].kind),
+    let block1 = match ast.statements[1].kind {
+        StmtKind::Expr(ref expr) => match expr.kind {
+            ExprKind::Block(_, _) => expr,
+            _ => panic!("Expected block {:?}", expr.kind),
         },
-        _ => panic!("Expected program {:?}", ast.ast_node),
+        _ => panic!("Expected expression statement {:?}", ast.statements[1].kind),
     };
 
     let block1_symbols = block1
@@ -145,7 +142,7 @@ fn test_block_scope() {
             },
             _ => panic!("Expected expression statement {:?}", nodes[1].kind),
         },
-        _ => panic!("Expected program {:?}", ast.ast_node),
+        _ => panic!("Expected block {:?}", block1.kind),
     };
 
     let block2_symbols = block2

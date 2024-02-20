@@ -1,6 +1,6 @@
 extern crate console_error_panic_hook;
 
-use tlang_ast::{node::Node, symbols::SymbolType};
+use tlang_ast::{node::Module, symbols::SymbolType};
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_parser::{error::ParseError, parser::Parser};
 use tlang_semantics::{diagnostic::Diagnostic, SemanticAnalyzer};
@@ -13,7 +13,7 @@ pub struct TlangCompiler {
     source: String,
     codegen: CodegenJS,
     analyzer: SemanticAnalyzer,
-    ast: Node,
+    ast: Module,
 
     diagnostics: Vec<Diagnostic>,
     parse_errors: Vec<ParseError>,
@@ -29,7 +29,7 @@ impl TlangCompiler {
             source: source.to_string(),
             codegen: CodegenJS::default(),
             analyzer: SemanticAnalyzer::default(),
-            ast: Node::default(),
+            ast: Module::new(vec![]),
             diagnostics: Vec::new(),
             parse_errors: Vec::new(),
         }

@@ -2,8 +2,8 @@
 source: crates/tlang_parser/tests/parser_fn.rs
 expression: "parse!(\"fn foo() { let x = 1; x }\")"
 ---
-Node(
-  ast_node: Legacy(Module([
+Module(
+  statements: [
     Stmt(
       kind: FunctionDeclaration(FunctionDeclaration(
         id: SymbolId(1),
@@ -175,7 +175,7 @@ Node(
       ),
       symbol_table: None,
     ),
-  ])),
+  ],
   symbol_table: None,
   span: Span(
     start: LineColumn(

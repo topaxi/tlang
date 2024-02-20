@@ -35,54 +35,6 @@ pub enum Associativity {
     Right,
 }
 
-// Backwards compatible with the old AST, while migrating to the new AST
-#[derive(Debug, Default, PartialEq, Clone, Serialize)]
-pub enum NodeKind {
-    #[default]
-    None,
-    Legacy(AstNode),
-}
-
-#[derive(Debug, PartialEq, Clone, Serialize)]
-pub struct Node<N = NodeKind> {
-    pub ast_node: N,
-    pub symbol_table: Option<Rc<RefCell<SymbolTable>>>,
-    pub span: Span,
-}
-
-impl Default for Node {
-    fn default() -> Self {
-        Node {
-            ast_node: NodeKind::None,
-            symbol_table: None,
-            span: Span::default(),
-        }
-    }
-}
-
-impl Node {
-    pub fn new(ast_node: NodeKind) -> Self {
-        Node {
-            ast_node,
-            symbol_table: None,
-            span: Span::default(),
-        }
-    }
-
-    pub fn new_with_span(ast_node: NodeKind, span: Span) -> Self {
-        Node {
-            ast_node,
-            symbol_table: None,
-            span,
-        }
-    }
-
-    pub fn with_span(mut self, span: Span) -> Self {
-        self.span = span;
-        self
-    }
-}
-
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct FunctionParameter {
     pub pattern: Box<Pattern>,
@@ -411,11 +363,21 @@ pub struct MatchArm {
     pub expression: Expr,
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Serialize)]
-pub enum AstNode {
-    #[default]
-    None,
-    Module(Vec<Stmt>),
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct Module {
+    pub statements: Vec<Stmt>,
+    pub symbol_table: Option<Rc<RefCell<SymbolTable>>>,
+    pub span: Span,
+}
+
+impl Module {
+    pub fn new(statements: Vec<Stmt>) -> Self {
+        Module {
+            statements,
+            symbol_table: None,
+            span: Span::default(),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Copy, Serialize)]
@@ -454,48 +416,6 @@ pub enum BinaryOpKind {
 }
 
 pub type BinaryOp = Spanned<BinaryOpKind>;
-
-#[macro_export]
-macro_rules! new {
-    ($node:ident) => {{
-        use tlang_ast::node::{Node, NodeKind, AstNode};
-        use tlang_ast::span::Span;
-
-        Node::new(NodeKind::Legacy(AstNode::$node))
-    }};
-
-    ($node:ident($( $arg:expr ),* $(,)? )) => {{
-        use tlang_ast::node::{Node, NodeKind, AstNode};
-        use tlang_ast::span::Span;
-
-        Node::new(NodeKind::Legacy(AstNode::$node( $( $arg ),* )))
-    }};
-
-    ($node:ident { $( $field:ident : $value:expr ),* $(,)? }) => {{
-        use tlang_ast::node::{Node, NodeKind, AstNode};
-        use tlang_ast::span::Span;
-
-        Node::new(NodeKind::Legacy(AstNode::$node { $( $field : $value ),* }))
-    }};
-
-    ($node:ident, $span:expr) => {{
-        use tlang_ast::node::{Node, NodeKind, AstNode};
-
-        Node::new_with_span(NodeKind::Legacy(AstNode::$node), $span)
-    }};
-
-    ($node:ident($( $arg:expr ),* $(,)? ), $span:expr) => {{
-        use tlang_ast::node::{Node, NodeKind, AstNode};
-
-        Node::new_with_span(NodeKind::Legacy(AstNode::$node( $( $arg ),* )), $span)
-    }};
-
-    ($node:ident { $( $field:ident : $value:expr ),* $(,)? }, $span:expr) => {{
-        use tlang_ast::node::{Node, NodeKind, AstNode};
-
-        Node::new_with_span(NodeKind::Legacy(AstNode::$node { $( $field : $value ),* }), $span)
-    }};
-}
 
 #[macro_export]
 macro_rules! expr {
@@ -557,6 +477,5 @@ macro_rules! stmt {
 }
 
 pub use expr;
-pub use new;
 pub use pat;
 pub use stmt;

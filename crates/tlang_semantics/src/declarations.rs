@@ -2,8 +2,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use tlang_ast::{
     node::{
-        AstNode, Expr, ExprKind, FunctionDeclaration, FunctionParameter, Node, NodeKind, Pattern,
-        PatternKind, Stmt, StmtKind,
+        Expr, ExprKind, FunctionDeclaration, FunctionParameter, Module, Pattern, PatternKind, Stmt,
+        StmtKind,
     },
     symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
 };
@@ -80,8 +80,8 @@ impl DeclarationAnalyzer {
         }
     }
 
-    pub fn analyze(&mut self, ast: &mut Node) {
-        self.collect_declarations(ast);
+    pub fn analyze(&mut self, module: &mut Module) {
+        self.collect_module_declarations(module);
     }
 
     #[inline(always)]
@@ -232,26 +232,11 @@ impl DeclarationAnalyzer {
         }
     }
 
-    fn collect_declarations(&mut self, node: &mut Node) {
-        let mut ast_node = std::mem::take(&mut node.ast_node);
+    fn collect_module_declarations(&mut self, module: &mut Module) {
+        module.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
 
-        match &mut ast_node {
-            NodeKind::Legacy(AstNode::Module(nodes)) => {
-                self.collect_module_declarations(node, nodes)
-            }
-            NodeKind::None | NodeKind::Legacy(AstNode::None) => {
-                // Nothing to do here
-            }
-        }
-
-        node.ast_node = ast_node;
-    }
-
-    fn collect_module_declarations(&mut self, node: &mut Node, nodes: &mut [Stmt]) {
-        node.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
-
-        for node in nodes {
-            self.collect_declarations_stmt(node);
+        for stmt in &mut module.statements {
+            self.collect_declarations_stmt(stmt);
         }
 
         self.pop_symbol_table();

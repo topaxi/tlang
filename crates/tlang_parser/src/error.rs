@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-use tlang_ast::{node::Node, span::Span, token::Token};
+use tlang_ast::{span::Span, token::Token};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParseError {
@@ -22,6 +22,5 @@ impl Display for ParseError {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParseErrorKind {
     UnexpectedToken(Token),
-    UnexpectedNode(Node),
     UnexpectedEof,
 }

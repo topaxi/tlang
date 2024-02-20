@@ -9,8 +9,8 @@ use crate::{
 };
 use tlang_ast::{
     node::{
-        AstNode, BinaryOpKind, EnumDeclaration, Expr, ExprKind, FunctionParameter, Ident, Node,
-        NodeKind, Pattern, PatternKind, Stmt, StmtKind, UnaryOp,
+        BinaryOpKind, EnumDeclaration, Expr, ExprKind, FunctionParameter, Ident, Module, Pattern,
+        PatternKind, Stmt, StmtKind, UnaryOp,
     },
     token::Literal,
 };
@@ -168,8 +168,8 @@ impl CodegenJS {
         self.context_stack.pop();
     }
 
-    pub fn generate_code(&mut self, node: &Node) {
-        self.generate_node(node)
+    pub fn generate_code(&mut self, module: &Module) {
+        self.generate_statements(&module.statements)
     }
 
     pub fn declare_function_pre_body_variable(&mut self, name: &str, value: &str) {
@@ -529,22 +529,6 @@ impl CodegenJS {
                 "Pattern matching not for {:?} implemented yet.",
                 pattern_kind
             ),
-        }
-    }
-
-    pub fn generate_node(&mut self, node: &Node) {
-        // TODO: Split into generate_statement and generate_expression.
-        //       This should also help setting proper block contexts.
-        match &node.ast_node {
-            NodeKind::Legacy(AstNode::Module(statements)) => {
-                self.generate_statements(statements);
-                self.flush_statement_buffer();
-            }
-            NodeKind::Legacy(AstNode::None) => {}
-            // Allow unreachable path, as we add new AST nodes, we do not want to automatically
-            // start failing tests while we are still implementing the codegen.
-            #[allow(unreachable_patterns)]
-            _ => unimplemented!("{:?} not implemented yet.", node),
         }
     }
 

@@ -2,8 +2,8 @@ use std::{cell::RefCell, rc::Rc};
 
 use tlang_ast::{
     node::{
-        AstNode, Expr, ExprKind, FunctionDeclaration, FunctionParameter, Node, NodeKind, Pattern,
-        PatternKind, Stmt, StmtKind,
+        Expr, ExprKind, FunctionDeclaration, FunctionParameter, Module, Pattern, PatternKind, Stmt,
+        StmtKind,
     },
     span::Span,
     symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
@@ -63,10 +63,10 @@ impl SemanticAnalyzer {
         self.declaration_analyzer.add_builtin_symbols(symbols)
     }
 
-    pub fn analyze(&mut self, ast: &mut Node) -> Result<(), Vec<Diagnostic>> {
-        self.collect_declarations(ast);
+    pub fn analyze(&mut self, module: &mut Module) -> Result<(), Vec<Diagnostic>> {
+        self.collect_declarations(module);
         // self.collect_initializations(ast);
-        self.analyze_node(ast);
+        self.analyze_module(module);
 
         if self.get_errors().is_empty() {
             Ok(())
@@ -75,8 +75,8 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn collect_declarations(&mut self, ast: &mut Node) {
-        self.declaration_analyzer.analyze(ast);
+    fn collect_declarations(&mut self, module: &mut Module) {
+        self.declaration_analyzer.analyze(module);
     }
 
     fn mark_as_used_by_name(&mut self, name: &str, span: &Span) {
@@ -291,26 +291,17 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn analyze_node(&mut self, ast: &mut Node) {
-        if let Some(symbol_table) = &ast.symbol_table {
+    fn analyze_module(&mut self, module: &mut Module) {
+        if let Some(symbol_table) = &module.symbol_table {
             self.push_symbol_table(symbol_table);
         }
 
-        let mut ast_node = std::mem::take(&mut ast.ast_node);
-
-        match &mut ast_node {
-            NodeKind::Legacy(AstNode::Module(nodes)) => {
-                nodes.iter_mut().for_each(|node| self.analyze_stmt(node))
-            }
-            NodeKind::None | NodeKind::Legacy(AstNode::None) => {
-                // Nothing to do here
-            }
+        for stmt in &mut module.statements {
+            self.analyze_stmt(stmt);
         }
 
-        ast.ast_node = ast_node;
-
-        if let Some(symbol_table) = &ast.symbol_table {
-            self.report_unused_symbols(symbol_table, &ast.span);
+        if let Some(symbol_table) = &module.symbol_table {
+            self.report_unused_symbols(symbol_table, &module.span);
             self.pop_symbol_table();
         }
     }

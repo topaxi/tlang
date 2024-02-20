@@ -2,8 +2,8 @@
 source: crates/tlang_parser/tests/parser_types.rs
 expression: "parse!(\"let x: Option<i64> = 1;\")"
 ---
-Node(
-  ast_node: Legacy(Module([
+Module(
+  statements: [
     Stmt(
       kind: Let(
         pattern: Pattern(
@@ -142,7 +142,7 @@ Node(
       ),
       symbol_table: None,
     ),
-  ])),
+  ],
   symbol_table: None,
   span: Span(
     start: LineColumn(

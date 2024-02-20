@@ -1,6 +1,6 @@
 use tlang_ast::node::{
     self, Associativity, BinaryOpKind, EnumDeclaration, EnumVariant, Expr, ExprKind,
-    FunctionDeclaration, FunctionParameter, Ident, MatchArm, Node, OperatorInfo, Path, Pattern,
+    FunctionDeclaration, FunctionParameter, Ident, MatchArm, Module, OperatorInfo, Path, Pattern,
     PatternKind, Stmt, StmtKind, Ty, UnaryOp,
 };
 use tlang_ast::span::Span;
@@ -112,7 +112,7 @@ impl<'src> Parser<'src> {
         Parser::new(Lexer::new(source))
     }
 
-    pub fn parse(&mut self) -> Result<Node, Vec<ParseError>> {
+    pub fn parse(&mut self) -> Result<Module, Vec<ParseError>> {
         self.advance();
         self.advance();
 
@@ -472,8 +472,8 @@ impl<'src> Parser<'src> {
         (statements, completion_expression)
     }
 
-    fn parse_module(&mut self) -> Node {
-        node::new!(Module(self.parse_statements(false).0))
+    fn parse_module(&mut self) -> Module {
+        Module::new(self.parse_statements(false).0)
     }
 
     fn parse_block(&mut self) -> Expr {
