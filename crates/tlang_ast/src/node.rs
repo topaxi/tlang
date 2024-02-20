@@ -86,7 +86,7 @@ impl Node {
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct FunctionParameter {
     pub pattern: Box<Pattern>,
-    pub type_annotation: Box<Option<Node>>,
+    pub type_annotation: Box<Option<Ty>>,
     pub span: Span,
 }
 
@@ -104,7 +104,7 @@ impl FunctionParameter {
         self
     }
 
-    pub fn with_type_annotation(mut self, type_annotation: Node) -> Self {
+    pub fn with_type_annotation(mut self, type_annotation: Ty) -> Self {
         self.type_annotation = Box::new(Some(type_annotation));
         self
     }
@@ -116,7 +116,7 @@ pub struct FunctionDeclaration {
     pub name: Box<Expr>,
     pub parameters: Vec<FunctionParameter>,
     pub guard: Box<Option<Expr>>,
-    pub return_type_annotation: Box<Option<Node>>,
+    pub return_type_annotation: Box<Option<Ty>>,
     pub body: Box<Expr>,
 }
 
@@ -354,7 +354,7 @@ pub enum StmtKind {
     Let {
         pattern: Box<Pattern>,
         expression: Box<Expr>,
-        type_annotation: Box<Option<Node>>,
+        type_annotation: Box<Option<Ty>>,
     },
     FunctionDeclaration(FunctionDeclaration),
     // Should this really be handled within the parser or should this be done in later stages?
@@ -380,8 +380,29 @@ impl<'a> From<&'a TokenKind> for StmtKind {
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct Ty {
-    pub name: Box<Expr>,
-    pub parameters: Vec<Node>,
+    pub name: Box<Path>,
+    pub parameters: Vec<Ty>,
+    pub span: Span,
+}
+
+impl Ty {
+    pub fn new(name: Path) -> Self {
+        Ty {
+            name: Box::new(name),
+            parameters: vec![],
+            span: Span::default(),
+        }
+    }
+
+    pub fn with_parameters(mut self, parameters: Vec<Ty>) -> Self {
+        self.parameters = parameters;
+        self
+    }
+
+    pub fn with_span(mut self, span: Span) -> Self {
+        self.span = span;
+        self
+    }
 }
 
 #[derive(Debug, Default, PartialEq, Clone, Serialize)]
@@ -396,7 +417,6 @@ pub enum AstNode {
     Wildcard,
     SingleLineComment(String),
     MultiLineComment(String),
-    TypeAnnotation(Ty),
 }
 
 #[derive(Debug, PartialEq, Clone, Copy, Serialize)]

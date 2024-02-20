@@ -116,51 +116,11 @@ Node(
             ),
           ),
         ),
-        type_annotation: Some(Node(
-          ast_node: Legacy(TypeAnnotation(Ty(
-            name: Expr(
-              kind: Path(Path(
-                segments: [
-                  Ident(
-                    name: "std",
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 7,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 10,
-                      ),
-                    ),
-                  ),
-                  Ident(
-                    name: "hash",
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 12,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 16,
-                      ),
-                    ),
-                  ),
-                  Ident(
-                    name: "Map",
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 18,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 21,
-                      ),
-                    ),
-                  ),
-                ],
+        type_annotation: Some(Ty(
+          name: Path(
+            segments: [
+              Ident(
+                name: "std",
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -171,51 +131,51 @@ Node(
                     column: 10,
                   ),
                 ),
-              )),
-              symbol_table: None,
-              span: Span(
-                start: LineColumn(
-                  line: 0,
-                  column: 7,
-                ),
-                end: LineColumn(
-                  line: 0,
-                  column: 21,
+              ),
+              Ident(
+                name: "hash",
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 12,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 16,
+                  ),
                 ),
               ),
+              Ident(
+                name: "Map",
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 18,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 21,
+                  ),
+                ),
+              ),
+            ],
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 7,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 21,
+              ),
             ),
-            parameters: [
-              Node(
-                ast_node: Legacy(TypeAnnotation(Ty(
-                  name: Expr(
-                    kind: Path(Path(
-                      segments: [
-                        Ident(
-                          name: "str",
-                          span: Span(
-                            start: LineColumn(
-                              line: 0,
-                              column: 22,
-                            ),
-                            end: LineColumn(
-                              line: 0,
-                              column: 25,
-                            ),
-                          ),
-                        ),
-                      ],
-                      span: Span(
-                        start: LineColumn(
-                          line: 0,
-                          column: 22,
-                        ),
-                        end: LineColumn(
-                          line: 0,
-                          column: 25,
-                        ),
-                      ),
-                    )),
-                    symbol_table: None,
+          ),
+          parameters: [
+            Ty(
+              name: Path(
+                segments: [
+                  Ident(
+                    name: "str",
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -227,51 +187,35 @@ Node(
                       ),
                     ),
                   ),
-                  parameters: [],
-                ))),
-                symbol_table: None,
+                ],
                 span: Span(
                   start: LineColumn(
                     line: 0,
-                    column: 0,
+                    column: 22,
                   ),
                   end: LineColumn(
                     line: 0,
-                    column: 0,
+                    column: 25,
                   ),
                 ),
               ),
-              Node(
-                ast_node: Legacy(TypeAnnotation(Ty(
-                  name: Expr(
-                    kind: Path(Path(
-                      segments: [
-                        Ident(
-                          name: "i64",
-                          span: Span(
-                            start: LineColumn(
-                              line: 0,
-                              column: 27,
-                            ),
-                            end: LineColumn(
-                              line: 0,
-                              column: 30,
-                            ),
-                          ),
-                        ),
-                      ],
-                      span: Span(
-                        start: LineColumn(
-                          line: 0,
-                          column: 27,
-                        ),
-                        end: LineColumn(
-                          line: 0,
-                          column: 30,
-                        ),
-                      ),
-                    )),
-                    symbol_table: None,
+              parameters: [],
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+              ),
+            ),
+            Ty(
+              name: Path(
+                segments: [
+                  Ident(
+                    name: "i64",
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -283,23 +227,31 @@ Node(
                       ),
                     ),
                   ),
-                  parameters: [],
-                ))),
-                symbol_table: None,
+                ],
                 span: Span(
                   start: LineColumn(
                     line: 0,
-                    column: 0,
+                    column: 27,
                   ),
                   end: LineColumn(
                     line: 0,
-                    column: 0,
+                    column: 30,
                   ),
                 ),
               ),
-            ],
-          ))),
-          symbol_table: None,
+              parameters: [],
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+              ),
+            ),
+          ],
           span: Span(
             start: LineColumn(
               line: 0,

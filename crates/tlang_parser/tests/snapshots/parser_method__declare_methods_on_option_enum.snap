@@ -145,7 +145,7 @@ Node(
                   ),
                   end: LineColumn(
                     line: 5,
-                    column: 10,
+                    column: 21,
                   ),
                 ),
               )),
@@ -202,7 +202,7 @@ Node(
                           ),
                           end: LineColumn(
                             line: 5,
-                            column: 28,
+                            column: 34,
                           ),
                         ),
                       )),
@@ -341,7 +341,7 @@ Node(
                   ),
                   end: LineColumn(
                     line: 6,
-                    column: 10,
+                    column: 21,
                   ),
                 ),
               )),
@@ -398,7 +398,7 @@ Node(
                           ),
                           end: LineColumn(
                             line: 6,
-                            column: 28,
+                            column: 34,
                           ),
                         ),
                       )),
@@ -523,7 +523,7 @@ Node(
                   ),
                   end: LineColumn(
                     line: 7,
-                    column: 10,
+                    column: 21,
                   ),
                 ),
               )),
@@ -736,7 +736,7 @@ Node(
                           ),
                           end: LineColumn(
                             line: 9,
-                            column: 25,
+                            column: 31,
                           ),
                         ),
                       )),
@@ -947,7 +947,7 @@ Node(
                           ),
                           end: LineColumn(
                             line: 10,
-                            column: 25,
+                            column: 31,
                           ),
                         ),
                       )),
@@ -1159,7 +1159,7 @@ Node(
                           ),
                           end: LineColumn(
                             line: 12,
-                            column: 21,
+                            column: 27,
                           ),
                         ),
                       )),
@@ -1579,7 +1579,7 @@ Node(
                           ),
                           end: LineColumn(
                             line: 13,
-                            column: 21,
+                            column: 27,
                           ),
                         ),
                       )),

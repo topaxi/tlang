@@ -301,7 +301,7 @@ impl SemanticAnalyzer {
             NodeKind::Legacy(AstNode::Module(nodes)) => {
                 nodes.iter_mut().for_each(|node| self.analyze_stmt(node))
             }
-            NodeKind::Legacy(AstNode::MatchArm { .. } | AstNode::TypeAnnotation { .. }) => {
+            NodeKind::Legacy(AstNode::MatchArm { .. }) => {
                 // TODO
             }
             NodeKind::None

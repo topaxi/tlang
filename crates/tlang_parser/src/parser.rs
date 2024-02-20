@@ -326,10 +326,7 @@ impl<'src> Parser<'src> {
         node::expr!(Path(path)).with_span(span)
     }
 
-    fn parse_identifier(&mut self) -> Expr {
-        // How do we generalize this span handling?
-        // Callbacks come to mind, but I'd rather not.
-        // Adding another stack is also not ideal.
+    fn parse_path(&mut self) -> Path {
         let mut span = self.create_span_from_current_token();
         let mut path = Path::from_ident(self.consume_identifier());
         while let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
@@ -338,6 +335,17 @@ impl<'src> Parser<'src> {
         }
 
         self.end_span_from_previous_token(&mut span);
+
+        path.span = span;
+        path
+    }
+
+    fn parse_identifier(&mut self) -> Expr {
+        // How do we generalize this span handling?
+        // Callbacks come to mind, but I'd rather not.
+        // Adding another stack is also not ideal.
+        let path = self.parse_path();
+        let span = path.span;
 
         node::expr!(Path(path)).with_span(span)
     }
@@ -886,7 +894,7 @@ impl<'src> Parser<'src> {
         )
     }
 
-    fn parse_type_annotation(&mut self) -> Option<Node> {
+    fn parse_type_annotation(&mut self) -> Option<Ty> {
         let token = self.current_token_kind()?;
 
         if !Self::is_type_annotation_token(&token) {
@@ -897,19 +905,16 @@ impl<'src> Parser<'src> {
 
         match token {
             TokenKind::Identifier(_) => {
-                let identifier = self.parse_identifier();
+                let identifier = self.parse_path();
                 let parameters = self.parse_type_annotation_parameters();
 
-                Some(node::new!(TypeAnnotation(Ty {
-                    name: Box::new(identifier),
-                    parameters,
-                })))
+                Some(Ty::new(identifier).with_parameters(parameters))
             }
             _ => unreachable!("Expected type annotation, found {:?}", token),
         }
     }
 
-    fn parse_type_annotation_parameters(&mut self) -> Vec<Node> {
+    fn parse_type_annotation_parameters(&mut self) -> Vec<Ty> {
         let mut parameters = Vec::new();
 
         if let Some(TokenKind::LessThan) = self.current_token_kind() {
@@ -927,7 +932,7 @@ impl<'src> Parser<'src> {
         parameters
     }
 
-    fn parse_return_type(&mut self) -> Option<Node> {
+    fn parse_return_type(&mut self) -> Option<Ty> {
         if let Some(TokenKind::Arrow) = self.current_token_kind() {
             self.advance();
             let return_type = self.parse_type_annotation()?;

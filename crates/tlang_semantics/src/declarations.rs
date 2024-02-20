@@ -238,7 +238,7 @@ impl DeclarationAnalyzer {
             NodeKind::Legacy(AstNode::Module(nodes)) => {
                 self.collect_module_declarations(node, nodes)
             }
-            NodeKind::Legacy(AstNode::MatchArm { .. } | AstNode::TypeAnnotation { .. }) => {
+            NodeKind::Legacy(AstNode::MatchArm { .. }) => {
                 // TODO
             }
             NodeKind::None

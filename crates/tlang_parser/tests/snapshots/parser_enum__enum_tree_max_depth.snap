@@ -216,7 +216,7 @@ Node(
                           ),
                           end: LineColumn(
                             line: 5,
-                            column: 22,
+                            column: 28,
                           ),
                         ),
                       )),
@@ -399,7 +399,7 @@ Node(
                           ),
                           end: LineColumn(
                             line: 6,
-                            column: 22,
+                            column: 28,
                           ),
                         ),
                       )),
