@@ -444,7 +444,7 @@ impl CodegenJS {
             }
             ExprKind::Path(path) => {
                 if path.segments.len() == 1 {
-                    self.generate_identifier(&path.segments.first().unwrap());
+                    self.generate_identifier(path.segments.first().unwrap());
                 } else {
                     self.push_str(
                         &path
@@ -462,7 +462,7 @@ impl CodegenJS {
                 self.generate_expr(index, None);
                 self.push_char(']');
             }
-            ExprKind::Let(pattern, expr) => todo!("Let expression not implemented yet."),
+            ExprKind::Let(_pattern, _expr) => todo!("Let expression not implemented yet."),
             ExprKind::Literal(literal) => self.generate_literal(literal),
             ExprKind::List(items) => {
                 self.push_char('[');
@@ -553,7 +553,7 @@ impl CodegenJS {
         //       This should also help setting proper block contexts.
         match &node.ast_node {
             NodeKind::Legacy(AstNode::SingleLineComment(_) | AstNode::MultiLineComment(_)) => {
-                self.generate_comment(&node);
+                self.generate_comment(node);
             }
             NodeKind::Legacy(AstNode::Module(statements)) => {
                 self.generate_statements(statements);

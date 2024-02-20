@@ -135,23 +135,11 @@ impl SymbolTable {
 
     pub fn mark_as_used(&mut self, id: SymbolId) {
         if let Some(symbol) = self.get_local(id) {
-            self.symbols
-                .iter_mut()
-                .find(|s| s.id == symbol.id)
-                .map(|s| s.used = true);
+            if let Some(s) = self.symbols.iter_mut().find(|s| s.id == symbol.id) {
+                s.used = true;
+            }
         } else if let Some(ref parent) = self.parent {
             parent.borrow_mut().mark_as_used(id);
-        }
-    }
-
-    pub fn mark_name_as_used(&mut self, name: &str) {
-        if let Some(symbol) = self.get_local_by_name(name) {
-            self.symbols
-                .iter_mut()
-                .find(|s| s.id == symbol.id)
-                .map(|s| s.used = true);
-        } else if let Some(ref parent) = self.parent {
-            parent.borrow_mut().mark_name_as_used(name);
         }
     }
 
@@ -164,7 +152,7 @@ impl SymbolTable {
     }
 
     pub fn get_all_local_symbols(&self) -> Vec<SymbolInfo> {
-        self.symbols.iter().map(|s| s.clone()).collect()
+        self.symbols.to_vec()
     }
 
     pub fn get_all_symbols(&self) -> Vec<SymbolInfo> {

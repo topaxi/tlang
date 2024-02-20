@@ -100,7 +100,6 @@ pub fn generate_match_expression(codegen: &mut CodegenJS, expression: &Expr, arm
             let completion_var = codegen.current_completion_variable().clone().unwrap();
             let prev_completion_var = codegen
                 .nth_completion_variable(codegen.current_completion_variable_count() - 2)
-                .clone()
                 .unwrap();
             codegen.push_str(&format!("{} = {};\n", prev_completion_var, completion_var));
         }

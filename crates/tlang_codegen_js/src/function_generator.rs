@@ -1,6 +1,5 @@
 use tlang_ast::node::{
-    AstNode, Expr, ExprKind, FunctionDeclaration, FunctionParameter, Node, NodeKind, Pattern,
-    PatternKind, Stmt, StmtKind,
+    Expr, ExprKind, FunctionDeclaration, FunctionParameter, Pattern, PatternKind, Stmt, StmtKind,
 };
 
 use crate::generator::{BlockContext, CodegenJS};
@@ -526,7 +525,7 @@ pub fn generate_return_statement(codegen: &mut CodegenJS, expr: &Option<Expr>) {
             if call_identifier.is_some() {
                 if let Some(function_context) = codegen.get_function_context() {
                     if function_context.is_tail_recursive
-                        && function_context.name == call_identifier.unwrap().to_string()
+                        && function_context.name == call_identifier.unwrap()
                     {
                         return codegen.generate_expr(&expr.clone().unwrap(), None);
                     }
@@ -553,16 +552,6 @@ fn flush_function_pre_body(codegen: &mut CodegenJS) {
         codegen.current_scope().declare_variable_alias(name, name);
     }
     codegen.flush_statement_buffer();
-}
-
-fn is_function_body_tail_recursive_node(function_name: &str, node: &Node) -> bool {
-    match &node.ast_node {
-        NodeKind::Legacy(AstNode::MatchArm {
-            pattern: _,
-            expression,
-        }) => is_function_body_tail_recursive(function_name, expression),
-        _ => false,
-    }
 }
 
 fn is_function_body_tail_recursive_stmt(function_name: &str, stmt: &Stmt) -> bool {

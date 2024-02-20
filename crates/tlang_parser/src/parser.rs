@@ -226,11 +226,13 @@ impl<'src> Parser<'src> {
 
     #[inline(always)]
     fn current_token_kind(&self) -> Option<TokenKind> {
+        #[allow(clippy::useless_asref)]
         self.current_token.as_ref().map(|token| token.kind.clone())
     }
 
     #[inline(always)]
     pub fn peek_token_kind(&self) -> Option<TokenKind> {
+        #[allow(clippy::useless_asref)]
         self.next_token.as_ref().map(|token| token.kind.clone())
     }
 
@@ -1402,11 +1404,7 @@ impl<'src> Parser<'src> {
                 .collect::<Vec<_>>()
                 .join("::"),
             ExprKind::FieldExpression { base, field } => {
-                format!(
-                    "{}.{}",
-                    self.fn_name_identifier_to_string(base),
-                    field.to_string()
-                )
+                format!("{}.{}", self.fn_name_identifier_to_string(base), field)
             }
             _ => {
                 self.panic_unexpected_expr(

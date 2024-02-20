@@ -271,6 +271,7 @@ impl DeclarationAnalyzer {
     }
 
     /// TODO: This is a temporary solution. We need to find a better way to handle this.
+    #[allow(clippy::only_used_in_recursion)]
     fn fn_identifier_to_string(&self, identifier: &Expr) -> String {
         match identifier.kind {
             ExprKind::Path(ref path) => path

@@ -266,6 +266,7 @@ impl SemanticAnalyzer {
         }
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn analyze_pat(&mut self, pat: &mut Pattern) {
         match &mut pat.kind {
             PatternKind::List(patterns) => {
@@ -339,7 +340,7 @@ impl SemanticAnalyzer {
                         unused_symbol.symbol_type, unused_symbol.name, unused_symbol.name
                     ),
                     Severity::Warning,
-                    unused_symbol.defined_at.clone().unwrap_or_else(|| *span)
+                    unused_symbol.defined_at.unwrap_or(*span)
                 ));
         }
     }
@@ -387,6 +388,7 @@ fn did_you_mean(name: &str, candidates: &[SymbolInfo]) -> Option<SymbolInfo> {
 
 fn levenshtein_distance(a: &str, b: &str) -> usize {
     let mut matrix = vec![vec![0; b.len() + 1]; a.len() + 1];
+    #[allow(clippy::needless_range_loop)]
     for i in 0..=a.len() {
         matrix[i][0] = i;
     }
