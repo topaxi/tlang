@@ -304,8 +304,13 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_comment(&mut self) -> Stmt {
-        // TODO: Implement conversion for comments
-        let comment: Stmt = self.current_token.as_ref().unwrap().into();
+        let comment = match self.current_token_kind() {
+            Some(TokenKind::SingleLineComment(comment)) => node::stmt!(SingleLineComment(comment))
+                .with_span(self.current_token.as_ref().unwrap().span),
+            Some(TokenKind::MultiLineComment(comment)) => node::stmt!(MultiLineComment(comment))
+                .with_span(self.current_token.as_ref().unwrap().span),
+            _ => unreachable!(),
+        };
         self.advance();
         comment
     }
@@ -1052,9 +1057,7 @@ impl<'src> Parser<'src> {
                 self.current_token_kind(),
                 Some(TokenKind::SingleLineComment(_)) | Some(TokenKind::MultiLineComment(_))
             ) {
-                // TODO: Broken as From<Token> for Stmt is not implemented yet
-                comments.push(self.current_token.as_ref().unwrap().into());
-                self.advance();
+                comments.push(self.parse_comment());
             }
 
             if let Some(TokenKind::Fn) = self.current_token_kind() {

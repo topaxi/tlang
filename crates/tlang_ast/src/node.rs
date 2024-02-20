@@ -5,7 +5,7 @@ use std::{cell::RefCell, fmt::Display};
 use crate::{
     span::{Span, Spanned},
     symbols::{SymbolId, SymbolTable},
-    token::{Literal, Token, TokenKind},
+    token::{Literal, TokenKind},
 };
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -288,16 +288,6 @@ impl Stmt {
     }
 }
 
-impl<'a> From<&'a Token> for Stmt {
-    fn from(token: &Token) -> Self {
-        Stmt {
-            kind: StmtKind::from(&token.kind),
-            span: Span::from_token(token),
-            symbol_table: None,
-        }
-    }
-}
-
 #[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub enum StmtKind {
     #[default]
@@ -315,19 +305,6 @@ pub enum StmtKind {
     SingleLineComment(String),
     MultiLineComment(String),
     EnumDeclaration(EnumDeclaration),
-}
-
-impl<'a> From<&'a TokenKind> for StmtKind {
-    fn from(token: &TokenKind) -> Self {
-        match token {
-            TokenKind::SingleLineComment(comment) => StmtKind::SingleLineComment(comment.clone()),
-            TokenKind::MultiLineComment(comment) => StmtKind::MultiLineComment(comment.clone()),
-            _ => unimplemented!(
-                "Expected token to be a literal or identifier, found {:?}",
-                token
-            ),
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
