@@ -332,16 +332,13 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_path(&mut self) -> Path {
-        let mut span = self.create_span_from_current_token();
         let mut path = Path::from_ident(self.consume_identifier());
         while let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
             self.advance();
             path.push(self.consume_identifier());
         }
 
-        self.end_span_from_previous_token(&mut span);
-
-        path.span = span;
+        self.end_span_from_previous_token(&mut path.span);
         path
     }
 
