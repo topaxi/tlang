@@ -23,6 +23,10 @@ pub trait Visitor<'ast>: Sized {
         walk_stmt(self, statement);
     }
 
+    fn visit_enum_decl(&mut self, decl: &'ast node::EnumDeclaration) {
+        walk_enum_decl(self, decl);
+    }
+
     fn visit_fn_decls(&mut self, declarations: &'ast [node::Stmt]) {
         for declaration in declarations {
             walk_stmt(self, declaration)
@@ -156,12 +160,18 @@ pub fn walk_stmt<'ast, V: Visitor<'ast>>(visitor: &mut V, statement: &'ast node:
                 visitor.visit_expr(expr);
             }
         }
-        node::StmtKind::EnumDeclaration(enum_decl) => {
-            for variant in &enum_decl.variants {
-                visitor.visit_variant(variant);
-            }
+        node::StmtKind::EnumDeclaration(decl) => {
+            visitor.visit_enum_decl(decl)
         }
         node::StmtKind::SingleLineComment(_) | node::StmtKind::MultiLineComment(_) => {}
+    }
+}
+
+pub fn walk_enum_decl<'ast, V: Visitor<'ast>>(visitor: &mut V, decl: &'ast node::EnumDeclaration) {
+    visitor.visit_ident(&decl.name);
+
+    for variant in &decl.variants {
+        visitor.visit_variant(variant);
     }
 }
 
