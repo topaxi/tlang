@@ -1271,17 +1271,7 @@ impl<'src> Parser<'src> {
 
     fn parse_pattern_literal(&mut self) -> Pattern {
         expect_token_matches!(self, "literal", TokenKind::Literal(_));
-
-        let token = self.current_token.as_ref().unwrap();
-
-        match &token.kind {
-            TokenKind::Literal(literal) => {
-                let lit = literal.clone();
-                self.advance();
-                node::pat!(Literal(lit))
-            }
-            _ => unreachable!("Expected literal, found {:?}", token),
-        }
+        node::pat!(Literal(self.parse_expression()))
     }
 
     fn parse_pattern(&mut self) -> Pattern {

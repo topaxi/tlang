@@ -52,7 +52,20 @@ Module(
             parameters: [
               FunctionParameter(
                 pattern: Pattern(
-                  kind: Literal(Integer(0)),
+                  kind: Literal(Expr(
+                    kind: Literal(Integer(0)),
+                    symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 13,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 14,
+                      ),
+                    ),
+                  )),
                   span: Span(
                     start: LineColumn(
                       line: 0,

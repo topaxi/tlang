@@ -53,7 +53,20 @@ Module(
             arms: [
               MatchArm(
                 pattern: Pattern(
-                  kind: Literal(Integer(1)),
+                  kind: Literal(Expr(
+                    kind: Literal(Integer(1)),
+                    symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 18,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 19,
+                      ),
+                    ),
+                  )),
                   span: Span(
                     start: LineColumn(
                       line: 0,
@@ -82,7 +95,20 @@ Module(
               ),
               MatchArm(
                 pattern: Pattern(
-                  kind: Literal(Integer(3)),
+                  kind: Literal(Expr(
+                    kind: Literal(Integer(3)),
+                    symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 26,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 27,
+                      ),
+                    ),
+                  )),
                   span: Span(
                     start: LineColumn(
                       line: 0,
