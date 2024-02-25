@@ -12,7 +12,7 @@ use tlang_ast::{
         BinaryOpKind, EnumDeclaration, Expr, ExprKind, FunctionParameter, Ident, Module, Pattern,
         PatternKind, Stmt, StmtKind, UnaryOp,
     },
-    token::Literal,
+    token::{Literal, Token, TokenKind},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -368,7 +368,23 @@ impl CodegenJS {
         }
     }
 
+    pub fn generate_comment(&mut self, comment: &Token) {
+        match &comment.kind {
+            TokenKind::SingleLineComment(comment) => {
+                self.push_str(&format!("//{}\n", comment));
+            }
+            TokenKind::MultiLineComment(comment) => {
+                self.push_str(&format!("/*{}*/\n", comment));
+            }
+            _ => {}
+        }
+    }
+
     pub fn generate_stmt(&mut self, statement: &Stmt) {
+        for comment in &statement.leading_comments {
+            self.generate_comment(comment);
+        }
+
         match &statement.kind {
             StmtKind::None => {}
             StmtKind::Expr(expr) => {
@@ -395,16 +411,10 @@ impl CodegenJS {
             StmtKind::FunctionDeclarations(decls) => generate_function_declarations(self, decls),
             StmtKind::Return(expr) => generate_return_statement(self, expr),
             StmtKind::EnumDeclaration(decl) => self.generate_enum_declaration(decl),
-            StmtKind::SingleLineComment(str) => {
-                self.push_str("//");
-                self.push_str(str);
-                self.push_char('\n');
-            }
-            StmtKind::MultiLineComment(str) => {
-                self.push_str("/*");
-                self.push_str(str);
-                self.push_str("*/\n");
-            }
+        }
+
+        for comment in &statement.trailing_comments {
+            self.generate_comment(comment);
         }
     }
 

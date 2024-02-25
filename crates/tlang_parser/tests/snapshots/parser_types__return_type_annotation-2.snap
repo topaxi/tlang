@@ -35,6 +35,8 @@ Module(
               ),
             ),
           )),
+          leading_comments: [],
+          trailing_comments: [],
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -133,6 +135,8 @@ Module(
         body: Expr(
           kind: Block([], Some(Expr(
             kind: Literal(Integer(1)),
+            leading_comments: [],
+            trailing_comments: [],
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -145,6 +149,8 @@ Module(
               ),
             ),
           ))),
+          leading_comments: [],
+          trailing_comments: [],
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -155,6 +161,19 @@ Module(
               line: 0,
               column: 0,
             ),
+          ),
+        ),
+        leading_comments: [],
+        trailing_comments: [],
+        symbol_table: None,
+        span: Span(
+          start: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+          end: LineColumn(
+            line: 0,
+            column: 29,
           ),
         ),
       )),
@@ -168,6 +187,8 @@ Module(
           column: 29,
         ),
       ),
+      leading_comments: [],
+      trailing_comments: [],
       symbol_table: None,
     ),
   ],

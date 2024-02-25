@@ -10,6 +10,8 @@ Module(
           op: Multiply,
           lhs: Expr(
             kind: Literal(Integer(1)),
+            leading_comments: [],
+            trailing_comments: [],
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -27,6 +29,8 @@ Module(
               op: Exponentiation,
               lhs: Expr(
                 kind: Literal(Integer(2)),
+                leading_comments: [],
+                trailing_comments: [],
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -41,6 +45,8 @@ Module(
               ),
               rhs: Expr(
                 kind: Literal(Integer(3)),
+                leading_comments: [],
+                trailing_comments: [],
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -54,6 +60,8 @@ Module(
                 ),
               ),
             ),
+            leading_comments: [],
+            trailing_comments: [],
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -67,6 +75,8 @@ Module(
             ),
           ),
         ),
+        leading_comments: [],
+        trailing_comments: [],
         symbol_table: None,
         span: Span(
           start: LineColumn(
@@ -89,6 +99,8 @@ Module(
           column: 11,
         ),
       ),
+      leading_comments: [],
+      trailing_comments: [],
       symbol_table: None,
     ),
   ],

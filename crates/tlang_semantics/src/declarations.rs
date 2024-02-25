@@ -105,10 +105,12 @@ impl DeclarationAnalyzer {
                 type_annotation: _,
             } => self.collect_variable_declaration(pattern, expression),
             StmtKind::FunctionDeclaration(declaration) => {
-                self.collect_function_declaration(stmt, declaration)
+                self.collect_function_declaration(declaration)
             }
             StmtKind::FunctionDeclarations(declarations) => {
-                self.collect_function_declarations(declarations);
+                for declaration in declarations {
+                    self.collect_function_declaration(declaration);
+                }
             }
             StmtKind::Return(expr) => self.collect_optional_declarations_expr(expr),
             StmtKind::EnumDeclaration(decl) => {
@@ -118,9 +120,6 @@ impl DeclarationAnalyzer {
                     SymbolType::Enum,
                     Some(stmt.span),
                 ));
-            }
-            StmtKind::SingleLineComment(_) | StmtKind::MultiLineComment(_) => {
-                // Nothing to do here
             }
         }
 
@@ -269,11 +268,7 @@ impl DeclarationAnalyzer {
         }
     }
 
-    fn collect_function_declaration(
-        &mut self,
-        stmt: &mut Stmt,
-        declaration: &mut FunctionDeclaration,
-    ) {
+    fn collect_function_declaration(&mut self, declaration: &mut FunctionDeclaration) {
         let name_as_str = self.fn_identifier_to_string(&declaration.name);
 
         self.declare_symbol(SymbolInfo::new(
@@ -283,8 +278,7 @@ impl DeclarationAnalyzer {
             Some(declaration.name.span),
         ));
 
-        // Function arguments have their own scope.
-        stmt.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
+        declaration.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
 
         self.symbol_type.push(SymbolType::Parameter);
         for param in &mut declaration.parameters {
@@ -296,12 +290,6 @@ impl DeclarationAnalyzer {
         self.collect_declarations_expr(&mut declaration.body);
 
         self.pop_symbol_table();
-    }
-
-    fn collect_function_declarations(&mut self, declarations: &mut [Stmt]) {
-        for declaration_node in declarations {
-            self.collect_declarations_stmt(declaration_node);
-        }
     }
 
     fn collect_pattern(&mut self, pattern: &mut Pattern) {

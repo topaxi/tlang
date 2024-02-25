@@ -1,21 +1,83 @@
 ---
 source: crates/tlang_parser/tests/parser.rs
-expression: "parse!(\"// this is a comment\")"
+expression: "parse!(\"// this is a comment\\nlet x = 1;\")"
 ---
 Module(
   statements: [
     Stmt(
-      kind: SingleLineComment(" this is a comment"),
+      kind: Let(
+        pattern: Pattern(
+          kind: Identifier(
+            id: SymbolId(1),
+            name: Ident(
+              name: "x",
+              span: Span(
+                start: LineColumn(
+                  line: 1,
+                  column: 5,
+                ),
+                end: LineColumn(
+                  line: 1,
+                  column: 6,
+                ),
+              ),
+            ),
+          ),
+          span: Span(
+            start: LineColumn(
+              line: 1,
+              column: 5,
+            ),
+            end: LineColumn(
+              line: 1,
+              column: 6,
+            ),
+          ),
+        ),
+        expression: Expr(
+          kind: Literal(Integer(1)),
+          leading_comments: [],
+          trailing_comments: [],
+          symbol_table: None,
+          span: Span(
+            start: LineColumn(
+              line: 1,
+              column: 9,
+            ),
+            end: LineColumn(
+              line: 1,
+              column: 10,
+            ),
+          ),
+        ),
+        type_annotation: None,
+      ),
       span: Span(
         start: LineColumn(
-          line: 0,
-          column: 0,
+          line: 1,
+          column: 1,
         ),
         end: LineColumn(
-          line: 0,
-          column: 20,
+          line: 1,
+          column: 11,
         ),
       ),
+      leading_comments: [
+        Token(
+          kind: SingleLineComment(" this is a comment"),
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 0,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 20,
+            ),
+          ),
+        ),
+      ],
+      trailing_comments: [],
       symbol_table: None,
     ),
   ],

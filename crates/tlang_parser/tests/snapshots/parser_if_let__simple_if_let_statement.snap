@@ -37,6 +37,8 @@ Module(
               ),
             ), Expr(
               kind: Literal(Integer(1)),
+              leading_comments: [],
+              trailing_comments: [],
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -49,6 +51,8 @@ Module(
                 ),
               ),
             )),
+            leading_comments: [],
+            trailing_comments: [],
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -90,6 +94,8 @@ Module(
                   ),
                 ),
               )),
+              leading_comments: [],
+              trailing_comments: [],
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -102,6 +108,8 @@ Module(
                 ),
               ),
             ))),
+            leading_comments: [],
+            trailing_comments: [],
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -116,6 +124,8 @@ Module(
           ),
           else_branch: None,
         ),
+        leading_comments: [],
+        trailing_comments: [],
         symbol_table: None,
         span: Span(
           start: LineColumn(
@@ -138,6 +148,8 @@ Module(
           column: 2,
         ),
       ),
+      leading_comments: [],
+      trailing_comments: [],
       symbol_table: None,
     ),
   ],

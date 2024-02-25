@@ -249,14 +249,14 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
         })
     );
 
-    let (function_node, function_declaration) = match &ast.statements[0].kind {
-        StmtKind::FunctionDeclaration(decl) => (ast.statements[0].clone(), decl.clone()),
+    let function_declaration = match &ast.statements[0].kind {
+        StmtKind::FunctionDeclaration(decl) => decl,
         _ => panic!("Expected function declaration {:?}", ast.statements[0].kind),
     };
 
     // Verify that c is within the scope of the function arguments
     assert_eq!(
-        function_node
+        function_declaration
             .symbol_table
             .clone()
             .unwrap()

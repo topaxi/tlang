@@ -120,6 +120,8 @@ Module(
           kind: List([
             Expr(
               kind: Literal(Integer(1)),
+              leading_comments: [],
+              trailing_comments: [],
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -134,6 +136,8 @@ Module(
             ),
             Expr(
               kind: Literal(Integer(2)),
+              leading_comments: [],
+              trailing_comments: [],
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -148,6 +152,8 @@ Module(
             ),
             Expr(
               kind: Literal(Integer(3)),
+              leading_comments: [],
+              trailing_comments: [],
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -162,6 +168,8 @@ Module(
             ),
             Expr(
               kind: Literal(Integer(4)),
+              leading_comments: [],
+              trailing_comments: [],
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -175,6 +183,8 @@ Module(
               ),
             ),
           ]),
+          leading_comments: [],
+          trailing_comments: [],
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -199,6 +209,8 @@ Module(
           column: 32,
         ),
       ),
+      leading_comments: [],
+      trailing_comments: [],
       symbol_table: None,
     ),
   ],
