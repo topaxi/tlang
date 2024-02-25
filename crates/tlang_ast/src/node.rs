@@ -240,7 +240,7 @@ pub enum PatternKind {
         id: SymbolId,
         name: Ident,
     },
-    Literal(Literal),
+    Literal(Expr),
     List(Vec<Pattern>),
     Rest(Box<Pattern>),
     Enum {

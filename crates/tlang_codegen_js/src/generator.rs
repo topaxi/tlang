@@ -524,7 +524,7 @@ impl CodegenJS {
                 elements,
                 named_fields,
             } => self.generate_enum_extraction(identifier, elements, *named_fields),
-            PatternKind::Literal(literal) => self.generate_literal(literal),
+            PatternKind::Literal(expr) => self.generate_expr(expr, None),
             pattern_kind => unimplemented!(
                 "Pattern matching not for {:?} implemented yet.",
                 pattern_kind
