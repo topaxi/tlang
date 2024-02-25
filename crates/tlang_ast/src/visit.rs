@@ -23,6 +23,12 @@ pub trait Visitor<'ast>: Sized {
         walk_stmt(self, statement);
     }
 
+    fn visit_fn_decls(&mut self, declarations: &'ast [node::Stmt]) {
+        for declaration in declarations {
+            walk_stmt(self, declaration)
+        }
+    }
+
     fn visit_fn_decl(&mut self, declaration: &'ast node::FunctionDeclaration) {
         walk_fn_decl(self, declaration);
     }
@@ -43,6 +49,10 @@ pub trait Visitor<'ast>: Sized {
         walk_expr(self, guard);
     }
 
+    fn visit_ty(&mut self, ty: &'ast node::Ty) {
+        walk_ty(self, ty);
+    }
+
     fn visit_fn_ret_ty(&mut self, annotation: &'ast node::Ty) {
         walk_ty(self, annotation);
     }
@@ -50,11 +60,25 @@ pub trait Visitor<'ast>: Sized {
     fn visit_fn_body(&mut self, body: &'ast node::Expr) {
         walk_fn_body(self, body);
     }
+
+    fn visit_variant(&mut self, variant: &'ast node::EnumVariant) {
+        walk_variant(self, variant);
+    }
+
+    fn visit_path(&mut self, path: &'ast node::Path) {
+        walk_path(self, path);
+    }
 }
 
 pub fn walk_module<'ast, V: Visitor<'ast>>(visitor: &mut V, module: &'ast node::Module) {
     for statement in &module.statements {
         visitor.visit_stmt(statement);
+    }
+}
+
+pub fn walk_path<'ast, V: Visitor<'ast>>(visitor: &mut V, path: &'ast node::Path) {
+    for segment in &path.segments {
+        visitor.visit_ident(&segment);
     }
 }
 
@@ -84,8 +108,10 @@ pub fn walk_pat<'ast, V: Visitor<'ast>>(visitor: &mut V, pattern: &'ast node::Pa
     }
 }
 
-pub fn walk_ty<'ast, V: Visitor<'ast>>(_visitor: &mut V, _ty: &'ast node::Ty) {
-    todo!()
+pub fn walk_ty<'ast, V: Visitor<'ast>>(visitor: &mut V, ty: &'ast node::Ty) {
+    for ty in &ty.parameters {
+        visitor.visit_ty(ty);
+    }
 }
 
 pub fn walk_block<'ast, V: Visitor<'ast>>(
@@ -107,10 +133,43 @@ pub fn walk_stmt<'ast, V: Visitor<'ast>>(visitor: &mut V, statement: &'ast node:
         node::StmtKind::Expr(expr) => {
             visitor.visit_expr(expr);
         }
+        node::StmtKind::Let {
+            pattern,
+            expression,
+            type_annotation,
+        } => {
+            visitor.visit_pat(pattern);
+            visitor.visit_expr(expression);
+
+            if let Some(ty) = type_annotation.as_ref() {
+                visitor.visit_ty(ty);
+            }
+        }
         node::StmtKind::FunctionDeclaration(declaration) => {
             visitor.visit_fn_decl(declaration);
         }
-        _ => todo!(),
+        node::StmtKind::FunctionDeclarations(declarations) => {
+            visitor.visit_fn_decls(declarations);
+        }
+        node::StmtKind::Return(expr) => {
+            if let Some(expr) = expr.as_ref() {
+                visitor.visit_expr(expr);
+            }
+        }
+        node::StmtKind::EnumDeclaration(enum_decl) => {
+            for variant in &enum_decl.variants {
+                visitor.visit_variant(variant);
+            }
+        }
+        node::StmtKind::SingleLineComment(_) | node::StmtKind::MultiLineComment(_) => {}
+    }
+}
+
+pub fn walk_variant<'ast, V: Visitor<'ast>>(visitor: &mut V, variant: &'ast node::EnumVariant) {
+    visitor.visit_ident(&variant.name);
+
+    for ident in &variant.parameters {
+        visitor.visit_ident(ident);
     }
 }
 
@@ -147,7 +206,73 @@ pub fn walk_expr<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'ast node
         node::ExprKind::UnaryOp(_, expression) => {
             visitor.visit_expr(expression);
         }
-        _ => todo!(),
+        node::ExprKind::FieldExpression { base, field } => {
+            visitor.visit_expr(base);
+            visitor.visit_ident(field);
+        }
+        node::ExprKind::Call {
+            function,
+            arguments,
+        } => {
+            visitor.visit_expr(function);
+            for argument in arguments {
+                visitor.visit_expr(argument);
+            }
+        }
+        node::ExprKind::Dict(kvs) => {
+            for (key, value) in kvs {
+                visitor.visit_expr(key);
+                visitor.visit_expr(value);
+            }
+        }
+        node::ExprKind::FunctionExpression(decl) => {
+            visitor.visit_fn_decl(decl);
+        }
+        node::ExprKind::IndexExpression { base, index } => {
+            visitor.visit_expr(base);
+            visitor.visit_expr(index);
+        }
+        node::ExprKind::Let(pattern, expr) => {
+            visitor.visit_pat(pattern);
+            visitor.visit_expr(expr);
+        }
+        node::ExprKind::Literal(_) => {}
+        node::ExprKind::List(exprs) => {
+            for expr in exprs {
+                visitor.visit_expr(expr);
+            }
+        }
+        node::ExprKind::IfElse {
+            condition,
+            then_branch,
+            else_branch,
+        } => {
+            visitor.visit_expr(condition);
+            visitor.visit_expr(then_branch);
+
+            if let Some(else_branch) = else_branch.as_ref() {
+                visitor.visit_expr(else_branch);
+            }
+        }
+        node::ExprKind::Match { expression, arms } => {
+            visitor.visit_expr(expression);
+
+            for arm in arms {
+                visitor.visit_pat(&arm.pattern);
+                visitor.visit_expr(&arm.expression);
+            }
+        }
+        node::ExprKind::Path(path) => {
+            visitor.visit_path(&path);
+        }
+        node::ExprKind::RecursiveCall(expr) => {
+            visitor.visit_expr(expr);
+        }
+        node::ExprKind::Range { start, end, .. } => {
+            visitor.visit_expr(start);
+            visitor.visit_expr(end);
+        }
+        node::ExprKind::Wildcard => {}
     }
 }
 

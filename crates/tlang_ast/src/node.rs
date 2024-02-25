@@ -300,6 +300,8 @@ pub enum StmtKind {
     },
     FunctionDeclaration(FunctionDeclaration),
     // Should this really be handled within the parser or should this be done in later stages?
+    // TODO: Instead of Vec<Stmt> we should have a Vec<FunctionDeclaration>, and attach comment
+    //       nodes onto our statements and expressions instead. (or some other generic way).
     FunctionDeclarations(Vec<Stmt>),
     Return(Box<Option<Expr>>),
     SingleLineComment(String),
