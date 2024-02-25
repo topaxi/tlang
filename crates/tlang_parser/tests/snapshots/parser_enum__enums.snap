@@ -2,35 +2,55 @@
 source: crates/tlang_parser/tests/parser_enum.rs
 expression: "parse!(indoc! {\n        \"\n        enum Option {\n            Some(x),\n            None,\n        }\n\n        let x = Option::Some(42);\n    \"\n    })"
 ---
-Node(
-  ast_node: Module([
-    Node(
-      ast_node: EnumDeclaration(
+Module(
+  statements: [
+    Stmt(
+      kind: EnumDeclaration(EnumDeclaration(
         id: SymbolId(1),
-        name: "Option",
+        name: Ident(
+          name: "Option",
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 5,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 11,
+            ),
+          ),
+        ),
         variants: [
-          Node(
-            ast_node: EnumVariant(
+          EnumVariant(
+            name: Ident(
               name: "Some",
-              named_fields: false,
-              parameters: [
-                Node(
-                  ast_node: Identifier("x"),
-                  symbol_table: None,
-                  span: Span(
-                    start: LineColumn(
-                      line: 1,
-                      column: 10,
-                    ),
-                    end: LineColumn(
-                      line: 1,
-                      column: 11,
-                    ),
+              span: Span(
+                start: LineColumn(
+                  line: 1,
+                  column: 5,
+                ),
+                end: LineColumn(
+                  line: 1,
+                  column: 9,
+                ),
+              ),
+            ),
+            named_fields: false,
+            parameters: [
+              Ident(
+                name: "x",
+                span: Span(
+                  start: LineColumn(
+                    line: 1,
+                    column: 10,
+                  ),
+                  end: LineColumn(
+                    line: 1,
+                    column: 11,
                   ),
                 ),
-              ],
-            ),
-            symbol_table: None,
+              ),
+            ],
             span: Span(
               start: LineColumn(
                 line: 1,
@@ -42,13 +62,22 @@ Node(
               ),
             ),
           ),
-          Node(
-            ast_node: EnumVariant(
+          EnumVariant(
+            name: Ident(
               name: "None",
-              named_fields: false,
-              parameters: [],
+              span: Span(
+                start: LineColumn(
+                  line: 2,
+                  column: 5,
+                ),
+                end: LineColumn(
+                  line: 2,
+                  column: 9,
+                ),
+              ),
             ),
-            symbol_table: None,
+            named_fields: false,
+            parameters: [],
             span: Span(
               start: LineColumn(
                 line: 2,
@@ -61,8 +90,7 @@ Node(
             ),
           ),
         ],
-      ),
-      symbol_table: None,
+      )),
       span: Span(
         start: LineColumn(
           line: 0,
@@ -73,13 +101,27 @@ Node(
           column: 2,
         ),
       ),
+      symbol_table: None,
     ),
-    Node(
-      ast_node: VariableDeclaration(
-        id: SymbolId(2),
-        pattern: Node(
-          ast_node: Identifier("x"),
-          symbol_table: None,
+    Stmt(
+      kind: Let(
+        pattern: Pattern(
+          kind: Identifier(
+            id: SymbolId(2),
+            name: Ident(
+              name: "x",
+              span: Span(
+                start: LineColumn(
+                  line: 5,
+                  column: 5,
+                ),
+                end: LineColumn(
+                  line: 5,
+                  column: 6,
+                ),
+              ),
+            ),
+          ),
           span: Span(
             start: LineColumn(
               line: 5,
@@ -91,28 +133,64 @@ Node(
             ),
           ),
         ),
-        expression: Node(
-          ast_node: Call(
-            function: Node(
-              ast_node: NestedIdentifier([
-                "Option",
-                "Some",
-              ]),
+        expression: Expr(
+          kind: Call(
+            function: Expr(
+              kind: Path(Path(
+                segments: [
+                  Ident(
+                    name: "Option",
+                    span: Span(
+                      start: LineColumn(
+                        line: 5,
+                        column: 9,
+                      ),
+                      end: LineColumn(
+                        line: 5,
+                        column: 15,
+                      ),
+                    ),
+                  ),
+                  Ident(
+                    name: "Some",
+                    span: Span(
+                      start: LineColumn(
+                        line: 5,
+                        column: 17,
+                      ),
+                      end: LineColumn(
+                        line: 5,
+                        column: 21,
+                      ),
+                    ),
+                  ),
+                ],
+                span: Span(
+                  start: LineColumn(
+                    line: 5,
+                    column: 9,
+                  ),
+                  end: LineColumn(
+                    line: 5,
+                    column: 15,
+                  ),
+                ),
+              )),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
-                  line: 0,
-                  column: 0,
+                  line: 5,
+                  column: 9,
                 ),
                 end: LineColumn(
-                  line: 0,
-                  column: 0,
+                  line: 5,
+                  column: 21,
                 ),
               ),
             ),
             arguments: [
-              Node(
-                ast_node: Literal(Integer(42)),
+              Expr(
+                kind: Literal(Integer(42)),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -141,7 +219,6 @@ Node(
         ),
         type_annotation: None,
       ),
-      symbol_table: None,
       span: Span(
         start: LineColumn(
           line: 5,
@@ -152,8 +229,9 @@ Node(
           column: 26,
         ),
       ),
+      symbol_table: None,
     ),
-  ]),
+  ],
   symbol_table: None,
   span: Span(
     start: LineColumn(

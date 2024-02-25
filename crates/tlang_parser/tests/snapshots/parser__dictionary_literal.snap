@@ -2,14 +2,27 @@
 source: crates/tlang_parser/tests/parser.rs
 expression: "parse!(r#\"let x = { foo: 1, bar: 2 };\"#)"
 ---
-Node(
-  ast_node: Module([
-    Node(
-      ast_node: VariableDeclaration(
-        id: SymbolId(1),
-        pattern: Node(
-          ast_node: Identifier("x"),
-          symbol_table: None,
+Module(
+  statements: [
+    Stmt(
+      kind: Let(
+        pattern: Pattern(
+          kind: Identifier(
+            id: SymbolId(1),
+            name: Ident(
+              name: "x",
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 4,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 5,
+                ),
+              ),
+            ),
+          ),
           span: Span(
             start: LineColumn(
               line: 0,
@@ -21,10 +34,36 @@ Node(
             ),
           ),
         ),
-        expression: Node(
-          ast_node: Dict([
-            (Node(
-              ast_node: Identifier("foo"),
+        expression: Expr(
+          kind: Dict([
+            (Expr(
+              kind: Path(Path(
+                segments: [
+                  Ident(
+                    name: "foo",
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 10,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 13,
+                      ),
+                    ),
+                  ),
+                ],
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 10,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 13,
+                  ),
+                ),
+              )),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -36,8 +75,8 @@ Node(
                   column: 13,
                 ),
               ),
-            ), Node(
-              ast_node: Literal(Integer(1)),
+            ), Expr(
+              kind: Literal(Integer(1)),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -50,8 +89,34 @@ Node(
                 ),
               ),
             )),
-            (Node(
-              ast_node: Identifier("bar"),
+            (Expr(
+              kind: Path(Path(
+                segments: [
+                  Ident(
+                    name: "bar",
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 18,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 21,
+                      ),
+                    ),
+                  ),
+                ],
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 18,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 21,
+                  ),
+                ),
+              )),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -63,8 +128,8 @@ Node(
                   column: 21,
                 ),
               ),
-            ), Node(
-              ast_node: Literal(Integer(2)),
+            ), Expr(
+              kind: Literal(Integer(2)),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -92,7 +157,6 @@ Node(
         ),
         type_annotation: None,
       ),
-      symbol_table: None,
       span: Span(
         start: LineColumn(
           line: 0,
@@ -103,8 +167,9 @@ Node(
           column: 27,
         ),
       ),
+      symbol_table: None,
     ),
-  ]),
+  ],
   symbol_table: None,
   span: Span(
     start: LineColumn(

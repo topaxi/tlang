@@ -17,6 +17,11 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      wasm:
+        patterns:
+          - "wasm-bindgen"
+          - "web-sys"
   - package-ecosystem: "npm"
     directory: "/"
     schedule:

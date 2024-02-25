@@ -2,49 +2,57 @@
 source: crates/tlang_parser/tests/parser_fn.rs
 expression: "parse!(indoc! {\n        \"\n        fn filter_map([], f) { [] }\n        fn filter_map([x, ...xs], f) if let y = f(x) { [y, ...filter_map(xs, f)] }\n        fn filter_map([x, ...xs], f) { rec filter_map(xs, f) }\n    \"\n    })"
 ---
-Node(
-  ast_node: Module([
-    Node(
-      ast_node: FunctionDeclarations(
-        id: SymbolId(12),
-        name: Node(
-          ast_node: Identifier("filter_map"),
-          symbol_table: None,
-          span: Span(
-            start: LineColumn(
-              line: 2,
-              column: 4,
-            ),
-            end: LineColumn(
-              line: 2,
-              column: 14,
-            ),
-          ),
-        ),
-        declarations: [
-          Node(
-            ast_node: FunctionDeclaration(FunctionDeclaration(
-              parameters: [
-                Node(
-                  ast_node: FunctionParameter(
-                    id: SymbolId(1),
-                    pattern: Node(
-                      ast_node: ListPattern([]),
-                      symbol_table: None,
-                      span: Span(
-                        start: LineColumn(
-                          line: 0,
-                          column: 14,
-                        ),
-                        end: LineColumn(
-                          line: 0,
-                          column: 16,
-                        ),
+Module(
+  statements: [
+    Stmt(
+      kind: FunctionDeclarations([
+        Stmt(
+          kind: FunctionDeclaration(FunctionDeclaration(
+            id: SymbolId(1),
+            name: Expr(
+              kind: Path(Path(
+                segments: [
+                  Ident(
+                    name: "filter_map",
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 3,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 13,
                       ),
                     ),
-                    type_annotation: None,
                   ),
-                  symbol_table: None,
+                ],
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 3,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 13,
+                  ),
+                ),
+              )),
+              symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 3,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 13,
+                ),
+              ),
+            ),
+            parameters: [
+              FunctionParameter(
+                pattern: Pattern(
+                  kind: List([]),
                   span: Span(
                     start: LineColumn(
                       line: 0,
@@ -56,12 +64,24 @@ Node(
                     ),
                   ),
                 ),
-                Node(
-                  ast_node: FunctionParameter(
+                type_annotation: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 14,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 16,
+                  ),
+                ),
+              ),
+              FunctionParameter(
+                pattern: Pattern(
+                  kind: Identifier(
                     id: SymbolId(2),
-                    pattern: Node(
-                      ast_node: Identifier("f"),
-                      symbol_table: None,
+                    name: Ident(
+                      name: "f",
                       span: Span(
                         start: LineColumn(
                           line: 0,
@@ -73,9 +93,7 @@ Node(
                         ),
                       ),
                     ),
-                    type_annotation: None,
                   ),
-                  symbol_table: None,
                   span: Span(
                     start: LineColumn(
                       line: 0,
@@ -87,63 +105,113 @@ Node(
                     ),
                   ),
                 ),
-              ],
-              guard: None,
-              return_type_annotation: None,
-              body: Node(
-                ast_node: Block([], Some(Node(
-                  ast_node: List([]),
-                  symbol_table: None,
-                  span: Span(
-                    start: LineColumn(
-                      line: 0,
-                      column: 23,
-                    ),
-                    end: LineColumn(
-                      line: 0,
-                      column: 25,
-                    ),
+                type_annotation: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 18,
                   ),
-                ))),
+                  end: LineColumn(
+                    line: 0,
+                    column: 19,
+                  ),
+                ),
+              ),
+            ],
+            guard: None,
+            return_type_annotation: None,
+            body: Expr(
+              kind: Block([], Some(Expr(
+                kind: List([]),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
                     line: 0,
-                    column: 0,
+                    column: 23,
                   ),
                   end: LineColumn(
                     line: 0,
-                    column: 0,
+                    column: 25,
                   ),
                 ),
-              ),
-            )),
-            symbol_table: None,
-            span: Span(
-              start: LineColumn(
-                line: 0,
-                column: 0,
-              ),
-              end: LineColumn(
-                line: 0,
-                column: 0,
+              ))),
+              symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
               ),
             ),
+          )),
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 0,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 0,
+            ),
           ),
-          Node(
-            ast_node: FunctionDeclaration(FunctionDeclaration(
-              parameters: [
-                Node(
-                  ast_node: FunctionParameter(
-                    id: SymbolId(5),
-                    pattern: Node(
-                      ast_node: ListPattern([
-                        Node(
-                          ast_node: IdentifierPattern(
-                            id: SymbolId(3),
-                            name: "x",
-                          ),
-                          symbol_table: None,
+          symbol_table: None,
+        ),
+        Stmt(
+          kind: FunctionDeclaration(FunctionDeclaration(
+            id: SymbolId(1),
+            name: Expr(
+              kind: Path(Path(
+                segments: [
+                  Ident(
+                    name: "filter_map",
+                    span: Span(
+                      start: LineColumn(
+                        line: 1,
+                        column: 4,
+                      ),
+                      end: LineColumn(
+                        line: 1,
+                        column: 14,
+                      ),
+                    ),
+                  ),
+                ],
+                span: Span(
+                  start: LineColumn(
+                    line: 1,
+                    column: 4,
+                  ),
+                  end: LineColumn(
+                    line: 1,
+                    column: 14,
+                  ),
+                ),
+              )),
+              symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 1,
+                  column: 4,
+                ),
+                end: LineColumn(
+                  line: 1,
+                  column: 14,
+                ),
+              ),
+            ),
+            parameters: [
+              FunctionParameter(
+                pattern: Pattern(
+                  kind: List([
+                    Pattern(
+                      kind: Identifier(
+                        id: SymbolId(3),
+                        name: Ident(
+                          name: "x",
                           span: Span(
                             start: LineColumn(
                               line: 1,
@@ -155,13 +223,24 @@ Node(
                             ),
                           ),
                         ),
-                        Node(
-                          ast_node: UnaryOp(Rest, Node(
-                            ast_node: IdentifierPattern(
-                              id: SymbolId(4),
-                              name: "xs",
-                            ),
-                            symbol_table: None,
+                      ),
+                      span: Span(
+                        start: LineColumn(
+                          line: 1,
+                          column: 16,
+                        ),
+                        end: LineColumn(
+                          line: 1,
+                          column: 17,
+                        ),
+                      ),
+                    ),
+                    Pattern(
+                      kind: Rest(Pattern(
+                        kind: Identifier(
+                          id: SymbolId(4),
+                          name: Ident(
+                            name: "xs",
                             span: Span(
                               start: LineColumn(
                                 line: 1,
@@ -172,233 +251,19 @@ Node(
                                 column: 24,
                               ),
                             ),
-                          )),
-                          symbol_table: None,
-                          span: Span(
-                            start: LineColumn(
-                              line: 0,
-                              column: 0,
-                            ),
-                            end: LineColumn(
-                              line: 0,
-                              column: 0,
-                            ),
                           ),
                         ),
-                      ]),
-                      symbol_table: None,
-                      span: Span(
-                        start: LineColumn(
-                          line: 1,
-                          column: 15,
-                        ),
-                        end: LineColumn(
-                          line: 1,
-                          column: 25,
-                        ),
-                      ),
-                    ),
-                    type_annotation: None,
-                  ),
-                  symbol_table: None,
-                  span: Span(
-                    start: LineColumn(
-                      line: 1,
-                      column: 15,
-                    ),
-                    end: LineColumn(
-                      line: 1,
-                      column: 25,
-                    ),
-                  ),
-                ),
-                Node(
-                  ast_node: FunctionParameter(
-                    id: SymbolId(6),
-                    pattern: Node(
-                      ast_node: Identifier("f"),
-                      symbol_table: None,
-                      span: Span(
-                        start: LineColumn(
-                          line: 1,
-                          column: 27,
-                        ),
-                        end: LineColumn(
-                          line: 1,
-                          column: 28,
-                        ),
-                      ),
-                    ),
-                    type_annotation: None,
-                  ),
-                  symbol_table: None,
-                  span: Span(
-                    start: LineColumn(
-                      line: 1,
-                      column: 27,
-                    ),
-                    end: LineColumn(
-                      line: 1,
-                      column: 28,
-                    ),
-                  ),
-                ),
-              ],
-              guard: Some(Node(
-                ast_node: VariableDeclaration(
-                  id: SymbolId(7),
-                  pattern: Node(
-                    ast_node: Identifier("y"),
-                    symbol_table: None,
-                    span: Span(
-                      start: LineColumn(
-                        line: 1,
-                        column: 37,
-                      ),
-                      end: LineColumn(
-                        line: 1,
-                        column: 38,
-                      ),
-                    ),
-                  ),
-                  expression: Node(
-                    ast_node: Call(
-                      function: Node(
-                        ast_node: Identifier("f"),
-                        symbol_table: None,
                         span: Span(
                           start: LineColumn(
                             line: 1,
-                            column: 41,
+                            column: 22,
                           ),
                           end: LineColumn(
                             line: 1,
-                            column: 42,
-                          ),
-                        ),
-                      ),
-                      arguments: [
-                        Node(
-                          ast_node: Identifier("x"),
-                          symbol_table: None,
-                          span: Span(
-                            start: LineColumn(
-                              line: 1,
-                              column: 43,
-                            ),
-                            end: LineColumn(
-                              line: 1,
-                              column: 44,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    symbol_table: None,
-                    span: Span(
-                      start: LineColumn(
-                        line: 1,
-                        column: 41,
-                      ),
-                      end: LineColumn(
-                        line: 1,
-                        column: 45,
-                      ),
-                    ),
-                  ),
-                  type_annotation: None,
-                ),
-                symbol_table: None,
-                span: Span(
-                  start: LineColumn(
-                    line: 0,
-                    column: 0,
-                  ),
-                  end: LineColumn(
-                    line: 0,
-                    column: 0,
-                  ),
-                ),
-              )),
-              return_type_annotation: None,
-              body: Node(
-                ast_node: Block([], Some(Node(
-                  ast_node: List([
-                    Node(
-                      ast_node: Identifier("y"),
-                      symbol_table: None,
-                      span: Span(
-                        start: LineColumn(
-                          line: 1,
-                          column: 49,
-                        ),
-                        end: LineColumn(
-                          line: 1,
-                          column: 50,
-                        ),
-                      ),
-                    ),
-                    Node(
-                      ast_node: UnaryOp(Spread, Node(
-                        ast_node: Call(
-                          function: Node(
-                            ast_node: Identifier("filter_map"),
-                            symbol_table: None,
-                            span: Span(
-                              start: LineColumn(
-                                line: 1,
-                                column: 55,
-                              ),
-                              end: LineColumn(
-                                line: 1,
-                                column: 65,
-                              ),
-                            ),
-                          ),
-                          arguments: [
-                            Node(
-                              ast_node: Identifier("xs"),
-                              symbol_table: None,
-                              span: Span(
-                                start: LineColumn(
-                                  line: 1,
-                                  column: 66,
-                                ),
-                                end: LineColumn(
-                                  line: 1,
-                                  column: 68,
-                                ),
-                              ),
-                            ),
-                            Node(
-                              ast_node: Identifier("f"),
-                              symbol_table: None,
-                              span: Span(
-                                start: LineColumn(
-                                  line: 1,
-                                  column: 70,
-                                ),
-                                end: LineColumn(
-                                  line: 1,
-                                  column: 71,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        symbol_table: None,
-                        span: Span(
-                          start: LineColumn(
-                            line: 1,
-                            column: 55,
-                          ),
-                          end: LineColumn(
-                            line: 1,
-                            column: 72,
+                            column: 24,
                           ),
                         ),
                       )),
-                      symbol_table: None,
                       span: Span(
                         start: LineColumn(
                           line: 0,
@@ -411,57 +276,492 @@ Node(
                       ),
                     ),
                   ]),
-                  symbol_table: None,
                   span: Span(
                     start: LineColumn(
                       line: 1,
-                      column: 48,
+                      column: 15,
                     ),
                     end: LineColumn(
                       line: 1,
-                      column: 73,
+                      column: 25,
                     ),
                   ),
-                ))),
-                symbol_table: None,
+                ),
+                type_annotation: None,
                 span: Span(
                   start: LineColumn(
-                    line: 0,
-                    column: 0,
+                    line: 1,
+                    column: 15,
                   ),
                   end: LineColumn(
-                    line: 0,
-                    column: 0,
+                    line: 1,
+                    column: 25,
                   ),
                 ),
               ),
-            )),
-            symbol_table: None,
-            span: Span(
-              start: LineColumn(
-                line: 0,
-                column: 0,
+              FunctionParameter(
+                pattern: Pattern(
+                  kind: Identifier(
+                    id: SymbolId(5),
+                    name: Ident(
+                      name: "f",
+                      span: Span(
+                        start: LineColumn(
+                          line: 1,
+                          column: 27,
+                        ),
+                        end: LineColumn(
+                          line: 1,
+                          column: 28,
+                        ),
+                      ),
+                    ),
+                  ),
+                  span: Span(
+                    start: LineColumn(
+                      line: 1,
+                      column: 27,
+                    ),
+                    end: LineColumn(
+                      line: 1,
+                      column: 28,
+                    ),
+                  ),
+                ),
+                type_annotation: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 1,
+                    column: 27,
+                  ),
+                  end: LineColumn(
+                    line: 1,
+                    column: 28,
+                  ),
+                ),
               ),
-              end: LineColumn(
-                line: 0,
-                column: 0,
+            ],
+            guard: Some(Expr(
+              kind: Let(Pattern(
+                kind: Identifier(
+                  id: SymbolId(6),
+                  name: Ident(
+                    name: "y",
+                    span: Span(
+                      start: LineColumn(
+                        line: 1,
+                        column: 37,
+                      ),
+                      end: LineColumn(
+                        line: 1,
+                        column: 38,
+                      ),
+                    ),
+                  ),
+                ),
+                span: Span(
+                  start: LineColumn(
+                    line: 1,
+                    column: 37,
+                  ),
+                  end: LineColumn(
+                    line: 1,
+                    column: 38,
+                  ),
+                ),
+              ), Expr(
+                kind: Call(
+                  function: Expr(
+                    kind: Path(Path(
+                      segments: [
+                        Ident(
+                          name: "f",
+                          span: Span(
+                            start: LineColumn(
+                              line: 1,
+                              column: 41,
+                            ),
+                            end: LineColumn(
+                              line: 1,
+                              column: 42,
+                            ),
+                          ),
+                        ),
+                      ],
+                      span: Span(
+                        start: LineColumn(
+                          line: 1,
+                          column: 41,
+                        ),
+                        end: LineColumn(
+                          line: 1,
+                          column: 42,
+                        ),
+                      ),
+                    )),
+                    symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 1,
+                        column: 41,
+                      ),
+                      end: LineColumn(
+                        line: 1,
+                        column: 42,
+                      ),
+                    ),
+                  ),
+                  arguments: [
+                    Expr(
+                      kind: Path(Path(
+                        segments: [
+                          Ident(
+                            name: "x",
+                            span: Span(
+                              start: LineColumn(
+                                line: 1,
+                                column: 43,
+                              ),
+                              end: LineColumn(
+                                line: 1,
+                                column: 44,
+                              ),
+                            ),
+                          ),
+                        ],
+                        span: Span(
+                          start: LineColumn(
+                            line: 1,
+                            column: 43,
+                          ),
+                          end: LineColumn(
+                            line: 1,
+                            column: 44,
+                          ),
+                        ),
+                      )),
+                      symbol_table: None,
+                      span: Span(
+                        start: LineColumn(
+                          line: 1,
+                          column: 43,
+                        ),
+                        end: LineColumn(
+                          line: 1,
+                          column: 44,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 1,
+                    column: 41,
+                  ),
+                  end: LineColumn(
+                    line: 1,
+                    column: 45,
+                  ),
+                ),
+              )),
+              symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+              ),
+            )),
+            return_type_annotation: None,
+            body: Expr(
+              kind: Block([], Some(Expr(
+                kind: List([
+                  Expr(
+                    kind: Path(Path(
+                      segments: [
+                        Ident(
+                          name: "y",
+                          span: Span(
+                            start: LineColumn(
+                              line: 1,
+                              column: 49,
+                            ),
+                            end: LineColumn(
+                              line: 1,
+                              column: 50,
+                            ),
+                          ),
+                        ),
+                      ],
+                      span: Span(
+                        start: LineColumn(
+                          line: 1,
+                          column: 49,
+                        ),
+                        end: LineColumn(
+                          line: 1,
+                          column: 50,
+                        ),
+                      ),
+                    )),
+                    symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 1,
+                        column: 49,
+                      ),
+                      end: LineColumn(
+                        line: 1,
+                        column: 50,
+                      ),
+                    ),
+                  ),
+                  Expr(
+                    kind: UnaryOp(Spread, Expr(
+                      kind: Call(
+                        function: Expr(
+                          kind: Path(Path(
+                            segments: [
+                              Ident(
+                                name: "filter_map",
+                                span: Span(
+                                  start: LineColumn(
+                                    line: 1,
+                                    column: 55,
+                                  ),
+                                  end: LineColumn(
+                                    line: 1,
+                                    column: 65,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            span: Span(
+                              start: LineColumn(
+                                line: 1,
+                                column: 55,
+                              ),
+                              end: LineColumn(
+                                line: 1,
+                                column: 65,
+                              ),
+                            ),
+                          )),
+                          symbol_table: None,
+                          span: Span(
+                            start: LineColumn(
+                              line: 1,
+                              column: 55,
+                            ),
+                            end: LineColumn(
+                              line: 1,
+                              column: 65,
+                            ),
+                          ),
+                        ),
+                        arguments: [
+                          Expr(
+                            kind: Path(Path(
+                              segments: [
+                                Ident(
+                                  name: "xs",
+                                  span: Span(
+                                    start: LineColumn(
+                                      line: 1,
+                                      column: 66,
+                                    ),
+                                    end: LineColumn(
+                                      line: 1,
+                                      column: 68,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              span: Span(
+                                start: LineColumn(
+                                  line: 1,
+                                  column: 66,
+                                ),
+                                end: LineColumn(
+                                  line: 1,
+                                  column: 68,
+                                ),
+                              ),
+                            )),
+                            symbol_table: None,
+                            span: Span(
+                              start: LineColumn(
+                                line: 1,
+                                column: 66,
+                              ),
+                              end: LineColumn(
+                                line: 1,
+                                column: 68,
+                              ),
+                            ),
+                          ),
+                          Expr(
+                            kind: Path(Path(
+                              segments: [
+                                Ident(
+                                  name: "f",
+                                  span: Span(
+                                    start: LineColumn(
+                                      line: 1,
+                                      column: 70,
+                                    ),
+                                    end: LineColumn(
+                                      line: 1,
+                                      column: 71,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              span: Span(
+                                start: LineColumn(
+                                  line: 1,
+                                  column: 70,
+                                ),
+                                end: LineColumn(
+                                  line: 1,
+                                  column: 71,
+                                ),
+                              ),
+                            )),
+                            symbol_table: None,
+                            span: Span(
+                              start: LineColumn(
+                                line: 1,
+                                column: 70,
+                              ),
+                              end: LineColumn(
+                                line: 1,
+                                column: 71,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      symbol_table: None,
+                      span: Span(
+                        start: LineColumn(
+                          line: 1,
+                          column: 55,
+                        ),
+                        end: LineColumn(
+                          line: 1,
+                          column: 72,
+                        ),
+                      ),
+                    )),
+                    symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 0,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 0,
+                      ),
+                    ),
+                  ),
+                ]),
+                symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 1,
+                    column: 48,
+                  ),
+                  end: LineColumn(
+                    line: 1,
+                    column: 73,
+                  ),
+                ),
+              ))),
+              symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
               ),
             ),
+          )),
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 0,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 0,
+            ),
           ),
-          Node(
-            ast_node: FunctionDeclaration(FunctionDeclaration(
-              parameters: [
-                Node(
-                  ast_node: FunctionParameter(
-                    id: SymbolId(10),
-                    pattern: Node(
-                      ast_node: ListPattern([
-                        Node(
-                          ast_node: IdentifierPattern(
-                            id: SymbolId(8),
-                            name: "x",
-                          ),
-                          symbol_table: None,
+          symbol_table: None,
+        ),
+        Stmt(
+          kind: FunctionDeclaration(FunctionDeclaration(
+            id: SymbolId(1),
+            name: Expr(
+              kind: Path(Path(
+                segments: [
+                  Ident(
+                    name: "filter_map",
+                    span: Span(
+                      start: LineColumn(
+                        line: 2,
+                        column: 4,
+                      ),
+                      end: LineColumn(
+                        line: 2,
+                        column: 14,
+                      ),
+                    ),
+                  ),
+                ],
+                span: Span(
+                  start: LineColumn(
+                    line: 2,
+                    column: 4,
+                  ),
+                  end: LineColumn(
+                    line: 2,
+                    column: 14,
+                  ),
+                ),
+              )),
+              symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 2,
+                  column: 4,
+                ),
+                end: LineColumn(
+                  line: 2,
+                  column: 14,
+                ),
+              ),
+            ),
+            parameters: [
+              FunctionParameter(
+                pattern: Pattern(
+                  kind: List([
+                    Pattern(
+                      kind: Identifier(
+                        id: SymbolId(7),
+                        name: Ident(
+                          name: "x",
                           span: Span(
                             start: LineColumn(
                               line: 2,
@@ -473,13 +773,24 @@ Node(
                             ),
                           ),
                         ),
-                        Node(
-                          ast_node: UnaryOp(Rest, Node(
-                            ast_node: IdentifierPattern(
-                              id: SymbolId(9),
-                              name: "xs",
-                            ),
-                            symbol_table: None,
+                      ),
+                      span: Span(
+                        start: LineColumn(
+                          line: 2,
+                          column: 16,
+                        ),
+                        end: LineColumn(
+                          line: 2,
+                          column: 17,
+                        ),
+                      ),
+                    ),
+                    Pattern(
+                      kind: Rest(Pattern(
+                        kind: Identifier(
+                          id: SymbolId(8),
+                          name: Ident(
+                            name: "xs",
                             span: Span(
                               start: LineColumn(
                                 line: 2,
@@ -490,35 +801,31 @@ Node(
                                 column: 24,
                               ),
                             ),
-                          )),
-                          symbol_table: None,
-                          span: Span(
-                            start: LineColumn(
-                              line: 0,
-                              column: 0,
-                            ),
-                            end: LineColumn(
-                              line: 0,
-                              column: 0,
-                            ),
                           ),
                         ),
-                      ]),
-                      symbol_table: None,
+                        span: Span(
+                          start: LineColumn(
+                            line: 2,
+                            column: 22,
+                          ),
+                          end: LineColumn(
+                            line: 2,
+                            column: 24,
+                          ),
+                        ),
+                      )),
                       span: Span(
                         start: LineColumn(
-                          line: 2,
-                          column: 15,
+                          line: 0,
+                          column: 0,
                         ),
                         end: LineColumn(
-                          line: 2,
-                          column: 25,
+                          line: 0,
+                          column: 0,
                         ),
                       ),
                     ),
-                    type_annotation: None,
-                  ),
-                  symbol_table: None,
+                  ]),
                   span: Span(
                     start: LineColumn(
                       line: 2,
@@ -530,12 +837,24 @@ Node(
                     ),
                   ),
                 ),
-                Node(
-                  ast_node: FunctionParameter(
-                    id: SymbolId(11),
-                    pattern: Node(
-                      ast_node: Identifier("f"),
-                      symbol_table: None,
+                type_annotation: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 2,
+                    column: 15,
+                  ),
+                  end: LineColumn(
+                    line: 2,
+                    column: 25,
+                  ),
+                ),
+              ),
+              FunctionParameter(
+                pattern: Pattern(
+                  kind: Identifier(
+                    id: SymbolId(9),
+                    name: Ident(
+                      name: "f",
                       span: Span(
                         start: LineColumn(
                           line: 2,
@@ -547,9 +866,7 @@ Node(
                         ),
                       ),
                     ),
-                    type_annotation: None,
                   ),
-                  symbol_table: None,
                   span: Span(
                     start: LineColumn(
                       line: 2,
@@ -561,16 +878,42 @@ Node(
                     ),
                   ),
                 ),
-              ],
-              guard: None,
-              return_type_annotation: None,
-              body: Node(
-                ast_node: Block([], Some(Node(
-                  ast_node: RecursiveCall(Node(
-                    ast_node: Call(
-                      function: Node(
-                        ast_node: Identifier("filter_map"),
-                        symbol_table: None,
+                type_annotation: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 2,
+                    column: 27,
+                  ),
+                  end: LineColumn(
+                    line: 2,
+                    column: 28,
+                  ),
+                ),
+              ),
+            ],
+            guard: None,
+            return_type_annotation: None,
+            body: Expr(
+              kind: Block([], Some(Expr(
+                kind: RecursiveCall(Expr(
+                  kind: Call(
+                    function: Expr(
+                      kind: Path(Path(
+                        segments: [
+                          Ident(
+                            name: "filter_map",
+                            span: Span(
+                              start: LineColumn(
+                                line: 2,
+                                column: 36,
+                              ),
+                              end: LineColumn(
+                                line: 2,
+                                column: 46,
+                              ),
+                            ),
+                          ),
+                        ],
                         span: Span(
                           start: LineColumn(
                             line: 2,
@@ -581,11 +924,37 @@ Node(
                             column: 46,
                           ),
                         ),
+                      )),
+                      symbol_table: None,
+                      span: Span(
+                        start: LineColumn(
+                          line: 2,
+                          column: 36,
+                        ),
+                        end: LineColumn(
+                          line: 2,
+                          column: 46,
+                        ),
                       ),
-                      arguments: [
-                        Node(
-                          ast_node: Identifier("xs"),
-                          symbol_table: None,
+                    ),
+                    arguments: [
+                      Expr(
+                        kind: Path(Path(
+                          segments: [
+                            Ident(
+                              name: "xs",
+                              span: Span(
+                                start: LineColumn(
+                                  line: 2,
+                                  column: 47,
+                                ),
+                                end: LineColumn(
+                                  line: 2,
+                                  column: 49,
+                                ),
+                              ),
+                            ),
+                          ],
                           span: Span(
                             start: LineColumn(
                               line: 2,
@@ -596,10 +965,36 @@ Node(
                               column: 49,
                             ),
                           ),
+                        )),
+                        symbol_table: None,
+                        span: Span(
+                          start: LineColumn(
+                            line: 2,
+                            column: 47,
+                          ),
+                          end: LineColumn(
+                            line: 2,
+                            column: 49,
+                          ),
                         ),
-                        Node(
-                          ast_node: Identifier("f"),
-                          symbol_table: None,
+                      ),
+                      Expr(
+                        kind: Path(Path(
+                          segments: [
+                            Ident(
+                              name: "f",
+                              span: Span(
+                                start: LineColumn(
+                                  line: 2,
+                                  column: 51,
+                                ),
+                                end: LineColumn(
+                                  line: 2,
+                                  column: 52,
+                                ),
+                              ),
+                            ),
+                          ],
                           span: Span(
                             start: LineColumn(
                               line: 2,
@@ -610,61 +1005,71 @@ Node(
                               column: 52,
                             ),
                           ),
+                        )),
+                        symbol_table: None,
+                        span: Span(
+                          start: LineColumn(
+                            line: 2,
+                            column: 51,
+                          ),
+                          end: LineColumn(
+                            line: 2,
+                            column: 52,
+                          ),
                         ),
-                      ],
-                    ),
-                    symbol_table: None,
-                    span: Span(
-                      start: LineColumn(
-                        line: 2,
-                        column: 36,
                       ),
-                      end: LineColumn(
-                        line: 2,
-                        column: 53,
-                      ),
-                    ),
-                  )),
+                    ],
+                  ),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
                       line: 2,
-                      column: 32,
+                      column: 36,
                     ),
                     end: LineColumn(
                       line: 2,
                       column: 53,
                     ),
                   ),
-                ))),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
-                    line: 0,
-                    column: 0,
+                    line: 2,
+                    column: 32,
                   ),
                   end: LineColumn(
-                    line: 0,
-                    column: 0,
+                    line: 2,
+                    column: 53,
                   ),
                 ),
-              ),
-            )),
-            symbol_table: None,
-            span: Span(
-              start: LineColumn(
-                line: 0,
-                column: 0,
-              ),
-              end: LineColumn(
-                line: 0,
-                column: 0,
+              ))),
+              symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
               ),
             ),
+          )),
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 0,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 0,
+            ),
           ),
-        ],
-      ),
-      symbol_table: None,
+          symbol_table: None,
+        ),
+      ]),
       span: Span(
         start: LineColumn(
           line: 0,
@@ -675,8 +1080,9 @@ Node(
           column: 55,
         ),
       ),
+      symbol_table: None,
     ),
-  ]),
+  ],
   symbol_table: None,
   span: Span(
     start: LineColumn(

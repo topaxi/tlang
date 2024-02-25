@@ -2,14 +2,27 @@
 source: crates/tlang_parser/tests/parser.rs
 expression: "parse!(\"let x = 1; let y = 2; x + y;\")"
 ---
-Node(
-  ast_node: Module([
-    Node(
-      ast_node: VariableDeclaration(
-        id: SymbolId(1),
-        pattern: Node(
-          ast_node: Identifier("x"),
-          symbol_table: None,
+Module(
+  statements: [
+    Stmt(
+      kind: Let(
+        pattern: Pattern(
+          kind: Identifier(
+            id: SymbolId(1),
+            name: Ident(
+              name: "x",
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 4,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 5,
+                ),
+              ),
+            ),
+          ),
           span: Span(
             start: LineColumn(
               line: 0,
@@ -21,8 +34,8 @@ Node(
             ),
           ),
         ),
-        expression: Node(
-          ast_node: Literal(Integer(1)),
+        expression: Expr(
+          kind: Literal(Integer(1)),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -37,7 +50,6 @@ Node(
         ),
         type_annotation: None,
       ),
-      symbol_table: None,
       span: Span(
         start: LineColumn(
           line: 0,
@@ -48,13 +60,27 @@ Node(
           column: 10,
         ),
       ),
+      symbol_table: None,
     ),
-    Node(
-      ast_node: VariableDeclaration(
-        id: SymbolId(2),
-        pattern: Node(
-          ast_node: Identifier("y"),
-          symbol_table: None,
+    Stmt(
+      kind: Let(
+        pattern: Pattern(
+          kind: Identifier(
+            id: SymbolId(2),
+            name: Ident(
+              name: "y",
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 15,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 16,
+                ),
+              ),
+            ),
+          ),
           span: Span(
             start: LineColumn(
               line: 0,
@@ -66,8 +92,8 @@ Node(
             ),
           ),
         ),
-        expression: Node(
-          ast_node: Literal(Integer(2)),
+        expression: Expr(
+          kind: Literal(Integer(2)),
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -82,7 +108,6 @@ Node(
         ),
         type_annotation: None,
       ),
-      symbol_table: None,
       span: Span(
         start: LineColumn(
           line: 0,
@@ -93,13 +118,40 @@ Node(
           column: 21,
         ),
       ),
+      symbol_table: None,
     ),
-    Node(
-      ast_node: ExpressionStatement(Node(
-        ast_node: BinaryOp(
+    Stmt(
+      kind: Expr(Expr(
+        kind: BinaryOp(
           op: Add,
-          lhs: Node(
-            ast_node: Identifier("x"),
+          lhs: Expr(
+            kind: Path(Path(
+              segments: [
+                Ident(
+                  name: "x",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 22,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 23,
+                    ),
+                  ),
+                ),
+              ],
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 22,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 23,
+                ),
+              ),
+            )),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -112,8 +164,34 @@ Node(
               ),
             ),
           ),
-          rhs: Node(
-            ast_node: Identifier("y"),
+          rhs: Expr(
+            kind: Path(Path(
+              segments: [
+                Ident(
+                  name: "y",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 26,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 27,
+                    ),
+                  ),
+                ),
+              ],
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 26,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 27,
+                ),
+              ),
+            )),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -139,7 +217,6 @@ Node(
           ),
         ),
       )),
-      symbol_table: None,
       span: Span(
         start: LineColumn(
           line: 0,
@@ -150,8 +227,9 @@ Node(
           column: 28,
         ),
       ),
+      symbol_table: None,
     ),
-  ]),
+  ],
   symbol_table: None,
   span: Span(
     start: LineColumn(

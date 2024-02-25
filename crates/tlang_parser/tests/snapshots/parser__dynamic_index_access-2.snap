@@ -2,14 +2,27 @@
 source: crates/tlang_parser/tests/parser.rs
 expression: "parse!(\"let x = foo[1][2];\")"
 ---
-Node(
-  ast_node: Module([
-    Node(
-      ast_node: VariableDeclaration(
-        id: SymbolId(1),
-        pattern: Node(
-          ast_node: Identifier("x"),
-          symbol_table: None,
+Module(
+  statements: [
+    Stmt(
+      kind: Let(
+        pattern: Pattern(
+          kind: Identifier(
+            id: SymbolId(1),
+            name: Ident(
+              name: "x",
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 4,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 5,
+                ),
+              ),
+            ),
+          ),
           span: Span(
             start: LineColumn(
               line: 0,
@@ -21,12 +34,38 @@ Node(
             ),
           ),
         ),
-        expression: Node(
-          ast_node: IndexExpression(
-            base: Node(
-              ast_node: IndexExpression(
-                base: Node(
-                  ast_node: Identifier("foo"),
+        expression: Expr(
+          kind: IndexExpression(
+            base: Expr(
+              kind: IndexExpression(
+                base: Expr(
+                  kind: Path(Path(
+                    segments: [
+                      Ident(
+                        name: "foo",
+                        span: Span(
+                          start: LineColumn(
+                            line: 0,
+                            column: 8,
+                          ),
+                          end: LineColumn(
+                            line: 0,
+                            column: 11,
+                          ),
+                        ),
+                      ),
+                    ],
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 8,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 11,
+                      ),
+                    ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -39,8 +78,8 @@ Node(
                     ),
                   ),
                 ),
-                index: Node(
-                  ast_node: Literal(Integer(1)),
+                index: Expr(
+                  kind: Literal(Integer(1)),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -66,8 +105,8 @@ Node(
                 ),
               ),
             ),
-            index: Node(
-              ast_node: Literal(Integer(2)),
+            index: Expr(
+              kind: Literal(Integer(2)),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -95,7 +134,6 @@ Node(
         ),
         type_annotation: None,
       ),
-      symbol_table: None,
       span: Span(
         start: LineColumn(
           line: 0,
@@ -106,8 +144,9 @@ Node(
           column: 18,
         ),
       ),
+      symbol_table: None,
     ),
-  ]),
+  ],
   symbol_table: None,
   span: Span(
     start: LineColumn(

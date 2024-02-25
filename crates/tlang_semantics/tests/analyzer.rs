@@ -1,7 +1,7 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
 use tlang_ast::{
-    node::AstNode,
+    node::StmtKind,
     span::{LineColumn, Span},
     symbols::{SymbolId, SymbolInfo, SymbolType},
 };
@@ -11,11 +11,17 @@ use tlang_semantics::{
     diagnostic::{Diagnostic, Severity},
 };
 
+fn create_analyzer(builtin_symbols: &[(&str, SymbolType)]) -> SemanticAnalyzer {
+    let mut analyzer = SemanticAnalyzer::default();
+    analyzer.add_builtin_symbols(builtin_symbols);
+    analyzer
+}
+
 macro_rules! analyze {
     ($source:expr) => {{
         let mut parser = Parser::from_source($source);
         let mut ast = parser.parse().unwrap();
-        let mut analyzer = SemanticAnalyzer::default();
+        let mut analyzer = $crate::create_analyzer(&[]);
         match analyzer.analyze(&mut ast) {
             Ok(_) => ast,
             Err(diagnostics) => panic!("Expected no error diagnostics, got {:#?}", diagnostics),
@@ -25,9 +31,13 @@ macro_rules! analyze {
 
 macro_rules! analyze_diag {
     ($source:expr) => {{
+        analyze_diag!($source, &vec![])
+    }};
+
+    ($source:expr, $builtin_symbols:expr) => {{
         let mut parser = Parser::from_source($source);
         let mut ast = parser.parse().unwrap();
-        let mut analyzer = SemanticAnalyzer::default();
+        let mut analyzer = $crate::create_analyzer(&$builtin_symbols);
         let _ = analyzer.analyze(&mut ast);
         analyzer.get_diagnostics().to_owned()
     }};
@@ -228,7 +238,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
     assert_eq!(
         program_symbols.borrow().get_by_name("add"),
         Some(SymbolInfo {
-            id: SymbolId::new(3),
+            id: SymbolId::new(1),
             name: "add".to_string(),
             symbol_type: SymbolType::Function,
             defined_at: Some(Span::new(
@@ -239,21 +249,9 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
         })
     );
 
-    let (function_node, function_declaration) = match ast.ast_node {
-        AstNode::Module(ref nodes) => match &nodes[0].ast_node {
-            AstNode::FunctionSingleDeclaration {
-                id: _,
-                name: _,
-                declaration,
-            } => match &declaration.ast_node {
-                AstNode::FunctionDeclaration(declaration) => {
-                    (nodes[0].clone(), declaration.clone())
-                }
-                _ => panic!("Expected function declaration {:?}", declaration),
-            },
-            _ => panic!("Expected function declaration {:?}", nodes[0].ast_node),
-        },
-        _ => panic!("Expected program {:?}", ast.ast_node),
+    let (function_node, function_declaration) = match &ast.statements[0].kind {
+        StmtKind::FunctionDeclaration(decl) => (ast.statements[0].clone(), decl.clone()),
+        _ => panic!("Expected function declaration {:?}", ast.statements[0].kind),
     };
 
     // Verify that c is within the scope of the function arguments
@@ -378,6 +376,16 @@ fn should_not_warn_about_used_function_and_parameters() {
     "});
     assert_eq!(diagnostics, vec![]);
 
+    let diagnostic = analyze_diag!(indoc! {"
+        fn fib(n) {
+            if n < 2 { n }
+            else { fib(n - 1) + fib(n - 2) }
+        }
+
+        fib(5);
+    "});
+    assert_eq!(diagnostic, vec![]);
+
     let diagnostics = analyze_diag!(indoc! {"
         fn factorial(n) { factorial(n, 1) }
         fn factorial(0, acc) { acc }
@@ -402,5 +410,38 @@ fn should_not_warn_about_unused_variables_prefixed_with_underscore() {
         let _a = 1;
         let _b = 2;
     "});
+    assert_eq!(diagnostics, vec![]);
+}
+
+#[test]
+fn should_handle_fn_guard_variables() {
+    let diagnostics = analyze_diag!(indoc! {"
+        fn fib(n) if n < 2 { n }
+        fn fib(n) { fib(n - 1) + fib(n - 2) }
+    "});
+    assert_eq!(diagnostics, vec![]);
+
+    let diagnostics = analyze_diag!(
+        indoc! {"
+        fn binary_search(list, target) { binary_search(list, target, 0, len(list) - 1) }
+        fn binary_search(_, _, low, high) if low > high; { -1 }
+        fn binary_search(list, target, low, high) {
+            let mid = floor((low + high) / 2);
+            let midValue = list[mid];
+
+            if midValue == target; {
+                mid
+            } else if midValue < target; {
+                binary_search(list, target, mid + 1, high)
+            } else {
+                binary_search(list, target, low, mid - 1)
+            }
+        }
+    "},
+        [
+            ("len", SymbolType::Function),
+            ("floor", SymbolType::Function)
+        ]
+    );
     assert_eq!(diagnostics, vec![]);
 }

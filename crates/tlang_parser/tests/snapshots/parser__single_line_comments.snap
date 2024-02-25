@@ -2,11 +2,10 @@
 source: crates/tlang_parser/tests/parser.rs
 expression: "parse!(\"// this is a comment\")"
 ---
-Node(
-  ast_node: Module([
-    Node(
-      ast_node: SingleLineComment(" this is a comment"),
-      symbol_table: None,
+Module(
+  statements: [
+    Stmt(
+      kind: SingleLineComment(" this is a comment"),
       span: Span(
         start: LineColumn(
           line: 0,
@@ -17,8 +16,9 @@ Node(
           column: 20,
         ),
       ),
+      symbol_table: None,
     ),
-  ]),
+  ],
   symbol_table: None,
   span: Span(
     start: LineColumn(

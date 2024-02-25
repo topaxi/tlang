@@ -2,15 +2,41 @@
 source: crates/tlang_parser/tests/parser.rs
 expression: "parse!(\"foo()();\")"
 ---
-Node(
-  ast_node: Module([
-    Node(
-      ast_node: ExpressionStatement(Node(
-        ast_node: Call(
-          function: Node(
-            ast_node: Call(
-              function: Node(
-                ast_node: Identifier("foo"),
+Module(
+  statements: [
+    Stmt(
+      kind: Expr(Expr(
+        kind: Call(
+          function: Expr(
+            kind: Call(
+              function: Expr(
+                kind: Path(Path(
+                  segments: [
+                    Ident(
+                      name: "foo",
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 0,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 3,
+                        ),
+                      ),
+                    ),
+                  ],
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 3,
+                    ),
+                  ),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -51,7 +77,6 @@ Node(
           ),
         ),
       )),
-      symbol_table: None,
       span: Span(
         start: LineColumn(
           line: 0,
@@ -62,8 +87,9 @@ Node(
           column: 8,
         ),
       ),
+      symbol_table: None,
     ),
-  ]),
+  ],
   symbol_table: None,
   span: Span(
     start: LineColumn(

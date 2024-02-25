@@ -2,15 +2,41 @@
 source: crates/tlang_parser/tests/parser.rs
 expression: "parse!(\"foo.bar.baz;\")"
 ---
-Node(
-  ast_node: Module([
-    Node(
-      ast_node: ExpressionStatement(Node(
-        ast_node: FieldExpression(
-          base: Node(
-            ast_node: FieldExpression(
-              base: Node(
-                ast_node: Identifier("foo"),
+Module(
+  statements: [
+    Stmt(
+      kind: Expr(Expr(
+        kind: FieldExpression(
+          base: Expr(
+            kind: FieldExpression(
+              base: Expr(
+                kind: Path(Path(
+                  segments: [
+                    Ident(
+                      name: "foo",
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 0,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 3,
+                        ),
+                      ),
+                    ),
+                  ],
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 3,
+                    ),
+                  ),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -23,17 +49,16 @@ Node(
                   ),
                 ),
               ),
-              field: Node(
-                ast_node: Identifier("bar"),
-                symbol_table: None,
+              field: Ident(
+                name: "bar",
                 span: Span(
                   start: LineColumn(
                     line: 0,
-                    column: 0,
+                    column: 4,
                   ),
                   end: LineColumn(
                     line: 0,
-                    column: 0,
+                    column: 7,
                   ),
                 ),
               ),
@@ -50,17 +75,16 @@ Node(
               ),
             ),
           ),
-          field: Node(
-            ast_node: Identifier("baz"),
-            symbol_table: None,
+          field: Ident(
+            name: "baz",
             span: Span(
               start: LineColumn(
                 line: 0,
-                column: 0,
+                column: 8,
               ),
               end: LineColumn(
                 line: 0,
-                column: 0,
+                column: 11,
               ),
             ),
           ),
@@ -77,7 +101,6 @@ Node(
           ),
         ),
       )),
-      symbol_table: None,
       span: Span(
         start: LineColumn(
           line: 0,
@@ -88,8 +111,9 @@ Node(
           column: 12,
         ),
       ),
+      symbol_table: None,
     ),
-  ]),
+  ],
   symbol_table: None,
   span: Span(
     start: LineColumn(

@@ -21,7 +21,7 @@ struct Args {
 fn compile_standard_library() -> Result<(), ParserError> {
     let std_lib_source = compile(&CodegenJS::get_standard_library_source())?;
     let output_file_name = "js/stdlib.js";
-    let mut output_file = match File::create(&output_file_name) {
+    let mut output_file = match File::create(output_file_name) {
         Err(why) => panic!("couldn't create {}: {}", output_file_name, why),
         Ok(file) => file,
     };

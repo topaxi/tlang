@@ -1,5 +1,7 @@
 use tlang_ast::node::{
-    self, Associativity, AstNode, BinaryOp, FunctionDeclaration, Node, OperatorInfo, UnaryOp,
+    self, Associativity, BinaryOpKind, EnumDeclaration, EnumVariant, Expr, ExprKind,
+    FunctionDeclaration, FunctionParameter, Ident, MatchArm, Module, OperatorInfo, Path, Pattern,
+    PatternKind, Stmt, StmtKind, Ty, UnaryOp,
 };
 use tlang_ast::span::Span;
 use tlang_ast::symbols::SymbolId;
@@ -14,6 +16,10 @@ macro_rules! expect_token_matches {
         match $parser.current_token_kind().as_ref() {
             Some($pattern) $(if $guard)? => (),
             _ => {
+                if !$parser.recoverable() {
+                    $parser.panic_unexpected_token(&format!("{:?}", stringify!($pattern)), $parser.current_token.clone());
+                }
+
                 $parser.push_unexpected_token_error(
                     &format!("{:?}", stringify!($pattern)),
                     $parser.current_token.clone(),
@@ -26,6 +32,10 @@ macro_rules! expect_token_matches {
         match $parser.current_token_kind().as_ref() {
             Some($pattern) $(if $guard)? => (),
             _ => {
+                if !$parser.recoverable() {
+                    $parser.panic_unexpected_token($message, $parser.current_token.clone());
+                }
+
                 $parser.push_unexpected_token_error(
                     $message,
                     $parser.current_token.clone(),
@@ -53,6 +63,8 @@ pub struct Parser<'src> {
     current_token: Option<Token>,
     next_token: Option<Token>,
 
+    recoverable: bool,
+
     // Id to identifiy symbols, e.g. functions and variables.
     unique_id: SymbolId,
 
@@ -74,7 +86,17 @@ impl<'src> Parser<'src> {
             current_line: 0,
             current_column: 0,
             errors: Vec::new(),
+            recoverable: false,
         }
+    }
+
+    pub fn set_recoverable(&mut self, recoverable: bool) -> &mut Self {
+        self.recoverable = recoverable;
+        self
+    }
+
+    pub fn recoverable(&self) -> bool {
+        self.recoverable
     }
 
     pub fn errors(&self) -> Vec<ParseError> {
@@ -90,7 +112,7 @@ impl<'src> Parser<'src> {
         Parser::new(Lexer::new(source))
     }
 
-    pub fn parse(&mut self) -> Result<Node, Vec<ParseError>> {
+    pub fn parse(&mut self) -> Result<Module, Vec<ParseError>> {
         self.advance();
         self.advance();
 
@@ -119,7 +141,7 @@ impl<'src> Parser<'src> {
                 actual.as_ref().unwrap().kind
             ),
             kind: ParseErrorKind::UnexpectedToken(actual.clone().unwrap()),
-            span: actual.as_ref().unwrap().span.clone(),
+            span: actual.as_ref().unwrap().span,
         });
     }
 
@@ -135,7 +157,7 @@ impl<'src> Parser<'src> {
         );
     }
 
-    fn panic_unexpected_node(&self, expected: &str, actual: Option<Node>) {
+    fn panic_unexpected_stmt(&self, expected: &str, actual: Option<Stmt>) {
         let node = actual.as_ref().unwrap();
         let start_span = &node.span.start;
         let source_line = self.lexer.source().lines().nth(start_span.line).unwrap();
@@ -143,7 +165,19 @@ impl<'src> Parser<'src> {
 
         panic!(
             "Expected {} on line {}, column {}, found {:?} instead\n{}\n{}",
-            expected, start_span.line, start_span.column, node.ast_node, source_line, caret
+            expected, start_span.line, start_span.column, node.kind, source_line, caret
+        );
+    }
+
+    fn panic_unexpected_expr(&self, expected: &str, actual: Option<Expr>) {
+        let node = actual.as_ref().unwrap();
+        let start_span = &node.span.start;
+        let source_line = self.lexer.source().lines().nth(start_span.line).unwrap();
+        let caret = " ".repeat(start_span.column) + "^";
+
+        panic!(
+            "Expected {} on line {}, column {}, found {:?} instead\n{}\n{}",
+            expected, start_span.line, start_span.column, node.kind, source_line, caret
         );
     }
 
@@ -160,18 +194,13 @@ impl<'src> Parser<'src> {
         self.advance();
     }
 
-    fn consume_identifier(&mut self) -> String {
+    fn consume_identifier(&mut self) -> Ident {
         expect_token_matches!(self, TokenKind::Identifier(_));
-        let identifier = self
-            .current_token
-            .as_ref()
-            .unwrap()
-            .kind
-            .get_identifier()
-            .unwrap()
-            .to_owned();
+        let current_token = self.current_token.as_ref().unwrap();
+        let name = current_token.kind.get_identifier().unwrap().clone();
+        let span = current_token.span;
         self.advance();
-        identifier
+        Ident::new(&name, span)
     }
 
     fn advance(&mut self) {
@@ -197,11 +226,13 @@ impl<'src> Parser<'src> {
 
     #[inline(always)]
     fn current_token_kind(&self) -> Option<TokenKind> {
+        #[allow(clippy::useless_asref)]
         self.current_token.as_ref().map(|token| token.kind.clone())
     }
 
     #[inline(always)]
     pub fn peek_token_kind(&self) -> Option<TokenKind> {
+        #[allow(clippy::useless_asref)]
         self.next_token.as_ref().map(|token| token.kind.clone())
     }
 
@@ -219,7 +250,7 @@ impl<'src> Parser<'src> {
         self.next_token = state.2;
     }
 
-    fn parse_statement(&mut self) -> (bool, Option<Node>) {
+    fn parse_statement(&mut self) -> (bool, Option<Stmt>) {
         debug!("Parsing statement {:?}", self.current_token);
 
         // Skip stray semicolons.
@@ -244,27 +275,27 @@ impl<'src> Parser<'src> {
             Some(TokenKind::SingleLineComment(_) | TokenKind::MultiLineComment(_)) => {
                 return (false, Some(self.parse_comment()));
             }
-            _ => node::new!(ExpressionStatement(Box::new(self.parse_expression()))),
+            _ => node::stmt!(Expr(Box::new(self.parse_expression()))),
         };
         self.end_span_from_previous_token(&mut span);
         node.span = span;
 
         // FunctionDeclaration statements does not need to be terminated with a semicolon.
-        match node.ast_node {
-            AstNode::FunctionSingleDeclaration { .. } | AstNode::FunctionDeclarations { .. } => {
+        match node.kind {
+            StmtKind::FunctionDeclaration { .. } | StmtKind::FunctionDeclarations { .. } => {
                 return (false, Some(node))
             }
             _ => (),
         }
 
         // Neither do EnumDeclaration statements.
-        if let AstNode::EnumDeclaration { .. } = node.ast_node {
+        if let StmtKind::EnumDeclaration { .. } = node.kind {
             return (false, Some(node));
         }
 
         // Expressions like IfElse as statements also do not need to be terminated with a semicolon.
-        if let AstNode::ExpressionStatement(ref expr) = node.ast_node {
-            if let AstNode::IfElse { .. } = expr.ast_node {
+        if let StmtKind::Expr(ref expr) = node.kind {
+            if let ExprKind::IfElse { .. } = expr.kind {
                 return (false, Some(node));
             }
         }
@@ -272,50 +303,56 @@ impl<'src> Parser<'src> {
         (true, Some(node))
     }
 
-    fn parse_comment(&mut self) -> Node {
-        let comment: Node = self.current_token.as_ref().unwrap().into();
+    fn parse_comment(&mut self) -> Stmt {
+        let comment = match self.current_token_kind() {
+            Some(TokenKind::SingleLineComment(comment)) => node::stmt!(SingleLineComment(comment))
+                .with_span(self.current_token.as_ref().unwrap().span),
+            Some(TokenKind::MultiLineComment(comment)) => node::stmt!(MultiLineComment(comment))
+                .with_span(self.current_token.as_ref().unwrap().span),
+            _ => unreachable!(),
+        };
         self.advance();
         comment
     }
 
-    fn parse_return_statement(&mut self) -> Node {
+    fn parse_return_statement(&mut self) -> Stmt {
         self.consume_token(TokenKind::Return);
 
         if self.current_token_kind() == Some(TokenKind::Semicolon) {
-            return node::new!(ReturnStatement(Box::new(None)));
+            return node::stmt!(Return(Box::new(None)));
         }
 
-        node::new!(ReturnStatement(Box::new(Some(self.parse_expression()))))
+        node::stmt!(Return(Box::new(Some(self.parse_expression()))))
     }
 
-    fn parse_single_identifier(&mut self) -> Node {
+    fn parse_single_identifier(&mut self) -> Expr {
+        let path = Path::from_ident(self.consume_identifier());
+        let span = path.span;
+        node::expr!(Path(path)).with_span(span)
+    }
+
+    fn parse_path(&mut self) -> Path {
+        let mut path = Path::from_ident(self.consume_identifier());
+        while let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
+            self.advance();
+            path.push(self.consume_identifier());
+        }
+
+        self.end_span_from_previous_token(&mut path.span);
+        path
+    }
+
+    fn parse_identifier(&mut self) -> Expr {
         // How do we generalize this span handling?
         // Callbacks come to mind, but I'd rather not.
         // Adding another stack is also not ideal.
-        let mut span = self.create_span_from_current_token();
-        let identifier = self.consume_identifier();
-        self.end_span_from_previous_token(&mut span);
-        node::new!(Identifier(identifier), span)
+        let path = self.parse_path();
+        let span = path.span;
+
+        node::expr!(Path(path)).with_span(span)
     }
 
-    fn parse_identifier(&mut self) -> Node {
-        let mut span = self.create_span_from_current_token();
-        let mut identifiers = vec![self.consume_identifier()];
-        while let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
-            self.advance();
-            identifiers.push(self.consume_identifier());
-        }
-
-        self.end_span_from_previous_token(&mut span);
-
-        if identifiers.len() == 1 {
-            node::new!(Identifier(identifiers.pop().unwrap()), span)
-        } else {
-            node::new!(NestedIdentifier(identifiers), span)
-        }
-    }
-
-    fn parse_enum_declaration(&mut self) -> Node {
+    fn parse_enum_declaration(&mut self) -> Stmt {
         self.consume_token(TokenKind::Enum);
         let name = self.consume_identifier();
         self.consume_token(TokenKind::LBrace);
@@ -327,60 +364,60 @@ impl<'src> Parser<'src> {
             }
         }
         self.consume_token(TokenKind::RBrace);
-        node::new!(EnumDeclaration {
+        node::stmt!(EnumDeclaration(EnumDeclaration {
             id: self.unique_id(),
-            name: name,
-            variants: variants,
-        })
+            name,
+            variants,
+        }))
     }
 
     /// Parses an enum variant, e.g. `Foo`, `Foo(1, 2, 3)` and
     /// `Foo { bar, baz }`.
-    fn parse_enum_variant(&mut self) -> Node {
+    fn parse_enum_variant(&mut self) -> EnumVariant {
         let mut span = self.create_span_from_current_token();
         let name = self.consume_identifier();
         log::debug!("Parsing enum variant {}", name);
-        let mut node: Node = match self.current_token_kind() {
+        let mut node = match self.current_token_kind() {
             Some(TokenKind::LParen) => {
                 self.advance();
                 let mut parameters = Vec::new();
                 while self.current_token_kind() != Some(TokenKind::RParen) {
-                    parameters.push(self.parse_single_identifier());
+                    parameters.push(self.consume_identifier());
                     if let Some(TokenKind::Comma) = self.current_token_kind() {
                         self.advance();
                     }
                 }
                 self.consume_token(TokenKind::RParen);
-                AstNode::EnumVariant {
+                EnumVariant {
                     name,
                     named_fields: false,
                     parameters,
+                    span: Default::default(),
                 }
-                .into()
             }
             Some(TokenKind::LBrace) => {
                 self.advance();
                 let mut parameters = Vec::new();
                 while self.current_token_kind() != Some(TokenKind::RBrace) {
-                    parameters.push(self.parse_single_identifier());
+                    parameters.push(self.consume_identifier());
                     if let Some(TokenKind::Comma) = self.current_token_kind() {
                         self.advance();
                     }
                 }
                 self.consume_token(TokenKind::RBrace);
-                AstNode::EnumVariant {
+                EnumVariant {
                     name,
                     named_fields: true,
                     parameters,
+                    span: Default::default(),
                 }
-                .into()
             }
-            _ => AstNode::EnumVariant {
+            _ => EnumVariant {
                 name,
                 named_fields: false,
                 parameters: Vec::new(),
-            }
-            .into(),
+                span: Default::default(),
+            },
         };
 
         self.end_span_from_previous_token(&mut span);
@@ -388,7 +425,7 @@ impl<'src> Parser<'src> {
         node
     }
 
-    fn parse_statements(&mut self, may_complete: bool) -> (Vec<Node>, Box<Option<Node>>) {
+    fn parse_statements(&mut self, may_complete: bool) -> (Vec<Stmt>, Box<Option<Expr>>) {
         let mut statements = Vec::new();
         let mut completion_expression = Box::new(None);
 
@@ -399,25 +436,19 @@ impl<'src> Parser<'src> {
                 if may_complete
                     && self.current_token_kind() == Some(TokenKind::RBrace)
                     && matches!(
-                        &statement.ast_node,
-                        AstNode::ExpressionStatement(_) | AstNode::FunctionSingleDeclaration { .. }
+                        &statement.kind,
+                        StmtKind::Expr(_) | StmtKind::FunctionDeclaration(_)
                     )
                 {
-                    let mut expression = match statement.ast_node {
-                        AstNode::ExpressionStatement(expr) => expr,
+                    let mut expression = match statement.kind {
+                        StmtKind::Expr(expr) => expr,
                         // Function declaration as completion expression.
                         // We remap the function declaration node to a function expression.
-                        AstNode::FunctionSingleDeclaration {
-                            id,
-                            name,
-                            declaration,
-                        } => Box::new(node::new!(FunctionExpression {
-                            id: id,
-                            name: Box::new(Some(*name)),
-                            declaration: declaration,
-                        })),
+                        StmtKind::FunctionDeclaration(decl) => {
+                            Box::new(node::expr!(FunctionExpression(decl)))
+                        }
                         _ => {
-                            self.panic_unexpected_node(
+                            self.panic_unexpected_stmt(
                                 "expression statement or function declaration",
                                 Some(statement),
                             );
@@ -443,58 +474,32 @@ impl<'src> Parser<'src> {
         (statements, completion_expression)
     }
 
-    fn parse_module(&mut self) -> Node {
-        node::new!(Module(self.parse_statements(false).0))
+    fn parse_module(&mut self) -> Module {
+        Module::new(self.parse_statements(false).0)
     }
 
-    fn parse_block(&mut self) -> Node {
+    fn parse_block(&mut self) -> Expr {
         self.consume_token(TokenKind::LBrace);
         let (statements, completion) = self.parse_statements(true);
         self.consume_token(TokenKind::RBrace);
 
-        node::new!(Block(statements, completion))
+        node::expr!(Block(statements, completion))
     }
 
-    fn parse_variable_declaration_pattern(&mut self) -> Node {
-        expect_token_matches!(
-            self,
-            "literal, identifier or list extraction",
-            TokenKind::Literal(_) | TokenKind::Identifier(_) | TokenKind::LBracket
-        );
-
-        let mut span = self.create_span_from_current_token();
-        let mut node = match self.current_token_kind() {
-            // Literal values will be pattern matched
-            Some(TokenKind::Literal(_)) => self.parse_primary_expression(),
-            Some(TokenKind::Identifier(ref identifier)) if identifier == "_" => {
-                self.advance();
-                node::new!(Wildcard)
-            }
-            // Identifiers can be namespaced identifiers or call expressions, which should be pattern matched.
-            // Simple identifiers will be used as is and mapped to a function parameter.
-            Some(TokenKind::Identifier(_)) => {
-                if let Some(TokenKind::NamespaceSeparator) = self.peek_token_kind() {
-                    self.parse_enum_extraction()
-                } else if let Some(TokenKind::LParen | TokenKind::LBrace) = self.peek_token_kind() {
-                    self.parse_enum_extraction()
-                } else {
-                    self.parse_single_identifier()
-                }
-            }
-            Some(TokenKind::LBracket) => self.parse_list_extraction(),
-            _ => unreachable!("Expected pattern, found {:?}", self.current_token_kind()),
-        };
-
-        self.end_span_from_previous_token(&mut span);
-        node.span = span;
-        node
+    fn parse_let_expression(&mut self) -> Expr {
+        self.consume_token(TokenKind::Let);
+        let pattern = self.parse_pattern();
+        self.consume_token(TokenKind::EqualSign);
+        let value = self.parse_expression();
+        node::expr!(Let(Box::new(pattern), Box::new(value)))
     }
 
-    fn parse_variable_declaration(&mut self) -> Node {
+    fn parse_variable_declaration(&mut self) -> Stmt {
+        debug!("Parsing variable declaration");
         self.consume_token(TokenKind::Let);
 
         // We probably want to know whether we are parsing a plain declaration of `if let`.
-        let pattern = self.parse_variable_declaration_pattern();
+        let pattern = self.parse_pattern();
 
         let type_annotation = match self.current_token_kind() {
             Some(TokenKind::Colon) => {
@@ -506,8 +511,7 @@ impl<'src> Parser<'src> {
         self.consume_token(TokenKind::EqualSign);
         let value = self.parse_expression();
 
-        node::new!(VariableDeclaration {
-            id: self.unique_id(),
+        node::stmt!(Let {
             pattern: Box::new(pattern),
             expression: Box::new(value),
             type_annotation: Box::new(type_annotation),
@@ -516,7 +520,8 @@ impl<'src> Parser<'src> {
 
     /// Parses a function call expression, e.g. `foo()`, `foo(1, 2, 3)` and
     /// `foo { bar, baz }`.
-    fn parse_call_expression(&mut self, function: Node) -> Node {
+    fn parse_call_expression(&mut self, expr: Expr) -> Expr {
+        let mut span = expr.span;
         log::debug!(
             "Parsing call expression, current token: {:?}",
             self.current_token
@@ -548,21 +553,23 @@ impl<'src> Parser<'src> {
             self.consume_token(TokenKind::RParen);
         }
 
-        AstNode::Call {
-            function: Box::new(function),
-            arguments,
-        }
-        .into()
+        self.end_span_from_previous_token(&mut span);
+
+        node::expr!(Call {
+            function: Box::new(expr),
+            arguments: arguments,
+        })
+        .with_span(span)
     }
 
-    fn parse_identifier_pattern(&mut self) -> Node {
-        let mut span = self.create_span_from_current_token();
+    fn parse_identifier_pattern(&mut self) -> Pattern {
         let name = self.consume_identifier();
+        let mut span = name.span;
 
-        let mut node = if name == "_" {
-            node::new!(Wildcard)
+        let mut node = if name.name == "_" {
+            node::pat!(Wildcard)
         } else {
-            node::new!(IdentifierPattern {
+            node::pat!(Identifier {
                 id: self.unique_id(),
                 name: name,
             })
@@ -573,7 +580,7 @@ impl<'src> Parser<'src> {
         node
     }
 
-    fn parse_list_extraction(&mut self) -> Node {
+    fn parse_list_extraction(&mut self) -> Pattern {
         self.consume_token(TokenKind::LBracket);
 
         let mut elements = Vec::new();
@@ -589,16 +596,12 @@ impl<'src> Parser<'src> {
             );
 
             let element = match self.current_token_kind() {
-                Some(TokenKind::Identifier(_)) => self.parse_identifier_pattern(),
-                Some(TokenKind::Literal(_) | TokenKind::LBracket) => {
-                    self.parse_primary_expression()
+                Some(TokenKind::Identifier(_) | TokenKind::Literal(_) | TokenKind::LBracket) => {
+                    self.parse_pattern()
                 }
                 Some(TokenKind::DotDotDot) => {
                     self.advance();
-                    node::new!(UnaryOp(
-                        UnaryOp::Rest,
-                        Box::new(self.parse_identifier_pattern())
-                    ))
+                    node::pat!(Rest(Box::new(self.parse_identifier_pattern())))
                 }
                 _ => unreachable!("Expected identifier, literal or rest parameter"),
             };
@@ -615,10 +618,10 @@ impl<'src> Parser<'src> {
 
         self.consume_token(TokenKind::RBracket);
 
-        node::new!(ListPattern(elements))
+        node::pat!(List(elements))
     }
 
-    fn parse_list_expression(&mut self) -> Node {
+    fn parse_list_expression(&mut self) -> Expr {
         self.consume_token(TokenKind::LBracket);
 
         let mut elements = Vec::new();
@@ -627,7 +630,7 @@ impl<'src> Parser<'src> {
                 Some(TokenKind::DotDotDot) => {
                     self.advance();
 
-                    node::new!(UnaryOp(UnaryOp::Spread, Box::new(self.parse_expression())))
+                    node::expr!(UnaryOp(UnaryOp::Spread, Box::new(self.parse_expression())))
                 }
                 _ => self.parse_expression(),
             };
@@ -644,10 +647,10 @@ impl<'src> Parser<'src> {
 
         self.consume_token(TokenKind::RBracket);
 
-        node::new!(List(elements))
+        node::expr!(List(elements))
     }
 
-    fn parse_block_or_dict(&mut self) -> Node {
+    fn parse_block_or_dict(&mut self) -> Expr {
         self.consume_token(TokenKind::LBrace);
         // If the first token is a identifier followed by a colon, we assume a dict.
         if let Some(TokenKind::Identifier(_)) = self.current_token_kind() {
@@ -663,47 +666,40 @@ impl<'src> Parser<'src> {
                     }
                 }
                 self.consume_token(TokenKind::RBrace);
-                return node::new!(Dict(elements));
+                return node::expr!(Dict(elements));
             }
         }
 
         let (statements, completion) = self.parse_statements(true);
         self.consume_token(TokenKind::RBrace);
 
-        node::new!(Block(statements, completion))
+        node::expr!(Block(statements, completion))
     }
 
     /// Can be a Identifier, NestedIdentifier or FieldExpression with a single field name.
-    fn parse_function_name(&mut self) -> Node {
-        let mut span = self.create_span_from_current_token();
-        let mut identifiers = vec![self.consume_identifier()];
+    fn parse_function_name(&mut self) -> Expr {
+        let path = self.parse_identifier();
+        let mut span = path.span;
 
-        let mut node = if let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
-            while let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
-                self.advance();
-                identifiers.push(self.consume_identifier());
-            }
-
-            node::new!(NestedIdentifier(identifiers))
-        } else if let Some(TokenKind::Dot) = self.current_token_kind() {
+        let mut expr = if let Some(TokenKind::Dot) = self.current_token_kind() {
             self.advance();
-            node::new!(FieldExpression {
-                base: Box::new(node::new!(Identifier(identifiers.pop().unwrap()))),
-                field: Box::new(self.parse_single_identifier()),
+            node::expr!(FieldExpression {
+                base: Box::new(path),
+                field: Box::new(self.consume_identifier()),
             })
         } else {
-            node::new!(Identifier(identifiers.pop().unwrap()))
+            path
         };
 
         self.end_span_from_previous_token(&mut span);
-        node.span = span;
-        node
+        expr.span = span;
+        expr
     }
 
-    fn parse_if_else_expression(&mut self) -> Node {
+    fn parse_if_else_expression(&mut self) -> Expr {
         self.consume_token(TokenKind::If);
         let condition = if let Some(TokenKind::Let) = self.current_token_kind() {
-            self.parse_variable_declaration()
+            self.parse_let_expression()
         } else {
             self.parse_expression()
         };
@@ -730,22 +726,24 @@ impl<'src> Parser<'src> {
             None
         };
 
-        node::new!(IfElse {
+        node::expr!(IfElse {
             condition: Box::new(condition),
             then_branch: Box::new(then_branch),
             else_branch: Box::new(else_branch),
         })
     }
 
-    fn parse_unary_expression(&mut self) -> Node {
+    fn parse_unary_expression(&mut self) -> Expr {
         self.advance();
-        node::new!(UnaryOp(
+        node::expr!(UnaryOp(
             UnaryOp::Minus,
             Box::new(self.parse_primary_expression())
         ))
     }
 
-    fn parse_primary_expression(&mut self) -> Node {
+    fn parse_primary_expression(&mut self) -> Expr {
+        debug!("Parsing primary expression {:?}", self.current_token);
+
         expect_token_matches!(
             self,
             "primary expression",
@@ -776,40 +774,45 @@ impl<'src> Parser<'src> {
             Some(TokenKind::Fn) => self.parse_function_expression(),
             Some(TokenKind::Rec) => {
                 self.advance();
-                node::new!(RecursiveCall(Box::new(self.parse_expression())))
+                node::expr!(RecursiveCall(Box::new(self.parse_expression())))
             }
             Some(TokenKind::Match) => self.parse_match_expression(),
-            Some(_) => {
-                let mut node: Node = self.current_token.as_ref().unwrap().into();
-
+            Some(TokenKind::Literal(literal)) => {
+                self.advance();
+                node::expr!(Literal(literal.clone()))
+            }
+            Some(TokenKind::Identifier(identifier)) => {
+                let identifier_span = self.create_span_from_current_token();
                 self.advance();
 
-                if let AstNode::Identifier(identifier) = &node.ast_node {
-                    if identifier == "_" {
-                        node = node::new!(Wildcard);
-                    } else {
-                        if let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
-                            let mut identifiers = vec![identifier.clone()];
-                            while let Some(TokenKind::NamespaceSeparator) =
-                                self.current_token_kind()
-                            {
-                                self.advance();
-                                identifiers.push(self.consume_identifier());
-                            }
-                            node = node::new!(NestedIdentifier(identifiers));
-                        }
+                if identifier == "_" {
+                    node::expr!(Wildcard)
+                } else {
+                    let mut path = Path::from_ident(Ident::new(identifier, identifier_span));
+                    let mut span = path.span;
 
-                        if let Some(TokenKind::LParen | TokenKind::LBrace) =
-                            self.current_token_kind()
-                        {
-                            node = self.parse_call_expression(node);
+                    if let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
+                        while let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
+                            self.advance();
+                            path.push(self.consume_identifier());
                         }
                     }
-                }
 
-                node
+                    self.end_span_from_previous_token(&mut span);
+
+                    let mut expr = Expr::new(ExprKind::Path(path)).with_span(span);
+
+                    if let Some(TokenKind::LParen | TokenKind::LBrace) = self.current_token_kind() {
+                        expr = self.parse_call_expression(expr);
+                    }
+
+                    expr
+                }
             }
-            _ => unreachable!("Expected primary expression"),
+            _ => {
+                self.panic_unexpected_token("primary expression", self.current_token.clone());
+                unreachable!("Expected primary expression")
+            }
         };
 
         self.end_span_from_previous_token(&mut span);
@@ -817,20 +820,20 @@ impl<'src> Parser<'src> {
         node
     }
 
-    fn parse_match_expression(&mut self) -> Node {
+    fn parse_match_expression(&mut self) -> Expr {
         self.consume_token(TokenKind::Match);
         let expression = self.parse_expression();
         self.consume_token(TokenKind::LBrace);
 
         let mut arms = Vec::new();
         while self.current_token_kind() != Some(TokenKind::RBrace) {
-            let pattern = self.parse_expression();
+            let pattern = self.parse_pattern();
             self.consume_token(TokenKind::FatArrow);
             let expression = self.parse_expression();
-            arms.push(node::new!(MatchArm {
-                pattern: Box::new(pattern),
-                expression: Box::new(expression),
-            }));
+            arms.push(MatchArm {
+                pattern,
+                expression,
+            });
             if let Some(TokenKind::Comma) = self.current_token_kind() {
                 self.advance();
             }
@@ -838,13 +841,13 @@ impl<'src> Parser<'src> {
 
         self.consume_token(TokenKind::RBrace);
 
-        node::new!(Match {
+        node::expr!(Match {
             expression: Box::new(expression),
             arms: arms,
         })
     }
 
-    fn parse_parameter_list(&mut self) -> Vec<Node> {
+    fn parse_parameter_list(&mut self) -> Vec<FunctionParameter> {
         let mut parameters = Vec::new();
 
         if self.current_token_kind() == Some(TokenKind::LParen) {
@@ -859,7 +862,7 @@ impl<'src> Parser<'src> {
                 }
 
                 let mut parameter_span = self.create_span_from_current_token();
-                let parameter_pattern = self.parse_variable_declaration_pattern();
+                let parameter_pattern = self.parse_pattern();
 
                 let type_annotation = match self.current_token_kind() {
                     Some(TokenKind::Colon) => {
@@ -871,14 +874,11 @@ impl<'src> Parser<'src> {
 
                 self.end_span_from_previous_token(&mut parameter_span);
 
-                parameters.push(node::new!(
-                    FunctionParameter {
-                        id: self.unique_id(),
-                        pattern: Box::new(parameter_pattern),
-                        type_annotation: Box::new(type_annotation),
-                    },
-                    parameter_span
-                ));
+                parameters.push(FunctionParameter {
+                    pattern: Box::new(parameter_pattern),
+                    type_annotation: Box::new(type_annotation),
+                    span: parameter_span,
+                });
             }
             self.consume_token(TokenKind::RParen);
         }
@@ -896,7 +896,7 @@ impl<'src> Parser<'src> {
         )
     }
 
-    fn parse_type_annotation(&mut self) -> Option<Node> {
+    fn parse_type_annotation(&mut self) -> Option<Ty> {
         let token = self.current_token_kind()?;
 
         if !Self::is_type_annotation_token(&token) {
@@ -907,19 +907,16 @@ impl<'src> Parser<'src> {
 
         match token {
             TokenKind::Identifier(_) => {
-                let identifier = self.parse_identifier();
+                let identifier = self.parse_path();
                 let parameters = self.parse_type_annotation_parameters();
 
-                Some(node::new!(TypeAnnotation {
-                    name: Box::new(identifier),
-                    parameters: parameters,
-                }))
+                Some(Ty::new(identifier).with_parameters(parameters))
             }
             _ => unreachable!("Expected type annotation, found {:?}", token),
         }
     }
 
-    fn parse_type_annotation_parameters(&mut self) -> Vec<Node> {
+    fn parse_type_annotation_parameters(&mut self) -> Vec<Ty> {
         let mut parameters = Vec::new();
 
         if let Some(TokenKind::LessThan) = self.current_token_kind() {
@@ -937,7 +934,7 @@ impl<'src> Parser<'src> {
         parameters
     }
 
-    fn parse_return_type(&mut self) -> Option<Node> {
+    fn parse_return_type(&mut self) -> Option<Ty> {
         if let Some(TokenKind::Arrow) = self.current_token_kind() {
             self.advance();
             let return_type = self.parse_type_annotation()?;
@@ -947,13 +944,16 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_function_expression(&mut self) -> Node {
+    fn parse_function_expression(&mut self) -> Expr {
         let mut span = self.create_span_from_current_token();
         self.consume_token(TokenKind::Fn);
         let name = if let Some(TokenKind::Identifier(_)) = &self.current_token_kind() {
-            Some(self.parse_single_identifier())
+            self.parse_single_identifier()
         } else {
-            None
+            node::expr!(Path(Path::from_ident(Ident::new(
+                "anonymous",
+                Default::default()
+            ))))
         };
 
         let parameters = self.parse_parameter_list();
@@ -962,24 +962,20 @@ impl<'src> Parser<'src> {
 
         self.end_span_from_previous_token(&mut span);
 
-        node::new!(
-            FunctionExpression {
-                id: self.unique_id(),
-                name: Box::new(name),
-                declaration: Box::new(node::new!(FunctionDeclaration(FunctionDeclaration {
-                    parameters,
-                    guard: Box::new(None),
-                    body: Box::new(body),
-                    return_type_annotation: Box::new(return_type),
-                }))),
-            },
-            span
-        )
+        node::expr!(FunctionExpression(FunctionDeclaration {
+            id: self.unique_id(),
+            name: Box::new(name),
+            parameters,
+            guard: Box::new(None),
+            body: Box::new(body),
+            return_type_annotation: Box::new(return_type),
+        }))
+        .with_span(span)
     }
 
     /// Parses an enum extraction, e.g. `Foo(bar, baz)` and `Foo { bar, baz }` within
     /// a function declarations parameter list.
-    fn parse_enum_extraction(&mut self) -> Node {
+    fn parse_enum_extraction(&mut self) -> Pattern {
         let identifier = Box::new(self.parse_identifier());
         let is_dict_extraction = self.current_token_kind() == Some(TokenKind::LBrace);
 
@@ -993,7 +989,7 @@ impl<'src> Parser<'src> {
                 }
             }
             self.consume_token(TokenKind::RBrace);
-            node::new!(EnumPattern {
+            node::pat!(Enum {
                 identifier: identifier,
                 elements: elements,
                 named_fields: true,
@@ -1005,9 +1001,9 @@ impl<'src> Parser<'src> {
                 let mut identifier = self.parse_identifier_pattern();
 
                 // Remap identifier of _ to Wildcard
-                if let AstNode::Identifier(ref ident) = identifier.ast_node {
-                    if ident == "_" {
-                        identifier = node::new!(Wildcard);
+                if let PatternKind::Identifier { ref name, .. } = identifier.kind {
+                    if name.name == "_" {
+                        identifier = node::pat!(Wildcard);
                     }
                 }
 
@@ -1017,14 +1013,13 @@ impl<'src> Parser<'src> {
                 }
             }
             self.consume_token(TokenKind::RParen);
-            AstNode::EnumPattern {
-                identifier,
-                elements,
+            node::pat!(Enum {
+                identifier: identifier,
+                elements: elements,
                 named_fields: false,
-            }
-            .into()
+            })
         } else {
-            node::new!(EnumPattern {
+            node::pat!(Enum {
                 identifier: identifier,
                 elements: Vec::new(),
                 named_fields: false,
@@ -1032,9 +1027,10 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_function_declaration(&mut self) -> Node {
-        let mut name: Option<Node> = None;
-        let mut declarations: Vec<Node> = Vec::new();
+    fn parse_function_declaration(&mut self) -> Stmt {
+        let id = self.unique_id();
+        let mut name: Option<Expr> = None;
+        let mut declarations: Vec<Stmt> = Vec::new();
 
         while matches!(
             self.current_token_kind(),
@@ -1052,13 +1048,13 @@ impl<'src> Parser<'src> {
             // parsing function declarations.
             let saved_state = self.save_state();
 
-            let mut comments: Vec<Node> = Vec::new();
+            // TODO: We should figure out how to represent comments in any AST node.
+            let mut comments: Vec<Stmt> = Vec::new();
             while matches!(
                 self.current_token_kind(),
                 Some(TokenKind::SingleLineComment(_)) | Some(TokenKind::MultiLineComment(_))
             ) {
-                comments.push(self.current_token.as_ref().unwrap().into());
-                self.advance();
+                comments.push(self.parse_comment());
             }
 
             if let Some(TokenKind::Fn) = self.current_token_kind() {
@@ -1083,12 +1079,12 @@ impl<'src> Parser<'src> {
                     break;
                 }
 
-                match node.ast_node {
-                    AstNode::Identifier(_) | AstNode::NestedIdentifier(_) => {
+                match node.kind {
+                    ExprKind::Path(_) => {
                         // We found a simple identifier, which we can use as the name of the function.
                         name = Some(node);
                     }
-                    AstNode::FieldExpression { .. } => {
+                    ExprKind::FieldExpression { .. } => {
                         // We found a field expression, which we can use as the name of the function.
                         name = Some(node);
                     }
@@ -1109,7 +1105,9 @@ impl<'src> Parser<'src> {
             let return_type = self.parse_return_type();
             let body = self.parse_block();
 
-            declarations.push(node::new!(FunctionDeclaration(FunctionDeclaration {
+            declarations.push(node::stmt!(FunctionDeclaration(FunctionDeclaration {
+                id,
+                name: Box::new(name.clone().unwrap()),
                 parameters,
                 guard: Box::new(guard),
                 body: Box::new(body),
@@ -1120,32 +1118,23 @@ impl<'src> Parser<'src> {
         if declarations.len() == 1 {
             let declaration = declarations.pop().unwrap();
 
-            if let AstNode::FunctionDeclaration(_) = declaration.ast_node {
-                return node::new!(FunctionSingleDeclaration {
-                    id: self.unique_id(),
-                    name: Box::new(name.unwrap()),
-                    declaration: Box::new(declaration)
-                });
-            } else {
-                unreachable!("Expected function declaration, found {:?}", declaration);
+            if let StmtKind::FunctionDeclaration(_) = declaration.kind {
+                return declaration;
             }
+
+            unreachable!("Expected function declaration, found {:?}", declaration);
         }
 
-        node::new!(FunctionDeclarations {
-            id: self.unique_id(),
-            name: Box::new(name.unwrap()),
-            declarations: declarations,
-        })
+        node::stmt!(FunctionDeclarations(declarations))
     }
 
-    fn parse_guard_clause(&mut self) -> Option<Node> {
+    fn parse_guard_clause(&mut self) -> Option<Expr> {
         if let Some(TokenKind::If) = self.current_token_kind() {
             self.advance();
 
             if let Some(TokenKind::Let) = self.current_token_kind() {
-                let decl = self.parse_variable_declaration();
+                let decl = self.parse_let_expression();
 
-                // TODO: Should we restrict and validate valid nodes in if let guard clauses?
                 return Some(decl);
             }
 
@@ -1153,10 +1142,10 @@ impl<'src> Parser<'src> {
             // expressions.
             let expression = self.parse_expression();
 
-            match expression.ast_node {
-                AstNode::Call { .. } | AstNode::BinaryOp { .. } | AstNode::UnaryOp { .. } => (),
+            match expression.kind {
+                ExprKind::Call { .. } | ExprKind::BinaryOp { .. } | ExprKind::UnaryOp { .. } => (),
                 _ => {
-                    self.panic_unexpected_node(
+                    self.panic_unexpected_expr(
                         "function call, binary logical expression or unary logical expression",
                         Some(expression.clone()),
                     );
@@ -1200,70 +1189,72 @@ impl<'src> Parser<'src> {
         )
     }
 
-    fn map_binary_op(token: &TokenKind) -> BinaryOp {
+    fn map_binary_op(token: &TokenKind) -> BinaryOpKind {
         match token {
-            TokenKind::Plus => BinaryOp::Add,
-            TokenKind::Minus => BinaryOp::Subtract,
-            TokenKind::Asterisk => BinaryOp::Multiply,
-            TokenKind::AsteriskAsterisk => BinaryOp::Exponentiation,
-            TokenKind::Slash => BinaryOp::Divide,
-            TokenKind::Percent => BinaryOp::Modulo,
-            TokenKind::EqualEqual => BinaryOp::Equal,
-            TokenKind::NotEqual => BinaryOp::NotEqual,
-            TokenKind::LessThan => BinaryOp::LessThan,
-            TokenKind::LessThanOrEqual => BinaryOp::LessThanOrEqual,
-            TokenKind::GreaterThan => BinaryOp::GreaterThan,
-            TokenKind::GreaterThanOrEqual => BinaryOp::GreaterThanOrEqual,
-            TokenKind::Pipe => BinaryOp::BitwiseOr,
-            TokenKind::Ampersand => BinaryOp::BitwiseAnd,
-            TokenKind::Caret => BinaryOp::BitwiseXor,
-            TokenKind::DoublePipe => BinaryOp::Or,
-            TokenKind::DoubleAmpersand => BinaryOp::And,
-            TokenKind::Pipeline => BinaryOp::Pipeline,
-            TokenKind::And => BinaryOp::And,
-            TokenKind::Or => BinaryOp::Or,
+            TokenKind::Plus => BinaryOpKind::Add,
+            TokenKind::Minus => BinaryOpKind::Subtract,
+            TokenKind::Asterisk => BinaryOpKind::Multiply,
+            TokenKind::AsteriskAsterisk => BinaryOpKind::Exponentiation,
+            TokenKind::Slash => BinaryOpKind::Divide,
+            TokenKind::Percent => BinaryOpKind::Modulo,
+            TokenKind::EqualEqual => BinaryOpKind::Equal,
+            TokenKind::NotEqual => BinaryOpKind::NotEqual,
+            TokenKind::LessThan => BinaryOpKind::LessThan,
+            TokenKind::LessThanOrEqual => BinaryOpKind::LessThanOrEqual,
+            TokenKind::GreaterThan => BinaryOpKind::GreaterThan,
+            TokenKind::GreaterThanOrEqual => BinaryOpKind::GreaterThanOrEqual,
+            TokenKind::Pipe => BinaryOpKind::BitwiseOr,
+            TokenKind::Ampersand => BinaryOpKind::BitwiseAnd,
+            TokenKind::Caret => BinaryOpKind::BitwiseXor,
+            TokenKind::DoublePipe => BinaryOpKind::Or,
+            TokenKind::DoubleAmpersand => BinaryOpKind::And,
+            TokenKind::Pipeline => BinaryOpKind::Pipeline,
+            TokenKind::And => BinaryOpKind::And,
+            TokenKind::Or => BinaryOpKind::Or,
             _ => {
                 unimplemented!("Expected binary operator, found {:?}", token)
             }
         }
     }
 
-    fn map_operator_info(operator: &BinaryOp) -> OperatorInfo {
+    fn map_operator_info(operator: &BinaryOpKind) -> OperatorInfo {
         match operator {
-            BinaryOp::Add | BinaryOp::Subtract => OperatorInfo {
+            BinaryOpKind::Add | BinaryOpKind::Subtract => OperatorInfo {
                 precedence: 6,
                 associativity: Associativity::Left,
             },
-            BinaryOp::Multiply | BinaryOp::Divide | BinaryOp::Modulo => OperatorInfo {
+            BinaryOpKind::Multiply | BinaryOpKind::Divide | BinaryOpKind::Modulo => OperatorInfo {
                 precedence: 7,
                 associativity: Associativity::Left,
             },
-            BinaryOp::Equal
-            | BinaryOp::NotEqual
-            | BinaryOp::LessThan
-            | BinaryOp::LessThanOrEqual
-            | BinaryOp::GreaterThan
-            | BinaryOp::GreaterThanOrEqual => OperatorInfo {
+            BinaryOpKind::Equal
+            | BinaryOpKind::NotEqual
+            | BinaryOpKind::LessThan
+            | BinaryOpKind::LessThanOrEqual
+            | BinaryOpKind::GreaterThan
+            | BinaryOpKind::GreaterThanOrEqual => OperatorInfo {
                 precedence: 5,
                 associativity: Associativity::Left,
             },
-            BinaryOp::And => OperatorInfo {
+            BinaryOpKind::And => OperatorInfo {
                 precedence: 3,
                 associativity: Associativity::Left,
             },
-            BinaryOp::Or => OperatorInfo {
+            BinaryOpKind::Or => OperatorInfo {
                 precedence: 2,
                 associativity: Associativity::Left,
             },
-            BinaryOp::BitwiseAnd | BinaryOp::BitwiseOr | BinaryOp::BitwiseXor => OperatorInfo {
-                precedence: 8,
-                associativity: Associativity::Left,
-            },
-            BinaryOp::Exponentiation => OperatorInfo {
+            BinaryOpKind::BitwiseAnd | BinaryOpKind::BitwiseOr | BinaryOpKind::BitwiseXor => {
+                OperatorInfo {
+                    precedence: 8,
+                    associativity: Associativity::Left,
+                }
+            }
+            BinaryOpKind::Exponentiation => OperatorInfo {
                 precedence: 9,
                 associativity: Associativity::Right,
             },
-            BinaryOp::Pipeline => OperatorInfo {
+            BinaryOpKind::Pipeline => OperatorInfo {
                 precedence: 1,
                 associativity: Associativity::Left,
             },
@@ -1278,19 +1269,69 @@ impl<'src> Parser<'src> {
         op1.precedence > op2.precedence
     }
 
-    fn parse_expression(&mut self) -> Node {
+    fn parse_pattern_literal(&mut self) -> Pattern {
+        expect_token_matches!(self, "literal", TokenKind::Literal(_));
+
+        let token = self.current_token.as_ref().unwrap();
+
+        match &token.kind {
+            TokenKind::Literal(literal) => {
+                let lit = literal.clone();
+                self.advance();
+                node::pat!(Literal(lit))
+            }
+            _ => unreachable!("Expected literal, found {:?}", token),
+        }
+    }
+
+    fn parse_pattern(&mut self) -> Pattern {
+        expect_token_matches!(
+            self,
+            "literal, identifier or list extraction",
+            TokenKind::Literal(_) | TokenKind::Identifier(_) | TokenKind::LBracket
+        );
+
         let mut span = self.create_span_from_current_token();
-        let mut node = self.parse_expression_with_precedence(0, Associativity::Left);
+        let mut node = match self.current_token_kind() {
+            // Literal values will be pattern matched
+            Some(TokenKind::Literal(_)) => self.parse_pattern_literal(),
+            Some(TokenKind::Identifier(ref identifier)) if identifier == "_" => {
+                self.advance();
+                node::pat!(Wildcard)
+            }
+            // Identifiers can be namespaced identifiers or call expressions, which should be pattern matched.
+            // Simple identifiers will be used as is and mapped to a function parameter.
+            Some(TokenKind::Identifier(_)) => {
+                if let Some(TokenKind::NamespaceSeparator) = self.peek_token_kind() {
+                    self.parse_enum_extraction()
+                } else if let Some(TokenKind::LParen | TokenKind::LBrace) = self.peek_token_kind() {
+                    self.parse_enum_extraction()
+                } else {
+                    self.parse_identifier_pattern()
+                }
+            }
+            Some(TokenKind::LBracket) => self.parse_list_extraction(),
+            _ => unreachable!("Expected pattern, found {:?}", self.current_token_kind()),
+        };
+
         self.end_span_from_previous_token(&mut span);
         node.span = span;
         node
+    }
+
+    fn parse_expression(&mut self) -> Expr {
+        self.parse_expression_with_precedence(0, Associativity::Left)
     }
 
     fn parse_expression_with_precedence(
         &mut self,
         precedence: u8,
         associativity: Associativity,
-    ) -> Node {
+    ) -> Expr {
+        debug!(
+            "Parsing expression with precedence {} {:#?}",
+            precedence, associativity
+        );
         let mut span = self.create_span_from_current_token();
         let mut lhs = self.parse_primary_expression();
 
@@ -1299,16 +1340,16 @@ impl<'src> Parser<'src> {
                 Some(TokenKind::Dot) => {
                     self.advance();
                     let field_name = self.consume_identifier();
-                    lhs = node::new!(FieldExpression {
+                    lhs = node::expr!(FieldExpression {
                         base: Box::new(lhs),
-                        field: Box::new(node::new!(Identifier(field_name))),
+                        field: Box::new(field_name),
                     });
                 }
                 Some(TokenKind::LBracket) => {
                     self.advance();
                     let index = self.parse_expression_with_precedence(0, Associativity::Left);
                     self.consume_token(TokenKind::RBracket);
-                    lhs = node::new!(IndexExpression {
+                    lhs = node::expr!(IndexExpression {
                         base: Box::new(lhs),
                         index: Box::new(index),
                     });
@@ -1337,7 +1378,7 @@ impl<'src> Parser<'src> {
                         operator_info.associativity,
                     );
 
-                    lhs = node::new!(BinaryOp {
+                    lhs = node::expr!(BinaryOp {
                         op: operator,
                         lhs: Box::new(lhs),
                         rhs: Box::new(rhs),
@@ -1359,19 +1400,19 @@ impl<'src> Parser<'src> {
         lhs
     }
 
-    fn fn_name_identifier_to_string(&self, identifier: &Node) -> String {
-        match &identifier.ast_node {
-            AstNode::Identifier(identifier) => identifier.clone(),
-            AstNode::NestedIdentifier(identifiers) => identifiers.join("::"),
-            AstNode::FieldExpression { base, field } => {
-                format!(
-                    "{}.{}",
-                    self.fn_name_identifier_to_string(base),
-                    self.fn_name_identifier_to_string(field)
-                )
+    fn fn_name_identifier_to_string(&self, identifier: &Expr) -> String {
+        match &identifier.kind {
+            ExprKind::Path(path) => path
+                .segments
+                .iter()
+                .map(|ident| ident.to_string())
+                .collect::<Vec<_>>()
+                .join("::"),
+            ExprKind::FieldExpression { base, field } => {
+                format!("{}.{}", self.fn_name_identifier_to_string(base), field)
             }
             _ => {
-                self.panic_unexpected_node(
+                self.panic_unexpected_expr(
                     "identifier, nested identifier or field expression",
                     Some(identifier.clone()),
                 );

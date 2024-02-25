@@ -2,35 +2,55 @@
 source: crates/tlang_parser/tests/parser_enum.rs
 expression: "parse!(indoc! {\n        \"\n        enum Option {\n            Some(value),\n            None,\n        }\n\n        fn unwrap(Option::None) { panic(\\\"Cannot unwrap None\\\") }\n        fn unwrap(Option::Some(value)) { value }\n    \"\n    })"
 ---
-Node(
-  ast_node: Module([
-    Node(
-      ast_node: EnumDeclaration(
+Module(
+  statements: [
+    Stmt(
+      kind: EnumDeclaration(EnumDeclaration(
         id: SymbolId(1),
-        name: "Option",
+        name: Ident(
+          name: "Option",
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 5,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 11,
+            ),
+          ),
+        ),
         variants: [
-          Node(
-            ast_node: EnumVariant(
+          EnumVariant(
+            name: Ident(
               name: "Some",
-              named_fields: false,
-              parameters: [
-                Node(
-                  ast_node: Identifier("value"),
-                  symbol_table: None,
-                  span: Span(
-                    start: LineColumn(
-                      line: 1,
-                      column: 10,
-                    ),
-                    end: LineColumn(
-                      line: 1,
-                      column: 15,
-                    ),
+              span: Span(
+                start: LineColumn(
+                  line: 1,
+                  column: 5,
+                ),
+                end: LineColumn(
+                  line: 1,
+                  column: 9,
+                ),
+              ),
+            ),
+            named_fields: false,
+            parameters: [
+              Ident(
+                name: "value",
+                span: Span(
+                  start: LineColumn(
+                    line: 1,
+                    column: 10,
+                  ),
+                  end: LineColumn(
+                    line: 1,
+                    column: 15,
                   ),
                 ),
-              ],
-            ),
-            symbol_table: None,
+              ),
+            ],
             span: Span(
               start: LineColumn(
                 line: 1,
@@ -42,13 +62,22 @@ Node(
               ),
             ),
           ),
-          Node(
-            ast_node: EnumVariant(
+          EnumVariant(
+            name: Ident(
               name: "None",
-              named_fields: false,
-              parameters: [],
+              span: Span(
+                start: LineColumn(
+                  line: 2,
+                  column: 5,
+                ),
+                end: LineColumn(
+                  line: 2,
+                  column: 9,
+                ),
+              ),
             ),
-            symbol_table: None,
+            named_fields: false,
+            parameters: [],
             span: Span(
               start: LineColumn(
                 line: 2,
@@ -61,8 +90,7 @@ Node(
             ),
           ),
         ],
-      ),
-      symbol_table: None,
+      )),
       span: Span(
         start: LineColumn(
           line: 0,
@@ -73,53 +101,98 @@ Node(
           column: 2,
         ),
       ),
+      symbol_table: None,
     ),
-    Node(
-      ast_node: FunctionDeclarations(
-        id: SymbolId(5),
-        name: Node(
-          ast_node: Identifier("unwrap"),
-          symbol_table: None,
-          span: Span(
-            start: LineColumn(
-              line: 6,
-              column: 4,
+    Stmt(
+      kind: FunctionDeclarations([
+        Stmt(
+          kind: FunctionDeclaration(FunctionDeclaration(
+            id: SymbolId(2),
+            name: Expr(
+              kind: Path(Path(
+                segments: [
+                  Ident(
+                    name: "unwrap",
+                    span: Span(
+                      start: LineColumn(
+                        line: 5,
+                        column: 4,
+                      ),
+                      end: LineColumn(
+                        line: 5,
+                        column: 10,
+                      ),
+                    ),
+                  ),
+                ],
+                span: Span(
+                  start: LineColumn(
+                    line: 5,
+                    column: 4,
+                  ),
+                  end: LineColumn(
+                    line: 5,
+                    column: 10,
+                  ),
+                ),
+              )),
+              symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 5,
+                  column: 4,
+                ),
+                end: LineColumn(
+                  line: 5,
+                  column: 10,
+                ),
+              ),
             ),
-            end: LineColumn(
-              line: 6,
-              column: 10,
-            ),
-          ),
-        ),
-        declarations: [
-          Node(
-            ast_node: FunctionDeclaration(FunctionDeclaration(
-              parameters: [
-                Node(
-                  ast_node: FunctionParameter(
-                    id: SymbolId(2),
-                    pattern: Node(
-                      ast_node: EnumPattern(
-                        identifier: Node(
-                          ast_node: NestedIdentifier([
-                            "Option",
-                            "None",
-                          ]),
-                          symbol_table: None,
-                          span: Span(
-                            start: LineColumn(
-                              line: 5,
-                              column: 11,
-                            ),
-                            end: LineColumn(
-                              line: 5,
-                              column: 23,
+            parameters: [
+              FunctionParameter(
+                pattern: Pattern(
+                  kind: Enum(
+                    identifier: Expr(
+                      kind: Path(Path(
+                        segments: [
+                          Ident(
+                            name: "Option",
+                            span: Span(
+                              start: LineColumn(
+                                line: 5,
+                                column: 11,
+                              ),
+                              end: LineColumn(
+                                line: 5,
+                                column: 17,
+                              ),
                             ),
                           ),
+                          Ident(
+                            name: "None",
+                            span: Span(
+                              start: LineColumn(
+                                line: 5,
+                                column: 19,
+                              ),
+                              end: LineColumn(
+                                line: 5,
+                                column: 23,
+                              ),
+                            ),
+                          ),
+                        ],
+                        span: Span(
+                          start: LineColumn(
+                            line: 5,
+                            column: 11,
+                          ),
+                          end: LineColumn(
+                            line: 5,
+                            column: 23,
+                          ),
                         ),
-                        elements: [],
-                        named_fields: false,
-                      ),
+                      )),
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -132,9 +205,9 @@ Node(
                         ),
                       ),
                     ),
-                    type_annotation: None,
+                    elements: [],
+                    named_fields: false,
                   ),
-                  symbol_table: None,
                   span: Span(
                     start: LineColumn(
                       line: 5,
@@ -146,15 +219,41 @@ Node(
                     ),
                   ),
                 ),
-              ],
-              guard: None,
-              return_type_annotation: None,
-              body: Node(
-                ast_node: Block([], Some(Node(
-                  ast_node: Call(
-                    function: Node(
-                      ast_node: Identifier("panic"),
-                      symbol_table: None,
+                type_annotation: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 5,
+                    column: 11,
+                  ),
+                  end: LineColumn(
+                    line: 5,
+                    column: 23,
+                  ),
+                ),
+              ),
+            ],
+            guard: None,
+            return_type_annotation: None,
+            body: Expr(
+              kind: Block([], Some(Expr(
+                kind: Call(
+                  function: Expr(
+                    kind: Path(Path(
+                      segments: [
+                        Ident(
+                          name: "panic",
+                          span: Span(
+                            start: LineColumn(
+                              line: 5,
+                              column: 27,
+                            ),
+                            end: LineColumn(
+                              line: 5,
+                              column: 32,
+                            ),
+                          ),
+                        ),
+                      ],
                       span: Span(
                         start: LineColumn(
                           line: 5,
@@ -165,93 +264,179 @@ Node(
                           column: 32,
                         ),
                       ),
+                    )),
+                    symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 5,
+                        column: 27,
+                      ),
+                      end: LineColumn(
+                        line: 5,
+                        column: 32,
+                      ),
                     ),
-                    arguments: [
-                      Node(
-                        ast_node: Literal(String("Cannot unwrap None")),
-                        symbol_table: None,
-                        span: Span(
-                          start: LineColumn(
-                            line: 5,
-                            column: 33,
-                          ),
-                          end: LineColumn(
-                            line: 5,
-                            column: 53,
-                          ),
+                  ),
+                  arguments: [
+                    Expr(
+                      kind: Literal(String("Cannot unwrap None")),
+                      symbol_table: None,
+                      span: Span(
+                        start: LineColumn(
+                          line: 5,
+                          column: 33,
+                        ),
+                        end: LineColumn(
+                          line: 5,
+                          column: 53,
                         ),
                       ),
-                    ],
-                  ),
-                  symbol_table: None,
-                  span: Span(
-                    start: LineColumn(
-                      line: 5,
-                      column: 27,
                     ),
-                    end: LineColumn(
-                      line: 5,
-                      column: 54,
-                    ),
-                  ),
-                ))),
+                  ],
+                ),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
-                    line: 0,
-                    column: 0,
+                    line: 5,
+                    column: 27,
                   ),
                   end: LineColumn(
-                    line: 0,
-                    column: 0,
+                    line: 5,
+                    column: 54,
                   ),
                 ),
-              ),
-            )),
-            symbol_table: None,
-            span: Span(
-              start: LineColumn(
-                line: 0,
-                column: 0,
-              ),
-              end: LineColumn(
-                line: 0,
-                column: 0,
+              ))),
+              symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
               ),
             ),
+          )),
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 0,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 0,
+            ),
           ),
-          Node(
-            ast_node: FunctionDeclaration(FunctionDeclaration(
-              parameters: [
-                Node(
-                  ast_node: FunctionParameter(
-                    id: SymbolId(4),
-                    pattern: Node(
-                      ast_node: EnumPattern(
-                        identifier: Node(
-                          ast_node: NestedIdentifier([
-                            "Option",
-                            "Some",
-                          ]),
-                          symbol_table: None,
-                          span: Span(
-                            start: LineColumn(
-                              line: 6,
-                              column: 11,
-                            ),
-                            end: LineColumn(
-                              line: 6,
-                              column: 23,
+          symbol_table: None,
+        ),
+        Stmt(
+          kind: FunctionDeclaration(FunctionDeclaration(
+            id: SymbolId(2),
+            name: Expr(
+              kind: Path(Path(
+                segments: [
+                  Ident(
+                    name: "unwrap",
+                    span: Span(
+                      start: LineColumn(
+                        line: 6,
+                        column: 4,
+                      ),
+                      end: LineColumn(
+                        line: 6,
+                        column: 10,
+                      ),
+                    ),
+                  ),
+                ],
+                span: Span(
+                  start: LineColumn(
+                    line: 6,
+                    column: 4,
+                  ),
+                  end: LineColumn(
+                    line: 6,
+                    column: 10,
+                  ),
+                ),
+              )),
+              symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 6,
+                  column: 4,
+                ),
+                end: LineColumn(
+                  line: 6,
+                  column: 10,
+                ),
+              ),
+            ),
+            parameters: [
+              FunctionParameter(
+                pattern: Pattern(
+                  kind: Enum(
+                    identifier: Expr(
+                      kind: Path(Path(
+                        segments: [
+                          Ident(
+                            name: "Option",
+                            span: Span(
+                              start: LineColumn(
+                                line: 6,
+                                column: 11,
+                              ),
+                              end: LineColumn(
+                                line: 6,
+                                column: 17,
+                              ),
                             ),
                           ),
-                        ),
-                        elements: [
-                          Node(
-                            ast_node: IdentifierPattern(
-                              id: SymbolId(3),
-                              name: "value",
+                          Ident(
+                            name: "Some",
+                            span: Span(
+                              start: LineColumn(
+                                line: 6,
+                                column: 19,
+                              ),
+                              end: LineColumn(
+                                line: 6,
+                                column: 23,
+                              ),
                             ),
-                            symbol_table: None,
+                          ),
+                        ],
+                        span: Span(
+                          start: LineColumn(
+                            line: 6,
+                            column: 11,
+                          ),
+                          end: LineColumn(
+                            line: 6,
+                            column: 23,
+                          ),
+                        ),
+                      )),
+                      symbol_table: None,
+                      span: Span(
+                        start: LineColumn(
+                          line: 6,
+                          column: 11,
+                        ),
+                        end: LineColumn(
+                          line: 6,
+                          column: 23,
+                        ),
+                      ),
+                    ),
+                    elements: [
+                      Pattern(
+                        kind: Identifier(
+                          id: SymbolId(3),
+                          name: Ident(
+                            name: "value",
                             span: Span(
                               start: LineColumn(
                                 line: 6,
@@ -263,24 +448,21 @@ Node(
                               ),
                             ),
                           ),
-                        ],
-                        named_fields: false,
-                      ),
-                      symbol_table: None,
-                      span: Span(
-                        start: LineColumn(
-                          line: 6,
-                          column: 11,
                         ),
-                        end: LineColumn(
-                          line: 6,
-                          column: 30,
+                        span: Span(
+                          start: LineColumn(
+                            line: 6,
+                            column: 24,
+                          ),
+                          end: LineColumn(
+                            line: 6,
+                            column: 29,
+                          ),
                         ),
                       ),
-                    ),
-                    type_annotation: None,
+                    ],
+                    named_fields: false,
                   ),
-                  symbol_table: None,
                   span: Span(
                     start: LineColumn(
                       line: 6,
@@ -292,13 +474,39 @@ Node(
                     ),
                   ),
                 ),
-              ],
-              guard: None,
-              return_type_annotation: None,
-              body: Node(
-                ast_node: Block([], Some(Node(
-                  ast_node: Identifier("value"),
-                  symbol_table: None,
+                type_annotation: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 6,
+                    column: 11,
+                  ),
+                  end: LineColumn(
+                    line: 6,
+                    column: 30,
+                  ),
+                ),
+              ),
+            ],
+            guard: None,
+            return_type_annotation: None,
+            body: Expr(
+              kind: Block([], Some(Expr(
+                kind: Path(Path(
+                  segments: [
+                    Ident(
+                      name: "value",
+                      span: Span(
+                        start: LineColumn(
+                          line: 6,
+                          column: 34,
+                        ),
+                        end: LineColumn(
+                          line: 6,
+                          column: 39,
+                        ),
+                      ),
+                    ),
+                  ],
                   span: Span(
                     start: LineColumn(
                       line: 6,
@@ -309,35 +517,45 @@ Node(
                       column: 39,
                     ),
                   ),
-                ))),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
-                    line: 0,
-                    column: 0,
+                    line: 6,
+                    column: 34,
                   ),
                   end: LineColumn(
-                    line: 0,
-                    column: 0,
+                    line: 6,
+                    column: 39,
                   ),
                 ),
-              ),
-            )),
-            symbol_table: None,
-            span: Span(
-              start: LineColumn(
-                line: 0,
-                column: 0,
-              ),
-              end: LineColumn(
-                line: 0,
-                column: 0,
+              ))),
+              symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
               ),
             ),
+          )),
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 0,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 0,
+            ),
           ),
-        ],
-      ),
-      symbol_table: None,
+          symbol_table: None,
+        ),
+      ]),
       span: Span(
         start: LineColumn(
           line: 5,
@@ -348,8 +566,9 @@ Node(
           column: 41,
         ),
       ),
+      symbol_table: None,
     ),
-  ]),
+  ],
   symbol_table: None,
   span: Span(
     start: LineColumn(

@@ -2,14 +2,14 @@
 source: crates/tlang_parser/tests/parser_pipeline.rs
 expression: "parse!(\"1 |> foo(2, _);\")"
 ---
-Node(
-  ast_node: Module([
-    Node(
-      ast_node: ExpressionStatement(Node(
-        ast_node: BinaryOp(
+Module(
+  statements: [
+    Stmt(
+      kind: Expr(Expr(
+        kind: BinaryOp(
           op: Pipeline,
-          lhs: Node(
-            ast_node: Literal(Integer(1)),
+          lhs: Expr(
+            kind: Literal(Integer(1)),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -22,10 +22,36 @@ Node(
               ),
             ),
           ),
-          rhs: Node(
-            ast_node: Call(
-              function: Node(
-                ast_node: Identifier("foo"),
+          rhs: Expr(
+            kind: Call(
+              function: Expr(
+                kind: Path(Path(
+                  segments: [
+                    Ident(
+                      name: "foo",
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 5,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 8,
+                        ),
+                      ),
+                    ),
+                  ],
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 5,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 8,
+                    ),
+                  ),
+                )),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -39,8 +65,8 @@ Node(
                 ),
               ),
               arguments: [
-                Node(
-                  ast_node: Literal(Integer(2)),
+                Expr(
+                  kind: Literal(Integer(2)),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -53,8 +79,8 @@ Node(
                     ),
                   ),
                 ),
-                Node(
-                  ast_node: Wildcard,
+                Expr(
+                  kind: Wildcard,
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -94,7 +120,6 @@ Node(
           ),
         ),
       )),
-      symbol_table: None,
       span: Span(
         start: LineColumn(
           line: 0,
@@ -105,8 +130,9 @@ Node(
           column: 15,
         ),
       ),
+      symbol_table: None,
     ),
-  ]),
+  ],
   symbol_table: None,
   span: Span(
     start: LineColumn(

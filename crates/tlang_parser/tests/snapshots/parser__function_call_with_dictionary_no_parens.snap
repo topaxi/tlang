@@ -2,13 +2,39 @@
 source: crates/tlang_parser/tests/parser.rs
 expression: "parse!(r#\"foo { foo: 1, bar: 2 };\"#)"
 ---
-Node(
-  ast_node: Module([
-    Node(
-      ast_node: ExpressionStatement(Node(
-        ast_node: Call(
-          function: Node(
-            ast_node: Identifier("foo"),
+Module(
+  statements: [
+    Stmt(
+      kind: Expr(Expr(
+        kind: Call(
+          function: Expr(
+            kind: Path(Path(
+              segments: [
+                Ident(
+                  name: "foo",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 3,
+                    ),
+                  ),
+                ),
+              ],
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 0,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 3,
+                ),
+              ),
+            )),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -22,10 +48,36 @@ Node(
             ),
           ),
           arguments: [
-            Node(
-              ast_node: Dict([
-                (Node(
-                  ast_node: Identifier("foo"),
+            Expr(
+              kind: Dict([
+                (Expr(
+                  kind: Path(Path(
+                    segments: [
+                      Ident(
+                        name: "foo",
+                        span: Span(
+                          start: LineColumn(
+                            line: 0,
+                            column: 6,
+                          ),
+                          end: LineColumn(
+                            line: 0,
+                            column: 9,
+                          ),
+                        ),
+                      ),
+                    ],
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 6,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 9,
+                      ),
+                    ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -37,8 +89,8 @@ Node(
                       column: 9,
                     ),
                   ),
-                ), Node(
-                  ast_node: Literal(Integer(1)),
+                ), Expr(
+                  kind: Literal(Integer(1)),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -51,8 +103,34 @@ Node(
                     ),
                   ),
                 )),
-                (Node(
-                  ast_node: Identifier("bar"),
+                (Expr(
+                  kind: Path(Path(
+                    segments: [
+                      Ident(
+                        name: "bar",
+                        span: Span(
+                          start: LineColumn(
+                            line: 0,
+                            column: 14,
+                          ),
+                          end: LineColumn(
+                            line: 0,
+                            column: 17,
+                          ),
+                        ),
+                      ),
+                    ],
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 14,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 17,
+                      ),
+                    ),
+                  )),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -64,8 +142,8 @@ Node(
                       column: 17,
                     ),
                   ),
-                ), Node(
-                  ast_node: Literal(Integer(2)),
+                ), Expr(
+                  kind: Literal(Integer(2)),
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -105,7 +183,6 @@ Node(
           ),
         ),
       )),
-      symbol_table: None,
       span: Span(
         start: LineColumn(
           line: 0,
@@ -116,8 +193,9 @@ Node(
           column: 23,
         ),
       ),
+      symbol_table: None,
     ),
-  ]),
+  ],
   symbol_table: None,
   span: Span(
     start: LineColumn(

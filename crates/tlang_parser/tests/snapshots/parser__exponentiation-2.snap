@@ -2,17 +2,17 @@
 source: crates/tlang_parser/tests/parser.rs
 expression: "parse!(\"1 ** 2 * 3;\")"
 ---
-Node(
-  ast_node: Module([
-    Node(
-      ast_node: ExpressionStatement(Node(
-        ast_node: BinaryOp(
+Module(
+  statements: [
+    Stmt(
+      kind: Expr(Expr(
+        kind: BinaryOp(
           op: Multiply,
-          lhs: Node(
-            ast_node: BinaryOp(
+          lhs: Expr(
+            kind: BinaryOp(
               op: Exponentiation,
-              lhs: Node(
-                ast_node: Literal(Integer(1)),
+              lhs: Expr(
+                kind: Literal(Integer(1)),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -25,8 +25,8 @@ Node(
                   ),
                 ),
               ),
-              rhs: Node(
-                ast_node: Literal(Integer(2)),
+              rhs: Expr(
+                kind: Literal(Integer(2)),
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -52,8 +52,8 @@ Node(
               ),
             ),
           ),
-          rhs: Node(
-            ast_node: Literal(Integer(3)),
+          rhs: Expr(
+            kind: Literal(Integer(3)),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -79,7 +79,6 @@ Node(
           ),
         ),
       )),
-      symbol_table: None,
       span: Span(
         start: LineColumn(
           line: 0,
@@ -90,8 +89,9 @@ Node(
           column: 11,
         ),
       ),
+      symbol_table: None,
     ),
-  ]),
+  ],
   symbol_table: None,
   span: Span(
     start: LineColumn(

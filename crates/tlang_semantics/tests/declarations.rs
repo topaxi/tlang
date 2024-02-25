@@ -1,7 +1,7 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
 use tlang_ast::{
-    node::AstNode,
+    node::{ExprKind, StmtKind},
     span::{LineColumn, Span},
     symbols::{SymbolId, SymbolInfo, SymbolType},
 };
@@ -81,15 +81,12 @@ fn test_block_scope() {
     assert_eq!(program_symbols.borrow().get_by_name("b"), None);
     assert_eq!(program_symbols.borrow().get_by_name("c"), None);
 
-    let block1 = match ast.ast_node {
-        AstNode::Module(ref nodes) => match nodes[1].ast_node {
-            AstNode::ExpressionStatement(ref node) => match node.ast_node {
-                AstNode::Block(_, _) => node,
-                _ => panic!("Expected block {:?}", node.ast_node),
-            },
-            _ => panic!("Expected expression statement {:?}", nodes[1].ast_node),
+    let block1 = match ast.statements[1].kind {
+        StmtKind::Expr(ref expr) => match expr.kind {
+            ExprKind::Block(_, _) => expr,
+            _ => panic!("Expected block {:?}", expr.kind),
         },
-        _ => panic!("Expected program {:?}", ast.ast_node),
+        _ => panic!("Expected expression statement {:?}", ast.statements[1].kind),
     };
 
     let block1_symbols = block1
@@ -137,15 +134,15 @@ fn test_block_scope() {
     );
     assert_eq!(block1_symbols.borrow().get_by_name("c"), None);
 
-    let block2 = match block1.ast_node {
-        AstNode::Block(ref nodes, _) => match nodes[1].ast_node {
-            AstNode::ExpressionStatement(ref node) => match node.ast_node {
-                AstNode::Block(_, _) => node,
-                _ => panic!("Expected block {:?}", node.ast_node),
+    let block2 = match block1.kind {
+        ExprKind::Block(ref nodes, _) => match nodes[1].kind {
+            StmtKind::Expr(ref expr) => match expr.kind {
+                ExprKind::Block(_, _) => expr,
+                _ => panic!("Expected block {:?}", expr.kind),
             },
-            _ => panic!("Expected expression statement {:?}", nodes[1].ast_node),
+            _ => panic!("Expected expression statement {:?}", nodes[1].kind),
         },
-        _ => panic!("Expected program {:?}", ast.ast_node),
+        _ => panic!("Expected block {:?}", block1.kind),
     };
 
     let block2_symbols = block2
@@ -228,7 +225,7 @@ fn test_should_collect_function_definitions() {
     assert_eq!(
         program_symbols.borrow().get_by_name("add"),
         Some(SymbolInfo {
-            id: SymbolId::new(3),
+            id: SymbolId::new(1),
             name: "add".to_string(),
             symbol_type: SymbolType::Function,
             defined_at: Some(Span::new(
@@ -256,7 +253,7 @@ fn test_should_collect_list_destructuring_symbols_in_function_arguments() {
     assert_eq!(
         program_symbols.borrow().get_by_name("add"),
         Some(SymbolInfo {
-            id: SymbolId::new(4),
+            id: SymbolId::new(1),
             name: "add".to_string(),
             symbol_type: SymbolType::Function,
             defined_at: Some(Span::new(
@@ -284,7 +281,7 @@ fn test_should_collect_list_destructuring_with_rest_symbols_in_function_argument
     assert_eq!(
         program_symbols.borrow().get_by_name("sum"),
         Some(SymbolInfo {
-            id: SymbolId::new(4),
+            id: SymbolId::new(1),
             name: "sum".to_string(),
             symbol_type: SymbolType::Function,
             defined_at: Some(Span::new(
@@ -312,14 +309,14 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
     assert_eq!(
         program_symbols.borrow().get_by_name("factorial"),
         Some(SymbolInfo {
-            id: SymbolId::new(5),
+            id: SymbolId::new(1),
             name: "factorial".to_string(),
             symbol_type: SymbolType::Function,
             defined_at: Some(Span::new(
-                LineColumn { line: 1, column: 4 },
+                LineColumn { line: 0, column: 3 },
                 LineColumn {
-                    line: 1,
-                    column: 13
+                    line: 0,
+                    column: 12
                 }
             )),
             used: true,
@@ -348,13 +345,13 @@ fn should_collect_function_arguments_with_enum_extraction() {
     assert_eq!(
         program_symbols.borrow().get_by_name("unwrap"),
         Some(SymbolInfo {
-            id: SymbolId::new(5),
+            id: SymbolId::new(2),
             name: "unwrap".to_string(),
             symbol_type: SymbolType::Function,
             defined_at: Some(Span::new(
-                LineColumn { line: 6, column: 4 },
+                LineColumn { line: 5, column: 4 },
                 LineColumn {
-                    line: 6,
+                    line: 5,
                     column: 10
                 }
             )),

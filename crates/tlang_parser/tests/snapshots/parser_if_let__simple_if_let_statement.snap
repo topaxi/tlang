@@ -2,44 +2,53 @@
 source: crates/tlang_parser/tests/parser_if_let.rs
 expression: "parse!(indoc! { \"\n        if let x = 1 {\n            x\n        }\n    \" })"
 ---
-Node(
-  ast_node: Module([
-    Node(
-      ast_node: ExpressionStatement(Node(
-        ast_node: IfElse(
-          condition: Node(
-            ast_node: VariableDeclaration(
-              id: SymbolId(1),
-              pattern: Node(
-                ast_node: Identifier("x"),
-                symbol_table: None,
-                span: Span(
-                  start: LineColumn(
-                    line: 0,
-                    column: 7,
-                  ),
-                  end: LineColumn(
-                    line: 0,
-                    column: 8,
-                  ),
-                ),
-              ),
-              expression: Node(
-                ast_node: Literal(Integer(1)),
-                symbol_table: None,
-                span: Span(
-                  start: LineColumn(
-                    line: 0,
-                    column: 11,
-                  ),
-                  end: LineColumn(
-                    line: 0,
-                    column: 12,
+Module(
+  statements: [
+    Stmt(
+      kind: Expr(Expr(
+        kind: IfElse(
+          condition: Expr(
+            kind: Let(Pattern(
+              kind: Identifier(
+                id: SymbolId(1),
+                name: Ident(
+                  name: "x",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 7,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 8,
+                    ),
                   ),
                 ),
               ),
-              type_annotation: None,
-            ),
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 7,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 8,
+                ),
+              ),
+            ), Expr(
+              kind: Literal(Integer(1)),
+              symbol_table: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 11,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 12,
+                ),
+              ),
+            )),
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -52,9 +61,35 @@ Node(
               ),
             ),
           ),
-          then_branch: Node(
-            ast_node: Block([], Some(Node(
-              ast_node: Identifier("x"),
+          then_branch: Expr(
+            kind: Block([], Some(Expr(
+              kind: Path(Path(
+                segments: [
+                  Ident(
+                    name: "x",
+                    span: Span(
+                      start: LineColumn(
+                        line: 1,
+                        column: 5,
+                      ),
+                      end: LineColumn(
+                        line: 1,
+                        column: 6,
+                      ),
+                    ),
+                  ),
+                ],
+                span: Span(
+                  start: LineColumn(
+                    line: 1,
+                    column: 5,
+                  ),
+                  end: LineColumn(
+                    line: 1,
+                    column: 6,
+                  ),
+                ),
+              )),
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -93,7 +128,6 @@ Node(
           ),
         ),
       )),
-      symbol_table: None,
       span: Span(
         start: LineColumn(
           line: 0,
@@ -104,8 +138,9 @@ Node(
           column: 2,
         ),
       ),
+      symbol_table: None,
     ),
-  ]),
+  ],
   symbol_table: None,
   span: Span(
     start: LineColumn(
