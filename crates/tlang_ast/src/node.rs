@@ -6,7 +6,7 @@ use crate::token::Token;
 use crate::{
     span::{Span, Spanned},
     symbols::{SymbolId, SymbolTable},
-    token::{Literal, TokenKind},
+    token::Literal,
 };
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -166,21 +166,6 @@ pub enum ExprKind {
         inclusive: bool,
     },
     Wildcard,
-}
-
-impl<'a> From<&'a TokenKind> for ExprKind {
-    fn from(token: &TokenKind) -> Self {
-        match token {
-            TokenKind::Literal(literal) => ExprKind::Literal(literal.clone()),
-            TokenKind::Identifier(name) => {
-                ExprKind::Path(Path::from_ident(Ident::new(name, Default::default())))
-            }
-            _ => unimplemented!(
-                "Expected token to be a literal or identifier, found {:?}",
-                token
-            ),
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
