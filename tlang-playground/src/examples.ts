@@ -5,5 +5,5 @@ export const examples = Object.fromEntries(
       import: 'default',
       eager: true,
     }),
-  ).map(([path, source]) => [path.split('/').pop()!, source]),
+  ).map(([path, source]) => [path.split('/').pop()!, String(source)]),
 );
