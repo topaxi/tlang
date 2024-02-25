@@ -27,9 +27,9 @@ pub trait Visitor<'ast>: Sized {
         walk_enum_decl(self, decl);
     }
 
-    fn visit_fn_decls(&mut self, declarations: &'ast [node::Stmt]) {
+    fn visit_fn_decls(&mut self, declarations: &'ast [node::FunctionDeclaration]) {
         for declaration in declarations {
-            walk_stmt(self, declaration)
+            walk_fn_decl(self, declaration)
         }
     }
 
@@ -157,7 +157,6 @@ pub fn walk_stmt<'ast, V: Visitor<'ast>>(visitor: &mut V, statement: &'ast node:
             }
         }
         node::StmtKind::EnumDeclaration(decl) => visitor.visit_enum_decl(decl),
-        node::StmtKind::SingleLineComment(_) | node::StmtKind::MultiLineComment(_) => {}
     }
 }
 
@@ -346,6 +345,8 @@ mod tests {
             kind: node::StmtKind::None,
             symbol_table: None,
             span: Span::default(),
+            leading_comments: vec![],
+            trailing_comments: vec![],
         }]);
         let mut visitor = TestVisitor { visited: vec![] };
         walk_module(&mut visitor, &module);
@@ -354,16 +355,8 @@ mod tests {
 
     #[test]
     fn test_walk_block() {
-        let statements = vec![node::Stmt {
-            kind: node::StmtKind::None,
-            symbol_table: None,
-            span: Span::default(),
-        }];
-        let expression = Some(node::Expr {
-            kind: node::ExprKind::None,
-            symbol_table: None,
-            span: Span::default(),
-        });
+        let statements = vec![node::Stmt::default()];
+        let expression = Some(node::Expr::default());
         let mut visitor = TestVisitor { visited: vec![] };
         walk_block(&mut visitor, &statements, &expression);
         assert_eq!(visitor.visited, vec!["visit_statement", "visit_expression"]);
@@ -371,11 +364,9 @@ mod tests {
 
     #[test]
     fn test_walk_statement() {
-        let statement = node::Stmt {
-            kind: node::StmtKind::Expr(Box::new(node::Expr::new(node::ExprKind::None))),
-            symbol_table: None,
-            span: Span::default(),
-        };
+        let statement = node::Stmt::new(node::StmtKind::Expr(Box::new(node::Expr::new(
+            node::ExprKind::None,
+        ))));
         let mut visitor = TestVisitor { visited: vec![] };
         walk_stmt(&mut visitor, &statement);
         assert_eq!(visitor.visited, vec!["visit_expression"]);
@@ -396,17 +387,13 @@ mod tests {
                 type_annotation: Box::new(None),
                 span: Span::default(),
             }],
-            guard: Box::new(Some(node::Expr {
-                kind: node::ExprKind::None,
-                symbol_table: None,
-                span: Span::default(),
-            })),
+            guard: Box::new(Some(node::Expr::default())),
             return_type_annotation: Box::new(None),
             body: Box::new(node::Expr {
                 kind: node::ExprKind::Block(vec![], Box::new(None)),
-                symbol_table: None,
-                span: Span::default(),
+                ..Default::default()
             }),
+            ..Default::default()
         };
         let mut visitor = TestVisitor { visited: vec![] };
         walk_fn_decl(&mut visitor, &declaration);

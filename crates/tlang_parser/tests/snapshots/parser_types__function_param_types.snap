@@ -35,6 +35,8 @@ Module(
               ),
             ),
           )),
+          leading_comments: [],
+          trailing_comments: [],
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -279,6 +281,8 @@ Module(
                 ),
               ),
             )),
+            leading_comments: [],
+            trailing_comments: [],
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -291,6 +295,8 @@ Module(
               ),
             ),
           ))),
+          leading_comments: [],
+          trailing_comments: [],
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -301,6 +307,19 @@ Module(
               line: 0,
               column: 0,
             ),
+          ),
+        ),
+        leading_comments: [],
+        trailing_comments: [],
+        symbol_table: None,
+        span: Span(
+          start: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+          end: LineColumn(
+            line: 0,
+            column: 35,
           ),
         ),
       )),
@@ -314,6 +333,8 @@ Module(
           column: 35,
         ),
       ),
+      leading_comments: [],
+      trailing_comments: [],
       symbol_table: None,
     ),
   ],

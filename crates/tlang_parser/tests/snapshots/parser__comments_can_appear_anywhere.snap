@@ -1,0 +1,153 @@
+---
+source: crates/tlang_parser/tests/parser.rs
+expression: "parse!(r#\"\n        // this is a third comment\n        let y = /* comment before expr */ 2 /* comment after expr */;\n        // trailing comment\n        \"#)"
+---
+Module(
+  statements: [
+    Stmt(
+      kind: Let(
+        pattern: Pattern(
+          kind: Identifier(
+            id: SymbolId(1),
+            name: Ident(
+              name: "y",
+              span: Span(
+                start: LineColumn(
+                  line: 2,
+                  column: 13,
+                ),
+                end: LineColumn(
+                  line: 2,
+                  column: 14,
+                ),
+              ),
+            ),
+          ),
+          span: Span(
+            start: LineColumn(
+              line: 2,
+              column: 13,
+            ),
+            end: LineColumn(
+              line: 2,
+              column: 14,
+            ),
+          ),
+        ),
+        expression: Expr(
+          kind: Literal(Integer(2)),
+          leading_comments: [
+            Token(
+              kind: MultiLineComment(" comment before expr "),
+              span: Span(
+                start: LineColumn(
+                  line: 2,
+                  column: 17,
+                ),
+                end: LineColumn(
+                  line: 2,
+                  column: 42,
+                ),
+              ),
+            ),
+          ],
+          trailing_comments: [
+            Token(
+              kind: MultiLineComment(" comment after expr "),
+              span: Span(
+                start: LineColumn(
+                  line: 2,
+                  column: 45,
+                ),
+                end: LineColumn(
+                  line: 2,
+                  column: 69,
+                ),
+              ),
+            ),
+          ],
+          symbol_table: None,
+          span: Span(
+            start: LineColumn(
+              line: 2,
+              column: 43,
+            ),
+            end: LineColumn(
+              line: 2,
+              column: 44,
+            ),
+          ),
+        ),
+        type_annotation: None,
+      ),
+      span: Span(
+        start: LineColumn(
+          line: 2,
+          column: 9,
+        ),
+        end: LineColumn(
+          line: 2,
+          column: 70,
+        ),
+      ),
+      leading_comments: [
+        Token(
+          kind: SingleLineComment(" this is a third comment"),
+          span: Span(
+            start: LineColumn(
+              line: 1,
+              column: 9,
+            ),
+            end: LineColumn(
+              line: 1,
+              column: 35,
+            ),
+          ),
+        ),
+      ],
+      trailing_comments: [],
+      symbol_table: None,
+    ),
+    Stmt(
+      kind: None,
+      span: Span(
+        start: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+      ),
+      leading_comments: [
+        Token(
+          kind: SingleLineComment(" trailing comment"),
+          span: Span(
+            start: LineColumn(
+              line: 3,
+              column: 9,
+            ),
+            end: LineColumn(
+              line: 3,
+              column: 28,
+            ),
+          ),
+        ),
+      ],
+      trailing_comments: [],
+      symbol_table: None,
+    ),
+  ],
+  symbol_table: None,
+  span: Span(
+    start: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+  ),
+)

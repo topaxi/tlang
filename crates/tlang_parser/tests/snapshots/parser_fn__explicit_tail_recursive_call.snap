@@ -6,38 +6,25 @@ Module(
   statements: [
     Stmt(
       kind: FunctionDeclarations([
-        Stmt(
-          kind: FunctionDeclaration(FunctionDeclaration(
-            id: SymbolId(1),
-            name: Expr(
-              kind: Path(Path(
-                segments: [
-                  Ident(
-                    name: "factorial",
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 3,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 12,
-                      ),
+        FunctionDeclaration(
+          id: SymbolId(1),
+          name: Expr(
+            kind: Path(Path(
+              segments: [
+                Ident(
+                  name: "factorial",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 3,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 12,
                     ),
                   ),
-                ],
-                span: Span(
-                  start: LineColumn(
-                    line: 0,
-                    column: 3,
-                  ),
-                  end: LineColumn(
-                    line: 0,
-                    column: 12,
-                  ),
                 ),
-              )),
-              symbol_table: None,
+              ],
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -48,38 +35,40 @@ Module(
                   column: 12,
                 ),
               ),
+            )),
+            leading_comments: [],
+            trailing_comments: [],
+            symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 3,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 12,
+              ),
             ),
-            parameters: [
-              FunctionParameter(
-                pattern: Pattern(
-                  kind: Identifier(
-                    id: SymbolId(2),
-                    name: Ident(
-                      name: "n",
-                      span: Span(
-                        start: LineColumn(
-                          line: 0,
-                          column: 13,
-                        ),
-                        end: LineColumn(
-                          line: 0,
-                          column: 14,
-                        ),
+          ),
+          parameters: [
+            FunctionParameter(
+              pattern: Pattern(
+                kind: Identifier(
+                  id: SymbolId(2),
+                  name: Ident(
+                    name: "n",
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 13,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 14,
                       ),
                     ),
                   ),
-                  span: Span(
-                    start: LineColumn(
-                      line: 0,
-                      column: 13,
-                    ),
-                    end: LineColumn(
-                      line: 0,
-                      column: 14,
-                    ),
-                  ),
                 ),
-                type_annotation: None,
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -91,41 +80,41 @@ Module(
                   ),
                 ),
               ),
-            ],
-            guard: None,
-            return_type_annotation: None,
-            body: Expr(
-              kind: Block([], Some(Expr(
-                kind: Call(
-                  function: Expr(
-                    kind: Path(Path(
-                      segments: [
-                        Ident(
-                          name: "factorial",
-                          span: Span(
-                            start: LineColumn(
-                              line: 0,
-                              column: 18,
-                            ),
-                            end: LineColumn(
-                              line: 0,
-                              column: 27,
-                            ),
+              type_annotation: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 13,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 14,
+                ),
+              ),
+            ),
+          ],
+          guard: None,
+          return_type_annotation: None,
+          body: Expr(
+            kind: Block([], Some(Expr(
+              kind: Call(
+                function: Expr(
+                  kind: Path(Path(
+                    segments: [
+                      Ident(
+                        name: "factorial",
+                        span: Span(
+                          start: LineColumn(
+                            line: 0,
+                            column: 18,
+                          ),
+                          end: LineColumn(
+                            line: 0,
+                            column: 27,
                           ),
                         ),
-                      ],
-                      span: Span(
-                        start: LineColumn(
-                          line: 0,
-                          column: 18,
-                        ),
-                        end: LineColumn(
-                          line: 0,
-                          column: 27,
-                        ),
                       ),
-                    )),
-                    symbol_table: None,
+                    ],
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -136,37 +125,39 @@ Module(
                         column: 27,
                       ),
                     ),
+                  )),
+                  leading_comments: [],
+                  trailing_comments: [],
+                  symbol_table: None,
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 18,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 27,
+                    ),
                   ),
-                  arguments: [
-                    Expr(
-                      kind: Path(Path(
-                        segments: [
-                          Ident(
-                            name: "n",
-                            span: Span(
-                              start: LineColumn(
-                                line: 0,
-                                column: 28,
-                              ),
-                              end: LineColumn(
-                                line: 0,
-                                column: 29,
-                              ),
+                ),
+                arguments: [
+                  Expr(
+                    kind: Path(Path(
+                      segments: [
+                        Ident(
+                          name: "n",
+                          span: Span(
+                            start: LineColumn(
+                              line: 0,
+                              column: 28,
+                            ),
+                            end: LineColumn(
+                              line: 0,
+                              column: 29,
                             ),
                           ),
-                        ],
-                        span: Span(
-                          start: LineColumn(
-                            line: 0,
-                            column: 28,
-                          ),
-                          end: LineColumn(
-                            line: 0,
-                            column: 29,
-                          ),
                         ),
-                      )),
-                      symbol_table: None,
+                      ],
                       span: Span(
                         start: LineColumn(
                           line: 0,
@@ -177,48 +168,70 @@ Module(
                           column: 29,
                         ),
                       ),
-                    ),
-                    Expr(
-                      kind: Literal(Integer(1)),
-                      symbol_table: None,
-                      span: Span(
-                        start: LineColumn(
-                          line: 0,
-                          column: 31,
-                        ),
-                        end: LineColumn(
-                          line: 0,
-                          column: 32,
-                        ),
+                    )),
+                    leading_comments: [],
+                    trailing_comments: [],
+                    symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 28,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 29,
                       ),
                     ),
-                  ],
-                ),
-                symbol_table: None,
-                span: Span(
-                  start: LineColumn(
-                    line: 0,
-                    column: 18,
                   ),
-                  end: LineColumn(
-                    line: 0,
-                    column: 33,
+                  Expr(
+                    kind: Literal(Integer(1)),
+                    leading_comments: [],
+                    trailing_comments: [],
+                    symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 31,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 32,
+                      ),
+                    ),
                   ),
-                ),
-              ))),
+                ],
+              ),
+              leading_comments: [],
+              trailing_comments: [],
               symbol_table: None,
               span: Span(
                 start: LineColumn(
                   line: 0,
-                  column: 0,
+                  column: 18,
                 ),
                 end: LineColumn(
                   line: 0,
-                  column: 0,
+                  column: 33,
                 ),
               ),
+            ))),
+            leading_comments: [],
+            trailing_comments: [],
+            symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 0,
+              ),
             ),
-          )),
+          ),
+          leading_comments: [],
+          trailing_comments: [],
+          symbol_table: None,
           span: Span(
             start: LineColumn(
               line: 0,
@@ -226,43 +239,29 @@ Module(
             ),
             end: LineColumn(
               line: 0,
-              column: 0,
+              column: 35,
             ),
           ),
-          symbol_table: None,
         ),
-        Stmt(
-          kind: FunctionDeclaration(FunctionDeclaration(
-            id: SymbolId(1),
-            name: Expr(
-              kind: Path(Path(
-                segments: [
-                  Ident(
-                    name: "factorial",
-                    span: Span(
-                      start: LineColumn(
-                        line: 1,
-                        column: 4,
-                      ),
-                      end: LineColumn(
-                        line: 1,
-                        column: 13,
-                      ),
+        FunctionDeclaration(
+          id: SymbolId(1),
+          name: Expr(
+            kind: Path(Path(
+              segments: [
+                Ident(
+                  name: "factorial",
+                  span: Span(
+                    start: LineColumn(
+                      line: 1,
+                      column: 4,
+                    ),
+                    end: LineColumn(
+                      line: 1,
+                      column: 13,
                     ),
                   ),
-                ],
-                span: Span(
-                  start: LineColumn(
-                    line: 1,
-                    column: 4,
-                  ),
-                  end: LineColumn(
-                    line: 1,
-                    column: 13,
-                  ),
                 ),
-              )),
-              symbol_table: None,
+              ],
               span: Span(
                 start: LineColumn(
                   line: 1,
@@ -273,24 +272,29 @@ Module(
                   column: 13,
                 ),
               ),
+            )),
+            leading_comments: [],
+            trailing_comments: [],
+            symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 1,
+                column: 4,
+              ),
+              end: LineColumn(
+                line: 1,
+                column: 13,
+              ),
             ),
-            parameters: [
-              FunctionParameter(
-                pattern: Pattern(
-                  kind: Literal(Expr(
-                    kind: Literal(Integer(0)),
-                    symbol_table: None,
-                    span: Span(
-                      start: LineColumn(
-                        line: 1,
-                        column: 14,
-                      ),
-                      end: LineColumn(
-                        line: 1,
-                        column: 15,
-                      ),
-                    ),
-                  )),
+          ),
+          parameters: [
+            FunctionParameter(
+              pattern: Pattern(
+                kind: Literal(Expr(
+                  kind: Literal(Integer(0)),
+                  leading_comments: [],
+                  trailing_comments: [],
+                  symbol_table: None,
                   span: Span(
                     start: LineColumn(
                       line: 1,
@@ -301,8 +305,7 @@ Module(
                       column: 15,
                     ),
                   ),
-                ),
-                type_annotation: None,
+                )),
                 span: Span(
                   start: LineColumn(
                     line: 1,
@@ -314,36 +317,36 @@ Module(
                   ),
                 ),
               ),
-              FunctionParameter(
-                pattern: Pattern(
-                  kind: Identifier(
-                    id: SymbolId(3),
-                    name: Ident(
-                      name: "acc",
-                      span: Span(
-                        start: LineColumn(
-                          line: 1,
-                          column: 17,
-                        ),
-                        end: LineColumn(
-                          line: 1,
-                          column: 20,
-                        ),
+              type_annotation: None,
+              span: Span(
+                start: LineColumn(
+                  line: 1,
+                  column: 14,
+                ),
+                end: LineColumn(
+                  line: 1,
+                  column: 15,
+                ),
+              ),
+            ),
+            FunctionParameter(
+              pattern: Pattern(
+                kind: Identifier(
+                  id: SymbolId(3),
+                  name: Ident(
+                    name: "acc",
+                    span: Span(
+                      start: LineColumn(
+                        line: 1,
+                        column: 17,
+                      ),
+                      end: LineColumn(
+                        line: 1,
+                        column: 20,
                       ),
                     ),
                   ),
-                  span: Span(
-                    start: LineColumn(
-                      line: 1,
-                      column: 17,
-                    ),
-                    end: LineColumn(
-                      line: 1,
-                      column: 20,
-                    ),
-                  ),
                 ),
-                type_annotation: None,
                 span: Span(
                   start: LineColumn(
                     line: 1,
@@ -355,39 +358,39 @@ Module(
                   ),
                 ),
               ),
-            ],
-            guard: None,
-            return_type_annotation: None,
-            body: Expr(
-              kind: Block([], Some(Expr(
-                kind: Path(Path(
-                  segments: [
-                    Ident(
-                      name: "acc",
-                      span: Span(
-                        start: LineColumn(
-                          line: 1,
-                          column: 24,
-                        ),
-                        end: LineColumn(
-                          line: 1,
-                          column: 27,
-                        ),
+              type_annotation: None,
+              span: Span(
+                start: LineColumn(
+                  line: 1,
+                  column: 17,
+                ),
+                end: LineColumn(
+                  line: 1,
+                  column: 20,
+                ),
+              ),
+            ),
+          ],
+          guard: None,
+          return_type_annotation: None,
+          body: Expr(
+            kind: Block([], Some(Expr(
+              kind: Path(Path(
+                segments: [
+                  Ident(
+                    name: "acc",
+                    span: Span(
+                      start: LineColumn(
+                        line: 1,
+                        column: 24,
+                      ),
+                      end: LineColumn(
+                        line: 1,
+                        column: 27,
                       ),
                     ),
-                  ],
-                  span: Span(
-                    start: LineColumn(
-                      line: 1,
-                      column: 24,
-                    ),
-                    end: LineColumn(
-                      line: 1,
-                      column: 27,
-                    ),
                   ),
-                )),
-                symbol_table: None,
+                ],
                 span: Span(
                   start: LineColumn(
                     line: 1,
@@ -398,64 +401,68 @@ Module(
                     column: 27,
                   ),
                 ),
-              ))),
+              )),
+              leading_comments: [],
+              trailing_comments: [],
               symbol_table: None,
               span: Span(
                 start: LineColumn(
-                  line: 0,
-                  column: 0,
+                  line: 1,
+                  column: 24,
                 ),
                 end: LineColumn(
-                  line: 0,
-                  column: 0,
+                  line: 1,
+                  column: 27,
                 ),
               ),
-            ),
-          )),
-          span: Span(
-            start: LineColumn(
-              line: 0,
-              column: 0,
-            ),
-            end: LineColumn(
-              line: 0,
-              column: 0,
+            ))),
+            leading_comments: [],
+            trailing_comments: [],
+            symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 0,
+              ),
             ),
           ),
+          leading_comments: [],
+          trailing_comments: [],
           symbol_table: None,
+          span: Span(
+            start: LineColumn(
+              line: 1,
+              column: 1,
+            ),
+            end: LineColumn(
+              line: 1,
+              column: 29,
+            ),
+          ),
         ),
-        Stmt(
-          kind: FunctionDeclaration(FunctionDeclaration(
-            id: SymbolId(1),
-            name: Expr(
-              kind: Path(Path(
-                segments: [
-                  Ident(
-                    name: "factorial",
-                    span: Span(
-                      start: LineColumn(
-                        line: 2,
-                        column: 4,
-                      ),
-                      end: LineColumn(
-                        line: 2,
-                        column: 13,
-                      ),
+        FunctionDeclaration(
+          id: SymbolId(1),
+          name: Expr(
+            kind: Path(Path(
+              segments: [
+                Ident(
+                  name: "factorial",
+                  span: Span(
+                    start: LineColumn(
+                      line: 2,
+                      column: 4,
+                    ),
+                    end: LineColumn(
+                      line: 2,
+                      column: 13,
                     ),
                   ),
-                ],
-                span: Span(
-                  start: LineColumn(
-                    line: 2,
-                    column: 4,
-                  ),
-                  end: LineColumn(
-                    line: 2,
-                    column: 13,
-                  ),
                 ),
-              )),
-              symbol_table: None,
+              ],
               span: Span(
                 start: LineColumn(
                   line: 2,
@@ -466,38 +473,40 @@ Module(
                   column: 13,
                 ),
               ),
+            )),
+            leading_comments: [],
+            trailing_comments: [],
+            symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 2,
+                column: 4,
+              ),
+              end: LineColumn(
+                line: 2,
+                column: 13,
+              ),
             ),
-            parameters: [
-              FunctionParameter(
-                pattern: Pattern(
-                  kind: Identifier(
-                    id: SymbolId(4),
-                    name: Ident(
-                      name: "n",
-                      span: Span(
-                        start: LineColumn(
-                          line: 2,
-                          column: 14,
-                        ),
-                        end: LineColumn(
-                          line: 2,
-                          column: 15,
-                        ),
+          ),
+          parameters: [
+            FunctionParameter(
+              pattern: Pattern(
+                kind: Identifier(
+                  id: SymbolId(4),
+                  name: Ident(
+                    name: "n",
+                    span: Span(
+                      start: LineColumn(
+                        line: 2,
+                        column: 14,
+                      ),
+                      end: LineColumn(
+                        line: 2,
+                        column: 15,
                       ),
                     ),
                   ),
-                  span: Span(
-                    start: LineColumn(
-                      line: 2,
-                      column: 14,
-                    ),
-                    end: LineColumn(
-                      line: 2,
-                      column: 15,
-                    ),
-                  ),
                 ),
-                type_annotation: None,
                 span: Span(
                   start: LineColumn(
                     line: 2,
@@ -509,36 +518,36 @@ Module(
                   ),
                 ),
               ),
-              FunctionParameter(
-                pattern: Pattern(
-                  kind: Identifier(
-                    id: SymbolId(5),
-                    name: Ident(
-                      name: "acc",
-                      span: Span(
-                        start: LineColumn(
-                          line: 2,
-                          column: 17,
-                        ),
-                        end: LineColumn(
-                          line: 2,
-                          column: 20,
-                        ),
+              type_annotation: None,
+              span: Span(
+                start: LineColumn(
+                  line: 2,
+                  column: 14,
+                ),
+                end: LineColumn(
+                  line: 2,
+                  column: 15,
+                ),
+              ),
+            ),
+            FunctionParameter(
+              pattern: Pattern(
+                kind: Identifier(
+                  id: SymbolId(5),
+                  name: Ident(
+                    name: "acc",
+                    span: Span(
+                      start: LineColumn(
+                        line: 2,
+                        column: 17,
+                      ),
+                      end: LineColumn(
+                        line: 2,
+                        column: 20,
                       ),
                     ),
                   ),
-                  span: Span(
-                    start: LineColumn(
-                      line: 2,
-                      column: 17,
-                    ),
-                    end: LineColumn(
-                      line: 2,
-                      column: 20,
-                    ),
-                  ),
                 ),
-                type_annotation: None,
                 span: Span(
                   start: LineColumn(
                     line: 2,
@@ -550,42 +559,42 @@ Module(
                   ),
                 ),
               ),
-            ],
-            guard: None,
-            return_type_annotation: None,
-            body: Expr(
-              kind: Block([], Some(Expr(
-                kind: RecursiveCall(Expr(
-                  kind: Call(
-                    function: Expr(
-                      kind: Path(Path(
-                        segments: [
-                          Ident(
-                            name: "factorial",
-                            span: Span(
-                              start: LineColumn(
-                                line: 2,
-                                column: 28,
-                              ),
-                              end: LineColumn(
-                                line: 2,
-                                column: 37,
-                              ),
+              type_annotation: None,
+              span: Span(
+                start: LineColumn(
+                  line: 2,
+                  column: 17,
+                ),
+                end: LineColumn(
+                  line: 2,
+                  column: 20,
+                ),
+              ),
+            ),
+          ],
+          guard: None,
+          return_type_annotation: None,
+          body: Expr(
+            kind: Block([], Some(Expr(
+              kind: RecursiveCall(Expr(
+                kind: Call(
+                  function: Expr(
+                    kind: Path(Path(
+                      segments: [
+                        Ident(
+                          name: "factorial",
+                          span: Span(
+                            start: LineColumn(
+                              line: 2,
+                              column: 28,
+                            ),
+                            end: LineColumn(
+                              line: 2,
+                              column: 37,
                             ),
                           ),
-                        ],
-                        span: Span(
-                          start: LineColumn(
-                            line: 2,
-                            column: 28,
-                          ),
-                          end: LineColumn(
-                            line: 2,
-                            column: 37,
-                          ),
                         ),
-                      )),
-                      symbol_table: None,
+                      ],
                       span: Span(
                         start: LineColumn(
                           line: 2,
@@ -596,40 +605,42 @@ Module(
                           column: 37,
                         ),
                       ),
+                    )),
+                    leading_comments: [],
+                    trailing_comments: [],
+                    symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 2,
+                        column: 28,
+                      ),
+                      end: LineColumn(
+                        line: 2,
+                        column: 37,
+                      ),
                     ),
-                    arguments: [
-                      Expr(
-                        kind: BinaryOp(
-                          op: Subtract,
-                          lhs: Expr(
-                            kind: Path(Path(
-                              segments: [
-                                Ident(
-                                  name: "n",
-                                  span: Span(
-                                    start: LineColumn(
-                                      line: 2,
-                                      column: 38,
-                                    ),
-                                    end: LineColumn(
-                                      line: 2,
-                                      column: 39,
-                                    ),
+                  ),
+                  arguments: [
+                    Expr(
+                      kind: BinaryOp(
+                        op: Subtract,
+                        lhs: Expr(
+                          kind: Path(Path(
+                            segments: [
+                              Ident(
+                                name: "n",
+                                span: Span(
+                                  start: LineColumn(
+                                    line: 2,
+                                    column: 38,
+                                  ),
+                                  end: LineColumn(
+                                    line: 2,
+                                    column: 39,
                                   ),
                                 ),
-                              ],
-                              span: Span(
-                                start: LineColumn(
-                                  line: 2,
-                                  column: 38,
-                                ),
-                                end: LineColumn(
-                                  line: 2,
-                                  column: 39,
-                                ),
                               ),
-                            )),
-                            symbol_table: None,
+                            ],
                             span: Span(
                               start: LineColumn(
                                 line: 2,
@@ -640,66 +651,72 @@ Module(
                                 column: 39,
                               ),
                             ),
-                          ),
-                          rhs: Expr(
-                            kind: Literal(Integer(1)),
-                            symbol_table: None,
-                            span: Span(
-                              start: LineColumn(
-                                line: 2,
-                                column: 42,
-                              ),
-                              end: LineColumn(
-                                line: 2,
-                                column: 43,
-                              ),
+                          )),
+                          leading_comments: [],
+                          trailing_comments: [],
+                          symbol_table: None,
+                          span: Span(
+                            start: LineColumn(
+                              line: 2,
+                              column: 38,
+                            ),
+                            end: LineColumn(
+                              line: 2,
+                              column: 39,
                             ),
                           ),
                         ),
-                        symbol_table: None,
-                        span: Span(
-                          start: LineColumn(
-                            line: 2,
-                            column: 38,
-                          ),
-                          end: LineColumn(
-                            line: 2,
-                            column: 43,
+                        rhs: Expr(
+                          kind: Literal(Integer(1)),
+                          leading_comments: [],
+                          trailing_comments: [],
+                          symbol_table: None,
+                          span: Span(
+                            start: LineColumn(
+                              line: 2,
+                              column: 42,
+                            ),
+                            end: LineColumn(
+                              line: 2,
+                              column: 43,
+                            ),
                           ),
                         ),
                       ),
-                      Expr(
-                        kind: BinaryOp(
-                          op: Multiply,
-                          lhs: Expr(
-                            kind: Path(Path(
-                              segments: [
-                                Ident(
-                                  name: "n",
-                                  span: Span(
-                                    start: LineColumn(
-                                      line: 2,
-                                      column: 45,
-                                    ),
-                                    end: LineColumn(
-                                      line: 2,
-                                      column: 46,
-                                    ),
+                      leading_comments: [],
+                      trailing_comments: [],
+                      symbol_table: None,
+                      span: Span(
+                        start: LineColumn(
+                          line: 2,
+                          column: 38,
+                        ),
+                        end: LineColumn(
+                          line: 2,
+                          column: 43,
+                        ),
+                      ),
+                    ),
+                    Expr(
+                      kind: BinaryOp(
+                        op: Multiply,
+                        lhs: Expr(
+                          kind: Path(Path(
+                            segments: [
+                              Ident(
+                                name: "n",
+                                span: Span(
+                                  start: LineColumn(
+                                    line: 2,
+                                    column: 45,
+                                  ),
+                                  end: LineColumn(
+                                    line: 2,
+                                    column: 46,
                                   ),
                                 ),
-                              ],
-                              span: Span(
-                                start: LineColumn(
-                                  line: 2,
-                                  column: 45,
-                                ),
-                                end: LineColumn(
-                                  line: 2,
-                                  column: 46,
-                                ),
                               ),
-                            )),
-                            symbol_table: None,
+                            ],
                             span: Span(
                               start: LineColumn(
                                 line: 2,
@@ -710,36 +727,38 @@ Module(
                                 column: 46,
                               ),
                             ),
+                          )),
+                          leading_comments: [],
+                          trailing_comments: [],
+                          symbol_table: None,
+                          span: Span(
+                            start: LineColumn(
+                              line: 2,
+                              column: 45,
+                            ),
+                            end: LineColumn(
+                              line: 2,
+                              column: 46,
+                            ),
                           ),
-                          rhs: Expr(
-                            kind: Path(Path(
-                              segments: [
-                                Ident(
-                                  name: "acc",
-                                  span: Span(
-                                    start: LineColumn(
-                                      line: 2,
-                                      column: 49,
-                                    ),
-                                    end: LineColumn(
-                                      line: 2,
-                                      column: 52,
-                                    ),
+                        ),
+                        rhs: Expr(
+                          kind: Path(Path(
+                            segments: [
+                              Ident(
+                                name: "acc",
+                                span: Span(
+                                  start: LineColumn(
+                                    line: 2,
+                                    column: 49,
+                                  ),
+                                  end: LineColumn(
+                                    line: 2,
+                                    column: 52,
                                   ),
                                 ),
-                              ],
-                              span: Span(
-                                start: LineColumn(
-                                  line: 2,
-                                  column: 49,
-                                ),
-                                end: LineColumn(
-                                  line: 2,
-                                  column: 52,
-                                ),
                               ),
-                            )),
-                            symbol_table: None,
+                            ],
                             span: Span(
                               start: LineColumn(
                                 line: 2,
@@ -750,70 +769,93 @@ Module(
                                 column: 52,
                               ),
                             ),
-                          ),
-                        ),
-                        symbol_table: None,
-                        span: Span(
-                          start: LineColumn(
-                            line: 2,
-                            column: 45,
-                          ),
-                          end: LineColumn(
-                            line: 2,
-                            column: 52,
+                          )),
+                          leading_comments: [],
+                          trailing_comments: [],
+                          symbol_table: None,
+                          span: Span(
+                            start: LineColumn(
+                              line: 2,
+                              column: 49,
+                            ),
+                            end: LineColumn(
+                              line: 2,
+                              column: 52,
+                            ),
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                  symbol_table: None,
-                  span: Span(
-                    start: LineColumn(
-                      line: 2,
-                      column: 28,
+                      leading_comments: [],
+                      trailing_comments: [],
+                      symbol_table: None,
+                      span: Span(
+                        start: LineColumn(
+                          line: 2,
+                          column: 45,
+                        ),
+                        end: LineColumn(
+                          line: 2,
+                          column: 52,
+                        ),
+                      ),
                     ),
-                    end: LineColumn(
-                      line: 2,
-                      column: 53,
-                    ),
-                  ),
-                )),
+                  ],
+                ),
+                leading_comments: [],
+                trailing_comments: [],
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
                     line: 2,
-                    column: 24,
+                    column: 28,
                   ),
                   end: LineColumn(
                     line: 2,
                     column: 53,
                   ),
                 ),
-              ))),
+              )),
+              leading_comments: [],
+              trailing_comments: [],
               symbol_table: None,
               span: Span(
                 start: LineColumn(
-                  line: 0,
-                  column: 0,
+                  line: 2,
+                  column: 24,
                 ),
                 end: LineColumn(
-                  line: 0,
-                  column: 0,
+                  line: 2,
+                  column: 53,
                 ),
               ),
-            ),
-          )),
-          span: Span(
-            start: LineColumn(
-              line: 0,
-              column: 0,
-            ),
-            end: LineColumn(
-              line: 0,
-              column: 0,
+            ))),
+            leading_comments: [],
+            trailing_comments: [],
+            symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 0,
+              ),
             ),
           ),
+          leading_comments: [],
+          trailing_comments: [],
           symbol_table: None,
+          span: Span(
+            start: LineColumn(
+              line: 2,
+              column: 1,
+            ),
+            end: LineColumn(
+              line: 2,
+              column: 55,
+            ),
+          ),
         ),
       ]),
       span: Span(
@@ -826,6 +868,8 @@ Module(
           column: 55,
         ),
       ),
+      leading_comments: [],
+      trailing_comments: [],
       symbol_table: None,
     ),
   ],

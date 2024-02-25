@@ -2,6 +2,7 @@ use serde::Serialize;
 use std::rc::Rc;
 use std::{cell::RefCell, fmt::Display};
 
+use crate::token::Token;
 use crate::{
     span::{Span, Spanned},
     symbols::{SymbolId, SymbolTable},
@@ -70,11 +71,34 @@ pub struct FunctionDeclaration {
     pub guard: Box<Option<Expr>>,
     pub return_type_annotation: Box<Option<Ty>>,
     pub body: Box<Expr>,
+    pub leading_comments: Vec<Token>,
+    pub trailing_comments: Vec<Token>,
+    pub symbol_table: Option<Rc<RefCell<SymbolTable>>>,
+    pub span: Span,
+}
+
+impl Default for FunctionDeclaration {
+    fn default() -> Self {
+        FunctionDeclaration {
+            id: SymbolId::new(0),
+            name: Box::new(Expr::new(ExprKind::None)),
+            parameters: vec![],
+            guard: Box::new(None),
+            return_type_annotation: Box::new(None),
+            body: Box::new(Expr::new(ExprKind::None)),
+            leading_comments: vec![],
+            trailing_comments: vec![],
+            symbol_table: None,
+            span: Span::default(),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct Expr {
     pub kind: ExprKind,
+    pub leading_comments: Vec<Token>,
+    pub trailing_comments: Vec<Token>,
     pub symbol_table: Option<Rc<RefCell<SymbolTable>>>,
     pub span: Span,
 }
@@ -83,14 +107,25 @@ impl Expr {
     pub fn new(kind: ExprKind) -> Self {
         Expr {
             kind,
-            symbol_table: None,
-            span: Span::default(),
+            ..Default::default()
         }
     }
 
     pub fn with_span(mut self, span: Span) -> Self {
         self.span = span;
         self
+    }
+}
+
+impl Default for Expr {
+    fn default() -> Self {
+        Expr {
+            kind: ExprKind::None,
+            leading_comments: vec![],
+            trailing_comments: vec![],
+            symbol_table: None,
+            span: Span::default(),
+        }
     }
 }
 
@@ -270,6 +305,8 @@ pub struct EnumDeclaration {
 pub struct Stmt {
     pub kind: StmtKind,
     pub span: Span,
+    pub leading_comments: Vec<Token>,
+    pub trailing_comments: Vec<Token>,
     pub symbol_table: Option<Rc<RefCell<SymbolTable>>>,
 }
 
@@ -277,14 +314,25 @@ impl Stmt {
     pub fn new(kind: StmtKind) -> Self {
         Stmt {
             kind,
-            span: Span::default(),
-            symbol_table: None,
+            ..Default::default()
         }
     }
 
     pub fn with_span(mut self, span: Span) -> Self {
         self.span = span;
         self
+    }
+}
+
+impl Default for Stmt {
+    fn default() -> Self {
+        Stmt {
+            kind: StmtKind::None,
+            span: Span::default(),
+            leading_comments: vec![],
+            trailing_comments: vec![],
+            symbol_table: None,
+        }
     }
 }
 
@@ -300,12 +348,8 @@ pub enum StmtKind {
     },
     FunctionDeclaration(FunctionDeclaration),
     // Should this really be handled within the parser or should this be done in later stages?
-    // TODO: Instead of Vec<Stmt> we should have a Vec<FunctionDeclaration>, and attach comment
-    //       nodes onto our statements and expressions instead. (or some other generic way).
-    FunctionDeclarations(Vec<Stmt>),
+    FunctionDeclarations(Vec<FunctionDeclaration>),
     Return(Box<Option<Expr>>),
-    SingleLineComment(String),
-    MultiLineComment(String),
     EnumDeclaration(EnumDeclaration),
 }
 

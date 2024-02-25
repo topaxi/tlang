@@ -9,6 +9,8 @@ Module(
         kind: IfElse(
           condition: Expr(
             kind: Literal(Boolean(true)),
+            leading_comments: [],
+            trailing_comments: [],
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -26,6 +28,8 @@ Module(
               Stmt(
                 kind: Expr(Expr(
                   kind: Literal(Integer(1)),
+                  leading_comments: [],
+                  trailing_comments: [],
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -48,9 +52,13 @@ Module(
                     column: 12,
                   ),
                 ),
+                leading_comments: [],
+                trailing_comments: [],
                 symbol_table: None,
               ),
             ], None),
+            leading_comments: [],
+            trailing_comments: [],
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -67,6 +75,8 @@ Module(
             kind: IfElse(
               condition: Expr(
                 kind: Literal(Boolean(false)),
+                leading_comments: [],
+                trailing_comments: [],
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -84,6 +94,8 @@ Module(
                   Stmt(
                     kind: Expr(Expr(
                       kind: Literal(Integer(2)),
+                      leading_comments: [],
+                      trailing_comments: [],
                       symbol_table: None,
                       span: Span(
                         start: LineColumn(
@@ -106,9 +118,13 @@ Module(
                         column: 33,
                       ),
                     ),
+                    leading_comments: [],
+                    trailing_comments: [],
                     symbol_table: None,
                   ),
                 ], None),
+                leading_comments: [],
+                trailing_comments: [],
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -123,6 +139,8 @@ Module(
               ),
               else_branch: None,
             ),
+            leading_comments: [],
+            trailing_comments: [],
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -136,6 +154,8 @@ Module(
             ),
           )),
         ),
+        leading_comments: [],
+        trailing_comments: [],
         symbol_table: None,
         span: Span(
           start: LineColumn(
@@ -158,6 +178,8 @@ Module(
           column: 35,
         ),
       ),
+      leading_comments: [],
+      trailing_comments: [],
       symbol_table: None,
     ),
   ],

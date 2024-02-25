@@ -64,6 +64,8 @@ Module(
                   ),
                 ),
               )),
+              leading_comments: [],
+              trailing_comments: [],
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -78,6 +80,8 @@ Module(
             ),
             index: Expr(
               kind: Literal(Integer(1)),
+              leading_comments: [],
+              trailing_comments: [],
               symbol_table: None,
               span: Span(
                 start: LineColumn(
@@ -91,6 +95,8 @@ Module(
               ),
             ),
           ),
+          leading_comments: [],
+          trailing_comments: [],
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -115,6 +121,8 @@ Module(
           column: 15,
         ),
       ),
+      leading_comments: [],
+      trailing_comments: [],
       symbol_table: None,
     ),
   ],

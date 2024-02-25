@@ -121,13 +121,13 @@ fn test_list_literal_with_trailing_comma() {
 
 #[test]
 fn test_single_line_comments() {
-    assert_parser_snapshot!("// this is a comment");
+    assert_parser_snapshot!("// this is a comment\nlet x = 1;");
 }
 
 #[test]
 fn test_multi_line_comments() {
-    assert_parser_snapshot!("/* this is a comment */");
-    assert_parser_snapshot!("/* this is a comment\n   spanning multiple lines */");
+    assert_parser_snapshot!("/* this is a comment */\nlet x = 1;");
+    assert_parser_snapshot!("/* this is a comment\n   spanning multiple lines */\nlet x = 1;");
 }
 
 #[test]
@@ -193,4 +193,15 @@ fn test_field_access_expressions() {
 fn test_dynamic_index_access() {
     assert_parser_snapshot!("let x = foo[1];");
     assert_parser_snapshot!("let x = foo[1][2];");
+}
+
+#[test]
+fn test_comments_can_appear_anywhere() {
+    assert_parser_snapshot!(
+        r#"
+        // this is a third comment
+        let y = /* comment before expr */ 2 /* comment after expr */;
+        // trailing comment
+        "#
+    );
 }

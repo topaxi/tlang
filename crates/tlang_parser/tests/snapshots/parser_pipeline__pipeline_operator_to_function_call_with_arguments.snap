@@ -10,6 +10,8 @@ Module(
           op: Pipeline,
           lhs: Expr(
             kind: Literal(Integer(1)),
+            leading_comments: [],
+            trailing_comments: [],
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -52,6 +54,8 @@ Module(
                     ),
                   ),
                 )),
+                leading_comments: [],
+                trailing_comments: [],
                 symbol_table: None,
                 span: Span(
                   start: LineColumn(
@@ -67,6 +71,8 @@ Module(
               arguments: [
                 Expr(
                   kind: Literal(Integer(2)),
+                  leading_comments: [],
+                  trailing_comments: [],
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
@@ -81,6 +87,8 @@ Module(
                 ),
               ],
             ),
+            leading_comments: [],
+            trailing_comments: [],
             symbol_table: None,
             span: Span(
               start: LineColumn(
@@ -94,6 +102,8 @@ Module(
             ),
           ),
         ),
+        leading_comments: [],
+        trailing_comments: [],
         symbol_table: None,
         span: Span(
           start: LineColumn(
@@ -116,6 +126,8 @@ Module(
           column: 12,
         ),
       ),
+      leading_comments: [],
+      trailing_comments: [],
       symbol_table: None,
     ),
   ],

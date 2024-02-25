@@ -192,6 +192,8 @@ impl<'src> Parser<'src> {
     fn consume_token(&mut self, expected: TokenKind) {
         self.expect_token(expected);
         self.advance();
+        // Should we check for any comments here? And buffer them for the next node which supports
+        // tracking comments?
     }
 
     fn consume_identifier(&mut self) -> Ident {
@@ -250,6 +252,22 @@ impl<'src> Parser<'src> {
         self.next_token = state.2;
     }
 
+    fn parse_comments(&mut self) -> Vec<Token> {
+        let mut comments: Vec<Token> = Vec::new();
+        while matches!(
+            self.current_token_kind(),
+            Some(TokenKind::SingleLineComment(_)) | Some(TokenKind::MultiLineComment(_))
+        ) {
+            comments.push(
+                <std::option::Option<tlang_ast::token::Token> as Clone>::clone(&self.current_token)
+                    .unwrap()
+                    .clone(),
+            );
+            self.advance();
+        }
+        comments
+    }
+
     fn parse_statement(&mut self) -> (bool, Option<Stmt>) {
         debug!("Parsing statement {:?}", self.current_token);
 
@@ -258,6 +276,14 @@ impl<'src> Parser<'src> {
             self.advance();
 
             return (false, None);
+        }
+
+        let comments = self.parse_comments();
+
+        if self.current_token_kind() == Some(TokenKind::Eof) {
+            let mut node = node::stmt!(None);
+            node.leading_comments = comments;
+            return (false, Some(node));
         }
 
         let mut span = self.create_span_from_current_token();
@@ -272,11 +298,9 @@ impl<'src> Parser<'src> {
             }
             Some(TokenKind::Return) => self.parse_return_statement(),
             Some(TokenKind::Enum) => self.parse_enum_declaration(),
-            Some(TokenKind::SingleLineComment(_) | TokenKind::MultiLineComment(_)) => {
-                return (false, Some(self.parse_comment()));
-            }
             _ => node::stmt!(Expr(Box::new(self.parse_expression()))),
         };
+        node.leading_comments = comments;
         self.end_span_from_previous_token(&mut span);
         node.span = span;
 
@@ -301,18 +325,6 @@ impl<'src> Parser<'src> {
         }
 
         (true, Some(node))
-    }
-
-    fn parse_comment(&mut self) -> Stmt {
-        let comment = match self.current_token_kind() {
-            Some(TokenKind::SingleLineComment(comment)) => node::stmt!(SingleLineComment(comment))
-                .with_span(self.current_token.as_ref().unwrap().span),
-            Some(TokenKind::MultiLineComment(comment)) => node::stmt!(MultiLineComment(comment))
-                .with_span(self.current_token.as_ref().unwrap().span),
-            _ => unreachable!(),
-        };
-        self.advance();
-        comment
     }
 
     fn parse_return_statement(&mut self) -> Stmt {
@@ -969,6 +981,8 @@ impl<'src> Parser<'src> {
             guard: Box::new(None),
             body: Box::new(body),
             return_type_annotation: Box::new(return_type),
+            span,
+            ..Default::default()
         }))
         .with_span(span)
     }
@@ -1030,7 +1044,7 @@ impl<'src> Parser<'src> {
     fn parse_function_declaration(&mut self) -> Stmt {
         let id = self.unique_id();
         let mut name: Option<Expr> = None;
-        let mut declarations: Vec<Stmt> = Vec::new();
+        let mut declarations: Vec<FunctionDeclaration> = Vec::new();
 
         while matches!(
             self.current_token_kind(),
@@ -1048,14 +1062,8 @@ impl<'src> Parser<'src> {
             // parsing function declarations.
             let saved_state = self.save_state();
 
-            // TODO: We should figure out how to represent comments in any AST node.
-            let mut comments: Vec<Stmt> = Vec::new();
-            while matches!(
-                self.current_token_kind(),
-                Some(TokenKind::SingleLineComment(_)) | Some(TokenKind::MultiLineComment(_))
-            ) {
-                comments.push(self.parse_comment());
-            }
+            let comments = self.parse_comments();
+            let mut span = self.create_span_from_current_token();
 
             if let Some(TokenKind::Fn) = self.current_token_kind() {
                 self.advance();
@@ -1099,30 +1107,28 @@ impl<'src> Parser<'src> {
             }
 
             self.expect_token(TokenKind::LParen);
-            declarations.extend_from_slice(&comments);
             let parameters = self.parse_parameter_list();
             let guard = self.parse_guard_clause();
             let return_type = self.parse_return_type();
             let body = self.parse_block();
 
-            declarations.push(node::stmt!(FunctionDeclaration(FunctionDeclaration {
+            self.end_span_from_previous_token(&mut span);
+
+            declarations.push(FunctionDeclaration {
                 id,
                 name: Box::new(name.clone().unwrap()),
                 parameters,
                 guard: Box::new(guard),
                 body: Box::new(body),
                 return_type_annotation: Box::new(return_type),
-            })));
+                leading_comments: comments,
+                span,
+                ..Default::default()
+            });
         }
 
         if declarations.len() == 1 {
-            let declaration = declarations.pop().unwrap();
-
-            if let StmtKind::FunctionDeclaration(_) = declaration.kind {
-                return declaration;
-            }
-
-            unreachable!("Expected function declaration, found {:?}", declaration);
+            return node::stmt!(FunctionDeclaration(declarations.pop().unwrap()));
         }
 
         node::stmt!(FunctionDeclarations(declarations))
@@ -1310,7 +1316,11 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_expression(&mut self) -> Expr {
-        self.parse_expression_with_precedence(0, Associativity::Left)
+        let comments = self.parse_comments();
+        let mut expr = self.parse_expression_with_precedence(0, Associativity::Left);
+        expr.leading_comments = comments;
+        expr.trailing_comments = self.parse_comments();
+        expr
     }
 
     fn parse_expression_with_precedence(

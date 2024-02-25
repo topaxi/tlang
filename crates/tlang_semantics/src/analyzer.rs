@@ -136,14 +136,13 @@ impl SemanticAnalyzer {
             StmtKind::FunctionDeclaration(decl) => self.analyze_fn_decl(decl),
             StmtKind::FunctionDeclarations(decls) => {
                 for decl in decls {
-                    self.analyze_stmt(decl);
+                    self.analyze_fn_decl(decl);
                 }
             }
             StmtKind::Return(expr) => self.analyze_optional_expr(expr),
             StmtKind::EnumDeclaration(_decl) => {
                 // TODO
             }
-            StmtKind::SingleLineComment(_) | StmtKind::MultiLineComment(_) => {}
         }
 
         if let Some(symbol_table) = &stmt.symbol_table {
@@ -157,6 +156,10 @@ impl SemanticAnalyzer {
     }
 
     fn analyze_fn_decl(&mut self, decl: &mut FunctionDeclaration) {
+        if let Some(symbol_table) = &decl.symbol_table {
+            self.push_symbol_table(symbol_table);
+        }
+
         for parameter in &mut decl.parameters {
             self.analyze_fn_param(parameter);
         }
@@ -166,6 +169,11 @@ impl SemanticAnalyzer {
         }
 
         self.analyze_expr(&mut decl.body);
+
+        if let Some(symbol_table) = &decl.symbol_table {
+            self.report_unused_symbols(symbol_table, &decl.span);
+            self.pop_symbol_table();
+        }
     }
 
     fn analyze_expr(&mut self, expr: &mut Expr) {

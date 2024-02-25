@@ -36,6 +36,8 @@ Module(
         ),
         expression: Expr(
           kind: Literal(Integer(1)),
+          leading_comments: [],
+          trailing_comments: [],
           symbol_table: None,
           span: Span(
             start: LineColumn(
@@ -140,6 +142,8 @@ Module(
           column: 23,
         ),
       ),
+      leading_comments: [],
+      trailing_comments: [],
       symbol_table: None,
     ),
   ],

@@ -4,41 +4,24 @@ use tlang_ast::node::{
 
 use crate::generator::{BlockContext, CodegenJS};
 
-fn map_to_function_declaration(stmt: &Stmt) -> Option<&FunctionDeclaration> {
-    match &stmt.kind {
-        StmtKind::FunctionDeclaration(declaration) => Some(declaration),
-        _ => None,
-    }
-}
-
-fn filter_comments(stmt: &Stmt) -> bool {
-    matches!(
-        stmt.kind,
-        StmtKind::SingleLineComment(_) | StmtKind::MultiLineComment(_)
-    )
-}
-
-pub fn generate_function_declarations(codegen: &mut CodegenJS, declarations: &[Stmt]) {
-    let function_declarations = declarations
-        .iter()
-        .filter_map(map_to_function_declaration)
-        .collect::<Vec<&FunctionDeclaration>>();
-
-    let first_declaration = function_declarations.first().unwrap();
+pub fn generate_function_declarations(
+    codegen: &mut CodegenJS,
+    declarations: &[FunctionDeclaration],
+) {
+    let first_declaration = declarations.first().unwrap();
     let name_as_str = fn_identifier_to_string(&first_declaration.name);
 
-    let function_comments = declarations
-        .iter()
-        .filter(|node| filter_comments(node))
-        .collect::<Vec<&Stmt>>();
-
-    let is_any_definition_tail_recursive = function_declarations
+    let is_any_definition_tail_recursive = declarations
         .iter()
         .any(|declaration| is_function_body_tail_recursive(&name_as_str, &declaration.body));
 
-    for comment in function_comments {
-        codegen.generate_stmt(comment);
+    for declaration in declarations.iter() {
+        for comment in declaration.leading_comments.iter() {
+            codegen.push_indent();
+            codegen.generate_comment(comment);
+        }
     }
+
     codegen.push_indent();
     codegen.push_str(&format!("function {}(...args) {{\n", name_as_str));
     codegen.push_scope();
@@ -46,7 +29,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, declarations: &[S
     codegen.inc_indent();
 
     // Declare and output temporary variables for if let guards.
-    for declaration in function_declarations.iter() {
+    for declaration in declarations.iter() {
         if let Some(ref expr) = *declaration.guard {
             if let ExprKind::Let(pattern, _) = &expr.kind {
                 match &pattern.kind {
@@ -114,22 +97,8 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, declarations: &[S
 
     codegen.push_indent();
 
-    let mut comments = vec![];
     let mut first_declaration = true;
     for declaration in declarations.iter() {
-        if matches!(
-            &declaration.kind,
-            StmtKind::SingleLineComment(_) | StmtKind::MultiLineComment(_)
-        ) {
-            comments.push(declaration);
-            continue;
-        }
-
-        let declaration = match &declaration.kind {
-            StmtKind::FunctionDeclaration(declaration) => declaration,
-            _ => unreachable!("Unexpected node in function declarations."),
-        };
-
         codegen.push_scope();
 
         if !first_declaration {
@@ -161,7 +130,7 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, declarations: &[S
 
         // Expand parameter matching if any definition has a different amount of
         // parameters.
-        let parameter_variadic = function_declarations
+        let parameter_variadic = declarations
             .iter()
             .map(|declaration| declaration.parameters.clone())
             .any(|params| params.len() != declaration.parameters.len());
@@ -296,11 +265,10 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, declarations: &[S
 
         codegen.inc_indent();
 
-        for comment in comments.iter() {
+        for comment in declaration.leading_comments.iter() {
             codegen.push_indent();
-            codegen.generate_stmt(comment);
+            codegen.generate_comment(comment);
         }
-        comments.clear();
 
         // Alias identifier args back to the parameter names for readability of generated code.
         for (j, param) in declaration.parameters.iter().enumerate() {
@@ -325,6 +293,11 @@ pub fn generate_function_declarations(codegen: &mut CodegenJS, declarations: &[S
         codegen.push_indent();
         codegen.push_char('}');
         codegen.pop_scope();
+
+        for comment in declaration.trailing_comments.iter() {
+            codegen.push_indent();
+            codegen.generate_comment(comment);
+        }
     }
 
     if is_any_definition_tail_recursive {
