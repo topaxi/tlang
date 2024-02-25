@@ -42,11 +42,7 @@ pub trait Visitor<'ast>: Sized {
     }
 
     fn visit_fn_param(&mut self, parameter: &'ast node::FunctionParameter) {
-        walk_pat(self, &parameter.pattern);
-
-        if let Some(ref type_annotation) = *parameter.type_annotation {
-            walk_ty(self, &type_annotation);
-        }
+        walk_fn_param(self, parameter);
     }
 
     fn visit_fn_guard(&mut self, guard: &'ast node::Expr) {
@@ -160,9 +156,7 @@ pub fn walk_stmt<'ast, V: Visitor<'ast>>(visitor: &mut V, statement: &'ast node:
                 visitor.visit_expr(expr);
             }
         }
-        node::StmtKind::EnumDeclaration(decl) => {
-            visitor.visit_enum_decl(decl)
-        }
+        node::StmtKind::EnumDeclaration(decl) => visitor.visit_enum_decl(decl),
         node::StmtKind::SingleLineComment(_) | node::StmtKind::MultiLineComment(_) => {}
     }
 }
@@ -180,6 +174,17 @@ pub fn walk_variant<'ast, V: Visitor<'ast>>(visitor: &mut V, variant: &'ast node
 
     for ident in &variant.parameters {
         visitor.visit_ident(ident);
+    }
+}
+
+pub fn walk_fn_param<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    parameter: &'ast node::FunctionParameter,
+) {
+    visitor.visit_pat(&parameter.pattern);
+
+    if let Some(ref type_annotation) = *parameter.type_annotation {
+        visitor.visit_ty(&type_annotation);
     }
 }
 
