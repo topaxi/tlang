@@ -1,19 +1,19 @@
 use crate::node;
 
 pub trait Visitor<'ast>: Sized {
-    fn visit_module(&mut self, statements: &'ast [node::Node]) {
-        walk_module(self, statements);
+    fn visit_module(&mut self, module: &'ast node::Module) {
+        walk_module(self, module);
     }
 
     fn visit_block(
         &mut self,
-        statements: &'ast [node::Node],
-        expression: &'ast Option<node::Node>,
+        statements: &'ast [node::Stmt],
+        expression: &'ast Option<node::Expr>,
     ) {
         walk_block(self, statements, expression);
     }
 
-    fn visit_statement(&mut self, statement: &'ast node::Node) {
+    fn visit_statement(&mut self, statement: &'ast node::Stmt) {
         walk_statement(self, statement);
     }
 
@@ -21,37 +21,37 @@ pub trait Visitor<'ast>: Sized {
         walk_function_declaration(self, declaration);
     }
 
-    fn visit_expression(&mut self, expression: &'ast node::Node) {
+    fn visit_expression(&mut self, expression: &'ast node::Expr) {
         walk_expression(self, expression);
     }
 
-    fn visit_function_parameter(&mut self, _parameter: &'ast node::Node) {
+    fn visit_function_parameter(&mut self, _parameter: &'ast node::FunctionParameter) {
         todo!()
     }
 
-    fn visit_function_guard(&mut self, _guard: &'ast node::Node) {
+    fn visit_function_guard(&mut self, _guard: &'ast node::Expr) {
         todo!()
     }
 
-    fn visit_function_return_type_annotation(&mut self, _annotation: &'ast node::Node) {
+    fn visit_function_return_type_annotation(&mut self, _annotation: &'ast node::Ty) {
         todo!()
     }
 
-    fn visit_function_body(&mut self, body: &'ast node::Node) {
+    fn visit_function_body(&mut self, body: &'ast node::Expr) {
         walk_function_body(self, body);
     }
 }
 
-pub fn walk_module<'ast, V: Visitor<'ast>>(visitor: &mut V, statements: &'ast [node::Node]) {
-    for statement in statements {
+pub fn walk_module<'ast, V: Visitor<'ast>>(visitor: &mut V, module: &'ast node::Module) {
+    for statement in &module.statements {
         visitor.visit_statement(statement);
     }
 }
 
 pub fn walk_block<'ast, V: Visitor<'ast>>(
     visitor: &mut V,
-    statements: &'ast [node::Node],
-    expression: &'ast Option<node::Node>,
+    statements: &'ast [node::Stmt],
+    expression: &'ast Option<node::Expr>,
 ) {
     for statement in statements {
         visitor.visit_statement(statement);
@@ -61,20 +61,20 @@ pub fn walk_block<'ast, V: Visitor<'ast>>(
     }
 }
 
-pub fn walk_statement<'ast, V: Visitor<'ast>>(visitor: &mut V, statement: &'ast node::Node) {
-    match &statement.ast_node {
-        node::AstNode::None => {}
-        node::AstNode::Block(statements, expression) => {
-            visitor.visit_block(statements, expression);
+pub fn walk_statement<'ast, V: Visitor<'ast>>(visitor: &mut V, statement: &'ast node::Stmt) {
+    match &statement.kind {
+        node::StmtKind::None => {}
+        node::StmtKind::Expr(expr) => {
+            visitor.visit_expression(expr);
         }
-        node::AstNode::FunctionDeclaration(declaration) => {
+        node::StmtKind::FunctionDeclaration(declaration) => {
             visitor.visit_function_declaration(declaration);
         }
         _ => todo!(),
     }
 }
 
-pub fn walk_function_body<'ast, V: Visitor<'ast>>(visitor: &mut V, body: &'ast node::Node) {
+pub fn walk_function_body<'ast, V: Visitor<'ast>>(visitor: &mut V, body: &'ast node::Expr) {
     visitor.visit_expression(body);
 }
 
@@ -94,17 +94,17 @@ pub fn walk_function_declaration<'ast, V: Visitor<'ast>>(
     visitor.visit_function_body(&declaration.body);
 }
 
-pub fn walk_expression<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'ast node::Node) {
-    match &expression.ast_node {
-        node::AstNode::None => {}
-        node::AstNode::Block(statements, expression) => {
+pub fn walk_expression<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'ast node::Expr) {
+    match &expression.kind {
+        node::ExprKind::None => {}
+        node::ExprKind::Block(statements, expression) => {
             visitor.visit_block(statements, expression);
         }
-        node::AstNode::BinaryOp { op: _, lhs, rhs } => {
+        node::ExprKind::BinaryOp { op: _, lhs, rhs } => {
             visitor.visit_expression(lhs);
             visitor.visit_expression(rhs);
         }
-        node::AstNode::UnaryOp(_, expression) => {
+        node::ExprKind::UnaryOp(_, expression) => {
             visitor.visit_expression(expression);
         }
         _ => todo!(),
@@ -114,24 +114,26 @@ pub fn walk_expression<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'as
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::node::AstNode;
-    use crate::node::Node;
-    use crate::span::Span;
+    use crate::{span::Span, symbols::SymbolId};
 
     struct TestVisitor {
         visited: Vec<&'static str>,
     }
 
     impl<'ast> Visitor<'ast> for TestVisitor {
-        fn visit_module(&mut self, statements: &'ast [Node]) {
+        fn visit_module(&mut self, module: &'ast node::Module) {
             self.visited.push("visit_module");
-            walk_module(self, statements);
+            walk_module(self, module);
         }
-        fn visit_block(&mut self, statements: &'ast [Node], expression: &'ast Option<Node>) {
+        fn visit_block(
+            &mut self,
+            statements: &'ast [node::Stmt],
+            expression: &'ast Option<node::Expr>,
+        ) {
             self.visited.push("visit_block");
             walk_block(self, statements, expression);
         }
-        fn visit_statement(&mut self, statement: &'ast Node) {
+        fn visit_statement(&mut self, statement: &'ast node::Stmt) {
             self.visited.push("visit_statement");
             walk_statement(self, statement);
         }
@@ -139,20 +141,20 @@ mod tests {
             self.visited.push("visit_function_declaration");
             walk_function_declaration(self, declaration);
         }
-        fn visit_expression(&mut self, expression: &'ast Node) {
+        fn visit_expression(&mut self, expression: &'ast node::Expr) {
             self.visited.push("visit_expression");
             walk_expression(self, expression);
         }
-        fn visit_function_parameter(&mut self, _parameter: &'ast Node) {
+        fn visit_function_parameter(&mut self, _parameter: &'ast node::FunctionParameter) {
             self.visited.push("visit_function_parameter");
         }
-        fn visit_function_guard(&mut self, _guard: &'ast Node) {
+        fn visit_function_guard(&mut self, _guard: &'ast node::Expr) {
             self.visited.push("visit_function_guard");
         }
-        fn visit_function_return_type_annotation(&mut self, _annotation: &'ast Node) {
+        fn visit_function_return_type_annotation(&mut self, _annotation: &'ast node::Ty) {
             self.visited.push("visit_function_return_type_annotation");
         }
-        fn visit_function_body(&mut self, body: &'ast Node) {
+        fn visit_function_body(&mut self, body: &'ast node::Expr) {
             self.visited.push("visit_function_body");
             walk_function_body(self, body);
         }
@@ -160,25 +162,25 @@ mod tests {
 
     #[test]
     fn test_walk_module() {
-        let statements = vec![Node {
-            ast_node: AstNode::None,
+        let module = node::Module::new(vec![node::Stmt {
+            kind: node::StmtKind::None,
             symbol_table: None,
             span: Span::default(),
-        }];
+        }]);
         let mut visitor = TestVisitor { visited: vec![] };
-        walk_module(&mut visitor, &statements);
+        walk_module(&mut visitor, &module);
         assert_eq!(visitor.visited, vec!["visit_statement"]);
     }
 
     #[test]
     fn test_walk_block() {
-        let statements = vec![Node {
-            ast_node: AstNode::None,
+        let statements = vec![node::Stmt {
+            kind: node::StmtKind::None,
             symbol_table: None,
             span: Span::default(),
         }];
-        let expression = Some(Node {
-            ast_node: AstNode::None,
+        let expression = Some(node::Expr {
+            kind: node::ExprKind::None,
             symbol_table: None,
             span: Span::default(),
         });
@@ -189,32 +191,39 @@ mod tests {
 
     #[test]
     fn test_walk_statement() {
-        let statement = Node {
-            ast_node: AstNode::Block(vec![], Box::new(None)),
+        let statement = node::Stmt {
+            kind: node::StmtKind::Expr(Box::new(node::Expr::new(node::ExprKind::None))),
             symbol_table: None,
             span: Span::default(),
         };
         let mut visitor = TestVisitor { visited: vec![] };
         walk_statement(&mut visitor, &statement);
-        assert_eq!(visitor.visited, vec!["visit_block"]);
+        assert_eq!(visitor.visited, vec!["visit_expression"]);
     }
 
     #[test]
     fn test_walk_function_declaration() {
         let declaration = node::FunctionDeclaration {
-            parameters: vec![Node {
-                ast_node: AstNode::None,
-                symbol_table: None,
+            id: SymbolId::new(2),
+            name: Box::new(node::Expr::new(node::ExprKind::Path(node::Path::new(
+                vec![node::Ident::new("my_fn", Span::default())],
+            )))),
+            parameters: vec![node::FunctionParameter {
+                pattern: Box::new(node::Pattern::new(node::PatternKind::Identifier {
+                    id: SymbolId::new(1),
+                    name: node::Ident::new("x", Span::default()),
+                })),
+                type_annotation: Box::new(None),
                 span: Span::default(),
             }],
-            guard: Box::new(Some(Node {
-                ast_node: AstNode::None,
+            guard: Box::new(Some(node::Expr {
+                kind: node::ExprKind::None,
                 symbol_table: None,
                 span: Span::default(),
             })),
             return_type_annotation: Box::new(None),
-            body: Box::new(Node {
-                ast_node: AstNode::Block(vec![], Box::new(None)),
+            body: Box::new(node::Expr {
+                kind: node::ExprKind::Block(vec![], Box::new(None)),
                 symbol_table: None,
                 span: Span::default(),
             }),
