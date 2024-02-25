@@ -154,12 +154,15 @@ impl DeclarationAnalyzer {
                 expr.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
                 let name = decl.name.as_ref();
                 let name_as_str = self.fn_identifier_to_string(name);
-                self.declare_symbol(SymbolInfo::new(
-                    decl.id,
-                    &name_as_str,
-                    SymbolType::Function,
-                    Some(name.span),
-                ));
+
+                if name_as_str != "anonymous" {
+                    self.declare_symbol(SymbolInfo::new(
+                        decl.id,
+                        &name_as_str,
+                        SymbolType::Function,
+                        Some(name.span),
+                    ));
+                }
 
                 self.collect_declarations_from_fn(decl);
                 self.pop_symbol_table();
@@ -271,14 +274,12 @@ impl DeclarationAnalyzer {
     fn collect_function_declaration(&mut self, declaration: &mut FunctionDeclaration) {
         let name_as_str = self.fn_identifier_to_string(&declaration.name);
 
-        if name_as_str != "anonymous" {
-            self.declare_symbol(SymbolInfo::new(
-                declaration.id,
-                &name_as_str,
-                SymbolType::Function,
-                Some(declaration.name.span),
-            ));
-        }
+        self.declare_symbol(SymbolInfo::new(
+            declaration.id,
+            &name_as_str,
+            SymbolType::Function,
+            Some(declaration.name.span),
+        ));
 
         declaration.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
 
