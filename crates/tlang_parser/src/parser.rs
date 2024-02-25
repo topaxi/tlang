@@ -483,6 +483,10 @@ impl<'src> Parser<'src> {
             }
         }
 
+        statements.last_mut().map(|stmt| {
+            stmt.trailing_comments = self.parse_comments();
+        });
+
         (statements, completion_expression)
     }
 
@@ -756,6 +760,8 @@ impl<'src> Parser<'src> {
     fn parse_primary_expression(&mut self) -> Expr {
         debug!("Parsing primary expression {:?}", self.current_token);
 
+        let comments = self.parse_comments();
+
         expect_token_matches!(
             self,
             "primary expression",
@@ -829,6 +835,8 @@ impl<'src> Parser<'src> {
 
         self.end_span_from_previous_token(&mut span);
         node.span = span;
+        node.leading_comments = comments;
+        node.trailing_comments = self.parse_comments();
         node
     }
 
@@ -1316,11 +1324,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_expression(&mut self) -> Expr {
-        let comments = self.parse_comments();
-        let mut expr = self.parse_expression_with_precedence(0, Associativity::Left);
-        expr.leading_comments = comments;
-        expr.trailing_comments = self.parse_comments();
-        expr
+        self.parse_expression_with_precedence(0, Associativity::Left)
     }
 
     fn parse_expression_with_precedence(
@@ -1332,13 +1336,14 @@ impl<'src> Parser<'src> {
             "Parsing expression with precedence {} {:#?}",
             precedence, associativity
         );
-        let mut span = self.create_span_from_current_token();
         let mut lhs = self.parse_primary_expression();
+        let mut span = lhs.span;
 
         loop {
             match self.current_token_kind().as_ref() {
                 Some(TokenKind::Dot) => {
                     self.advance();
+                    lhs.trailing_comments = self.parse_comments();
                     let field_name = self.consume_identifier();
                     lhs = node::expr!(FieldExpression {
                         base: Box::new(lhs),
@@ -1397,6 +1402,7 @@ impl<'src> Parser<'src> {
             lhs.span = span;
         }
 
+        lhs.trailing_comments.extend(self.parse_comments());
         lhs
     }
 

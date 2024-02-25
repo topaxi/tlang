@@ -1,6 +1,6 @@
 ---
 source: crates/tlang_parser/tests/parser.rs
-expression: "parse!(r#\"\n        // this is a third comment\n        let y = /* comment before expr */ 2 /* comment after expr */;\n        // trailing comment\n        \"#)"
+expression: "parse!(r#\"\n        // this is a third comment\n        let y = /* comment before expr */ 2 /* comment after expr */;\n        // trailing comment\n        [1,2] // trailing comment\n        |> foo // trailing comment\n        //|> bar\n        |> baz;\n        \"#)"
 ---
 Module(
   statements: [
@@ -109,15 +109,224 @@ Module(
       symbol_table: None,
     ),
     Stmt(
-      kind: None,
+      kind: Expr(Expr(
+        kind: BinaryOp(
+          op: Pipeline,
+          lhs: Expr(
+            kind: BinaryOp(
+              op: Pipeline,
+              lhs: Expr(
+                kind: List([
+                  Expr(
+                    kind: Literal(Integer(1)),
+                    leading_comments: [],
+                    trailing_comments: [],
+                    symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 4,
+                        column: 10,
+                      ),
+                      end: LineColumn(
+                        line: 4,
+                        column: 11,
+                      ),
+                    ),
+                  ),
+                  Expr(
+                    kind: Literal(Integer(2)),
+                    leading_comments: [],
+                    trailing_comments: [],
+                    symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 4,
+                        column: 12,
+                      ),
+                      end: LineColumn(
+                        line: 4,
+                        column: 13,
+                      ),
+                    ),
+                  ),
+                ]),
+                leading_comments: [],
+                trailing_comments: [
+                  Token(
+                    kind: SingleLineComment(" trailing comment"),
+                    span: Span(
+                      start: LineColumn(
+                        line: 4,
+                        column: 15,
+                      ),
+                      end: LineColumn(
+                        line: 4,
+                        column: 34,
+                      ),
+                    ),
+                  ),
+                ],
+                symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 4,
+                    column: 9,
+                  ),
+                  end: LineColumn(
+                    line: 4,
+                    column: 14,
+                  ),
+                ),
+              ),
+              rhs: Expr(
+                kind: Path(Path(
+                  segments: [
+                    Ident(
+                      name: "foo",
+                      span: Span(
+                        start: LineColumn(
+                          line: 5,
+                          column: 12,
+                        ),
+                        end: LineColumn(
+                          line: 5,
+                          column: 15,
+                        ),
+                      ),
+                    ),
+                  ],
+                  span: Span(
+                    start: LineColumn(
+                      line: 5,
+                      column: 12,
+                    ),
+                    end: LineColumn(
+                      line: 5,
+                      column: 15,
+                    ),
+                  ),
+                )),
+                leading_comments: [],
+                trailing_comments: [
+                  Token(
+                    kind: SingleLineComment(" trailing comment"),
+                    span: Span(
+                      start: LineColumn(
+                        line: 5,
+                        column: 16,
+                      ),
+                      end: LineColumn(
+                        line: 5,
+                        column: 35,
+                      ),
+                    ),
+                  ),
+                  Token(
+                    kind: SingleLineComment("|> bar"),
+                    span: Span(
+                      start: LineColumn(
+                        line: 6,
+                        column: 9,
+                      ),
+                      end: LineColumn(
+                        line: 6,
+                        column: 17,
+                      ),
+                    ),
+                  ),
+                ],
+                symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 5,
+                    column: 12,
+                  ),
+                  end: LineColumn(
+                    line: 5,
+                    column: 15,
+                  ),
+                ),
+              ),
+            ),
+            leading_comments: [],
+            trailing_comments: [],
+            symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 0,
+              ),
+            ),
+          ),
+          rhs: Expr(
+            kind: Path(Path(
+              segments: [
+                Ident(
+                  name: "baz",
+                  span: Span(
+                    start: LineColumn(
+                      line: 7,
+                      column: 12,
+                    ),
+                    end: LineColumn(
+                      line: 7,
+                      column: 15,
+                    ),
+                  ),
+                ),
+              ],
+              span: Span(
+                start: LineColumn(
+                  line: 7,
+                  column: 12,
+                ),
+                end: LineColumn(
+                  line: 7,
+                  column: 15,
+                ),
+              ),
+            )),
+            leading_comments: [],
+            trailing_comments: [],
+            symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 7,
+                column: 12,
+              ),
+              end: LineColumn(
+                line: 7,
+                column: 15,
+              ),
+            ),
+          ),
+        ),
+        leading_comments: [],
+        trailing_comments: [],
+        symbol_table: None,
+        span: Span(
+          start: LineColumn(
+            line: 4,
+            column: 9,
+          ),
+          end: LineColumn(
+            line: 7,
+            column: 15,
+          ),
+        ),
+      )),
       span: Span(
         start: LineColumn(
-          line: 0,
-          column: 0,
+          line: 4,
+          column: 9,
         ),
         end: LineColumn(
-          line: 0,
-          column: 0,
+          line: 7,
+          column: 16,
         ),
       ),
       leading_comments: [
