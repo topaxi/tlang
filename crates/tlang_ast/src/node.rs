@@ -9,6 +9,25 @@ use crate::{
     token::Literal,
 };
 
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct NodeId(usize);
+
+impl NodeId {
+    pub fn new(id: usize) -> Self {
+        NodeId(id)
+    }
+
+    pub fn next(&self) -> Self {
+        NodeId(self.0 + 1)
+    }
+}
+
+impl Display for NodeId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.0, f)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Ident {
     pub name: String,
@@ -65,7 +84,7 @@ impl FunctionParameter {
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct FunctionDeclaration {
-    pub id: SymbolId,
+    pub id: NodeId,
     pub name: Box<Expr>,
     pub parameters: Vec<FunctionParameter>,
     pub guard: Box<Option<Expr>>,
@@ -80,7 +99,7 @@ pub struct FunctionDeclaration {
 impl Default for FunctionDeclaration {
     fn default() -> Self {
         FunctionDeclaration {
-            id: SymbolId::new(0),
+            id: NodeId::new(0),
             name: Box::new(Expr::new(ExprKind::None)),
             parameters: vec![],
             guard: Box::new(None),
@@ -257,24 +276,24 @@ impl Pattern {
         self
     }
 
-    pub fn get_symbol_id(&self) -> Option<SymbolId> {
+    pub fn get_node_id(&self) -> Option<NodeId> {
         match &self.kind {
             PatternKind::Identifier { id, .. } => Some(*id),
             _ => None,
         }
     }
 
-    pub fn get_all_symbol_ids(&self) -> Vec<SymbolId> {
+    pub fn get_all_node_ids(&self) -> Vec<NodeId> {
         match &self.kind {
             PatternKind::Identifier { id, .. } => vec![*id],
             PatternKind::List(patterns) => patterns
                 .iter()
-                .flat_map(|pattern| pattern.get_all_symbol_ids())
+                .flat_map(|pattern| pattern.get_all_node_ids())
                 .collect(),
-            PatternKind::Rest(pattern) => pattern.get_all_symbol_ids(),
+            PatternKind::Rest(pattern) => pattern.get_all_node_ids(),
             PatternKind::Enum { elements, .. } => elements
                 .iter()
-                .flat_map(|pattern| pattern.get_all_symbol_ids())
+                .flat_map(|pattern| pattern.get_all_node_ids())
                 .collect(),
             _ => todo!(
                 "Getting symbol ids for pattern kind {:?} not implemented yet",
@@ -287,7 +306,7 @@ impl Pattern {
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub enum PatternKind {
     Identifier {
-        id: SymbolId,
+        id: NodeId,
         name: Ident,
     },
     Literal(Expr),
@@ -311,13 +330,14 @@ pub struct EnumVariant {
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct EnumDeclaration {
-    pub id: SymbolId,
+    pub id: NodeId,
     pub name: Ident,
     pub variants: Vec<EnumVariant>,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct Stmt {
+    pub id: NodeId,
     pub kind: StmtKind,
     pub span: Span,
     pub leading_comments: Vec<Token>,
@@ -326,19 +346,30 @@ pub struct Stmt {
 }
 
 impl Stmt {
-    pub fn new(kind: StmtKind) -> Self {
+    pub fn new(id: NodeId, kind: StmtKind) -> Self {
         Stmt {
+            id,
             kind,
-            span: Span::default(),
-            leading_comments: vec![],
-            trailing_comments: vec![],
-            symbol_table: None,
+            ..Default::default()
         }
     }
 
     pub fn with_span(mut self, span: Span) -> Self {
         self.span = span;
         self
+    }
+}
+
+impl Default for Stmt {
+    fn default() -> Self {
+        Stmt {
+            id: NodeId::new(0),
+            kind: StmtKind::None,
+            span: Span::default(),
+            leading_comments: vec![],
+            trailing_comments: vec![],
+            symbol_table: None,
+        }
     }
 }
 

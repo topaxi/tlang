@@ -361,7 +361,7 @@ impl SemanticAnalyzer {
         // By removing the symbol from the table while analyzing the expression, we can check
         // whether the expression references any symbols that were not declared before.
         let pattern_symbols = pattern
-            .get_all_symbol_ids()
+            .get_all_node_ids()
             .iter()
             .filter_map(|id| self.get_last_symbol_table().borrow_mut().remove(*id))
             .collect::<Vec<_>>();

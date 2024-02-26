@@ -1,10 +1,9 @@
 use tlang_ast::node::{
     self, Associativity, BinaryOpKind, Block, EnumDeclaration, EnumVariant, Expr, ExprKind,
-    FunctionDeclaration, FunctionParameter, Ident, MatchArm, Module, OperatorInfo, Path, Pattern,
-    PatternKind, Stmt, StmtKind, Ty, UnaryOp,
+    FunctionDeclaration, FunctionParameter, Ident, MatchArm, Module, NodeId, OperatorInfo, Path,
+    Pattern, PatternKind, Stmt, StmtKind, Ty, UnaryOp,
 };
 use tlang_ast::span::Span;
-use tlang_ast::symbols::SymbolId;
 use tlang_ast::token::{Token, TokenKind};
 
 use crate::error::{ParseError, ParseErrorKind};
@@ -65,8 +64,8 @@ pub struct Parser<'src> {
 
     recoverable: bool,
 
-    // Id to identifiy symbols, e.g. functions and variables.
-    unique_id: SymbolId,
+    // Id to identifiy nodes.
+    unique_id: NodeId,
 
     // We have to copy over the lexers position as we scan ahead of the current token.
     current_line: usize,
@@ -82,7 +81,7 @@ impl<'src> Parser<'src> {
             previous_token: None,
             current_token: None,
             next_token: None,
-            unique_id: SymbolId::new(0),
+            unique_id: NodeId::new(0),
             current_line: 0,
             current_column: 0,
             errors: Vec::new(),
@@ -103,7 +102,7 @@ impl<'src> Parser<'src> {
         self.errors.clone()
     }
 
-    fn unique_id(&mut self) -> SymbolId {
+    fn unique_id(&mut self) -> NodeId {
         self.unique_id = self.unique_id.next();
         self.unique_id
     }
