@@ -202,6 +202,10 @@ fn test_comments_can_appear_anywhere() {
         // this is a third comment
         let y = /* comment before expr */ 2 /* comment after expr */;
         // trailing comment
+        [1,2] // trailing comment
+        |> foo // trailing comment
+        //|> bar
+        |> baz;
         "#
     );
 }
