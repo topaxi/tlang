@@ -78,7 +78,7 @@ pub fn walk_module<'ast, V: Visitor<'ast>>(visitor: &mut V, module: &'ast node::
 
 pub fn walk_path<'ast, V: Visitor<'ast>>(visitor: &mut V, path: &'ast node::Path) {
     for segment in &path.segments {
-        visitor.visit_ident(&segment);
+        visitor.visit_ident(segment);
     }
 }
 
@@ -183,7 +183,7 @@ pub fn walk_fn_param<'ast, V: Visitor<'ast>>(
     visitor.visit_pat(&parameter.pattern);
 
     if let Some(ref type_annotation) = *parameter.type_annotation {
-        visitor.visit_ty(&type_annotation);
+        visitor.visit_ty(type_annotation);
     }
 }
 
@@ -277,7 +277,7 @@ pub fn walk_expr<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'ast node
             }
         }
         node::ExprKind::Path(path) => {
-            visitor.visit_path(&path);
+            visitor.visit_path(path);
         }
         node::ExprKind::RecursiveCall(expr) => {
             visitor.visit_expr(expr);
