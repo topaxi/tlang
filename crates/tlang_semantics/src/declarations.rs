@@ -2,8 +2,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use tlang_ast::{
     node::{
-        Expr, ExprKind, FunctionDeclaration, FunctionParameter, Module, Pattern, PatternKind, Stmt,
-        StmtKind,
+        Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, Module, Pattern,
+        PatternKind, Stmt, StmtKind,
     },
     symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
 };
@@ -133,23 +133,26 @@ impl DeclarationAnalyzer {
         }
         self.symbol_type.pop();
         self.collect_optional_declarations_expr(&mut function_decl.guard);
-        self.collect_declarations_expr(&mut function_decl.body);
+        self.collect_declarations_block(&mut function_decl.body);
     }
 
     fn collect_declarations_from_fn_param(&mut self, param: &mut FunctionParameter) {
         self.collect_pattern(&mut param.pattern);
     }
 
+    fn collect_declarations_block(&mut self, block: &mut Block) {
+        block.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
+        for stmt in &mut block.statements {
+            self.collect_declarations_stmt(stmt);
+        }
+
+        self.collect_optional_declarations_expr(&mut block.expression);
+        self.pop_symbol_table();
+    }
+
     fn collect_declarations_expr(&mut self, expr: &mut Expr) {
         match &mut expr.kind {
-            ExprKind::Block(stmts, cexpr) => {
-                expr.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
-                for stmt in stmts {
-                    self.collect_declarations_stmt(stmt);
-                }
-                self.collect_optional_declarations_expr(cexpr);
-                self.pop_symbol_table();
-            }
+            ExprKind::Block(block) => self.collect_declarations_block(block),
             ExprKind::FunctionExpression(decl) => {
                 expr.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
                 let name = decl.name.as_ref();
@@ -290,7 +293,7 @@ impl DeclarationAnalyzer {
         self.symbol_type.pop();
 
         self.collect_optional_declarations_expr(&mut declaration.guard);
-        self.collect_declarations_expr(&mut declaration.body);
+        self.collect_declarations_block(&mut declaration.body);
 
         self.pop_symbol_table();
     }

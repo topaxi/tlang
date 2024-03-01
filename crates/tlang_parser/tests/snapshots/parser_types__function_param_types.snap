@@ -252,8 +252,9 @@ Module(
             ),
           ),
         )),
-        body: Expr(
-          kind: Block([], Some(Expr(
+        body: Block(
+          statements: [],
+          expression: Some(Expr(
             kind: Path(Path(
               segments: [
                 Ident(
@@ -294,20 +295,18 @@ Module(
                 column: 33,
               ),
             ),
-          ))),
-          leading_comments: [],
-          trailing_comments: [],
-          symbol_table: None,
+          )),
           span: Span(
             start: LineColumn(
               line: 0,
-              column: 0,
+              column: 30,
             ),
             end: LineColumn(
               line: 0,
-              column: 0,
+              column: 35,
             ),
           ),
+          symbol_table: None,
         ),
         leading_comments: [],
         trailing_comments: [],

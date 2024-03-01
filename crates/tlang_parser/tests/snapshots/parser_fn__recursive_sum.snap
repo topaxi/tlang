@@ -80,8 +80,9 @@ Module(
           ],
           guard: None,
           return_type_annotation: None,
-          body: Expr(
-            kind: Block([], Some(Expr(
+          body: Block(
+            statements: [],
+            expression: Some(Expr(
               kind: Literal(Integer(0)),
               leading_comments: [],
               trailing_comments: [],
@@ -96,20 +97,18 @@ Module(
                   column: 14,
                 ),
               ),
-            ))),
-            leading_comments: [],
-            trailing_comments: [],
-            symbol_table: None,
+            )),
             span: Span(
               start: LineColumn(
                 line: 0,
-                column: 0,
+                column: 11,
               ),
               end: LineColumn(
                 line: 0,
-                column: 0,
+                column: 16,
               ),
             ),
+            symbol_table: None,
           ),
           leading_comments: [],
           trailing_comments: [],
@@ -268,8 +267,9 @@ Module(
           ],
           guard: None,
           return_type_annotation: None,
-          body: Expr(
-            kind: Block([], Some(Expr(
+          body: Block(
+            statements: [],
+            expression: Some(Expr(
               kind: BinaryOp(
                 op: Add,
                 lhs: Expr(
@@ -431,20 +431,18 @@ Module(
                   column: 33,
                 ),
               ),
-            ))),
-            leading_comments: [],
-            trailing_comments: [],
-            symbol_table: None,
+            )),
             span: Span(
               start: LineColumn(
-                line: 0,
-                column: 0,
+                line: 1,
+                column: 20,
               ),
               end: LineColumn(
-                line: 0,
-                column: 0,
+                line: 1,
+                column: 35,
               ),
             ),
+            symbol_table: None,
           ),
           leading_comments: [],
           trailing_comments: [],

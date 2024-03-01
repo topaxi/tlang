@@ -82,8 +82,8 @@ fn test_block_scope() {
     assert_eq!(program_symbols.borrow().get_by_name("c"), None);
 
     let block1 = match ast.statements[1].kind {
-        StmtKind::Expr(ref expr) => match expr.kind {
-            ExprKind::Block(_, _) => expr,
+        StmtKind::Expr(ref expr) => match &expr.kind {
+            ExprKind::Block(block) => block,
             _ => panic!("Expected block {:?}", expr.kind),
         },
         _ => panic!("Expected expression statement {:?}", ast.statements[1].kind),
@@ -134,15 +134,15 @@ fn test_block_scope() {
     );
     assert_eq!(block1_symbols.borrow().get_by_name("c"), None);
 
-    let block2 = match block1.kind {
-        ExprKind::Block(ref nodes, _) => match nodes[1].kind {
-            StmtKind::Expr(ref expr) => match expr.kind {
-                ExprKind::Block(_, _) => expr,
-                _ => panic!("Expected block {:?}", expr.kind),
-            },
-            _ => panic!("Expected expression statement {:?}", nodes[1].kind),
+    let block2 = match block1.statements[1].kind {
+        StmtKind::Expr(ref expr) => match &expr.kind {
+            ExprKind::Block(block) => block,
+            _ => panic!("Expected block {:?}", expr.kind),
         },
-        _ => panic!("Expected block {:?}", block1.kind),
+        _ => panic!(
+            "Expected expression statement {:?}",
+            block1.statements[1].kind
+        ),
     };
 
     let block2_symbols = block2

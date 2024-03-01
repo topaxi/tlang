@@ -1,5 +1,5 @@
 use tlang_ast::node::{
-    self, Associativity, BinaryOpKind, EnumDeclaration, EnumVariant, Expr, ExprKind,
+    self, Associativity, BinaryOpKind, Block, EnumDeclaration, EnumVariant, Expr, ExprKind,
     FunctionDeclaration, FunctionParameter, Ident, MatchArm, Module, OperatorInfo, Path, Pattern,
     PatternKind, Stmt, StmtKind, Ty, UnaryOp,
 };
@@ -437,9 +437,9 @@ impl<'src> Parser<'src> {
         node
     }
 
-    fn parse_statements(&mut self, may_complete: bool) -> (Vec<Stmt>, Box<Option<Expr>>) {
+    fn parse_statements(&mut self, may_complete: bool) -> (Vec<Stmt>, Option<Expr>) {
         let mut statements = Vec::new();
-        let mut completion_expression = Box::new(None);
+        let mut completion_expression = None;
 
         while self.current_token_kind() != Some(TokenKind::RBrace)
             && self.current_token_kind() != Some(TokenKind::Eof)
@@ -469,7 +469,7 @@ impl<'src> Parser<'src> {
                     };
                     self.end_span_from_previous_token(&mut statement.span);
                     expression.span = statement.span;
-                    completion_expression = Box::new(Some(*expression));
+                    completion_expression = Some(*expression);
                     break;
                 }
 
@@ -483,9 +483,9 @@ impl<'src> Parser<'src> {
             }
         }
 
-        statements.last_mut().map(|stmt| {
+        if let Some(stmt) = statements.last_mut() {
             stmt.trailing_comments = self.parse_comments();
-        });
+        }
 
         (statements, completion_expression)
     }
@@ -494,12 +494,14 @@ impl<'src> Parser<'src> {
         Module::new(self.parse_statements(false).0)
     }
 
-    fn parse_block(&mut self) -> Expr {
+    fn parse_block(&mut self) -> Block {
+        let mut span = self.create_span_from_current_token();
         self.consume_token(TokenKind::LBrace);
-        let (statements, completion) = self.parse_statements(true);
+        let (statements, expression) = self.parse_statements(true);
         self.consume_token(TokenKind::RBrace);
+        self.end_span_from_previous_token(&mut span);
 
-        node::expr!(Block(statements, completion))
+        Block::new(statements, expression).with_span(span)
     }
 
     fn parse_let_expression(&mut self) -> Expr {
@@ -667,6 +669,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_block_or_dict(&mut self) -> Expr {
+        let mut span = self.create_span_from_current_token();
         self.consume_token(TokenKind::LBrace);
         // If the first token is a identifier followed by a colon, we assume a dict.
         if let Some(TokenKind::Identifier(_)) = self.current_token_kind() {
@@ -686,10 +689,11 @@ impl<'src> Parser<'src> {
             }
         }
 
-        let (statements, completion) = self.parse_statements(true);
+        let (statements, expression) = self.parse_statements(true);
         self.consume_token(TokenKind::RBrace);
+        self.end_span_from_previous_token(&mut span);
 
-        node::expr!(Block(statements, completion))
+        node::expr!(Block(Block::new(statements, expression).with_span(span))).with_span(span)
     }
 
     /// Can be a Identifier, NestedIdentifier or FieldExpression with a single field name.
@@ -729,14 +733,14 @@ impl<'src> Parser<'src> {
         }
 
         self.expect_token(TokenKind::LBrace);
-        let then_branch = self.parse_block();
+        let then_branch = node::expr!(Block(self.parse_block()));
         let else_branch = if let Some(TokenKind::Else) = self.current_token_kind() {
             self.advance();
 
             if let Some(TokenKind::If) = self.current_token_kind() {
                 Some(self.parse_if_else_expression())
             } else {
-                Some(self.parse_block())
+                Some(node::expr!(Block(self.parse_block())))
             }
         } else {
             None
@@ -987,7 +991,7 @@ impl<'src> Parser<'src> {
             name: Box::new(name),
             parameters,
             guard: Box::new(None),
-            body: Box::new(body),
+            body,
             return_type_annotation: Box::new(return_type),
             span,
             ..Default::default()
@@ -1127,7 +1131,7 @@ impl<'src> Parser<'src> {
                 name: Box::new(name.clone().unwrap()),
                 parameters,
                 guard: Box::new(guard),
-                body: Box::new(body),
+                body,
                 return_type_annotation: Box::new(return_type),
                 leading_comments: comments,
                 span,

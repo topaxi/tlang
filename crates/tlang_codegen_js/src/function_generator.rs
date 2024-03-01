@@ -1,5 +1,6 @@
 use tlang_ast::node::{
-    Expr, ExprKind, FunctionDeclaration, FunctionParameter, Pattern, PatternKind, Stmt, StmtKind,
+    Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, Pattern, PatternKind, Stmt,
+    StmtKind,
 };
 
 use crate::generator::{BlockContext, CodegenJS};
@@ -13,7 +14,7 @@ pub fn generate_function_declarations(
 
     let is_any_definition_tail_recursive = declarations
         .iter()
-        .any(|declaration| is_function_body_tail_recursive(&name_as_str, &declaration.body));
+        .any(|declaration| is_function_body_tail_recursive_block(&name_as_str, &declaration.body));
 
     for declaration in declarations.iter() {
         for comment in declaration.leading_comments.iter() {
@@ -391,7 +392,7 @@ pub fn generate_function_parameter_list(codegen: &mut CodegenJS, parameters: &[F
 
 pub fn generate_function_declaration(codegen: &mut CodegenJS, declaration: &FunctionDeclaration) {
     let name_as_str = fn_identifier_to_string(&declaration.name);
-    let is_tail_recursive = is_function_body_tail_recursive(&name_as_str, &declaration.body);
+    let is_tail_recursive = is_function_body_tail_recursive_block(&name_as_str, &declaration.body);
     codegen.push_function_context(
         &name_as_str,
         &declaration.parameters,
@@ -417,7 +418,7 @@ pub fn generate_function_declaration(codegen: &mut CodegenJS, declaration: &Func
 pub fn generate_function_expression(codegen: &mut CodegenJS, declaration: &FunctionDeclaration) {
     codegen.push_scope();
     let name_as_str = fn_identifier_to_string(&declaration.name);
-    let is_tail_recursive = is_function_body_tail_recursive(&name_as_str, &declaration.body);
+    let is_tail_recursive = is_function_body_tail_recursive_block(&name_as_str, &declaration.body);
     codegen.push_function_context(
         &name_as_str,
         &declaration.parameters,
@@ -459,7 +460,7 @@ fn generate_function_parameter(codegen: &mut CodegenJS, pattern: &Pattern) {
     }
 }
 
-fn generate_function_body(codegen: &mut CodegenJS, body: &Expr, is_tail_recursive: bool) {
+fn generate_function_body(codegen: &mut CodegenJS, body: &Block, is_tail_recursive: bool) {
     codegen.push_context(BlockContext::FunctionBody);
     flush_function_pre_body(codegen);
     if is_tail_recursive {
@@ -467,7 +468,7 @@ fn generate_function_body(codegen: &mut CodegenJS, body: &Expr, is_tail_recursiv
         codegen.push_str("while (true) {\n");
         codegen.inc_indent();
     }
-    codegen.generate_expr(body, None);
+    codegen.generate_block(body);
     if is_tail_recursive {
         codegen.dec_indent();
         codegen.push_indent();
@@ -541,6 +542,20 @@ fn is_function_body_tail_recursive_stmt(function_name: &str, stmt: &Stmt) -> boo
     }
 }
 
+fn is_function_body_tail_recursive_block(function_name: &str, block: &Block) -> bool {
+    for statement in &block.statements {
+        if is_function_body_tail_recursive_stmt(function_name, statement) {
+            return true;
+        }
+    }
+
+    if let Some(ref expression) = *block.expression {
+        return is_function_body_tail_recursive(function_name, expression);
+    }
+
+    false
+}
+
 fn is_function_body_tail_recursive(function_name: &str, node: &Expr) -> bool {
     // Recursively traverse nodes to check for tail recursive calls to the function itself.
     // We currently only support tail recursion to the function itself, not any other function.
@@ -562,17 +577,7 @@ fn is_function_body_tail_recursive(function_name: &str, node: &Expr) -> bool {
             }
             false
         }
-        ExprKind::Block(statements, expression) => {
-            for statement in statements {
-                if is_function_body_tail_recursive_stmt(function_name, statement) {
-                    return true;
-                }
-            }
-            if let Some(expression) = expression.as_ref() {
-                return is_function_body_tail_recursive(function_name, expression);
-            }
-            false
-        }
+        ExprKind::Block(block) => is_function_body_tail_recursive_block(function_name, block),
         ExprKind::Match {
             expression,
             arms: _,

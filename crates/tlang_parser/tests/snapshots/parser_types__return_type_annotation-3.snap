@@ -121,8 +121,9 @@ Module(
                 ),
               ),
             )),
-            body: Expr(
-              kind: Block([], Some(Expr(
+            body: Block(
+              statements: [],
+              expression: Some(Expr(
                 kind: Literal(Integer(1)),
                 leading_comments: [],
                 trailing_comments: [],
@@ -137,20 +138,18 @@ Module(
                     column: 30,
                   ),
                 ),
-              ))),
-              leading_comments: [],
-              trailing_comments: [],
-              symbol_table: None,
+              )),
               span: Span(
                 start: LineColumn(
                   line: 0,
-                  column: 0,
+                  column: 27,
                 ),
                 end: LineColumn(
                   line: 0,
-                  column: 0,
+                  column: 32,
                 ),
               ),
+              symbol_table: None,
             ),
             leading_comments: [],
             trailing_comments: [],

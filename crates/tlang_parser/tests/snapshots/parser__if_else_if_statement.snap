@@ -24,13 +24,25 @@ Module(
             ),
           ),
           then_branch: Expr(
-            kind: Block([
-              Stmt(
-                kind: Expr(Expr(
-                  kind: Literal(Integer(1)),
-                  leading_comments: [],
-                  trailing_comments: [],
-                  symbol_table: None,
+            kind: Block(Block(
+              statements: [
+                Stmt(
+                  kind: Expr(Expr(
+                    kind: Literal(Integer(1)),
+                    leading_comments: [],
+                    trailing_comments: [],
+                    symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 10,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 11,
+                      ),
+                    ),
+                  )),
                   span: Span(
                     start: LineColumn(
                       line: 0,
@@ -38,25 +50,27 @@ Module(
                     ),
                     end: LineColumn(
                       line: 0,
-                      column: 11,
+                      column: 12,
                     ),
                   ),
-                )),
-                span: Span(
-                  start: LineColumn(
-                    line: 0,
-                    column: 10,
-                  ),
-                  end: LineColumn(
-                    line: 0,
-                    column: 12,
-                  ),
+                  leading_comments: [],
+                  trailing_comments: [],
+                  symbol_table: None,
                 ),
-                leading_comments: [],
-                trailing_comments: [],
-                symbol_table: None,
+              ],
+              expression: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 8,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 14,
+                ),
               ),
-            ], None),
+              symbol_table: None,
+            )),
             leading_comments: [],
             trailing_comments: [],
             symbol_table: None,
@@ -90,13 +104,25 @@ Module(
                 ),
               ),
               then_branch: Expr(
-                kind: Block([
-                  Stmt(
-                    kind: Expr(Expr(
-                      kind: Literal(Integer(2)),
-                      leading_comments: [],
-                      trailing_comments: [],
-                      symbol_table: None,
+                kind: Block(Block(
+                  statements: [
+                    Stmt(
+                      kind: Expr(Expr(
+                        kind: Literal(Integer(2)),
+                        leading_comments: [],
+                        trailing_comments: [],
+                        symbol_table: None,
+                        span: Span(
+                          start: LineColumn(
+                            line: 0,
+                            column: 31,
+                          ),
+                          end: LineColumn(
+                            line: 0,
+                            column: 32,
+                          ),
+                        ),
+                      )),
                       span: Span(
                         start: LineColumn(
                           line: 0,
@@ -104,25 +130,27 @@ Module(
                         ),
                         end: LineColumn(
                           line: 0,
-                          column: 32,
+                          column: 33,
                         ),
                       ),
-                    )),
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 31,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 33,
-                      ),
+                      leading_comments: [],
+                      trailing_comments: [],
+                      symbol_table: None,
                     ),
-                    leading_comments: [],
-                    trailing_comments: [],
-                    symbol_table: None,
+                  ],
+                  expression: None,
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 29,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 35,
+                    ),
                   ),
-                ], None),
+                  symbol_table: None,
+                )),
                 leading_comments: [],
                 trailing_comments: [],
                 symbol_table: None,

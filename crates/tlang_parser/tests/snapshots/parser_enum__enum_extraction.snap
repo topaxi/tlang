@@ -239,8 +239,9 @@ Module(
           ],
           guard: None,
           return_type_annotation: None,
-          body: Expr(
-            kind: Block([], Some(Expr(
+          body: Block(
+            statements: [],
+            expression: Some(Expr(
               kind: Call(
                 function: Expr(
                   kind: Path(Path(
@@ -316,20 +317,18 @@ Module(
                   column: 54,
                 ),
               ),
-            ))),
-            leading_comments: [],
-            trailing_comments: [],
-            symbol_table: None,
+            )),
             span: Span(
               start: LineColumn(
-                line: 0,
-                column: 0,
+                line: 5,
+                column: 25,
               ),
               end: LineColumn(
-                line: 0,
-                column: 0,
+                line: 5,
+                column: 56,
               ),
             ),
+            symbol_table: None,
           ),
           leading_comments: [],
           trailing_comments: [],
@@ -506,8 +505,9 @@ Module(
           ],
           guard: None,
           return_type_annotation: None,
-          body: Expr(
-            kind: Block([], Some(Expr(
+          body: Block(
+            statements: [],
+            expression: Some(Expr(
               kind: Path(Path(
                 segments: [
                   Ident(
@@ -548,20 +548,18 @@ Module(
                   column: 39,
                 ),
               ),
-            ))),
-            leading_comments: [],
-            trailing_comments: [],
-            symbol_table: None,
+            )),
             span: Span(
               start: LineColumn(
-                line: 0,
-                column: 0,
+                line: 6,
+                column: 32,
               ),
               end: LineColumn(
-                line: 0,
-                column: 0,
+                line: 6,
+                column: 41,
               ),
             ),
+            symbol_table: None,
           ),
           leading_comments: [],
           trailing_comments: [],

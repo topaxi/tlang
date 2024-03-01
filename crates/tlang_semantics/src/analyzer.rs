@@ -2,8 +2,8 @@ use std::{cell::RefCell, rc::Rc};
 
 use tlang_ast::{
     node::{
-        Expr, ExprKind, FunctionDeclaration, FunctionParameter, Module, Pattern, PatternKind, Stmt,
-        StmtKind,
+        Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, Module, Pattern,
+        PatternKind, Stmt, StmtKind,
     },
     span::Span,
     symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
@@ -120,6 +120,23 @@ impl SemanticAnalyzer {
         }
     }
 
+    fn analyze_block(&mut self, block: &mut Block) {
+        if let Some(symbol_table) = &block.symbol_table {
+            self.push_symbol_table(symbol_table);
+        }
+
+        for stmt in &mut block.statements {
+            self.analyze_stmt(stmt);
+        }
+
+        self.analyze_optional_expr(&mut block.expression);
+
+        if let Some(symbol_table) = &block.symbol_table {
+            self.report_unused_symbols(symbol_table, &block.span);
+            self.pop_symbol_table();
+        }
+    }
+
     fn analyze_stmt(&mut self, stmt: &mut Stmt) {
         if let Some(symbol_table) = &stmt.symbol_table {
             self.push_symbol_table(symbol_table);
@@ -168,7 +185,7 @@ impl SemanticAnalyzer {
             self.analyze_expr(guard);
         }
 
-        self.analyze_expr(&mut decl.body);
+        self.analyze_block(&mut decl.body);
 
         if let Some(symbol_table) = &decl.symbol_table {
             self.report_unused_symbols(symbol_table, &decl.span);
@@ -188,12 +205,7 @@ impl SemanticAnalyzer {
                 self.analyze_expr(lhs);
                 self.analyze_expr(rhs);
             }
-            ExprKind::Block(stmts, expr) => {
-                for stmt in stmts.iter_mut() {
-                    self.analyze_stmt(stmt);
-                }
-                self.analyze_optional_expr(expr);
-            }
+            ExprKind::Block(block) => self.analyze_block(block),
             ExprKind::UnaryOp(_, node) => {
                 self.analyze_expr(node);
             }

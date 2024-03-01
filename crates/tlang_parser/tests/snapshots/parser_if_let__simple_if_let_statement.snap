@@ -66,23 +66,39 @@ Module(
             ),
           ),
           then_branch: Expr(
-            kind: Block([], Some(Expr(
-              kind: Path(Path(
-                segments: [
-                  Ident(
-                    name: "x",
-                    span: Span(
-                      start: LineColumn(
-                        line: 1,
-                        column: 5,
-                      ),
-                      end: LineColumn(
-                        line: 1,
-                        column: 6,
+            kind: Block(Block(
+              statements: [],
+              expression: Some(Expr(
+                kind: Path(Path(
+                  segments: [
+                    Ident(
+                      name: "x",
+                      span: Span(
+                        start: LineColumn(
+                          line: 1,
+                          column: 5,
+                        ),
+                        end: LineColumn(
+                          line: 1,
+                          column: 6,
+                        ),
                       ),
                     ),
+                  ],
+                  span: Span(
+                    start: LineColumn(
+                      line: 1,
+                      column: 5,
+                    ),
+                    end: LineColumn(
+                      line: 1,
+                      column: 6,
+                    ),
                   ),
-                ],
+                )),
+                leading_comments: [],
+                trailing_comments: [],
+                symbol_table: None,
                 span: Span(
                   start: LineColumn(
                     line: 1,
@@ -94,20 +110,18 @@ Module(
                   ),
                 ),
               )),
-              leading_comments: [],
-              trailing_comments: [],
-              symbol_table: None,
               span: Span(
                 start: LineColumn(
-                  line: 1,
-                  column: 5,
+                  line: 0,
+                  column: 13,
                 ),
                 end: LineColumn(
-                  line: 1,
-                  column: 6,
+                  line: 2,
+                  column: 2,
                 ),
               ),
-            ))),
+              symbol_table: None,
+            )),
             leading_comments: [],
             trailing_comments: [],
             symbol_table: None,

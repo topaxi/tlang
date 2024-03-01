@@ -9,8 +9,8 @@ use crate::{
 };
 use tlang_ast::{
     node::{
-        BinaryOpKind, EnumDeclaration, Expr, ExprKind, FunctionParameter, Ident, Module, Pattern,
-        PatternKind, Stmt, StmtKind, UnaryOp,
+        BinaryOpKind, Block, EnumDeclaration, Expr, ExprKind, FunctionParameter, Ident, Module,
+        Pattern, PatternKind, Stmt, StmtKind, UnaryOp,
     },
     token::{Literal, Token, TokenKind},
 };
@@ -261,7 +261,7 @@ impl CodegenJS {
     }
 
     /// Generates blocks in expression position.
-    fn generate_block_expression(&mut self, statements: &[Stmt], expression: &Option<Expr>) {
+    fn generate_block_expression(&mut self, block: &Block) {
         let has_completion_var = self.completion_variables.last().unwrap().is_some();
         let completion_tmp_var = self
             .completion_variables
@@ -281,7 +281,7 @@ impl CodegenJS {
             self.replace_statement_buffer(String::new())
         };
 
-        if expression.is_some() {
+        if block.has_completion() {
             if has_completion_var {
                 // Halp I made a mess
             } else {
@@ -291,9 +291,9 @@ impl CodegenJS {
             }
         }
 
-        self.generate_statements(statements);
+        self.generate_statements(&block.statements);
 
-        if expression.is_none() {
+        if !block.has_completion() {
             self.push_statement_buffer();
             self.push_str(&lhs);
             self.flush_statement_buffer();
@@ -305,7 +305,8 @@ impl CodegenJS {
 
         self.push_indent();
         self.push_str(&format!("{} = ", completion_tmp_var));
-        self.generate_expr(expression.as_ref().unwrap(), None);
+        // TODO: Remove clone call
+        self.generate_expr(&block.expression.clone().unwrap(), None);
         self.push_str(";\n");
         if !has_completion_var {
             self.indent_level -= 1;
@@ -319,15 +320,15 @@ impl CodegenJS {
         self.pop_scope();
     }
 
-    fn generate_block(&mut self, statements: &[Stmt], expression: &Option<Expr>) {
+    pub fn generate_block(&mut self, block: &Block) {
         // Functions handle their scoping themselves
         if self.current_context() != BlockContext::FunctionBody {
             self.push_scope();
         }
 
-        self.generate_statements(statements);
+        self.generate_statements(&block.statements);
 
-        if expression.is_none() {
+        if !block.has_completion() {
             if self.current_context() != BlockContext::FunctionBody {
                 self.pop_scope();
             }
@@ -338,9 +339,11 @@ impl CodegenJS {
             // We only render the return statement if we are not in a tail recursive function body
             // and the node is RecursiveCall pointing to the current function.
             if let Some(function_context) = self.function_context_stack.last() {
-                if function_context.is_tail_recursive && expression.is_some() {
-                    if let ExprKind::RecursiveCall(_) = expression.as_ref().unwrap().kind {
-                        self.generate_expr(expression.as_ref().unwrap(), None);
+                if function_context.is_tail_recursive && block.has_completion() {
+                    // TODO: Get rid of clone call
+                    let expression = block.expression.clone().unwrap();
+                    if let ExprKind::RecursiveCall(_) = expression.kind {
+                        self.generate_expr(&expression, None);
                         return;
                     }
                 }
@@ -349,7 +352,7 @@ impl CodegenJS {
             self.push_str(&self.get_indent());
             self.push_str("return ");
             self.push_context(BlockContext::Expression);
-            self.generate_expr(expression.as_ref().unwrap(), None);
+            self.generate_expr(&block.expression.clone().unwrap(), None);
             self.pop_context();
             self.push_str(";\n");
             self.flush_statement_buffer();
@@ -421,11 +424,11 @@ impl CodegenJS {
     pub fn generate_expr(&mut self, expr: &Expr, parent_op: Option<&BinaryOpKind>) {
         match &expr.kind {
             ExprKind::None => {}
-            ExprKind::Block(stmts, expr) if self.current_context() == BlockContext::Expression => {
-                self.generate_block_expression(stmts, expr);
+            ExprKind::Block(block) if self.current_context() == BlockContext::Expression => {
+                self.generate_block_expression(block);
             }
-            ExprKind::Block(stmts, expr) => {
-                self.generate_block(stmts, expr);
+            ExprKind::Block(block) => {
+                self.generate_block(block);
             }
             ExprKind::Call {
                 function,
@@ -633,7 +636,7 @@ impl CodegenJS {
         // TODO: In case of recursive calls in tail position, we'll want to omit lhs.
         let has_block_completions = self.current_context() == BlockContext::Expression
             && match &then_branch.kind {
-                ExprKind::Block(_, expr) => expr.is_some(),
+                ExprKind::Block(block) => block.has_completion(),
                 _ => false,
             };
         if has_block_completions {

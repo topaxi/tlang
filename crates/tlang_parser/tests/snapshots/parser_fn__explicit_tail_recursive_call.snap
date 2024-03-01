@@ -95,8 +95,9 @@ Module(
           ],
           guard: None,
           return_type_annotation: None,
-          body: Expr(
-            kind: Block([], Some(Expr(
+          body: Block(
+            statements: [],
+            expression: Some(Expr(
               kind: Call(
                 function: Expr(
                   kind: Path(Path(
@@ -214,20 +215,18 @@ Module(
                   column: 33,
                 ),
               ),
-            ))),
-            leading_comments: [],
-            trailing_comments: [],
-            symbol_table: None,
+            )),
             span: Span(
               start: LineColumn(
                 line: 0,
-                column: 0,
+                column: 16,
               ),
               end: LineColumn(
                 line: 0,
-                column: 0,
+                column: 35,
               ),
             ),
+            symbol_table: None,
           ),
           leading_comments: [],
           trailing_comments: [],
@@ -373,8 +372,9 @@ Module(
           ],
           guard: None,
           return_type_annotation: None,
-          body: Expr(
-            kind: Block([], Some(Expr(
+          body: Block(
+            statements: [],
+            expression: Some(Expr(
               kind: Path(Path(
                 segments: [
                   Ident(
@@ -415,20 +415,18 @@ Module(
                   column: 27,
                 ),
               ),
-            ))),
-            leading_comments: [],
-            trailing_comments: [],
-            symbol_table: None,
+            )),
             span: Span(
               start: LineColumn(
-                line: 0,
-                column: 0,
+                line: 1,
+                column: 22,
               ),
               end: LineColumn(
-                line: 0,
-                column: 0,
+                line: 1,
+                column: 29,
               ),
             ),
+            symbol_table: None,
           ),
           leading_comments: [],
           trailing_comments: [],
@@ -574,8 +572,9 @@ Module(
           ],
           guard: None,
           return_type_annotation: None,
-          body: Expr(
-            kind: Block([], Some(Expr(
+          body: Block(
+            statements: [],
+            expression: Some(Expr(
               kind: RecursiveCall(Expr(
                 kind: Call(
                   function: Expr(
@@ -828,20 +827,18 @@ Module(
                   column: 53,
                 ),
               ),
-            ))),
-            leading_comments: [],
-            trailing_comments: [],
-            symbol_table: None,
+            )),
             span: Span(
               start: LineColumn(
-                line: 0,
-                column: 0,
+                line: 2,
+                column: 22,
               ),
               end: LineColumn(
-                line: 0,
-                column: 0,
+                line: 2,
+                column: 55,
               ),
             ),
+            symbol_table: None,
           ),
           leading_comments: [],
           trailing_comments: [],

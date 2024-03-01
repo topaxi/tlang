@@ -4,7 +4,7 @@ use crate::generator::{BlockContext, CodegenJS};
 
 fn match_args_have_completions(arms: &[MatchArm]) -> bool {
     arms.iter().any(|arm| match &arm.expression.kind {
-        ExprKind::Block(_, expr) => expr.is_some(),
+        ExprKind::Block(block) => block.has_completion(),
         _ => true,
     })
 }
@@ -14,7 +14,7 @@ fn is_wildcard_pattern(pattern: &Pattern) -> bool {
 }
 
 fn generate_match_arm_expression(codegen: &mut CodegenJS, expression: &Expr) {
-    if let ExprKind::Block(_, _) = &expression.kind {
+    if let ExprKind::Block(_) = &expression.kind {
         codegen.generate_expr(expression, None);
     } else {
         let completion_tmp_var = codegen.current_completion_variable().clone().unwrap();

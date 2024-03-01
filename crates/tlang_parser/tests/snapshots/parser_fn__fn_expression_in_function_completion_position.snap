@@ -52,8 +52,9 @@ Module(
         parameters: [],
         guard: None,
         return_type_annotation: None,
-        body: Expr(
-          kind: Block([], Some(Expr(
+        body: Block(
+          statements: [],
+          expression: Some(Expr(
             kind: FunctionExpression(FunctionDeclaration(
               id: SymbolId(2),
               name: Expr(
@@ -101,21 +102,20 @@ Module(
               parameters: [],
               guard: None,
               return_type_annotation: None,
-              body: Expr(
-                kind: Block([], None),
-                leading_comments: [],
-                trailing_comments: [],
-                symbol_table: None,
+              body: Block(
+                statements: [],
+                expression: None,
                 span: Span(
                   start: LineColumn(
                     line: 0,
-                    column: 0,
+                    column: 20,
                   ),
                   end: LineColumn(
                     line: 0,
-                    column: 0,
+                    column: 22,
                   ),
                 ),
+                symbol_table: None,
               ),
               leading_comments: [],
               trailing_comments: [],
@@ -144,20 +144,18 @@ Module(
                 column: 22,
               ),
             ),
-          ))),
-          leading_comments: [],
-          trailing_comments: [],
-          symbol_table: None,
+          )),
           span: Span(
             start: LineColumn(
               line: 0,
-              column: 0,
+              column: 9,
             ),
             end: LineColumn(
               line: 0,
-              column: 0,
+              column: 24,
             ),
           ),
+          symbol_table: None,
         ),
         leading_comments: [],
         trailing_comments: [],

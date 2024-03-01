@@ -58,47 +58,59 @@ Module(
             ),
           ),
           then_branch: Expr(
-            kind: Block([
-              Stmt(
-                kind: Expr(Expr(
-                  kind: BinaryOp(
-                    op: Add,
-                    lhs: Expr(
-                      kind: Literal(Integer(3)),
-                      leading_comments: [],
-                      trailing_comments: [],
-                      symbol_table: None,
-                      span: Span(
-                        start: LineColumn(
-                          line: 0,
-                          column: 13,
+            kind: Block(Block(
+              statements: [
+                Stmt(
+                  kind: Expr(Expr(
+                    kind: BinaryOp(
+                      op: Add,
+                      lhs: Expr(
+                        kind: Literal(Integer(3)),
+                        leading_comments: [],
+                        trailing_comments: [],
+                        symbol_table: None,
+                        span: Span(
+                          start: LineColumn(
+                            line: 0,
+                            column: 13,
+                          ),
+                          end: LineColumn(
+                            line: 0,
+                            column: 14,
+                          ),
                         ),
-                        end: LineColumn(
-                          line: 0,
-                          column: 14,
+                      ),
+                      rhs: Expr(
+                        kind: Literal(Integer(4)),
+                        leading_comments: [],
+                        trailing_comments: [],
+                        symbol_table: None,
+                        span: Span(
+                          start: LineColumn(
+                            line: 0,
+                            column: 17,
+                          ),
+                          end: LineColumn(
+                            line: 0,
+                            column: 18,
+                          ),
                         ),
                       ),
                     ),
-                    rhs: Expr(
-                      kind: Literal(Integer(4)),
-                      leading_comments: [],
-                      trailing_comments: [],
-                      symbol_table: None,
-                      span: Span(
-                        start: LineColumn(
-                          line: 0,
-                          column: 17,
-                        ),
-                        end: LineColumn(
-                          line: 0,
-                          column: 18,
-                        ),
+                    leading_comments: [],
+                    trailing_comments: [],
+                    symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 13,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 18,
                       ),
                     ),
-                  ),
-                  leading_comments: [],
-                  trailing_comments: [],
-                  symbol_table: None,
+                  )),
                   span: Span(
                     start: LineColumn(
                       line: 0,
@@ -106,25 +118,27 @@ Module(
                     ),
                     end: LineColumn(
                       line: 0,
-                      column: 18,
+                      column: 19,
                     ),
                   ),
-                )),
-                span: Span(
-                  start: LineColumn(
-                    line: 0,
-                    column: 13,
-                  ),
-                  end: LineColumn(
-                    line: 0,
-                    column: 19,
-                  ),
+                  leading_comments: [],
+                  trailing_comments: [],
+                  symbol_table: None,
                 ),
-                leading_comments: [],
-                trailing_comments: [],
-                symbol_table: None,
+              ],
+              expression: None,
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 11,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 21,
+                ),
               ),
-            ], None),
+              symbol_table: None,
+            )),
             leading_comments: [],
             trailing_comments: [],
             symbol_table: None,

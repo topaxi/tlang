@@ -95,8 +95,9 @@ Module(
           ],
           guard: None,
           return_type_annotation: None,
-          body: Expr(
-            kind: Block([], Some(Expr(
+          body: Block(
+            statements: [],
+            expression: Some(Expr(
               kind: Literal(Integer(1)),
               leading_comments: [],
               trailing_comments: [],
@@ -111,20 +112,18 @@ Module(
                   column: 13,
                 ),
               ),
-            ))),
-            leading_comments: [],
-            trailing_comments: [],
-            symbol_table: None,
+            )),
             span: Span(
               start: LineColumn(
                 line: 0,
-                column: 0,
+                column: 10,
               ),
               end: LineColumn(
                 line: 0,
-                column: 0,
+                column: 15,
               ),
             ),
+            symbol_table: None,
           ),
           leading_comments: [],
           trailing_comments: [],
@@ -229,8 +228,9 @@ Module(
           ],
           guard: None,
           return_type_annotation: None,
-          body: Expr(
-            kind: Block([], Some(Expr(
+          body: Block(
+            statements: [],
+            expression: Some(Expr(
               kind: BinaryOp(
                 op: Multiply,
                 lhs: Expr(
@@ -305,20 +305,18 @@ Module(
                   column: 18,
                 ),
               ),
-            ))),
-            leading_comments: [],
-            trailing_comments: [],
-            symbol_table: None,
+            )),
             span: Span(
               start: LineColumn(
-                line: 0,
-                column: 0,
+                line: 2,
+                column: 11,
               ),
               end: LineColumn(
-                line: 0,
-                column: 0,
+                line: 2,
+                column: 20,
               ),
             ),
+            symbol_table: None,
           ),
           leading_comments: [
             Token(

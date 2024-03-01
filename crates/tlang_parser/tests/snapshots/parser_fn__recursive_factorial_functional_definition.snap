@@ -95,8 +95,8 @@ Module(
           ],
           guard: None,
           return_type_annotation: None,
-          body: Expr(
-            kind: Block([
+          body: Block(
+            statements: [
               Stmt(
                 kind: Return(Some(Expr(
                   kind: Literal(Integer(1)),
@@ -128,20 +128,19 @@ Module(
                 trailing_comments: [],
                 symbol_table: None,
               ),
-            ], None),
-            leading_comments: [],
-            trailing_comments: [],
-            symbol_table: None,
+            ],
+            expression: None,
             span: Span(
               start: LineColumn(
                 line: 0,
-                column: 0,
+                column: 16,
               ),
               end: LineColumn(
                 line: 0,
-                column: 0,
+                column: 29,
               ),
             ),
+            symbol_table: None,
           ),
           leading_comments: [],
           trailing_comments: [],
@@ -246,8 +245,8 @@ Module(
           ],
           guard: None,
           return_type_annotation: None,
-          body: Expr(
-            kind: Block([
+          body: Block(
+            statements: [
               Stmt(
                 kind: Return(Some(Expr(
                   kind: BinaryOp(
@@ -460,20 +459,19 @@ Module(
                 trailing_comments: [],
                 symbol_table: None,
               ),
-            ], None),
-            leading_comments: [],
-            trailing_comments: [],
-            symbol_table: None,
+            ],
+            expression: None,
             span: Span(
               start: LineColumn(
-                line: 0,
-                column: 0,
+                line: 1,
+                column: 17,
               ),
               end: LineColumn(
-                line: 0,
-                column: 0,
+                line: 1,
+                column: 49,
               ),
             ),
+            symbol_table: None,
           ),
           leading_comments: [],
           trailing_comments: [],

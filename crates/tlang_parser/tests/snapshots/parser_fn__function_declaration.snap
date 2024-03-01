@@ -52,8 +52,8 @@ Module(
         parameters: [],
         guard: None,
         return_type_annotation: None,
-        body: Expr(
-          kind: Block([
+        body: Block(
+          statements: [
             Stmt(
               kind: Expr(Expr(
                 kind: Call(
@@ -194,20 +194,19 @@ Module(
               trailing_comments: [],
               symbol_table: None,
             ),
-          ], None),
-          leading_comments: [],
-          trailing_comments: [],
-          symbol_table: None,
+          ],
+          expression: None,
           span: Span(
             start: LineColumn(
               line: 0,
-              column: 0,
+              column: 9,
             ),
             end: LineColumn(
               line: 0,
-              column: 0,
+              column: 26,
             ),
           ),
+          symbol_table: None,
         ),
         leading_comments: [],
         trailing_comments: [],

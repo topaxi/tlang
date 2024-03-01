@@ -70,7 +70,7 @@ pub struct FunctionDeclaration {
     pub parameters: Vec<FunctionParameter>,
     pub guard: Box<Option<Expr>>,
     pub return_type_annotation: Box<Option<Ty>>,
-    pub body: Box<Expr>,
+    pub body: Block,
     pub leading_comments: Vec<Token>,
     pub trailing_comments: Vec<Token>,
     pub symbol_table: Option<Rc<RefCell<SymbolTable>>>,
@@ -85,9 +85,48 @@ impl Default for FunctionDeclaration {
             parameters: vec![],
             guard: Box::new(None),
             return_type_annotation: Box::new(None),
-            body: Box::new(Expr::new(ExprKind::None)),
+            body: Block::default(),
             leading_comments: vec![],
             trailing_comments: vec![],
+            symbol_table: None,
+            span: Span::default(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct Block {
+    pub statements: Vec<Stmt>,
+    pub expression: Box<Option<Expr>>,
+    pub span: Span,
+    pub symbol_table: Option<Rc<RefCell<SymbolTable>>>,
+}
+
+impl Block {
+    pub fn new(statements: Vec<Stmt>, expression: Option<Expr>) -> Self {
+        Block {
+            statements,
+            expression: Box::new(expression),
+            symbol_table: None,
+            span: Span::default(),
+        }
+    }
+
+    pub fn with_span(mut self, span: Span) -> Self {
+        self.span = span;
+        self
+    }
+
+    pub fn has_completion(&self) -> bool {
+        self.expression.is_some()
+    }
+}
+
+impl Default for Block {
+    fn default() -> Self {
+        Block {
+            statements: vec![],
+            expression: Box::new(None),
             symbol_table: None,
             span: Span::default(),
         }
@@ -124,7 +163,7 @@ impl Expr {
 pub enum ExprKind {
     #[default]
     None,
-    Block(Vec<Stmt>, Box<Option<Expr>>),
+    Block(Block),
     Call {
         function: Box<Expr>,
         arguments: Vec<Expr>,
