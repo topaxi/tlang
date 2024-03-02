@@ -258,11 +258,7 @@ impl<'src> Parser<'src> {
             self.current_token_kind(),
             Some(TokenKind::SingleLineComment(_)) | Some(TokenKind::MultiLineComment(_))
         ) {
-            comments.push(
-                <std::option::Option<tlang_ast::token::Token> as Clone>::clone(&self.current_token)
-                    .unwrap()
-                    .clone(),
-            );
+            comments.push(self.current_token.clone().unwrap());
             self.advance();
         }
         comments
