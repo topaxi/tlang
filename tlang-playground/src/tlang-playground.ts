@@ -1,22 +1,24 @@
 import { LitElement, PropertyValueMap, css, html } from 'lit';
 import { customElement, query, state } from 'lit/decorators.js';
-import LZString from 'lz-string';
 import init, { TlangCompiler } from 'tlang_bindings_js';
 import { examples } from './examples';
 
-import './components/t-codemirror';
-import { TCodeMirror } from './components/t-codemirror';
+import { type TCodeMirror } from './components/t-codemirror';
+import { compressSource, decompressSource } from './utils/lz';
 
-await init();
+await Promise.all([
+  init(),
+  import('./components/t-codemirror'),
+]);
 
 // Default source code is either the code provided via hashcode "source"
 // compressed by lz-string or the "example" hashcode with the corresponding
 // example file name. Default is the first example.
-function defaultSource() {
+async function defaultSource() {
   let params = new URLSearchParams(window.location.hash.slice(1));
 
   if (params.has('source')) {
-    return LZString.decompressFromEncodedURIComponent(params.get('source')!);
+    return await decompressSource(params.get('source')!);
   } else if (params.has('example')) {
     let exampleName = params.get('example') ?? '';
     if (exampleName in examples) {
@@ -26,8 +28,8 @@ function defaultSource() {
   return examples[Object.keys(examples)[0]];
 }
 
-function updateSourceHashparam(source: string) {
-  window.location.hash = `source=${LZString.compressToEncodedURIComponent(
+async function updateSourceHashparam(source: string) {
+  window.location.hash = `source=${await compressSource(
     source,
   )}`;
 }
@@ -199,8 +201,8 @@ export class TlangPlayground extends LitElement {
     });
   }
 
-  share() {
-    updateSourceHashparam(this.source);
+  async share() {
+    await updateSourceHashparam(this.source);
 
     navigator.clipboard.writeText(String(window.location)).then(() => {
       let flashnotification = document.createElement('div');
@@ -263,8 +265,10 @@ export class TlangPlayground extends LitElement {
       this.shadowRoot!.querySelector('select')!.value = exampleName;
     }
 
-    this.codemirror.source = defaultSource();
-    this.run();
+    defaultSource().then((source) => {
+      this.codemirror.source = source;
+      this.run();
+    });
   }
 
   protected updated(

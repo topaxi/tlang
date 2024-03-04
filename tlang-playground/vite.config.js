@@ -12,5 +12,14 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "codemirror": ["codemirror", '@codemirror/state', '@codemirror/lint', 'codemirror-theme-catppuccin'],
+          "codemirror-javascript": ["@codemirror/lang-javascript"],
+          "codemirror-tlang": ["codemirror-lang-tlang"],
+        }
+      }
+    }
   }
 });
