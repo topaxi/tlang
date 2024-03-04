@@ -16,7 +16,7 @@ fn test_simple_self_recursive_tail_call_converted_to_loop() {
     "});
     let expected_output = indoc! {"
         function factorial(n, acc) {
-            while (true) {
+            __rec: while (true) {
                 if (n === 0) {
                     return acc;
                 } else {
@@ -24,6 +24,7 @@ fn test_simple_self_recursive_tail_call_converted_to_loop() {
                     let $tmp$b = n * acc;
                     n = $tmp$a;
                     acc = $tmp$b;
+                    continue __rec;
                 }
             }
         }
@@ -49,7 +50,7 @@ fn test_fn_expression_explicit_tail_recursive_call_converted_to_loop() {
     let expected_output = indoc! {"
         function factorial(n) {
             let factorial_rec = function rec_helper(n, acc) {
-                while (true) {
+                __rec: while (true) {
                     if (n === 0) {
                         return acc;
                     } else {
@@ -57,6 +58,7 @@ fn test_fn_expression_explicit_tail_recursive_call_converted_to_loop() {
                         let $tmp$b = n * acc;
                         n = $tmp$a;
                         acc = $tmp$b;
+                        continue __rec;
                     }
                 }
             };
@@ -74,7 +76,7 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_simple() {
     "});
     let expected_output = indoc! {"
         function factorial(...args) {
-            while (true) {
+            __rec: while (true) {
                 if (args[0] === 0) {
                     let acc = args[1];
                     return acc;
@@ -85,6 +87,7 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_simple() {
                     let $tmp$b = n * acc;
                     args[0] = $tmp$a;
                     args[1] = $tmp$b;
+                    continue __rec;
                 }
             }
         }
@@ -101,7 +104,7 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_convenient() {
     "});
     let expected_output = indoc! {"
         function factorial(...args) {
-            while (true) {
+            __rec: while (true) {
                 if (args.length === 1) {
                     let n = args[0];
                     return factorial(n, 1);
@@ -115,6 +118,7 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_convenient() {
                     let $tmp$b = n * acc;
                     args[0] = $tmp$a;
                     args[1] = $tmp$b;
+                    continue __rec;
                 }
             }
         }
@@ -132,7 +136,7 @@ fn test_tail_recursive_fibonacci() {
     "});
     let expected_output = indoc! {"
         function fibonacci(...args) {
-            while (true) {
+            __rec: while (true) {
                 if (args.length === 1) {
                     let n = args[0];
                     return fibonacci(n, 0, 1);
@@ -154,6 +158,7 @@ fn test_tail_recursive_fibonacci() {
                     args[0] = $tmp$a;
                     args[1] = $tmp$b;
                     args[2] = $tmp$c;
+                    continue __rec;
                 }
             }
         }
@@ -169,7 +174,7 @@ fn test_foldl_impl() {
     "});
     let expected_output = indoc! {"
         function foldl(...args) {
-            while (true) {
+            __rec: while (true) {
                 if (args[0].length === 0) {
                     let acc = args[1];
                     return acc;
@@ -184,6 +189,7 @@ fn test_foldl_impl() {
                     args[0] = $tmp$b;
                     args[1] = $tmp$c;
                     args[2] = $tmp$d;
+                    continue __rec;
                 }
             }
         }
@@ -210,7 +216,7 @@ fn test_partition_impl() {
         // partition(a[], fn(a) -> bool) -> (a[], a[])
         // partition(a[], fn(a) -> bool, a[], a[]) -> (a[], a[])
         function partition(...args) {
-            while (true) {
+            __rec: while (true) {
                 if (args.length === 2 && args[0].length === 0) {
                     return [[], []];
                 } else if (args.length === 2) {
@@ -249,6 +255,82 @@ fn test_partition_impl() {
                     args[1] = $tmp$e;
                     args[2] = $tmp$f;
                     args[3] = $tmp$g;
+                    continue __rec;
+                }
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn test_rec_binary_search() {
+    let output = compile!(indoc! {"
+        // binary_search(a[], a) -> int
+        fn binary_search(list, target) { binary_search(list, target, 0, len(list) - 1) }
+        // binary_search(a[], a, int, int) -> int
+        fn binary_search(_, _, low, high) if low > high; { -1 }
+        fn binary_search(list, target, low, high) {
+            let mid = floor((low + high) / 2);
+            let midValue = list[mid];
+
+            if midValue == target; {
+                mid
+            } else if midValue < target; {
+                rec binary_search(list, target, mid + 1, high)
+            } else {
+                rec binary_search(list, target, low, mid - 1)
+            }
+        }
+    "});
+    let expected_output = indoc! {"
+        // binary_search(a[], a) -> int
+        // binary_search(a[], a, int, int) -> int
+        function binary_search(...args) {
+            __rec: while (true) {
+                if (args.length === 2) {
+                    let list = args[0];
+                    let target = args[1];
+                    return binary_search(list, target, 0, len(list) - 1);
+                } else if (args.length === 4 && args[2] > args[3]) {
+                    // binary_search(a[], a, int, int) -> int
+                    let low = args[2];
+                    let high = args[3];
+                    return -1;
+                } else if (args.length === 4) {
+                    let list = args[0];
+                    let target = args[1];
+                    let low = args[2];
+                    let high = args[3];
+                    let mid = Math.floor((low + high) / 2);
+                    let midValue = list[mid];
+                    let $tmp$a;if (midValue === target) {
+                        $tmp$a = mid;
+                    } else {
+                        let $tmp$b;if (midValue < target) {
+                            let $tmp$b = list;
+                            let $tmp$c = target;
+                            let $tmp$d = mid + 1;
+                            let $tmp$e = high;
+                            args[0] = $tmp$b;
+                            args[1] = $tmp$c;
+                            args[2] = $tmp$d;
+                            args[3] = $tmp$e;
+                            continue __rec;
+                        } else {
+                            let $tmp$f = list;
+                            let $tmp$g = target;
+                            let $tmp$h = low;
+                            let $tmp$i = mid - 1;
+                            args[0] = $tmp$f;
+                            args[1] = $tmp$g;
+                            args[2] = $tmp$h;
+                            args[3] = $tmp$i;
+                            continue __rec;
+                        }
+                        $tmp$a = $tmp$b;
+                    }
+                    return $tmp$a;
                 }
             }
         }

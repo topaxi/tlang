@@ -262,7 +262,6 @@ impl CodegenJS {
 
     /// Generates blocks in expression position.
     fn generate_block_expression(&mut self, block: &Block) {
-        let has_completion_var = self.completion_variables.last().unwrap().is_some();
         let completion_tmp_var = self
             .completion_variables
             .last()
@@ -270,6 +269,9 @@ impl CodegenJS {
             .clone()
             .unwrap_or_else(|| self.scopes.declare_tmp_variable());
         self.push_scope();
+        let is_rec = block.completion_is_rec();
+        let has_completion = block.has_completion() && !is_rec;
+        let has_completion_var = self.completion_variables.last().unwrap().is_some();
 
         // In a case of `let a = { 1 }`, we want to render the expression as a statement.
         // At this state, we should have `let a = ` in the statement buffer.
@@ -281,19 +283,17 @@ impl CodegenJS {
             self.replace_statement_buffer(String::new())
         };
 
-        if block.has_completion() {
-            if has_completion_var {
-                // Halp I made a mess
-            } else {
-                self.push_indent();
-                self.push_str(&format!("let {};{{\n", completion_tmp_var));
-                self.indent_level += 1;
-            }
+        if has_completion_var || is_rec {
+            // Halp I made a mess
+        } else {
+            self.push_indent();
+            self.push_str(&format!("let {};{{\n", completion_tmp_var));
+            self.indent_level += 1;
         }
 
         self.generate_statements(&block.statements);
 
-        if !block.has_completion() {
+        if !has_completion {
             self.push_statement_buffer();
             self.push_str(&lhs);
             self.flush_statement_buffer();
@@ -305,10 +305,9 @@ impl CodegenJS {
 
         self.push_indent();
         self.push_str(&format!("{} = ", completion_tmp_var));
-        // TODO: Remove clone call
-        self.generate_expr(&block.expression.clone().unwrap(), None);
+        self.generate_opt_expr(&block.expression, None);
         self.push_str(";\n");
-        if !has_completion_var {
+        if !has_completion_var && !is_rec {
             self.indent_level -= 1;
             self.push_str(&self.get_indent());
             self.push_str("};\n");
@@ -339,13 +338,11 @@ impl CodegenJS {
             // We only render the return statement if we are not in a tail recursive function body
             // and the node is RecursiveCall pointing to the current function.
             if let Some(function_context) = self.function_context_stack.last() {
-                if function_context.is_tail_recursive && block.has_completion() {
-                    // TODO: Get rid of clone call
-                    let expression = block.expression.clone().unwrap();
-                    if let ExprKind::RecursiveCall(_) = expression.kind {
-                        self.generate_expr(&expression, None);
-                        return;
-                    }
+                if function_context.is_tail_recursive && block.completion_is_rec() {
+                    self.generate_opt_expr(&block.expression, None);
+                    self.push_indent();
+                    self.push_str("continue __rec;\n");
+                    return;
                 }
             }
 
@@ -418,6 +415,12 @@ impl CodegenJS {
 
         for comment in &statement.trailing_comments {
             self.generate_comment(comment);
+        }
+    }
+
+    pub fn generate_opt_expr(&mut self, expr: &Option<Expr>, parent_op: Option<&BinaryOpKind>) {
+        if let Some(expr) = expr {
+            self.generate_expr(expr, parent_op);
         }
     }
 
@@ -636,7 +639,7 @@ impl CodegenJS {
         // TODO: In case of recursive calls in tail position, we'll want to omit lhs.
         let has_block_completions = self.current_context() == BlockContext::Expression
             && match &then_branch.kind {
-                ExprKind::Block(block) => block.has_completion(),
+                ExprKind::Block(block) => block.has_completion() && !block.completion_is_rec(),
                 _ => false,
             };
         if has_block_completions {

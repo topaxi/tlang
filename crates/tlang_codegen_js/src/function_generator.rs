@@ -92,7 +92,7 @@ pub fn generate_function_declarations(
 
     if is_any_definition_tail_recursive {
         codegen.push_indent();
-        codegen.push_str("while (true) {\n");
+        codegen.push_str("__rec: while (true) {\n");
         codegen.inc_indent();
     }
 
@@ -465,7 +465,7 @@ fn generate_function_body(codegen: &mut CodegenJS, body: &Block, is_tail_recursi
     flush_function_pre_body(codegen);
     if is_tail_recursive {
         codegen.push_indent();
-        codegen.push_str("while (true) {\n");
+        codegen.push_str("__rec: while (true) {\n");
         codegen.inc_indent();
     }
     codegen.generate_block(body);
@@ -501,7 +501,10 @@ pub fn generate_return_statement(codegen: &mut CodegenJS, expr: &Option<Expr>) {
                     if function_context.is_tail_recursive
                         && function_context.name == call_identifier.unwrap()
                     {
-                        return codegen.generate_expr(&expr.clone().unwrap(), None);
+                        codegen.generate_expr(&expr.clone().unwrap(), None);
+                        codegen.push_indent();
+                        codegen.push_str("continue __rec;\n");
+                        return;
                     }
                 }
             }

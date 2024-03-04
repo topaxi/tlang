@@ -33,6 +33,8 @@ macro_rules! compile {
                 ("log", SymbolType::Function),
                 ("max", SymbolType::Function),
                 ("min", SymbolType::Function),
+                ("len", SymbolType::Function),
+                ("floor", SymbolType::Function),
             ],
         )
     }};

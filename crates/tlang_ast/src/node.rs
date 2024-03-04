@@ -120,6 +120,13 @@ impl Block {
     pub fn has_completion(&self) -> bool {
         self.expression.is_some()
     }
+
+    pub fn completion_is_rec(&self) -> bool {
+        if let Some(expr) = self.expression.as_ref() {
+            return matches!(expr.kind, ExprKind::RecursiveCall(_));
+        };
+        false
+    }
 }
 
 impl Default for Block {
