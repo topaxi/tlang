@@ -307,28 +307,27 @@ fn test_rec_binary_search() {
                     let $tmp$a;if (midValue === target) {
                         $tmp$a = mid;
                     } else {
-                        let $tmp$b;if (midValue < target) {
-                            let $tmp$b = list;
-                            let $tmp$c = target;
-                            let $tmp$d = mid + 1;
-                            let $tmp$e = high;
-                            args[0] = $tmp$b;
-                            args[1] = $tmp$c;
-                            args[2] = $tmp$d;
-                            args[3] = $tmp$e;
+                        if (midValue < target) {
+                            let $tmp$a = list;
+                            let $tmp$b = target;
+                            let $tmp$c = mid + 1;
+                            let $tmp$d = high;
+                            args[0] = $tmp$a;
+                            args[1] = $tmp$b;
+                            args[2] = $tmp$c;
+                            args[3] = $tmp$d;
                             continue __rec;
                         } else {
-                            let $tmp$f = list;
-                            let $tmp$g = target;
-                            let $tmp$h = low;
-                            let $tmp$i = mid - 1;
-                            args[0] = $tmp$f;
-                            args[1] = $tmp$g;
-                            args[2] = $tmp$h;
-                            args[3] = $tmp$i;
+                            let $tmp$a = list;
+                            let $tmp$b = target;
+                            let $tmp$c = low;
+                            let $tmp$d = mid - 1;
+                            args[0] = $tmp$a;
+                            args[1] = $tmp$b;
+                            args[2] = $tmp$c;
+                            args[3] = $tmp$d;
                             continue __rec;
                         }
-                        $tmp$a = $tmp$b;
                     }
                     return $tmp$a;
                 }
