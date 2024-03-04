@@ -30,6 +30,10 @@ jobs:
             # contains package information of crates installed via `cargo install`.
             ~/.cargo/.crates.toml
             ~/.cargo/.crates2.json
+            # Cache build targets to avoid rebuilds in case not all crates
+            # changed. Especially useful while working on playground/non-rust
+            # code.
+            target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-0
           restore-keys: ${{ runner.os }}-cargo-
 
