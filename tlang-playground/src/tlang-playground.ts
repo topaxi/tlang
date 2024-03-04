@@ -6,10 +6,11 @@ import { examples } from './examples';
 import { type TCodeMirror } from './components/t-codemirror';
 import { compressSource, decompressSource } from './utils/lz';
 
-await Promise.all([
-  init(),
-  import('./components/t-codemirror'),
-]);
+await Promise.allSettled([init(), import('./components/t-codemirror')]).catch(
+  (error: any) => {
+    console.error(error);
+  },
+);
 
 // Default source code is either the code provided via hashcode "source"
 // compressed by lz-string or the "example" hashcode with the corresponding
@@ -29,9 +30,7 @@ async function defaultSource() {
 }
 
 async function updateSourceHashparam(source: string) {
-  window.location.hash = `source=${await compressSource(
-    source,
-  )}`;
+  window.location.hash = `source=${await compressSource(source)}`;
 }
 
 @customElement('tlang-playground')
@@ -179,7 +178,8 @@ export class TlangPlayground extends LitElement {
   private compile(source: string) {
     let parser = new TlangCompiler(source);
     parser.compile();
-    let { output, parseErrors, ast, diagnostics, codemirrorDiagnostics } = parser;
+    let { output, parseErrors, ast, diagnostics, codemirrorDiagnostics } =
+      parser;
     parser.free();
     return { output, parseErrors, ast, diagnostics, codemirrorDiagnostics };
   }
@@ -231,9 +231,8 @@ export class TlangPlayground extends LitElement {
     if (changedProperties.has('source')) {
       try {
         this.error = '';
-        let { output, parseErrors, ast, diagnostics, codemirrorDiagnostics } = this.compile(
-          this.source,
-        );
+        let { output, parseErrors, ast, diagnostics, codemirrorDiagnostics } =
+          this.compile(this.source);
 
         this.codemirror.diagnostics = codemirrorDiagnostics;
 
@@ -297,8 +296,8 @@ export class TlangPlayground extends LitElement {
     return html`
       <div class="log-message">
         ${typeof args === 'string'
-        ? args
-        : args.map((arg) => JSON.stringify(arg)).join(', ')}
+          ? args
+          : args.map((arg) => JSON.stringify(arg)).join(', ')}
       </div>
     `;
   }
@@ -313,8 +312,8 @@ export class TlangPlayground extends LitElement {
         </select>
         <select
           @change=${(event: Event) =>
-      (this.display = (event.target as HTMLSelectElement)
-        .value as typeof this.display)}
+            (this.display = (event.target as HTMLSelectElement)
+              .value as typeof this.display)}
         >
           <option value="output">code</option>
           <option value="ast">ast</option>
@@ -328,16 +327,16 @@ export class TlangPlayground extends LitElement {
       </div>
       <div class="output">
         ${this.display === 'ast'
-        ? html`<pre class="output-ast">${this.ast}</pre>`
-        : ''}
+          ? html`<pre class="output-ast">${this.ast}</pre>`
+          : ''}
         ${this.display === 'output'
-        ? html`<t-codemirror
+          ? html`<t-codemirror
               class="output-code"
               language="javascript"
               .source=${this.output}
               readonly
             ></t-codemirror>`
-        : ''}
+          : ''}
         ${this.error ? html`<pre class="output-error">${this.error}</pre>` : ''}
       </div>
       <div class="console">
