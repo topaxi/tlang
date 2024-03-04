@@ -3,14 +3,11 @@ import { customElement, query, state } from 'lit/decorators.js';
 import init, { TlangCompiler } from 'tlang_bindings_js';
 import { examples } from './examples';
 
+import './components/t-codemirror';
 import { type TCodeMirror } from './components/t-codemirror';
 import { compressSource, decompressSource } from './utils/lz';
 
-await Promise.allSettled([init(), import('./components/t-codemirror')]).catch(
-  (error: any) => {
-    console.error(error);
-  },
-);
+await init();
 
 // Default source code is either the code provided via hashcode "source"
 // compressed by lz-string or the "example" hashcode with the corresponding
