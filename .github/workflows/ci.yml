@@ -37,7 +37,8 @@ jobs:
         if: ${{ steps.cache.outputs.cache-hit != 'true' }}
         run: |
           cargo install -f rustup-toolchain-install-master
-          cargo install -f wasm-bindgen-cli
+          # wasm-bindgen-cli must match wasm-bindgen package
+          cargo install -f wasm-bindgen-cli --version $(grep -oP 'wasm-bindgen = "\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
           cargo install -f cargo-make
 
       - name: Install binaryen
