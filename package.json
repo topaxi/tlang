@@ -2,6 +2,10 @@
   "name": "@tlang/repo",
   "version": "1.0.0",
   "description": "",
+  "scripts": {
+    "dev": "npm run dev -w tlang-playground",
+    "build": "npm run build -w tlang-playground"
+  },
   "workspaces": [
     "packages/*",
     "tlang-playground"
