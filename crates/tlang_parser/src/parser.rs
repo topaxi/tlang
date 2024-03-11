@@ -218,8 +218,8 @@ impl<'src> Parser<'src> {
             return;
         }
 
-        self.previous_token = self.current_token.clone();
-        self.current_token = self.next_token.clone();
+        self.previous_token.clone_from(&self.current_token);
+        self.current_token.clone_from(&self.next_token);
         self.current_column = self.lexer.current_column();
         self.current_line = self.lexer.current_line();
         self.next_token = Some(self.lexer.next_token());

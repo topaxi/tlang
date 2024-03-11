@@ -72,7 +72,9 @@ impl TlangCompiler {
             ("zip", SymbolType::Function),
         ]);
         let _ = self.analyzer.analyze(&mut self.ast);
-        self.diagnostics = self.analyzer.get_diagnostics().to_owned();
+        self.analyzer
+            .get_diagnostics()
+            .clone_into(&mut self.diagnostics);
     }
 
     #[wasm_bindgen]
