@@ -13,7 +13,7 @@
   "author": "Damian Senn <damian.senn@topaxi.codes>",
   "license": "ISC",
   "devDependencies": {
-    "@lezer/generator": "^1.6.0"
+    "@lezer/generator": "^1.7.0"
   },
   "dependencies": {
     "@lezer/lr": "^1.4.0"
