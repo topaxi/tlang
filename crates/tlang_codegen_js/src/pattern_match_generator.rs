@@ -19,7 +19,7 @@ fn generate_match_arm_expression(codegen: &mut CodegenJS, expression: &Expr) {
     } else {
         let completion_tmp_var = codegen.current_completion_variable().clone().unwrap();
         codegen.push_indent();
-        codegen.push_str(&format!("{} = ", completion_tmp_var));
+        codegen.push_str(&format!("{completion_tmp_var} = "));
         codegen.generate_expr(expression, None);
         codegen.push_str(";\n");
     }
@@ -30,12 +30,12 @@ pub fn generate_match_expression(codegen: &mut CodegenJS, expression: &Expr, arm
     let lhs = codegen.replace_statement_buffer(String::new());
     let has_block_completions = match_args_have_completions(arms);
     let match_value_tmp_var = codegen.current_scope().declare_tmp_variable();
-    codegen.push_str(&format!("let {} = ", match_value_tmp_var));
+    codegen.push_str(&format!("let {match_value_tmp_var} = "));
     codegen.generate_expr(expression, None);
     if has_block_completions {
         let completion_tmp_var = codegen.current_scope().declare_tmp_variable();
         codegen.push_indent();
-        codegen.push_str(&format!(",{};", completion_tmp_var));
+        codegen.push_str(&format!(",{completion_tmp_var};"));
         codegen.push_completion_variable(Some(completion_tmp_var));
     } else {
         codegen.push_completion_variable(None);
@@ -94,7 +94,7 @@ pub fn generate_match_expression(codegen: &mut CodegenJS, expression: &Expr, arm
             let prev_completion_var = codegen
                 .nth_completion_variable(codegen.current_completion_variable_count() - 2)
                 .unwrap();
-            codegen.push_str(&format!("{} = {};\n", prev_completion_var, completion_var));
+            codegen.push_str(&format!("{prev_completion_var} = {completion_var};\n"));
         }
     }
     codegen.pop_completion_variable();

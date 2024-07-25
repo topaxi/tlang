@@ -63,7 +63,7 @@ pub fn generate_binary_op(
                 }
             } else {
                 codegen.generate_expr(lhs, None);
-                for arg in arguments.iter() {
+                for arg in arguments {
                     codegen.push_str(", ");
                     codegen.generate_expr(arg, None);
                 }

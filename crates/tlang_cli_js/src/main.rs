@@ -22,11 +22,11 @@ fn compile_standard_library() -> Result<(), ParserError> {
     let std_lib_source = compile(&CodegenJS::get_standard_library_source())?;
     let output_file_name = "js/stdlib.js";
     let mut output_file = match File::create(output_file_name) {
-        Err(why) => panic!("couldn't create {}: {}", output_file_name, why),
+        Err(why) => panic!("couldn't create {output_file_name}: {why}"),
         Ok(file) => file,
     };
     if let Err(why) = output_file.write_all(std_lib_source.as_bytes()) {
-        panic!("couldn't write to {}: {}", output_file_name, why)
+        panic!("couldn't write to {output_file_name}: {why}")
     };
 
     Ok(())
@@ -48,7 +48,7 @@ fn main() {
     let output = match compile(&source) {
         Ok(output) => output,
         Err(errors) => {
-            eprintln!("{:?}", errors);
+            eprintln!("{errors:?}");
             return;
         }
     };
@@ -65,21 +65,21 @@ fn main() {
         panic!("couldn't read {}: {}", std_lib_file.display(), why)
     };
 
-    let output = format!("{}\n{}", std_lib_source, output);
+    let output = format!("{std_lib_source}\n{output}");
 
     if args.output_file.is_none() {
-        println!("{}", output);
+        println!("{output}");
         return;
     }
 
     let output_file_name = args.output_file.unwrap();
 
     let mut output_file = match File::create(&output_file_name) {
-        Err(why) => panic!("couldn't create {}: {}", output_file_name, why),
+        Err(why) => panic!("couldn't create {output_file_name}: {why}"),
         Ok(file) => file,
     };
     if let Err(why) = output_file.write_all(output.as_bytes()) {
-        panic!("couldn't write to {}: {}", output_file_name, why)
+        panic!("couldn't write to {output_file_name}: {why}")
     };
 }
 
@@ -115,7 +115,7 @@ fn compile(source: &str) -> Result<String, ParserError> {
         ("random", SymbolType::Function),
     ]);
     match semantic_analyzer.analyze(&mut ast) {
-        Ok(_) => {
+        Ok(()) => {
             let mut generator = CodegenJS::default();
             generator.generate_code(&ast);
             Ok(generator.get_output().to_string())

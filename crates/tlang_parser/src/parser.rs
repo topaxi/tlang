@@ -184,7 +184,7 @@ impl<'src> Parser<'src> {
     fn expect_token(&mut self, expected: TokenKind) {
         expect_token_matches!(
             self,
-            &format!("{:?}", expected),
+            &format!("{expected:?}"),
             _kind if *_kind == expected
         );
     }
@@ -256,7 +256,7 @@ impl<'src> Parser<'src> {
         let mut comments: Vec<Token> = Vec::new();
         while matches!(
             self.current_token_kind(),
-            Some(TokenKind::SingleLineComment(_)) | Some(TokenKind::MultiLineComment(_))
+            Some(TokenKind::SingleLineComment(_) | TokenKind::MultiLineComment(_))
         ) {
             comments.push(self.current_token.clone().unwrap());
             self.advance();
@@ -1056,9 +1056,7 @@ impl<'src> Parser<'src> {
 
         while matches!(
             self.current_token_kind(),
-            Some(TokenKind::Fn)
-                | Some(TokenKind::SingleLineComment(_))
-                | Some(TokenKind::MultiLineComment(_))
+            Some(TokenKind::Fn | TokenKind::SingleLineComment(_) | TokenKind::MultiLineComment(_))
         ) {
             // We have to check if it is the same function declaration as the previous one.
             // Parse ahead to get the identifier of the function, which might be an Identifier,

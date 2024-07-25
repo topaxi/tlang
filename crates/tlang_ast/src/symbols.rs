@@ -52,7 +52,7 @@ impl Default for SymbolInfo {
     fn default() -> Self {
         SymbolInfo {
             id: SymbolId::new(0),
-            name: "".to_string(),
+            name: String::new(),
             symbol_type: SymbolType::Variable,
             defined_at: None,
             used: false,
@@ -151,7 +151,7 @@ impl SymbolTable {
     }
 
     pub fn get_all_local_symbols(&self) -> Vec<SymbolInfo> {
-        self.symbols.to_vec()
+        self.symbols.clone()
     }
 
     pub fn get_all_symbols(&self) -> Vec<SymbolInfo> {

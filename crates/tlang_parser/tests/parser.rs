@@ -151,7 +151,7 @@ fn test_string_literal() {
 
 #[test]
 fn test_char_literal() {
-    let program = parse!(r#"'a';"#);
+    let program = parse!(r"'a';");
 
     assert_eq!(
         program,
@@ -170,12 +170,12 @@ fn test_char_literal() {
 
 #[test]
 fn test_dictionary_literal() {
-    assert_parser_snapshot!(r#"let x = { foo: 1, bar: 2 };"#);
+    assert_parser_snapshot!(r"let x = { foo: 1, bar: 2 };");
 }
 
 #[test]
 fn test_function_call_with_dictionary_no_parens() {
-    assert_parser_snapshot!(r#"foo { foo: 1, bar: 2 };"#);
+    assert_parser_snapshot!(r"foo { foo: 1, bar: 2 };");
 }
 
 #[test]
@@ -198,7 +198,7 @@ fn test_dynamic_index_access() {
 #[test]
 fn test_comments_can_appear_anywhere() {
     assert_parser_snapshot!(
-        r#"
+        r"
         // this is a third comment
         let y = /* comment before expr */ 2 /* comment after expr */;
         // trailing comment
@@ -206,6 +206,6 @@ fn test_comments_can_appear_anywhere() {
         |> foo // trailing comment
         //|> bar
         |> baz;
-        "#
+        "
     );
 }

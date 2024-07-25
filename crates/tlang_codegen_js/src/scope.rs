@@ -38,7 +38,7 @@ impl Scope {
     fn get_unique_variable_name(&self, prefix: &str) -> String {
         let mut suffix = 'a';
         loop {
-            let new_name = format!("{}${}", prefix, suffix);
+            let new_name = format!("{prefix}${suffix}");
             if !self.variables.contains_key(&new_name) {
                 return new_name;
             }

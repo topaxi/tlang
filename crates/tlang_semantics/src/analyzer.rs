@@ -60,7 +60,7 @@ impl SemanticAnalyzer {
     }
 
     pub fn add_builtin_symbols(&mut self, symbols: &[(&str, SymbolType)]) {
-        self.declaration_analyzer.add_builtin_symbols(symbols)
+        self.declaration_analyzer.add_builtin_symbols(symbols);
     }
 
     pub fn analyze(&mut self, module: &mut Module) -> Result<(), Vec<Diagnostic>> {
@@ -105,7 +105,7 @@ impl SemanticAnalyzer {
                 ));
             } else {
                 self.diagnostics.push(Diagnostic::new(
-                    format!("Use of undeclared variable `{}`", name),
+                    format!("Use of undeclared variable `{name}`"),
                     Severity::Error,
                     *span,
                 ));
@@ -273,7 +273,7 @@ impl SemanticAnalyzer {
 
                 for arm in arms {
                     self.analyze_pat(&mut arm.pattern);
-                    self.analyze_expr(&mut arm.expression)
+                    self.analyze_expr(&mut arm.expression);
                 }
             }
             ExprKind::Range { start, end, .. } => {
@@ -340,7 +340,7 @@ impl SemanticAnalyzer {
             .filter(|symbol| !symbol.name.starts_with('_'))
             .collect::<Vec<_>>();
 
-        for unused_symbol in unused_symbols.iter_mut() {
+        for unused_symbol in &mut unused_symbols {
             self.diagnostics.push(Diagnostic::new(
                     format!(
                         "Unused {} `{}`, if this is intentional, prefix the name with an underscore: `_{}`",

@@ -269,12 +269,12 @@ impl Pattern {
             PatternKind::Identifier { id, .. } => vec![*id],
             PatternKind::List(patterns) => patterns
                 .iter()
-                .flat_map(|pattern| pattern.get_all_symbol_ids())
+                .flat_map(Pattern::get_all_symbol_ids)
                 .collect(),
             PatternKind::Rest(pattern) => pattern.get_all_symbol_ids(),
             PatternKind::Enum { elements, .. } => elements
                 .iter()
-                .flat_map(|pattern| pattern.get_all_symbol_ids())
+                .flat_map(Pattern::get_all_symbol_ids)
                 .collect(),
             _ => todo!(
                 "Getting symbol ids for pattern kind {:?} not implemented yet",

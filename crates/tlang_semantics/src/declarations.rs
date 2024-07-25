@@ -105,7 +105,7 @@ impl DeclarationAnalyzer {
                 type_annotation: _,
             } => self.collect_variable_declaration(pattern, expression),
             StmtKind::FunctionDeclaration(declaration) => {
-                self.collect_function_declaration(declaration)
+                self.collect_function_declaration(declaration);
             }
             StmtKind::FunctionDeclarations(declarations) => {
                 for declaration in declarations {
@@ -268,7 +268,7 @@ impl DeclarationAnalyzer {
             } => {
                 let base_name = self.fn_identifier_to_string(base);
 
-                format!("{}.{}", base_name, field)
+                format!("{base_name}.{field}")
             }
             _ => panic!("Expected identifier, found {:?}", identifier.kind),
         }

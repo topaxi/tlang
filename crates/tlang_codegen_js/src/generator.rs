@@ -91,9 +91,10 @@ impl CodegenJS {
     }
 
     pub fn pop_statement_buffer(&mut self) -> String {
-        if self.statement_buffer.len() == 1 {
-            panic!("Cannot pop last statement buffer.");
-        }
+        assert!(
+            self.statement_buffer.len() != 1,
+            "Cannot pop last statement buffer."
+        );
 
         self.statement_buffer.pop().unwrap()
     }
@@ -169,7 +170,7 @@ impl CodegenJS {
     }
 
     pub fn generate_code(&mut self, module: &Module) {
-        self.generate_statements(&module.statements)
+        self.generate_statements(&module.statements);
     }
 
     pub fn declare_function_pre_body_variable(&mut self, name: &str, value: &str) {
@@ -255,7 +256,7 @@ impl CodegenJS {
                 self.push_str(&value.to_string());
             }
             Literal::String(value) | Literal::Char(value) => {
-                self.push_str(&format!("\"{}\"", value));
+                self.push_str(&format!("\"{value}\""));
             }
         }
     }
@@ -286,7 +287,7 @@ impl CodegenJS {
                 // Halp I made a mess
             } else {
                 self.push_indent();
-                self.push_str(&format!("let {};{{\n", completion_tmp_var));
+                self.push_str(&format!("let {completion_tmp_var};{{\n"));
                 self.indent_level += 1;
             }
         }
@@ -304,7 +305,7 @@ impl CodegenJS {
         }
 
         self.push_indent();
-        self.push_str(&format!("{} = ", completion_tmp_var));
+        self.push_str(&format!("{completion_tmp_var} = "));
         // TODO: Remove clone call
         self.generate_expr(&block.expression.clone().unwrap(), None);
         self.push_str(";\n");
@@ -374,10 +375,10 @@ impl CodegenJS {
     pub fn generate_comment(&mut self, comment: &Token) {
         match &comment.kind {
             TokenKind::SingleLineComment(comment) => {
-                self.push_str(&format!("//{}\n", comment));
+                self.push_str(&format!("//{comment}\n"));
             }
             TokenKind::MultiLineComment(comment) => {
-                self.push_str(&format!("/*{}*/\n", comment));
+                self.push_str(&format!("/*{comment}*/\n"));
             }
             _ => {}
         }
@@ -570,7 +571,7 @@ impl CodegenJS {
         self.push_str(&self.get_indent());
         let shadowed_name = self.current_scope().resolve_variable(name);
         let var_name = self.current_scope().declare_variable(name);
-        self.push_str(&format!("let {} = ", var_name));
+        self.push_str(&format!("let {var_name} = "));
         self.context_stack.push(BlockContext::Expression);
         if let Some(shadowed_name) = shadowed_name {
             self.current_scope()
@@ -643,7 +644,7 @@ impl CodegenJS {
             lhs = self.replace_statement_buffer(String::new());
             let completion_tmp_var = self.scopes.declare_tmp_variable();
             self.push_indent();
-            self.push_str(&format!("let {};", completion_tmp_var));
+            self.push_str(&format!("let {completion_tmp_var};"));
             self.completion_variables.push(Some(completion_tmp_var));
         } else {
             self.completion_variables.push(None);
@@ -685,7 +686,7 @@ impl CodegenJS {
                     [self.completion_variables.len() - 2]
                     .clone()
                     .unwrap();
-                self.push_str(&format!("{} = {};\n", prev_completion_var, completion_var));
+                self.push_str(&format!("{prev_completion_var} = {completion_var};\n"));
             }
         }
         self.completion_variables.pop();
@@ -696,7 +697,7 @@ impl CodegenJS {
         self.push_str(&format!("const {} = {{\n", decl.name));
         self.indent_level += 1;
         for variant in &decl.variants {
-            self.generate_enum_variant(&variant.name, variant.named_fields, &variant.parameters)
+            self.generate_enum_variant(&variant.name, variant.named_fields, &variant.parameters);
         }
         self.indent_level -= 1;
         self.push_str(&self.get_indent());
@@ -707,11 +708,11 @@ impl CodegenJS {
         self.push_str(&self.get_indent());
 
         if parameters.is_empty() {
-            self.push_str(&format!("{}: {{ tag: \"{}\" }},\n", name, name));
+            self.push_str(&format!("{name}: {{ tag: \"{name}\" }},\n"));
             return;
         }
 
-        self.push_str(&format!("{}(", name));
+        self.push_str(&format!("{name}("));
         if named_fields {
             self.push_str("{ ");
         }
@@ -730,13 +731,13 @@ impl CodegenJS {
         self.push_str("return {\n");
         self.indent_level += 1;
         self.push_str(&self.get_indent());
-        self.push_str(format!("tag: \"{}\",\n", name).as_str());
+        self.push_str(format!("tag: \"{name}\",\n").as_str());
         for (i, param) in parameters.iter().enumerate() {
             self.push_str(&self.get_indent());
             if named_fields {
                 self.push_str(&param.to_string());
             } else {
-                self.push_str(&format!("[{}]: ", i));
+                self.push_str(&format!("[{i}]: "));
                 self.push_str(&param.to_string());
             }
             self.push_str(",\n");
@@ -778,7 +779,7 @@ impl CodegenJS {
                 }
 
                 if let ExprKind::Wildcard = arg.kind {
-                    self.push_str(format!("args[{}]", wildcard_index).as_str());
+                    self.push_str(format!("args[{wildcard_index}]").as_str());
                     wildcard_index += 1;
                 } else {
                     self.generate_expr(arg, None);
@@ -853,7 +854,7 @@ impl CodegenJS {
         }
 
         // For any other referenced function, we do a normal call expression.
-        self.generate_expr(node, parent_op)
+        self.generate_expr(node, parent_op);
     }
 
     fn get_indent(&self) -> String {

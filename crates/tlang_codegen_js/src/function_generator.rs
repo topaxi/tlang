@@ -16,28 +16,28 @@ pub fn generate_function_declarations(
         .iter()
         .any(|declaration| is_function_body_tail_recursive_block(&name_as_str, &declaration.body));
 
-    for declaration in declarations.iter() {
-        for comment in declaration.leading_comments.iter() {
+    for declaration in declarations {
+        for comment in &declaration.leading_comments {
             codegen.push_indent();
             codegen.generate_comment(comment);
         }
     }
 
     codegen.push_indent();
-    codegen.push_str(&format!("function {}(...args) {{\n", name_as_str));
+    codegen.push_str(&format!("function {name_as_str}(...args) {{\n"));
     codegen.push_scope();
     codegen.current_scope().declare_variable("args");
     codegen.inc_indent();
 
     // Declare and output temporary variables for if let guards.
-    for declaration in declarations.iter() {
+    for declaration in declarations {
         if let Some(ref expr) = *declaration.guard {
             if let ExprKind::Let(pattern, _) = &expr.kind {
                 match &pattern.kind {
                     PatternKind::Identifier { name, .. } => {
                         let tmp_variable = codegen.current_scope().declare_tmp_variable();
                         codegen.push_indent();
-                        codegen.push_str(&format!("let {};\n", tmp_variable));
+                        codegen.push_str(&format!("let {tmp_variable};\n"));
                         codegen
                             .current_scope()
                             .declare_variable_alias(&name.to_string(), &tmp_variable);
@@ -47,7 +47,7 @@ pub fn generate_function_declarations(
                             if let PatternKind::Identifier { name, .. } = &pattern.kind {
                                 let tmp_variable = codegen.current_scope().declare_tmp_variable();
                                 codegen.push_indent();
-                                codegen.push_str(&format!("let {};\n", tmp_variable));
+                                codegen.push_str(&format!("let {tmp_variable};\n"));
                                 codegen
                                     .current_scope()
                                     .declare_variable_alias(&name.to_string(), &tmp_variable);
@@ -65,7 +65,7 @@ pub fn generate_function_declarations(
                             _ => unreachable!(),
                         };
                         codegen.push_indent();
-                        codegen.push_str(&format!("let {};\n", tmp_variable_enum));
+                        codegen.push_str(&format!("let {tmp_variable_enum};\n"));
                         codegen
                             .current_scope()
                             .declare_variable_alias(&enum_name, &tmp_variable_enum);
@@ -78,7 +78,7 @@ pub fn generate_function_declarations(
                             };
                             let tmp_variable = codegen.current_scope().declare_tmp_variable();
                             codegen.push_indent();
-                            codegen.push_str(&format!("let {};\n", tmp_variable));
+                            codegen.push_str(&format!("let {tmp_variable};\n"));
                             codegen
                                 .current_scope()
                                 .declare_variable_alias(&identifier, &tmp_variable);
@@ -99,7 +99,7 @@ pub fn generate_function_declarations(
     codegen.push_indent();
 
     let mut first_declaration = true;
-    for declaration in declarations.iter() {
+    for declaration in declarations {
         codegen.push_scope();
 
         if !first_declaration {
@@ -113,14 +113,14 @@ pub fn generate_function_declarations(
                 PatternKind::Identifier { name, .. } => {
                     codegen
                         .current_scope()
-                        .declare_variable_alias(&name.to_string(), &format!("args[{}]", j));
+                        .declare_variable_alias(&name.to_string(), &format!("args[{j}]"));
                 }
                 PatternKind::List(patterns) => {
                     for (i, pattern) in patterns.iter().enumerate() {
                         if let PatternKind::Identifier { name, .. } = &pattern.kind {
                             codegen.current_scope().declare_variable_alias(
                                 &name.to_string(),
-                                &format!("args[{}][{}]", j, i),
+                                &format!("args[{j}][{i}]"),
                             );
                         }
                     }
@@ -169,12 +169,12 @@ pub fn generate_function_declarations(
 
                 match &param.pattern.kind {
                     PatternKind::Identifier { .. } | PatternKind::Literal(_) => {
-                        codegen.push_str(&format!("args[{}] === ", k));
+                        codegen.push_str(&format!("args[{k}] === "));
                         generate_function_parameter(codegen, &param.pattern);
                     }
                     PatternKind::List(patterns) => {
                         if patterns.is_empty() {
-                            codegen.push_str(&format!("args[{}].length === 0", k));
+                            codegen.push_str(&format!("args[{k}].length === 0"));
                             continue;
                         }
 
@@ -187,17 +187,17 @@ pub fn generate_function_declarations(
 
                             match &pattern.kind {
                                 PatternKind::Literal(_) => {
-                                    codegen.push_str(&format!("args[{}][{}] === ", k, i));
+                                    codegen.push_str(&format!("args[{k}][{i}] === "));
                                     codegen.generate_pat(pattern);
                                 }
                                 PatternKind::Rest(identified) => {
                                     if let PatternKind::Identifier { ref name, .. } =
                                         identified.kind
                                     {
-                                        codegen.push_str(&format!("args[{}].length >= {}", k, i));
+                                        codegen.push_str(&format!("args[{k}].length >= {i}"));
                                         codegen.declare_function_pre_body_variable(
                                             &name.to_string(),
-                                            &format!("args[{}].slice({})", k, i),
+                                            &format!("args[{k}].slice({i})"),
                                         );
                                     } else {
                                         unreachable!();
@@ -206,7 +206,7 @@ pub fn generate_function_declarations(
                                 PatternKind::Identifier { name, .. } => {
                                     codegen.declare_function_pre_body_variable(
                                         &name.to_string(),
-                                        &format!("args[{}][{}]", k, i),
+                                        &format!("args[{k}][{i}]"),
                                     );
                                 }
                                 PatternKind::Wildcard => {}
@@ -223,7 +223,7 @@ pub fn generate_function_declarations(
                             ExprKind::Path(path) => path.segments.last().unwrap().to_string(),
                             _ => unreachable!(),
                         };
-                        codegen.push_str(&format!("args[{}].tag === \"{}\"", k, identifier));
+                        codegen.push_str(&format!("args[{k}].tag === \"{identifier}\""));
                         for (i, element) in elements.iter().enumerate() {
                             let identifier = match &element.kind {
                                 // Skip any Wildcards
@@ -234,13 +234,13 @@ pub fn generate_function_declarations(
                             if *named_fields {
                                 codegen.declare_function_pre_body_variable(
                                     &identifier,
-                                    &format!("args[{}].{}", k, identifier),
+                                    &format!("args[{k}].{identifier}"),
                                 );
                             } else {
                                 codegen.declare_function_pre_body_variable(
                                     &identifier,
-                                    &format!("args[{}][{}]", k, i),
-                                )
+                                    &format!("args[{k}][{i}]"),
+                                );
                             }
                         }
                     }
@@ -266,7 +266,7 @@ pub fn generate_function_declarations(
 
         codegen.inc_indent();
 
-        for comment in declaration.leading_comments.iter() {
+        for comment in &declaration.leading_comments {
             codegen.push_indent();
             codegen.generate_comment(comment);
         }
@@ -275,7 +275,7 @@ pub fn generate_function_declarations(
         for (j, param) in declaration.parameters.iter().enumerate() {
             if let PatternKind::Identifier { ref name, .. } = param.pattern.kind {
                 codegen.push_indent();
-                codegen.push_str(&format!("let {} = args[{}];\n", name, j));
+                codegen.push_str(&format!("let {name} = args[{j}];\n"));
                 codegen
                     .current_scope()
                     .declare_variable_alias(&name.to_string(), &name.to_string());
@@ -295,7 +295,7 @@ pub fn generate_function_declarations(
         codegen.push_char('}');
         codegen.pop_scope();
 
-        for comment in declaration.trailing_comments.iter() {
+        for comment in &declaration.trailing_comments {
             codegen.push_indent();
             codegen.generate_comment(comment);
         }
@@ -401,7 +401,7 @@ pub fn generate_function_declaration(codegen: &mut CodegenJS, declaration: &Func
     );
 
     codegen.push_indent();
-    codegen.push_str(&format!("function {}", name_as_str));
+    codegen.push_str(&format!("function {name_as_str}"));
     codegen.push_scope();
     generate_function_parameter_list(codegen, &declaration.parameters);
     codegen.push_str(" {\n");
@@ -427,7 +427,7 @@ pub fn generate_function_expression(codegen: &mut CodegenJS, declaration: &Funct
     );
     let function_keyword = match name_as_str.as_str() {
         "anonymous" => "function".to_string(),
-        _ => format!("function {}", name_as_str),
+        _ => format!("function {name_as_str}"),
     };
 
     codegen.push_str(&function_keyword);
@@ -520,9 +520,9 @@ pub fn generate_return_statement(codegen: &mut CodegenJS, expr: &Option<Expr>) {
 }
 
 fn flush_function_pre_body(codegen: &mut CodegenJS) {
-    for (name, value) in codegen.consume_function_pre_body_declarations().iter() {
+    for (name, value) in &codegen.consume_function_pre_body_declarations() {
         codegen.push_indent();
-        codegen.push_str(&format!("let {} = {};\n", name, value));
+        codegen.push_str(&format!("let {name} = {value};\n"));
         codegen.current_scope().declare_variable_alias(name, name);
     }
     codegen.flush_statement_buffer();
