@@ -5,6 +5,7 @@ fn len(list) { list.length }
 fn binary_search(list, target) { binary_search(list, target, 0, len(list) - 1) }
 // binary_search(a[], a, int, int) -> int
 fn binary_search(_, _, low, high) if low > high; { -1 }
+// binary_search(a[], a, int, int) -> int
 fn binary_search(list, target, low, high) {
     let mid = floor((low + high) / 2);
     let midValue = list[mid];
