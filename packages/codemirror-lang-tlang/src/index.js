@@ -1,6 +1,6 @@
-import { parser } from "./parser.js"
-import { foldNodeProp, foldInside, indentNodeProp } from "@codemirror/language"
-import { styleTags, tags as t } from "@lezer/highlight"
+import { parser } from "./parser.js";
+import { foldNodeProp, foldInside, indentNodeProp } from "@codemirror/language";
+import { styleTags, tags as t } from "@lezer/highlight";
 
 let parserWithMetadata = parser.configure({
   props: [
@@ -10,9 +10,13 @@ let parserWithMetadata = parser.configure({
       "CallExpression/VariableName": t.function(t.variableName),
       "if else return rec": t.controlKeyword,
       "let enum fn": t.definitionKeyword,
-      "FunctionDeclaration/VariableDefinition": t.function(t.definition(t.variableName)),
+      "FunctionDeclaration/VariableDefinition": t.function(
+        t.definition(t.variableName),
+      ),
       PropertyName: t.propertyName,
-      "CallExpression/MemberExpression/PropertyName": t.function(t.propertyName),
+      "CallExpression/MemberExpression/PropertyName": t.function(
+        t.propertyName,
+      ),
       BooleanLiteral: t.bool,
       Number: t.number,
       String: t.string,
@@ -27,28 +31,29 @@ let parserWithMetadata = parser.configure({
       "{ }": t.brace,
       ".": t.derefOperator,
       ", ;": t.separator,
-      "_": t.special,
+      _: t.special,
     }),
     indentNodeProp.add({
-      Application: context => context.column(context.node.from) + context.unit
+      Application: (context) =>
+        context.column(context.node.from) + context.unit,
     }),
     foldNodeProp.add({
-      "Block ObjectExpression ArrayExpression": foldInside
-    })
-  ]
-})
+      "Block ObjectExpression ArrayExpression": foldInside,
+    }),
+  ],
+});
 
-import { LRLanguage } from "@codemirror/language"
+import { LRLanguage } from "@codemirror/language";
 
 export const tlangLanguage = LRLanguage.define({
-  name: 'tlang',
+  name: "tlang",
   parser: parserWithMetadata,
   languageData: {
-    commentTokens: { line: ";" }
-  }
-})
+    commentTokens: { line: ";" },
+  },
+});
 
-import { completeFromList } from "@codemirror/autocomplete"
+import { completeFromList } from "@codemirror/autocomplete";
 
 export const tlangCompletion = tlangLanguage.data.of({
   autocomplete: completeFromList([
@@ -80,13 +85,11 @@ export const tlangCompletion = tlangLanguage.data.of({
     { label: "foldr", type: "function" },
     { label: "sum", type: "function" },
     { label: "zip", type: "function" },
-  ])
-})
+  ]),
+});
 
-
-import { LanguageSupport } from "@codemirror/language"
+import { LanguageSupport } from "@codemirror/language";
 
 export function tlangLanguageSupport() {
   return new LanguageSupport(tlangLanguage, [tlangCompletion]);
 }
-

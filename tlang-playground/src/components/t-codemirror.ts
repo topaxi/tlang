@@ -1,6 +1,6 @@
 import { EditorView, basicSetup } from 'codemirror';
 import { EditorState } from '@codemirror/state';
-import { linter, lintGutter } from "@codemirror/lint"
+import { linter, lintGutter } from '@codemirror/lint';
 import { catppuccin } from 'codemirror-theme-catppuccin';
 import { tlangLanguageSupport } from 'codemirror-lang-tlang';
 import { javascript } from '@codemirror/lang-javascript';
@@ -41,13 +41,12 @@ export class TCodeMirror extends LitElement {
     });
 
     let tlangLint = linter(() => {
-      let diagnostics = this.diagnostics
-        .map((d: any) => ({
-          message: d.message,
-          severity: d.severity,
-          from: d.from,
-          to: d.to,
-        }));
+      let diagnostics = this.diagnostics.map((d: any) => ({
+        message: d.message,
+        severity: d.severity,
+        from: d.from,
+        to: d.to,
+      }));
 
       return diagnostics;
     });
