@@ -212,6 +212,7 @@ fn test_partition_impl() {
         function partition(...args) {
             while (true) {
                 if (args.length === 2 && args[0].length === 0) {
+                    // partition(a[], fn(a) -> bool) -> (a[], a[])
                     return [[], []];
                 } else if (args.length === 2) {
                     let list = args[0];

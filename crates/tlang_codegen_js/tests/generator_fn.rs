@@ -302,28 +302,34 @@ fn test_function_declarations_with_if_let_guard_named_fields_enum() {
 fn test_function_declarations_with_comments_inbetween() {
     let output = compile!(
         indoc! {"
+        // Comment 1
         fn filter_map([], f) { [] }
+        // Comment 2
         fn filter_map([x, ...xs], f) if let Some { value } = f(x) { [value, ...filter_map(xs, f)] }
-        // Comment
+        // Comment 3
         fn filter_map([x, ...xs], f) { filter_map(xs, f) }
     "},
         &[("Some", SymbolType::Variable)]
     );
     let expected_output = indoc! {"
-        // Comment
+        // Comment 1
+        // Comment 2
+        // Comment 3
         function filter_map(...args) {
             let $tmp$a;
             let $tmp$b;
             if (args[0].length === 0) {
+                // Comment 1
                 let f = args[1];
                 return [];
             } else if (args[0].length >= 1 && ($tmp$a = args[1](args[0][0])) && $tmp$a.tag === \"Some\" && (($tmp$b = $tmp$a.value), true)) {
+                // Comment 2
                 let f = args[1];
                 let x = args[0][0];
                 let xs = args[0].slice(1);
                 return [$tmp$b, ...filter_map(xs, f)];
             } else if (args[0].length >= 1) {
-                // Comment
+                // Comment 3
                 let f = args[1];
                 let x = args[0][0];
                 let xs = args[0].slice(1);

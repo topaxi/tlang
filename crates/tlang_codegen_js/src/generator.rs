@@ -412,7 +412,9 @@ impl CodegenJS {
                 self.generate_variable_declaration(pattern, expression);
             }
             StmtKind::FunctionDeclaration(decl) => generate_function_declaration(self, decl),
-            StmtKind::FunctionDeclarations(decls) => generate_function_declarations(self, decls),
+            StmtKind::FunctionDeclarations(decls) => {
+                generate_function_declarations(self, decls, &statement.leading_comments)
+            }
             StmtKind::Return(expr) => generate_return_statement(self, expr),
             StmtKind::EnumDeclaration(decl) => self.generate_enum_declaration(decl),
         }

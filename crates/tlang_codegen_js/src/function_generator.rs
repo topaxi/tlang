@@ -2,12 +2,14 @@ use tlang_ast::node::{
     Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, Pattern, PatternKind, Stmt,
     StmtKind,
 };
+use tlang_ast::token::Token;
 
 use crate::generator::{BlockContext, CodegenJS};
 
 pub fn generate_function_declarations(
     codegen: &mut CodegenJS,
     declarations: &[FunctionDeclaration],
+    first_declaration_comments: &[Token],
 ) {
     let first_declaration = declarations.first().unwrap();
     let name_as_str = fn_identifier_to_string(&first_declaration.name);
@@ -105,8 +107,6 @@ pub fn generate_function_declarations(
         if !first_declaration {
             codegen.push_str(" else ");
         }
-
-        first_declaration = false;
 
         for (j, param) in declaration.parameters.iter().enumerate() {
             match &param.pattern.kind {
@@ -266,6 +266,13 @@ pub fn generate_function_declarations(
 
         codegen.inc_indent();
 
+        if first_declaration {
+            for comment in first_declaration_comments {
+                codegen.push_indent();
+                codegen.generate_comment(comment);
+            }
+        }
+
         for comment in &declaration.leading_comments {
             codegen.push_indent();
             codegen.generate_comment(comment);
@@ -299,6 +306,8 @@ pub fn generate_function_declarations(
             codegen.push_indent();
             codegen.generate_comment(comment);
         }
+
+        first_declaration = false;
     }
 
     if is_any_definition_tail_recursive {
