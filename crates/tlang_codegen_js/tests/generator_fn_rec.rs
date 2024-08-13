@@ -302,3 +302,26 @@ fn test_all_impl() {
 
     assert_eq!(output, expected_output);
 }
+
+#[test]
+#[ignore]
+fn test_reduce_impl() {
+    // TODO: Implement some kind of exception or panic handling,
+    //       or find a different test case for a tail recursion with different
+    //       arity.
+    // TODO: This currently will fail as `rec ...` expects all implementations
+    //       have the same arity.
+    let output = compile!(indoc! {"
+        // reduce(a[], fn(b, a) -> b) -> b
+        fn reduce([], _) { panic(\"Called reduce on empty list without accumulator\") }
+        fn reduce([x, y, ...xs], f) { rec reduce(xs, f, f(x, y)) }
+        fn reduce([x], _) { x }
+        // reduce(a[], fn(b, a) -> b, b) -> b
+        fn reduce([], _, acc) { acc }
+        fn reduce([x, ...xs], f, acc) { rec reduce(xs, f, f(acc, x)) }
+    "});
+    let expected_output = indoc! {"
+    "};
+
+    assert_eq!(output, expected_output);
+}
