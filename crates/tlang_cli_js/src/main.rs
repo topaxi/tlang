@@ -65,7 +65,7 @@ fn main() {
         panic!("couldn't read {}: {}", std_lib_file.display(), why)
     };
 
-    let output = format!("{std_lib_source}\n{output}");
+    let output = format!("{std_lib_source}\n{{{output}}}");
 
     if args.output_file.is_none() {
         println!("{output}");
