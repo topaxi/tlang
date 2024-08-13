@@ -765,7 +765,7 @@ impl<'src> Parser<'src> {
                 Box::new(self.parse_primary_expression())
             )),
 
-            _ => unreachable!(),
+            _ => unreachable!("Unexpected token kind"),
         }
     }
 

@@ -494,6 +494,7 @@ impl CodegenJS {
             ExprKind::UnaryOp(op, expr) => {
                 match op {
                     UnaryOp::Minus => self.push_char('-'),
+                    UnaryOp::Not => self.push_char('!'),
                     UnaryOp::Spread => self.push_str("..."),
                     _ => unimplemented!("PrefixOp {:?} not implemented yet.", op),
                 }

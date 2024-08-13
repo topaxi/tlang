@@ -38,6 +38,7 @@ function compose(f, g) {
 // map(a[], fn(a) -> b) -> b[]
 function map(...args) {
     if (args[0].length === 0) {
+        // map(a[], fn(a) -> b) -> b[]
         return [];
     } else if (args[0].length >= 1) {
         let f = args[1];
@@ -50,6 +51,7 @@ function map(...args) {
 function filter(...args) {
     while (true) {
         if (args[0].length === 0) {
+            // filter(a[], fn(a) -> bool) -> a[]
             return [];
         } else if (args[0].length >= 1 && args[1](args[0][0])) {
             let f = args[1];
@@ -71,6 +73,7 @@ function filter(...args) {
 function partition(...args) {
     while (true) {
         if (args.length === 2 && args[0].length === 0) {
+            // partition(a[], fn(a) -> bool) -> (a[], a[])
             return [[], []];
         } else if (args.length === 2) {
             let list = args[0];
@@ -118,6 +121,7 @@ function filter_map(...args) {
     let $tmp$b;
     while (true) {
         if (args[0].length === 0) {
+            // filter_map(a[], fn(a) -> Option(b)) -> b[]
             return [];
         } else if (args[0].length >= 1 && ($tmp$a = args[1](args[0][0])) && $tmp$a.tag === "Some" && (($tmp$b = $tmp$a[0]), true)) {
             let f = args[1];
@@ -138,6 +142,7 @@ function filter_map(...args) {
 function foldl(...args) {
     while (true) {
         if (args[0].length === 0) {
+            // foldl(a[], b, fn(b, a) -> b) -> b
             let acc = args[1];
             return acc;
         } else if (args[0].length >= 1) {
@@ -157,6 +162,7 @@ function foldl(...args) {
 // foldr(a[], b, fn(a, b) -> b) -> b
 function foldr(...args) {
     if (args[0].length === 0) {
+        // foldr(a[], b, fn(a, b) -> b) -> b
         let acc = args[1];
         return acc;
     } else if (args[0].length >= 1) {
@@ -170,6 +176,7 @@ function foldr(...args) {
 // sum(int[] xs) -> int
 function sum(...args) {
     if (args[0].length === 0) {
+        // sum(int[] xs) -> int
         return 0;
     } else if (args[0].length >= 1) {
         let x = args[0][0];
@@ -180,6 +187,7 @@ function sum(...args) {
 // zip(a[], b[]) -> [a, b][]
 function zip(...args) {
     if (args[0].length === 0 && args[1].length === 0) {
+        // zip(a[], b[]) -> [a, b][]
         return [];
     } else if (args[0].length >= 1 && args[1].length >= 1) {
         let x = args[0][0];

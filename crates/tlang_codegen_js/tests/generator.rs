@@ -5,6 +5,17 @@ use tlang_ast::symbols::SymbolType;
 mod common;
 
 #[test]
+fn test_codegen_not_expression() {
+    let output = compile!("not true;");
+    let expected_output = "!true;\n";
+    assert_eq!(output, expected_output);
+
+    let output = compile!("!true;");
+    let expected_output = "!true;\n";
+    assert_eq!(output, expected_output);
+}
+
+#[test]
 fn test_codegen_function_declaration() {
     let output = compile!("fn main() {}");
     let expected_output = "function main() {\n}\n";
