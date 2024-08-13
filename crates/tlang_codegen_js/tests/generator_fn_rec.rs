@@ -256,3 +256,49 @@ fn test_partition_impl() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_all_impl() {
+    let output = compile!(indoc! {"
+        // all(a[], fn(a) -> bool) -> bool
+        fn all(list, predicate) { all(list, predicate, true) }
+        // all(a[], fn(a) -> bool, bool) -> bool
+        fn all([], _, acc) { acc }
+        fn all([x], predicate, _) if not predicate(x) { false }
+        fn all([_, ...xs], predicate, acc) { rec all(xs, predicate, acc) }
+    "});
+    let expected_output = indoc! {"
+        // all(a[], fn(a) -> bool) -> bool
+        // all(a[], fn(a) -> bool, bool) -> bool
+        function all(...args) {
+            while (true) {
+                if (args.length === 2) {
+                    // all(a[], fn(a) -> bool) -> bool
+                    let list = args[0];
+                    let predicate = args[1];
+                    return all(list, predicate, true);
+                } else if (args.length === 3 && args[0].length === 0) {
+                    // all(a[], fn(a) -> bool, bool) -> bool
+                    let acc = args[2];
+                    return acc;
+                } else if (args.length === 3 && args[0].length >= 1 && !args[1](args[0][0])) {
+                    let predicate = args[1];
+                    let x = args[0][0];
+                    return false;
+                } else if (args.length === 3 && args[0].length >= 1) {
+                    let predicate = args[1];
+                    let acc = args[2];
+                    let xs = args[0].slice(1);
+                    let $tmp$b = xs;
+                    let $tmp$c = predicate;
+                    let $tmp$d = acc;
+                    args[0] = $tmp$b;
+                    args[1] = $tmp$c;
+                    args[2] = $tmp$d;
+                }
+            }
+        }
+    "};
+
+    assert_eq!(output, expected_output);
+}

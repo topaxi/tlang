@@ -17,21 +17,21 @@ fn reduce([x, ...xs], f, acc) { rec reduce(xs, f, f(acc, x)) }
 fn find(list, predicate) { find(list, predicate, Option::None) }
 // find(a[], fn(a) -> bool, Option(a)) -> Option(a)
 fn find([], _, acc) { acc }
-fn find([x, ...xs], predicate, _) if predicate(x) { Option::Some(x) }
+fn find([x], predicate, _) if predicate(x) { Option::Some(x) }
 fn find([_, ...xs], predicate, acc) { rec find(xs, predicate, acc) }
 
 // all(a[], fn(a) -> bool) -> bool
 fn all(list, predicate) { all(list, predicate, true) }
 // all(a[], fn(a) -> bool, bool) -> bool
 fn all([], _, acc) { acc }
-fn all([x, ...xs], predicate, _) if not predicate(x) { false }
+fn all([x], predicate, _) if not predicate(x) { false }
 fn all([_, ...xs], predicate, acc) { rec all(xs, predicate, acc) }
 
 // any(a[], fn(a) -> bool) -> bool
 fn any(list, predicate) { any(list, predicate, false) }
 // any(a[], fn(a) -> bool, bool) -> bool
 fn any([], _, acc) { acc }
-fn any([x, ...xs], predicate, _) if predicate(x) { true }
+fn any([x], predicate, _) if predicate(x) { true }
 fn any([_, ...xs], predicate, acc) { rec any(xs, predicate, acc) }
 
 // flatten(a[][]) -> a[]
@@ -51,7 +51,7 @@ fn take(_, _, acc) { acc }
 fn drop(list, n) { drop(list, n, []) }
 // drop(a[], int, a[]) -> a[]
 fn drop([], _, acc) { acc }
-fn drop([x, ...xs], n, acc) if n > 0 { rec drop(xs, n - 1, acc) }
+fn drop([_, ...xs], n, acc) if n > 0 { rec drop(xs, n - 1, acc) }
 fn drop([x, ...xs], _, acc) { rec drop(xs, 0, [...acc, x]) }
 
 // Reverse the list

@@ -178,23 +178,28 @@ pub fn generate_function_declarations(
                             continue;
                         }
 
-                        // TODO: Handle multiple patterns, for now a simple recursive sum was the test case :D
-                        let should_and = false;
-                        for (i, pattern) in patterns.iter().enumerate() {
-                            if should_and {
-                                codegen.push_str(" && ");
-                            }
+                        let mut patterns_len = patterns.len();
+                        let last_pattern_is_rest = patterns.last().is_some()
+                            && matches!(patterns.last().unwrap().kind, PatternKind::Rest(_));
 
+                        if last_pattern_is_rest {
+                            patterns_len -= 1;
+                        }
+
+                        codegen.push_str(&format!("args[{k}].length >= {patterns_len}"));
+
+                        for (i, pattern) in patterns.iter().enumerate() {
                             match &pattern.kind {
                                 PatternKind::Literal(_) => {
+                                    codegen.push_str(" && ");
+
                                     codegen.push_str(&format!("args[{k}][{i}] === "));
                                     codegen.generate_pat(pattern);
                                 }
-                                PatternKind::Rest(identified) => {
+                                PatternKind::Rest(identifier) => {
                                     if let PatternKind::Identifier { ref name, .. } =
-                                        identified.kind
+                                        identifier.kind
                                     {
-                                        codegen.push_str(&format!("args[{k}].length >= {i}"));
                                         codegen.declare_function_pre_body_variable(
                                             &name.to_string(),
                                             &format!("args[{k}].slice({i})"),
