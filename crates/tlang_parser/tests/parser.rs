@@ -25,6 +25,12 @@ fn test_simple_arithmetic_sum_mult_precedence() {
 }
 
 #[test]
+fn test_simple_unary_not() {
+    assert_parser_snapshot!("!true;");
+    assert_parser_snapshot!("not true;");
+}
+
+#[test]
 fn test_simple_arithmetic_sum_mult_precedence_parentheses() {
     assert_parser_snapshot!("(1 + 2) * 3;");
 }

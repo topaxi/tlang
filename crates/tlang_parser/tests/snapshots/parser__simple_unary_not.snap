@@ -1,0 +1,65 @@
+---
+source: crates/tlang_parser/tests/parser.rs
+expression: "parse! (\"!true;\")"
+---
+Module(
+  statements: [
+    Stmt(
+      kind: Expr(Expr(
+        kind: UnaryOp(Not, Expr(
+          kind: Literal(Boolean(true)),
+          leading_comments: [],
+          trailing_comments: [],
+          symbol_table: None,
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 1,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 5,
+            ),
+          ),
+        )),
+        leading_comments: [],
+        trailing_comments: [],
+        symbol_table: None,
+        span: Span(
+          start: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+          end: LineColumn(
+            line: 0,
+            column: 5,
+          ),
+        ),
+      )),
+      span: Span(
+        start: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end: LineColumn(
+          line: 0,
+          column: 6,
+        ),
+      ),
+      leading_comments: [],
+      trailing_comments: [],
+      symbol_table: None,
+    ),
+  ],
+  symbol_table: None,
+  span: Span(
+    start: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+  ),
+)

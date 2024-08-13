@@ -353,6 +353,7 @@ impl Lexer<'_> {
                     "if" => self.token(TokenKind::If, start),
                     "else" => self.token(TokenKind::Else, start),
                     "match" => self.token(TokenKind::Match, start),
+                    "not" => self.token(TokenKind::Not, start),
                     "enum" => self.token(TokenKind::Enum, start),
                     "struct" => self.token(TokenKind::Struct, start),
                     "true" => self.token(TokenKind::Literal(Literal::Boolean(true)), start),

@@ -412,6 +412,7 @@ impl Module {
 #[derive(Debug, PartialEq, Clone, Copy, Serialize)]
 pub enum UnaryOp {
     Minus,
+    Not,
     Rest,
     Spread,
 }

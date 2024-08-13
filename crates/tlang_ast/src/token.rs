@@ -69,6 +69,7 @@ pub enum TokenKind {
     Match,
     Enum,
     Struct,
+    Not,
     And,
     Or,
 

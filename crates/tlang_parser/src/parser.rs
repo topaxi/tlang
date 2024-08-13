@@ -750,11 +750,23 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_unary_expression(&mut self) -> Expr {
+        let token = self.current_token_kind();
+
         self.advance();
-        node::expr!(UnaryOp(
-            UnaryOp::Minus,
-            Box::new(self.parse_primary_expression())
-        ))
+
+        match token {
+            Some(TokenKind::Minus) => node::expr!(UnaryOp(
+                UnaryOp::Minus,
+                Box::new(self.parse_primary_expression())
+            )),
+
+            Some(TokenKind::ExclamationMark | TokenKind::Not) => node::expr!(UnaryOp(
+                UnaryOp::Not,
+                Box::new(self.parse_primary_expression())
+            )),
+
+            _ => unreachable!(),
+        }
     }
 
     fn parse_primary_expression(&mut self) -> Expr {
@@ -766,6 +778,7 @@ impl<'src> Parser<'src> {
             self,
             "primary expression",
             TokenKind::Minus
+                | TokenKind::ExclamationMark
                 | TokenKind::LParen
                 | TokenKind::LBrace
                 | TokenKind::LBracket
@@ -773,13 +786,16 @@ impl<'src> Parser<'src> {
                 | TokenKind::Fn
                 | TokenKind::Rec
                 | TokenKind::Match
+                | TokenKind::Not
                 | TokenKind::Identifier(_)
                 | TokenKind::Literal(_)
         );
 
         let mut span = self.create_span_from_current_token();
         let mut node = match &self.current_token_kind() {
-            Some(TokenKind::Minus) => self.parse_unary_expression(),
+            Some(TokenKind::Minus | TokenKind::ExclamationMark | TokenKind::Not) => {
+                self.parse_unary_expression()
+            }
             Some(TokenKind::LParen) => {
                 self.advance();
                 let expression = self.parse_expression();
