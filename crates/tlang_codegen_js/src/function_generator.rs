@@ -260,12 +260,11 @@ pub fn generate_function_declarations(
                 generate_function_definition_guard(codegen, expr);
             }
             codegen.push_str(") {\n");
+        } else if let Some(ref expr) = *declaration.guard {
+            codegen.push_str("if (");
+            generate_function_definition_guard(codegen, expr);
+            codegen.push_str(") {\n");
         } else {
-            if let Some(ref expr) = *declaration.guard {
-                codegen.push_str("if (");
-                generate_function_definition_guard(codegen, expr);
-                codegen.push_str(") {\n");
-            }
             codegen.push_str("{\n");
         }
 

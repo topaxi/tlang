@@ -307,7 +307,7 @@ fn test_function_declarations_with_comments_inbetween() {
         // Comment 2
         fn filter_map([x, ...xs], f) if let Some { value } = f(x) { [value, ...filter_map(xs, f)] }
         // Comment 3
-        fn filter_map([x, ...xs], f) { filter_map(xs, f) }
+        fn filter_map([_, ...xs], f) { filter_map(xs, f) }
     "},
         &[("Some", SymbolType::Variable)]
     );
@@ -331,12 +331,37 @@ fn test_function_declarations_with_comments_inbetween() {
             } else if (args[0].length >= 1) {
                 // Comment 3
                 let f = args[1];
-                let x = args[0][0];
                 let xs = args[0].slice(1);
                 return filter_map(xs, f);
             }
         }
     "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn test_function_declarations_with_guard_in_first_declaration() {
+    let output = compile!(indoc! {"
+        // gcd(int, int) -> int
+        fn gcd(a, b) if b == 0 { a }
+        fn gcd(a, b) { gcd(b, a % b) }
+    "});
+    let expected_output = indoc! {"
+        // gcd(int, int) -> int
+        function gcd(...args) {
+            if (args[1] === 0) {
+                // gcd(int, int) -> int
+                let a = args[0];
+                let b = args[1];
+                return a;
+            } else {
+                let a = args[0];
+                let b = args[1];
+                return gcd(b, a % b);
+            }
+        }
+    "};
+
     assert_eq!(output, expected_output);
 }
 
