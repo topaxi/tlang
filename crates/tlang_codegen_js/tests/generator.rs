@@ -152,27 +152,22 @@ fn test_if_else_as_expression() {
     assert_eq!(output, expected_output);
 }
 
-#[ignore = "implement if/else in expression position first"]
 #[test]
 fn test_if_else_as_expression_nested() {
     let output =
         compile!("fn main() { let result = if true { if true { 1 } else { 2 } } else { 3 }; }");
     let expected_output = indoc! {"
         function main() {
-            let $tmp$a;{
-                if (true) {
-                    let $tmp$b;{
-                        if (true) {
-                            $tmp$b = 1;
-                        } else {
-                            $tmp$b = 2;
-                        }
-                    };
-                    $tmp$a = $tmp$b;
+            let $tmp$a;if (true) {
+                let $tmp$b;if (true) {
+                    $tmp$b = 1;
                 } else {
-                    $tmp$a = 3;
+                    $tmp$b = 2;
                 }
-            };
+                $tmp$a = $tmp$b;
+            } else {
+                $tmp$a = 3;
+            }
             let result = $tmp$a;
         }
     "};

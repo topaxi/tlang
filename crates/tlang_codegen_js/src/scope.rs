@@ -20,7 +20,7 @@ impl Scope {
     }
 
     pub fn declare_variable(&mut self, name: &str) -> String {
-        if !self.variables.contains_key(name) {
+        if !self.has_local_variable(name) {
             self.variables.insert(name.to_string(), name.to_string());
 
             return name.to_string();
@@ -39,7 +39,7 @@ impl Scope {
         let mut suffix = 'a';
         loop {
             let new_name = format!("{prefix}${suffix}");
-            if !self.variables.contains_key(&new_name) {
+            if !self.has_variable_in_scope(&new_name) {
                 return new_name;
             }
             suffix = (suffix as u8 + 1) as char;
@@ -51,6 +51,23 @@ impl Scope {
         self.variables
             .insert(tmp_var_name.clone(), tmp_var_name.clone());
         tmp_var_name
+    }
+
+    #[inline(always)]
+    pub fn has_local_variable(&self, name: &str) -> bool {
+        self.variables.contains_key(name)
+    }
+
+    pub fn has_variable_in_scope(&self, name: &str) -> bool {
+        if self.has_local_variable(name) {
+            return true;
+        }
+
+        if let Some(parent) = &self.parent {
+            return parent.has_variable_in_scope(name);
+        }
+
+        false
     }
 
     pub fn resolve_variable(&self, name: &str) -> Option<String> {
