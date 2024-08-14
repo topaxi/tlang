@@ -542,10 +542,21 @@ impl CodegenJS {
                 named_fields,
             } => self.generate_enum_extraction(identifier, elements, *named_fields),
             PatternKind::Literal(expr) => self.generate_expr(expr, None),
-            pattern_kind => unimplemented!(
-                "Pattern matching not for {:?} implemented yet.",
-                pattern_kind
-            ),
+            PatternKind::List(patterns) => {
+                self.push_str("[");
+                for (i, pattern) in patterns.iter().enumerate() {
+                    if i > 0 {
+                        self.push_str(", ");
+                    }
+                    self.generate_pat(pattern);
+                }
+                self.push_str("]");
+            }
+            PatternKind::Rest(pattern) => {
+                self.push_str("...");
+                self.generate_pat(pattern);
+            }
+            PatternKind::Wildcard => {}
         }
     }
 
