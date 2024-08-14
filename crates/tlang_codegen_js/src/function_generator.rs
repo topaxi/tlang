@@ -285,11 +285,21 @@ pub fn generate_function_declarations(
         // Alias identifier args back to the parameter names for readability of generated code.
         for (j, param) in declaration.parameters.iter().enumerate() {
             if let PatternKind::Identifier { ref name, .. } = param.pattern.kind {
+                // `args` is a special case, as we use it internally to refer to the arguments
+                // in the generated code. Given that we currently always reference arguments
+                // via `args` instead of normal arguments. We could probably be more precise
+                // and use actual arguments, but given that each signature could define
+                // different names, this is the easiest way to handle this for now.
+                let name = name.to_string();
+                let name = if name == "args" {
+                    codegen.current_scope().declare_variable("args")
+                } else {
+                    name
+                };
+
                 codegen.push_indent();
                 codegen.push_str(&format!("let {name} = args[{j}];\n"));
-                codegen
-                    .current_scope()
-                    .declare_variable_alias(&name.to_string(), &name.to_string());
+                codegen.current_scope().declare_variable_alias(&name, &name);
             }
         }
         // We handle the tail recursion case in multiple function body declarations ourselves higher up.

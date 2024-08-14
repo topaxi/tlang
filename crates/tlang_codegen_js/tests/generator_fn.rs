@@ -163,7 +163,6 @@ fn test_recursive_map() {
 }
 
 #[test]
-#[ignore = "TODO"]
 fn test_function_declarations_args_redefinition_should_not_collide() {
     let output = compile!(indoc! {"
         fn foo(0) { 0 }
