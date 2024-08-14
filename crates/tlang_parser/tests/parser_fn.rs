@@ -116,6 +116,5 @@ fn test_list_matching_wildcard() {
 
 #[test]
 fn test_fn_expression_in_function_completion_position() {
-    // TODO: This should work without parentheses.
     assert_parser_snapshot!("fn foo() { fn bar() {} }");
 }
