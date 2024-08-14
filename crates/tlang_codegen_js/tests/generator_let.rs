@@ -32,6 +32,14 @@ fn test_codegen_list_pattern() {
 }
 
 #[test]
+fn test_codegen_list_pattern_with_wildcard() {
+    let output = compile!("let [_, y] = [1, 2];");
+    let expected_output = "let [, y] = [1, 2];\n";
+
+    assert_eq!(output, expected_output);
+}
+
+#[test]
 fn test_codegen_list_pattern_repetition() {
     // TODO: Should this be allowed?
     let output = compile!("let [x, x] = [1, 2]; x;");

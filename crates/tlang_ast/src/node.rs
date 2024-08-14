@@ -276,9 +276,10 @@ impl Pattern {
                 .iter()
                 .flat_map(Pattern::get_all_symbol_ids)
                 .collect(),
-            _ => todo!(
+            PatternKind::Wildcard => vec![],
+            pattern_kind => todo!(
                 "Getting symbol ids for pattern kind {:?} not implemented yet",
-                self.kind
+                pattern_kind
             ),
         }
     }

@@ -618,7 +618,11 @@ impl CodegenJS {
                     }
                     bindings.push((name, var_name));
                 }
-                _ => todo!("Variable declaration pattern matching is not implemented yet."),
+                PatternKind::Wildcard => {}
+                pattern_kind => todo!(
+                    "Variable declaration pattern matching for {:?} is not implemented yet.",
+                    pattern_kind
+                ),
             }
         }
 
