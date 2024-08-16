@@ -358,7 +358,17 @@ pub enum StmtKind {
     FunctionDeclarations(Vec<FunctionDeclaration>),
     Return(Box<Option<Expr>>),
     EnumDeclaration(EnumDeclaration),
+    StructDeclaration(StructDeclaration),
 }
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct StructDeclaration {
+    pub id: SymbolId,
+    pub name: Ident,
+    pub fields: Vec<StructField>,
+}
+
+pub type StructField = (Ident, Ty);
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct Ty {

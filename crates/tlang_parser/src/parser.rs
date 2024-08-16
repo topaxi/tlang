@@ -1,7 +1,7 @@
 use tlang_ast::node::{
     self, Associativity, BinaryOpKind, Block, EnumDeclaration, EnumVariant, Expr, ExprKind,
     FunctionDeclaration, FunctionParameter, Ident, MatchArm, Module, OperatorInfo, Path, Pattern,
-    PatternKind, Stmt, StmtKind, Ty, UnaryOp,
+    PatternKind, Stmt, StmtKind, StructDeclaration, StructField, Ty, UnaryOp,
 };
 use tlang_ast::span::Span;
 use tlang_ast::symbols::SymbolId;
@@ -294,6 +294,7 @@ impl<'src> Parser<'src> {
             }
             Some(TokenKind::Return) => self.parse_return_statement(),
             Some(TokenKind::Enum) => self.parse_enum_declaration(),
+            Some(TokenKind::Struct) => self.parse_struct_declaration(),
             _ => node::stmt!(Expr(Box::new(self.parse_expression()))),
         };
         node.leading_comments = comments;
@@ -310,6 +311,11 @@ impl<'src> Parser<'src> {
 
         // Neither do EnumDeclaration statements.
         if let StmtKind::EnumDeclaration { .. } = node.kind {
+            return (false, Some(node));
+        }
+
+        // Nor do StructDeclaration statements.
+        if let StmtKind::StructDeclaration { .. } = node.kind {
             return (false, Some(node));
         }
 
@@ -358,6 +364,35 @@ impl<'src> Parser<'src> {
         let span = path.span;
 
         node::expr!(Path(path)).with_span(span)
+    }
+
+    fn parse_struct_declaration(&mut self) -> Stmt {
+        self.consume_token(TokenKind::Struct);
+        let name = self.consume_identifier();
+        self.consume_token(TokenKind::LBrace);
+        let mut fields = Vec::new();
+        while self.current_token_kind() != Some(TokenKind::RBrace) {
+            fields.push(self.parse_struct_field());
+            if let Some(TokenKind::Comma) = self.current_token_kind() {
+                self.advance();
+            }
+        }
+        self.consume_token(TokenKind::RBrace);
+        node::stmt!(StructDeclaration(StructDeclaration {
+            id: self.unique_id(),
+            name,
+            fields,
+        }))
+    }
+
+    fn parse_struct_field(&mut self) -> StructField {
+        let name = self.consume_identifier();
+        self.consume_token(TokenKind::Colon);
+        // TODO: Emit proper parse error.
+        let ty = self
+            .parse_type_annotation()
+            .expect("Expected type annotation");
+        (name, ty)
     }
 
     fn parse_enum_declaration(&mut self) -> Stmt {

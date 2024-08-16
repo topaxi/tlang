@@ -12,6 +12,7 @@ pub enum SymbolType {
     Parameter,
     Enum,
     EnumVariant,
+    Struct,
 }
 
 impl Display for SymbolType {
@@ -22,6 +23,7 @@ impl Display for SymbolType {
             SymbolType::Parameter => write!(f, "parameter"),
             SymbolType::Enum => write!(f, "enum"),
             SymbolType::EnumVariant => write!(f, "enum variant"),
+            SymbolType::Struct => write!(f, "struct"),
         }
     }
 }

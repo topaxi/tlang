@@ -160,6 +160,9 @@ impl SemanticAnalyzer {
             StmtKind::EnumDeclaration(_decl) => {
                 // TODO
             }
+            StmtKind::StructDeclaration(_decl) => {
+                // TODO
+            }
         }
 
         if let Some(symbol_table) = &stmt.symbol_table {

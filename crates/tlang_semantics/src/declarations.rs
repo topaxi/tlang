@@ -121,6 +121,14 @@ impl DeclarationAnalyzer {
                     Some(stmt.span),
                 ));
             }
+            StmtKind::StructDeclaration(decl) => {
+                self.declare_symbol(SymbolInfo::new(
+                    decl.id,
+                    &decl.name.to_string(),
+                    SymbolType::Struct,
+                    Some(stmt.span),
+                ));
+            }
         }
 
         stmt.kind = kind;
