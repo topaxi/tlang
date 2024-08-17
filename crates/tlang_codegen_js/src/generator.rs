@@ -417,7 +417,7 @@ impl CodegenJS {
             }
             StmtKind::Return(expr) => generate_return_statement(self, expr),
             StmtKind::EnumDeclaration(decl) => self.generate_enum_declaration(decl),
-            StmtKind::StructDeclaration(_decl) => todo!("Struct declaration not implemented yet."),
+            StmtKind::StructDeclaration(decl) => self.generate_struct_declaration(decl),
         }
 
         for comment in &statement.trailing_comments {
