@@ -388,10 +388,7 @@ impl<'src> Parser<'src> {
     fn parse_struct_field(&mut self) -> StructField {
         let name = self.consume_identifier();
         self.consume_token(TokenKind::Colon);
-        // TODO: Emit proper parse error.
-        let ty = self
-            .parse_type_annotation()
-            .expect("Expected type annotation");
+        let ty = self.parse_type_annotation();
         (name, ty)
     }
 
@@ -553,7 +550,7 @@ impl<'src> Parser<'src> {
         let type_annotation = match self.current_token_kind() {
             Some(TokenKind::Colon) => {
                 self.advance();
-                self.parse_type_annotation()
+                self.parse_optional_type_annotation()
             }
             _ => None,
         };
@@ -938,7 +935,7 @@ impl<'src> Parser<'src> {
                 let type_annotation = match self.current_token_kind() {
                     Some(TokenKind::Colon) => {
                         self.advance();
-                        self.parse_type_annotation()
+                        self.parse_optional_type_annotation()
                     }
                     _ => None,
                 };
@@ -967,12 +964,8 @@ impl<'src> Parser<'src> {
         )
     }
 
-    fn parse_type_annotation(&mut self) -> Option<Ty> {
-        let token = self.current_token_kind()?;
-
-        if !Self::is_type_annotation_token(&token) {
-            return None;
-        }
+    fn parse_type_annotation(&mut self) -> Ty {
+        let token = self.current_token_kind().unwrap();
 
         expect_token_matches!(self, "type annotation", TokenKind::Identifier(_));
 
@@ -981,10 +974,20 @@ impl<'src> Parser<'src> {
                 let identifier = self.parse_path();
                 let parameters = self.parse_type_annotation_parameters();
 
-                Some(Ty::new(identifier).with_parameters(parameters))
+                Ty::new(identifier).with_parameters(parameters)
             }
             _ => unreachable!("Expected type annotation, found {:?}", token),
         }
+    }
+
+    fn parse_optional_type_annotation(&mut self) -> Option<Ty> {
+        let token = self.current_token_kind()?;
+
+        if !Self::is_type_annotation_token(&token) {
+            return None;
+        }
+
+        self.parse_type_annotation().into()
     }
 
     fn parse_type_annotation_parameters(&mut self) -> Vec<Ty> {
@@ -993,7 +996,7 @@ impl<'src> Parser<'src> {
         if let Some(TokenKind::LessThan) = self.current_token_kind() {
             self.advance();
             while self.current_token_kind() != Some(TokenKind::GreaterThan) {
-                let parameter = self.parse_type_annotation().unwrap();
+                let parameter = self.parse_type_annotation();
                 parameters.push(parameter);
                 if let Some(TokenKind::Comma) = self.current_token_kind() {
                     self.advance();
@@ -1008,8 +1011,7 @@ impl<'src> Parser<'src> {
     fn parse_return_type(&mut self) -> Option<Ty> {
         if let Some(TokenKind::Arrow) = self.current_token_kind() {
             self.advance();
-            let return_type = self.parse_type_annotation()?;
-            Some(return_type)
+            self.parse_optional_type_annotation()
         } else {
             None
         }
