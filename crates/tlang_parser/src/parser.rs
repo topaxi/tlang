@@ -76,7 +76,7 @@ pub struct Parser<'src> {
 }
 
 impl<'src> Parser<'src> {
-    pub fn new(lexer: Lexer<'src>) -> Parser {
+    pub fn new(lexer: Lexer<'src>) -> Parser<'src> {
         Parser {
             lexer,
             previous_token: None,
