@@ -7,14 +7,19 @@ mod common;
 #[test]
 fn test_recursive_function_definition() {
     let output = compile!(indoc! {"
+        // factorial(int) -> int
         fn factorial(0) { 1 }
+        // factorial(int) -> int
         fn factorial(n) { n * factorial(n - 1) }
     "});
     let expected_output = indoc! {"
+        // factorial(int) -> int
         function factorial(...args) {
             if (args[0] === 0) {
+                // factorial(int) -> int
                 return 1;
             } else {
+                // factorial(int) -> int
                 let n = args[0];
                 return n * factorial(n - 1);
             }

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use tlang_ast::node::{
     Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, Pattern, PatternKind, Stmt,
     StmtKind,
@@ -18,10 +20,23 @@ pub fn generate_function_declarations(
         .iter()
         .any(|declaration| is_function_body_tail_recursive_block(&name_as_str, &declaration.body));
 
+    let mut seen_comments: HashSet<String> = HashSet::new();
+
+    // These comments were already rendered
+    for comment in first_declaration_comments {
+        if let Some(comment_str) = comment.get_comment() {
+            seen_comments.insert(comment_str.to_string());
+        }
+    }
+
     for declaration in declarations {
         for comment in &declaration.leading_comments {
-            codegen.push_indent();
-            codegen.generate_comment(comment);
+            if let Some(comment_str) = comment.get_comment() {
+                if seen_comments.insert(comment_str.to_string()) {
+                    codegen.push_indent();
+                    codegen.generate_comment(comment);
+                }
+            }
         }
     }
 

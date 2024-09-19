@@ -109,4 +109,12 @@ impl Token {
     pub fn new(kind: TokenKind, span: Span) -> Self {
         Self { kind, span }
     }
+
+    pub fn get_comment(&self) -> Option<&String> {
+        match &self.kind {
+            TokenKind::SingleLineComment(comment) => Some(comment),
+            TokenKind::MultiLineComment(comment) => Some(comment),
+            _ => None,
+        }
+    }
 }
