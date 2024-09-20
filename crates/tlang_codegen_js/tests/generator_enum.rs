@@ -157,12 +157,12 @@ fn test_maximum_depth_tree() {
                 };
             },
         };
-        function maximum_depth(...args) {
-            if (args[0].tag === \"Leaf\") {
+        function maximum_depth(arg0) {
+            if (arg0.tag === \"Leaf\") {
                 return 1;
-            } else if (args[0].tag === \"Node\") {
-                let left = args[0].left;
-                let right = args[0].right;
+            } else if (arg0.tag === \"Node\") {
+                let left = arg0.left;
+                let right = arg0.right;
                 return 1 + Math.max(maximum_depth(left), maximum_depth(right));
             }
         }
@@ -206,12 +206,12 @@ fn test_maximum_depth_tree_positional() {
                 };
             },
         };
-        function maximum_depth(...args) {
-            if (args[0].tag === \"Leaf\") {
+        function maximum_depth(arg0) {
+            if (arg0.tag === \"Leaf\") {
                 return 1;
-            } else if (args[0].tag === \"Node\") {
-                let left = args[0][0];
-                let right = args[0][1];
+            } else if (arg0.tag === \"Node\") {
+                let left = arg0[0];
+                let right = arg0[1];
                 return 1 + Math.max(maximum_depth(left), maximum_depth(right));
             }
         }

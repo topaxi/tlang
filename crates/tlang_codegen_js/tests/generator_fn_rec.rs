@@ -73,18 +73,18 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_simple() {
         fn factorial(n, acc) { return rec factorial(n - 1, n * acc); }
     "});
     let expected_output = indoc! {"
-        function factorial(...args) {
+        function factorial(arg0, arg1) {
             while (true) {
-                if (args[0] === 0) {
-                    let acc = args[1];
+                if (arg0 === 0) {
+                    let acc = arg1;
                     return acc;
                 } else {
-                    let n = args[0];
-                    let acc = args[1];
+                    let n = arg0;
+                    let acc = arg1;
                     let $tmp$a = n - 1;
                     let $tmp$b = n * acc;
-                    args[0] = $tmp$a;
-                    args[1] = $tmp$b;
+                    arg0 = $tmp$a;
+                    arg1 = $tmp$b;
                 }
             }
         }
@@ -168,22 +168,22 @@ fn test_foldl_impl() {
         fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
     "});
     let expected_output = indoc! {"
-        function foldl(...args) {
+        function foldl(arg0, arg1, arg2) {
             while (true) {
-                if (args[0].length === 0) {
-                    let acc = args[1];
+                if (arg0.length === 0) {
+                    let acc = arg1;
                     return acc;
-                } else if (args[0].length >= 1) {
-                    let acc = args[1];
-                    let f = args[2];
-                    let x = args[0][0];
-                    let xs = args[0].slice(1);
+                } else if (arg0.length >= 1) {
+                    let acc = arg1;
+                    let f = arg2;
+                    let x = arg0[0];
+                    let xs = arg0.slice(1);
                     let $tmp$b = xs;
                     let $tmp$c = f(acc, x);
                     let $tmp$d = f;
-                    args[0] = $tmp$b;
-                    args[1] = $tmp$c;
-                    args[2] = $tmp$d;
+                    arg0 = $tmp$b;
+                    arg1 = $tmp$c;
+                    arg2 = $tmp$d;
                 }
             }
         }

@@ -36,6 +36,9 @@ pub struct FunctionContext {
     // The parameters of the current function we're in.
     pub params: Vec<String>,
 
+    // The parameter name bindings of the current function we're in.
+    pub parameter_bindings: Vec<String>,
+
     // Is the current function body tail recursive?
     // This is used to determine if we should unwrap the recursion into a while loop.
     pub is_tail_recursive: bool,
@@ -190,6 +193,7 @@ impl CodegenJS {
         &mut self,
         name: &str,
         parameters: &[FunctionParameter],
+        parameter_bindings: &[String],
         is_tail_recursive: bool,
         remap_to_rest_args: bool,
     ) {
@@ -207,6 +211,7 @@ impl CodegenJS {
                     }
                 })
                 .collect(),
+            parameter_bindings: parameter_bindings.to_vec(),
             is_tail_recursive,
             remap_to_rest_args,
         });
@@ -843,6 +848,7 @@ impl CodegenJS {
                         && function_context.name == fn_identifier_to_string(function)
                     {
                         let params = function_context.params.clone();
+                        let parameter_bindings = function_context.parameter_bindings.clone();
                         let remap_to_rest_args = function_context.remap_to_rest_args;
                         let tmp_vars = params
                             .iter()
@@ -858,7 +864,8 @@ impl CodegenJS {
                         if remap_to_rest_args {
                             for (i, _arg_name) in params.iter().enumerate() {
                                 self.push_str(&self.get_indent());
-                                self.push_str(&format!("args[{}] = {};\n", i, tmp_vars[i]));
+                                let arg_name = parameter_bindings[i].clone();
+                                self.push_str(&format!("{arg_name} = {};\n", tmp_vars[i]));
                             }
                         } else {
                             for (i, arg_name) in params.iter().enumerate() {
