@@ -41,9 +41,9 @@ pub fn generate_function_declarations(
     }
 
     codegen.push_indent();
-    codegen.push_str(&format!("function {name_as_str}(...args) {{\n"));
     codegen.push_scope();
-    codegen.current_scope().declare_variable("args");
+    let args_binding = codegen.current_scope().declare_variable("args");
+    codegen.push_str(&format!("function {name_as_str}(...{args_binding}) {{\n"));
     codegen.inc_indent();
 
     // Declare and output temporary variables for if let guards.
@@ -128,14 +128,14 @@ pub fn generate_function_declarations(
                 PatternKind::Identifier { name, .. } => {
                     codegen
                         .current_scope()
-                        .declare_variable_alias(&name.to_string(), &format!("args[{j}]"));
+                        .declare_variable_alias(&name.to_string(), &format!("{args_binding}[{j}]"));
                 }
                 PatternKind::List(patterns) => {
                     for (i, pattern) in patterns.iter().enumerate() {
                         if let PatternKind::Identifier { name, .. } = &pattern.kind {
                             codegen.current_scope().declare_variable_alias(
                                 &name.to_string(),
-                                &format!("args[{j}][{i}]"),
+                                &format!("{args_binding}[{j}][{i}]"),
                             );
                         }
                     }
@@ -167,7 +167,7 @@ pub fn generate_function_declarations(
 
         if variadic_or_pattern_matching {
             if parameter_variadic {
-                codegen.push_str("if (args.length === ");
+                codegen.push_str(&format!("if ({args_binding}.length === "));
                 codegen.push_str(&declaration.parameters.len().to_string());
 
                 if pattern_matched_parameters.clone().count() > 0 {
@@ -184,12 +184,12 @@ pub fn generate_function_declarations(
 
                 match &param.pattern.kind {
                     PatternKind::Identifier { .. } | PatternKind::Literal(_) => {
-                        codegen.push_str(&format!("args[{k}] === "));
+                        codegen.push_str(&format!("{args_binding}[{k}] === "));
                         generate_function_parameter(codegen, &param.pattern);
                     }
                     PatternKind::List(patterns) => {
                         if patterns.is_empty() {
-                            codegen.push_str(&format!("args[{k}].length === 0"));
+                            codegen.push_str(&format!("{args_binding}[{k}].length === 0"));
                             continue;
                         }
 
@@ -201,14 +201,14 @@ pub fn generate_function_declarations(
                             patterns_len -= 1;
                         }
 
-                        codegen.push_str(&format!("args[{k}].length >= {patterns_len}"));
+                        codegen.push_str(&format!("{args_binding}[{k}].length >= {patterns_len}"));
 
                         for (i, pattern) in patterns.iter().enumerate() {
                             match &pattern.kind {
                                 PatternKind::Literal(_) => {
                                     codegen.push_str(" && ");
 
-                                    codegen.push_str(&format!("args[{k}][{i}] === "));
+                                    codegen.push_str(&format!("{args_binding}[{k}][{i}] === "));
                                     codegen.generate_pat(pattern);
                                 }
                                 PatternKind::Rest(identifier) => {
@@ -217,7 +217,7 @@ pub fn generate_function_declarations(
                                     {
                                         codegen.declare_function_pre_body_variable(
                                             &name.to_string(),
-                                            &format!("args[{k}].slice({i})"),
+                                            &format!("{args_binding}[{k}].slice({i})"),
                                         );
                                     } else {
                                         unreachable!();
@@ -226,7 +226,7 @@ pub fn generate_function_declarations(
                                 PatternKind::Identifier { name, .. } => {
                                     codegen.declare_function_pre_body_variable(
                                         &name.to_string(),
-                                        &format!("args[{k}][{i}]"),
+                                        &format!("{args_binding}[{k}][{i}]"),
                                     );
                                 }
                                 PatternKind::Wildcard => {}
@@ -243,7 +243,7 @@ pub fn generate_function_declarations(
                             ExprKind::Path(path) => path.segments.last().unwrap().to_string(),
                             _ => unreachable!(),
                         };
-                        codegen.push_str(&format!("args[{k}].tag === \"{identifier}\""));
+                        codegen.push_str(&format!("{args_binding}[{k}].tag === \"{identifier}\""));
                         for (i, element) in elements.iter().enumerate() {
                             let identifier = match &element.kind {
                                 // Skip any Wildcards
@@ -254,12 +254,12 @@ pub fn generate_function_declarations(
                             if *named_fields {
                                 codegen.declare_function_pre_body_variable(
                                     &identifier,
-                                    &format!("args[{k}].{identifier}"),
+                                    &format!("{args_binding}[{k}].{identifier}"),
                                 );
                             } else {
                                 codegen.declare_function_pre_body_variable(
                                     &identifier,
-                                    &format!("args[{k}][{i}]"),
+                                    &format!("{args_binding}[{k}][{i}]"),
                                 );
                             }
                         }
@@ -306,14 +306,14 @@ pub fn generate_function_declarations(
                 // and use actual arguments, but given that each signature could define
                 // different names, this is the easiest way to handle this for now.
                 let name = name.to_string();
-                let name = if name == "args" {
+                let name = if name == args_binding {
                     codegen.current_scope().declare_variable("args")
                 } else {
                     name
                 };
 
                 codegen.push_indent();
-                codegen.push_str(&format!("let {name} = args[{j}];\n"));
+                codegen.push_str(&format!("let {name} = {args_binding}[{j}];\n"));
                 codegen.current_scope().declare_variable_alias(&name, &name);
             }
         }
