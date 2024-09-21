@@ -862,15 +862,14 @@ impl CodegenJS {
                             self.push_str(";\n");
                         }
                         if remap_to_rest_args {
-                            for (i, _arg_name) in params.iter().enumerate() {
+                            for (i, arg_name) in parameter_bindings.iter().enumerate() {
                                 self.push_str(&self.get_indent());
-                                let arg_name = parameter_bindings[i].clone();
                                 self.push_str(&format!("{arg_name} = {};\n", tmp_vars[i]));
                             }
                         } else {
                             for (i, arg_name) in params.iter().enumerate() {
                                 self.push_str(&self.get_indent());
-                                self.push_str(&format!("{} = {};\n", arg_name, tmp_vars[i]));
+                                self.push_str(&format!("{arg_name} = {};\n", tmp_vars[i]));
                             }
                         }
                         return;
