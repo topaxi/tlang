@@ -73,18 +73,15 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_simple() {
         fn factorial(n, acc) { return rec factorial(n - 1, n * acc); }
     "});
     let expected_output = indoc! {"
-        function factorial(arg0, arg1) {
+        function factorial(n, acc) {
             while (true) {
-                if (arg0 === 0) {
-                    let acc = arg1;
+                if (n === 0) {
                     return acc;
                 } else {
-                    let n = arg0;
-                    let acc = arg1;
                     let $tmp$a = n - 1;
                     let $tmp$b = n * acc;
-                    arg0 = $tmp$a;
-                    arg1 = $tmp$b;
+                    n = $tmp$a;
+                    acc = $tmp$b;
                 }
             }
         }
@@ -168,22 +165,19 @@ fn test_foldl_impl() {
         fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
     "});
     let expected_output = indoc! {"
-        function foldl(arg0, arg1, arg2) {
+        function foldl(arg0, acc, f) {
             while (true) {
                 if (arg0.length === 0) {
-                    let acc = arg1;
                     return acc;
                 } else if (arg0.length >= 1) {
-                    let acc = arg1;
-                    let f = arg2;
                     let x = arg0[0];
                     let xs = arg0.slice(1);
                     let $tmp$b = xs;
                     let $tmp$c = f(acc, x);
                     let $tmp$d = f;
                     arg0 = $tmp$b;
-                    arg1 = $tmp$c;
-                    arg2 = $tmp$d;
+                    acc = $tmp$c;
+                    f = $tmp$d;
                 }
             }
         }

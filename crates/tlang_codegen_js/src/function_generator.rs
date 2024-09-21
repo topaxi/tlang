@@ -306,6 +306,12 @@ pub fn generate_function_declarations(
         // Alias identifier args back to the parameter names for readability of generated code.
         for (j, param) in declaration.parameters.iter().enumerate() {
             if let PatternKind::Identifier { ref name, .. } = param.pattern.kind {
+                let arg_name = arg_bindings[j].as_str();
+
+                if arg_name == name.name {
+                    continue;
+                }
+
                 // `args` is a special case, as we use it internally to refer to the arguments
                 // in the generated code. Given that we currently always reference arguments
                 // via `args` instead of normal arguments. We could probably be more precise
@@ -322,7 +328,6 @@ pub fn generate_function_declarations(
                 };
 
                 codegen.push_indent();
-                let arg_name = arg_bindings[j].as_str();
                 codegen.push_str(&format!("let {name} = {arg_name};\n"));
                 codegen.current_scope().declare_variable_alias(&name, &name);
             }
@@ -381,8 +386,38 @@ fn generate_function_arguments(
                 codegen.push_str(", ");
             }
 
-            bindings.push(codegen.current_scope().declare_variable(&format!("arg{i}")));
-            codegen.push_str(&format!("arg{i}"));
+            // If the name of this parameter is the same in all declarations, we can reuse the
+            // actual defined name. Otherwise we use `arg{i}` as the name.
+            let arg_name = declarations.iter().find_map(|d| {
+                let param = &d.parameters[i];
+                match param.pattern.kind {
+                    PatternKind::Identifier { ref name, .. } => Some(name.to_string()),
+                    PatternKind::Wildcard => None,
+                    PatternKind::Literal(_) => None,
+                    _ => None,
+                }
+            });
+
+            if arg_name.is_some()
+                && declarations.iter().all(|d| {
+                    let param = &d.parameters[i];
+                    match param.pattern.kind {
+                        PatternKind::Identifier { ref name, .. } => {
+                            Some(name.to_string()) == arg_name
+                        }
+                        PatternKind::Wildcard => true,
+                        PatternKind::Literal(_) => true,
+                        _ => false,
+                    }
+                })
+            {
+                bindings.push(arg_name.clone().unwrap());
+                #[allow(clippy::unnecessary_unwrap)]
+                codegen.push_str(&arg_name.unwrap());
+            } else {
+                bindings.push(codegen.current_scope().declare_variable(&format!("arg{i}")));
+                codegen.push_str(&format!("arg{i}"));
+            }
         }
 
         (None, bindings)

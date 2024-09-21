@@ -61,6 +61,14 @@ impl FunctionParameter {
         self.type_annotation = Box::new(Some(type_annotation));
         self
     }
+
+    pub fn name(self) -> Option<String> {
+        match self.pattern.kind {
+            PatternKind::Identifier { ref name, .. } => Some(name.to_string()),
+            PatternKind::Wildcard => Some(String::from("_")),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
