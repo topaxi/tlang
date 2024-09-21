@@ -352,3 +352,47 @@ fn test_function_list_match_with_wildcard() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_function_reuse_param_name_with_pattern() {
+    let output = compile!(
+        indoc! {"
+        // quicksort(a[]) -> a[]
+        fn quicksort([]) { [] }
+        fn quicksort(list) {
+          let pivotIndex = random_int(len(list));
+          let pivot = list[pivotIndex];
+          let list = [...list.slice(0, pivotIndex), ...list.slice(pivotIndex+1)];
+          let smaller = list |> filter(fn(y) { y <= pivot });
+          let greater = list |> filter(fn(y) { y > pivot });
+          [...quicksort(smaller), pivot, ...quicksort(greater)]
+        }
+    "},
+        &[
+            ("filter", SymbolType::Function),
+            ("len", SymbolType::Function),
+            ("random_int", SymbolType::Function)
+        ]
+    );
+    let expected_output = indoc! {"
+        // quicksort(a[]) -> a[]
+        function quicksort(list) {
+            if (list.length === 0) {
+                // quicksort(a[]) -> a[]
+                return [];
+            } else {
+                let pivotIndex = random_int(len(list));
+                let pivot = list[pivotIndex];
+                let list$a = [...list.slice(0, pivotIndex), ...list.slice(pivotIndex + 1)];
+                let smaller = filter(list$a, function(y) {
+                    return y <= pivot;
+                });
+                let greater = filter(list$a, function(y) {
+                    return y > pivot;
+                });
+                return [...quicksort(smaller), pivot, ...quicksort(greater)];
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+}

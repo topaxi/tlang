@@ -392,8 +392,6 @@ fn generate_function_arguments(
                 let param = &d.parameters[i];
                 match param.pattern.kind {
                     PatternKind::Identifier { ref name, .. } => Some(name.to_string()),
-                    PatternKind::Wildcard => None,
-                    PatternKind::Literal(_) => None,
                     _ => None,
                 }
             });
@@ -405,9 +403,7 @@ fn generate_function_arguments(
                         PatternKind::Identifier { ref name, .. } => {
                             Some(name.to_string()) == arg_name
                         }
-                        PatternKind::Wildcard => true,
-                        PatternKind::Literal(_) => true,
-                        _ => false,
+                        _ => true,
                     }
                 })
             {
