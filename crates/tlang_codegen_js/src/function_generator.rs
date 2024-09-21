@@ -392,6 +392,9 @@ fn generate_function_arguments(
                 let param = &d.parameters[i];
                 match param.pattern.kind {
                     PatternKind::Identifier { ref name, .. } => Some(name.to_string()),
+                    PatternKind::Enum { ref identifier, .. } => {
+                        Some(get_enum_name(identifier).to_lowercase())
+                    }
                     _ => None,
                 }
             });
@@ -403,6 +406,10 @@ fn generate_function_arguments(
                         PatternKind::Identifier { ref name, .. } => {
                             Some(name.to_string()) == arg_name
                         }
+                        PatternKind::Enum { ref identifier, .. } => {
+                            Some(get_enum_name(identifier).to_lowercase()) == arg_name
+                        }
+
                         _ => true,
                     }
                 })
@@ -434,6 +441,13 @@ fn generate_function_arguments(
         }
 
         (Some(args_binding), bindings)
+    }
+}
+
+fn get_enum_name(identifier: &Expr) -> String {
+    match &identifier.kind {
+        ExprKind::Path(path) => path.segments[path.segments.len() - 2].to_string(),
+        _ => unreachable!(),
     }
 }
 
