@@ -208,13 +208,13 @@ fn test_function_declarations_with_if_let_guard() {
     "});
     let expected_output = indoc! {"
         function filter_map(arg0, f) {
-            let $tmp$a;
+            let y;
             if (arg0.length === 0) {
                 return [];
-            } else if (arg0.length >= 1 && ($tmp$a = f(arg0[0]))) {
+            } else if (arg0.length >= 1 && (y = f(arg0[0]))) {
                 let x = arg0[0];
                 let xs = arg0.slice(1);
-                return [$tmp$a, ...filter_map(xs, f)];
+                return [y, ...filter_map(xs, f)];
             } else if (arg0.length >= 1) {
                 let x = arg0[0];
                 let xs = arg0.slice(1);
@@ -235,13 +235,13 @@ fn test_function_declarations_with_if_let_guard_enum() {
     let expected_output = indoc! {"
         function filter_map(arg0, f) {
             let $tmp$a;
-            let $tmp$b;
+            let y;
             if (arg0.length === 0) {
                 return [];
-            } else if (arg0.length >= 1 && ($tmp$a = f(arg0[0])) && $tmp$a.tag === \"Some\" && (($tmp$b = $tmp$a[0]), true)) {
+            } else if (arg0.length >= 1 && ($tmp$a = f(arg0[0])) && $tmp$a.tag === \"Some\" && ((y = $tmp$a[0]), true)) {
                 let x = arg0[0];
                 let xs = arg0.slice(1);
-                return [$tmp$b, ...filter_map(xs, f)];
+                return [y, ...filter_map(xs, f)];
             } else if (arg0.length >= 1) {
                 let x = arg0[0];
                 let xs = arg0.slice(1);
@@ -262,13 +262,13 @@ fn test_function_declarations_with_if_let_guard_named_fields_enum() {
     let expected_output = indoc! {"
         function filter_map(arg0, f) {
             let $tmp$a;
-            let $tmp$b;
+            let value;
             if (arg0.length === 0) {
                 return [];
-            } else if (arg0.length >= 1 && ($tmp$a = f(arg0[0])) && $tmp$a.tag === \"Some\" && (($tmp$b = $tmp$a.value), true)) {
+            } else if (arg0.length >= 1 && ($tmp$a = f(arg0[0])) && $tmp$a.tag === \"Some\" && ((value = $tmp$a.value), true)) {
                 let x = arg0[0];
                 let xs = arg0.slice(1);
-                return [$tmp$b, ...filter_map(xs, f)];
+                return [value, ...filter_map(xs, f)];
             } else if (arg0.length >= 1) {
                 let x = arg0[0];
                 let xs = arg0.slice(1);
@@ -298,15 +298,15 @@ fn test_function_declarations_with_comments_inbetween() {
         // Comment 3
         function filter_map(arg0, f) {
             let $tmp$a;
-            let $tmp$b;
+            let value;
             if (arg0.length === 0) {
                 // Comment 1
                 return [];
-            } else if (arg0.length >= 1 && ($tmp$a = f(arg0[0])) && $tmp$a.tag === \"Some\" && (($tmp$b = $tmp$a.value), true)) {
+            } else if (arg0.length >= 1 && ($tmp$a = f(arg0[0])) && $tmp$a.tag === \"Some\" && ((value = $tmp$a.value), true)) {
                 // Comment 2
                 let x = arg0[0];
                 let xs = arg0.slice(1);
-                return [$tmp$b, ...filter_map(xs, f)];
+                return [value, ...filter_map(xs, f)];
             } else if (arg0.length >= 1) {
                 // Comment 3
                 let xs = arg0.slice(1);

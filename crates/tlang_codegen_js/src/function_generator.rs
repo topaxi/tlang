@@ -53,22 +53,18 @@ pub fn generate_function_declarations(
             if let ExprKind::Let(pattern, _) = &expr.kind {
                 match &pattern.kind {
                     PatternKind::Identifier { name, .. } => {
-                        let tmp_variable = codegen.current_scope().declare_tmp_variable();
+                        let tmp_variable =
+                            codegen.current_scope().declare_variable(&name.to_string());
                         codegen.push_indent();
                         codegen.push_str(&format!("let {tmp_variable};\n"));
-                        codegen
-                            .current_scope()
-                            .declare_variable_alias(&name.to_string(), &tmp_variable);
                     }
                     PatternKind::List(patterns) => {
                         for pattern in patterns {
                             if let PatternKind::Identifier { name, .. } = &pattern.kind {
-                                let tmp_variable = codegen.current_scope().declare_tmp_variable();
+                                let tmp_variable =
+                                    codegen.current_scope().declare_variable(&name.to_string());
                                 codegen.push_indent();
                                 codegen.push_str(&format!("let {tmp_variable};\n"));
-                                codegen
-                                    .current_scope()
-                                    .declare_variable_alias(&name.to_string(), &tmp_variable);
                             }
                         }
                     }
@@ -94,12 +90,10 @@ pub fn generate_function_declarations(
                                 PatternKind::Identifier { name, .. } => name.to_string(),
                                 _ => unreachable!(),
                             };
-                            let tmp_variable = codegen.current_scope().declare_tmp_variable();
+                            let tmp_variable =
+                                codegen.current_scope().declare_variable(&identifier);
                             codegen.push_indent();
                             codegen.push_str(&format!("let {tmp_variable};\n"));
-                            codegen
-                                .current_scope()
-                                .declare_variable_alias(&identifier, &tmp_variable);
                         }
                     }
                     _ => todo!("Handle if let guards with non-identifier patterns."),
