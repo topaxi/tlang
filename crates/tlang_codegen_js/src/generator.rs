@@ -316,7 +316,7 @@ impl CodegenJS {
         self.push_str(";\n");
         if !has_completion_var {
             self.indent_level -= 1;
-            self.push_str(&self.get_indent());
+            self.push_indent();
             self.push_str("};\n");
             self.flush_statement_buffer();
             self.push_str(&lhs);
@@ -355,7 +355,7 @@ impl CodegenJS {
                 }
             }
 
-            self.push_str(&self.get_indent());
+            self.push_indent();
             self.push_str("return ");
             self.push_context(BlockContext::Expression);
             self.generate_expr(&block.expression.clone().unwrap(), None);
@@ -397,7 +397,7 @@ impl CodegenJS {
         match &statement.kind {
             StmtKind::None => {}
             StmtKind::Expr(expr) => {
-                self.push_str(&self.get_indent());
+                self.push_indent();
                 self.context_stack.push(BlockContext::Statement);
                 self.generate_expr(expr, None);
                 self.context_stack.pop();
@@ -487,14 +487,14 @@ impl CodegenJS {
                     if i > 0 {
                         self.push_str(",\n");
                     }
-                    self.push_str(&self.get_indent());
+                    self.push_indent();
                     self.generate_expr(key, None);
                     self.push_str(": ");
                     self.generate_expr(value, None);
                 }
                 self.push_str(",\n");
                 self.indent_level -= 1;
-                self.push_str(&self.get_indent());
+                self.push_indent();
                 self.push_char('}');
             }
             ExprKind::UnaryOp(op, expr) => {
@@ -588,7 +588,7 @@ impl CodegenJS {
     }
 
     fn generate_variable_declaration_identifier(&mut self, name: &str, value: &Expr) {
-        self.push_str(&self.get_indent());
+        self.push_indent();
         let shadowed_name = self.current_scope().resolve_variable(name);
         let var_name = self.current_scope().declare_variable(name);
         self.push_str(&format!("let {var_name} = "));
@@ -604,7 +604,7 @@ impl CodegenJS {
     }
 
     fn generate_variable_declaration_list_pattern(&mut self, patterns: &[Pattern], value: &Expr) {
-        self.push_str(&self.get_indent());
+        self.push_indent();
         self.push_str("let [");
 
         let mut bindings = vec![];
@@ -685,7 +685,7 @@ impl CodegenJS {
         self.indent_level -= 1;
 
         if let Some(else_branch) = else_branch {
-            self.push_str(&self.get_indent());
+            self.push_indent();
             self.push_str("} else {\n");
             self.indent_level += 1;
             self.flush_statement_buffer();
@@ -693,7 +693,7 @@ impl CodegenJS {
             self.indent_level -= 1;
         }
 
-        self.push_str(&self.get_indent());
+        self.push_indent();
         self.push_char('}');
         if has_block_completions {
             self.push_str("\n");
@@ -704,7 +704,7 @@ impl CodegenJS {
                 let completion_var = self.completion_variables.last().unwrap().clone().unwrap();
                 self.push_str(&completion_var);
             } else {
-                self.push_str(&self.get_indent());
+                self.push_indent();
                 let completion_var = self.completion_variables.last().unwrap().clone().unwrap();
                 let prev_completion_var = self.completion_variables
                     [self.completion_variables.len() - 2]
@@ -717,19 +717,19 @@ impl CodegenJS {
     }
 
     fn generate_enum_declaration(&mut self, decl: &EnumDeclaration) {
-        self.push_str(&self.get_indent());
+        self.push_indent();
         self.push_str(&format!("const {} = {{\n", decl.name));
         self.indent_level += 1;
         for variant in &decl.variants {
             self.generate_enum_variant(&variant.name, variant.named_fields, &variant.parameters);
         }
         self.indent_level -= 1;
-        self.push_str(&self.get_indent());
+        self.push_indent();
         self.push_str("};\n");
     }
 
     fn generate_enum_variant(&mut self, name: &Ident, named_fields: bool, parameters: &[Ident]) {
-        self.push_str(&self.get_indent());
+        self.push_indent();
 
         if parameters.is_empty() {
             self.push_str(&format!("{name}: {{ tag: \"{name}\" }},\n"));
@@ -751,13 +751,13 @@ impl CodegenJS {
         }
         self.push_str(") {\n");
         self.indent_level += 1;
-        self.push_str(&self.get_indent());
+        self.push_indent();
         self.push_str("return {\n");
         self.indent_level += 1;
-        self.push_str(&self.get_indent());
+        self.push_indent();
         self.push_str(format!("tag: \"{name}\",\n").as_str());
         for (i, param) in parameters.iter().enumerate() {
-            self.push_str(&self.get_indent());
+            self.push_indent();
             if named_fields {
                 self.push_str(&param.to_string());
             } else {
@@ -767,10 +767,10 @@ impl CodegenJS {
             self.push_str(",\n");
         }
         self.indent_level -= 1;
-        self.push_str(&self.get_indent());
+        self.push_indent();
         self.push_str("};\n");
         self.indent_level -= 1;
-        self.push_str(&self.get_indent());
+        self.push_indent();
         self.push_str("},\n");
     }
 
@@ -791,7 +791,7 @@ impl CodegenJS {
         if has_wildcards {
             self.push_str("function(...args) {\n");
             self.indent_level += 1;
-            self.push_str(&self.get_indent());
+            self.push_indent();
             self.push_str("return ");
             self.generate_expr(function, None);
             self.push_char('(');
@@ -812,7 +812,7 @@ impl CodegenJS {
 
             self.push_str(");\n");
             self.indent_level -= 1;
-            self.push_str(&self.get_indent());
+            self.push_indent();
             self.push_char('}');
             return;
         }
@@ -856,19 +856,19 @@ impl CodegenJS {
                             .collect::<Vec<_>>();
 
                         for (i, arg) in arguments.iter().enumerate() {
-                            self.push_str(&self.get_indent());
+                            self.push_indent();
                             self.push_str(&format!("let {} = ", tmp_vars[i]));
                             self.generate_expr(arg, None);
                             self.push_str(";\n");
                         }
                         if remap_to_rest_args {
                             for (i, arg_name) in parameter_bindings.iter().enumerate() {
-                                self.push_str(&self.get_indent());
+                                self.push_indent();
                                 self.push_str(&format!("{arg_name} = {};\n", tmp_vars[i]));
                             }
                         } else {
                             for (i, arg_name) in params.iter().enumerate() {
-                                self.push_str(&self.get_indent());
+                                self.push_indent();
                                 self.push_str(&format!("{arg_name} = {};\n", tmp_vars[i]));
                             }
                         }
@@ -882,6 +882,7 @@ impl CodegenJS {
         self.generate_expr(node, parent_op);
     }
 
+    #[inline(always)]
     fn get_indent(&self) -> String {
         "    ".repeat(self.indent_level)
     }
