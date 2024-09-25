@@ -784,48 +784,31 @@ impl CodegenJS {
     }
 
     fn generate_call_expression(&mut self, function: &Expr, arguments: &[Expr]) {
-        let has_wildcards = arguments
+        let is_partial_application = arguments
             .iter()
             .any(|arg| matches!(arg.kind, ExprKind::Wildcard));
 
-        if has_wildcards {
-            self.push_str("function(...args) {\n");
-            self.indent_level += 1;
-            self.push_indent();
-            self.push_str("return ");
-            self.generate_expr(function, None);
-            self.push_char('(');
-
-            let mut wildcard_index = 0;
-            for (i, arg) in arguments.iter().enumerate() {
-                if i > 0 {
-                    self.push_str(", ");
-                }
-
-                if let ExprKind::Wildcard = arg.kind {
-                    self.push_str(format!("args[{wildcard_index}]").as_str());
-                    wildcard_index += 1;
-                } else {
-                    self.generate_expr(arg, None);
-                }
-            }
-
-            self.push_str(");\n");
-            self.indent_level -= 1;
-            self.push_indent();
-            self.push_char('}');
-            return;
+        if is_partial_application {
+            self.push_str("(...args) => ");
         }
 
         self.generate_expr(function, None);
         self.push_char('(');
 
+        let mut wildcard_index = 0;
         for (i, arg) in arguments.iter().enumerate() {
             if i > 0 {
                 self.push_str(", ");
             }
-            self.generate_expr(arg, None);
+
+            if let ExprKind::Wildcard = arg.kind {
+                self.push_str(format!("args[{wildcard_index}]").as_str());
+                wildcard_index += 1;
+            } else {
+                self.generate_expr(arg, None);
+            }
         }
+
         self.push_char(')');
     }
 
