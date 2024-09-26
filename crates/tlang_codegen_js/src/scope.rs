@@ -26,7 +26,7 @@ impl Scope {
             return name.to_string();
         }
         // If already declared, generate a new name with a suffix (e.g., $a, $b)
-        let new_name = self.get_unique_variable_name(name);
+        let new_name = self.get_unique_variable_name(&format!("{name}$"));
         self.variables.insert(name.to_string(), new_name.clone());
         new_name
     }
