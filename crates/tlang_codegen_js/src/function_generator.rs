@@ -510,14 +510,14 @@ fn generate_function_definition_guard(codegen: &mut CodegenJS, node: &Expr) {
 }
 
 pub fn generate_function_parameter_list(codegen: &mut CodegenJS, parameters: &[FunctionParameter]) {
-    codegen.push_str("(");
+    codegen.push_char('(');
     for (i, param) in parameters.iter().enumerate() {
         if i > 0 {
             codegen.push_str(", ");
         }
         codegen.generate_pat(&param.pattern);
     }
-    codegen.push_str(")");
+    codegen.push_char(')');
 }
 
 pub fn generate_function_declaration(codegen: &mut CodegenJS, declaration: &FunctionDeclaration) {

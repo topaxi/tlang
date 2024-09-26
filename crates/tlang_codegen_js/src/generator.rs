@@ -549,14 +549,14 @@ impl CodegenJS {
             } => self.generate_enum_extraction(identifier, elements, *named_fields),
             PatternKind::Literal(expr) => self.generate_expr(expr, None),
             PatternKind::List(patterns) => {
-                self.push_str("[");
+                self.push_char('[');
                 for (i, pattern) in patterns.iter().enumerate() {
                     if i > 0 {
                         self.push_str(", ");
                     }
                     self.generate_pat(pattern);
                 }
-                self.push_str("]");
+                self.push_char(']');
             }
             PatternKind::Rest(pattern) => {
                 self.push_str("...");

@@ -64,7 +64,7 @@ pub fn generate_match_expression(codegen: &mut CodegenJS, expression: &Expr, arm
             codegen.dec_indent();
             codegen.push_indent();
             if i == arms.len() - 1 {
-                codegen.push_str("}");
+                codegen.push_char('}');
             } else {
                 codegen.push_str("} else ");
             }
@@ -76,7 +76,7 @@ pub fn generate_match_expression(codegen: &mut CodegenJS, expression: &Expr, arm
             codegen.pop_context();
             codegen.dec_indent();
             codegen.push_indent();
-            codegen.push_str("}");
+            codegen.push_char('}');
         }
     }
 
