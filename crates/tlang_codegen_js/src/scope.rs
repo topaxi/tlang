@@ -36,18 +36,22 @@ impl Scope {
     }
 
     fn get_unique_variable_name(&self, prefix: &str) -> String {
-        let mut suffix = 'a';
+        let mut suffix = 0;
         loop {
             let new_name = format!("{prefix}${suffix}");
             if !self.has_variable_in_scope(&new_name) {
                 return new_name;
             }
-            suffix = (suffix as u8 + 1) as char;
+            suffix += 1;
         }
     }
 
     pub fn declare_tmp_variable(&mut self) -> String {
-        let tmp_var_name = self.get_unique_variable_name("$tmp");
+        self.declare_unique_variable("$tmp")
+    }
+
+    pub fn declare_unique_variable(&mut self, prefix: &str) -> String {
+        let tmp_var_name = self.get_unique_variable_name(prefix);
         self.variables
             .insert(tmp_var_name.clone(), tmp_var_name.clone());
         tmp_var_name

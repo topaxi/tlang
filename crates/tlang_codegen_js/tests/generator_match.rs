@@ -14,12 +14,12 @@ fn test_codegen_pattern_match_expressions() {
     "});
     let expected_output = indoc! {"
         let x = 42;
-        let $tmp$a = x,$tmp$b;if ($tmp$a === 42) {
-            $tmp$b = 1;
+        let $tmp$0 = x,$tmp$1;if ($tmp$0 === 42) {
+            $tmp$1 = 1;
         } else {
-            $tmp$b = 0;
+            $tmp$1 = 0;
         }
-        let y = $tmp$b;
+        let y = $tmp$1;
     "};
 
     assert_eq!(output, expected_output);
@@ -36,12 +36,12 @@ fn test_codegen_pattern_match_blocks() {
     "});
     let expected_output = indoc! {"
         let x = 42;
-        let $tmp$a = x,$tmp$b;if ($tmp$a === 42) {
-            $tmp$b = 1;
+        let $tmp$0 = x,$tmp$1;if ($tmp$0 === 42) {
+            $tmp$1 = 1;
         } else {
-            $tmp$b = 0;
+            $tmp$1 = 0;
         }
-        let y = $tmp$b;
+        let y = $tmp$1;
     "};
 
     assert_eq!(output, expected_output);

@@ -20,10 +20,10 @@ fn test_simple_self_recursive_tail_call_converted_to_loop() {
                 if (n === 0) {
                     return acc;
                 } else {
-                    let $tmp$a = n - 1;
-                    let $tmp$b = n * acc;
-                    n = $tmp$a;
-                    acc = $tmp$b;
+                    let $tmp$0 = n - 1;
+                    let $tmp$1 = n * acc;
+                    n = $tmp$0;
+                    acc = $tmp$1;
                 }
             }
         }
@@ -53,10 +53,10 @@ fn test_fn_expression_explicit_tail_recursive_call_converted_to_loop() {
                     if (n === 0) {
                         return acc;
                     } else {
-                        let $tmp$a = n - 1;
-                        let $tmp$b = n * acc;
-                        n = $tmp$a;
-                        acc = $tmp$b;
+                        let $tmp$0 = n - 1;
+                        let $tmp$1 = n * acc;
+                        n = $tmp$0;
+                        acc = $tmp$1;
                     }
                 }
             };
@@ -78,10 +78,10 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_simple() {
                 if (n === 0) {
                     return acc;
                 } else {
-                    let $tmp$a = n - 1;
-                    let $tmp$b = n * acc;
-                    n = $tmp$a;
-                    acc = $tmp$b;
+                    let $tmp$0 = n - 1;
+                    let $tmp$1 = n * acc;
+                    n = $tmp$0;
+                    acc = $tmp$1;
                 }
             }
         }
@@ -108,10 +108,10 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_convenient() {
                 } else if (args.length === 2) {
                     let n = args[0];
                     let acc = args[1];
-                    let $tmp$a = n - 1;
-                    let $tmp$b = n * acc;
-                    args[0] = $tmp$a;
-                    args[1] = $tmp$b;
+                    let $tmp$0 = n - 1;
+                    let $tmp$1 = n * acc;
+                    args[0] = $tmp$0;
+                    args[1] = $tmp$1;
                 }
             }
         }
@@ -145,12 +145,12 @@ fn test_tail_recursive_fibonacci() {
                     let n = args[0];
                     let a = args[1];
                     let b = args[2];
-                    let $tmp$a = n - 1;
-                    let $tmp$b = b;
-                    let $tmp$c = a + b;
-                    args[0] = $tmp$a;
-                    args[1] = $tmp$b;
-                    args[2] = $tmp$c;
+                    let $tmp$0 = n - 1;
+                    let $tmp$1 = b;
+                    let $tmp$2 = a + b;
+                    args[0] = $tmp$0;
+                    args[1] = $tmp$1;
+                    args[2] = $tmp$2;
                 }
             }
         }
@@ -172,12 +172,12 @@ fn test_foldl_impl() {
                 } else if (arg0.length >= 1) {
                     let x = arg0[0];
                     let xs = arg0.slice(1);
-                    let $tmp$b = xs;
-                    let $tmp$c = f(acc, x);
-                    let $tmp$d = f;
-                    arg0 = $tmp$b;
-                    acc = $tmp$c;
-                    f = $tmp$d;
+                    let $tmp$1 = xs;
+                    let $tmp$2 = f(acc, x);
+                    let $tmp$3 = f;
+                    arg0 = $tmp$1;
+                    acc = $tmp$2;
+                    f = $tmp$3;
                 }
             }
         }
@@ -224,26 +224,26 @@ fn test_partition_impl() {
                     let doesNotSatisfy = args[3];
                     let x = args[0][0];
                     let xs = args[0].slice(1);
-                    let $tmp$b;if (predicate(x)) {
-                        $tmp$b = [...satisfies, x];
+                    let $tmp$1;if (predicate(x)) {
+                        $tmp$1 = [...satisfies, x];
                     } else {
-                        $tmp$b = satisfies;
+                        $tmp$1 = satisfies;
                     }
-                    let partitionedSatisfies = $tmp$b;
-                    let $tmp$c;if (predicate(x)) {
-                        $tmp$c = doesNotSatisfy;
+                    let partitionedSatisfies = $tmp$1;
+                    let $tmp$2;if (predicate(x)) {
+                        $tmp$2 = doesNotSatisfy;
                     } else {
-                        $tmp$c = [...doesNotSatisfy, x];
+                        $tmp$2 = [...doesNotSatisfy, x];
                     }
-                    let partitionedDoesNotSatisfy = $tmp$c;
-                    let $tmp$d = xs;
-                    let $tmp$e = predicate;
-                    let $tmp$f = partitionedSatisfies;
-                    let $tmp$g = partitionedDoesNotSatisfy;
-                    args[0] = $tmp$d;
-                    args[1] = $tmp$e;
-                    args[2] = $tmp$f;
-                    args[3] = $tmp$g;
+                    let partitionedDoesNotSatisfy = $tmp$2;
+                    let $tmp$3 = xs;
+                    let $tmp$4 = predicate;
+                    let $tmp$5 = partitionedSatisfies;
+                    let $tmp$6 = partitionedDoesNotSatisfy;
+                    args[0] = $tmp$3;
+                    args[1] = $tmp$4;
+                    args[2] = $tmp$5;
+                    args[3] = $tmp$6;
                 }
             }
         }
@@ -283,12 +283,12 @@ fn test_all_impl() {
                     let predicate = args[1];
                     let acc = args[2];
                     let xs = args[0].slice(1);
-                    let $tmp$b = xs;
-                    let $tmp$c = predicate;
-                    let $tmp$d = acc;
-                    args[0] = $tmp$b;
-                    args[1] = $tmp$c;
-                    args[2] = $tmp$d;
+                    let $tmp$1 = xs;
+                    let $tmp$2 = predicate;
+                    let $tmp$3 = acc;
+                    args[0] = $tmp$1;
+                    args[1] = $tmp$2;
+                    args[2] = $tmp$3;
                 }
             }
         }

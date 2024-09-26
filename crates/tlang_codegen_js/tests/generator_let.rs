@@ -19,7 +19,7 @@ fn test_codegen_variable_declaration_with_expression() {
 #[test]
 fn test_variable_shadowing() {
     let output = compile!("let x = 42; let x = 43; x;");
-    let expected_output = "let x = 42;\nlet x$a = 43;\nx$a;\n";
+    let expected_output = "let x = 42;\nlet x$0 = 43;\nx$0;\n";
     assert_eq!(output, expected_output);
 }
 
@@ -43,7 +43,7 @@ fn test_codegen_list_pattern_with_wildcard() {
 fn test_codegen_list_pattern_repetition() {
     // TODO: Should this be allowed?
     let output = compile!("let [x, x] = [1, 2]; x;");
-    let expected_output = "let [x, x$a] = [1, 2];\nx$a;\n";
+    let expected_output = "let [x, x$0] = [1, 2];\nx$0;\n";
 
     assert_eq!(output, expected_output);
 }

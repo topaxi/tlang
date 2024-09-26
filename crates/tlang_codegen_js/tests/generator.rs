@@ -86,10 +86,10 @@ fn test_codegen_operator_precedence() {
 fn test_block_expression() {
     let output = compile!("let one = { 1 };");
     let expected_output = indoc! {"
-        let $tmp$a;{
-            $tmp$a = 1;
+        let $tmp$0;{
+            $tmp$0 = 1;
         };
-        let one = $tmp$a;
+        let one = $tmp$0;
     "};
     assert_eq!(output, expected_output);
 }
@@ -98,11 +98,11 @@ fn test_block_expression() {
 fn test_block_expression_with_statements() {
     let output = compile!("let one = { let x = 1; x };");
     let expected_output = indoc! {"
-        let $tmp$a;{
+        let $tmp$0;{
             let x = 1;
-            $tmp$a = x;
+            $tmp$0 = x;
         };
-        let one = $tmp$a;
+        let one = $tmp$0;
     "};
     assert_eq!(output, expected_output);
 }
@@ -125,12 +125,12 @@ fn test_if_else_as_expression_as_fn_completion() {
     let output = compile!("fn main() { if true { 1 } else { 2 } }");
     let expected_output = indoc! {"
         function main() {
-            let $tmp$a;if (true) {
-                $tmp$a = 1;
+            let $tmp$0;if (true) {
+                $tmp$0 = 1;
             } else {
-                $tmp$a = 2;
+                $tmp$0 = 2;
             }
-            return $tmp$a;
+            return $tmp$0;
         }
     "};
     assert_eq!(output, expected_output);
@@ -141,12 +141,12 @@ fn test_if_else_as_expression() {
     let output = compile!("fn main() { let result = if true { 1 } else { 2 }; }");
     let expected_output = indoc! {"
         function main() {
-            let $tmp$a;if (true) {
-                $tmp$a = 1;
+            let $tmp$0;if (true) {
+                $tmp$0 = 1;
             } else {
-                $tmp$a = 2;
+                $tmp$0 = 2;
             }
-            let result = $tmp$a;
+            let result = $tmp$0;
         }
     "};
     assert_eq!(output, expected_output);
@@ -158,17 +158,17 @@ fn test_if_else_as_expression_nested() {
         compile!("fn main() { let result = if true { if true { 1 } else { 2 } } else { 3 }; }");
     let expected_output = indoc! {"
         function main() {
-            let $tmp$a;if (true) {
-                let $tmp$b;if (true) {
-                    $tmp$b = 1;
+            let $tmp$0;if (true) {
+                let $tmp$1;if (true) {
+                    $tmp$1 = 1;
                 } else {
-                    $tmp$b = 2;
+                    $tmp$1 = 2;
                 }
-                $tmp$a = $tmp$b;
+                $tmp$0 = $tmp$1;
             } else {
-                $tmp$a = 3;
+                $tmp$0 = 3;
             }
-            let result = $tmp$a;
+            let result = $tmp$0;
         }
     "};
     assert_eq!(output, expected_output);
@@ -189,7 +189,7 @@ fn test_list_literal() {
 fn test_partial_application() {
     let output = compile!("let add1 = add(_, 1);", &[("add", SymbolType::Function)]);
     let expected_output = indoc! {"
-        let add1 = ($tmp$a) => add($tmp$a, 1);
+        let add1 = ($0) => add($0, 1);
     "};
     assert_eq!(output, expected_output);
 }
@@ -198,7 +198,7 @@ fn test_partial_application() {
 fn test_partial_application_with_multiple_arguments() {
     let output = compile!("let add1 = add(_, 1, _);", &[("add", SymbolType::Function)]);
     let expected_output = indoc! {"
-        let add1 = ($tmp$a, $tmp$b) => add($tmp$a, 1, $tmp$b);
+        let add1 = ($0, $1) => add($0, 1, $1);
     "};
     assert_eq!(output, expected_output);
 }

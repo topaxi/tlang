@@ -798,7 +798,7 @@ impl CodegenJS {
                 self.push_str(", ");
             }
 
-            let tmp_var = self.scopes.declare_tmp_variable();
+            let tmp_var = self.scopes.declare_unique_variable("");
 
             self.push_str(&tmp_var);
 

@@ -167,7 +167,7 @@ fn test_function_declarations_args_redefinition_should_not_collide() {
             if (args.length === 1 && args[0] === 0) {
                 return 0;
             } else if (args.length === 2 && args[0] === 0) {
-                let args$a = args[1];
+                let args$0 = args[1];
                 return 0;
             }
         }
@@ -234,11 +234,11 @@ fn test_function_declarations_with_if_let_guard_enum() {
     "});
     let expected_output = indoc! {"
         function filter_map(arg0, f) {
-            let $tmp$a;
+            let $tmp$0;
             let y;
             if (arg0.length === 0) {
                 return [];
-            } else if (arg0.length >= 1 && ($tmp$a = f(arg0[0])) && $tmp$a.tag === \"Some\" && ((y = $tmp$a[0]), true)) {
+            } else if (arg0.length >= 1 && ($tmp$0 = f(arg0[0])) && $tmp$0.tag === \"Some\" && ((y = $tmp$0[0]), true)) {
                 let x = arg0[0];
                 let xs = arg0.slice(1);
                 return [y, ...filter_map(xs, f)];
@@ -261,11 +261,11 @@ fn test_function_declarations_with_if_let_guard_named_fields_enum() {
     "});
     let expected_output = indoc! {"
         function filter_map(arg0, f) {
-            let $tmp$a;
+            let $tmp$0;
             let value;
             if (arg0.length === 0) {
                 return [];
-            } else if (arg0.length >= 1 && ($tmp$a = f(arg0[0])) && $tmp$a.tag === \"Some\" && ((value = $tmp$a.value), true)) {
+            } else if (arg0.length >= 1 && ($tmp$0 = f(arg0[0])) && $tmp$0.tag === \"Some\" && ((value = $tmp$0.value), true)) {
                 let x = arg0[0];
                 let xs = arg0.slice(1);
                 return [value, ...filter_map(xs, f)];
@@ -297,12 +297,12 @@ fn test_function_declarations_with_comments_inbetween() {
         // Comment 2
         // Comment 3
         function filter_map(arg0, f) {
-            let $tmp$a;
+            let $tmp$0;
             let value;
             if (arg0.length === 0) {
                 // Comment 1
                 return [];
-            } else if (arg0.length >= 1 && ($tmp$a = f(arg0[0])) && $tmp$a.tag === \"Some\" && ((value = $tmp$a.value), true)) {
+            } else if (arg0.length >= 1 && ($tmp$0 = f(arg0[0])) && $tmp$0.tag === \"Some\" && ((value = $tmp$0.value), true)) {
                 // Comment 2
                 let x = arg0[0];
                 let xs = arg0.slice(1);
@@ -383,11 +383,11 @@ fn test_function_reuse_param_name_with_pattern() {
             } else {
                 let pivotIndex = random_int(len(list));
                 let pivot = list[pivotIndex];
-                let list$a = [...list.slice(0, pivotIndex), ...list.slice(pivotIndex + 1)];
-                let smaller = filter(list$a, function(y) {
+                let list$0 = [...list.slice(0, pivotIndex), ...list.slice(pivotIndex + 1)];
+                let smaller = filter(list$0, function(y) {
                     return y <= pivot;
                 });
-                let greater = filter(list$a, function(y) {
+                let greater = filter(list$0, function(y) {
                     return y > pivot;
                 });
                 return [...quicksort(smaller), pivot, ...quicksort(greater)];
