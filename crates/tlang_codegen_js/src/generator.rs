@@ -784,12 +784,28 @@ impl CodegenJS {
     }
 
     fn generate_call_expression(&mut self, function: &Expr, arguments: &[Expr]) {
-        let is_partial_application = arguments
+        let wildcard_count = arguments
             .iter()
-            .any(|arg| matches!(arg.kind, ExprKind::Wildcard));
+            .filter(|arg| matches!(arg.kind, ExprKind::Wildcard))
+            .count();
+        let mut placeholders = vec![];
 
-        if is_partial_application {
-            self.push_str("(...args) => ");
+        if wildcard_count > 0 {
+            self.push_char('(');
+
+            for n in 0..wildcard_count {
+                if n > 0 {
+                    self.push_str(", ");
+                }
+
+                let tmp_var = self.scopes.declare_tmp_variable();
+
+                self.push_str(&tmp_var);
+
+                placeholders.push(tmp_var);
+            }
+
+            self.push_str(") => ");
         }
 
         self.generate_expr(function, None);
@@ -802,7 +818,7 @@ impl CodegenJS {
             }
 
             if let ExprKind::Wildcard = arg.kind {
-                self.push_str(format!("args[{wildcard_index}]").as_str());
+                self.push_str(&placeholders[wildcard_index]);
                 wildcard_index += 1;
             } else {
                 self.generate_expr(arg, None);
