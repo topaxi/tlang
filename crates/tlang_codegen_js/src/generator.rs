@@ -783,30 +783,29 @@ impl CodegenJS {
         todo!("enum extraction outside of function parameters is not implemented yet.")
     }
 
-    fn generate_call_expression(&mut self, function: &Expr, arguments: &[Expr]) {
-        let wildcard_count = arguments
-            .iter()
-            .filter(|arg| matches!(arg.kind, ExprKind::Wildcard))
-            .count();
+    fn generate_partial_application(
+        &mut self,
+        function: &Expr,
+        arguments: &[Expr],
+        wildcard_count: usize,
+    ) {
         let mut placeholders = vec![];
 
-        if wildcard_count > 0 {
-            self.push_char('(');
+        self.push_char('(');
 
-            for n in 0..wildcard_count {
-                if n > 0 {
-                    self.push_str(", ");
-                }
-
-                let tmp_var = self.scopes.declare_tmp_variable();
-
-                self.push_str(&tmp_var);
-
-                placeholders.push(tmp_var);
+        for n in 0..wildcard_count {
+            if n > 0 {
+                self.push_str(", ");
             }
 
-            self.push_str(") => ");
+            let tmp_var = self.scopes.declare_tmp_variable();
+
+            self.push_str(&tmp_var);
+
+            placeholders.push(tmp_var);
         }
+
+        self.push_str(") => ");
 
         self.generate_expr(function, None);
         self.push_char('(');
@@ -823,6 +822,30 @@ impl CodegenJS {
             } else {
                 self.generate_expr(arg, None);
             }
+        }
+
+        self.push_char(')');
+    }
+
+    fn generate_call_expression(&mut self, function: &Expr, arguments: &[Expr]) {
+        let wildcard_count = arguments
+            .iter()
+            .filter(|arg| matches!(arg.kind, ExprKind::Wildcard))
+            .count();
+
+        if wildcard_count > 0 {
+            return self.generate_partial_application(function, arguments, wildcard_count);
+        }
+
+        self.generate_expr(function, None);
+        self.push_char('(');
+
+        for (i, arg) in arguments.iter().enumerate() {
+            if i > 0 {
+                self.push_str(", ");
+            }
+
+            self.generate_expr(arg, None);
         }
 
         self.push_char(')');
