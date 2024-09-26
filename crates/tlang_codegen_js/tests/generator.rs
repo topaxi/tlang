@@ -189,7 +189,7 @@ fn test_list_literal() {
 fn test_partial_application() {
     let output = compile!("let add1 = add(_, 1);", &[("add", SymbolType::Function)]);
     let expected_output = indoc! {"
-        let add1 = ($0) => add($0, 1);
+        let add1 = (_) => add(_, 1);
     "};
     assert_eq!(output, expected_output);
 }
@@ -198,7 +198,7 @@ fn test_partial_application() {
 fn test_partial_application_with_multiple_arguments() {
     let output = compile!("let add1 = add(_, 1, _);", &[("add", SymbolType::Function)]);
     let expected_output = indoc! {"
-        let add1 = ($0, $1) => add($0, 1, $1);
+        let add1 = (_0, _1) => add(_0, 1, _1);
     "};
     assert_eq!(output, expected_output);
 }

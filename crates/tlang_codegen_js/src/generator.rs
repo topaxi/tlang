@@ -793,16 +793,21 @@ impl CodegenJS {
 
         self.push_char('(');
 
-        for n in 0..wildcard_count {
-            if n > 0 {
-                self.push_str(", ");
+        if wildcard_count == 1 {
+            self.push_char('_');
+            placeholders.push('_'.to_string());
+        } else {
+            for n in 0..wildcard_count {
+                if n > 0 {
+                    self.push_str(", ");
+                }
+
+                let tmp_var = self.scopes.declare_unique_variable("_");
+
+                self.push_str(&tmp_var);
+
+                placeholders.push(tmp_var);
             }
-
-            let tmp_var = self.scopes.declare_unique_variable("");
-
-            self.push_str(&tmp_var);
-
-            placeholders.push(tmp_var);
         }
 
         self.push_str(") => ");
