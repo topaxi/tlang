@@ -4,18 +4,52 @@ use std::{
     path::Path,
 };
 
+use clap::{arg, command, ArgMatches};
 use tlang_ast::symbols::SymbolType;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_parser::error::ParseError;
 use tlang_semantics::{diagnostic::Diagnostic, SemanticAnalyzer};
 
-#[derive(clap::Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[derive(Debug)]
 struct Args {
-    input_file: String,
-
-    #[arg(short, long)]
+    input_file: Option<String>,
     output_file: Option<String>,
+    output_stdlib: bool,
+    silent: bool,
+}
+
+fn validate_args(matches: &ArgMatches) -> Args {
+    let silent = matches.get_flag("silent");
+    let output_stdlib = matches.get_flag("output_stdlib");
+
+    let input_file = if output_stdlib {
+        None
+    } else {
+        matches.get_one::<String>("input_file").cloned()
+    };
+
+    if !output_stdlib && input_file.is_none() {
+        eprintln!("Error: input_file is required unless output_stdlib is true.");
+        std::process::exit(1);
+    }
+
+    Args {
+        input_file,
+        output_file: matches.get_one::<String>("output_file").cloned(),
+        output_stdlib,
+        silent,
+    }
+}
+
+fn get_args() -> Args {
+    let matches = command!()
+        .arg(arg!(input_file: <INPUT_FILE> "Input file").required(false))
+        .arg(arg!(output_file: -o --"output-file" <OUTPUT_FILE> "Output file").required(false))
+        .arg(arg!(output_stdlib: --"output-stdlib" "Flag to use stdlib"))
+        .arg(arg!(silent: -s --"silent" "Flag to suppress output"))
+        .get_matches();
+
+    validate_args(&matches)
 }
 
 fn compile_standard_library() -> Result<(), ParserError> {
@@ -35,23 +69,7 @@ fn compile_standard_library() -> Result<(), ParserError> {
 // Main entry point for the CLI, which compiles tlang to javascript.
 // The cli takes a single argument, the path to the tlang source file.
 fn main() {
-    let args = <Args as clap::Parser>::parse();
-    let path = Path::new(&args.input_file);
-    let mut file = match File::open(path) {
-        Err(why) => panic!("couldn't open {}: {}", path.display(), why),
-        Ok(file) => file,
-    };
-    let mut source = String::new();
-    if let Err(why) = file.read_to_string(&mut source) {
-        panic!("couldn't read {}: {}", path.display(), why)
-    };
-    let output = match compile(&source) {
-        Ok(output) => output,
-        Err(errors) => {
-            eprintln!("{errors:?}");
-            return;
-        }
-    };
+    let args = get_args();
 
     compile_standard_library().unwrap();
 
@@ -65,22 +83,49 @@ fn main() {
         panic!("couldn't read {}: {}", std_lib_file.display(), why)
     };
 
-    let output = format!("{std_lib_source}\n{{{output}}}");
+    if args.output_stdlib {
+        if !args.silent {
+            println!("{}", std_lib_source);
+        }
 
-    if args.output_file.is_none() {
-        println!("{output}");
         return;
     }
 
-    let output_file_name = args.output_file.unwrap();
+    if let Some(input_file) = &args.input_file {
+        let path = Path::new(&input_file);
+        let mut file = match File::open(path) {
+            Err(why) => panic!("couldn't open {}: {}", path.display(), why),
+            Ok(file) => file,
+        };
+        let mut source = String::new();
+        if let Err(why) = file.read_to_string(&mut source) {
+            panic!("couldn't read {}: {}", path.display(), why)
+        };
+        let output = match compile(&source) {
+            Ok(output) => output,
+            Err(errors) => {
+                eprintln!("{errors:?}");
+                return;
+            }
+        };
 
-    let mut output_file = match File::create(&output_file_name) {
-        Err(why) => panic!("couldn't create {output_file_name}: {why}"),
-        Ok(file) => file,
-    };
-    if let Err(why) = output_file.write_all(output.as_bytes()) {
-        panic!("couldn't write to {output_file_name}: {why}")
-    };
+        let output = format!("{std_lib_source}\n{{{output}}}");
+
+        if args.output_file.is_none() {
+            println!("{output}");
+            return;
+        }
+
+        let output_file_name = args.output_file.unwrap();
+
+        let mut output_file = match File::create(&output_file_name) {
+            Err(why) => panic!("couldn't create {output_file_name}: {why}"),
+            Ok(file) => file,
+        };
+        if let Err(why) = output_file.write_all(output.as_bytes()) {
+            panic!("couldn't write to {output_file_name}: {why}")
+        };
+    }
 }
 
 #[derive(Debug)]

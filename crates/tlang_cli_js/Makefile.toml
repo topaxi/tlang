@@ -1,2 +1,10 @@
 [env]
 CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = true
+
+[tasks.post-build]
+dependencies = ["generate-stdlib"]
+
+[tasks.generate-stdlib]
+command = "cargo"
+args = ["run", "--", "--silent", "--output-stdlib"]
+dependencies = ["build", "test"]
