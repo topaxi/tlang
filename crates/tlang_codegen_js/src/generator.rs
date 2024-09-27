@@ -581,11 +581,11 @@ impl CodegenJS {
 
     fn generate_identifier(&mut self, name: &Ident) {
         let name_string = name.as_str();
-        let identifier = &self
+        let identifier = self
             .current_scope()
             .resolve_variable(name_string)
             .unwrap_or_else(|| name_string.to_string());
-        self.push_str(identifier);
+        self.push_str(&identifier);
     }
 
     fn generate_variable_declaration(&mut self, pattern: &Pattern, value: &Expr) {
