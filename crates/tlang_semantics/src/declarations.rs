@@ -116,7 +116,7 @@ impl DeclarationAnalyzer {
             StmtKind::EnumDeclaration(decl) => {
                 self.declare_symbol(SymbolInfo::new(
                     decl.id,
-                    &decl.name.to_string(),
+                    decl.name.as_str(),
                     SymbolType::Enum,
                     Some(stmt.span),
                 ));
@@ -124,7 +124,7 @@ impl DeclarationAnalyzer {
             StmtKind::StructDeclaration(decl) => {
                 self.declare_symbol(SymbolInfo::new(
                     decl.id,
-                    &decl.name.to_string(),
+                    decl.name.as_str(),
                     SymbolType::Struct,
                     Some(stmt.span),
                 ));
@@ -271,7 +271,7 @@ impl DeclarationAnalyzer {
             ExprKind::Path(ref path) => path
                 .segments
                 .iter()
-                .map(|ident| ident.to_string())
+                .map(|ident| ident.as_str())
                 .collect::<Vec<_>>()
                 .join("::"),
             ExprKind::FieldExpression {
@@ -315,7 +315,7 @@ impl DeclarationAnalyzer {
             PatternKind::Identifier { id, name } => {
                 self.declare_symbol(SymbolInfo::new(
                     *id,
-                    &name.to_string(),
+                    name.as_str(),
                     self.symbol_type
                         .last()
                         .unwrap_or(&SymbolType::Variable)

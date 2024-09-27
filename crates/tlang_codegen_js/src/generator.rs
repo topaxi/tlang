@@ -459,7 +459,7 @@ impl CodegenJS {
             ExprKind::FieldExpression { base, field } => {
                 self.generate_expr(base, None);
                 self.push_char('.');
-                self.push_str(&field.to_string());
+                self.push_str(field.as_str());
             }
             ExprKind::Path(path) => {
                 if path.segments.len() == 1 {
@@ -469,7 +469,7 @@ impl CodegenJS {
                         &path
                             .segments
                             .iter()
-                            .map(|ident| ident.to_string())
+                            .map(|ident| ident.as_str())
                             .collect::<Vec<_>>()
                             .join("."),
                     );
@@ -550,10 +550,10 @@ impl CodegenJS {
     pub fn generate_pat(&mut self, pattern: &Pattern) {
         match &pattern.kind {
             PatternKind::Identifier { name, .. } => {
-                let var_name = self.current_scope().declare_variable(&name.to_string());
+                let var_name = self.current_scope().declare_variable(name.as_str());
                 self.push_str(&var_name);
                 self.current_scope()
-                    .declare_variable_alias(&name.to_string(), &var_name);
+                    .declare_variable_alias(name.as_str(), &var_name);
             }
             PatternKind::Enum {
                 identifier,
@@ -580,18 +580,18 @@ impl CodegenJS {
     }
 
     fn generate_identifier(&mut self, name: &Ident) {
-        let name_string = name.to_string();
+        let name_string = name.as_str();
         let identifier = &self
             .current_scope()
-            .resolve_variable(&name_string)
-            .unwrap_or(name_string);
+            .resolve_variable(name_string)
+            .unwrap_or_else(|| name_string.to_string());
         self.push_str(identifier);
     }
 
     fn generate_variable_declaration(&mut self, pattern: &Pattern, value: &Expr) {
         match &pattern.kind {
             PatternKind::Identifier { name, .. } => {
-                self.generate_variable_declaration_identifier(&name.to_string(), value);
+                self.generate_variable_declaration_identifier(name.as_str(), value);
             }
             PatternKind::List(patterns) => {
                 self.generate_variable_declaration_list_pattern(patterns, value);
@@ -628,12 +628,12 @@ impl CodegenJS {
             }
             match &pattern.kind {
                 PatternKind::Identifier { name, .. } => {
-                    let shadowed_name = self.current_scope().resolve_variable(&name.to_string());
-                    let var_name = self.current_scope().declare_variable(&name.to_string());
+                    let shadowed_name = self.current_scope().resolve_variable(name.as_str());
+                    let var_name = self.current_scope().declare_variable(name.as_str());
                     self.push_str(&var_name);
                     if let Some(shadowed_name) = shadowed_name {
                         self.current_scope()
-                            .declare_variable_alias(&name.to_string(), &shadowed_name);
+                            .declare_variable_alias(name.as_str(), &shadowed_name);
                     }
                     bindings.push((name, var_name));
                 }
@@ -651,7 +651,7 @@ impl CodegenJS {
 
         for (name, var_name) in bindings {
             self.current_scope()
-                .declare_variable_alias(&name.to_string(), &var_name);
+                .declare_variable_alias(name.as_str(), &var_name);
         }
 
         self.context_stack.pop();
@@ -768,7 +768,7 @@ impl CodegenJS {
             if i > 0 {
                 self.push_str(", ");
             }
-            self.push_str(&param.to_string());
+            self.push_str(param.as_str());
         }
         if named_fields {
             self.push_str(" }");
@@ -783,10 +783,10 @@ impl CodegenJS {
         for (i, param) in parameters.iter().enumerate() {
             self.push_indent();
             if named_fields {
-                self.push_str(&param.to_string());
+                self.push_str(param.as_str());
             } else {
                 self.push_str(&format!("[{i}]: "));
-                self.push_str(&param.to_string());
+                self.push_str(param.as_str());
             }
             self.push_str(",\n");
         }

@@ -53,8 +53,7 @@ pub fn generate_function_declarations(
             if let ExprKind::Let(pattern, _) = &expr.kind {
                 match &pattern.kind {
                     PatternKind::Identifier { name, .. } => {
-                        let tmp_variable =
-                            codegen.current_scope().declare_variable(&name.to_string());
+                        let tmp_variable = codegen.current_scope().declare_variable(name.as_str());
                         codegen.push_indent();
                         codegen.push_str(&format!("let {tmp_variable};\n"));
                     }
@@ -62,7 +61,7 @@ pub fn generate_function_declarations(
                         for pattern in patterns {
                             if let PatternKind::Identifier { name, .. } = &pattern.kind {
                                 let tmp_variable =
-                                    codegen.current_scope().declare_variable(&name.to_string());
+                                    codegen.current_scope().declare_variable(name.as_str());
                                 codegen.push_indent();
                                 codegen.push_str(&format!("let {tmp_variable};\n"));
                             }
@@ -75,23 +74,22 @@ pub fn generate_function_declarations(
                     } => {
                         let tmp_variable_enum = codegen.current_scope().declare_tmp_variable();
                         let enum_name = match &identifier.kind {
-                            ExprKind::Path(path) => path.segments.last().unwrap().to_string(),
+                            ExprKind::Path(path) => path.segments.last().unwrap().as_str(),
                             _ => unreachable!(),
                         };
                         codegen.push_indent();
                         codegen.push_str(&format!("let {tmp_variable_enum};\n"));
                         codegen
                             .current_scope()
-                            .declare_variable_alias(&enum_name, &tmp_variable_enum);
+                            .declare_variable_alias(enum_name, &tmp_variable_enum);
                         for element in elements {
                             let identifier = match &element.kind {
                                 // Skip any Wildcards
                                 PatternKind::Wildcard => continue,
-                                PatternKind::Identifier { name, .. } => name.to_string(),
+                                PatternKind::Identifier { name, .. } => name.as_str(),
                                 _ => unreachable!(),
                             };
-                            let tmp_variable =
-                                codegen.current_scope().declare_variable(&identifier);
+                            let tmp_variable = codegen.current_scope().declare_variable(identifier);
                             codegen.push_indent();
                             codegen.push_str(&format!("let {tmp_variable};\n"));
                         }
@@ -123,17 +121,16 @@ pub fn generate_function_declarations(
                 PatternKind::Identifier { name, .. } => {
                     codegen
                         .current_scope()
-                        .declare_variable_alias(&name.to_string(), arg_bindings[j].as_str());
+                        .declare_variable_alias(name.as_str(), arg_bindings[j].as_str());
                 }
                 PatternKind::List(patterns) => {
                     for (i, pattern) in patterns.iter().enumerate() {
                         if let PatternKind::Identifier { name, .. } = &pattern.kind {
                             let arg_name = arg_bindings[j].as_str();
 
-                            codegen.current_scope().declare_variable_alias(
-                                &name.to_string(),
-                                &format!("{arg_name}[{i}]"),
-                            );
+                            codegen
+                                .current_scope()
+                                .declare_variable_alias(name.as_str(), &format!("{arg_name}[{i}]"));
                         }
                     }
                 }
@@ -215,7 +212,7 @@ pub fn generate_function_declarations(
                                         identifier.kind
                                     {
                                         codegen.declare_function_pre_body_variable(
-                                            &name.to_string(),
+                                            name.as_str(),
                                             &format!("{arg_name}.slice({i})"),
                                         );
                                     } else {
@@ -224,7 +221,7 @@ pub fn generate_function_declarations(
                                 }
                                 PatternKind::Identifier { name, .. } => {
                                     codegen.declare_function_pre_body_variable(
-                                        &name.to_string(),
+                                        name.as_str(),
                                         &format!("{arg_name}[{i}]"),
                                     );
                                 }
@@ -239,7 +236,7 @@ pub fn generate_function_declarations(
                         named_fields,
                     } => {
                         let identifier = match &identifier.kind {
-                            ExprKind::Path(path) => path.segments.last().unwrap().to_string(),
+                            ExprKind::Path(path) => path.segments.last().unwrap().as_str(),
                             _ => unreachable!(),
                         };
                         codegen.push_str(&format!("{arg_name}.tag === \"{identifier}\""));
@@ -247,17 +244,17 @@ pub fn generate_function_declarations(
                             let identifier = match &element.kind {
                                 // Skip any Wildcards
                                 PatternKind::Wildcard => continue,
-                                PatternKind::Identifier { name, .. } => name.to_string(),
+                                PatternKind::Identifier { name, .. } => name.as_str(),
                                 _ => unreachable!(),
                             };
                             if *named_fields {
                                 codegen.declare_function_pre_body_variable(
-                                    &identifier,
+                                    identifier,
                                     &format!("{arg_name}.{identifier}"),
                                 );
                             } else {
                                 codegen.declare_function_pre_body_variable(
-                                    &identifier,
+                                    identifier,
                                     &format!("{arg_name}[{i}]"),
                                 );
                             }
@@ -447,7 +444,7 @@ fn generate_function_definition_guard(codegen: &mut CodegenJS, node: &Expr) {
     if let ExprKind::Let(pattern, expression) = &node.kind {
         match &pattern.kind {
             PatternKind::Identifier { name, .. } => {
-                let guard_variable = codegen.current_scope().resolve_variable(&name.to_string());
+                let guard_variable = codegen.current_scope().resolve_variable(name.as_str());
                 codegen.push_str(&format!("({} = ", guard_variable.unwrap()));
                 codegen.generate_expr(expression, None);
                 codegen.push_char(')');
@@ -458,10 +455,10 @@ fn generate_function_definition_guard(codegen: &mut CodegenJS, node: &Expr) {
                 named_fields,
             } => {
                 let enum_name = match &identifier.kind {
-                    ExprKind::Path(path) => path.segments.last().unwrap().to_string(),
+                    ExprKind::Path(path) => path.segments.last().unwrap().as_str(),
                     _ => unreachable!(),
                 };
-                let guard_variable = codegen.current_scope().resolve_variable(&enum_name);
+                let guard_variable = codegen.current_scope().resolve_variable(enum_name);
                 codegen.push_str(&format!("({} = ", guard_variable.as_ref().unwrap()));
                 codegen.generate_expr(expression, None);
                 codegen.push_char(')');
@@ -477,11 +474,11 @@ fn generate_function_definition_guard(codegen: &mut CodegenJS, node: &Expr) {
                     let identifier = match &element.kind {
                         // Skip any Wildcards
                         PatternKind::Wildcard => continue,
-                        PatternKind::Identifier { name, .. } => name.to_string(),
+                        PatternKind::Identifier { name, .. } => name.as_str(),
                         _ => unreachable!(),
                     };
                     codegen.push_str(" && ((");
-                    let identifier_resolved = codegen.current_scope().resolve_variable(&identifier);
+                    let identifier_resolved = codegen.current_scope().resolve_variable(identifier);
                     if *named_fields {
                         codegen.push_str(&format!(
                             "{} = {}.{}",
@@ -546,8 +543,10 @@ pub fn generate_function_declaration(codegen: &mut CodegenJS, declaration: &Func
 
 pub fn generate_function_expression(codegen: &mut CodegenJS, declaration: &FunctionDeclaration) {
     codegen.push_scope();
+
     let name_as_str = fn_identifier_to_string(&declaration.name);
     let is_tail_recursive = is_function_body_tail_recursive_block(&name_as_str, &declaration.body);
+
     codegen.push_function_context(
         &name_as_str,
         &declaration.parameters,
@@ -555,12 +554,12 @@ pub fn generate_function_expression(codegen: &mut CodegenJS, declaration: &Funct
         is_tail_recursive,
         false,
     );
-    let function_keyword = match name_as_str.as_str() {
-        "anonymous" => "function".to_string(),
-        _ => format!("function {name_as_str}"),
+
+    match name_as_str.as_str() {
+        "anonymous" => codegen.push_str("function"),
+        _ => codegen.push_str(&format!("function {name_as_str}")),
     };
 
-    codegen.push_str(&function_keyword);
     generate_function_parameter_list(codegen, &declaration.parameters);
     codegen.push_str(" {\n");
     codegen.inc_indent();
@@ -577,8 +576,8 @@ fn generate_function_parameter(codegen: &mut CodegenJS, pattern: &Pattern) {
     match &pattern.kind {
         // Do not run generate_identifier, as that would resolve the parameter as a variable.
         PatternKind::Identifier { name, .. } => {
-            codegen.current_scope().declare_variable(&name.to_string());
-            codegen.push_str(&name.to_string());
+            codegen.current_scope().declare_variable(name.as_str());
+            codegen.push_str(name.as_str());
         }
         PatternKind::Literal(_) => codegen.generate_pat(pattern),
         PatternKind::List(_) => todo!(),
@@ -732,7 +731,7 @@ pub fn fn_identifier_to_string(expr: &Expr) -> String {
         ExprKind::Path(path) => path
             .segments
             .iter()
-            .map(|s| s.to_string())
+            .map(|s| s.as_str())
             .collect::<Vec<_>>()
             .join("."),
         _ => todo!(),

@@ -12,7 +12,7 @@ impl CodegenJS {
                 self.push_str(", ");
             }
 
-            self.push_str(&field_name.to_string());
+            self.push_str(field_name.as_str());
         }
 
         self.push_str(") {\n");

@@ -270,7 +270,7 @@ impl SemanticAnalyzer {
             }
             ExprKind::Path(path) => {
                 if let Some(first_ident) = path.segments.first() {
-                    self.mark_as_used_by_name(&first_ident.to_string(), &expr.span);
+                    self.mark_as_used_by_name(first_ident.as_str(), &expr.span);
                 }
 
                 // TODO: Handle nested identifiers
@@ -312,7 +312,7 @@ impl SemanticAnalyzer {
                 elements,
                 ..
             } => {
-                // self.mark_as_used_by_name(&identifier.to_string(), &pat.span);
+                // self.mark_as_used_by_name(identifier.as_str(), &pat.span);
 
                 for element in elements {
                     self.analyze_pat(element);

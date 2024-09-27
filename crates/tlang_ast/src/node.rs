@@ -22,6 +22,10 @@ impl Ident {
             span,
         }
     }
+
+    pub fn as_str(&self) -> &str {
+        &self.name
+    }
 }
 
 impl Display for Ident {

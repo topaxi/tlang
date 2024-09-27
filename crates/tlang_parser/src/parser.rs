@@ -1494,9 +1494,10 @@ impl<'src> Parser<'src> {
             ExprKind::Path(path) => path
                 .segments
                 .iter()
-                .map(|ident| ident.to_string())
+                .map(|ident| ident.as_str())
                 .collect::<Vec<_>>()
                 .join("::"),
+
             ExprKind::FieldExpression { base, field } => {
                 format!("{}.{}", self.fn_name_identifier_to_string(base), field)
             }
