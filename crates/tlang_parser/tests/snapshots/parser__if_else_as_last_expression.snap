@@ -1,6 +1,6 @@
 ---
 source: crates/tlang_parser/tests/parser.rs
-expression: "parse!(\"fn main() { if true { 1 } else { 2 } }\")"
+expression: "parse! (\"fn main() { if true { 1 } else { 2 } }\")"
 ---
 Module(
   statements: [
@@ -117,51 +117,56 @@ Module(
                   ),
                 ),
               ),
-              else_branch: Some(Expr(
-                kind: Block(Block(
-                  statements: [],
-                  expression: Some(Expr(
-                    kind: Literal(Integer(2)),
+              else_branches: [
+                ElseClause(
+                  condition: None,
+                  consequence: Expr(
+                    kind: Block(Block(
+                      statements: [],
+                      expression: Some(Expr(
+                        kind: Literal(Integer(2)),
+                        leading_comments: [],
+                        trailing_comments: [],
+                        symbol_table: None,
+                        span: Span(
+                          start: LineColumn(
+                            line: 0,
+                            column: 33,
+                          ),
+                          end: LineColumn(
+                            line: 0,
+                            column: 34,
+                          ),
+                        ),
+                      )),
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 31,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 36,
+                        ),
+                      ),
+                      symbol_table: None,
+                    )),
                     leading_comments: [],
                     trailing_comments: [],
                     symbol_table: None,
                     span: Span(
                       start: LineColumn(
                         line: 0,
-                        column: 33,
+                        column: 0,
                       ),
                       end: LineColumn(
                         line: 0,
-                        column: 34,
+                        column: 0,
                       ),
                     ),
-                  )),
-                  span: Span(
-                    start: LineColumn(
-                      line: 0,
-                      column: 31,
-                    ),
-                    end: LineColumn(
-                      line: 0,
-                      column: 36,
-                    ),
-                  ),
-                  symbol_table: None,
-                )),
-                leading_comments: [],
-                trailing_comments: [],
-                symbol_table: None,
-                span: Span(
-                  start: LineColumn(
-                    line: 0,
-                    column: 0,
-                  ),
-                  end: LineColumn(
-                    line: 0,
-                    column: 0,
                   ),
                 ),
-              )),
+              ],
             ),
             leading_comments: [],
             trailing_comments: [],

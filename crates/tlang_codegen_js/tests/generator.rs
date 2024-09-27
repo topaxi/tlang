@@ -175,6 +175,25 @@ fn test_if_else_as_expression_nested() {
 }
 
 #[test]
+fn test_if_else_if_as_expression() {
+    let output =
+        compile!("fn main() { let result = if true { 1 } else if true { 2 } else { 3 }; }");
+    let expected_output = indoc! {"
+        function main() {
+            let $tmp$0;if (true) {
+                $tmp$0 = 1;
+            } else if (true) {
+                $tmp$0 = 2;
+            } else {
+                $tmp$0 = 3;
+            }
+            let result = $tmp$0;
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
 fn test_list_literal() {
     let output = compile!("fn main() { [1, 2, 3] }");
     let expected_output = indoc! {"

@@ -167,6 +167,12 @@ impl Expr {
     }
 }
 
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct ElseClause {
+    pub condition: Box<Option<Expr>>,
+    pub consequence: Box<Expr>,
+}
+
 #[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub enum ExprKind {
     #[default]
@@ -177,6 +183,7 @@ pub enum ExprKind {
         arguments: Vec<Expr>,
     },
     Dict(Vec<(Expr, Expr)>),
+    // TODO: Box this
     FunctionExpression(FunctionDeclaration),
     FieldExpression {
         base: Box<Expr>,
@@ -191,13 +198,14 @@ pub enum ExprKind {
     IfElse {
         condition: Box<Expr>,
         then_branch: Box<Expr>,
-        else_branch: Box<Option<Expr>>,
+        else_branches: Vec<ElseClause>,
     },
     List(Vec<Expr>),
     Literal(Literal),
     Path(Path),
     UnaryOp(UnaryOp, Box<Expr>),
     BinaryOp {
+        // TODO: Box this
         op: BinaryOpKind,
         lhs: Box<Expr>,
         rhs: Box<Expr>,

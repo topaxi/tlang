@@ -1,6 +1,6 @@
 ---
 source: crates/tlang_parser/tests/parser.rs
-expression: "parse!(\"if true { 1; } else { 2; }\")"
+expression: "parse! (\"if true { 1; } else { 2; }\")"
 ---
 Module(
   statements: [
@@ -85,68 +85,73 @@ Module(
               ),
             ),
           ),
-          else_branch: Some(Expr(
-            kind: Block(Block(
-              statements: [
-                Stmt(
-                  kind: Expr(Expr(
-                    kind: Literal(Integer(2)),
-                    leading_comments: [],
-                    trailing_comments: [],
-                    symbol_table: None,
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 22,
+          else_branches: [
+            ElseClause(
+              condition: None,
+              consequence: Expr(
+                kind: Block(Block(
+                  statements: [
+                    Stmt(
+                      kind: Expr(Expr(
+                        kind: Literal(Integer(2)),
+                        leading_comments: [],
+                        trailing_comments: [],
+                        symbol_table: None,
+                        span: Span(
+                          start: LineColumn(
+                            line: 0,
+                            column: 22,
+                          ),
+                          end: LineColumn(
+                            line: 0,
+                            column: 23,
+                          ),
+                        ),
+                      )),
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 22,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 24,
+                        ),
                       ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 23,
-                      ),
+                      leading_comments: [],
+                      trailing_comments: [],
+                      symbol_table: None,
                     ),
-                  )),
+                  ],
+                  expression: None,
                   span: Span(
                     start: LineColumn(
                       line: 0,
-                      column: 22,
+                      column: 20,
                     ),
                     end: LineColumn(
                       line: 0,
-                      column: 24,
+                      column: 26,
                     ),
                   ),
-                  leading_comments: [],
-                  trailing_comments: [],
                   symbol_table: None,
+                )),
+                leading_comments: [],
+                trailing_comments: [],
+                symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 0,
+                  ),
                 ),
-              ],
-              expression: None,
-              span: Span(
-                start: LineColumn(
-                  line: 0,
-                  column: 20,
-                ),
-                end: LineColumn(
-                  line: 0,
-                  column: 26,
-                ),
-              ),
-              symbol_table: None,
-            )),
-            leading_comments: [],
-            trailing_comments: [],
-            symbol_table: None,
-            span: Span(
-              start: LineColumn(
-                line: 0,
-                column: 0,
-              ),
-              end: LineColumn(
-                line: 0,
-                column: 0,
               ),
             ),
-          )),
+          ],
         ),
         leading_comments: [],
         trailing_comments: [],

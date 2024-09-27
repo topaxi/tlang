@@ -1,7 +1,7 @@
 use tlang_ast::node::{
-    self, Associativity, BinaryOpKind, Block, EnumDeclaration, EnumVariant, Expr, ExprKind,
-    FunctionDeclaration, FunctionParameter, Ident, MatchArm, Module, OperatorInfo, Path, Pattern,
-    PatternKind, Stmt, StmtKind, StructDeclaration, StructField, Ty, UnaryOp,
+    self, Associativity, BinaryOpKind, Block, ElseClause, EnumDeclaration, EnumVariant, Expr,
+    ExprKind, FunctionDeclaration, FunctionParameter, Ident, MatchArm, Module, OperatorInfo, Path,
+    Pattern, PatternKind, Stmt, StmtKind, StructDeclaration, StructField, Ty, UnaryOp,
 };
 use tlang_ast::span::Span;
 use tlang_ast::symbols::SymbolId;
@@ -186,6 +186,14 @@ impl<'src> Parser<'src> {
             self,
             &format!("{expected:?}"),
             _kind if *_kind == expected
+        );
+    }
+
+    fn expect_token_not(&mut self, expected: TokenKind) {
+        expect_token_matches!(
+            self,
+            &format!("not {:?}", expected),
+            _kind if *_kind != expected
         );
     }
 
@@ -744,13 +752,15 @@ impl<'src> Parser<'src> {
         expr
     }
 
-    fn parse_if_else_expression(&mut self) -> Expr {
+    fn parse_if_condition(&mut self) -> Expr {
         self.consume_token(TokenKind::If);
+
         let condition = if let Some(TokenKind::Let) = self.current_token_kind() {
             self.parse_let_expression()
         } else {
             self.parse_expression()
         };
+
         // TODO: Reevaluate whether we want `foo {}` to be a `foo({})` call expression.
         //       As this collides with `if let` statements.
         // Semicolon or parenthesis are currently needed to disambiguate call with dictionary and block.
@@ -760,24 +770,46 @@ impl<'src> Parser<'src> {
             self.advance();
         }
 
+        condition
+    }
+
+    fn parse_if_else_expression(&mut self) -> Expr {
+        let condition = self.parse_if_condition();
+
         self.expect_token(TokenKind::LBrace);
         let then_branch = node::expr!(Block(self.parse_block()));
-        let else_branch = if let Some(TokenKind::Else) = self.current_token_kind() {
+
+        let mut else_branches = Vec::new();
+        while let Some(TokenKind::Else) = self.current_token_kind() {
             self.advance();
 
             if let Some(TokenKind::If) = self.current_token_kind() {
-                Some(self.parse_if_else_expression())
+                let condition = self.parse_if_condition();
+
+                self.expect_token(TokenKind::LBrace);
+                let consequence = node::expr!(Block(self.parse_block()));
+
+                else_branches.push(ElseClause {
+                    condition: Box::new(Some(condition)),
+                    consequence: Box::new(consequence),
+                });
             } else {
-                Some(node::expr!(Block(self.parse_block())))
+                self.expect_token(TokenKind::LBrace);
+                let consequence = node::expr!(Block(self.parse_block()));
+
+                else_branches.push(ElseClause {
+                    condition: Box::new(None),
+                    consequence: Box::new(consequence),
+                });
+
+                self.expect_token_not(TokenKind::Else);
             }
-        } else {
-            None
-        };
+        }
 
         node::expr!(IfElse {
             condition: Box::new(condition),
             then_branch: Box::new(then_branch),
-            else_branch: Box::new(else_branch),
+            else_branches: else_branches,
         })
     }
 

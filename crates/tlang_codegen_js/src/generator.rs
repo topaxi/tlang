@@ -9,8 +9,8 @@ use crate::{
 };
 use tlang_ast::{
     node::{
-        BinaryOpKind, Block, EnumDeclaration, Expr, ExprKind, FunctionParameter, Ident, Module,
-        Pattern, PatternKind, Stmt, StmtKind, UnaryOp,
+        BinaryOpKind, Block, ElseClause, EnumDeclaration, Expr, ExprKind, FunctionParameter, Ident,
+        Module, Pattern, PatternKind, Stmt, StmtKind, UnaryOp,
     },
     token::{Literal, Token, TokenKind},
 };
@@ -515,9 +515,9 @@ impl CodegenJS {
             ExprKind::IfElse {
                 condition,
                 then_branch,
-                else_branch,
+                else_branches,
             } => {
-                self.generate_if_else(condition, then_branch, else_branch);
+                self.generate_if_else(condition, then_branch, else_branches);
             }
             ExprKind::FunctionExpression(decl) => {
                 generate_function_expression(self, decl);
@@ -649,7 +649,7 @@ impl CodegenJS {
         &mut self,
         condition: &Expr,
         then_branch: &Expr,
-        else_branch: &Option<Expr>,
+        else_branches: &[ElseClause],
     ) {
         let mut lhs = String::new();
         // TODO: Potentially in a return position or other expression, before we generate the if
@@ -684,12 +684,23 @@ impl CodegenJS {
         self.generate_expr(then_branch, None);
         self.indent_level -= 1;
 
-        if let Some(else_branch) = else_branch {
+        for else_branch in else_branches {
             self.push_indent();
-            self.push_str("} else {\n");
+            self.push_str("} else");
+
+            if let Some(ref condition) = *else_branch.condition {
+                self.push_str(" if (");
+                let indent_level = self.indent_level;
+                self.indent_level = 0;
+                self.generate_expr(condition, None);
+                self.indent_level = indent_level;
+                self.push_str(")");
+            }
+
+            self.push_str(" {\n");
             self.indent_level += 1;
             self.flush_statement_buffer();
-            self.generate_expr(else_branch, None);
+            self.generate_expr(&else_branch.consequence, None);
             self.indent_level -= 1;
         }
 

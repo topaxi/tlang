@@ -1,6 +1,6 @@
 ---
 source: crates/tlang_parser/tests/parser_if_let.rs
-expression: "parse!(indoc! { \"\n        if let x = 1 {\n            x\n        }\n    \" })"
+expression: "parse! (indoc! { \"\n        if let x = 1 {\n            x\n        }\n    \" })"
 ---
 Module(
   statements: [
@@ -136,7 +136,7 @@ Module(
               ),
             ),
           ),
-          else_branch: None,
+          else_branches: [],
         ),
         leading_comments: [],
         trailing_comments: [],

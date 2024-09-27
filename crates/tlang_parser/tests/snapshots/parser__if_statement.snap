@@ -1,6 +1,6 @@
 ---
 source: crates/tlang_parser/tests/parser.rs
-expression: "parse!(\"if (1 + 2) { 3 + 4; }\")"
+expression: "parse! (\"if (1 + 2) { 3 + 4; }\")"
 ---
 Module(
   statements: [
@@ -153,7 +153,7 @@ Module(
               ),
             ),
           ),
-          else_branch: None,
+          else_branches: [],
         ),
         leading_comments: [],
         trailing_comments: [],

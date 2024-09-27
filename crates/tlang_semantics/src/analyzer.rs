@@ -225,11 +225,15 @@ impl SemanticAnalyzer {
             ExprKind::IfElse {
                 condition,
                 then_branch,
-                else_branch,
+                else_branches,
             } => {
                 self.analyze_expr(condition);
                 self.analyze_expr(then_branch);
-                self.analyze_optional_expr(else_branch);
+
+                for else_branch in else_branches {
+                    self.analyze_optional_expr(&mut else_branch.condition);
+                    self.analyze_expr(&mut else_branch.consequence);
+                }
             }
             ExprKind::RecursiveCall(node) => {
                 self.analyze_expr(node);

@@ -215,11 +215,15 @@ impl DeclarationAnalyzer {
             ExprKind::IfElse {
                 condition,
                 then_branch,
-                else_branch,
+                else_branches,
             } => {
                 self.collect_declarations_expr(condition);
                 self.collect_declarations_expr(then_branch);
-                self.collect_optional_declarations_expr(else_branch);
+
+                for else_branch in else_branches {
+                    self.collect_optional_declarations_expr(&mut else_branch.condition);
+                    self.collect_declarations_expr(&mut else_branch.consequence);
+                }
             }
             ExprKind::FieldExpression { base, .. } => {
                 self.collect_declarations_expr(base);

@@ -1,6 +1,6 @@
 ---
 source: crates/tlang_parser/tests/parser.rs
-expression: "parse!(\"let x = if (true) { 1; } else { 2; };\")"
+expression: "parse! (\"let x = if (true) { 1; } else { 2; };\")"
 ---
 Module(
   statements: [
@@ -114,68 +114,73 @@ Module(
                 ),
               ),
             ),
-            else_branch: Some(Expr(
-              kind: Block(Block(
-                statements: [
-                  Stmt(
-                    kind: Expr(Expr(
-                      kind: Literal(Integer(2)),
-                      leading_comments: [],
-                      trailing_comments: [],
-                      symbol_table: None,
-                      span: Span(
-                        start: LineColumn(
-                          line: 0,
-                          column: 32,
+            else_branches: [
+              ElseClause(
+                condition: None,
+                consequence: Expr(
+                  kind: Block(Block(
+                    statements: [
+                      Stmt(
+                        kind: Expr(Expr(
+                          kind: Literal(Integer(2)),
+                          leading_comments: [],
+                          trailing_comments: [],
+                          symbol_table: None,
+                          span: Span(
+                            start: LineColumn(
+                              line: 0,
+                              column: 32,
+                            ),
+                            end: LineColumn(
+                              line: 0,
+                              column: 33,
+                            ),
+                          ),
+                        )),
+                        span: Span(
+                          start: LineColumn(
+                            line: 0,
+                            column: 32,
+                          ),
+                          end: LineColumn(
+                            line: 0,
+                            column: 34,
+                          ),
                         ),
-                        end: LineColumn(
-                          line: 0,
-                          column: 33,
-                        ),
+                        leading_comments: [],
+                        trailing_comments: [],
+                        symbol_table: None,
                       ),
-                    )),
+                    ],
+                    expression: None,
                     span: Span(
                       start: LineColumn(
                         line: 0,
-                        column: 32,
+                        column: 30,
                       ),
                       end: LineColumn(
                         line: 0,
-                        column: 34,
+                        column: 36,
                       ),
                     ),
-                    leading_comments: [],
-                    trailing_comments: [],
                     symbol_table: None,
+                  )),
+                  leading_comments: [],
+                  trailing_comments: [],
+                  symbol_table: None,
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 0,
+                    ),
                   ),
-                ],
-                expression: None,
-                span: Span(
-                  start: LineColumn(
-                    line: 0,
-                    column: 30,
-                  ),
-                  end: LineColumn(
-                    line: 0,
-                    column: 36,
-                  ),
-                ),
-                symbol_table: None,
-              )),
-              leading_comments: [],
-              trailing_comments: [],
-              symbol_table: None,
-              span: Span(
-                start: LineColumn(
-                  line: 0,
-                  column: 0,
-                ),
-                end: LineColumn(
-                  line: 0,
-                  column: 0,
                 ),
               ),
-            )),
+            ],
           ),
           leading_comments: [],
           trailing_comments: [],

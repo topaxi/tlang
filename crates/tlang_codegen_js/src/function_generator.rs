@@ -717,13 +717,12 @@ fn is_function_body_tail_recursive(function_name: &str, node: &Expr) -> bool {
         ExprKind::IfElse {
             condition,
             then_branch,
-            else_branch,
+            else_branches,
         } => {
             is_function_body_tail_recursive(function_name, condition)
                 || is_function_body_tail_recursive(function_name, then_branch)
-                // TODO: Get rid of clone.
-                || <Option<Expr> as Clone>::clone(else_branch.as_ref()).map_or(false, |branch| {
-                    is_function_body_tail_recursive(function_name, &branch)
+                || else_branches.iter().any(|else_clause| {
+                    is_function_body_tail_recursive(function_name, &else_clause.consequence)
                 })
         }
         _ => false,
