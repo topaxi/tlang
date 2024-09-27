@@ -314,8 +314,7 @@ impl CodegenJS {
 
         self.push_indent();
         self.push_str(&format!("{completion_tmp_var} = "));
-        // TODO: Remove clone call
-        self.generate_expr(&block.expression.clone().unwrap(), None);
+        self.generate_optional_expr(&block.expression, None);
         self.push_str(";\n");
         if !has_completion_var {
             self.indent_level -= 1;
@@ -349,11 +348,11 @@ impl CodegenJS {
             // and the node is RecursiveCall pointing to the current function.
             if let Some(function_context) = self.function_context_stack.last() {
                 if function_context.is_tail_recursive && block.has_completion() {
-                    // TODO: Get rid of clone call
-                    let expression = block.expression.clone().unwrap();
-                    if let ExprKind::RecursiveCall(_) = expression.kind {
-                        self.generate_expr(&expression, None);
-                        return;
+                    if let Some(ref expression) = *block.expression {
+                        if let ExprKind::RecursiveCall(_) = expression.kind {
+                            self.generate_expr(expression, None);
+                            return;
+                        }
                     }
                 }
             }
@@ -361,7 +360,7 @@ impl CodegenJS {
             self.push_indent();
             self.push_str("return ");
             self.push_context(BlockContext::Expression);
-            self.generate_expr(&block.expression.clone().unwrap(), None);
+            self.generate_optional_expr(&block.expression, None);
             self.pop_context();
             self.push_str(";\n");
             self.flush_statement_buffer();
@@ -430,6 +429,17 @@ impl CodegenJS {
 
         for comment in &statement.trailing_comments {
             self.generate_comment(comment);
+        }
+    }
+
+    #[inline(always)]
+    pub fn generate_optional_expr(
+        &mut self,
+        expr: &Option<Expr>,
+        parent_op: Option<&BinaryOpKind>,
+    ) {
+        if let Some(expr) = expr {
+            self.generate_expr(expr, parent_op);
         }
     }
 
@@ -891,7 +901,8 @@ impl CodegenJS {
                         let params = function_context.params.clone();
                         let parameter_bindings = function_context.parameter_bindings.clone();
                         let remap_to_rest_args = function_context.remap_to_rest_args;
-                        let tmp_vars = params
+                        let tmp_vars = function_context
+                            .params
                             .iter()
                             .map(|_| self.scopes.declare_tmp_variable())
                             .collect::<Vec<_>>();
@@ -902,6 +913,7 @@ impl CodegenJS {
                             self.generate_expr(arg, None);
                             self.push_str(";\n");
                         }
+
                         if remap_to_rest_args {
                             for (i, arg_name) in parameter_bindings.iter().enumerate() {
                                 self.push_indent();

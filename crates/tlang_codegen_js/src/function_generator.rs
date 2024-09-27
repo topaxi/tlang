@@ -145,22 +145,21 @@ pub fn generate_function_declarations(
         // parameters.
         let parameter_variadic = declarations
             .iter()
-            .map(|declaration| declaration.parameters.clone())
-            .any(|params| params.len() != declaration.parameters.len());
-        let pattern_matched_parameters =
-            declaration
-                .parameters
-                .iter()
-                .enumerate()
-                .filter(|(_, param)| {
-                    matches!(
-                        param.pattern.kind,
-                        PatternKind::Literal(_) | PatternKind::List(_) | PatternKind::Enum { .. }
-                    )
-                });
+            .any(|d| d.parameters.len() != declaration.parameters.len());
+        let pattern_matched_parameters = declaration
+            .parameters
+            .iter()
+            .enumerate()
+            .filter(|(_, param)| {
+                matches!(
+                    param.pattern.kind,
+                    PatternKind::Literal(_) | PatternKind::List(_) | PatternKind::Enum { .. }
+                )
+            })
+            .collect::<Vec<_>>();
 
         let variadic_or_pattern_matching =
-            parameter_variadic || pattern_matched_parameters.clone().count() > 0;
+            parameter_variadic || !pattern_matched_parameters.is_empty();
 
         if variadic_or_pattern_matching {
             if parameter_variadic {
@@ -168,14 +167,14 @@ pub fn generate_function_declarations(
                 codegen.push_str(&format!("if ({args_binding}.length === "));
                 codegen.push_str(&declaration.parameters.len().to_string());
 
-                if pattern_matched_parameters.clone().count() > 0 {
+                if !pattern_matched_parameters.is_empty() {
                     codegen.push_str(" && ");
                 }
             } else {
                 codegen.push_str("if (");
             }
             // Filter only literal params.
-            for (j, (k, param)) in pattern_matched_parameters.enumerate() {
+            for (j, (k, param)) in pattern_matched_parameters.into_iter().enumerate() {
                 if j > 0 {
                     codegen.push_str(" && ");
                 }
@@ -312,7 +311,6 @@ pub fn generate_function_declarations(
                 // and use actual arguments, but given that each signature could define
                 // different names, this is the easiest way to handle this for now.
                 let name = name.to_string();
-                // TODO: Do this for each arg_bindings too
                 let name = if name == arg_binding.clone().unwrap_or_default() {
                     codegen.current_scope().declare_variable("args")
                 } else if arg_bindings.contains(&name) {
@@ -633,7 +631,7 @@ pub fn generate_return_statement(codegen: &mut CodegenJS, expr: &Option<Expr>) {
                     if function_context.is_tail_recursive
                         && function_context.name == call_identifier.unwrap()
                     {
-                        return codegen.generate_expr(&expr.clone().unwrap(), None);
+                        return codegen.generate_optional_expr(expr, None);
                     }
                 }
             }
