@@ -121,6 +121,21 @@ fn test_if_else() {
 }
 
 #[test]
+fn test_if_else_if() {
+    let output = compile!("if true { 1; } else if (false) { 2; } else { 3; }");
+    let expected_output = indoc! {"
+        if (true) {
+            1;
+        } else if (false) {
+            2;
+        } else {
+            3;
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
 fn test_if_else_as_expression_as_fn_completion() {
     let output = compile!("fn main() { if true { 1 } else { 2 } }");
     let expected_output = indoc! {"
