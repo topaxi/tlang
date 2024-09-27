@@ -133,6 +133,7 @@ impl<'src> Parser<'src> {
         span.end_by_token(self.previous_token.as_ref().unwrap());
     }
 
+    #[inline(never)]
     fn push_unexpected_token_error(&mut self, expected: &str, actual: Option<Token>) {
         self.errors.push(ParseError {
             msg: format!(
@@ -145,6 +146,7 @@ impl<'src> Parser<'src> {
         });
     }
 
+    #[inline(never)]
     fn panic_unexpected_token(&self, expected: &str, actual: Option<Token>) {
         let token = actual.as_ref().unwrap();
         let start_span = &token.span.start;
@@ -157,6 +159,7 @@ impl<'src> Parser<'src> {
         );
     }
 
+    #[inline(never)]
     fn panic_unexpected_stmt(&self, expected: &str, actual: Option<Stmt>) {
         let node = actual.as_ref().unwrap();
         let start_span = &node.span.start;
@@ -169,6 +172,7 @@ impl<'src> Parser<'src> {
         );
     }
 
+    #[inline(never)]
     fn panic_unexpected_expr(&self, expected: &str, actual: Option<Expr>) {
         let node = actual.as_ref().unwrap();
         let start_span = &node.span.start;
@@ -477,14 +481,15 @@ impl<'src> Parser<'src> {
         let mut statements = Vec::new();
         let mut completion_expression = None;
 
-        while self.current_token_kind() != Some(TokenKind::RBrace)
-            && self.current_token_kind() != Some(TokenKind::Eof)
-        {
+        while !matches!(
+            self.current_token_kind(),
+            Some(TokenKind::RBrace | TokenKind::Eof)
+        ) {
             if let (consume_semicolon, Some(mut statement)) = self.parse_statement() {
                 if may_complete
                     && self.current_token_kind() == Some(TokenKind::RBrace)
                     && matches!(
-                        &statement.kind,
+                        statement.kind,
                         StmtKind::Expr(_) | StmtKind::FunctionDeclaration(_)
                     )
                 {

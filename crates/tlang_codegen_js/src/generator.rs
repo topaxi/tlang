@@ -10,7 +10,7 @@ use crate::{
 use tlang_ast::{
     node::{
         BinaryOpKind, Block, ElseClause, EnumDeclaration, Expr, ExprKind, FunctionParameter, Ident,
-        Module, Pattern, PatternKind, Stmt, StmtKind, UnaryOp,
+        Module, Path, Pattern, PatternKind, Stmt, StmtKind, UnaryOp,
     },
     token::{Literal, Token, TokenKind},
 };
@@ -447,11 +447,9 @@ impl CodegenJS {
         match &expr.kind {
             ExprKind::None => {}
             ExprKind::Block(block) if self.current_context() == BlockContext::Expression => {
-                self.generate_block_expression(block);
+                self.generate_block_expression(block)
             }
-            ExprKind::Block(block) => {
-                self.generate_block(block);
-            }
+            ExprKind::Block(block) => self.generate_block(block),
             ExprKind::Call {
                 function,
                 arguments,
@@ -461,20 +459,7 @@ impl CodegenJS {
                 self.push_char('.');
                 self.push_str(field.as_str());
             }
-            ExprKind::Path(path) => {
-                if path.segments.len() == 1 {
-                    self.generate_identifier(path.segments.first().unwrap());
-                } else {
-                    self.push_str(
-                        &path
-                            .segments
-                            .iter()
-                            .map(|ident| ident.as_str())
-                            .collect::<Vec<_>>()
-                            .join("."),
-                    );
-                }
-            }
+            ExprKind::Path(path) => self.generate_path_expression(path),
             ExprKind::IndexExpression { base, index } => {
                 self.generate_expr(base, None);
                 self.push_char('[');
@@ -483,33 +468,8 @@ impl CodegenJS {
             }
             ExprKind::Let(_pattern, _expr) => todo!("Let expression not implemented yet."),
             ExprKind::Literal(literal) => self.generate_literal(literal),
-            ExprKind::List(items) => {
-                self.push_char('[');
-                for (i, item) in items.iter().enumerate() {
-                    if i > 0 {
-                        self.push_str(", ");
-                    }
-                    self.generate_expr(item, None);
-                }
-                self.push_char(']');
-            }
-            ExprKind::Dict(kvs) => {
-                self.push_str("{\n");
-                self.indent_level += 1;
-                for (i, (key, value)) in kvs.iter().enumerate() {
-                    if i > 0 {
-                        self.push_str(",\n");
-                    }
-                    self.push_indent();
-                    self.generate_expr(key, None);
-                    self.push_str(": ");
-                    self.generate_expr(value, None);
-                }
-                self.push_str(",\n");
-                self.indent_level -= 1;
-                self.push_indent();
-                self.push_char('}');
-            }
+            ExprKind::List(items) => self.generate_list_expression(items),
+            ExprKind::Dict(kvs) => self.generate_dict_expression(kvs),
             ExprKind::UnaryOp(op, expr) => {
                 match op {
                     UnaryOp::Minus => self.push_char('-'),
@@ -520,23 +480,19 @@ impl CodegenJS {
                 self.generate_expr(expr, None);
             }
             ExprKind::BinaryOp { op, lhs, rhs } => {
-                generate_binary_op(self, op, lhs, rhs, parent_op);
+                generate_binary_op(self, op, lhs, rhs, parent_op)
             }
             ExprKind::Match { expression, arms } => {
-                generate_match_expression(self, expression, arms);
+                generate_match_expression(self, expression, arms)
             }
             ExprKind::IfElse {
                 condition,
                 then_branch,
                 else_branches,
-            } => {
-                self.generate_if_else(condition, then_branch, else_branches);
-            }
-            ExprKind::FunctionExpression(decl) => {
-                generate_function_expression(self, decl);
-            }
+            } => self.generate_if_else(condition, then_branch, else_branches),
+            ExprKind::FunctionExpression(decl) => generate_function_expression(self, decl),
             ExprKind::RecursiveCall(expr) => {
-                self.generate_recursive_call_expression(expr, parent_op);
+                self.generate_recursive_call_expression(expr, parent_op)
             }
             ExprKind::Range {
                 start: _,
@@ -545,6 +501,50 @@ impl CodegenJS {
             } => todo!("Range expression not implemented yet."),
             ExprKind::Wildcard => {}
         }
+    }
+
+    fn generate_path_expression(&mut self, path: &Path) {
+        if path.segments.len() == 1 {
+            self.generate_identifier(path.segments.first().unwrap());
+        } else {
+            self.push_str(
+                &path
+                    .segments
+                    .iter()
+                    .map(|ident| ident.as_str())
+                    .collect::<Vec<_>>()
+                    .join("."),
+            );
+        }
+    }
+
+    fn generate_list_expression(&mut self, items: &[Expr]) {
+        self.push_str("[");
+        for (i, item) in items.iter().enumerate() {
+            if i > 0 {
+                self.push_str(", ");
+            }
+            self.generate_expr(item, None);
+        }
+        self.push_str("]");
+    }
+
+    fn generate_dict_expression(&mut self, kvs: &[(Expr, Expr)]) {
+        self.push_str("{\n");
+        self.indent_level += 1;
+        for (i, (key, value)) in kvs.iter().enumerate() {
+            if i > 0 {
+                self.push_str(",\n");
+            }
+            self.push_indent();
+            self.generate_expr(key, None);
+            self.push_str(": ");
+            self.generate_expr(value, None);
+        }
+        self.push_str(",\n");
+        self.indent_level -= 1;
+        self.push_indent();
+        self.push_char('}');
     }
 
     pub fn generate_pat(&mut self, pattern: &Pattern) {

@@ -22,11 +22,13 @@ dependencies = ["cargo-clean", "wasm-clean"]
 [tasks.wasm-bindgen]
 command = "wasm-bindgen"
 args = [
+  "--split-linked-modules",
+  "--reference-types",
   "--target",
   "web",
-  "../../target/wasm32-unknown-unknown/release/tlang_bindings_js.wasm",
   "--out-dir",
   "wasm",
+  "../../target/wasm32-unknown-unknown/release/tlang_bindings_js.wasm",
 ]
 
 [tasks.wasm-opt-prepare]
@@ -49,7 +51,7 @@ script = "mv -force wasm/tlang_bindings_js_bg.wasm wasm/tlang_bindings_js_bg.uno
 [tasks.wasm-opt]
 command = "wasm-opt"
 args = [
-  "-Os",
+  "-Oz",
   "-o",
   "wasm/tlang_bindings_js_bg.wasm",
   "wasm/tlang_bindings_js_bg.unoptimized.wasm",
