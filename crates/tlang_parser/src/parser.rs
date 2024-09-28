@@ -13,7 +13,7 @@ use log::debug;
 
 macro_rules! expect_token_matches {
     ($parser:ident, $pattern:pat $(if $guard:expr)? $(,)?) => {
-        match $parser.current_token_kind().as_ref() {
+        match $parser.current_token_kind() {
             Some($pattern) $(if $guard)? => (),
             _ => {
                 if !$parser.recoverable() {
@@ -29,7 +29,7 @@ macro_rules! expect_token_matches {
         }
     };
     ($parser:ident, $message:expr, $pattern:pat $(if $guard:expr)? $(,)?) => {
-        match $parser.current_token_kind().as_ref() {
+        match $parser.current_token_kind() {
             Some($pattern) $(if $guard)? => (),
             _ => {
                 if !$parser.recoverable() {
@@ -118,7 +118,7 @@ impl<'src> Parser<'src> {
 
         let module = self.parse_module();
 
-        if self.errors().is_empty() {
+        if self.errors.is_empty() {
             Ok(module)
         } else {
             Err(self.errors())
@@ -218,8 +218,8 @@ impl<'src> Parser<'src> {
     }
 
     fn advance(&mut self) {
-        if self.current_token_kind() == Some(TokenKind::Eof)
-            && self.peek_token_kind() == Some(TokenKind::Eof)
+        if matches!(self.current_token_kind(), Some(TokenKind::Eof))
+            && matches!(self.peek_token_kind(), Some(TokenKind::Eof))
         {
             // In error recovery we scan ahead and look for the expected token.
             // If we reach the end of the file, we don't want to continue scanning and
@@ -230,8 +230,8 @@ impl<'src> Parser<'src> {
             return;
         }
 
-        self.previous_token.clone_from(&self.current_token);
-        self.current_token.clone_from(&self.next_token);
+        self.previous_token = std::mem::take(&mut self.current_token);
+        self.current_token = std::mem::take(&mut self.next_token);
         self.current_column = self.lexer.current_column();
         self.current_line = self.lexer.current_line();
         self.next_token = Some(self.lexer.next_token());
@@ -239,15 +239,18 @@ impl<'src> Parser<'src> {
     }
 
     #[inline(always)]
-    fn current_token_kind(&self) -> Option<TokenKind> {
-        #[allow(clippy::useless_asref)]
-        self.current_token.as_ref().map(|token| token.kind.clone())
+    fn previous_token_kind(&self) -> Option<&TokenKind> {
+        self.previous_token.as_ref().map(|token| &token.kind)
     }
 
     #[inline(always)]
-    pub fn peek_token_kind(&self) -> Option<TokenKind> {
-        #[allow(clippy::useless_asref)]
-        self.next_token.as_ref().map(|token| token.kind.clone())
+    fn current_token_kind(&self) -> Option<&TokenKind> {
+        self.current_token.as_ref().map(|token| &token.kind)
+    }
+
+    #[inline(always)]
+    pub fn peek_token_kind(&self) -> Option<&TokenKind> {
+        self.next_token.as_ref().map(|token| &token.kind)
     }
 
     fn save_state(&self) -> (Lexer<'src>, Option<Token>, Option<Token>) {
@@ -288,7 +291,7 @@ impl<'src> Parser<'src> {
 
         let comments = self.parse_comments();
 
-        if self.current_token_kind() == Some(TokenKind::Eof) {
+        if matches!(self.current_token_kind(), Some(TokenKind::Eof)) {
             let mut node = node::stmt!(None);
             node.leading_comments = comments;
             return (false, Some(node));
@@ -344,7 +347,7 @@ impl<'src> Parser<'src> {
     fn parse_return_statement(&mut self) -> Stmt {
         self.consume_token(TokenKind::Return);
 
-        if self.current_token_kind() == Some(TokenKind::Semicolon) {
+        if matches!(self.current_token_kind(), Some(TokenKind::Semicolon)) {
             return node::stmt!(Return(Box::new(None)));
         }
 
@@ -383,7 +386,7 @@ impl<'src> Parser<'src> {
         let name = self.consume_identifier();
         self.consume_token(TokenKind::LBrace);
         let mut fields = Vec::new();
-        while self.current_token_kind() != Some(TokenKind::RBrace) {
+        while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
             fields.push(self.parse_struct_field());
             if let Some(TokenKind::Comma) = self.current_token_kind() {
                 self.advance();
@@ -409,7 +412,7 @@ impl<'src> Parser<'src> {
         let name = self.consume_identifier();
         self.consume_token(TokenKind::LBrace);
         let mut variants = Vec::new();
-        while self.current_token_kind() != Some(TokenKind::RBrace) {
+        while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
             variants.push(self.parse_enum_variant());
             if let Some(TokenKind::Comma) = self.current_token_kind() {
                 self.advance();
@@ -433,7 +436,7 @@ impl<'src> Parser<'src> {
             Some(TokenKind::LParen) => {
                 self.advance();
                 let mut parameters = Vec::new();
-                while self.current_token_kind() != Some(TokenKind::RParen) {
+                while !matches!(self.current_token_kind(), Some(TokenKind::RParen)) {
                     parameters.push(self.consume_identifier());
                     if let Some(TokenKind::Comma) = self.current_token_kind() {
                         self.advance();
@@ -450,7 +453,7 @@ impl<'src> Parser<'src> {
             Some(TokenKind::LBrace) => {
                 self.advance();
                 let mut parameters = Vec::new();
-                while self.current_token_kind() != Some(TokenKind::RBrace) {
+                while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
                     parameters.push(self.consume_identifier());
                     if let Some(TokenKind::Comma) = self.current_token_kind() {
                         self.advance();
@@ -487,7 +490,7 @@ impl<'src> Parser<'src> {
         ) {
             if let (consume_semicolon, Some(mut statement)) = self.parse_statement() {
                 if may_complete
-                    && self.current_token_kind() == Some(TokenKind::RBrace)
+                    && matches!(self.current_token_kind(), Some(TokenKind::RBrace))
                     && matches!(
                         statement.kind,
                         StmtKind::Expr(_) | StmtKind::FunctionDeclaration(_)
@@ -585,7 +588,7 @@ impl<'src> Parser<'src> {
             "Parsing call expression, current token: {:?}",
             self.current_token
         );
-        let is_dict_call = self.current_token_kind() == Some(TokenKind::LBrace);
+        let is_dict_call = matches!(self.current_token_kind(), Some(TokenKind::LBrace));
         let mut arguments = Vec::new();
 
         log::debug!("Is dict call: {}", is_dict_call);
@@ -595,14 +598,14 @@ impl<'src> Parser<'src> {
         } else {
             self.consume_token(TokenKind::LParen);
             let mut is_first_argument = true;
-            while self.current_token_kind() != Some(TokenKind::RParen) {
+            while !matches!(self.current_token_kind(), Some(TokenKind::RParen)) {
                 if !is_first_argument {
                     self.consume_token(TokenKind::Comma);
                 } else {
                     is_first_argument = false;
                 }
 
-                if self.current_token_kind() == Some(TokenKind::RParen) {
+                if matches!(self.current_token_kind(), Some(TokenKind::RParen)) {
                     break;
                 }
 
@@ -644,7 +647,7 @@ impl<'src> Parser<'src> {
 
         let mut elements = Vec::new();
         // Only allow literal values, identifiers and and rest params for now.
-        while self.current_token_kind() != Some(TokenKind::RBracket) {
+        while !matches!(self.current_token_kind(), Some(TokenKind::RBracket)) {
             expect_token_matches!(
                 self,
                 "identifier, literal or rest parameter",
@@ -668,7 +671,7 @@ impl<'src> Parser<'src> {
             elements.push(element);
 
             // Allow trailing comma.
-            if self.current_token_kind() == Some(TokenKind::RBracket) {
+            if matches!(self.current_token_kind(), Some(TokenKind::RBracket)) {
                 break;
             }
 
@@ -684,7 +687,7 @@ impl<'src> Parser<'src> {
         self.consume_token(TokenKind::LBracket);
 
         let mut elements = Vec::new();
-        while self.current_token_kind() != Some(TokenKind::RBracket) {
+        while !matches!(self.current_token_kind(), Some(TokenKind::RBracket)) {
             let element = match self.current_token_kind() {
                 Some(TokenKind::DotDotDot) => {
                     self.advance();
@@ -697,7 +700,7 @@ impl<'src> Parser<'src> {
             elements.push(element);
 
             // Allow trailing comma.
-            if self.current_token_kind() == Some(TokenKind::RBracket) {
+            if matches!(self.current_token_kind(), Some(TokenKind::RBracket)) {
                 break;
             }
 
@@ -716,7 +719,7 @@ impl<'src> Parser<'src> {
         if let Some(TokenKind::Identifier(_)) = self.current_token_kind() {
             if let Some(TokenKind::Colon) = self.peek_token_kind() {
                 let mut elements = Vec::new();
-                while self.current_token_kind() != Some(TokenKind::RBrace) {
+                while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
                     let key = self.parse_primary_expression();
                     self.consume_token(TokenKind::Colon);
                     let value = self.parse_expression();
@@ -819,11 +822,9 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_unary_expression(&mut self) -> Expr {
-        let token = self.current_token_kind();
-
         self.advance();
 
-        match token {
+        match self.previous_token_kind() {
             Some(TokenKind::Minus) => node::expr!(UnaryOp(
                 UnaryOp::Minus,
                 Box::new(self.parse_primary_expression())
@@ -861,7 +862,7 @@ impl<'src> Parser<'src> {
         );
 
         let mut span = self.create_span_from_current_token();
-        let mut node = match &self.current_token_kind() {
+        let mut node = match self.current_token_kind() {
             Some(TokenKind::Minus | TokenKind::ExclamationMark | TokenKind::Not) => {
                 self.parse_unary_expression()
             }
@@ -881,17 +882,20 @@ impl<'src> Parser<'src> {
             }
             Some(TokenKind::Match) => self.parse_match_expression(),
             Some(TokenKind::Literal(literal)) => {
+                let literal = literal.clone();
                 self.advance();
-                node::expr!(Literal(literal.clone()))
+                node::expr!(Literal(literal))
             }
             Some(TokenKind::Identifier(identifier)) => {
+                let identifier = identifier.clone();
                 let identifier_span = self.create_span_from_current_token();
+
                 self.advance();
 
                 if identifier == "_" {
                     node::expr!(Wildcard)
                 } else {
-                    let mut path = Path::from_ident(Ident::new(identifier, identifier_span));
+                    let mut path = Path::from_ident(Ident::new(&identifier, identifier_span));
                     let mut span = path.span;
 
                     if let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
@@ -931,7 +935,7 @@ impl<'src> Parser<'src> {
         self.consume_token(TokenKind::LBrace);
 
         let mut arms = Vec::new();
-        while self.current_token_kind() != Some(TokenKind::RBrace) {
+        while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
             let pattern = self.parse_pattern();
             self.consume_token(TokenKind::FatArrow);
             let expression = self.parse_expression();
@@ -955,11 +959,11 @@ impl<'src> Parser<'src> {
     fn parse_parameter_list(&mut self) -> Vec<FunctionParameter> {
         let mut parameters = Vec::new();
 
-        if self.current_token_kind() == Some(TokenKind::LParen) {
+        if let Some(TokenKind::LParen) = self.current_token_kind() {
             self.consume_token(TokenKind::LParen);
 
             let mut is_first_parameter = true;
-            while self.current_token_kind() != Some(TokenKind::RParen) {
+            while !matches!(self.current_token_kind(), Some(TokenKind::RParen)) {
                 if !is_first_parameter {
                     self.consume_token(TokenKind::Comma);
                 } else {
@@ -1002,25 +1006,24 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_type_annotation(&mut self) -> Ty {
-        let token = self.current_token_kind().unwrap();
-
         expect_token_matches!(self, "type annotation", TokenKind::Identifier(_));
 
-        match token {
-            TokenKind::Identifier(_) => {
+        match self.current_token_kind() {
+            Some(TokenKind::Identifier(_)) => {
                 let identifier = self.parse_path();
                 let parameters = self.parse_type_annotation_parameters();
 
                 Ty::new(identifier).with_parameters(parameters)
             }
-            _ => unreachable!("Expected type annotation, found {:?}", token),
+            Some(token) => unreachable!("Expected type annotation, found {:?}", token),
+            None => unreachable!("Expected type annotation"),
         }
     }
 
     fn parse_optional_type_annotation(&mut self) -> Option<Ty> {
         let token = self.current_token_kind()?;
 
-        if !Self::is_type_annotation_token(&token) {
+        if !Self::is_type_annotation_token(token) {
             return None;
         }
 
@@ -1032,7 +1035,7 @@ impl<'src> Parser<'src> {
 
         if let Some(TokenKind::LessThan) = self.current_token_kind() {
             self.advance();
-            while self.current_token_kind() != Some(TokenKind::GreaterThan) {
+            while !matches!(self.current_token_kind(), Some(TokenKind::GreaterThan)) {
                 let parameter = self.parse_type_annotation();
                 parameters.push(parameter);
                 if let Some(TokenKind::Comma) = self.current_token_kind() {
@@ -1057,7 +1060,7 @@ impl<'src> Parser<'src> {
     fn parse_function_expression(&mut self) -> Expr {
         let mut span = self.create_span_from_current_token();
         self.consume_token(TokenKind::Fn);
-        let name = if let Some(TokenKind::Identifier(_)) = &self.current_token_kind() {
+        let name = if let Some(TokenKind::Identifier(_)) = self.current_token_kind() {
             self.parse_single_identifier()
         } else {
             node::expr!(Path(Path::from_ident(Ident::new(
@@ -1089,12 +1092,12 @@ impl<'src> Parser<'src> {
     /// a function declarations parameter list.
     fn parse_enum_extraction(&mut self) -> Pattern {
         let identifier = Box::new(self.parse_identifier());
-        let is_dict_extraction = self.current_token_kind() == Some(TokenKind::LBrace);
+        let is_dict_extraction = matches!(self.current_token_kind(), Some(TokenKind::LBrace));
 
         if is_dict_extraction {
             self.consume_token(TokenKind::LBrace);
             let mut elements = Vec::new();
-            while self.current_token_kind() != Some(TokenKind::RBrace) {
+            while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
                 elements.push(self.parse_identifier_pattern());
                 if let Some(TokenKind::Comma) = self.current_token_kind() {
                     self.advance();
@@ -1109,7 +1112,7 @@ impl<'src> Parser<'src> {
         } else if let Some(TokenKind::LParen) = self.current_token_kind() {
             self.consume_token(TokenKind::LParen);
             let mut elements = Vec::new();
-            while self.current_token_kind() != Some(TokenKind::RParen) {
+            while !matches!(self.current_token_kind(), Some(TokenKind::RParen)) {
                 let mut identifier = self.parse_identifier_pattern();
 
                 // Remap identifier of _ to Wildcard
