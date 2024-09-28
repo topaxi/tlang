@@ -23,7 +23,6 @@ dependencies = ["cargo-clean", "wasm-clean"]
 command = "wasm-bindgen"
 args = [
   "--split-linked-modules",
-  "--reference-types",
   "--target",
   "web",
   "--out-dir",
