@@ -8,6 +8,11 @@ use wasm_bindgen::prelude::*;
 
 pub mod codemirror;
 
+#[wasm_bindgen(js_name = "getStandardLibrarySource")]
+pub fn get_standard_library_source() -> String {
+    CodegenJS::get_standard_library_source()
+}
+
 #[wasm_bindgen]
 pub struct TlangCompiler {
     source: String,
@@ -116,11 +121,6 @@ impl TlangCompiler {
             .map(|d| codemirror::from_tlang_diagnostic(&self.source, d));
 
         parse_errors.chain(diagnostics).collect()
-    }
-
-    #[wasm_bindgen(getter, js_name = "standardLibrarySource")]
-    pub fn standard_library_source() -> String {
-        CodegenJS::get_standard_library_source()
     }
 
     #[wasm_bindgen(getter)]

@@ -5,6 +5,7 @@
   "type": "module",
   "main": "src/index.js",
   "types": "src/index.d.ts",
+  "sideEffects": false,
   "scripts": {
     "prepare": "lezer-generator src/tlang.grammar -o src/parser.js",
     "build": "npm run prepare",
