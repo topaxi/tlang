@@ -48,7 +48,7 @@ macro_rules! expect_token_matches {
 
 macro_rules! advance_until {
     ($parser:ident, $pattern:pat) => {
-        while let Some(token) = $parser.current_token.as_ref() {
+        while let Some(ref token) = $parser.current_token {
             if matches!(&token.kind, $pattern) {
                 break;
             }
@@ -1429,7 +1429,7 @@ impl<'src> Parser<'src> {
         let mut span = lhs.span;
 
         loop {
-            match self.current_token_kind().as_ref() {
+            match self.current_token_kind() {
                 Some(TokenKind::Dot) => {
                     self.advance();
                     lhs.trailing_comments = self.parse_comments();
