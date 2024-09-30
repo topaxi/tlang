@@ -99,13 +99,13 @@ impl SymbolTable {
         self.parent.clone()
     }
 
-    fn get_local(&self, id: SymbolId) -> Option<SymbolInfo> {
-        self.symbols.iter().find(|s| s.id == id).cloned()
+    fn get_local(&self, id: SymbolId) -> Option<&SymbolInfo> {
+        self.symbols.iter().find(|s| s.id == id)
     }
 
     pub fn get(&self, id: SymbolId) -> Option<SymbolInfo> {
         if let Some(symbol) = self.get_local(id) {
-            Some(symbol)
+            Some(symbol.clone())
         } else if let Some(ref parent) = self.parent {
             parent.borrow().get(id)
         } else {
@@ -113,8 +113,8 @@ impl SymbolTable {
         }
     }
 
-    fn get_local_by_name(&self, name: &str) -> Option<SymbolInfo> {
-        self.symbols.iter().find(|s| s.name == name).cloned()
+    fn get_local_by_name(&self, name: &str) -> Option<&SymbolInfo> {
+        self.symbols.iter().find(|s| s.name == name)
     }
 
     pub fn get_by_name(&self, name: &str) -> Option<SymbolInfo> {
@@ -136,8 +136,8 @@ impl SymbolTable {
     }
 
     pub fn mark_as_used(&mut self, id: SymbolId) {
-        if let Some(symbol) = self.get_local(id) {
-            if let Some(s) = self.symbols.iter_mut().find(|s| s.id == symbol.id) {
+        if self.get_local(id).is_some() {
+            if let Some(s) = self.symbols.iter_mut().find(|s| s.id == id) {
                 s.used = true;
             }
         } else if let Some(ref parent) = self.parent {
@@ -152,12 +152,12 @@ impl SymbolTable {
             .map(|index| self.symbols.swap_remove(index))
     }
 
-    pub fn get_all_local_symbols(&self) -> Vec<SymbolInfo> {
-        self.symbols.clone()
+    pub fn get_all_local_symbols(&self) -> &[SymbolInfo] {
+        &self.symbols
     }
 
     pub fn get_all_symbols(&self) -> Vec<SymbolInfo> {
-        let mut names = self.get_all_local_symbols();
+        let mut names = self.get_all_local_symbols().to_vec();
         if let Some(ref parent) = self.parent {
             names.extend(parent.borrow().get_all_symbols());
         }
