@@ -155,7 +155,6 @@ pub enum ExprKind {
         arguments: Vec<Expr>,
     },
     Dict(Vec<(Expr, Expr)>),
-    // TODO: Box this
     FunctionExpression(Box<FunctionDeclaration>),
     FieldExpression {
         base: Box<Expr>,
