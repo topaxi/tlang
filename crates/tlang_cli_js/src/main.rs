@@ -52,18 +52,8 @@ fn get_args() -> Args {
     validate_args(&matches)
 }
 
-fn compile_standard_library() -> Result<(), ParserError> {
-    let std_lib_source = compile(&CodegenJS::get_standard_library_source())?;
-    let output_file_name = "js/stdlib.js";
-    let mut output_file = match File::create(output_file_name) {
-        Err(why) => panic!("couldn't create {output_file_name}: {why}"),
-        Ok(file) => file,
-    };
-    if let Err(why) = output_file.write_all(std_lib_source.as_bytes()) {
-        panic!("couldn't write to {output_file_name}: {why}")
-    };
-
-    Ok(())
+fn compile_standard_library() -> Result<String, ParserError> {
+    compile(&CodegenJS::get_standard_library_source())
 }
 
 // Main entry point for the CLI, which compiles tlang to javascript.
@@ -71,21 +61,9 @@ fn compile_standard_library() -> Result<(), ParserError> {
 fn main() {
     let args = get_args();
 
-    compile_standard_library().unwrap();
-
-    let std_lib_file = Path::new("js/stdlib.js");
-    let mut std_lib = match File::open(std_lib_file) {
-        Err(why) => panic!("couldn't open {}: {}", std_lib_file.display(), why),
-        Ok(file) => file,
-    };
-    let mut std_lib_source = String::new();
-    if let Err(why) = std_lib.read_to_string(&mut std_lib_source) {
-        panic!("couldn't read {}: {}", std_lib_file.display(), why)
-    };
-
     if args.output_stdlib {
         if !args.silent {
-            println!("{}", std_lib_source);
+            println!("{}", compile_standard_library().unwrap());
         }
 
         return;
@@ -109,6 +87,7 @@ fn main() {
             }
         };
 
+        let std_lib_source = compile_standard_library().unwrap();
         let output = format!("{std_lib_source}\n{{{output}}}");
 
         if args.output_file.is_none() {
