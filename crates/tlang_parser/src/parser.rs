@@ -357,7 +357,7 @@ impl<'src> Parser<'src> {
     fn parse_single_identifier(&mut self) -> Expr {
         let path = Path::from_ident(self.consume_identifier());
         let span = path.span;
-        node::expr!(Path(path)).with_span(span)
+        node::expr!(Path(Box::new(path))).with_span(span)
     }
 
     fn parse_path(&mut self) -> Path {
@@ -378,7 +378,7 @@ impl<'src> Parser<'src> {
         let path = self.parse_path();
         let span = path.span;
 
-        node::expr!(Path(path)).with_span(span)
+        node::expr!(Path(Box::new(path))).with_span(span)
     }
 
     fn parse_struct_declaration(&mut self) -> Stmt {
@@ -393,11 +393,11 @@ impl<'src> Parser<'src> {
             }
         }
         self.consume_token(TokenKind::RBrace);
-        node::stmt!(StructDeclaration(StructDeclaration {
+        node::stmt!(StructDeclaration(Box::new(StructDeclaration {
             id: self.unique_id(),
             name,
             fields,
-        }))
+        })))
     }
 
     fn parse_struct_field(&mut self) -> StructField {
@@ -419,11 +419,11 @@ impl<'src> Parser<'src> {
             }
         }
         self.consume_token(TokenKind::RBrace);
-        node::stmt!(EnumDeclaration(EnumDeclaration {
+        node::stmt!(EnumDeclaration(Box::new(EnumDeclaration {
             id: self.unique_id(),
             name,
             variants,
-        }))
+        })))
     }
 
     /// Parses an enum variant, e.g. `Foo`, `Foo(1, 2, 3)` and
@@ -737,7 +737,10 @@ impl<'src> Parser<'src> {
         self.consume_token(TokenKind::RBrace);
         self.end_span_from_previous_token(&mut span);
 
-        node::expr!(Block(Block::new(statements, expression).with_span(span))).with_span(span)
+        node::expr!(Block(Box::new(
+            Block::new(statements, expression).with_span(span)
+        )))
+        .with_span(span)
     }
 
     /// Can be a Identifier, NestedIdentifier or FieldExpression with a single field name.
@@ -785,7 +788,7 @@ impl<'src> Parser<'src> {
         let condition = self.parse_if_condition();
 
         self.expect_token(TokenKind::LBrace);
-        let then_branch = node::expr!(Block(self.parse_block()));
+        let then_branch = node::expr!(Block(Box::new(self.parse_block())));
 
         let mut else_branches = Vec::new();
         while let Some(TokenKind::Else) = self.current_token_kind() {
@@ -795,7 +798,7 @@ impl<'src> Parser<'src> {
                 let condition = self.parse_if_condition();
 
                 self.expect_token(TokenKind::LBrace);
-                let consequence = node::expr!(Block(self.parse_block()));
+                let consequence = node::expr!(Block(Box::new(self.parse_block())));
 
                 else_branches.push(ElseClause {
                     condition: Box::new(Some(condition)),
@@ -803,7 +806,7 @@ impl<'src> Parser<'src> {
                 });
             } else {
                 self.expect_token(TokenKind::LBrace);
-                let consequence = node::expr!(Block(self.parse_block()));
+                let consequence = node::expr!(Block(Box::new(self.parse_block())));
 
                 else_branches.push(ElseClause {
                     condition: Box::new(None),
@@ -907,7 +910,7 @@ impl<'src> Parser<'src> {
 
                     self.end_span_from_previous_token(&mut span);
 
-                    let mut expr = Expr::new(ExprKind::Path(path)).with_span(span);
+                    let mut expr = node::expr!(Path(Box::new(path))).with_span(span);
 
                     if let Some(TokenKind::LParen | TokenKind::LBrace) = self.current_token_kind() {
                         expr = self.parse_call_expression(expr);
@@ -1063,10 +1066,10 @@ impl<'src> Parser<'src> {
         let name = if let Some(TokenKind::Identifier(_)) = self.current_token_kind() {
             self.parse_single_identifier()
         } else {
-            node::expr!(Path(Path::from_ident(Ident::new(
+            node::expr!(Path(Box::new(Path::from_ident(Ident::new(
                 "anonymous",
                 Default::default()
-            ))))
+            )))))
         };
 
         let parameters = self.parse_parameter_list();
@@ -1075,7 +1078,7 @@ impl<'src> Parser<'src> {
 
         self.end_span_from_previous_token(&mut span);
 
-        node::expr!(FunctionExpression(FunctionDeclaration {
+        node::expr!(FunctionExpression(Box::new(FunctionDeclaration {
             id: self.unique_id(),
             name: Box::new(name),
             parameters,
@@ -1084,7 +1087,7 @@ impl<'src> Parser<'src> {
             return_type_annotation: Box::new(return_type),
             span,
             ..Default::default()
-        }))
+        })))
         .with_span(span)
     }
 
@@ -1227,7 +1230,7 @@ impl<'src> Parser<'src> {
         }
 
         if declarations.len() == 1 {
-            return node::stmt!(FunctionDeclaration(declarations.pop().unwrap()));
+            return node::stmt!(FunctionDeclaration(Box::new(declarations.pop().unwrap())));
         }
 
         node::stmt!(FunctionDeclarations(declarations))
@@ -1376,7 +1379,7 @@ impl<'src> Parser<'src> {
 
     fn parse_pattern_literal(&mut self) -> Pattern {
         expect_token_matches!(self, "literal", TokenKind::Literal(_));
-        node::pat!(Literal(self.parse_expression()))
+        node::pat!(Literal(Box::new(self.parse_expression())))
     }
 
     fn parse_pattern(&mut self) -> Pattern {

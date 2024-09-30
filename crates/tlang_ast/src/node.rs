@@ -149,14 +149,14 @@ pub struct ElseClause {
 pub enum ExprKind {
     #[default]
     None,
-    Block(Block),
+    Block(Box<Block>),
     Call {
         function: Box<Expr>,
         arguments: Vec<Expr>,
     },
     Dict(Vec<(Expr, Expr)>),
     // TODO: Box this
-    FunctionExpression(FunctionDeclaration),
+    FunctionExpression(Box<FunctionDeclaration>),
     FieldExpression {
         base: Box<Expr>,
         field: Box<Ident>,
@@ -174,10 +174,9 @@ pub enum ExprKind {
     },
     List(Vec<Expr>),
     Literal(Literal),
-    Path(Path),
+    Path(Box<Path>),
     UnaryOp(UnaryOp, Box<Expr>),
     BinaryOp {
-        // TODO: Box this
         op: BinaryOpKind,
         lhs: Box<Expr>,
         rhs: Box<Expr>,
@@ -279,7 +278,7 @@ pub enum PatternKind {
         id: SymbolId,
         name: Ident,
     },
-    Literal(Expr),
+    Literal(Box<Expr>),
     List(Vec<Pattern>),
     Rest(Box<Pattern>),
     Enum {
@@ -338,12 +337,12 @@ pub enum StmtKind {
         expression: Box<Expr>,
         type_annotation: Box<Option<Ty>>,
     },
-    FunctionDeclaration(FunctionDeclaration),
+    FunctionDeclaration(Box<FunctionDeclaration>),
     // Should this really be handled within the parser or should this be done in later stages?
     FunctionDeclarations(Vec<FunctionDeclaration>),
     Return(Box<Option<Expr>>),
-    EnumDeclaration(EnumDeclaration),
-    StructDeclaration(StructDeclaration),
+    EnumDeclaration(Box<EnumDeclaration>),
+    StructDeclaration(Box<StructDeclaration>),
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
