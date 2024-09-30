@@ -208,9 +208,11 @@ impl Path {
     }
 
     pub fn from_ident(ident: Ident) -> Self {
+        let span = ident.span;
+
         Path {
-            segments: vec![ident.clone()],
-            span: ident.span,
+            segments: vec![ident],
+            span,
         }
     }
 
