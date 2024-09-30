@@ -794,27 +794,23 @@ impl<'src> Parser<'src> {
         while let Some(TokenKind::Else) = self.current_token_kind() {
             self.advance();
 
-            if let Some(TokenKind::If) = self.current_token_kind() {
-                let condition = self.parse_if_condition();
-
-                self.expect_token(TokenKind::LBrace);
-                let consequence = node::expr!(Block(Box::new(self.parse_block())));
-
-                else_branches.push(ElseClause {
-                    condition: Box::new(Some(condition)),
-                    consequence: Box::new(consequence),
-                });
+            let condition = if let Some(TokenKind::If) = self.current_token_kind() {
+                Some(self.parse_if_condition())
             } else {
-                self.expect_token(TokenKind::LBrace);
-                let consequence = node::expr!(Block(Box::new(self.parse_block())));
+                None
+            };
 
-                else_branches.push(ElseClause {
-                    condition: Box::new(None),
-                    consequence: Box::new(consequence),
-                });
+            self.expect_token(TokenKind::LBrace);
+            let consequence = node::expr!(Block(Box::new(self.parse_block())));
 
+            if condition.is_none() {
                 self.expect_token_not(TokenKind::Else);
             }
+
+            else_branches.push(ElseClause {
+                condition,
+                consequence,
+            });
         }
 
         node::expr!(IfElse {
@@ -987,8 +983,8 @@ impl<'src> Parser<'src> {
                 self.end_span_from_previous_token(&mut parameter_span);
 
                 parameters.push(FunctionParameter {
-                    pattern: Box::new(parameter_pattern),
-                    type_annotation: Box::new(type_annotation),
+                    pattern: parameter_pattern,
+                    type_annotation,
                     span: parameter_span,
                 });
             }
@@ -1080,11 +1076,10 @@ impl<'src> Parser<'src> {
 
         node::expr!(FunctionExpression(Box::new(FunctionDeclaration {
             id: self.unique_id(),
-            name: Box::new(name),
+            name,
             parameters,
-            guard: Box::new(None),
             body,
-            return_type_annotation: Box::new(return_type),
+            return_type_annotation: return_type,
             span,
             ..Default::default()
         })))
@@ -1218,11 +1213,11 @@ impl<'src> Parser<'src> {
 
             declarations.push(FunctionDeclaration {
                 id,
-                name: Box::new(name.clone().unwrap()),
+                name: name.clone().unwrap(),
                 parameters,
-                guard: Box::new(guard),
+                guard,
                 body,
-                return_type_annotation: Box::new(return_type),
+                return_type_annotation: return_type,
                 leading_comments: comments,
                 span,
                 ..Default::default()

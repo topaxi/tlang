@@ -49,7 +49,7 @@ pub fn generate_function_declarations(
 
     // Declare and output temporary variables for if let guards.
     for declaration in declarations {
-        if let Some(ref expr) = *declaration.guard {
+        if let Some(ref expr) = declaration.guard {
             if let ExprKind::Let(pattern, _) = &expr.kind {
                 match &pattern.kind {
                     PatternKind::Identifier { name, .. } => {
@@ -266,12 +266,12 @@ pub fn generate_function_declarations(
         }
 
         if variadic_or_pattern_matching {
-            if let Some(ref expr) = *declaration.guard {
+            if let Some(ref expr) = declaration.guard {
                 codegen.push_str(" && ");
                 generate_function_definition_guard(codegen, expr);
             }
             codegen.push_str(") {\n");
-        } else if let Some(ref expr) = *declaration.guard {
+        } else if let Some(ref expr) = declaration.guard {
             codegen.push_str("if (");
             generate_function_definition_guard(codegen, expr);
             codegen.push_str(") {\n");
@@ -678,7 +678,7 @@ fn is_function_body_tail_recursive_block(function_name: &str, block: &Block) -> 
         }
     }
 
-    if let Some(ref expression) = *block.expression {
+    if let Some(ref expression) = block.expression {
         return is_function_body_tail_recursive(function_name, expression);
     }
 

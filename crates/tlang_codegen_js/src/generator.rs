@@ -348,7 +348,7 @@ impl CodegenJS {
             // and the node is RecursiveCall pointing to the current function.
             if let Some(function_context) = self.function_context_stack.last() {
                 if function_context.is_tail_recursive && block.has_completion() {
-                    if let Some(ref expression) = *block.expression {
+                    if let Some(ref expression) = block.expression {
                         if let ExprKind::RecursiveCall(_) = expression.kind {
                             self.generate_expr(expression, None);
                             return;
@@ -701,7 +701,7 @@ impl CodegenJS {
             self.push_indent();
             self.push_str("} else");
 
-            if let Some(ref condition) = *else_branch.condition {
+            if let Some(ref condition) = else_branch.condition {
                 self.push_str(" if (");
                 let indent_level = self.indent_level;
                 self.indent_level = 0;

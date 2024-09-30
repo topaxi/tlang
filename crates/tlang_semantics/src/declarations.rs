@@ -163,15 +163,14 @@ impl DeclarationAnalyzer {
             ExprKind::Block(block) => self.collect_declarations_block(block),
             ExprKind::FunctionExpression(decl) => {
                 expr.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
-                let name = decl.name.as_ref();
-                let name_as_str = self.fn_identifier_to_string(name);
+                let name_as_str = self.fn_identifier_to_string(&decl.name);
 
                 if name_as_str != "anonymous" {
                     self.declare_symbol(SymbolInfo::new(
                         decl.id,
                         &name_as_str,
                         SymbolType::Function,
-                        Some(name.span),
+                        Some(decl.name.span),
                     ));
                 }
 

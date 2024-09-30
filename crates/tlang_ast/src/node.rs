@@ -42,16 +42,16 @@ pub enum Associativity {
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct FunctionParameter {
-    pub pattern: Box<Pattern>,
-    pub type_annotation: Box<Option<Ty>>,
+    pub pattern: Pattern,
+    pub type_annotation: Option<Ty>,
     pub span: Span,
 }
 
 impl FunctionParameter {
     pub fn new(pattern: Pattern) -> Self {
         FunctionParameter {
-            pattern: Box::new(pattern),
-            type_annotation: Box::new(None),
+            pattern,
+            type_annotation: None,
             span: Span::default(),
         }
     }
@@ -62,7 +62,7 @@ impl FunctionParameter {
     }
 
     pub fn with_type_annotation(mut self, type_annotation: Ty) -> Self {
-        self.type_annotation = Box::new(Some(type_annotation));
+        self.type_annotation = Some(type_annotation);
         self
     }
 
@@ -78,10 +78,10 @@ impl FunctionParameter {
 #[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub struct FunctionDeclaration {
     pub id: SymbolId,
-    pub name: Box<Expr>,
+    pub name: Expr,
     pub parameters: Vec<FunctionParameter>,
-    pub guard: Box<Option<Expr>>,
-    pub return_type_annotation: Box<Option<Ty>>,
+    pub guard: Option<Expr>,
+    pub return_type_annotation: Option<Ty>,
     pub body: Block,
     pub leading_comments: Vec<Token>,
     pub trailing_comments: Vec<Token>,
@@ -92,7 +92,7 @@ pub struct FunctionDeclaration {
 #[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub struct Block {
     pub statements: Vec<Stmt>,
-    pub expression: Box<Option<Expr>>,
+    pub expression: Option<Expr>,
     pub span: Span,
     pub symbol_table: Option<Rc<RefCell<SymbolTable>>>,
 }
@@ -101,7 +101,7 @@ impl Block {
     pub fn new(statements: Vec<Stmt>, expression: Option<Expr>) -> Self {
         Block {
             statements,
-            expression: Box::new(expression),
+            expression,
             ..Default::default()
         }
     }
@@ -141,8 +141,8 @@ impl Expr {
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct ElseClause {
-    pub condition: Box<Option<Expr>>,
-    pub consequence: Box<Expr>,
+    pub condition: Option<Expr>,
+    pub consequence: Expr,
 }
 
 #[derive(Debug, Default, PartialEq, Clone, Serialize)]

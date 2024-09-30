@@ -184,7 +184,7 @@ impl SemanticAnalyzer {
             self.analyze_fn_param(parameter);
         }
 
-        if let Some(ref mut guard) = *decl.guard {
+        if let Some(ref mut guard) = decl.guard {
             self.analyze_expr(guard);
         }
 
