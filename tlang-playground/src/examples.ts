@@ -1,4 +1,4 @@
-import { TlangCompiler } from './tlang';
+import { standardLibrarySource } from './tlang';
 
 const cli_examples = Object.fromEntries(
   Object.entries(
@@ -12,5 +12,5 @@ const cli_examples = Object.fromEntries(
 
 export const examples: Record<string, string> = {
   ...cli_examples,
-  'stdlib.tl': TlangCompiler.standardLibrarySource,
+  'stdlib.tl': standardLibrarySource,
 };

@@ -5,7 +5,7 @@ import { examples } from './examples';
 import './components/t-codemirror';
 import { type TCodeMirror } from './components/t-codemirror';
 import { compressSource, decompressSource } from './utils/lz';
-import { TlangCompiler } from './tlang';
+import { compile, getStandardLibraryCompiled } from './tlang';
 
 // Default source code is either the code provided via hashcode "source"
 // compressed by lz-string or the "example" hashcode with the corresponding
@@ -166,16 +166,11 @@ export class TlangPlayground extends LitElement {
 
   @state() error = '';
 
-  private get standardLibrary() {
-    return this.compile(TlangCompiler.standardLibrarySource).output;
-  }
-
   private compile(source: string) {
-    let parser = new TlangCompiler(source);
-    parser.compile();
+    let compiler = compile(source);
     let { output, parseErrors, ast, diagnostics, codemirrorDiagnostics } =
-      parser;
-    parser.free();
+      compiler;
+    compiler.free();
     return { output, parseErrors, ast, diagnostics, codemirrorDiagnostics };
   }
 
@@ -186,7 +181,7 @@ export class TlangPlayground extends LitElement {
 
     let fn = new Function(
       'console',
-      `${this.standardLibrary}\n{${this.output}};`,
+      `${getStandardLibraryCompiled()}\n{${this.output}};`,
     );
 
     fn({
@@ -228,6 +223,10 @@ export class TlangPlayground extends LitElement {
         this.error = '';
         let { output, parseErrors, ast, diagnostics, codemirrorDiagnostics } =
           this.compile(this.source);
+
+        for (let diagnostic of codemirrorDiagnostics) {
+          diagnostic.free();
+        }
 
         this.codemirror.diagnostics = codemirrorDiagnostics;
 

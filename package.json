@@ -4,7 +4,9 @@
   "description": "",
   "scripts": {
     "dev": "npm run dev -w tlang-playground",
-    "build": "npm run build -w tlang-playground"
+    "build": "npm run build -w tlang-playground",
+    "prepreview": "npm run build",
+    "preview": "npx serve tlang-playground/dist"
   },
   "workspaces": [
     "packages/*",
