@@ -23,7 +23,6 @@
     "tlang_bindings_js": "file:../crates/tlang_bindings_js"
   },
   "devDependencies": {
-    "typescript": "^5.6.2",
     "vite": "^5.4.8",
     "vite-plugin-wasm": "^3.3.0"
   }

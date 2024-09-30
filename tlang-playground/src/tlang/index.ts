@@ -1,10 +1,13 @@
-import init, { getStandardLibrarySource, TlangCompiler } from 'tlang_bindings_js';
+import init, {
+  getStandardLibrarySource,
+  TlangCompiler,
+} from 'tlang_bindings_js';
 
 await init();
 
 export const standardLibrarySource = getStandardLibrarySource();
 
-let standardLibraryCompiled = ''
+let standardLibraryCompiled = '';
 
 export function getStandardLibraryCompiled(): string {
   if (standardLibraryCompiled !== '') {

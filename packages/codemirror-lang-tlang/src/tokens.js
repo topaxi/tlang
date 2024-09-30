@@ -1,7 +1,7 @@
 //!trackNewline
 
-import { ContextTracker } from "@lezer/lr";
-import { spaces, newline, BlockComment, LineComment } from "./parser.terms.js";
+import { ContextTracker } from '@lezer/lr';
+import { spaces, newline, BlockComment, LineComment } from './parser.terms.js';
 
 export const trackNewline = new ContextTracker({
   start: false,
@@ -15,16 +15,14 @@ export const trackNewline = new ContextTracker({
 
 //!externalTokenizers
 
-import { ExternalTokenizer } from "@lezer/lr";
-import { insertSemi, noSemi } from "./parser.terms.js";
+import { ExternalTokenizer } from '@lezer/lr';
+import { insertSemi, noSemi } from './parser.terms.js';
 
 const space = [9, 10, 11, 12, 13, 32, 133, 160];
-const braceR = 125,
-  semicolon = 59,
-  slash = 47,
-  star = 42,
-  plus = 43,
-  minus = 45;
+const braceR = 125;
+const semicolon = 59;
+const slash = 47;
+const star = 42;
 
 export const insertSemicolon = new ExternalTokenizer(
   (input, stack) => {

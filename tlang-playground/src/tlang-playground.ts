@@ -7,6 +7,8 @@ import { type TCodeMirror } from './components/t-codemirror';
 import { compressSource, decompressSource } from './utils/lz';
 import { compile, getStandardLibraryCompiled } from './tlang';
 
+type CodemirrorSeverity = 'hint' | 'info' | 'warning' | 'error';
+
 // Default source code is either the code provided via hashcode "source"
 // compressed by lz-string or the "example" hashcode with the corresponding
 // example file name. Default is the first example.
@@ -213,9 +215,7 @@ export class TlangPlayground extends LitElement {
     });
   }
 
-  protected update(
-    changedProperties: PropertyValueMap<any> | Map<PropertyKey, unknown>,
-  ): void {
+  protected update(changedProperties: PropertyValueMap<this>): void {
     super.update(changedProperties);
 
     if (changedProperties.has('source')) {
@@ -228,7 +228,14 @@ export class TlangPlayground extends LitElement {
           diagnostic.free();
         }
 
-        this.codemirror.diagnostics = codemirrorDiagnostics;
+        this.codemirror.diagnostics = codemirrorDiagnostics.map(
+          (diagnostic) => ({
+            from: diagnostic.from,
+            to: diagnostic.to,
+            message: diagnostic.message,
+            severity: diagnostic.severity as CodemirrorSeverity,
+          }),
+        );
 
         let diagnosticsErrors = diagnostics.filter((diagnostic) =>
           diagnostic.startsWith('ERROR:'),
@@ -247,9 +254,7 @@ export class TlangPlayground extends LitElement {
     }
   }
 
-  protected firstUpdated(
-    _changedProperties: PropertyValueMap<any> | Map<PropertyKey, unknown>,
-  ): void {
+  protected firstUpdated(_changedProperties: PropertyValueMap<this>): void {
     let params = new URLSearchParams(window.location.hash.slice(1));
 
     let exampleName = String(params.get('example'));
@@ -264,9 +269,7 @@ export class TlangPlayground extends LitElement {
     });
   }
 
-  protected updated(
-    changedProperties: PropertyValueMap<any> | Map<PropertyKey, unknown>,
-  ): void {
+  protected updated(changedProperties: PropertyValueMap<this>): void {
     if (changedProperties.has('consoleOutput')) {
       this.consoleOutputElement.scrollTop =
         this.consoleOutputElement.scrollHeight;

@@ -4,7 +4,7 @@ on:
   pull_request:
   push:
     branches:
-      - "main"
+      - 'main'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -64,11 +64,17 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          cache: "npm"
+          cache: 'npm'
           cache-dependency-path: package-lock.json
 
       - name: Install playground dependencies
         run: npm ci
+
+      - name: Lint playground
+        run: npm run lint
+
+      - name: TypeCheck playground
+        run: npm run typecheck
 
       - name: Build playground
         working-directory: tlang-playground
@@ -83,7 +89,7 @@ jobs:
   deploy-pages:
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
-    needs: ["build"]
+    needs: ['build']
 
     permissions:
       actions: read
