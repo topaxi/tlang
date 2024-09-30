@@ -382,10 +382,14 @@ impl CodegenJS {
     pub fn generate_comment(&mut self, comment: &Token) {
         match &comment.kind {
             TokenKind::SingleLineComment(comment) => {
-                self.push_str(&format!("//{comment}\n"));
+                self.push_str("//");
+                self.push_str(comment);
+                self.push_str("\n");
             }
             TokenKind::MultiLineComment(comment) => {
-                self.push_str(&format!("/*{comment}*/\n"));
+                self.push_str("/*");
+                self.push_str(comment);
+                self.push_str("*/\n");
             }
             _ => {}
         }
