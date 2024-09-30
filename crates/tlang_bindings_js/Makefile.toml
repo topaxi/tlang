@@ -50,7 +50,8 @@ script = "mv -force wasm/tlang_bindings_js_bg.wasm wasm/tlang_bindings_js_bg.uno
 [tasks.wasm-opt]
 command = "wasm-opt"
 args = [
-  "-Oz",
+  "-Oz", # aggressively optimize for file size
+  "-g",  # but still emit names for debugging/profiling
   "-o",
   "wasm/tlang_bindings_js_bg.wasm",
   "wasm/tlang_bindings_js_bg.unoptimized.wasm",
