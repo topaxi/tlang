@@ -9,7 +9,6 @@ pub struct Lexer<'src> {
     position: usize,
     current_line: usize,
     current_column: usize,
-    current_token: Option<Token>,
 }
 
 impl Lexer<'_> {
@@ -19,7 +18,6 @@ impl Lexer<'_> {
             position: 0,
             current_line: 0,
             current_column: 0,
-            current_token: None,
         }
     }
 
@@ -380,7 +378,6 @@ impl Lexer<'_> {
             _ => self.token(TokenKind::Unknown(ch.to_string()), start),
         };
 
-        self.current_token = Some(token.clone());
         token
     }
 }
