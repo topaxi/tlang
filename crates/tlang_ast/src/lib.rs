@@ -5,3 +5,4 @@ pub mod node_id;
 pub mod span;
 pub mod symbols;
 pub mod token;
+pub mod visit;
