@@ -75,7 +75,7 @@ impl FunctionParameter {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub struct FunctionDeclaration {
     pub id: SymbolId,
     pub name: Box<Expr>,
@@ -89,24 +89,7 @@ pub struct FunctionDeclaration {
     pub span: Span,
 }
 
-impl Default for FunctionDeclaration {
-    fn default() -> Self {
-        FunctionDeclaration {
-            id: SymbolId::new(0),
-            name: Box::new(Expr::new(ExprKind::None)),
-            parameters: vec![],
-            guard: Box::new(None),
-            return_type_annotation: Box::new(None),
-            body: Block::default(),
-            leading_comments: vec![],
-            trailing_comments: vec![],
-            symbol_table: None,
-            span: Span::default(),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub struct Block {
     pub statements: Vec<Stmt>,
     pub expression: Box<Option<Expr>>,
@@ -119,8 +102,7 @@ impl Block {
         Block {
             statements,
             expression: Box::new(expression),
-            symbol_table: None,
-            span: Span::default(),
+            ..Default::default()
         }
     }
 
@@ -134,18 +116,7 @@ impl Block {
     }
 }
 
-impl Default for Block {
-    fn default() -> Self {
-        Block {
-            statements: vec![],
-            expression: Box::new(None),
-            symbol_table: None,
-            span: Span::default(),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub struct Expr {
     pub kind: ExprKind,
     pub leading_comments: Vec<Token>,
@@ -158,10 +129,7 @@ impl Expr {
     pub fn new(kind: ExprKind) -> Self {
         Expr {
             kind,
-            leading_comments: vec![],
-            trailing_comments: vec![],
-            symbol_table: None,
-            span: Span::default(),
+            ..Default::default()
         }
     }
 
@@ -337,7 +305,7 @@ pub struct EnumDeclaration {
     pub variants: Vec<EnumVariant>,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub struct Stmt {
     pub kind: StmtKind,
     pub span: Span,
@@ -350,10 +318,7 @@ impl Stmt {
     pub fn new(kind: StmtKind) -> Self {
         Stmt {
             kind,
-            span: Span::default(),
-            leading_comments: vec![],
-            trailing_comments: vec![],
-            symbol_table: None,
+            ..Default::default()
         }
     }
 
