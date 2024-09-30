@@ -27,18 +27,17 @@ impl DeclarationAnalyzer {
         }
     }
 
-    fn root_symbol_table(&self) -> Rc<RefCell<SymbolTable>> {
-        Rc::clone(&self.symbol_table_stack[0])
+    fn root_symbol_table(&self) -> &Rc<RefCell<SymbolTable>> {
+        &self.symbol_table_stack[0]
     }
 
-    fn get_last_symbol_table(&self) -> Rc<RefCell<SymbolTable>> {
-        Rc::clone(self.symbol_table_stack.last().unwrap())
+    fn get_last_symbol_table(&self) -> &Rc<RefCell<SymbolTable>> {
+        self.symbol_table_stack.last().unwrap()
     }
 
     fn push_symbol_table(&mut self) -> Rc<RefCell<SymbolTable>> {
-        let new_symbol_table = Rc::new(RefCell::new(SymbolTable::new(Rc::clone(
-            &self.get_last_symbol_table(),
-        ))));
+        let parent = Rc::clone(self.get_last_symbol_table());
+        let new_symbol_table = Rc::new(RefCell::new(SymbolTable::new(parent)));
         self.symbol_table_stack.push(Rc::clone(&new_symbol_table));
 
         new_symbol_table
@@ -50,20 +49,11 @@ impl DeclarationAnalyzer {
 
     #[inline(always)]
     fn declare_symbol(&mut self, symbol_info: SymbolInfo) {
+        let symbol_table = self.get_last_symbol_table();
+
         // Multiple function declarations with the same name result in SymbolInfo with the same ID.
-        if self
-            .symbol_table_stack
-            .last()
-            .unwrap()
-            .borrow()
-            .get(symbol_info.id)
-            .is_none()
-        {
-            self.symbol_table_stack
-                .last_mut()
-                .unwrap()
-                .borrow_mut()
-                .insert(symbol_info);
+        if symbol_table.borrow().get(symbol_info.id).is_none() {
+            symbol_table.borrow_mut().insert(symbol_info);
         }
     }
 
