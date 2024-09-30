@@ -35,15 +35,26 @@ impl Lexer<'_> {
         self.source
     }
 
-    fn peek_ahead(&self) -> Option<char> {
-        self.source.chars().nth(self.position + 1)
+    #[inline(always)]
+    fn current_char(&self) -> Option<char> {
+        self.source[self.position..].chars().next()
+    }
+
+    #[inline(always)]
+    fn peek_char(&self) -> Option<char> {
+        self.source[self.position..].chars().nth(1)
+    }
+
+    #[inline(always)]
+    fn previous_char(&self) -> Option<char> {
+        self.source[..self.position].chars().last()
     }
 
     fn advance(&mut self) {
         if self.position < self.source.len() {
             self.position += 1;
 
-            if let Some(ch) = self.source.chars().nth(self.position - 1) {
+            if let Some(ch) = self.previous_char() {
                 if ch == '\n' {
                     self.current_line += 1;
                     self.current_column = 1;
@@ -64,7 +75,7 @@ impl Lexer<'_> {
 
     #[inline(always)]
     fn advance_while(&mut self, predicate: impl Fn(char) -> bool) {
-        while let Some(ch) = self.source.chars().nth(self.position) {
+        for ch in self.source[self.position..].chars() {
             if predicate(ch) {
                 self.advance();
             } else {
@@ -125,7 +136,7 @@ impl Lexer<'_> {
             return self.token(TokenKind::Eof, start);
         }
 
-        let ch = self.source.chars().nth(self.position).unwrap();
+        let ch = self.current_char().unwrap();
 
         let token = match ch {
             '+' => {
@@ -133,7 +144,7 @@ impl Lexer<'_> {
                 self.token(TokenKind::Plus, start)
             }
             '-' => {
-                if self.peek_ahead() == Some('>') {
+                if self.peek_char() == Some('>') {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::Arrow, start)
@@ -143,7 +154,7 @@ impl Lexer<'_> {
                 }
             }
             '*' => {
-                if self.peek_ahead() == Some('*') {
+                if self.peek_char() == Some('*') {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::AsteriskAsterisk, start)
@@ -153,14 +164,14 @@ impl Lexer<'_> {
                 }
             }
             '/' => {
-                if self.peek_ahead() == Some('/') {
+                if self.peek_char() == Some('/') {
                     self.advance();
                     self.advance();
                     let start_position = self.position;
                     self.advance_while(|ch| ch != '\n');
                     let slice = &self.source[start_position..self.position];
                     self.token(TokenKind::SingleLineComment(slice.to_owned()), start)
-                } else if self.peek_ahead() == Some('*') {
+                } else if self.peek_char() == Some('*') {
                     self.advance();
                     self.advance();
                     let start_position = self.position;
@@ -187,11 +198,11 @@ impl Lexer<'_> {
                 self.token(TokenKind::Caret, start)
             }
             '|' => {
-                if self.peek_ahead() == Some('|') {
+                if self.peek_char() == Some('|') {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::DoublePipe, start)
-                } else if self.peek_ahead() == Some('>') {
+                } else if self.peek_char() == Some('>') {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::Pipeline, start)
@@ -201,7 +212,7 @@ impl Lexer<'_> {
                 }
             }
             '&' => {
-                if self.peek_ahead() == Some('&') {
+                if self.peek_char() == Some('&') {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::DoubleAmpersand, start)
@@ -211,7 +222,7 @@ impl Lexer<'_> {
                 }
             }
             '<' => {
-                if self.peek_ahead() == Some('=') {
+                if self.peek_char() == Some('=') {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::LessThanOrEqual, start)
@@ -221,7 +232,7 @@ impl Lexer<'_> {
                 }
             }
             '>' => {
-                if self.peek_ahead() == Some('=') {
+                if self.peek_char() == Some('=') {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::GreaterThanOrEqual, start)
@@ -259,11 +270,11 @@ impl Lexer<'_> {
                 self.token(TokenKind::Comma, start)
             }
             '=' => {
-                if self.peek_ahead() == Some('=') {
+                if self.peek_char() == Some('=') {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::EqualEqual, start)
-                } else if self.peek_ahead() == Some('>') {
+                } else if self.peek_char() == Some('>') {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::FatArrow, start)
@@ -273,7 +284,7 @@ impl Lexer<'_> {
                 }
             }
             '!' => {
-                if self.peek_ahead() == Some('=') {
+                if self.peek_char() == Some('=') {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::NotEqual, start)
@@ -287,7 +298,7 @@ impl Lexer<'_> {
                 self.token(TokenKind::QuestionMark, start)
             }
             ':' => {
-                if self.peek_ahead() == Some(':') {
+                if self.peek_char() == Some(':') {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::NamespaceSeparator, start)
@@ -301,7 +312,7 @@ impl Lexer<'_> {
                 self.token(TokenKind::Semicolon, start)
             }
             '.' => {
-                if let Some('.') = self.peek_ahead() {
+                if let Some('.') = self.peek_char() {
                     if self.source[self.position + 1..].starts_with("..") {
                         self.advance();
                         self.advance();
