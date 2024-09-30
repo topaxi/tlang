@@ -109,9 +109,9 @@ impl Lexer<'_> {
     fn read_string_literal(&mut self, quote: char) -> String {
         let start = self.position;
         self.advance_while(|ch| ch != quote);
-        let slice = &self.source[start..self.position];
+        let string_literal = self.source[start..self.position].to_string();
         self.advance();
-        slice.to_owned()
+        string_literal
     }
 
     fn line_column(&self) -> LineColumn {
@@ -167,8 +167,8 @@ impl Lexer<'_> {
                     self.advance();
                     let start_position = self.position;
                     self.advance_while(|ch| ch != '\n');
-                    let slice = &self.source[start_position..self.position];
-                    self.token(TokenKind::SingleLineComment(slice.to_owned()), start)
+                    let comment = self.source[start_position..self.position].to_string();
+                    self.token(TokenKind::SingleLineComment(comment), start)
                 } else if self.peek_char() == Some('*') {
                     self.advance();
                     self.advance();
@@ -178,10 +178,10 @@ impl Lexer<'_> {
                     {
                         self.advance();
                     }
-                    let slice = &self.source[start_position..self.position];
+                    let comment = self.source[start_position..self.position].to_string();
                     self.advance();
                     self.advance();
-                    self.token(TokenKind::MultiLineComment(slice.to_owned()), start)
+                    self.token(TokenKind::MultiLineComment(comment), start)
                 } else {
                     self.advance();
                     self.token(TokenKind::Slash, start)
