@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use crate::span::Span;
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, PartialEq, Copy, Clone, Serialize)]
 pub enum SymbolType {
     Variable,
     Function,

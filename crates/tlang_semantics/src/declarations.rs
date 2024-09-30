@@ -74,7 +74,7 @@ impl DeclarationAnalyzer {
                 .insert(SymbolInfo::new(
                     SymbolId::new(0), // Builtins have ID 0 for now.
                     name,
-                    symbol_type.clone(),
+                    *symbol_type,
                     None,
                 ));
         }
@@ -315,10 +315,7 @@ impl DeclarationAnalyzer {
                 self.declare_symbol(SymbolInfo::new(
                     *id,
                     name.as_str(),
-                    self.symbol_type
-                        .last()
-                        .unwrap_or(&SymbolType::Variable)
-                        .clone(),
+                    *self.symbol_type.last().unwrap_or(&SymbolType::Variable),
                     Some(pattern.span),
                 ));
             }
