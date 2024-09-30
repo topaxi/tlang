@@ -5,7 +5,14 @@ import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended'
 
 export default [
   { files: ['**/*.{js,mjs,cjs,ts}'] },
-  { ignores: ['**/dist/', '**/wasm/'] },
+  {
+    ignores: [
+      '**/dist/',
+      '**/wasm/',
+      'packages/codemirror-lang-tlang/src/parser.js',
+      'packages/codemirror-lang-tlang/src/parser.terms.js',
+    ],
+  },
   { languageOptions: { globals: globals.browser } },
   pluginJs.configs.recommended,
   ...tseslint.configs.recommended,
