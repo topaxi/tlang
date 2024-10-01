@@ -1497,12 +1497,7 @@ impl<'src> Parser<'src> {
 
     fn fn_name_identifier_to_string(&self, identifier: &Expr) -> String {
         match &identifier.kind {
-            ExprKind::Path(path) => path
-                .segments
-                .iter()
-                .map(|ident| ident.as_str())
-                .collect::<Vec<_>>()
-                .join("::"),
+            ExprKind::Path(path) => path.join("::"),
 
             ExprKind::FieldExpression { base, field } => {
                 format!("{}.{}", self.fn_name_identifier_to_string(base), field)

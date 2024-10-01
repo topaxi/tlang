@@ -511,14 +511,7 @@ impl CodegenJS {
         if path.segments.len() == 1 {
             self.generate_identifier(path.segments.first().unwrap());
         } else {
-            self.push_str(
-                &path
-                    .segments
-                    .iter()
-                    .map(|ident| ident.as_str())
-                    .collect::<Vec<_>>()
-                    .join("."),
-            );
+            self.push_str(&path.join("."));
         }
     }
 

@@ -257,12 +257,7 @@ impl DeclarationAnalyzer {
     #[allow(clippy::only_used_in_recursion)]
     fn fn_identifier_to_string(&self, identifier: &Expr) -> String {
         match identifier.kind {
-            ExprKind::Path(ref path) => path
-                .segments
-                .iter()
-                .map(|ident| ident.as_str())
-                .collect::<Vec<_>>()
-                .join("::"),
+            ExprKind::Path(ref path) => path.join("::"),
             ExprKind::FieldExpression {
                 ref base,
                 ref field,

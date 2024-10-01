@@ -224,6 +224,14 @@ impl Path {
     pub fn push(&mut self, ident: Ident) {
         self.segments.push(ident);
     }
+
+    pub fn join(&self, separator: &str) -> String {
+        self.segments
+            .iter()
+            .map(|segment| segment.as_str())
+            .collect::<Vec<_>>()
+            .join(separator)
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]

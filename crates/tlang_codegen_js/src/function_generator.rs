@@ -728,12 +728,7 @@ fn is_function_body_tail_recursive(function_name: &str, node: &Expr) -> bool {
 
 pub fn fn_identifier_to_string(expr: &Expr) -> String {
     match &expr.kind {
-        ExprKind::Path(path) => path
-            .segments
-            .iter()
-            .map(|s| s.as_str())
-            .collect::<Vec<_>>()
-            .join("."),
+        ExprKind::Path(path) => path.join("."),
         _ => todo!(),
     }
 }
