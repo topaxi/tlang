@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{
     binary_operator_generator::generate_binary_op,
     function_generator::{
@@ -51,7 +53,7 @@ pub struct FunctionContext {
 pub struct CodegenJS {
     output: String,
     indent_level: usize,
-    scopes: Scope,
+    scopes: Rc<RefCell<Scope>>,
     context_stack: Vec<BlockContext>,
     function_context_stack: Vec<FunctionContext>,
     function_pre_body_declarations: Vec<(String, String)>,
@@ -70,7 +72,7 @@ impl CodegenJS {
         Self {
             output: String::new(),
             indent_level: 0,
-            scopes: Scope::default(),
+            scopes: Rc::new(RefCell::new(Scope::default())),
             context_stack: vec![BlockContext::Program],
             function_context_stack: vec![],
             function_pre_body_declarations: vec![],
@@ -147,20 +149,39 @@ impl CodegenJS {
     }
 
     #[inline(always)]
-    pub fn current_scope(&mut self) -> &mut Scope {
+    pub fn current_scope(&mut self) -> &mut Rc<RefCell<Scope>> {
         &mut self.scopes
     }
 
     #[inline(always)]
     pub fn push_scope(&mut self) {
-        self.scopes = Scope::new(Some(Box::new(self.scopes.clone())));
+        self.scopes = Rc::new(RefCell::new(Scope::new(self.scopes.clone())));
     }
 
     #[inline(always)]
     pub fn pop_scope(&mut self) {
-        if let Some(parent) = self.scopes.get_parent() {
-            self.scopes = parent.clone();
-        }
+        let parent = self.scopes.borrow().get_parent().unwrap().clone();
+        self.scopes = parent;
+    }
+
+    pub fn resolve_variable(&self, name: &str) -> Option<String> {
+        self.scopes.borrow().resolve_variable(name)
+    }
+
+    pub fn declare_variable(&mut self, name: &str) -> String {
+        self.scopes.borrow_mut().declare_variable(name)
+    }
+
+    pub fn declare_variable_alias(&mut self, name: &str, alias: &str) {
+        self.scopes.borrow_mut().declare_variable_alias(name, alias);
+    }
+
+    pub fn declare_tmp_variable(&mut self) -> String {
+        self.scopes.borrow_mut().declare_tmp_variable()
+    }
+
+    pub fn declare_unique_variable(&mut self, prefix: &str) -> String {
+        self.scopes.borrow_mut().declare_unique_variable(prefix)
     }
 
     pub fn current_context(&self) -> BlockContext {
@@ -210,7 +231,7 @@ impl CodegenJS {
                     } else {
                         // Encountered destructuring/pattern matching or wildcard, declare
                         // tmp variable to potentially dereference from. Unused at the moment.
-                        self.scopes.declare_tmp_variable()
+                        self.scopes.borrow_mut().declare_tmp_variable()
                     }
                 })
                 .collect(),
@@ -277,7 +298,7 @@ impl CodegenJS {
             .last()
             .unwrap_or(&None)
             .clone()
-            .unwrap_or_else(|| self.scopes.declare_tmp_variable());
+            .unwrap_or_else(|| self.declare_tmp_variable());
         self.push_scope();
 
         // In a case of `let a = { 1 }`, we want to render the expression as a statement.
@@ -547,10 +568,9 @@ impl CodegenJS {
     pub fn generate_pat(&mut self, pattern: &Pattern) {
         match &pattern.kind {
             PatternKind::Identifier { name, .. } => {
-                let var_name = self.current_scope().declare_variable(name.as_str());
+                let var_name = self.declare_variable(name.as_str());
                 self.push_str(&var_name);
-                self.current_scope()
-                    .declare_variable_alias(name.as_str(), &var_name);
+                self.declare_variable_alias(name.as_str(), &var_name);
             }
             PatternKind::Enum {
                 identifier,
@@ -579,7 +599,6 @@ impl CodegenJS {
     fn generate_identifier(&mut self, name: &Ident) {
         let name_string = name.as_str();
         let identifier = self
-            .current_scope()
             .resolve_variable(name_string)
             .unwrap_or_else(|| name_string.to_string());
         self.push_str(&identifier);
@@ -599,16 +618,15 @@ impl CodegenJS {
 
     fn generate_variable_declaration_identifier(&mut self, name: &str, value: &Expr) {
         self.push_indent();
-        let shadowed_name = self.current_scope().resolve_variable(name);
-        let var_name = self.current_scope().declare_variable(name);
+        let shadowed_name = self.resolve_variable(name);
+        let var_name = self.declare_variable(name);
         self.push_str(&format!("let {var_name} = "));
         self.context_stack.push(BlockContext::Expression);
         if let Some(shadowed_name) = shadowed_name {
-            self.current_scope()
-                .declare_variable_alias(name, &shadowed_name);
+            self.declare_variable_alias(name, &shadowed_name);
         }
         self.generate_expr(value, None);
-        self.current_scope().declare_variable_alias(name, &var_name);
+        self.declare_variable_alias(name, &var_name);
         self.context_stack.pop();
         self.push_str(";\n");
     }
@@ -625,12 +643,11 @@ impl CodegenJS {
             }
             match &pattern.kind {
                 PatternKind::Identifier { name, .. } => {
-                    let shadowed_name = self.current_scope().resolve_variable(name.as_str());
-                    let var_name = self.current_scope().declare_variable(name.as_str());
+                    let shadowed_name = self.resolve_variable(name.as_str());
+                    let var_name = self.declare_variable(name.as_str());
                     self.push_str(&var_name);
                     if let Some(shadowed_name) = shadowed_name {
-                        self.current_scope()
-                            .declare_variable_alias(name.as_str(), &shadowed_name);
+                        self.declare_variable_alias(name.as_str(), &shadowed_name);
                     }
                     bindings.push((name, var_name));
                 }
@@ -647,8 +664,7 @@ impl CodegenJS {
         self.generate_expr(value, None);
 
         for (name, var_name) in bindings {
-            self.current_scope()
-                .declare_variable_alias(name.as_str(), &var_name);
+            self.declare_variable_alias(name.as_str(), &var_name);
         }
 
         self.context_stack.pop();
@@ -676,7 +692,7 @@ impl CodegenJS {
             };
         if has_block_completions {
             lhs = self.replace_statement_buffer(String::new());
-            let completion_tmp_var = self.scopes.declare_tmp_variable();
+            let completion_tmp_var = self.declare_tmp_variable();
             self.push_indent();
             self.push_str(&format!("let {completion_tmp_var};"));
             self.completion_variables.push(Some(completion_tmp_var));
@@ -830,7 +846,7 @@ impl CodegenJS {
                     self.push_str(", ");
                 }
 
-                let tmp_var = self.scopes.declare_unique_variable("_");
+                let tmp_var = self.declare_unique_variable("_");
 
                 self.push_str(&tmp_var);
 
@@ -908,7 +924,7 @@ impl CodegenJS {
                         let tmp_vars = function_context
                             .params
                             .iter()
-                            .map(|_| self.scopes.declare_tmp_variable())
+                            .map(|_| self.scopes.borrow_mut().declare_tmp_variable())
                             .collect::<Vec<_>>();
 
                         for (i, arg) in arguments.iter().enumerate() {

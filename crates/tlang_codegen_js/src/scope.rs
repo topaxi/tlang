@@ -1,22 +1,24 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scope {
-    parent: Option<Box<Scope>>,
+    parent: Option<Rc<RefCell<Scope>>>,
 
     variables: HashMap<String, String>,
 }
 
 impl Scope {
-    pub fn new(parent: Option<Box<Scope>>) -> Self {
+    pub fn new(parent: Rc<RefCell<Scope>>) -> Self {
         Self {
-            parent,
+            parent: Some(parent),
             variables: HashMap::new(),
         }
     }
 
-    pub fn get_parent(&self) -> Option<&Scope> {
-        self.parent.as_deref()
+    pub fn get_parent(&self) -> Option<Rc<RefCell<Scope>>> {
+        self.parent.clone()
     }
 
     pub fn declare_variable(&mut self, name: &str) -> String {
@@ -68,7 +70,7 @@ impl Scope {
         }
 
         if let Some(parent) = &self.parent {
-            return parent.has_variable_in_scope(name);
+            return parent.borrow().has_variable_in_scope(name);
         }
 
         false
@@ -80,7 +82,7 @@ impl Scope {
         }
 
         if let Some(parent) = &self.parent {
-            return parent.resolve_variable(name);
+            return parent.borrow().resolve_variable(name);
         }
 
         None

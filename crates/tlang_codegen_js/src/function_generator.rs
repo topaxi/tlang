@@ -53,15 +53,14 @@ pub fn generate_function_declarations(
             if let ExprKind::Let(pattern, _) = &expr.kind {
                 match &pattern.kind {
                     PatternKind::Identifier { name, .. } => {
-                        let tmp_variable = codegen.current_scope().declare_variable(name.as_str());
+                        let tmp_variable = codegen.declare_variable(name.as_str());
                         codegen.push_indent();
                         codegen.push_str(&format!("let {tmp_variable};\n"));
                     }
                     PatternKind::List(patterns) => {
                         for pattern in patterns {
                             if let PatternKind::Identifier { name, .. } = &pattern.kind {
-                                let tmp_variable =
-                                    codegen.current_scope().declare_variable(name.as_str());
+                                let tmp_variable = codegen.declare_variable(name.as_str());
                                 codegen.push_indent();
                                 codegen.push_str(&format!("let {tmp_variable};\n"));
                             }
@@ -72,16 +71,14 @@ pub fn generate_function_declarations(
                         elements,
                         named_fields: _,
                     } => {
-                        let tmp_variable_enum = codegen.current_scope().declare_tmp_variable();
+                        let tmp_variable_enum = codegen.declare_tmp_variable();
                         let enum_name = match &identifier.kind {
                             ExprKind::Path(path) => path.segments.last().unwrap().as_str(),
                             _ => unreachable!(),
                         };
                         codegen.push_indent();
                         codegen.push_str(&format!("let {tmp_variable_enum};\n"));
-                        codegen
-                            .current_scope()
-                            .declare_variable_alias(enum_name, &tmp_variable_enum);
+                        codegen.declare_variable_alias(enum_name, &tmp_variable_enum);
                         for element in elements {
                             let identifier = match &element.kind {
                                 // Skip any Wildcards
@@ -89,7 +86,7 @@ pub fn generate_function_declarations(
                                 PatternKind::Identifier { name, .. } => name.as_str(),
                                 _ => unreachable!(),
                             };
-                            let tmp_variable = codegen.current_scope().declare_variable(identifier);
+                            let tmp_variable = codegen.declare_variable(identifier);
                             codegen.push_indent();
                             codegen.push_str(&format!("let {tmp_variable};\n"));
                         }
@@ -119,9 +116,7 @@ pub fn generate_function_declarations(
         for (j, param) in declaration.parameters.iter().enumerate() {
             match &param.pattern.kind {
                 PatternKind::Identifier { name, .. } => {
-                    codegen
-                        .current_scope()
-                        .declare_variable_alias(name.as_str(), arg_bindings[j].as_str());
+                    codegen.declare_variable_alias(name.as_str(), arg_bindings[j].as_str());
                 }
                 PatternKind::List(patterns) => {
                     for (i, pattern) in patterns.iter().enumerate() {
@@ -129,7 +124,6 @@ pub fn generate_function_declarations(
                             let arg_name = arg_bindings[j].as_str();
 
                             codegen
-                                .current_scope()
                                 .declare_variable_alias(name.as_str(), &format!("{arg_name}[{i}]"));
                         }
                     }
@@ -309,16 +303,16 @@ pub fn generate_function_declarations(
                 // different names, this is the easiest way to handle this for now.
                 let name = name.to_string();
                 let name = if Some(&name) == arg_binding.as_ref() {
-                    codegen.current_scope().declare_variable("args")
+                    codegen.declare_variable("args")
                 } else if arg_bindings.contains(&name) {
-                    codegen.current_scope().declare_variable(&name)
+                    codegen.declare_variable(&name)
                 } else {
                     name
                 };
 
                 codegen.push_indent();
                 codegen.push_str(&format!("let {name} = {arg_name};\n"));
-                codegen.current_scope().declare_variable_alias(&name, &name);
+                codegen.declare_variable_alias(&name, &name);
             }
         }
         // We handle the tail recursion case in multiple function body declarations ourselves higher up.
@@ -406,7 +400,7 @@ fn generate_function_arguments(
                 #[allow(clippy::unnecessary_unwrap)]
                 arg_name.unwrap()
             } else {
-                codegen.current_scope().declare_variable(&format!("arg{i}"))
+                codegen.declare_variable(&format!("arg{i}"))
             };
 
             codegen.push_str(&arg_name);
@@ -415,7 +409,7 @@ fn generate_function_arguments(
 
         (None, bindings)
     } else {
-        let args_binding = codegen.current_scope().declare_variable("args");
+        let args_binding = codegen.declare_variable("args");
         codegen.push_str(&format!("...{args_binding}"));
 
         let max_args = declarations
@@ -445,7 +439,7 @@ fn generate_function_definition_guard(codegen: &mut CodegenJS, node: &Expr) {
     if let ExprKind::Let(pattern, expression) = &node.kind {
         match &pattern.kind {
             PatternKind::Identifier { name, .. } => {
-                let guard_variable = codegen.current_scope().resolve_variable(name.as_str());
+                let guard_variable = codegen.resolve_variable(name.as_str());
                 codegen.push_str(&format!("({} = ", guard_variable.unwrap()));
                 codegen.generate_expr(expression, None);
                 codegen.push_char(')');
@@ -459,7 +453,7 @@ fn generate_function_definition_guard(codegen: &mut CodegenJS, node: &Expr) {
                     ExprKind::Path(path) => path.segments.last().unwrap().as_str(),
                     _ => unreachable!(),
                 };
-                let guard_variable = codegen.current_scope().resolve_variable(enum_name);
+                let guard_variable = codegen.resolve_variable(enum_name);
                 codegen.push_str(&format!("({} = ", guard_variable.as_ref().unwrap()));
                 codegen.generate_expr(expression, None);
                 codegen.push_char(')');
@@ -479,7 +473,7 @@ fn generate_function_definition_guard(codegen: &mut CodegenJS, node: &Expr) {
                         _ => unreachable!(),
                     };
                     codegen.push_str(" && ((");
-                    let identifier_resolved = codegen.current_scope().resolve_variable(identifier);
+                    let identifier_resolved = codegen.resolve_variable(identifier);
                     if *named_fields {
                         codegen.push_str(&format!(
                             "{} = {}.{}",
@@ -584,7 +578,7 @@ fn generate_function_parameter(codegen: &mut CodegenJS, pattern: &Pattern) {
     match &pattern.kind {
         // Do not run generate_identifier, as that would resolve the parameter as a variable.
         PatternKind::Identifier { name, .. } => {
-            codegen.current_scope().declare_variable(name.as_str());
+            codegen.declare_variable(name.as_str());
             codegen.push_str(name.as_str());
         }
         PatternKind::Literal(_) => codegen.generate_pat(pattern),
@@ -660,7 +654,7 @@ fn flush_function_pre_body(codegen: &mut CodegenJS) {
     for (name, value) in &codegen.consume_function_pre_body_declarations() {
         codegen.push_indent();
         codegen.push_str(&format!("let {name} = {value};\n"));
-        codegen.current_scope().declare_variable_alias(name, name);
+        codegen.declare_variable_alias(name, name);
     }
     codegen.flush_statement_buffer();
 }

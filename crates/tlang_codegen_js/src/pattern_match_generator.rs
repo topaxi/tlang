@@ -25,11 +25,11 @@ pub fn generate_match_expression(codegen: &mut CodegenJS, expression: &Expr, arm
     // TODO: A lot here is copied from the if statement generator.
     let lhs = codegen.replace_statement_buffer(String::new());
     let has_block_completions = match_args_have_completions(arms);
-    let match_value_tmp_var = codegen.current_scope().declare_tmp_variable();
+    let match_value_tmp_var = codegen.declare_tmp_variable();
     codegen.push_str(&format!("let {match_value_tmp_var} = "));
     codegen.generate_expr(expression, None);
     if has_block_completions {
-        let completion_tmp_var = codegen.current_scope().declare_tmp_variable();
+        let completion_tmp_var = codegen.declare_tmp_variable();
         codegen.push_indent();
         codegen.push_str(&format!(",{completion_tmp_var};"));
         codegen.push_completion_variable(Some(completion_tmp_var));
