@@ -93,9 +93,9 @@ impl Lexer<'_> {
 
         let slice = &self.source[start_position..self.position];
         let token_kind = if slice.contains('.') {
-                TokenKind::Literal(Literal::Float(slice.parse().unwrap_or(0.0)))
+            TokenKind::Literal(Literal::Float(slice.parse().unwrap_or(0.0)))
         } else {
-                TokenKind::Literal(Literal::Integer(slice.parse().unwrap_or(0)))
+            TokenKind::Literal(Literal::Integer(slice.parse().unwrap_or(0)))
         };
 
         self.token(token_kind, start)

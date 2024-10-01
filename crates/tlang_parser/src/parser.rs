@@ -897,11 +897,9 @@ impl<'src> Parser<'src> {
                     let mut path = Path::from_ident(Ident::new(&identifier, identifier_span));
                     let mut span = path.span;
 
-                    if let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
-                        while let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
-                            self.advance();
-                            path.push(self.consume_identifier());
-                        }
+                    while let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
+                        self.advance();
+                        path.push(self.consume_identifier());
                     }
 
                     self.end_span_from_previous_token(&mut span);
