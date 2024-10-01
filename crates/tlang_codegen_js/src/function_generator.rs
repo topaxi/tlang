@@ -308,7 +308,7 @@ pub fn generate_function_declarations(
                 // and use actual arguments, but given that each signature could define
                 // different names, this is the easiest way to handle this for now.
                 let name = name.to_string();
-                let name = if name == arg_binding.clone().unwrap_or_default() {
+                let name = if Some(&name) == arg_binding.as_ref() {
                     codegen.current_scope().declare_variable("args")
                 } else if arg_bindings.contains(&name) {
                     codegen.current_scope().declare_variable(&name)
@@ -389,7 +389,7 @@ fn generate_function_arguments(
                 }
             });
 
-            if arg_name.is_some()
+            let arg_name = if arg_name.is_some()
                 && declarations.iter().all(|d| {
                     let param = &d.parameters[i];
                     match param.pattern.kind {
@@ -402,15 +402,15 @@ fn generate_function_arguments(
 
                         _ => true,
                     }
-                })
-            {
-                bindings.push(arg_name.clone().unwrap());
+                }) {
                 #[allow(clippy::unnecessary_unwrap)]
-                codegen.push_str(&arg_name.unwrap());
+                arg_name.unwrap()
             } else {
-                bindings.push(codegen.current_scope().declare_variable(&format!("arg{i}")));
-                codegen.push_str(&format!("arg{i}"));
-            }
+                codegen.current_scope().declare_variable(&format!("arg{i}"))
+            };
+
+            codegen.push_str(&arg_name);
+            bindings.push(arg_name);
         }
 
         (None, bindings)
@@ -528,7 +528,8 @@ pub fn generate_function_declaration(codegen: &mut CodegenJS, declaration: &Func
     );
 
     codegen.push_indent();
-    codegen.push_str(&format!("function {name_as_str}"));
+    codegen.push_str("function ");
+    codegen.push_str(&name_as_str);
     codegen.push_scope();
     generate_function_parameter_list(codegen, &declaration.parameters);
     codegen.push_str(" {\n");
