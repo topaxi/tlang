@@ -362,13 +362,14 @@ fn generate_function_arguments(
     codegen: &mut CodegenJS,
     declarations: &[FunctionDeclaration],
 ) -> (Option<String>, Vec<String>) {
+    let first_declaration_number_of_args = declarations[0].parameters.len();
     // check whether all declarations have the same number of parameters
     let same_number_of_args = declarations
         .iter()
-        .all(|d| d.parameters.len() == declarations[0].parameters.len());
+        .all(|d| d.parameters.len() == first_declaration_number_of_args);
 
     if same_number_of_args {
-        let mut bindings = vec![];
+        let mut bindings = Vec::with_capacity(first_declaration_number_of_args);
 
         for i in 0..declarations[0].parameters.len() {
             if i > 0 {
@@ -423,7 +424,7 @@ fn generate_function_arguments(
             .max()
             .unwrap();
 
-        let mut bindings = vec![];
+        let mut bindings = Vec::with_capacity(max_args);
 
         for i in 0..max_args {
             bindings.push(format!("args[{i}]"));

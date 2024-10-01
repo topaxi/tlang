@@ -777,16 +777,22 @@ impl CodegenJS {
         self.indent_level += 1;
         self.push_indent();
         self.push_str(format!("tag: \"{name}\",\n").as_str());
-        for (i, param) in parameters.iter().enumerate() {
-            self.push_indent();
-            if named_fields {
+
+        if named_fields {
+            for param in parameters {
+                self.push_indent();
                 self.push_str(param.as_str());
-            } else {
+                self.push_str(",\n");
+            }
+        } else {
+            for (i, param) in parameters.iter().enumerate() {
+                self.push_indent();
                 self.push_str(&format!("[{i}]: "));
                 self.push_str(param.as_str());
+                self.push_str(",\n");
             }
-            self.push_str(",\n");
         }
+
         self.indent_level -= 1;
         self.push_indent();
         self.push_str("};\n");
@@ -810,7 +816,7 @@ impl CodegenJS {
         arguments: &[Expr],
         wildcard_count: usize,
     ) {
-        let mut placeholders = vec![];
+        let mut placeholders = Vec::with_capacity(wildcard_count);
 
         self.push_char('(');
 
