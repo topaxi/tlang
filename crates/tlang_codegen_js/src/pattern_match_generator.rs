@@ -1,4 +1,4 @@
-use tlang_ast::node::{Expr, ExprKind, MatchArm, Pattern, PatternKind};
+use tlang_ast::node::{Expr, ExprKind, MatchArm};
 
 use crate::generator::{BlockContext, CodegenJS};
 
