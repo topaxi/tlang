@@ -516,14 +516,14 @@ impl CodegenJS {
     }
 
     fn generate_list_expression(&mut self, items: &[Expr]) {
-        self.push_str("[");
+        self.push_char('[');
         for (i, item) in items.iter().enumerate() {
             if i > 0 {
                 self.push_str(", ");
             }
             self.generate_expr(item, None);
         }
-        self.push_str("]");
+        self.push_char(']');
     }
 
     fn generate_dict_expression(&mut self, kvs: &[(Expr, Expr)]) {
@@ -704,7 +704,7 @@ impl CodegenJS {
                 self.indent_level = 0;
                 self.generate_expr(condition, None);
                 self.indent_level = indent_level;
-                self.push_str(")");
+                self.push_char(')');
             }
 
             self.push_str(" {\n");
