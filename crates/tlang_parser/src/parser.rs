@@ -210,11 +210,16 @@ impl<'src> Parser<'src> {
 
     fn consume_identifier(&mut self) -> Ident {
         expect_token_matches!(self, TokenKind::Identifier(_));
+
         let current_token = self.current_token.as_ref().unwrap();
-        let name = current_token.kind.get_identifier().unwrap().clone();
-        let span = current_token.span;
+        let ident = Ident::new(
+            &current_token.kind.get_identifier().unwrap(),
+            current_token.span,
+        );
+
         self.advance();
-        Ident::new(&name, span)
+
+        ident
     }
 
     fn advance(&mut self) {
