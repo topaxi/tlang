@@ -170,8 +170,13 @@ export class TlangPlayground extends LitElement {
 
   private compile(source: string) {
     let compiler = compile(source);
-    let { output, parseErrors, ast, diagnostics, codemirrorDiagnostics } =
-      compiler;
+    let {
+      output,
+      parseErrors,
+      ast_string: ast,
+      diagnostics,
+      codemirrorDiagnostics,
+    } = compiler;
     compiler.free();
     return { output, parseErrors, ast, diagnostics, codemirrorDiagnostics };
   }

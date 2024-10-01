@@ -1,5 +1,6 @@
 extern crate console_error_panic_hook;
 
+use gloo_utils::format::JsValueSerdeExt;
 use tlang_ast::{node::Module, symbols::SymbolType};
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_parser::{error::ParseError, parser::Parser};
@@ -95,8 +96,21 @@ impl TlangCompiler {
     }
 
     #[wasm_bindgen(getter)]
-    pub fn ast(&self) -> String {
-        format!("{:#?}", self.ast)
+    pub fn ast_string(&self) -> Result<String, JsError> {
+        Ok(ron::ser::to_string_pretty(
+            &self.ast,
+            ron::ser::PrettyConfig::default(),
+        )?)
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn ast_json_string(&self) -> Result<String, JsError> {
+        Ok(serde_json::to_string_pretty(&self.ast)?)
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn ast(&self) -> Result<JsValue, JsError> {
+        Ok(JsValue::from_serde(&self.ast)?)
     }
 
     #[wasm_bindgen(getter, js_name = "diagnostics")]
