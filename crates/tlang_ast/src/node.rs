@@ -137,6 +137,10 @@ impl Expr {
         self.span = span;
         self
     }
+
+    pub fn is_wildcard(&self) -> bool {
+        matches!(self.kind, ExprKind::Wildcard)
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
@@ -278,6 +282,10 @@ impl Pattern {
                 pattern_kind
             ),
         }
+    }
+
+    pub fn is_wildcard(&self) -> bool {
+        matches!(self.kind, PatternKind::Wildcard)
     }
 }
 

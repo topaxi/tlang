@@ -718,15 +718,16 @@ impl CodegenJS {
         self.push_char('}');
         if has_block_completions {
             self.push_str("\n");
+
+            let completion_var = self.completion_variables.last().unwrap().clone().unwrap();
+
             // If we have an lhs, put the completion var as the rhs of the lhs.
             // Otherwise, we assign the completion_var to the previous completion_var.
             if !lhs.is_empty() {
                 self.push_str(&lhs);
-                let completion_var = self.completion_variables.last().unwrap().clone().unwrap();
                 self.push_str(&completion_var);
             } else {
                 self.push_indent();
-                let completion_var = self.completion_variables.last().unwrap().clone().unwrap();
                 let prev_completion_var = self.completion_variables
                     [self.completion_variables.len() - 2]
                     .clone()
@@ -860,10 +861,7 @@ impl CodegenJS {
     }
 
     fn generate_call_expression(&mut self, function: &Expr, arguments: &[Expr]) {
-        let wildcard_count = arguments
-            .iter()
-            .filter(|arg| matches!(arg.kind, ExprKind::Wildcard))
-            .count();
+        let wildcard_count = arguments.iter().filter(|arg| arg.is_wildcard()).count();
 
         if wildcard_count > 0 {
             return self.generate_partial_application(function, arguments, wildcard_count);
@@ -872,11 +870,14 @@ impl CodegenJS {
         self.generate_expr(function, None);
         self.push_char('(');
 
-        for (i, arg) in arguments.iter().enumerate() {
-            if i > 0 {
-                self.push_str(", ");
-            }
+        let mut args_iter = arguments.iter();
 
+        if let Some(arg) = args_iter.next() {
+            self.generate_expr(arg, None);
+        }
+
+        for arg in args_iter {
+            self.push_str(", ");
             self.generate_expr(arg, None);
         }
 

@@ -9,10 +9,6 @@ fn match_args_have_completions(arms: &[MatchArm]) -> bool {
     })
 }
 
-fn is_wildcard_pattern(pattern: &Pattern) -> bool {
-    matches!(pattern.kind, PatternKind::Wildcard)
-}
-
 fn generate_match_arm_expression(codegen: &mut CodegenJS, expression: &Expr) {
     if let ExprKind::Block(_) = &expression.kind {
         codegen.generate_expr(expression, None);
@@ -51,7 +47,7 @@ pub fn generate_match_expression(codegen: &mut CodegenJS, expression: &Expr, arm
         },
     ) in arms.iter().enumerate()
     {
-        if !is_wildcard_pattern(pattern) {
+        if !pattern.is_wildcard() {
             codegen.push_str("if (");
             codegen.push_str(&match_value_tmp_var);
             codegen.push_str(" === ");

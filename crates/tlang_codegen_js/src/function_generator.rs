@@ -507,12 +507,18 @@ fn generate_function_definition_guard(codegen: &mut CodegenJS, node: &Expr) {
 
 pub fn generate_function_parameter_list(codegen: &mut CodegenJS, parameters: &[FunctionParameter]) {
     codegen.push_char('(');
-    for (i, param) in parameters.iter().enumerate() {
-        if i > 0 {
-            codegen.push_str(", ");
-        }
+
+    let mut iter = parameters.iter();
+
+    if let Some(param) = iter.next() {
         codegen.generate_pat(&param.pattern);
     }
+
+    for param in iter {
+        codegen.push_str(", ");
+        codegen.generate_pat(&param.pattern);
+    }
+
     codegen.push_char(')');
 }
 
