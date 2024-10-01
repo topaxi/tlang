@@ -71,6 +71,10 @@ impl Lexer<'_> {
         ch.is_ascii_digit()
     }
 
+    fn is_number_literal_char(ch: char) -> bool {
+        Self::is_digit(ch) || ch == '.' || ch == '_'
+    }
+
     #[inline(always)]
     fn advance_while(&mut self, predicate: impl Fn(char) -> bool) {
         for ch in self.source[self.position..].chars() {
@@ -82,18 +86,19 @@ impl Lexer<'_> {
         }
     }
 
-    fn read_integer(&mut self) -> i64 {
-        let start = self.position;
-        self.advance_while(Self::is_digit);
-        let slice = &self.source[start..self.position];
-        slice.parse().unwrap_or(0)
-    }
+    fn read_number_literal(&mut self, start: LineColumn) -> Token {
+        let start_position = self.position;
 
-    fn read_float(&mut self) -> f64 {
-        let start = self.position;
-        self.advance_while(|ch| Self::is_digit(ch) || ch == '.');
-        let slice = &self.source[start..self.position];
-        slice.parse().unwrap_or(0.0)
+        self.advance_while(Self::is_number_literal_char);
+
+        let slice = &self.source[start_position..self.position];
+        let token_kind = if slice.contains('.') {
+                TokenKind::Literal(Literal::Float(slice.parse().unwrap_or(0.0)))
+        } else {
+                TokenKind::Literal(Literal::Integer(slice.parse().unwrap_or(0)))
+        };
+
+        self.token(token_kind, start)
     }
 
     fn is_alphanumeric(ch: char) -> bool {
@@ -326,20 +331,7 @@ impl Lexer<'_> {
                     self.token(TokenKind::Dot, start)
                 }
             }
-            '0'..='9' => {
-                let is_float = self.source[self.position..]
-                    .chars()
-                    .take_while(|&ch| Self::is_digit(ch) || ch == '.')
-                    .any(|ch| ch == '.');
-
-                if is_float {
-                    let float_value = self.read_float();
-                    self.token(TokenKind::Literal(Literal::Float(float_value)), start)
-                } else {
-                    let int_value = self.read_integer();
-                    self.token(TokenKind::Literal(Literal::Integer(int_value)), start)
-                }
-            }
+            '0'..='9' => self.read_number_literal(start),
             '"' | '\'' => {
                 let quote = ch;
                 self.advance();
@@ -351,31 +343,27 @@ impl Lexer<'_> {
                     self.token(TokenKind::Literal(Literal::Char(literal)), start)
                 }
             }
-            _ if Self::is_alphanumeric(ch) => {
-                let identifier = self.read_identifier();
-
-                match identifier {
-                    "let" => self.token(TokenKind::Let, start),
-                    "fn" => self.token(TokenKind::Fn, start),
-                    "rec" => self.token(TokenKind::Rec, start),
-                    "return" => self.token(TokenKind::Return, start),
-                    "if" => self.token(TokenKind::If, start),
-                    "else" => self.token(TokenKind::Else, start),
-                    "match" => self.token(TokenKind::Match, start),
-                    "not" => self.token(TokenKind::Not, start),
-                    "enum" => self.token(TokenKind::Enum, start),
-                    "struct" => self.token(TokenKind::Struct, start),
-                    "true" => self.token(TokenKind::Literal(Literal::Boolean(true)), start),
-                    "false" => self.token(TokenKind::Literal(Literal::Boolean(false)), start),
-                    "and" => self.token(TokenKind::And, start),
-                    "or" => self.token(TokenKind::Or, start),
-                    _ => {
-                        let identifier_string = identifier.to_string();
-                        self.token(TokenKind::Identifier(identifier_string), start)
-                    }
+            ch if Self::is_alphanumeric(ch) => match self.read_identifier() {
+                "let" => self.token(TokenKind::Let, start),
+                "fn" => self.token(TokenKind::Fn, start),
+                "rec" => self.token(TokenKind::Rec, start),
+                "return" => self.token(TokenKind::Return, start),
+                "if" => self.token(TokenKind::If, start),
+                "else" => self.token(TokenKind::Else, start),
+                "match" => self.token(TokenKind::Match, start),
+                "not" => self.token(TokenKind::Not, start),
+                "enum" => self.token(TokenKind::Enum, start),
+                "struct" => self.token(TokenKind::Struct, start),
+                "true" => self.token(TokenKind::Literal(Literal::Boolean(true)), start),
+                "false" => self.token(TokenKind::Literal(Literal::Boolean(false)), start),
+                "and" => self.token(TokenKind::And, start),
+                "or" => self.token(TokenKind::Or, start),
+                identifier => {
+                    let identifier_string = identifier.to_string();
+                    self.token(TokenKind::Identifier(identifier_string), start)
                 }
-            }
-            _ => self.token(TokenKind::Unknown(ch.to_string()), start),
+            },
+            ch => self.token(TokenKind::Unknown(ch.to_string()), start),
         };
 
         token
