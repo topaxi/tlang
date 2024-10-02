@@ -1,11 +1,11 @@
 ---
 source: crates/tlang_parser/tests/parser.rs
-expression: "parse!(r#\"\n        // this is a third comment\n        let y = /* comment before expr */ 2 /* comment after expr */;\n        // trailing comment\n        [1,2] // trailing comment\n        |> foo // trailing comment\n        //|> bar\n        |> baz;\n        \"#)"
+expression: "parse!\n(r\"\n        // this is a third comment\n        let y = /* comment before expr */ 2 /* comment after expr */;\n        // trailing comment\n        [1,2] // trailing comment\n        |> foo // trailing comment\n        //|> bar\n        |> baz;\n        \")"
 ---
 Module(
   statements: [
     Stmt(
-      kind: Let(
+      kind: Let(LetDeclaration(
         pattern: Pattern(
           kind: Identifier(
             id: SymbolId(1),
@@ -79,7 +79,7 @@ Module(
           ),
         ),
         type_annotation: None,
-      ),
+      )),
       span: Span(
         start: LineColumn(
           line: 2,

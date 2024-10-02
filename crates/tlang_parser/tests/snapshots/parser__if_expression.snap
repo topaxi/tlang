@@ -5,7 +5,7 @@ expression: "parse! (\"let x = if (true) { 1; } else { 2; };\")"
 Module(
   statements: [
     Stmt(
-      kind: Let(
+      kind: Let(LetDeclaration(
         pattern: Pattern(
           kind: Identifier(
             id: SymbolId(1),
@@ -197,7 +197,7 @@ Module(
           ),
         ),
         type_annotation: None,
-      ),
+      )),
       span: Span(
         start: LineColumn(
           line: 0,

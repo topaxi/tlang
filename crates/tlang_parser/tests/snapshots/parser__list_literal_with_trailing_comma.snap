@@ -1,11 +1,11 @@
 ---
 source: crates/tlang_parser/tests/parser.rs
-expression: "parse!(\"let x = [1, 2, 3,];\")"
+expression: "parse! (\"let x = [1, 2, 3,];\")"
 ---
 Module(
   statements: [
     Stmt(
-      kind: Let(
+      kind: Let(LetDeclaration(
         pattern: Pattern(
           kind: Identifier(
             id: SymbolId(1),
@@ -100,7 +100,7 @@ Module(
           ),
         ),
         type_annotation: None,
-      ),
+      )),
       span: Span(
         start: LineColumn(
           line: 0,

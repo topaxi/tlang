@@ -2,8 +2,8 @@ use std::{cell::RefCell, rc::Rc};
 
 use tlang_ast::{
     node::{
-        Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, Module, Pattern,
-        PatternKind, Stmt, StmtKind,
+        Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, LetDeclaration, Module,
+        Pattern, PatternKind, Stmt, StmtKind,
     },
     span::Span,
     symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
@@ -145,11 +145,7 @@ impl SemanticAnalyzer {
         match &mut stmt.kind {
             StmtKind::None => {}
             StmtKind::Expr(expr) => self.analyze_expr(expr),
-            StmtKind::Let {
-                pattern,
-                expression,
-                type_annotation: _,
-            } => self.analyze_variable_declaration(pattern, expression),
+            StmtKind::Let(decl) => self.analyze_variable_declaration(decl),
             StmtKind::FunctionDeclaration(decl) => self.analyze_fn_decl(decl),
             StmtKind::FunctionDeclarations(decls) => {
                 for decl in decls {
@@ -359,21 +355,22 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn analyze_variable_declaration(&mut self, pattern: &mut Pattern, expression: &mut Expr) {
-        self.analyze_pat(pattern);
+    fn analyze_variable_declaration(&mut self, decl: &mut LetDeclaration) {
+        self.analyze_pat(&mut decl.pattern);
 
         // When declaring a variable, we can only reference symbols that were declared before.
         // This includes our own variable name.
         // E.g. `let a = a;` is not allowed. But `let a = 1; let a = a;` is.
         // By removing the symbol from the table while analyzing the expression, we can check
         // whether the expression references any symbols that were not declared before.
-        let pattern_symbols = pattern
+        let pattern_symbols = decl
+            .pattern
             .get_all_symbol_ids()
             .iter()
             .filter_map(|id| self.get_last_symbol_table().borrow_mut().remove(*id))
             .collect::<Vec<_>>();
 
-        self.analyze_expr(expression);
+        self.analyze_expr(&mut decl.expression);
 
         for symbol in pattern_symbols {
             self.get_last_symbol_table()

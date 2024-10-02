@@ -1,6 +1,6 @@
 ---
 source: crates/tlang_parser/tests/parser_enum.rs
-expression: "parse!(indoc! {\n        \"\n        enum Tree {\n            Leaf(value),\n            Node { left, right },\n        }\n\n        fn maximum_depth(Tree::Leaf(_)) { 1 }\n        fn maximum_depth(Tree::Node { left, right }) { 1 + max(maximum_depth(left), maximum_depth(right)) }\n\n        fn main() {\n            let x = Tree::Node {\n                left: Tree::Leaf(1),\n                right: Tree::Node {\n                    left: Tree::Leaf(2),\n                    right: Tree::Leaf(3),\n                },\n            };\n        }\n    \"\n    })"
+expression: "parse!\n(indoc!\n{\n    \"\n        enum Tree {\n            Leaf(value),\n            Node { left, right },\n        }\n\n        fn maximum_depth(Tree::Leaf(_)) { 1 }\n        fn maximum_depth(Tree::Node { left, right }) { 1 + max(maximum_depth(left), maximum_depth(right)) }\n\n        fn main() {\n            let x = Tree::Node {\n                left: Tree::Leaf(1),\n                right: Tree::Node {\n                    left: Tree::Leaf(2),\n                    right: Tree::Leaf(3),\n                },\n            };\n        }\n    \"\n})"
 ---
 Module(
   statements: [
@@ -908,7 +908,7 @@ Module(
         body: Block(
           statements: [
             Stmt(
-              kind: Let(
+              kind: Let(LetDeclaration(
                 pattern: Pattern(
                   kind: Identifier(
                     id: SymbolId(6),
@@ -1554,7 +1554,7 @@ Module(
                   ),
                 ),
                 type_annotation: None,
-              ),
+              )),
               span: Span(
                 start: LineColumn(
                   line: 9,

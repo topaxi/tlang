@@ -1,6 +1,6 @@
 ---
 source: crates/tlang_parser/tests/parser_fn.rs
-expression: "parse!(\"fn foo() { let x = 1; x }\")"
+expression: "parse! (\"fn foo() { let x = 1; x }\")"
 ---
 Module(
   statements: [
@@ -55,7 +55,7 @@ Module(
         body: Block(
           statements: [
             Stmt(
-              kind: Let(
+              kind: Let(LetDeclaration(
                 pattern: Pattern(
                   kind: Identifier(
                     id: SymbolId(2),
@@ -101,7 +101,7 @@ Module(
                   ),
                 ),
                 type_annotation: None,
-              ),
+              )),
               span: Span(
                 start: LineColumn(
                   line: 0,

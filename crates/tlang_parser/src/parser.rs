@@ -1,7 +1,8 @@
 use tlang_ast::node::{
     self, Associativity, BinaryOpKind, Block, ElseClause, EnumDeclaration, EnumVariant, Expr,
-    ExprKind, FunctionDeclaration, FunctionParameter, Ident, MatchArm, Module, OperatorInfo, Path,
-    Pattern, PatternKind, Stmt, StmtKind, StructDeclaration, StructField, Ty, UnaryOp,
+    ExprKind, FunctionDeclaration, FunctionParameter, Ident, LetDeclaration, MatchArm, Module,
+    OperatorInfo, Path, Pattern, PatternKind, Stmt, StmtKind, StructDeclaration, StructField, Ty,
+    UnaryOp,
 };
 use tlang_ast::span::Span;
 use tlang_ast::symbols::SymbolId;
@@ -213,7 +214,7 @@ impl<'src> Parser<'src> {
 
         let current_token = self.current_token.as_ref().unwrap();
         let ident = Ident::new(
-            &current_token.kind.get_identifier().unwrap(),
+            current_token.kind.get_identifier().unwrap(),
             current_token.span,
         );
 
@@ -576,13 +577,13 @@ impl<'src> Parser<'src> {
             _ => None,
         };
         self.consume_token(TokenKind::EqualSign);
-        let value = self.parse_expression();
+        let expression = self.parse_expression();
 
-        node::stmt!(Let {
-            pattern: Box::new(pattern),
-            expression: Box::new(value),
-            type_annotation: Box::new(type_annotation),
-        })
+        node::stmt!(Let(Box::new(LetDeclaration {
+            pattern,
+            expression,
+            type_annotation,
+        })))
     }
 
     /// Parses a function call expression, e.g. `foo()`, `foo(1, 2, 3)` and

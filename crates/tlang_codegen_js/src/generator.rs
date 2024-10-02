@@ -410,12 +410,8 @@ impl CodegenJS {
 
                 self.push_str(";\n");
             }
-            StmtKind::Let {
-                pattern,
-                expression,
-                ..
-            } => {
-                self.generate_variable_declaration(pattern, expression);
+            StmtKind::Let(decl) => {
+                self.generate_variable_declaration(&decl.pattern, &decl.expression);
             }
             StmtKind::FunctionDeclaration(decl) => self.generate_function_declaration(decl),
             StmtKind::FunctionDeclarations(decls) => {

@@ -2,8 +2,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use tlang_ast::{
     node::{
-        Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, Module, Pattern,
-        PatternKind, Stmt, StmtKind,
+        Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, LetDeclaration, Module,
+        Pattern, PatternKind, Stmt, StmtKind,
     },
     symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
 };
@@ -89,11 +89,7 @@ impl DeclarationAnalyzer {
                 // Nothing to do here
             }
             StmtKind::Expr(expr) => self.collect_declarations_expr(expr),
-            StmtKind::Let {
-                pattern,
-                expression,
-                type_annotation: _,
-            } => self.collect_variable_declaration(pattern, expression),
+            StmtKind::Let(decl) => self.collect_variable_declaration(decl),
             StmtKind::FunctionDeclaration(declaration) => {
                 self.collect_function_declaration(declaration);
             }
@@ -248,9 +244,9 @@ impl DeclarationAnalyzer {
         self.pop_symbol_table();
     }
 
-    fn collect_variable_declaration(&mut self, pattern: &mut Pattern, expr: &mut Expr) {
-        self.collect_declarations_expr(expr);
-        self.collect_pattern(pattern);
+    fn collect_variable_declaration(&mut self, decl: &mut LetDeclaration) {
+        self.collect_declarations_expr(&mut decl.expression);
+        self.collect_pattern(&mut decl.pattern);
     }
 
     /// TODO: This is a temporary solution. We need to find a better way to handle this.

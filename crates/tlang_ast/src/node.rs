@@ -349,17 +349,20 @@ pub enum StmtKind {
     #[default]
     None,
     Expr(Box<Expr>),
-    Let {
-        pattern: Box<Pattern>,
-        expression: Box<Expr>,
-        type_annotation: Box<Option<Ty>>,
-    },
+    Let(Box<LetDeclaration>),
     FunctionDeclaration(Box<FunctionDeclaration>),
     // Should this really be handled within the parser or should this be done in later stages?
     FunctionDeclarations(Vec<FunctionDeclaration>),
     Return(Box<Option<Expr>>),
     EnumDeclaration(Box<EnumDeclaration>),
     StructDeclaration(Box<StructDeclaration>),
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct LetDeclaration {
+    pub pattern: Pattern,
+    pub expression: Expr,
+    pub type_annotation: Option<Ty>,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]

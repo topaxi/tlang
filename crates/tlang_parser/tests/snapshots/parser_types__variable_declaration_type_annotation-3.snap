@@ -1,11 +1,11 @@
 ---
 source: crates/tlang_parser/tests/parser_types.rs
-expression: "parse!(\"let x: std::hash::Map<str, i64> = std::hash::Map();\")"
+expression: "parse! (\"let x: std::hash::Map<str, i64> = std::hash::Map();\")"
 ---
 Module(
   statements: [
     Stmt(
-      kind: Let(
+      kind: Let(LetDeclaration(
         pattern: Pattern(
           kind: Identifier(
             id: SymbolId(1),
@@ -267,7 +267,7 @@ Module(
             ),
           ),
         )),
-      ),
+      )),
       span: Span(
         start: LineColumn(
           line: 0,
