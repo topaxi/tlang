@@ -1,5 +1,4 @@
 use crate::{
-    binary_operator_generator::generate_binary_op,
     function_generator::{
         fn_identifier_to_string, generate_function_declaration, generate_function_declarations,
         generate_function_expression, generate_return_statement,
@@ -483,9 +482,7 @@ impl CodegenJS {
                 }
                 self.generate_expr(expr, None);
             }
-            ExprKind::BinaryOp { op, lhs, rhs } => {
-                generate_binary_op(self, op, lhs, rhs, parent_op)
-            }
+            ExprKind::BinaryOp { op, lhs, rhs } => self.generate_binary_op(op, lhs, rhs, parent_op),
             ExprKind::Match { expression, arms } => {
                 generate_match_expression(self, expression, arms)
             }
