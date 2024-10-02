@@ -1,10 +1,6 @@
 use crate::{
-    function_generator::{
-        fn_identifier_to_string, generate_function_declaration, generate_function_declarations,
-        generate_function_expression, generate_return_statement,
-    },
-    pattern_match_generator::generate_match_expression,
-    scope::Scope,
+    function_generator::fn_identifier_to_string,
+    pattern_match_generator::generate_match_expression, scope::Scope,
 };
 use tlang_ast::{
     node::{
@@ -421,11 +417,11 @@ impl CodegenJS {
             } => {
                 self.generate_variable_declaration(pattern, expression);
             }
-            StmtKind::FunctionDeclaration(decl) => generate_function_declaration(self, decl),
+            StmtKind::FunctionDeclaration(decl) => self.generate_function_declaration(decl),
             StmtKind::FunctionDeclarations(decls) => {
-                generate_function_declarations(self, decls, &statement.leading_comments)
+                self.generate_function_declarations(decls, &statement.leading_comments)
             }
-            StmtKind::Return(expr) => generate_return_statement(self, expr),
+            StmtKind::Return(expr) => self.generate_return_statement(expr),
             StmtKind::EnumDeclaration(decl) => self.generate_enum_declaration(decl),
             StmtKind::StructDeclaration(decl) => self.generate_struct_declaration(decl),
         }
@@ -491,7 +487,7 @@ impl CodegenJS {
                 then_branch,
                 else_branches,
             } => self.generate_if_else(condition, then_branch, else_branches),
-            ExprKind::FunctionExpression(decl) => generate_function_expression(self, decl),
+            ExprKind::FunctionExpression(decl) => self.generate_function_expression(decl),
             ExprKind::RecursiveCall(expr) => {
                 self.generate_recursive_call_expression(expr, parent_op)
             }
