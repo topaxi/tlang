@@ -283,16 +283,10 @@ impl CodegenJS {
             self.inc_indent();
 
             if first_declaration {
-                for comment in first_declaration_comments {
-                    self.push_indent();
-                    self.generate_comment(comment);
-                }
+                self.generate_comments(first_declaration_comments);
             }
 
-            for comment in &declaration.leading_comments {
-                self.push_indent();
-                self.generate_comment(comment);
-            }
+            self.generate_comments(&declaration.leading_comments);
 
             // Alias identifier args back to the parameter names for readability of generated code.
             for (j, param) in declaration.parameters.iter().enumerate() {
@@ -337,10 +331,7 @@ impl CodegenJS {
             self.push_char('}');
             self.pop_scope();
 
-            for comment in &declaration.trailing_comments {
-                self.push_indent();
-                self.generate_comment(comment);
-            }
+            self.generate_comments(&declaration.trailing_comments);
 
             first_declaration = false;
         }

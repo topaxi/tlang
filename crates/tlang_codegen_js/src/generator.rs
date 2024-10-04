@@ -390,10 +390,15 @@ impl CodegenJS {
         }
     }
 
-    pub fn generate_stmt(&mut self, statement: &Stmt) {
-        for comment in &statement.leading_comments {
+    pub fn generate_comments(&mut self, comments: &[Token]) {
+        for comment in comments {
+            self.push_indent();
             self.generate_comment(comment);
         }
+    }
+
+    pub fn generate_stmt(&mut self, statement: &Stmt) {
+        self.generate_comments(&statement.leading_comments);
 
         match &statement.kind {
             StmtKind::None => {}
@@ -422,9 +427,7 @@ impl CodegenJS {
             StmtKind::StructDeclaration(decl) => self.generate_struct_declaration(decl),
         }
 
-        for comment in &statement.trailing_comments {
-            self.generate_comment(comment);
-        }
+        self.generate_comments(&statement.trailing_comments);
     }
 
     #[inline(always)]
