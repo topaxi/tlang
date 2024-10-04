@@ -1,7 +1,4 @@
-use crate::{
-    function_generator::fn_identifier_to_string,
-    pattern_match_generator::generate_match_expression, scope::Scope,
-};
+use crate::{function_generator::fn_identifier_to_string, scope::Scope};
 use tlang_ast::{
     node::{
         BinaryOpKind, Block, ElseClause, Expr, ExprKind, FunctionParameter, Ident, Module, Path,
@@ -230,8 +227,8 @@ impl CodegenJS {
     }
 
     #[inline(always)]
-    pub fn current_completion_variable(&self) -> Option<String> {
-        self.completion_variables.last().unwrap().clone()
+    pub fn current_completion_variable(&self) -> Option<&str> {
+        self.completion_variables.last().unwrap().as_deref()
     }
 
     #[inline(always)]
@@ -240,8 +237,8 @@ impl CodegenJS {
     }
 
     #[inline(always)]
-    pub fn nth_completion_variable(&self, index: usize) -> Option<&String> {
-        self.completion_variables.get(index).unwrap().as_ref()
+    pub fn nth_completion_variable(&self, index: usize) -> Option<&str> {
+        self.completion_variables.get(index).unwrap().as_deref()
     }
 
     fn generate_literal(&mut self, literal: &Literal) {
@@ -479,7 +476,7 @@ impl CodegenJS {
             }
             ExprKind::BinaryOp { op, lhs, rhs } => self.generate_binary_op(op, lhs, rhs, parent_op),
             ExprKind::Match { expression, arms } => {
-                generate_match_expression(self, expression, arms)
+                self.generate_match_expression(expression, arms)
             }
             ExprKind::IfElse {
                 condition,

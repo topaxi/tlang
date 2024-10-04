@@ -9,89 +9,91 @@ fn match_args_have_completions(arms: &[MatchArm]) -> bool {
     })
 }
 
-fn generate_match_arm_expression(codegen: &mut CodegenJS, expression: &Expr) {
-    if let ExprKind::Block(_) = &expression.kind {
-        codegen.generate_expr(expression, None);
-    } else {
-        let completion_tmp_var = codegen.current_completion_variable().clone().unwrap();
-        codegen.push_indent();
-        codegen.push_str(&format!("{completion_tmp_var} = "));
-        codegen.generate_expr(expression, None);
-        codegen.push_str(";\n");
-    }
-}
-
-pub fn generate_match_expression(codegen: &mut CodegenJS, expression: &Expr, arms: &[MatchArm]) {
-    // TODO: A lot here is copied from the if statement generator.
-    let lhs = codegen.replace_statement_buffer(String::new());
-    let has_block_completions = match_args_have_completions(arms);
-    let match_value_tmp_var = codegen.current_scope().declare_tmp_variable();
-    codegen.push_str(&format!("let {match_value_tmp_var} = "));
-    codegen.generate_expr(expression, None);
-    if has_block_completions {
-        let completion_tmp_var = codegen.current_scope().declare_tmp_variable();
-        codegen.push_indent();
-        codegen.push_str(&format!(",{completion_tmp_var};"));
-        codegen.push_completion_variable(Some(completion_tmp_var));
-    } else {
-        codegen.push_completion_variable(None);
+impl CodegenJS {
+    fn generate_match_arm_expression(&mut self, expression: &Expr) {
+        if let ExprKind::Block(_) = &expression.kind {
+            self.generate_expr(expression, None);
+        } else {
+            self.push_indent();
+            let completion_tmp_var = self.current_completion_variable().unwrap();
+            self.push_str(&format!("{completion_tmp_var} = "));
+            self.generate_expr(expression, None);
+            self.push_str(";\n");
+        }
     }
 
-    codegen.push_indent();
+    pub fn generate_match_expression(&mut self, expression: &Expr, arms: &[MatchArm]) {
+        // TODO: A lot here is copied from the if statement generator.
+        let lhs = self.replace_statement_buffer(String::new());
+        let has_block_completions = match_args_have_completions(arms);
+        let match_value_tmp_var = self.current_scope().declare_tmp_variable();
+        self.push_str(&format!("let {match_value_tmp_var} = "));
+        self.generate_expr(expression, None);
+        if has_block_completions {
+            let completion_tmp_var = self.current_scope().declare_tmp_variable();
+            self.push_indent();
+            self.push_str(&format!(",{completion_tmp_var};"));
+            self.push_completion_variable(Some(completion_tmp_var));
+        } else {
+            self.push_completion_variable(None);
+        }
 
-    for (
-        i,
-        MatchArm {
-            pattern,
-            expression,
-        },
-    ) in arms.iter().enumerate()
-    {
-        if !pattern.is_wildcard() {
-            codegen.push_str("if (");
-            codegen.push_str(&match_value_tmp_var);
-            codegen.push_str(" === ");
-            codegen.generate_pat(pattern);
-            codegen.push_str(") {\n");
-            codegen.inc_indent();
-            codegen.push_context(BlockContext::Expression);
-            generate_match_arm_expression(codegen, expression);
-            codegen.pop_context();
-            codegen.dec_indent();
-            codegen.push_indent();
-            if i == arms.len() - 1 {
-                codegen.push_char('}');
+        self.push_indent();
+
+        for (
+            i,
+            MatchArm {
+                pattern,
+                expression,
+            },
+        ) in arms.iter().enumerate()
+        {
+            if !pattern.is_wildcard() {
+                self.push_str("if (");
+                self.push_str(&match_value_tmp_var);
+                self.push_str(" === ");
+                self.generate_pat(pattern);
+                self.push_str(") {\n");
+                self.inc_indent();
+                self.push_context(BlockContext::Expression);
+                self.generate_match_arm_expression(expression);
+                self.pop_context();
+                self.dec_indent();
+                self.push_indent();
+                if i == arms.len() - 1 {
+                    self.push_char('}');
+                } else {
+                    self.push_str("} else ");
+                }
             } else {
-                codegen.push_str("} else ");
+                self.push_str("{\n");
+                self.inc_indent();
+                self.push_context(BlockContext::Expression);
+                self.generate_match_arm_expression(expression);
+                self.pop_context();
+                self.dec_indent();
+                self.push_indent();
+                self.push_char('}');
             }
-        } else {
-            codegen.push_str("{\n");
-            codegen.inc_indent();
-            codegen.push_context(BlockContext::Expression);
-            generate_match_arm_expression(codegen, expression);
-            codegen.pop_context();
-            codegen.dec_indent();
-            codegen.push_indent();
-            codegen.push_char('}');
         }
-    }
 
-    if has_block_completions {
-        codegen.push_str("\n");
-        // If we have an lhs, put the completion var as the rhs of the lhs.
-        // Otherwise, we assign the completion_var to the previous completion_var.
-        if !lhs.is_empty() {
-            codegen.push_str(&lhs);
-            let completion_var = codegen.current_completion_variable().unwrap().clone();
-            codegen.push_str(&completion_var);
-        } else {
-            codegen.push_indent();
-            let completion_var = codegen.current_completion_variable().clone().unwrap();
-            let prev_completion_var = codegen
-                .nth_completion_variable(codegen.current_completion_variable_count() - 2)
-                .unwrap();
-            codegen.push_str(&format!("{prev_completion_var} = {completion_var};\n"));
+        if has_block_completions {
+            self.push_str("\n");
+            // If we have an lhs, put the completion var as the rhs of the lhs.
+            // Otherwise, we assign the completion_var to the previous completion_var.
+            if !lhs.is_empty() {
+                self.push_str(&lhs);
+                let completion_var = self.current_completion_variable().unwrap().to_string();
+                self.push_str(&completion_var);
+            } else {
+                self.push_indent();
+                let completion_var = self.current_completion_variable().unwrap();
+                let prev_completion_var = self
+                    .nth_completion_variable(self.current_completion_variable_count() - 2)
+                    .unwrap();
+                self.push_str(&format!("{prev_completion_var} = {completion_var};\n"));
+            }
         }
+        self.pop_completion_variable();
     }
-    codegen.pop_completion_variable();
 }
