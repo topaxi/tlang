@@ -884,7 +884,16 @@ impl<'src> Parser<'src> {
             Some(TokenKind::Fn) => self.parse_function_expression(),
             Some(TokenKind::Rec) => {
                 self.advance();
-                node::expr!(RecursiveCall(Box::new(self.parse_expression())))
+                let expr = self.parse_expression();
+                let call_expr = match expr.kind {
+                    ExprKind::Call(call) => call,
+                    _ => {
+                        self.panic_unexpected_expr("call expression", Some(expr));
+                        unreachable!()
+                    }
+                };
+
+                node::expr!(RecursiveCall(call_expr)).with_span(expr.span)
             }
             Some(TokenKind::Match) => self.parse_match_expression(),
             Some(TokenKind::Literal(literal)) => {

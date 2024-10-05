@@ -163,14 +163,11 @@ impl DeclarationAnalyzer {
                 self.collect_declarations_from_fn(decl);
                 self.pop_symbol_table();
             }
-            ExprKind::Call(expr) => {
+            ExprKind::Call(expr) | ExprKind::RecursiveCall(expr) => {
                 self.collect_declarations_expr(&mut expr.callee);
                 for argument in &mut expr.arguments {
                     self.collect_declarations_expr(argument);
                 }
-            }
-            ExprKind::RecursiveCall(expr) => {
-                self.collect_declarations_expr(expr);
             }
             ExprKind::UnaryOp(_, node) => {
                 self.collect_declarations_expr(node);

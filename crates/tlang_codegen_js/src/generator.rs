@@ -1,8 +1,8 @@
 use crate::{function_generator::fn_identifier_to_string, scope::Scope};
 use tlang_ast::{
     node::{
-        BinaryOpKind, Block, ElseClause, Expr, ExprKind, FunctionParameter, Ident, Module, Path,
-        Pattern, PatternKind, Stmt, StmtKind, UnaryOp,
+        BinaryOpKind, Block, CallExpression, ElseClause, Expr, ExprKind, FunctionParameter, Ident,
+        Module, Path, Pattern, PatternKind, Stmt, StmtKind, UnaryOp,
     },
     token::{Literal, Token, TokenKind},
 };
@@ -479,9 +479,7 @@ impl CodegenJS {
                 self.generate_if_else(&expr.condition, &expr.then_branch, &expr.else_branches)
             }
             ExprKind::FunctionExpression(decl) => self.generate_function_expression(decl),
-            ExprKind::RecursiveCall(expr) => {
-                self.generate_recursive_call_expression(expr, parent_op)
-            }
+            ExprKind::RecursiveCall(expr) => self.generate_recursive_call_expression(expr),
             ExprKind::Range(_) => todo!("Range expression not implemented yet."),
             ExprKind::Wildcard => {}
         }
@@ -800,55 +798,49 @@ impl CodegenJS {
         self.push_char(')');
     }
 
-    fn generate_recursive_call_expression(
-        &mut self,
-        node: &Expr,
-        parent_op: Option<&BinaryOpKind>,
-    ) {
+    fn generate_recursive_call_expression(&mut self, expr: &CallExpression) {
         // If call expression is referencing the current function, all we do is update the arguments,
         // as we are in a while loop.
-        if let ExprKind::Call(expr) = &node.kind {
-            if let ExprKind::Path(_) = &expr.callee.kind {
-                if let Some(function_context) = self.function_context_stack.last() {
-                    if function_context.is_tail_recursive
+        if let ExprKind::Path(_) = &expr.callee.kind {
+            if let Some(function_context) = self.function_context_stack.last() {
+                if function_context.is_tail_recursive
                         // TODO: Comparing identifier by string might not be the best idea.
                         && function_context.name == fn_identifier_to_string(&expr.callee)
-                    {
-                        let params = function_context.params.clone();
-                        let parameter_bindings = function_context.parameter_bindings.clone();
-                        let remap_to_rest_args = function_context.remap_to_rest_args;
-                        let tmp_vars = function_context
-                            .params
-                            .iter()
-                            .map(|_| self.scopes.declare_tmp_variable())
-                            .collect::<Vec<_>>();
+                {
+                    let params = function_context.params.clone();
+                    let parameter_bindings = function_context.parameter_bindings.clone();
+                    let remap_to_rest_args = function_context.remap_to_rest_args;
+                    let tmp_vars = function_context
+                        .params
+                        .iter()
+                        .map(|_| self.scopes.declare_tmp_variable())
+                        .collect::<Vec<_>>();
 
-                        for (i, arg) in expr.arguments.iter().enumerate() {
-                            self.push_indent();
-                            self.push_str(&format!("let {} = ", tmp_vars[i]));
-                            self.generate_expr(arg, None);
-                            self.push_str(";\n");
-                        }
-
-                        if remap_to_rest_args {
-                            for (i, arg_name) in parameter_bindings.iter().enumerate() {
-                                self.push_indent();
-                                self.push_str(&format!("{arg_name} = {};\n", tmp_vars[i]));
-                            }
-                        } else {
-                            for (i, arg_name) in params.iter().enumerate() {
-                                self.push_indent();
-                                self.push_str(&format!("{arg_name} = {};\n", tmp_vars[i]));
-                            }
-                        }
-                        return;
+                    for (i, arg) in expr.arguments.iter().enumerate() {
+                        self.push_indent();
+                        self.push_str(&format!("let {} = ", tmp_vars[i]));
+                        self.generate_expr(arg, None);
+                        self.push_str(";\n");
                     }
+
+                    if remap_to_rest_args {
+                        for (i, arg_name) in parameter_bindings.iter().enumerate() {
+                            self.push_indent();
+                            self.push_str(&format!("{arg_name} = {};\n", tmp_vars[i]));
+                        }
+                    } else {
+                        for (i, arg_name) in params.iter().enumerate() {
+                            self.push_indent();
+                            self.push_str(&format!("{arg_name} = {};\n", tmp_vars[i]));
+                        }
+                    }
+                    return;
                 }
             }
         }
 
         // For any other referenced function, we do a normal call expression.
-        self.generate_expr(node, parent_op);
+        self.generate_call_expression(&expr.callee, &expr.arguments)
     }
 
     #[inline(always)]

@@ -208,7 +208,7 @@ impl SemanticAnalyzer {
             ExprKind::UnaryOp(_, node) => {
                 self.analyze_expr(node);
             }
-            ExprKind::Call(expr) => {
+            ExprKind::Call(expr) | ExprKind::RecursiveCall(expr) => {
                 self.analyze_expr(&mut expr.callee);
 
                 for argument in &mut expr.arguments {
@@ -223,9 +223,6 @@ impl SemanticAnalyzer {
                     self.analyze_optional_expr(&mut else_branch.condition);
                     self.analyze_expr(&mut else_branch.consequence);
                 }
-            }
-            ExprKind::RecursiveCall(node) => {
-                self.analyze_expr(node);
             }
             ExprKind::Let(pat, expr) => {
                 self.analyze_pat(pat);

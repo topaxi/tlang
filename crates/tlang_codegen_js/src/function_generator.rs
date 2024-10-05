@@ -605,16 +605,11 @@ impl CodegenJS {
         // We do not render a return statement if we are in a tail recursive function body.
         // Which calls the current function recursively.
         if expr.is_some() {
-            if let ExprKind::RecursiveCall(call_exp) = &expr.as_ref().unwrap().kind {
-                let call_identifier = match &call_exp.kind {
-                    ExprKind::Call(expr) => {
-                        if let ExprKind::Path(_) = &expr.callee.kind {
-                            Some(fn_identifier_to_string(&expr.callee))
-                        } else {
-                            None
-                        }
-                    }
-                    _ => None,
+            if let ExprKind::RecursiveCall(call_expr) = &expr.as_ref().unwrap().kind {
+                let call_identifier = if let ExprKind::Path(_) = &call_expr.callee.kind {
+                    Some(fn_identifier_to_string(&call_expr.callee))
+                } else {
+                    None
                 };
 
                 if call_identifier.is_some() {
@@ -690,14 +685,11 @@ fn is_function_body_tail_recursive(function_name: &str, node: &Expr) -> bool {
     // We currently only support tail recursion to the function itself, not any other function.
     // Therefore we look for RecursiveCall nodes which reference the current function name.
     match &node.kind {
-        ExprKind::RecursiveCall(node) => {
-            // Node is a Call expression, unwrap first.
-            if let ExprKind::Call(expr) = &node.kind {
-                // If the function is an identifier, check if it's the same as the current function name.
-                if let ExprKind::Path(_) = &expr.callee.kind {
-                    if fn_identifier_to_string(&expr.callee) == function_name {
-                        return true;
-                    }
+        ExprKind::RecursiveCall(call_expr) => {
+            // If the function is an identifier, check if it's the same as the current function name.
+            if let ExprKind::Path(_) = &call_expr.callee.kind {
+                if fn_identifier_to_string(&call_expr.callee) == function_name {
+                    return true;
                 }
             }
             false

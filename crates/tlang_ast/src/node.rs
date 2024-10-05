@@ -213,8 +213,7 @@ pub enum ExprKind {
     UnaryOp(UnaryOp, Box<Expr>),
     BinaryOp(Box<BinaryOpExpression>),
     Match(Box<MatchExpression>),
-    // TODO: This should probably be RecursiveCall(Box<CallExpression>)
-    RecursiveCall(Box<Expr>),
+    RecursiveCall(Box<CallExpression>),
     Range(Box<RangeExpression>),
     Wildcard,
 }
