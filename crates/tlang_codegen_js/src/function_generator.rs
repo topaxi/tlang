@@ -9,7 +9,7 @@ use tlang_ast::token::Token;
 use crate::generator::{BlockContext, CodegenJS};
 
 impl CodegenJS {
-    pub fn generate_function_declarations(
+    pub(crate) fn generate_function_declarations(
         &mut self,
         declarations: &[FunctionDeclaration],
         first_declaration_comments: &[Token],
@@ -507,7 +507,7 @@ impl CodegenJS {
         self.push_char(')');
     }
 
-    pub fn generate_function_declaration(&mut self, declaration: &FunctionDeclaration) {
+    pub(crate) fn generate_function_declaration(&mut self, declaration: &FunctionDeclaration) {
         let name_as_str = fn_identifier_to_string(&declaration.name);
         let is_tail_recursive =
             is_function_body_tail_recursive_block(&name_as_str, &declaration.body);
@@ -535,7 +535,10 @@ impl CodegenJS {
         self.pop_function_context();
     }
 
-    pub fn generate_function_expression(self: &mut CodegenJS, declaration: &FunctionDeclaration) {
+    pub(crate) fn generate_function_expression(
+        self: &mut CodegenJS,
+        declaration: &FunctionDeclaration,
+    ) {
         self.push_scope();
 
         let name_as_str = fn_identifier_to_string(&declaration.name);
@@ -601,7 +604,7 @@ impl CodegenJS {
         self.pop_context();
     }
 
-    pub fn generate_return_statement(self: &mut CodegenJS, expr: &Option<Expr>) {
+    pub(crate) fn generate_return_statement(self: &mut CodegenJS, expr: &Option<Expr>) {
         // We do not render a return statement if we are in a tail recursive function body.
         // Which calls the current function recursively.
         if expr.is_some() {
@@ -707,7 +710,7 @@ fn is_function_body_tail_recursive(function_name: &str, node: &Expr) -> bool {
     }
 }
 
-pub fn fn_identifier_to_string(expr: &Expr) -> String {
+pub(crate) fn fn_identifier_to_string(expr: &Expr) -> String {
     match &expr.kind {
         ExprKind::Path(path) => path.join("."),
         _ => todo!(),

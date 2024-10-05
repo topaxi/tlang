@@ -15,7 +15,7 @@ struct JSOperatorInfo {
 }
 
 impl CodegenJS {
-    pub fn generate_binary_op(
+    pub(crate) fn generate_binary_op(
         &mut self,
         op: &BinaryOpKind,
         lhs: &Expr,

@@ -1,25 +1,25 @@
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Scope {
+pub(crate) struct Scope {
     parent: Option<Box<Scope>>,
 
     variables: HashMap<String, String>,
 }
 
 impl Scope {
-    pub fn new(parent: Option<Box<Scope>>) -> Self {
+    pub(crate) fn new(parent: Option<Box<Scope>>) -> Self {
         Self {
             parent,
             variables: HashMap::new(),
         }
     }
 
-    pub fn get_parent(&self) -> Option<&Scope> {
+    pub(crate) fn get_parent(&self) -> Option<&Scope> {
         self.parent.as_deref()
     }
 
-    pub fn declare_variable(&mut self, name: &str) -> String {
+    pub(crate) fn declare_variable(&mut self, name: &str) -> String {
         if !self.has_local_variable(name) {
             self.variables.insert(name.to_string(), name.to_string());
 
@@ -31,7 +31,7 @@ impl Scope {
         new_name
     }
 
-    pub fn declare_variable_alias(&mut self, name: &str, alias: &str) {
+    pub(crate) fn declare_variable_alias(&mut self, name: &str, alias: &str) {
         self.variables.insert(name.to_string(), alias.to_string());
     }
 
@@ -46,11 +46,11 @@ impl Scope {
         }
     }
 
-    pub fn declare_tmp_variable(&mut self) -> String {
+    pub(crate) fn declare_tmp_variable(&mut self) -> String {
         self.declare_unique_variable("$tmp$")
     }
 
-    pub fn declare_unique_variable(&mut self, prefix: &str) -> String {
+    pub(crate) fn declare_unique_variable(&mut self, prefix: &str) -> String {
         let tmp_var_name = self.get_unique_variable_name(prefix);
         self.variables
             .insert(tmp_var_name.clone(), tmp_var_name.clone());
@@ -58,11 +58,11 @@ impl Scope {
     }
 
     #[inline(always)]
-    pub fn has_local_variable(&self, name: &str) -> bool {
+    pub(crate) fn has_local_variable(&self, name: &str) -> bool {
         self.variables.contains_key(name)
     }
 
-    pub fn has_variable_in_scope(&self, name: &str) -> bool {
+    pub(crate) fn has_variable_in_scope(&self, name: &str) -> bool {
         if self.has_local_variable(name) {
             return true;
         }
@@ -74,7 +74,7 @@ impl Scope {
         false
     }
 
-    pub fn resolve_variable(&self, name: &str) -> Option<String> {
+    pub(crate) fn resolve_variable(&self, name: &str) -> Option<String> {
         if let Some(value) = self.variables.get(name) {
             return Some(value.clone());
         }

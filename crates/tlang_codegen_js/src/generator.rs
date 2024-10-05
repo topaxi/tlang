@@ -8,7 +8,7 @@ use tlang_ast::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum BlockContext {
+pub(crate) enum BlockContext {
     // Are we in a top level Program?
     Program,
     // Are we in a StatementExpression with a Block?
@@ -20,7 +20,7 @@ pub enum BlockContext {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct FunctionContext {
+pub(crate) struct FunctionContext {
     // The name of the current function we're in.
     // Empty string for anonymous functions.
     pub name: String,
@@ -78,17 +78,17 @@ impl CodegenJS {
         format!("{}\n{}", notice, stdlib_js_src)
     }
 
-    pub fn push_statement_buffer(&mut self) {
+    pub(crate) fn push_statement_buffer(&mut self) {
         self.statement_buffer.push(String::new());
     }
 
-    pub fn replace_statement_buffer(&mut self, buffer: String) -> String {
+    pub(crate) fn replace_statement_buffer(&mut self, buffer: String) -> String {
         let buf = self.statement_buffer.pop();
         self.statement_buffer.push(buffer);
         buf.unwrap()
     }
 
-    pub fn pop_statement_buffer(&mut self) -> String {
+    pub(crate) fn pop_statement_buffer(&mut self) -> String {
         assert!(
             self.statement_buffer.len() != 1,
             "Cannot pop last statement buffer."
@@ -98,72 +98,62 @@ impl CodegenJS {
     }
 
     #[inline(always)]
-    pub fn push_str(&mut self, str: &str) {
+    pub(crate) fn push_str(&mut self, str: &str) {
         self.statement_buffer.last_mut().unwrap().push_str(str);
     }
 
     #[inline(always)]
-    pub fn push_char(&mut self, char: char) {
+    pub(crate) fn push_char(&mut self, char: char) {
         self.statement_buffer.last_mut().unwrap().push(char);
     }
 
     #[inline(always)]
-    pub fn push_indent(&mut self) {
+    pub(crate) fn push_indent(&mut self) {
         self.push_str(&self.get_indent());
     }
 
     #[inline(always)]
-    pub fn inc_indent(&mut self) {
+    pub(crate) fn inc_indent(&mut self) {
         self.indent_level += 1;
     }
 
     #[inline(always)]
-    pub fn dec_indent(&mut self) {
+    pub(crate) fn dec_indent(&mut self) {
         self.indent_level -= 1;
     }
 
     #[inline(always)]
-    pub fn get_indent_level(&self) -> usize {
-        self.indent_level
-    }
-
-    #[inline(always)]
-    pub fn set_indent_level(&mut self, level: usize) {
-        self.indent_level = level;
-    }
-
-    #[inline(always)]
-    pub fn flush_statement_buffer(&mut self) {
+    pub(crate) fn flush_statement_buffer(&mut self) {
         self.output.push_str(self.statement_buffer.last().unwrap());
         self.statement_buffer.last_mut().unwrap().clear();
     }
 
     #[inline(always)]
-    pub fn current_scope(&mut self) -> &mut Scope {
+    pub(crate) fn current_scope(&mut self) -> &mut Scope {
         &mut self.scopes
     }
 
     #[inline(always)]
-    pub fn push_scope(&mut self) {
+    pub(crate) fn push_scope(&mut self) {
         self.scopes = Scope::new(Some(Box::new(self.scopes.clone())));
     }
 
     #[inline(always)]
-    pub fn pop_scope(&mut self) {
+    pub(crate) fn pop_scope(&mut self) {
         if let Some(parent) = self.scopes.get_parent() {
             self.scopes = parent.clone();
         }
     }
 
-    pub fn current_context(&self) -> BlockContext {
+    pub(crate) fn current_context(&self) -> BlockContext {
         *self.context_stack.last().unwrap()
     }
 
-    pub fn push_context(&mut self, context: BlockContext) {
+    pub(crate) fn push_context(&mut self, context: BlockContext) {
         self.context_stack.push(context);
     }
 
-    pub fn pop_context(&mut self) {
+    pub(crate) fn pop_context(&mut self) {
         self.context_stack.pop();
     }
 
@@ -171,20 +161,20 @@ impl CodegenJS {
         self.generate_statements(&module.statements);
     }
 
-    pub fn declare_function_pre_body_variable(&mut self, name: &str, value: &str) {
+    pub(crate) fn declare_function_pre_body_variable(&mut self, name: &str, value: &str) {
         self.function_pre_body_declarations
             .push((name.to_string(), value.to_string()));
     }
 
-    pub fn consume_function_pre_body_declarations(&mut self) -> Vec<(String, String)> {
+    pub(crate) fn consume_function_pre_body_declarations(&mut self) -> Vec<(String, String)> {
         std::mem::take(&mut self.function_pre_body_declarations)
     }
 
-    pub fn get_function_context(&self) -> Option<&FunctionContext> {
+    pub(crate) fn get_function_context(&self) -> Option<&FunctionContext> {
         self.function_context_stack.last()
     }
 
-    pub fn push_function_context(
+    pub(crate) fn push_function_context(
         &mut self,
         name: &str,
         parameters: &[FunctionParameter],
@@ -212,32 +202,32 @@ impl CodegenJS {
         });
     }
 
-    pub fn pop_function_context(&mut self) {
+    pub(crate) fn pop_function_context(&mut self) {
         self.function_context_stack.pop();
     }
 
     #[inline(always)]
-    pub fn push_completion_variable(&mut self, name: Option<String>) {
+    pub(crate) fn push_completion_variable(&mut self, name: Option<String>) {
         self.completion_variables.push(name);
     }
 
     #[inline(always)]
-    pub fn pop_completion_variable(&mut self) {
+    pub(crate) fn pop_completion_variable(&mut self) {
         self.completion_variables.pop();
     }
 
     #[inline(always)]
-    pub fn current_completion_variable(&self) -> Option<&str> {
+    pub(crate) fn current_completion_variable(&self) -> Option<&str> {
         self.completion_variables.last().unwrap().as_deref()
     }
 
     #[inline(always)]
-    pub fn current_completion_variable_count(&self) -> usize {
+    pub(crate) fn current_completion_variable_count(&self) -> usize {
         self.completion_variables.len()
     }
 
     #[inline(always)]
-    pub fn nth_completion_variable(&self, index: usize) -> Option<&str> {
+    pub(crate) fn nth_completion_variable(&self, index: usize) -> Option<&str> {
         self.completion_variables.get(index).unwrap().as_deref()
     }
 
@@ -320,7 +310,7 @@ impl CodegenJS {
         self.pop_scope();
     }
 
-    pub fn generate_block(&mut self, block: &Block) {
+    pub(crate) fn generate_block(&mut self, block: &Block) {
         // Functions handle their scoping themselves
         if self.current_context() != BlockContext::FunctionBody {
             self.push_scope();
@@ -371,7 +361,7 @@ impl CodegenJS {
         }
     }
 
-    pub fn generate_comment(&mut self, comment: &Token) {
+    pub(crate) fn generate_comment(&mut self, comment: &Token) {
         match &comment.kind {
             TokenKind::SingleLineComment(comment) => {
                 self.push_str("//");
@@ -387,14 +377,14 @@ impl CodegenJS {
         }
     }
 
-    pub fn generate_comments(&mut self, comments: &[Token]) {
+    pub(crate) fn generate_comments(&mut self, comments: &[Token]) {
         for comment in comments {
             self.push_indent();
             self.generate_comment(comment);
         }
     }
 
-    pub fn generate_stmt(&mut self, statement: &Stmt) {
+    pub(crate) fn generate_stmt(&mut self, statement: &Stmt) {
         self.generate_comments(&statement.leading_comments);
 
         match &statement.kind {
@@ -428,7 +418,7 @@ impl CodegenJS {
     }
 
     #[inline(always)]
-    pub fn generate_optional_expr(
+    pub(crate) fn generate_optional_expr(
         &mut self,
         expr: &Option<Expr>,
         parent_op: Option<&BinaryOpKind>,
@@ -438,7 +428,7 @@ impl CodegenJS {
         }
     }
 
-    pub fn generate_expr(&mut self, expr: &Expr, parent_op: Option<&BinaryOpKind>) {
+    pub(crate) fn generate_expr(&mut self, expr: &Expr, parent_op: Option<&BinaryOpKind>) {
         match &expr.kind {
             ExprKind::None => {}
             ExprKind::Block(block) if self.current_context() == BlockContext::Expression => {
@@ -522,7 +512,7 @@ impl CodegenJS {
         self.push_char('}');
     }
 
-    pub fn generate_pat(&mut self, pattern: &Pattern) {
+    pub(crate) fn generate_pat(&mut self, pattern: &Pattern) {
         match &pattern.kind {
             PatternKind::Identifier { name, .. } => {
                 let var_name = self.current_scope().declare_variable(name.as_str());

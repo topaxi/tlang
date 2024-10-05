@@ -3,7 +3,7 @@ use tlang_ast::node::{Ident, StructDeclaration, Ty};
 use crate::generator::CodegenJS;
 
 impl CodegenJS {
-    pub fn generate_struct_declaration(&mut self, decl: &StructDeclaration) {
+    pub(crate) fn generate_struct_declaration(&mut self, decl: &StructDeclaration) {
         self.push_indent();
         self.push_str(&format!("function {}(", decl.name));
 

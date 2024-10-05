@@ -22,7 +22,7 @@ impl CodegenJS {
         }
     }
 
-    pub fn generate_match_expression(&mut self, expression: &Expr, arms: &[MatchArm]) {
+    pub(crate) fn generate_match_expression(&mut self, expression: &Expr, arms: &[MatchArm]) {
         // TODO: A lot here is copied from the if statement generator.
         let lhs = self.replace_statement_buffer(String::new());
         let has_block_completions = match_args_have_completions(arms);
