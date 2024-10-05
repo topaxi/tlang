@@ -820,6 +820,9 @@ impl CodegenJS {
     }
 
     pub(crate) fn generate_call_expression(&mut self, function: &Expr, arguments: &[Expr]) {
+        // TODO: If the call is to a struct, we instead call it with `new` and map the fields to
+        // the positional arguments of the constructor.
+
         let wildcard_count = arguments.iter().filter(|arg| arg.is_wildcard()).count();
 
         if wildcard_count > 0 {

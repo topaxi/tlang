@@ -41,7 +41,7 @@ impl CodegenJS {
             }
         }
 
-        self.push_indent();
+        self.generate_struct_method_binding(first_declaration);
         self.push_scope();
         self.push_str(&format!("function {name_as_str}("));
         let (arg_binding, arg_bindings) = self.generate_function_arguments(declarations);
@@ -507,6 +507,36 @@ impl CodegenJS {
         self.push_char(')');
     }
 
+    fn generate_struct_method_binding(&mut self, declaration: &FunctionDeclaration) {
+        if is_static_method(&declaration.name) {
+            let lhs = match &declaration.name.kind {
+                ExprKind::Path(path) => path.join("."),
+                _ => unreachable!(),
+            };
+
+            self.push_indent();
+            self.push_str(&format!("{} = ", lhs));
+        } else if is_member_method(&declaration.name) {
+            let target_name: String = match &declaration.name.kind {
+                ExprKind::FieldExpression(expr) => fn_identifier_to_string(&expr.base),
+                _ => unreachable!(),
+            };
+
+            let field_name = match &declaration.name.kind {
+                ExprKind::FieldExpression(expr) => expr.field.to_string(),
+                _ => unreachable!(),
+            };
+
+            self.push_indent();
+            self.push_str(&target_name);
+            self.push_str(".prototype.");
+            self.push_str(&field_name);
+            self.push_str(" = ");
+        } else {
+            self.push_indent();
+        }
+    }
+
     pub(crate) fn generate_function_declaration(&mut self, declaration: &FunctionDeclaration) {
         let name_as_str = fn_identifier_to_string(&declaration.name);
         let is_tail_recursive =
@@ -518,7 +548,7 @@ impl CodegenJS {
             is_tail_recursive,
         );
 
-        self.push_indent();
+        self.generate_struct_method_binding(declaration);
         self.push_str("function ");
         self.push_str(&name_as_str);
         self.push_scope();
@@ -751,9 +781,22 @@ fn is_function_body_tail_recursive(function_name: &str, node: &Expr) -> bool {
     }
 }
 
+fn is_member_method(node: &Expr) -> bool {
+    matches!(&node.kind, ExprKind::FieldExpression(_))
+}
+
+fn is_static_method(node: &Expr) -> bool {
+    if let ExprKind::Path(path) = &node.kind {
+        return path.segments.len() > 1;
+    }
+
+    false
+}
+
 pub(crate) fn fn_identifier_to_string(expr: &Expr) -> String {
     match &expr.kind {
-        ExprKind::Path(path) => path.join("."),
-        _ => todo!(),
+        ExprKind::Path(path) => path.join("_"),
+        ExprKind::FieldExpression(expr) => expr.field.to_string(),
+        kind => todo!("fn_identifier_to_string: {:?}", kind),
     }
 }
