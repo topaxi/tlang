@@ -163,12 +163,9 @@ impl DeclarationAnalyzer {
                 self.collect_declarations_from_fn(decl);
                 self.pop_symbol_table();
             }
-            ExprKind::Call {
-                function,
-                arguments,
-            } => {
-                self.collect_declarations_expr(function);
-                for argument in arguments {
+            ExprKind::Call(expr) => {
+                self.collect_declarations_expr(&mut expr.callee);
+                for argument in &mut expr.arguments {
                     self.collect_declarations_expr(argument);
                 }
             }
@@ -178,9 +175,9 @@ impl DeclarationAnalyzer {
             ExprKind::UnaryOp(_, node) => {
                 self.collect_declarations_expr(node);
             }
-            ExprKind::BinaryOp { lhs, rhs, .. } => {
-                self.collect_declarations_expr(lhs);
-                self.collect_declarations_expr(rhs);
+            ExprKind::BinaryOp(expr) => {
+                self.collect_declarations_expr(&mut expr.lhs);
+                self.collect_declarations_expr(&mut expr.rhs);
             }
             ExprKind::List(values) => {
                 for value in values {
@@ -197,36 +194,32 @@ impl DeclarationAnalyzer {
                 self.collect_declarations_expr(expr);
                 self.collect_pattern(pattern);
             }
-            ExprKind::IfElse {
-                condition,
-                then_branch,
-                else_branches,
-            } => {
-                self.collect_declarations_expr(condition);
-                self.collect_declarations_expr(then_branch);
+            ExprKind::IfElse(expr) => {
+                self.collect_declarations_expr(&mut expr.condition);
+                self.collect_declarations_expr(&mut expr.then_branch);
 
-                for else_branch in else_branches {
+                for else_branch in &mut expr.else_branches {
                     self.collect_optional_declarations_expr(&mut else_branch.condition);
                     self.collect_declarations_expr(&mut else_branch.consequence);
                 }
             }
-            ExprKind::FieldExpression { base, .. } => {
-                self.collect_declarations_expr(base);
+            ExprKind::FieldExpression(expr) => {
+                self.collect_declarations_expr(&mut expr.base);
             }
-            ExprKind::IndexExpression { base, index } => {
-                self.collect_declarations_expr(base);
-                self.collect_declarations_expr(index);
+            ExprKind::IndexExpression(expr) => {
+                self.collect_declarations_expr(&mut expr.base);
+                self.collect_declarations_expr(&mut expr.index);
             }
-            ExprKind::Match { expression, arms } => {
-                self.collect_declarations_expr(expression);
-                for arm in arms {
+            ExprKind::Match(expr) => {
+                self.collect_declarations_expr(&mut expr.expression);
+                for arm in &mut expr.arms {
                     self.collect_pattern(&mut arm.pattern);
                     self.collect_declarations_expr(&mut arm.expression);
                 }
             }
-            ExprKind::Range { start, end, .. } => {
-                self.collect_declarations_expr(start);
-                self.collect_declarations_expr(end);
+            ExprKind::Range(expr) => {
+                self.collect_declarations_expr(&mut expr.start);
+                self.collect_declarations_expr(&mut expr.end);
             }
             ExprKind::Path(_) | ExprKind::Literal(_) | ExprKind::Wildcard | ExprKind::None => {
                 // Nothing to do here
@@ -254,13 +247,10 @@ impl DeclarationAnalyzer {
     fn fn_identifier_to_string(&self, identifier: &Expr) -> String {
         match identifier.kind {
             ExprKind::Path(ref path) => path.join("::"),
-            ExprKind::FieldExpression {
-                ref base,
-                ref field,
-            } => {
-                let base_name = self.fn_identifier_to_string(base);
+            ExprKind::FieldExpression(ref expr) => {
+                let base_name = self.fn_identifier_to_string(&expr.base);
 
-                format!("{base_name}.{field}")
+                format!("{base_name}.{}", expr.field)
             }
             _ => panic!("Expected identifier, found {:?}", identifier.kind),
         }

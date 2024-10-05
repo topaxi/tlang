@@ -1,15 +1,15 @@
 ---
 source: crates/tlang_parser/tests/parser.rs
-expression: "parse!(\"1 ** 2 * 3;\")"
+expression: "parse! (\"1 ** 2 * 3;\")"
 ---
 Module(
   statements: [
     Stmt(
       kind: Expr(Expr(
-        kind: BinaryOp(
+        kind: BinaryOp(BinaryOpExpression(
           op: Multiply,
           lhs: Expr(
-            kind: BinaryOp(
+            kind: BinaryOp(BinaryOpExpression(
               op: Exponentiation,
               lhs: Expr(
                 kind: Literal(Integer(1)),
@@ -43,7 +43,7 @@ Module(
                   ),
                 ),
               ),
-            ),
+            )),
             leading_comments: [],
             trailing_comments: [],
             symbol_table: None,
@@ -74,7 +74,7 @@ Module(
               ),
             ),
           ),
-        ),
+        )),
         leading_comments: [],
         trailing_comments: [],
         symbol_table: None,

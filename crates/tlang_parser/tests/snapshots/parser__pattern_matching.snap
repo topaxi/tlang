@@ -35,7 +35,7 @@ Module(
           ),
         ),
         expression: Expr(
-          kind: Match(
+          kind: Match(MatchExpression(
             expression: Expr(
               kind: Literal(Integer(1)),
               leading_comments: [],
@@ -177,7 +177,7 @@ Module(
                 ),
               ),
             ],
-          ),
+          )),
           leading_comments: [],
           trailing_comments: [],
           symbol_table: None,

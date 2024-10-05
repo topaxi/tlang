@@ -1,6 +1,6 @@
 ---
 source: crates/tlang_parser/tests/parser_fn.rs
-expression: "parse!(indoc! {\n        \"\n        fn foo(1) { 1 }\n        // comment\n        fn foo(n) { n * 2 }\n    \"\n    })"
+expression: "parse!\n(indoc!\n{\n    \"\n        fn foo(1) { 1 }\n        // comment\n        fn foo(n) { n * 2 }\n    \"\n})"
 ---
 Module(
   statements: [
@@ -231,7 +231,7 @@ Module(
           body: Block(
             statements: [],
             expression: Some(Expr(
-              kind: BinaryOp(
+              kind: BinaryOp(BinaryOpExpression(
                 op: Multiply,
                 lhs: Expr(
                   kind: Path(Path(
@@ -291,7 +291,7 @@ Module(
                     ),
                   ),
                 ),
-              ),
+              )),
               leading_comments: [],
               trailing_comments: [],
               symbol_table: None,

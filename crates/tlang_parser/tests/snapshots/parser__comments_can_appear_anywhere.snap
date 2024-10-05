@@ -110,10 +110,10 @@ Module(
     ),
     Stmt(
       kind: Expr(Expr(
-        kind: BinaryOp(
+        kind: BinaryOp(BinaryOpExpression(
           op: Pipeline,
           lhs: Expr(
-            kind: BinaryOp(
+            kind: BinaryOp(BinaryOpExpression(
               op: Pipeline,
               lhs: Expr(
                 kind: List([
@@ -247,7 +247,7 @@ Module(
                   ),
                 ),
               ),
-            ),
+            )),
             leading_comments: [],
             trailing_comments: [],
             symbol_table: None,
@@ -304,7 +304,7 @@ Module(
               ),
             ),
           ),
-        ),
+        )),
         leading_comments: [],
         trailing_comments: [],
         symbol_table: None,

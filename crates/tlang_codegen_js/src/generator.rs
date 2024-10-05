@@ -445,20 +445,17 @@ impl CodegenJS {
                 self.generate_block_expression(block)
             }
             ExprKind::Block(block) => self.generate_block(block),
-            ExprKind::Call {
-                function,
-                arguments,
-            } => self.generate_call_expression(function, arguments),
-            ExprKind::FieldExpression { base, field } => {
-                self.generate_expr(base, None);
+            ExprKind::Call(expr) => self.generate_call_expression(&expr.callee, &expr.arguments),
+            ExprKind::FieldExpression(expr) => {
+                self.generate_expr(&expr.base, None);
                 self.push_char('.');
-                self.push_str(field.as_str());
+                self.push_str(expr.field.as_str());
             }
             ExprKind::Path(path) => self.generate_path_expression(path),
-            ExprKind::IndexExpression { base, index } => {
-                self.generate_expr(base, None);
+            ExprKind::IndexExpression(expr) => {
+                self.generate_expr(&expr.base, None);
                 self.push_char('[');
-                self.generate_expr(index, None);
+                self.generate_expr(&expr.index, None);
                 self.push_char(']');
             }
             ExprKind::Let(_pattern, _expr) => todo!("Let expression not implemented yet."),
@@ -474,24 +471,18 @@ impl CodegenJS {
                 }
                 self.generate_expr(expr, None);
             }
-            ExprKind::BinaryOp { op, lhs, rhs } => self.generate_binary_op(op, lhs, rhs, parent_op),
-            ExprKind::Match { expression, arms } => {
-                self.generate_match_expression(expression, arms)
+            ExprKind::BinaryOp(expr) => {
+                self.generate_binary_op(&expr.op, &expr.lhs, &expr.rhs, parent_op)
             }
-            ExprKind::IfElse {
-                condition,
-                then_branch,
-                else_branches,
-            } => self.generate_if_else(condition, then_branch, else_branches),
+            ExprKind::Match(expr) => self.generate_match_expression(&expr.expression, &expr.arms),
+            ExprKind::IfElse(expr) => {
+                self.generate_if_else(&expr.condition, &expr.then_branch, &expr.else_branches)
+            }
             ExprKind::FunctionExpression(decl) => self.generate_function_expression(decl),
             ExprKind::RecursiveCall(expr) => {
                 self.generate_recursive_call_expression(expr, parent_op)
             }
-            ExprKind::Range {
-                start: _,
-                end: _,
-                inclusive: _,
-            } => todo!("Range expression not implemented yet."),
+            ExprKind::Range(_) => todo!("Range expression not implemented yet."),
             ExprKind::Wildcard => {}
         }
     }
@@ -816,16 +807,12 @@ impl CodegenJS {
     ) {
         // If call expression is referencing the current function, all we do is update the arguments,
         // as we are in a while loop.
-        if let ExprKind::Call {
-            function,
-            arguments,
-        } = &node.kind
-        {
-            if let ExprKind::Path(_) = &function.kind {
+        if let ExprKind::Call(expr) = &node.kind {
+            if let ExprKind::Path(_) = &expr.callee.kind {
                 if let Some(function_context) = self.function_context_stack.last() {
                     if function_context.is_tail_recursive
                         // TODO: Comparing identifier by string might not be the best idea.
-                        && function_context.name == fn_identifier_to_string(function)
+                        && function_context.name == fn_identifier_to_string(&expr.callee)
                     {
                         let params = function_context.params.clone();
                         let parameter_bindings = function_context.parameter_bindings.clone();
@@ -836,7 +823,7 @@ impl CodegenJS {
                             .map(|_| self.scopes.declare_tmp_variable())
                             .collect::<Vec<_>>();
 
-                        for (i, arg) in arguments.iter().enumerate() {
+                        for (i, arg) in expr.arguments.iter().enumerate() {
                             self.push_indent();
                             self.push_str(&format!("let {} = ", tmp_vars[i]));
                             self.generate_expr(arg, None);

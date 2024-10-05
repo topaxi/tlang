@@ -6,9 +6,9 @@ Module(
   statements: [
     Stmt(
       kind: Expr(Expr(
-        kind: IfElse(
+        kind: IfElse(IfElseExpression(
           condition: Expr(
-            kind: BinaryOp(
+            kind: BinaryOp(BinaryOpExpression(
               op: Add,
               lhs: Expr(
                 kind: Literal(Integer(1)),
@@ -42,7 +42,7 @@ Module(
                   ),
                 ),
               ),
-            ),
+            )),
             leading_comments: [],
             trailing_comments: [],
             symbol_table: None,
@@ -62,7 +62,7 @@ Module(
               statements: [
                 Stmt(
                   kind: Expr(Expr(
-                    kind: BinaryOp(
+                    kind: BinaryOp(BinaryOpExpression(
                       op: Add,
                       lhs: Expr(
                         kind: Literal(Integer(3)),
@@ -96,7 +96,7 @@ Module(
                           ),
                         ),
                       ),
-                    ),
+                    )),
                     leading_comments: [],
                     trailing_comments: [],
                     symbol_table: None,
@@ -154,7 +154,7 @@ Module(
             ),
           ),
           else_branches: [],
-        ),
+        )),
         leading_comments: [],
         trailing_comments: [],
         symbol_table: None,

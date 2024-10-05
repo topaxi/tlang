@@ -1,6 +1,6 @@
 ---
 source: crates/tlang_parser/tests/parser_fn.rs
-expression: "parse!(indoc! {\n        \"\n        fn factorial(n) { factorial(n, 1) }\n        fn factorial(0, acc) { acc }\n        fn factorial(n, acc) { rec factorial(n - 1, n * acc) }\n    \"\n    })"
+expression: "parse!\n(indoc!\n{\n    \"\n        fn factorial(n) { factorial(n, 1) }\n        fn factorial(0, acc) { acc }\n        fn factorial(n, acc) { rec factorial(n - 1, n * acc) }\n    \"\n})"
 ---
 Module(
   statements: [
@@ -98,8 +98,8 @@ Module(
           body: Block(
             statements: [],
             expression: Some(Expr(
-              kind: Call(
-                function: Expr(
+              kind: Call(CallExpression(
+                callee: Expr(
                   kind: Path(Path(
                     segments: [
                       Ident(
@@ -201,7 +201,7 @@ Module(
                     ),
                   ),
                 ],
-              ),
+              )),
               leading_comments: [],
               trailing_comments: [],
               symbol_table: None,
@@ -576,8 +576,8 @@ Module(
             statements: [],
             expression: Some(Expr(
               kind: RecursiveCall(Expr(
-                kind: Call(
-                  function: Expr(
+                kind: Call(CallExpression(
+                  callee: Expr(
                     kind: Path(Path(
                       segments: [
                         Ident(
@@ -621,7 +621,7 @@ Module(
                   ),
                   arguments: [
                     Expr(
-                      kind: BinaryOp(
+                      kind: BinaryOp(BinaryOpExpression(
                         op: Subtract,
                         lhs: Expr(
                           kind: Path(Path(
@@ -681,7 +681,7 @@ Module(
                             ),
                           ),
                         ),
-                      ),
+                      )),
                       leading_comments: [],
                       trailing_comments: [],
                       symbol_table: None,
@@ -697,7 +697,7 @@ Module(
                       ),
                     ),
                     Expr(
-                      kind: BinaryOp(
+                      kind: BinaryOp(BinaryOpExpression(
                         op: Multiply,
                         lhs: Expr(
                           kind: Path(Path(
@@ -783,7 +783,7 @@ Module(
                             ),
                           ),
                         ),
-                      ),
+                      )),
                       leading_comments: [],
                       trailing_comments: [],
                       symbol_table: None,
@@ -799,7 +799,7 @@ Module(
                       ),
                     ),
                   ],
-                ),
+                )),
                 leading_comments: [],
                 trailing_comments: [],
                 symbol_table: None,

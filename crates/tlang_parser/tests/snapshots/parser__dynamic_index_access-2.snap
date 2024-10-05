@@ -35,9 +35,9 @@ Module(
           ),
         ),
         expression: Expr(
-          kind: IndexExpression(
+          kind: IndexExpression(IndexAccessExpression(
             base: Expr(
-              kind: IndexExpression(
+              kind: IndexExpression(IndexAccessExpression(
                 base: Expr(
                   kind: Path(Path(
                     segments: [
@@ -96,7 +96,7 @@ Module(
                     ),
                   ),
                 ),
-              ),
+              )),
               leading_comments: [],
               trailing_comments: [],
               symbol_table: None,
@@ -127,7 +127,7 @@ Module(
                 ),
               ),
             ),
-          ),
+          )),
           leading_comments: [],
           trailing_comments: [],
           symbol_table: None,

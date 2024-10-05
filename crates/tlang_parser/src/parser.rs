@@ -1,8 +1,9 @@
 use tlang_ast::node::{
-    self, Associativity, BinaryOpKind, Block, ElseClause, EnumDeclaration, EnumVariant, Expr,
-    ExprKind, FunctionDeclaration, FunctionParameter, Ident, LetDeclaration, MatchArm, Module,
-    OperatorInfo, Path, Pattern, PatternKind, Stmt, StmtKind, StructDeclaration, StructField, Ty,
-    UnaryOp,
+    self, Associativity, BinaryOpExpression, BinaryOpKind, Block, CallExpression, ElseClause,
+    EnumDeclaration, EnumVariant, Expr, ExprKind, FieldAccessExpression, FunctionDeclaration,
+    FunctionParameter, Ident, IfElseExpression, IndexAccessExpression, LetDeclaration, MatchArm,
+    MatchExpression, Module, OperatorInfo, Path, Pattern, PatternKind, Stmt, StmtKind,
+    StructDeclaration, StructField, Ty, UnaryOp,
 };
 use tlang_ast::span::Span;
 use tlang_ast::symbols::SymbolId;
@@ -623,10 +624,10 @@ impl<'src> Parser<'src> {
 
         self.end_span_from_previous_token(&mut span);
 
-        node::expr!(Call {
-            function: Box::new(expr),
-            arguments: arguments,
-        })
+        node::expr!(Call(Box::new(CallExpression {
+            callee: expr,
+            arguments,
+        })))
         .with_span(span)
     }
 
@@ -756,10 +757,10 @@ impl<'src> Parser<'src> {
 
         let mut expr = if let Some(TokenKind::Dot) = self.current_token_kind() {
             self.advance();
-            node::expr!(FieldExpression {
-                base: Box::new(path),
-                field: Box::new(self.consume_identifier()),
-            })
+            node::expr!(FieldExpression(Box::new(FieldAccessExpression {
+                base: path,
+                field: self.consume_identifier(),
+            })))
         } else {
             path
         };
@@ -819,11 +820,11 @@ impl<'src> Parser<'src> {
             });
         }
 
-        node::expr!(IfElse {
-            condition: Box::new(condition),
-            then_branch: Box::new(then_branch),
-            else_branches: else_branches,
-        })
+        node::expr!(IfElse(Box::new(IfElseExpression {
+            condition,
+            then_branch,
+            else_branches,
+        })))
     }
 
     fn parse_unary_expression(&mut self) -> Expr {
@@ -889,7 +890,7 @@ impl<'src> Parser<'src> {
             Some(TokenKind::Literal(literal)) => {
                 let literal = literal.clone();
                 self.advance();
-                node::expr!(Literal(literal))
+                node::expr!(Literal(Box::new(literal)))
             }
             Some(TokenKind::Identifier(identifier)) => {
                 let identifier = identifier.clone();
@@ -953,10 +954,7 @@ impl<'src> Parser<'src> {
 
         self.consume_token(TokenKind::RBrace);
 
-        node::expr!(Match {
-            expression: Box::new(expression),
-            arms: arms,
-        })
+        node::expr!(Match(Box::new(MatchExpression { expression, arms })))
     }
 
     fn parse_parameter_list(&mut self) -> Vec<FunctionParameter> {
@@ -1438,19 +1436,19 @@ impl<'src> Parser<'src> {
                     self.advance();
                     lhs.trailing_comments = self.parse_comments();
                     let field_name = self.consume_identifier();
-                    lhs = node::expr!(FieldExpression {
-                        base: Box::new(lhs),
-                        field: Box::new(field_name),
-                    });
+                    lhs = node::expr!(FieldExpression(Box::new(FieldAccessExpression {
+                        base: lhs,
+                        field: field_name,
+                    })));
                 }
                 Some(TokenKind::LBracket) => {
                     self.advance();
                     let index = self.parse_expression_with_precedence(0, Associativity::Left);
                     self.consume_token(TokenKind::RBracket);
-                    lhs = node::expr!(IndexExpression {
-                        base: Box::new(lhs),
-                        index: Box::new(index),
-                    });
+                    lhs = node::expr!(IndexExpression(Box::new(IndexAccessExpression {
+                        base: lhs,
+                        index,
+                    })));
                 }
                 Some(TokenKind::LParen) => {
                     lhs = self.parse_call_expression(lhs);
@@ -1476,11 +1474,11 @@ impl<'src> Parser<'src> {
                         operator_info.associativity,
                     );
 
-                    lhs = node::expr!(BinaryOp {
+                    lhs = node::expr!(BinaryOp(Box::new(BinaryOpExpression {
                         op: operator,
-                        lhs: Box::new(lhs),
-                        rhs: Box::new(rhs),
-                    });
+                        lhs,
+                        rhs,
+                    })));
                 }
                 _ => break,
             }
@@ -1503,8 +1501,12 @@ impl<'src> Parser<'src> {
         match &identifier.kind {
             ExprKind::Path(path) => path.join("::"),
 
-            ExprKind::FieldExpression { base, field } => {
-                format!("{}.{}", self.fn_name_identifier_to_string(base), field)
+            ExprKind::FieldExpression(field) => {
+                format!(
+                    "{}.{}",
+                    self.fn_name_identifier_to_string(&field.base),
+                    field.field
+                )
             }
             _ => {
                 self.panic_unexpected_expr(

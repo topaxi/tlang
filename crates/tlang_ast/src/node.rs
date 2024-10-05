@@ -116,6 +116,31 @@ impl Block {
     }
 }
 
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct CallExpression {
+    pub callee: Expr,
+    pub arguments: Vec<Expr>,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct FieldAccessExpression {
+    pub base: Expr,
+    pub field: Ident,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct IndexAccessExpression {
+    pub base: Expr,
+    pub index: Expr,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct IfElseExpression {
+    pub condition: Expr,
+    pub then_branch: Expr,
+    pub else_branches: Vec<ElseClause>,
+}
+
 #[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub struct Expr {
     pub kind: ExprKind,
@@ -149,51 +174,48 @@ pub struct ElseClause {
     pub consequence: Expr,
 }
 
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct BinaryOpExpression {
+    pub op: BinaryOpKind,
+    pub lhs: Expr,
+    pub rhs: Expr,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct MatchExpression {
+    pub expression: Expr,
+    pub arms: Vec<MatchArm>,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct RangeExpression {
+    pub start: Expr,
+    pub end: Expr,
+    pub inclusive: bool,
+}
+
 #[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub enum ExprKind {
     #[default]
     None,
     Block(Box<Block>),
-    Call {
-        function: Box<Expr>,
-        arguments: Vec<Expr>,
-    },
+    Call(Box<CallExpression>),
     Dict(Vec<(Expr, Expr)>),
     FunctionExpression(Box<FunctionDeclaration>),
-    FieldExpression {
-        base: Box<Expr>,
-        field: Box<Ident>,
-    },
-    IndexExpression {
-        base: Box<Expr>,
-        index: Box<Expr>,
-    },
+    FieldExpression(Box<FieldAccessExpression>),
+    IndexExpression(Box<IndexAccessExpression>),
     // Let expression, only valid within if conditions and guards
     Let(Box<Pattern>, Box<Expr>),
-    IfElse {
-        condition: Box<Expr>,
-        then_branch: Box<Expr>,
-        else_branches: Vec<ElseClause>,
-    },
+    IfElse(Box<IfElseExpression>),
     List(Vec<Expr>),
-    Literal(Literal),
+    Literal(Box<Literal>),
     Path(Box<Path>),
     UnaryOp(UnaryOp, Box<Expr>),
-    BinaryOp {
-        op: BinaryOpKind,
-        lhs: Box<Expr>,
-        rhs: Box<Expr>,
-    },
-    Match {
-        expression: Box<Expr>,
-        arms: Vec<MatchArm>,
-    },
+    BinaryOp(Box<BinaryOpExpression>),
+    Match(Box<MatchExpression>),
+    // TODO: This should probably be RecursiveCall(Box<CallExpression>)
     RecursiveCall(Box<Expr>),
-    Range {
-        start: Box<Expr>,
-        end: Box<Expr>,
-        inclusive: bool,
-    },
+    Range(Box<RangeExpression>),
     Wildcard,
 }
 

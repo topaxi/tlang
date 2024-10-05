@@ -607,12 +607,9 @@ impl CodegenJS {
         if expr.is_some() {
             if let ExprKind::RecursiveCall(call_exp) = &expr.as_ref().unwrap().kind {
                 let call_identifier = match &call_exp.kind {
-                    ExprKind::Call {
-                        function,
-                        arguments: _,
-                    } => {
-                        if let ExprKind::Path(_) = &function.kind {
-                            Some(fn_identifier_to_string(function))
+                    ExprKind::Call(expr) => {
+                        if let ExprKind::Path(_) = &expr.callee.kind {
+                            Some(fn_identifier_to_string(&expr.callee))
                         } else {
                             None
                         }
@@ -695,14 +692,10 @@ fn is_function_body_tail_recursive(function_name: &str, node: &Expr) -> bool {
     match &node.kind {
         ExprKind::RecursiveCall(node) => {
             // Node is a Call expression, unwrap first.
-            if let ExprKind::Call {
-                function,
-                arguments: _,
-            } = &node.kind
-            {
+            if let ExprKind::Call(expr) = &node.kind {
                 // If the function is an identifier, check if it's the same as the current function name.
-                if let ExprKind::Path(_) = &function.kind {
-                    if fn_identifier_to_string(function) == function_name {
+                if let ExprKind::Path(_) = &expr.callee.kind {
+                    if fn_identifier_to_string(&expr.callee) == function_name {
                         return true;
                     }
                 }
@@ -710,18 +703,11 @@ fn is_function_body_tail_recursive(function_name: &str, node: &Expr) -> bool {
             false
         }
         ExprKind::Block(block) => is_function_body_tail_recursive_block(function_name, block),
-        ExprKind::Match {
-            expression,
-            arms: _,
-        } => is_function_body_tail_recursive(function_name, expression),
-        ExprKind::IfElse {
-            condition,
-            then_branch,
-            else_branches,
-        } => {
-            is_function_body_tail_recursive(function_name, condition)
-                || is_function_body_tail_recursive(function_name, then_branch)
-                || else_branches.iter().any(|else_clause| {
+        ExprKind::Match(expr) => is_function_body_tail_recursive(function_name, &expr.expression),
+        ExprKind::IfElse(expr) => {
+            is_function_body_tail_recursive(function_name, &expr.condition)
+                || is_function_body_tail_recursive(function_name, &expr.then_branch)
+                || expr.else_branches.iter().any(|else_clause| {
                     is_function_body_tail_recursive(function_name, &else_clause.consequence)
                 })
         }

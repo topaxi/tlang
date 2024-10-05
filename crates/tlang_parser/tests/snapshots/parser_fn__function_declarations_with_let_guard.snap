@@ -1,6 +1,6 @@
 ---
 source: crates/tlang_parser/tests/parser_fn.rs
-expression: "parse!(indoc! {\n        \"\n        fn filter_map([], f) { [] }\n        fn filter_map([x, ...xs], f) if let y = f(x) { [y, ...filter_map(xs, f)] }\n        fn filter_map([x, ...xs], f) { rec filter_map(xs, f) }\n    \"\n    })"
+expression: "parse!\n(indoc!\n{\n    \"\n        fn filter_map([], f) { [] }\n        fn filter_map([x, ...xs], f) if let y = f(x) { [y, ...filter_map(xs, f)] }\n        fn filter_map([x, ...xs], f) { rec filter_map(xs, f) }\n    \"\n})"
 ---
 Module(
   statements: [
@@ -376,8 +376,8 @@ Module(
                 ),
               ),
             ), Expr(
-              kind: Call(
-                function: Expr(
+              kind: Call(CallExpression(
+                callee: Expr(
                   kind: Path(Path(
                     segments: [
                       Ident(
@@ -463,7 +463,7 @@ Module(
                     ),
                   ),
                 ],
-              ),
+              )),
               leading_comments: [],
               trailing_comments: [],
               symbol_table: None,
@@ -541,8 +541,8 @@ Module(
                 ),
                 Expr(
                   kind: UnaryOp(Spread, Expr(
-                    kind: Call(
-                      function: Expr(
+                    kind: Call(CallExpression(
+                      callee: Expr(
                         kind: Path(Path(
                           segments: [
                             Ident(
@@ -670,7 +670,7 @@ Module(
                           ),
                         ),
                       ],
-                    ),
+                    )),
                     leading_comments: [],
                     trailing_comments: [],
                     symbol_table: None,
@@ -928,8 +928,8 @@ Module(
             statements: [],
             expression: Some(Expr(
               kind: RecursiveCall(Expr(
-                kind: Call(
-                  function: Expr(
+                kind: Call(CallExpression(
+                  callee: Expr(
                     kind: Path(Path(
                       segments: [
                         Ident(
@@ -1057,7 +1057,7 @@ Module(
                       ),
                     ),
                   ],
-                ),
+                )),
                 leading_comments: [],
                 trailing_comments: [],
                 symbol_table: None,

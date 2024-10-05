@@ -37,19 +37,15 @@ impl CodegenJS {
                 self.generate_expr(lhs, None);
                 self.push_char(')');
             // If rhs is a Call node and we prepend the lhs to the argument list.
-            } else if let ExprKind::Call {
-                function,
-                arguments,
-            } = &rhs.kind
-            {
-                self.generate_expr(function, None);
+            } else if let ExprKind::Call(call_expr) = &rhs.kind {
+                self.generate_expr(&call_expr.callee, None);
                 self.push_char('(');
 
                 // If we have a wildcard in the argument list, we instead replace the wildcard with the lhs.
                 // Otherwise we prepend the lhs to the argument list.
-                let has_wildcard = arguments.iter().any(|arg| arg.is_wildcard());
+                let has_wildcard = call_expr.arguments.iter().any(|arg| arg.is_wildcard());
                 if has_wildcard {
-                    for (i, arg) in arguments.iter().enumerate() {
+                    for (i, arg) in call_expr.arguments.iter().enumerate() {
                         if i > 0 {
                             self.push_str(", ");
                         }
@@ -62,7 +58,7 @@ impl CodegenJS {
                     }
                 } else {
                     self.generate_expr(lhs, None);
-                    for arg in arguments {
+                    for arg in &call_expr.arguments {
                         self.push_str(", ");
                         self.generate_expr(arg, None);
                     }

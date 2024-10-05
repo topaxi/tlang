@@ -1,12 +1,12 @@
 ---
 source: crates/tlang_parser/tests/parser.rs
-expression: "parse!(\"foo.bar;\")"
+expression: "parse! (\"foo.bar;\")"
 ---
 Module(
   statements: [
     Stmt(
       kind: Expr(Expr(
-        kind: FieldExpression(
+        kind: FieldExpression(FieldAccessExpression(
           base: Expr(
             kind: Path(Path(
               segments: [
@@ -62,7 +62,7 @@ Module(
               ),
             ),
           ),
-        ),
+        )),
         leading_comments: [],
         trailing_comments: [],
         symbol_table: None,

@@ -1,21 +1,21 @@
 ---
 source: crates/tlang_parser/tests/parser_pipeline.rs
-expression: "parse!(indoc! {\n        \"\n        [1,2,3]\n        |> map(fn (x) { x ** 2 })\n        |> filter(fn (x) { x % 2 == 0 })\n        |> foldl(fn (acc, x) { acc + x }, 0)\n        |> log();\n    \"\n    })"
+expression: "parse!\n(indoc!\n{\n    \"\n        [1,2,3]\n        |> map(fn (x) { x ** 2 })\n        |> filter(fn (x) { x % 2 == 0 })\n        |> foldl(fn (acc, x) { acc + x }, 0)\n        |> log();\n    \"\n})"
 ---
 Module(
   statements: [
     Stmt(
       kind: Expr(Expr(
-        kind: BinaryOp(
+        kind: BinaryOp(BinaryOpExpression(
           op: Pipeline,
           lhs: Expr(
-            kind: BinaryOp(
+            kind: BinaryOp(BinaryOpExpression(
               op: Pipeline,
               lhs: Expr(
-                kind: BinaryOp(
+                kind: BinaryOp(BinaryOpExpression(
                   op: Pipeline,
                   lhs: Expr(
-                    kind: BinaryOp(
+                    kind: BinaryOp(BinaryOpExpression(
                       op: Pipeline,
                       lhs: Expr(
                         kind: List([
@@ -83,8 +83,8 @@ Module(
                         ),
                       ),
                       rhs: Expr(
-                        kind: Call(
-                          function: Expr(
+                        kind: Call(CallExpression(
+                          callee: Expr(
                             kind: Path(Path(
                               segments: [
                                 Ident(
@@ -220,7 +220,7 @@ Module(
                                 body: Block(
                                   statements: [],
                                   expression: Some(Expr(
-                                    kind: BinaryOp(
+                                    kind: BinaryOp(BinaryOpExpression(
                                       op: Exponentiation,
                                       lhs: Expr(
                                         kind: Path(Path(
@@ -280,7 +280,7 @@ Module(
                                           ),
                                         ),
                                       ),
-                                    ),
+                                    )),
                                     leading_comments: [],
                                     trailing_comments: [],
                                     symbol_table: None,
@@ -336,7 +336,7 @@ Module(
                               ),
                             ),
                           ],
-                        ),
+                        )),
                         leading_comments: [],
                         trailing_comments: [],
                         symbol_table: None,
@@ -351,7 +351,7 @@ Module(
                           ),
                         ),
                       ),
-                    ),
+                    )),
                     leading_comments: [],
                     trailing_comments: [],
                     symbol_table: None,
@@ -367,8 +367,8 @@ Module(
                     ),
                   ),
                   rhs: Expr(
-                    kind: Call(
-                      function: Expr(
+                    kind: Call(CallExpression(
+                      callee: Expr(
                         kind: Path(Path(
                           segments: [
                             Ident(
@@ -504,10 +504,10 @@ Module(
                             body: Block(
                               statements: [],
                               expression: Some(Expr(
-                                kind: BinaryOp(
+                                kind: BinaryOp(BinaryOpExpression(
                                   op: Equal,
                                   lhs: Expr(
-                                    kind: BinaryOp(
+                                    kind: BinaryOp(BinaryOpExpression(
                                       op: Modulo,
                                       lhs: Expr(
                                         kind: Path(Path(
@@ -567,7 +567,7 @@ Module(
                                           ),
                                         ),
                                       ),
-                                    ),
+                                    )),
                                     leading_comments: [],
                                     trailing_comments: [],
                                     symbol_table: None,
@@ -598,7 +598,7 @@ Module(
                                       ),
                                     ),
                                   ),
-                                ),
+                                )),
                                 leading_comments: [],
                                 trailing_comments: [],
                                 symbol_table: None,
@@ -654,7 +654,7 @@ Module(
                           ),
                         ),
                       ],
-                    ),
+                    )),
                     leading_comments: [],
                     trailing_comments: [],
                     symbol_table: None,
@@ -669,7 +669,7 @@ Module(
                       ),
                     ),
                   ),
-                ),
+                )),
                 leading_comments: [],
                 trailing_comments: [],
                 symbol_table: None,
@@ -685,8 +685,8 @@ Module(
                 ),
               ),
               rhs: Expr(
-                kind: Call(
-                  function: Expr(
+                kind: Call(CallExpression(
+                  callee: Expr(
                     kind: Path(Path(
                       segments: [
                         Ident(
@@ -863,7 +863,7 @@ Module(
                         body: Block(
                           statements: [],
                           expression: Some(Expr(
-                            kind: BinaryOp(
+                            kind: BinaryOp(BinaryOpExpression(
                               op: Add,
                               lhs: Expr(
                                 kind: Path(Path(
@@ -949,7 +949,7 @@ Module(
                                   ),
                                 ),
                               ),
-                            ),
+                            )),
                             leading_comments: [],
                             trailing_comments: [],
                             symbol_table: None,
@@ -1021,7 +1021,7 @@ Module(
                       ),
                     ),
                   ],
-                ),
+                )),
                 leading_comments: [],
                 trailing_comments: [],
                 symbol_table: None,
@@ -1036,7 +1036,7 @@ Module(
                   ),
                 ),
               ),
-            ),
+            )),
             leading_comments: [],
             trailing_comments: [],
             symbol_table: None,
@@ -1052,8 +1052,8 @@ Module(
             ),
           ),
           rhs: Expr(
-            kind: Call(
-              function: Expr(
+            kind: Call(CallExpression(
+              callee: Expr(
                 kind: Path(Path(
                   segments: [
                     Ident(
@@ -1096,7 +1096,7 @@ Module(
                 ),
               ),
               arguments: [],
-            ),
+            )),
             leading_comments: [],
             trailing_comments: [],
             symbol_table: None,
@@ -1111,7 +1111,7 @@ Module(
               ),
             ),
           ),
-        ),
+        )),
         leading_comments: [],
         trailing_comments: [],
         symbol_table: None,

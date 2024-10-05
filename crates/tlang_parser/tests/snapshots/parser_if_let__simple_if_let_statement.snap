@@ -6,7 +6,7 @@ Module(
   statements: [
     Stmt(
       kind: Expr(Expr(
-        kind: IfElse(
+        kind: IfElse(IfElseExpression(
           condition: Expr(
             kind: Let(Pattern(
               kind: Identifier(
@@ -137,7 +137,7 @@ Module(
             ),
           ),
           else_branches: [],
-        ),
+        )),
         leading_comments: [],
         trailing_comments: [],
         symbol_table: None,

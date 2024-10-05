@@ -200,33 +200,26 @@ impl SemanticAnalyzer {
         let mut kind = std::mem::take(&mut expr.kind);
 
         match &mut kind {
-            ExprKind::BinaryOp { op: _, lhs, rhs } => {
-                self.analyze_expr(lhs);
-                self.analyze_expr(rhs);
+            ExprKind::BinaryOp(expr) => {
+                self.analyze_expr(&mut expr.lhs);
+                self.analyze_expr(&mut expr.rhs);
             }
             ExprKind::Block(block) => self.analyze_block(block),
             ExprKind::UnaryOp(_, node) => {
                 self.analyze_expr(node);
             }
-            ExprKind::Call {
-                function,
-                arguments,
-            } => {
-                self.analyze_expr(function);
+            ExprKind::Call(expr) => {
+                self.analyze_expr(&mut expr.callee);
 
-                for argument in arguments {
+                for argument in &mut expr.arguments {
                     self.analyze_expr(argument);
                 }
             }
-            ExprKind::IfElse {
-                condition,
-                then_branch,
-                else_branches,
-            } => {
-                self.analyze_expr(condition);
-                self.analyze_expr(then_branch);
+            ExprKind::IfElse(expr) => {
+                self.analyze_expr(&mut expr.condition);
+                self.analyze_expr(&mut expr.then_branch);
 
-                for else_branch in else_branches {
+                for else_branch in &mut expr.else_branches {
                     self.analyze_optional_expr(&mut else_branch.condition);
                     self.analyze_expr(&mut else_branch.consequence);
                 }
@@ -250,16 +243,16 @@ impl SemanticAnalyzer {
                     self.analyze_expr(value);
                 }
             }
-            ExprKind::IndexExpression { base, index } => {
-                self.analyze_expr(base);
-                self.analyze_expr(index);
+            ExprKind::IndexExpression(expr) => {
+                self.analyze_expr(&mut expr.base);
+                self.analyze_expr(&mut expr.index);
             }
-            ExprKind::FieldExpression { base, field: _ } => {
-                self.analyze_expr(base);
+            ExprKind::FieldExpression(expr) => {
+                self.analyze_expr(&mut expr.base);
                 // TODO: We are checking for unused variables, this should be refactored into
                 //       it's own pass. Skipping analyzing field of variable as we do not have
                 //       any type information yet.
-                // self.analyze_node(field);
+                // self.analyze_node(&mut expr.field);
             }
             ExprKind::FunctionExpression(decl) => {
                 self.analyze_fn_decl(decl);
@@ -271,17 +264,17 @@ impl SemanticAnalyzer {
 
                 // TODO: Handle nested identifiers
             }
-            ExprKind::Match { expression, arms } => {
-                self.analyze_expr(expression);
+            ExprKind::Match(expr) => {
+                self.analyze_expr(&mut expr.expression);
 
-                for arm in arms {
+                for arm in &mut expr.arms {
                     self.analyze_pat(&mut arm.pattern);
                     self.analyze_expr(&mut arm.expression);
                 }
             }
-            ExprKind::Range { start, end, .. } => {
-                self.analyze_expr(start);
-                self.analyze_expr(end);
+            ExprKind::Range(expr) => {
+                self.analyze_expr(&mut expr.start);
+                self.analyze_expr(&mut expr.end);
             }
             ExprKind::None | ExprKind::Literal(_) | ExprKind::Wildcard => {}
         }

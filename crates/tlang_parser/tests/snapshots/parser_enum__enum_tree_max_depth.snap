@@ -516,7 +516,7 @@ Module(
           body: Block(
             statements: [],
             expression: Some(Expr(
-              kind: BinaryOp(
+              kind: BinaryOp(BinaryOpExpression(
                 op: Add,
                 lhs: Expr(
                   kind: Literal(Integer(1)),
@@ -535,8 +535,8 @@ Module(
                   ),
                 ),
                 rhs: Expr(
-                  kind: Call(
-                    function: Expr(
+                  kind: Call(CallExpression(
+                    callee: Expr(
                       kind: Path(Path(
                         segments: [
                           Ident(
@@ -580,8 +580,8 @@ Module(
                     ),
                     arguments: [
                       Expr(
-                        kind: Call(
-                          function: Expr(
+                        kind: Call(CallExpression(
+                          callee: Expr(
                             kind: Path(Path(
                               segments: [
                                 Ident(
@@ -667,7 +667,7 @@ Module(
                               ),
                             ),
                           ],
-                        ),
+                        )),
                         leading_comments: [],
                         trailing_comments: [],
                         symbol_table: None,
@@ -683,8 +683,8 @@ Module(
                         ),
                       ),
                       Expr(
-                        kind: Call(
-                          function: Expr(
+                        kind: Call(CallExpression(
+                          callee: Expr(
                             kind: Path(Path(
                               segments: [
                                 Ident(
@@ -770,7 +770,7 @@ Module(
                               ),
                             ),
                           ],
-                        ),
+                        )),
                         leading_comments: [],
                         trailing_comments: [],
                         symbol_table: None,
@@ -786,7 +786,7 @@ Module(
                         ),
                       ),
                     ],
-                  ),
+                  )),
                   leading_comments: [],
                   trailing_comments: [],
                   symbol_table: None,
@@ -801,7 +801,7 @@ Module(
                     ),
                   ),
                 ),
-              ),
+              )),
               leading_comments: [],
               trailing_comments: [],
               symbol_table: None,
@@ -938,8 +938,8 @@ Module(
                   ),
                 ),
                 expression: Expr(
-                  kind: Call(
-                    function: Expr(
+                  kind: Call(CallExpression(
+                    callee: Expr(
                       kind: Path(Path(
                         segments: [
                           Ident(
@@ -1039,8 +1039,8 @@ Module(
                               ),
                             ),
                           ), Expr(
-                            kind: Call(
-                              function: Expr(
+                            kind: Call(CallExpression(
+                              callee: Expr(
                                 kind: Path(Path(
                                   segments: [
                                     Ident(
@@ -1113,7 +1113,7 @@ Module(
                                   ),
                                 ),
                               ],
-                            ),
+                            )),
                             leading_comments: [],
                             trailing_comments: [],
                             symbol_table: None,
@@ -1170,8 +1170,8 @@ Module(
                               ),
                             ),
                           ), Expr(
-                            kind: Call(
-                              function: Expr(
+                            kind: Call(CallExpression(
+                              callee: Expr(
                                 kind: Path(Path(
                                   segments: [
                                     Ident(
@@ -1271,8 +1271,8 @@ Module(
                                         ),
                                       ),
                                     ), Expr(
-                                      kind: Call(
-                                        function: Expr(
+                                      kind: Call(CallExpression(
+                                        callee: Expr(
                                           kind: Path(Path(
                                             segments: [
                                               Ident(
@@ -1345,7 +1345,7 @@ Module(
                                             ),
                                           ),
                                         ],
-                                      ),
+                                      )),
                                       leading_comments: [],
                                       trailing_comments: [],
                                       symbol_table: None,
@@ -1402,8 +1402,8 @@ Module(
                                         ),
                                       ),
                                     ), Expr(
-                                      kind: Call(
-                                        function: Expr(
+                                      kind: Call(CallExpression(
+                                        callee: Expr(
                                           kind: Path(Path(
                                             segments: [
                                               Ident(
@@ -1476,7 +1476,7 @@ Module(
                                             ),
                                           ),
                                         ],
-                                      ),
+                                      )),
                                       leading_comments: [],
                                       trailing_comments: [],
                                       symbol_table: None,
@@ -1507,7 +1507,7 @@ Module(
                                   ),
                                 ),
                               ],
-                            ),
+                            )),
                             leading_comments: [],
                             trailing_comments: [],
                             symbol_table: None,
@@ -1538,7 +1538,7 @@ Module(
                         ),
                       ),
                     ],
-                  ),
+                  )),
                   leading_comments: [],
                   trailing_comments: [],
                   symbol_table: None,

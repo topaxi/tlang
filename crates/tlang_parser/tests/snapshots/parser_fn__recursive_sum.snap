@@ -1,6 +1,6 @@
 ---
 source: crates/tlang_parser/tests/parser_fn.rs
-expression: "parse!(indoc! {\n        \"\n        fn sum([]) { 0 }\n        fn sum([x, ...xs]) { x + sum(xs) }\n    \"\n    })"
+expression: "parse!\n(indoc!\n{\n    \"\n        fn sum([]) { 0 }\n        fn sum([x, ...xs]) { x + sum(xs) }\n    \"\n})"
 ---
 Module(
   statements: [
@@ -270,7 +270,7 @@ Module(
           body: Block(
             statements: [],
             expression: Some(Expr(
-              kind: BinaryOp(
+              kind: BinaryOp(BinaryOpExpression(
                 op: Add,
                 lhs: Expr(
                   kind: Path(Path(
@@ -315,8 +315,8 @@ Module(
                   ),
                 ),
                 rhs: Expr(
-                  kind: Call(
-                    function: Expr(
+                  kind: Call(CallExpression(
+                    callee: Expr(
                       kind: Path(Path(
                         segments: [
                           Ident(
@@ -402,7 +402,7 @@ Module(
                         ),
                       ),
                     ],
-                  ),
+                  )),
                   leading_comments: [],
                   trailing_comments: [],
                   symbol_table: None,
@@ -417,7 +417,7 @@ Module(
                     ),
                   ),
                 ),
-              ),
+              )),
               leading_comments: [],
               trailing_comments: [],
               symbol_table: None,

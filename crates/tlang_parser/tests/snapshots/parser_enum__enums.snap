@@ -136,8 +136,8 @@ Module(
           ),
         ),
         expression: Expr(
-          kind: Call(
-            function: Expr(
+          kind: Call(CallExpression(
+            callee: Expr(
               kind: Path(Path(
                 segments: [
                   Ident(
@@ -210,7 +210,7 @@ Module(
                 ),
               ),
             ],
-          ),
+          )),
           leading_comments: [],
           trailing_comments: [],
           symbol_table: None,

@@ -1,6 +1,6 @@
 ---
 source: crates/tlang_parser/tests/parser_fn.rs
-expression: "parse!(indoc! {\n        \"\n        fn foldl([], acc, _) { acc }\n        fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }\n    \"\n    })"
+expression: "parse!\n(indoc!\n{\n    \"\n        fn foldl([], acc, _) { acc }\n        fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }\n    \"\n})"
 ---
 Module(
   statements: [
@@ -446,8 +446,8 @@ Module(
             statements: [],
             expression: Some(Expr(
               kind: RecursiveCall(Expr(
-                kind: Call(
-                  function: Expr(
+                kind: Call(CallExpression(
+                  callee: Expr(
                     kind: Path(Path(
                       segments: [
                         Ident(
@@ -533,8 +533,8 @@ Module(
                       ),
                     ),
                     Expr(
-                      kind: Call(
-                        function: Expr(
+                      kind: Call(CallExpression(
+                        callee: Expr(
                           kind: Path(Path(
                             segments: [
                               Ident(
@@ -662,7 +662,7 @@ Module(
                             ),
                           ),
                         ],
-                      ),
+                      )),
                       leading_comments: [],
                       trailing_comments: [],
                       symbol_table: None,
@@ -720,7 +720,7 @@ Module(
                       ),
                     ),
                   ],
-                ),
+                )),
                 leading_comments: [],
                 trailing_comments: [],
                 symbol_table: None,

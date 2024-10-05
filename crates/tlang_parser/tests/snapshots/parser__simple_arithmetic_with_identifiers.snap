@@ -130,7 +130,7 @@ Module(
     ),
     Stmt(
       kind: Expr(Expr(
-        kind: BinaryOp(
+        kind: BinaryOp(BinaryOpExpression(
           op: Add,
           lhs: Expr(
             kind: Path(Path(
@@ -216,7 +216,7 @@ Module(
               ),
             ),
           ),
-        ),
+        )),
         leading_comments: [],
         trailing_comments: [],
         symbol_table: None,

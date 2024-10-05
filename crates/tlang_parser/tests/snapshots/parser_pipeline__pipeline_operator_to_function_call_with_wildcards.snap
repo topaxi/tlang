@@ -1,12 +1,12 @@
 ---
 source: crates/tlang_parser/tests/parser_pipeline.rs
-expression: "parse!(\"1 |> foo(2, _);\")"
+expression: "parse! (\"1 |> foo(2, _);\")"
 ---
 Module(
   statements: [
     Stmt(
       kind: Expr(Expr(
-        kind: BinaryOp(
+        kind: BinaryOp(BinaryOpExpression(
           op: Pipeline,
           lhs: Expr(
             kind: Literal(Integer(1)),
@@ -25,8 +25,8 @@ Module(
             ),
           ),
           rhs: Expr(
-            kind: Call(
-              function: Expr(
+            kind: Call(CallExpression(
+              callee: Expr(
                 kind: Path(Path(
                   segments: [
                     Ident(
@@ -102,7 +102,7 @@ Module(
                   ),
                 ),
               ],
-            ),
+            )),
             leading_comments: [],
             trailing_comments: [],
             symbol_table: None,
@@ -117,7 +117,7 @@ Module(
               ),
             ),
           ),
-        ),
+        )),
         leading_comments: [],
         trailing_comments: [],
         symbol_table: None,

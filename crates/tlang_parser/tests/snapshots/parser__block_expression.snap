@@ -39,7 +39,7 @@ Module(
             statements: [
               Stmt(
                 kind: Expr(Expr(
-                  kind: BinaryOp(
+                  kind: BinaryOp(BinaryOpExpression(
                     op: Add,
                     lhs: Expr(
                       kind: Literal(Integer(1)),
@@ -73,7 +73,7 @@ Module(
                         ),
                       ),
                     ),
-                  ),
+                  )),
                   leading_comments: [],
                   trailing_comments: [],
                   symbol_table: None,

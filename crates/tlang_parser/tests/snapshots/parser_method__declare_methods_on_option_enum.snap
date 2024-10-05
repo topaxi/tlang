@@ -1,6 +1,6 @@
 ---
 source: crates/tlang_parser/tests/parser_method.rs
-expression: "parse!(indoc! {\n        \"\n        enum Option {\n            Some(x),\n            None,\n        }\n\n        fn Option::is_option(Option::Some(_)) { true }\n        fn Option::is_option(Option::None) { true }\n        fn Option::is_option(_) { false }\n\n        fn Option.is_some(Option::Some(_)) { true }\n        fn Option.is_some(Option::None) { false }\n\n        fn Option.map(Option::Some(x), f) { Option::Some(f(x)) }\n        fn Option.map(Option::None, _) { Option::None }\n    \"\n    })"
+expression: "parse!\n(indoc!\n{\n    \"\n        enum Option {\n            Some(x),\n            None,\n        }\n\n        fn Option::is_option(Option::Some(_)) { true }\n        fn Option::is_option(Option::None) { true }\n        fn Option::is_option(_) { false }\n\n        fn Option.is_some(Option::Some(_)) { true }\n        fn Option.is_some(Option::None) { false }\n\n        fn Option.map(Option::Some(x), f) { Option::Some(f(x)) }\n        fn Option.map(Option::None, _) { Option::None }\n    \"\n})"
 ---
 Module(
   statements: [
@@ -650,7 +650,7 @@ Module(
         FunctionDeclaration(
           id: SymbolId(3),
           name: Expr(
-            kind: FieldExpression(
+            kind: FieldExpression(FieldAccessExpression(
               base: Expr(
                 kind: Path(Path(
                   segments: [
@@ -706,7 +706,7 @@ Module(
                   ),
                 ),
               ),
-            ),
+            )),
             leading_comments: [],
             trailing_comments: [],
             symbol_table: None,
@@ -870,7 +870,7 @@ Module(
         FunctionDeclaration(
           id: SymbolId(3),
           name: Expr(
-            kind: FieldExpression(
+            kind: FieldExpression(FieldAccessExpression(
               base: Expr(
                 kind: Path(Path(
                   segments: [
@@ -926,7 +926,7 @@ Module(
                   ),
                 ),
               ),
-            ),
+            )),
             leading_comments: [],
             trailing_comments: [],
             symbol_table: None,
@@ -1093,7 +1093,7 @@ Module(
         FunctionDeclaration(
           id: SymbolId(4),
           name: Expr(
-            kind: FieldExpression(
+            kind: FieldExpression(FieldAccessExpression(
               base: Expr(
                 kind: Path(Path(
                   segments: [
@@ -1149,7 +1149,7 @@ Module(
                   ),
                 ),
               ),
-            ),
+            )),
             leading_comments: [],
             trailing_comments: [],
             symbol_table: None,
@@ -1325,8 +1325,8 @@ Module(
           body: Block(
             statements: [],
             expression: Some(Expr(
-              kind: Call(
-                function: Expr(
+              kind: Call(CallExpression(
+                callee: Expr(
                   kind: Path(Path(
                     segments: [
                       Ident(
@@ -1383,8 +1383,8 @@ Module(
                 ),
                 arguments: [
                   Expr(
-                    kind: Call(
-                      function: Expr(
+                    kind: Call(CallExpression(
+                      callee: Expr(
                         kind: Path(Path(
                           segments: [
                             Ident(
@@ -1470,7 +1470,7 @@ Module(
                           ),
                         ),
                       ],
-                    ),
+                    )),
                     leading_comments: [],
                     trailing_comments: [],
                     symbol_table: None,
@@ -1486,7 +1486,7 @@ Module(
                     ),
                   ),
                 ],
-              ),
+              )),
               leading_comments: [],
               trailing_comments: [],
               symbol_table: None,
@@ -1530,7 +1530,7 @@ Module(
         FunctionDeclaration(
           id: SymbolId(4),
           name: Expr(
-            kind: FieldExpression(
+            kind: FieldExpression(FieldAccessExpression(
               base: Expr(
                 kind: Path(Path(
                   segments: [
@@ -1586,7 +1586,7 @@ Module(
                   ),
                 ),
               ),
-            ),
+            )),
             leading_comments: [],
             trailing_comments: [],
             symbol_table: None,

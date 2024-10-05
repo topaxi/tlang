@@ -35,7 +35,7 @@ Module(
           ),
         ),
         expression: Expr(
-          kind: IfElse(
+          kind: IfElse(IfElseExpression(
             condition: Expr(
               kind: Literal(Boolean(true)),
               leading_comments: [],
@@ -181,7 +181,7 @@ Module(
                 ),
               ),
             ],
-          ),
+          )),
           leading_comments: [],
           trailing_comments: [],
           symbol_table: None,
