@@ -12,9 +12,12 @@ fn test_struct_definition() {
         }
     "});
     let expected_output = indoc! {"
-        function Point(x, y) {
+        function PointConstructor(x, y) {
             this.x = x;
             this.y = y;
+        }
+        function Point(props) {
+            return new PointConstructor(props.x, props.y);
         }
     "};
     assert_eq!(output, expected_output);

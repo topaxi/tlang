@@ -43,7 +43,9 @@ impl CodegenJS {
 
         self.generate_struct_method_binding(first_declaration);
         self.push_scope();
-        self.push_str(&format!("function {name_as_str}("));
+        self.push_str("function ");
+        self.push_str(&name_as_str);
+        self.push_char('(');
         let (arg_binding, arg_bindings) = self.generate_function_arguments(declarations);
         self.push_str(") {\n");
         self.inc_indent();
@@ -353,6 +355,7 @@ impl CodegenJS {
         &mut self,
         declarations: &[FunctionDeclaration],
     ) -> (Option<String>, Vec<String>) {
+        let is_member_method = is_member_method(&declarations[0].name);
         let first_declaration_number_of_args = declarations[0].parameters.len();
         // check whether all declarations have the same number of parameters
         let same_number_of_args = declarations
@@ -363,10 +366,6 @@ impl CodegenJS {
             let mut bindings = Vec::with_capacity(first_declaration_number_of_args);
 
             for i in 0..declarations[0].parameters.len() {
-                if i > 0 {
-                    self.push_str(", ");
-                }
-
                 // If the name of this parameter is the same in all declarations, we can reuse the
                 // actual defined name. Otherwise we use `arg{i}` as the name.
                 let arg_name = declarations.iter().find_map(|d| {
@@ -402,6 +401,10 @@ impl CodegenJS {
                     self.current_scope().declare_variable(&format!("arg{i}"))
                 };
 
+                if i > 0 {
+                    self.push_str(", ");
+                }
+                // TODO: if member method and self, push `this`.
                 self.push_str(&arg_name);
                 bindings.push(arg_name);
             }
@@ -421,6 +424,7 @@ impl CodegenJS {
             let mut bindings = Vec::with_capacity(max_args);
 
             for i in 0..max_args {
+                // TODO: if member method and self, push `this`.
                 bindings.push(format!("args[{i}]"));
             }
 
@@ -529,7 +533,7 @@ impl CodegenJS {
 
             self.push_indent();
             self.push_str(&target_name);
-            self.push_str(".prototype.");
+            self.push_str("Constructor.prototype.");
             self.push_str(&field_name);
             self.push_str(" = ");
         } else {
@@ -795,7 +799,7 @@ fn is_static_method(node: &Expr) -> bool {
 
 pub(crate) fn fn_identifier_to_string(expr: &Expr) -> String {
     match &expr.kind {
-        ExprKind::Path(path) => path.join("_"),
+        ExprKind::Path(path) => path.join("__"),
         ExprKind::FieldExpression(expr) => expr.field.to_string(),
         kind => todo!("fn_identifier_to_string: {:?}", kind),
     }
