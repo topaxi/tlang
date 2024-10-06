@@ -11,53 +11,8 @@ use tlang_ast::token::{Token, TokenKind};
 
 use crate::error::{ParseError, ParseErrorKind};
 use crate::lexer::Lexer;
+use crate::macros::expect_token_matches;
 use log::debug;
-
-macro_rules! expect_token_matches {
-    ($parser:ident, $pattern:pat $(if $guard:expr)? $(,)?) => {
-        match $parser.current_token_kind() {
-            Some($pattern) $(if $guard)? => (),
-            _ => {
-                if !$parser.recoverable() {
-                    $parser.panic_unexpected_token(&format!("{:?}", stringify!($pattern)), $parser.current_token.clone());
-                }
-
-                $parser.push_unexpected_token_error(
-                    &format!("{:?}", stringify!($pattern)),
-                    $parser.current_token.clone(),
-                );
-                advance_until!($parser, $pattern);
-            }
-        }
-    };
-    ($parser:ident, $message:expr, $pattern:pat $(if $guard:expr)? $(,)?) => {
-        match $parser.current_token_kind() {
-            Some($pattern) $(if $guard)? => (),
-            _ => {
-                if !$parser.recoverable() {
-                    $parser.panic_unexpected_token($message, $parser.current_token.clone());
-                }
-
-                $parser.push_unexpected_token_error(
-                    $message,
-                    $parser.current_token.clone(),
-                );
-                advance_until!($parser, $pattern);
-            }
-        }
-    };
-}
-
-macro_rules! advance_until {
-    ($parser:ident, $pattern:pat) => {
-        while let Some(ref token) = $parser.current_token {
-            if matches!(&token.kind, $pattern) {
-                break;
-            }
-            $parser.advance();
-        }
-    };
-}
 
 pub struct Parser<'src> {
     lexer: Lexer<'src>,
