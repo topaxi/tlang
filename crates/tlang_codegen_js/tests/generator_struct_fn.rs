@@ -3,7 +3,6 @@ use pretty_assertions::assert_eq;
 
 mod common;
 
-#[ignore]
 #[test]
 fn test_function_definition_on_struct() {
     let output = compile!(indoc! {"
@@ -22,13 +21,18 @@ fn test_function_definition_on_struct() {
         }
     "});
     let expected_output = indoc! {"
-        function Test(field) {
+        function TestConstructor(field) {
             this.field = field;
         }
-        Test.new = function Text__new() {
-            return new Test(0);
+        function Test(props) {
+            return new TestConstructor(props.field);
+        }
+        Test.new = function Test__new() {
+            return Test({
+                field: 0,
+            });
         };
-        Test.prototype.get_field = function Test__get_field() {
+        TestConstructor.prototype.get_field = function get_field() {
             return this.field;
         };
     "};
