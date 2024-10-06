@@ -1,6 +1,22 @@
 use crate::span::Span;
 use serde::Serialize;
 
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+pub enum Keyword {
+    Let,
+    Fn,
+    Return,
+    Rec,
+    If,
+    Else,
+    Match,
+    Enum,
+    Struct,
+    Not,
+    And,
+    Or,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub enum TokenKind {
     // Tokens for binary operators
@@ -60,18 +76,7 @@ pub enum TokenKind {
     MultiLineComment(String),
 
     // Keywords
-    Let,
-    Fn,
-    Return,
-    Rec,
-    If,
-    Else,
-    Match,
-    Enum,
-    Struct,
-    Not,
-    And,
-    Or,
+    Keyword(Keyword),
 
     // Unknown token, unexpected character
     Unknown(String),
@@ -84,6 +89,13 @@ impl TokenKind {
     pub fn get_identifier(&self) -> Option<&String> {
         match self {
             TokenKind::Identifier(identifier) => Some(identifier),
+            _ => None,
+        }
+    }
+
+    pub fn get_keyword(&self) -> Option<&Keyword> {
+        match self {
+            TokenKind::Keyword(keyword) => Some(keyword),
             _ => None,
         }
     }

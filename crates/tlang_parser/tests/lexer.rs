@@ -1,4 +1,4 @@
-use tlang_ast::token::{Literal, TokenKind};
+use tlang_ast::token::{Keyword, Literal, TokenKind};
 
 use tlang_parser::lexer::Lexer;
 
@@ -139,17 +139,17 @@ fn test_keywords() {
     assert_tokens!(
         lexer,
         [
-            TokenKind::Let,
-            TokenKind::Fn,
-            TokenKind::Rec,
-            TokenKind::Return,
-            TokenKind::If,
-            TokenKind::Else,
-            TokenKind::Match,
-            TokenKind::Enum,
-            TokenKind::Struct,
-            TokenKind::And,
-            TokenKind::Or,
+            TokenKind::Keyword(Keyword::Let),
+            TokenKind::Keyword(Keyword::Fn),
+            TokenKind::Keyword(Keyword::Rec),
+            TokenKind::Keyword(Keyword::Return),
+            TokenKind::Keyword(Keyword::If),
+            TokenKind::Keyword(Keyword::Else),
+            TokenKind::Keyword(Keyword::Match),
+            TokenKind::Keyword(Keyword::Enum),
+            TokenKind::Keyword(Keyword::Struct),
+            TokenKind::Keyword(Keyword::And),
+            TokenKind::Keyword(Keyword::Or),
         ]
     );
 }
@@ -185,7 +185,7 @@ fn test_simple_assignment() {
     assert_tokens!(
         lexer,
         [
-            TokenKind::Let,
+            TokenKind::Keyword(Keyword::Let),
             TokenKind::Identifier("x".to_string()),
             TokenKind::EqualSign,
             TokenKind::Literal(Literal::Integer(1)),
@@ -203,7 +203,7 @@ fn test_function_declaration_with_explicit_return_statement() {
     assert_tokens!(
         lexer,
         [
-            TokenKind::Fn,
+            TokenKind::Keyword(Keyword::Fn),
             TokenKind::Identifier("add".to_string()),
             TokenKind::LParen,
             TokenKind::Identifier("a".to_string()),
@@ -217,7 +217,7 @@ fn test_function_declaration_with_explicit_return_statement() {
             TokenKind::Arrow,
             TokenKind::Identifier("i64".to_string()),
             TokenKind::LBrace,
-            TokenKind::Return,
+            TokenKind::Keyword(Keyword::Return),
             TokenKind::Identifier("a".to_string()),
             TokenKind::Plus,
             TokenKind::Identifier("b".to_string()),
@@ -234,7 +234,7 @@ fn test_regression_integer_literal_followed_by_dot() {
     assert_tokens!(
         lexer,
         [
-            TokenKind::Fn,
+            TokenKind::Keyword(Keyword::Fn),
             TokenKind::Identifier("sum".to_string()),
             TokenKind::LParen,
             TokenKind::LBracket,
@@ -243,7 +243,7 @@ fn test_regression_integer_literal_followed_by_dot() {
             TokenKind::LBrace,
             TokenKind::Literal(Literal::Integer(0)),
             TokenKind::RBrace,
-            TokenKind::Fn,
+            TokenKind::Keyword(Keyword::Fn),
             TokenKind::Identifier("sum".to_string()),
             TokenKind::LParen,
             TokenKind::LBracket,

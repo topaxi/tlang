@@ -1,6 +1,6 @@
 use tlang_ast::{
     span::{LineColumn, Span},
-    token::{Literal, Token, TokenKind},
+    token::{Keyword, Literal, Token, TokenKind},
 };
 
 #[derive(Debug, Clone)]
@@ -337,20 +337,20 @@ impl Lexer<'_> {
                 }
             }
             ch if Self::is_alphanumeric(ch) => match self.read_identifier() {
-                "let" => self.token(TokenKind::Let, start),
-                "fn" => self.token(TokenKind::Fn, start),
-                "rec" => self.token(TokenKind::Rec, start),
-                "return" => self.token(TokenKind::Return, start),
-                "if" => self.token(TokenKind::If, start),
-                "else" => self.token(TokenKind::Else, start),
-                "match" => self.token(TokenKind::Match, start),
-                "not" => self.token(TokenKind::Not, start),
-                "enum" => self.token(TokenKind::Enum, start),
-                "struct" => self.token(TokenKind::Struct, start),
+                "let" => self.token(TokenKind::Keyword(Keyword::Let), start),
+                "fn" => self.token(TokenKind::Keyword(Keyword::Fn), start),
+                "rec" => self.token(TokenKind::Keyword(Keyword::Rec), start),
+                "return" => self.token(TokenKind::Keyword(Keyword::Return), start),
+                "if" => self.token(TokenKind::Keyword(Keyword::If), start),
+                "else" => self.token(TokenKind::Keyword(Keyword::Else), start),
+                "match" => self.token(TokenKind::Keyword(Keyword::Match), start),
+                "not" => self.token(TokenKind::Keyword(Keyword::Not), start),
+                "enum" => self.token(TokenKind::Keyword(Keyword::Enum), start),
+                "struct" => self.token(TokenKind::Keyword(Keyword::Struct), start),
                 "true" => self.token(TokenKind::Literal(Literal::Boolean(true)), start),
                 "false" => self.token(TokenKind::Literal(Literal::Boolean(false)), start),
-                "and" => self.token(TokenKind::And, start),
-                "or" => self.token(TokenKind::Or, start),
+                "and" => self.token(TokenKind::Keyword(Keyword::And), start),
+                "or" => self.token(TokenKind::Keyword(Keyword::Or), start),
                 identifier => {
                     let identifier_string = identifier.to_string();
                     self.token(TokenKind::Identifier(identifier_string), start)

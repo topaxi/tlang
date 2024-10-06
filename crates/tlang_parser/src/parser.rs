@@ -7,7 +7,7 @@ use tlang_ast::node::{
 };
 use tlang_ast::span::Span;
 use tlang_ast::symbols::SymbolId;
-use tlang_ast::token::{Token, TokenKind};
+use tlang_ast::token::{Keyword, Token, TokenKind};
 
 use crate::error::{ParseError, ParseErrorKind};
 use crate::lexer::Lexer;
@@ -159,6 +159,11 @@ impl<'src> Parser<'src> {
         // tracking comments?
     }
 
+    #[inline(always)]
+    fn consume_keyword_token(&mut self, expected: Keyword) {
+        self.consume_token(TokenKind::Keyword(expected));
+    }
+
     fn consume_identifier(&mut self) -> Ident {
         expect_token_matches!(self, TokenKind::Identifier(_));
 
@@ -256,18 +261,18 @@ impl<'src> Parser<'src> {
         }
 
         let mut span = self.create_span_from_current_token();
-        let mut node = match self.current_token_kind() {
-            Some(TokenKind::Let) => self.parse_variable_declaration(),
-            Some(TokenKind::Fn)
+        let mut node = match self.current_token_kind().and_then(|tk| tk.get_keyword()) {
+            Some(Keyword::Let) => self.parse_variable_declaration(),
+            Some(Keyword::Fn)
                 // If the next token is an identifier, we assume a function declaration.
                 // If it's not, we assume a function expression which is handled as a primary expression.
                 if matches!(self.peek_token_kind(), Some(TokenKind::Identifier(_))) =>
             {
                 self.parse_function_declaration()
             }
-            Some(TokenKind::Return) => self.parse_return_statement(),
-            Some(TokenKind::Enum) => self.parse_enum_declaration(),
-            Some(TokenKind::Struct) => self.parse_struct_declaration(),
+            Some(Keyword::Return) => self.parse_return_statement(),
+            Some(Keyword::Enum) => self.parse_enum_declaration(),
+            Some(Keyword::Struct) => self.parse_struct_declaration(),
             _ => node::stmt!(Expr(Box::new(self.parse_expression()))),
         };
         node.leading_comments = comments;
@@ -303,7 +308,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_return_statement(&mut self) -> Stmt {
-        self.consume_token(TokenKind::Return);
+        self.consume_keyword_token(Keyword::Return);
 
         if matches!(self.current_token_kind(), Some(TokenKind::Semicolon)) {
             return node::stmt!(Return(Box::new(None)));
@@ -340,7 +345,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_struct_declaration(&mut self) -> Stmt {
-        self.consume_token(TokenKind::Struct);
+        self.consume_keyword_token(Keyword::Struct);
         let name = self.consume_identifier();
         self.consume_token(TokenKind::LBrace);
         let mut fields = Vec::new();
@@ -366,7 +371,8 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_enum_declaration(&mut self) -> Stmt {
-        self.consume_token(TokenKind::Enum);
+        self.consume_keyword_token(Keyword::Enum);
+
         let name = self.consume_identifier();
         self.consume_token(TokenKind::LBrace);
         let mut variants = Vec::new();
@@ -507,7 +513,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_let_expression(&mut self) -> Expr {
-        self.consume_token(TokenKind::Let);
+        self.consume_keyword_token(Keyword::Let);
         let pattern = self.parse_pattern();
         self.consume_token(TokenKind::EqualSign);
         let value = self.parse_expression();
@@ -516,7 +522,7 @@ impl<'src> Parser<'src> {
 
     fn parse_variable_declaration(&mut self) -> Stmt {
         debug!("Parsing variable declaration");
-        self.consume_token(TokenKind::Let);
+        self.consume_keyword_token(Keyword::Let);
 
         // We probably want to know whether we are parsing a plain declaration of `if let`.
         let pattern = self.parse_pattern();
@@ -722,9 +728,9 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_if_condition(&mut self) -> Expr {
-        self.consume_token(TokenKind::If);
+        self.consume_keyword_token(Keyword::If);
 
-        let condition = if let Some(TokenKind::Let) = self.current_token_kind() {
+        let condition = if let Some(TokenKind::Keyword(Keyword::Let)) = self.current_token_kind() {
             self.parse_let_expression()
         } else {
             self.parse_expression()
@@ -749,10 +755,11 @@ impl<'src> Parser<'src> {
         let then_branch = node::expr!(Block(Box::new(self.parse_block())));
 
         let mut else_branches = Vec::new();
-        while let Some(TokenKind::Else) = self.current_token_kind() {
+        while let Some(TokenKind::Keyword(Keyword::Else)) = self.current_token_kind() {
             self.advance();
 
-            let condition = if let Some(TokenKind::If) = self.current_token_kind() {
+            let condition = if let Some(TokenKind::Keyword(Keyword::If)) = self.current_token_kind()
+            {
                 Some(self.parse_if_condition())
             } else {
                 None
@@ -762,7 +769,7 @@ impl<'src> Parser<'src> {
             let consequence = node::expr!(Block(Box::new(self.parse_block())));
 
             if condition.is_none() {
-                self.expect_token_not(TokenKind::Else);
+                self.expect_token_not(TokenKind::Keyword(Keyword::Else));
             }
 
             else_branches.push(ElseClause {
@@ -787,10 +794,9 @@ impl<'src> Parser<'src> {
                 Box::new(self.parse_primary_expression())
             )),
 
-            Some(TokenKind::ExclamationMark | TokenKind::Not) => node::expr!(UnaryOp(
-                UnaryOp::Not,
-                Box::new(self.parse_primary_expression())
-            )),
+            Some(TokenKind::ExclamationMark | TokenKind::Keyword(Keyword::Not)) => node::expr!(
+                UnaryOp(UnaryOp::Not, Box::new(self.parse_primary_expression()))
+            ),
 
             _ => unreachable!("Unexpected token kind"),
         }
@@ -809,20 +815,18 @@ impl<'src> Parser<'src> {
                 | TokenKind::LParen
                 | TokenKind::LBrace
                 | TokenKind::LBracket
-                | TokenKind::If
-                | TokenKind::Fn
-                | TokenKind::Rec
-                | TokenKind::Match
-                | TokenKind::Not
+                | TokenKind::Keyword(
+                    Keyword::If | Keyword::Fn | Keyword::Rec | Keyword::Match | Keyword::Not
+                )
                 | TokenKind::Identifier(_)
                 | TokenKind::Literal(_)
         );
 
         let mut span = self.create_span_from_current_token();
         let mut node = match self.current_token_kind() {
-            Some(TokenKind::Minus | TokenKind::ExclamationMark | TokenKind::Not) => {
-                self.parse_unary_expression()
-            }
+            Some(
+                TokenKind::Minus | TokenKind::ExclamationMark | TokenKind::Keyword(Keyword::Not),
+            ) => self.parse_unary_expression(),
             Some(TokenKind::LParen) => {
                 self.advance();
                 let expression = self.parse_expression();
@@ -831,9 +835,9 @@ impl<'src> Parser<'src> {
             }
             Some(TokenKind::LBrace) => self.parse_block_or_dict(),
             Some(TokenKind::LBracket) => self.parse_list_expression(),
-            Some(TokenKind::If) => self.parse_if_else_expression(),
-            Some(TokenKind::Fn) => self.parse_function_expression(),
-            Some(TokenKind::Rec) => {
+            Some(TokenKind::Keyword(Keyword::If)) => self.parse_if_else_expression(),
+            Some(TokenKind::Keyword(Keyword::Fn)) => self.parse_function_expression(),
+            Some(TokenKind::Keyword(Keyword::Rec)) => {
                 self.advance();
                 let expr = self.parse_expression();
                 let call_expr = match expr.kind {
@@ -846,7 +850,7 @@ impl<'src> Parser<'src> {
 
                 node::expr!(RecursiveCall(call_expr)).with_span(expr.span)
             }
-            Some(TokenKind::Match) => self.parse_match_expression(),
+            Some(TokenKind::Keyword(Keyword::Match)) => self.parse_match_expression(),
             Some(TokenKind::Literal(literal)) => {
                 let literal = literal.clone();
                 self.advance();
@@ -894,7 +898,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_match_expression(&mut self) -> Expr {
-        self.consume_token(TokenKind::Match);
+        self.consume_keyword_token(Keyword::Match);
         let expression = self.parse_expression();
         self.consume_token(TokenKind::LBrace);
 
@@ -1020,7 +1024,7 @@ impl<'src> Parser<'src> {
 
     fn parse_function_expression(&mut self) -> Expr {
         let mut span = self.create_span_from_current_token();
-        self.consume_token(TokenKind::Fn);
+        self.consume_keyword_token(Keyword::Fn);
         let name = if let Some(TokenKind::Identifier(_)) = self.current_token_kind() {
             self.parse_single_identifier()
         } else {
@@ -1109,7 +1113,11 @@ impl<'src> Parser<'src> {
 
         while matches!(
             self.current_token_kind(),
-            Some(TokenKind::Fn | TokenKind::SingleLineComment(_) | TokenKind::MultiLineComment(_))
+            Some(
+                TokenKind::Keyword(Keyword::Fn)
+                    | TokenKind::SingleLineComment(_)
+                    | TokenKind::MultiLineComment(_)
+            )
         ) {
             // We have to check if it is the same function declaration as the previous one.
             // Parse ahead to get the identifier of the function, which might be an Identifier,
@@ -1124,7 +1132,7 @@ impl<'src> Parser<'src> {
             let comments = self.parse_comments();
             let mut span = self.create_span_from_current_token();
 
-            if let Some(TokenKind::Fn) = self.current_token_kind() {
+            if let Some(TokenKind::Keyword(Keyword::Fn)) = self.current_token_kind() {
                 self.advance();
             } else {
                 // We found a comment, but not a function declaration, stop parsing function
@@ -1194,10 +1202,10 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_guard_clause(&mut self) -> Option<Expr> {
-        if let Some(TokenKind::If) = self.current_token_kind() {
+        if let Some(TokenKind::Keyword(Keyword::If)) = self.current_token_kind() {
             self.advance();
 
-            if let Some(TokenKind::Let) = self.current_token_kind() {
+            if let Some(TokenKind::Keyword(Keyword::Let)) = self.current_token_kind() {
                 let decl = self.parse_let_expression();
 
                 return Some(decl);
@@ -1249,8 +1257,7 @@ impl<'src> Parser<'src> {
                 | TokenKind::DoublePipe
                 | TokenKind::DoubleAmpersand
                 | TokenKind::Pipeline
-                | TokenKind::And
-                | TokenKind::Or
+                | TokenKind::Keyword(Keyword::And | Keyword::Or)
         )
     }
 
@@ -1274,8 +1281,8 @@ impl<'src> Parser<'src> {
             TokenKind::DoublePipe => BinaryOpKind::Or,
             TokenKind::DoubleAmpersand => BinaryOpKind::And,
             TokenKind::Pipeline => BinaryOpKind::Pipeline,
-            TokenKind::And => BinaryOpKind::And,
-            TokenKind::Or => BinaryOpKind::Or,
+            TokenKind::Keyword(Keyword::And) => BinaryOpKind::And,
+            TokenKind::Keyword(Keyword::Or) => BinaryOpKind::Or,
             _ => {
                 unimplemented!("Expected binary operator, found {:?}", token)
             }
