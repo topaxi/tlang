@@ -5,7 +5,12 @@ import { examples } from './examples';
 import './components/t-codemirror';
 import { type TCodeMirror } from './components/t-codemirror';
 import { compressSource, decompressSource } from './utils/lz';
-import { compile, getStandardLibraryCompiled } from './tlang';
+import {
+  compile,
+  getStandardLibraryCompiled,
+  TlangCompiler,
+  CodemirrorDiagnostic,
+} from './tlang';
 
 type CodemirrorSeverity = 'hint' | 'info' | 'warning' | 'error';
 
@@ -162,23 +167,35 @@ export class TlangPlayground extends LitElement {
   @query('.console-output')
   consoleOutputElement!: HTMLElement;
 
+  @state() compiler: TlangCompiler | null = null;
+
   @state() output = '';
 
-  @state() ast = '';
+  get error() {
+    if (this.compiler == null) {
+      return '';
+    }
 
-  @state() error = '';
+    let { diagnostics, parseErrors } = this.compiler;
+
+    let diagnosticsErrors = diagnostics.filter((diagnostic) =>
+      diagnostic.startsWith('ERROR:'),
+    );
+
+    if (parseErrors.length + diagnosticsErrors.length) {
+      return [...parseErrors, ...diagnostics].join('\n');
+    } else {
+      return diagnostics.join('\n');
+    }
+  }
 
   private compile(source: string) {
-    let compiler = compile(source);
-    let {
-      output,
-      parseErrors,
-      ast_string: ast,
-      diagnostics,
-      codemirrorDiagnostics,
-    } = compiler;
-    compiler.free();
-    return { output, parseErrors, ast, diagnostics, codemirrorDiagnostics };
+    if (this.compiler != null) {
+      this.compiler.free();
+    }
+
+    this.compiler = compile(source);
+    this.output = this.compiler.output;
   }
 
   run() {
@@ -220,41 +237,32 @@ export class TlangPlayground extends LitElement {
     });
   }
 
+  private mapAndFreeCodemirrorDiagnosticToJS(diagnostic: CodemirrorDiagnostic) {
+    let mapped = {
+      from: diagnostic.from,
+      to: diagnostic.to,
+      message: diagnostic.message,
+      severity: diagnostic.severity as CodemirrorSeverity,
+    };
+
+    diagnostic.free();
+
+    return mapped;
+  }
+
   protected update(changedProperties: PropertyValueMap<this>): void {
     super.update(changedProperties);
 
     if (changedProperties.has('source')) {
       try {
-        this.error = '';
-        let { output, parseErrors, ast, diagnostics, codemirrorDiagnostics } =
-          this.compile(this.source);
+        this.compile(this.source);
 
-        for (let diagnostic of codemirrorDiagnostics) {
-          diagnostic.free();
-        }
-
-        this.codemirror.diagnostics = codemirrorDiagnostics.map(
-          (diagnostic) => ({
-            from: diagnostic.from,
-            to: diagnostic.to,
-            message: diagnostic.message,
-            severity: diagnostic.severity as CodemirrorSeverity,
-          }),
-        );
-
-        let diagnosticsErrors = diagnostics.filter((diagnostic) =>
-          diagnostic.startsWith('ERROR:'),
-        );
-
-        if (parseErrors.length + diagnosticsErrors.length) {
-          this.error = [...parseErrors, ...diagnostics].join('\n');
-        } else {
-          this.error = diagnostics.join('\n');
-          this.ast = ast;
-          this.output = output;
-        }
+        this.codemirror.diagnostics =
+          this.compiler?.codemirrorDiagnostics.map(
+            this.mapAndFreeCodemirrorDiagnosticToJS,
+          ) ?? [];
       } catch (error) {
-        this.error = String(error);
+        console.error(error);
       }
     }
   }
@@ -329,7 +337,7 @@ export class TlangPlayground extends LitElement {
       </div>
       <div class="output">
         ${this.display === 'ast'
-          ? html`<pre class="output-ast">${this.ast}</pre>`
+          ? html`<pre class="output-ast">${this.compiler?.ast_string}</pre>`
           : ''}
         ${this.display === 'output'
           ? html`<t-codemirror

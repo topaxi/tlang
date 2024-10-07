@@ -3,6 +3,8 @@ import init, {
   TlangCompiler,
 } from 'tlang_bindings_js';
 
+export { type CodemirrorDiagnostic } from 'tlang_bindings_js';
+
 await init();
 
 export const standardLibrarySource = getStandardLibrarySource();
