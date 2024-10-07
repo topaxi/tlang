@@ -6,18 +6,30 @@ use tlang_ast::{
 #[derive(Debug, Clone)]
 pub struct Lexer<'src> {
     source: &'src str,
+    chars: std::str::Chars<'src>, // char iterator over `source`.
     position: usize,
     current_line: usize,
     current_column: usize,
+    previous_char: char,
+    current_char: char,
+    next_char: char,
 }
 
 impl Lexer<'_> {
     pub fn new(source: &str) -> Lexer {
+        let mut chars = source.chars();
+        let current_char = chars.next().unwrap_or('\0');
+        let next_char = chars.next().unwrap_or('\0');
+
         Lexer {
             source,
             position: 0,
             current_line: 0,
             current_column: 0,
+            previous_char: '\0',
+            current_char,
+            next_char,
+            chars,
         }
     }
 
@@ -33,33 +45,18 @@ impl Lexer<'_> {
         self.source
     }
 
-    #[inline(always)]
-    fn current_char(&self) -> Option<char> {
-        self.source[self.position..].chars().next()
-    }
-
-    #[inline(always)]
-    fn peek_char(&self) -> Option<char> {
-        self.source[self.position..].chars().nth(1)
-    }
-
-    #[inline(always)]
-    fn previous_char(&self) -> Option<char> {
-        self.source[..self.position].chars().last()
-    }
-
     fn advance(&mut self) {
-        if self.position < self.source.len() {
-            self.position += 1;
+        self.previous_char = self.current_char;
+        self.current_char = self.next_char;
+        self.next_char = self.chars.next().unwrap_or('\0');
 
-            if let Some(ch) = self.previous_char() {
-                if ch == '\n' {
-                    self.current_line += 1;
-                    self.current_column = 1;
-                } else {
-                    self.current_column += 1;
-                }
-            }
+        self.position += self.previous_char.len_utf8();
+
+        if self.previous_char == '\n' {
+            self.current_line += 1;
+            self.current_column = 1;
+        } else {
+            self.current_column += 1;
         }
     }
 
@@ -77,12 +74,8 @@ impl Lexer<'_> {
 
     #[inline(always)]
     fn advance_while(&mut self, predicate: impl Fn(char) -> bool) {
-        for ch in self.source[self.position..].chars() {
-            if predicate(ch) {
-                self.advance();
-            } else {
-                break;
-            }
+        while predicate(self.current_char) && self.current_char != '\0' {
+            self.advance();
         }
     }
 
@@ -111,10 +104,10 @@ impl Lexer<'_> {
         &self.source[start..self.position]
     }
 
-    fn read_string_literal(&mut self, quote: char) -> String {
+    fn read_string_literal(&mut self, quote: char) -> &str {
         let start = self.position;
         self.advance_while(|ch| ch != quote);
-        let string_literal = self.source[start..self.position].to_string();
+        let string_literal = &self.source[start..self.position];
         self.advance();
         string_literal
     }
@@ -135,11 +128,11 @@ impl Lexer<'_> {
 
         let start = self.line_column();
 
-        if self.position >= self.source.len() {
+        if self.current_char == '\0' {
             return self.token(TokenKind::Eof, start);
         }
 
-        let ch = self.current_char().unwrap();
+        let ch = self.current_char;
 
         let token = match ch {
             '+' => {
@@ -147,7 +140,7 @@ impl Lexer<'_> {
                 self.token(TokenKind::Plus, start)
             }
             '-' => {
-                if self.peek_char() == Some('>') {
+                if self.next_char == '>' {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::Arrow, start)
@@ -157,7 +150,7 @@ impl Lexer<'_> {
                 }
             }
             '*' => {
-                if self.peek_char() == Some('*') {
+                if self.next_char == '*' {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::AsteriskAsterisk, start)
@@ -167,14 +160,14 @@ impl Lexer<'_> {
                 }
             }
             '/' => {
-                if self.peek_char() == Some('/') {
+                if self.next_char == '/' {
                     self.advance();
                     self.advance();
                     let start_position = self.position;
                     self.advance_while(|ch| ch != '\n');
                     let comment = self.source[start_position..self.position].to_string();
                     self.token(TokenKind::SingleLineComment(comment), start)
-                } else if self.peek_char() == Some('*') {
+                } else if self.next_char == '*' {
                     self.advance();
                     self.advance();
                     let start_position = self.position;
@@ -201,11 +194,11 @@ impl Lexer<'_> {
                 self.token(TokenKind::Caret, start)
             }
             '|' => {
-                if self.peek_char() == Some('|') {
+                if self.next_char == '|' {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::DoublePipe, start)
-                } else if self.peek_char() == Some('>') {
+                } else if self.next_char == '>' {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::Pipeline, start)
@@ -215,7 +208,7 @@ impl Lexer<'_> {
                 }
             }
             '&' => {
-                if self.peek_char() == Some('&') {
+                if self.next_char == '&' {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::DoubleAmpersand, start)
@@ -225,7 +218,7 @@ impl Lexer<'_> {
                 }
             }
             '<' => {
-                if self.peek_char() == Some('=') {
+                if self.next_char == '=' {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::LessThanOrEqual, start)
@@ -235,7 +228,7 @@ impl Lexer<'_> {
                 }
             }
             '>' => {
-                if self.peek_char() == Some('=') {
+                if self.next_char == '=' {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::GreaterThanOrEqual, start)
@@ -273,11 +266,11 @@ impl Lexer<'_> {
                 self.token(TokenKind::Comma, start)
             }
             '=' => {
-                if self.peek_char() == Some('=') {
+                if self.next_char == '=' {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::EqualEqual, start)
-                } else if self.peek_char() == Some('>') {
+                } else if self.next_char == '>' {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::FatArrow, start)
@@ -287,7 +280,7 @@ impl Lexer<'_> {
                 }
             }
             '!' => {
-                if self.peek_char() == Some('=') {
+                if self.next_char == '=' {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::NotEqual, start)
@@ -301,7 +294,7 @@ impl Lexer<'_> {
                 self.token(TokenKind::QuestionMark, start)
             }
             ':' => {
-                if self.peek_char() == Some(':') {
+                if self.next_char == ':' {
                     self.advance();
                     self.advance();
                     self.token(TokenKind::NamespaceSeparator, start)
@@ -315,7 +308,7 @@ impl Lexer<'_> {
                 self.token(TokenKind::Semicolon, start)
             }
             '.' => {
-                if let Some('.') = self.peek_char() {
+                if self.next_char == '.' {
                     if self.source[self.position + 1..].starts_with("..") {
                         self.advance();
                         self.advance();
@@ -335,7 +328,7 @@ impl Lexer<'_> {
             '"' | '\'' => {
                 let quote = ch;
                 self.advance();
-                let literal = self.read_string_literal(quote);
+                let literal = self.read_string_literal(quote).to_string();
 
                 if quote == '"' {
                     self.token(TokenKind::Literal(Literal::String(literal)), start)
