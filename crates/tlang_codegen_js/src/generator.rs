@@ -7,6 +7,14 @@ use tlang_ast::{
     token::{Literal, Token, TokenKind},
 };
 
+// Before we indent a line, we reserve at least the indentation space plus some more for the the
+// next statement. We start with an assumption of 128 below, this might the maximum overhead once
+// we are done generating the code.
+const STATEMENT_RESERVE_SIZE: usize = 128;
+
+// When we create a new statement buffer, we reserve a certain amount of space for the statements.
+const STATEMENT_BUFFER_CAPACITY: usize = 512;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum BlockContext {
     // Are we in a top level Program?
@@ -66,7 +74,7 @@ impl CodegenJS {
             context_stack: vec![BlockContext::Program],
             function_context_stack: vec![],
             function_pre_body_declarations: vec![],
-            statement_buffer: vec![String::new()],
+            statement_buffer: vec![String::with_capacity(STATEMENT_BUFFER_CAPACITY)],
             completion_variables: vec![None],
         }
     }
@@ -79,13 +87,20 @@ impl CodegenJS {
     }
 
     pub(crate) fn push_statement_buffer(&mut self) {
-        self.statement_buffer.push(String::new());
+        self.statement_buffer
+            .push(String::with_capacity(STATEMENT_BUFFER_CAPACITY));
     }
 
+    #[must_use]
     pub(crate) fn replace_statement_buffer(&mut self, buffer: String) -> String {
         let buf = self.statement_buffer.pop();
         self.statement_buffer.push(buffer);
         buf.unwrap()
+    }
+
+    #[must_use]
+    pub(crate) fn replace_statement_buffer_with_empty_string(&mut self) -> String {
+        self.replace_statement_buffer(String::with_capacity(STATEMENT_BUFFER_CAPACITY))
     }
 
     pub(crate) fn pop_statement_buffer(&mut self) -> String {
@@ -114,6 +129,12 @@ impl CodegenJS {
 
     #[inline(always)]
     pub(crate) fn push_indent(&mut self) {
+        // We are starting a new line, we should reserve at least the space for the indentation
+        // plus some extra space for the statement.
+        let reserve = self.indent_level * 4 + STATEMENT_RESERVE_SIZE;
+
+        self.statement_buffer.last_mut().unwrap().reserve(reserve);
+
         for _ in 0..self.indent_level {
             self.push_str("    ");
         }
@@ -166,6 +187,7 @@ impl CodegenJS {
 
     pub fn generate_code(&mut self, module: &Module) {
         self.generate_statements(&module.statements);
+        self.output.shrink_to_fit();
     }
 
     pub(crate) fn declare_function_pre_body_variable(&mut self, name: &str, value: &str) {
@@ -301,7 +323,7 @@ impl CodegenJS {
         let lhs = if has_completion_var {
             String::new()
         } else {
-            self.replace_statement_buffer(String::new())
+            self.replace_statement_buffer_with_empty_string()
         };
 
         if block.has_completion() {
@@ -675,7 +697,7 @@ impl CodegenJS {
                 _ => false,
             };
         if has_block_completions {
-            lhs = self.replace_statement_buffer(String::new());
+            lhs = self.replace_statement_buffer_with_empty_string();
             let completion_tmp_var = self.scopes.declare_tmp_variable();
             self.push_let_declaration(&completion_tmp_var);
             self.completion_variables.push(Some(completion_tmp_var));
