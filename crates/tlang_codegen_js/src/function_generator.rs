@@ -55,16 +55,16 @@ impl CodegenJS {
                     match &pattern.kind {
                         PatternKind::Identifier { name, .. } => {
                             let tmp_variable = self.current_scope().declare_variable(name.as_str());
-                            self.push_indent();
-                            self.push_str(&format!("let {tmp_variable};\n"));
+                            self.push_let_declaration(&tmp_variable);
+                            self.push_newline();
                         }
                         PatternKind::List(patterns) => {
                             for pattern in patterns {
                                 if let PatternKind::Identifier { name, .. } = &pattern.kind {
                                     let tmp_variable =
                                         self.current_scope().declare_variable(name.as_str());
-                                    self.push_indent();
-                                    self.push_str(&format!("let {tmp_variable};\n"));
+                                    self.push_let_declaration(&tmp_variable);
+                                    self.push_newline();
                                 }
                             }
                         }
@@ -78,8 +78,8 @@ impl CodegenJS {
                                 ExprKind::Path(path) => path.segments.last().unwrap().as_str(),
                                 _ => unreachable!(),
                             };
-                            self.push_indent();
-                            self.push_str(&format!("let {tmp_variable_enum};\n"));
+                            self.push_let_declaration(&tmp_variable_enum);
+                            self.push_newline();
                             self.current_scope()
                                 .declare_variable_alias(enum_name, &tmp_variable_enum);
                             for element in elements {
@@ -91,8 +91,8 @@ impl CodegenJS {
                                 };
                                 let tmp_variable =
                                     self.current_scope().declare_variable(identifier);
-                                self.push_indent();
-                                self.push_str(&format!("let {tmp_variable};\n"));
+                                self.push_let_declaration(&tmp_variable);
+                                self.push_newline();
                             }
                         }
                         _ => todo!("Handle if let guards with non-identifier patterns."),
@@ -311,8 +311,7 @@ impl CodegenJS {
                         name
                     };
 
-                    self.push_indent();
-                    self.push_str(&format!("let {name} = {arg_name};\n"));
+                    self.push_let_declaration_to_identifier(&name, arg_name);
                     self.current_scope().declare_variable_alias(&name, &name);
                 }
             }
@@ -338,13 +337,13 @@ impl CodegenJS {
 
         if is_any_definition_tail_recursive {
             self.dec_indent();
-            self.push_char('\n');
+            self.push_newline();
             self.push_indent();
             self.push_char('}');
         }
 
         self.dec_indent();
-        self.push_char('\n');
+        self.push_newline();
         self.push_indent();
         self.push_str("}\n");
         self.pop_scope();
@@ -640,8 +639,7 @@ impl CodegenJS {
 
     fn flush_function_pre_body(self: &mut CodegenJS) {
         for (name, value) in &self.consume_function_pre_body_declarations() {
-            self.push_indent();
-            self.push_str(&format!("let {name} = {value};\n"));
+            self.push_let_declaration_to_identifier(name, value);
             self.current_scope().declare_variable_alias(name, name);
         }
         self.flush_statement_buffer();

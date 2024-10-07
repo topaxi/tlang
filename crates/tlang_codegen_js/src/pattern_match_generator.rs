@@ -27,8 +27,7 @@ impl CodegenJS {
         let lhs = self.replace_statement_buffer(String::new());
         let has_block_completions = match_args_have_completions(arms);
         let match_value_tmp_var = self.current_scope().declare_tmp_variable();
-        self.push_str(&format!("let {match_value_tmp_var} = "));
-        self.generate_expr(expression, None);
+        self.push_let_declaration_to_expr(&match_value_tmp_var, expression);
         if has_block_completions {
             let completion_tmp_var = self.current_scope().declare_tmp_variable();
             self.push_indent();
@@ -78,7 +77,7 @@ impl CodegenJS {
         }
 
         if has_block_completions {
-            self.push_str("\n");
+            self.push_newline();
             // If we have an lhs, put the completion var as the rhs of the lhs.
             // Otherwise, we assign the completion_var to the previous completion_var.
             if !lhs.is_empty() {

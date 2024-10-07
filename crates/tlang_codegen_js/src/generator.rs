@@ -108,6 +108,11 @@ impl CodegenJS {
     }
 
     #[inline(always)]
+    pub(crate) fn push_newline(&mut self) {
+        self.push_char('\n');
+    }
+
+    #[inline(always)]
     pub(crate) fn push_indent(&mut self) {
         self.push_str(&self.get_indent());
     }
@@ -231,6 +236,31 @@ impl CodegenJS {
         self.completion_variables.get(index).unwrap().as_deref()
     }
 
+    pub(crate) fn push_let_declaration(&mut self, name: &str) {
+        self.push_indent();
+        self.push_str("let ");
+        self.push_str(name);
+        self.push_char(';');
+    }
+
+    pub(crate) fn push_open_let_declaration(&mut self, name: &str) {
+        self.push_indent();
+        self.push_str("let ");
+        self.push_str(name);
+        self.push_str(" = ");
+    }
+
+    pub(crate) fn push_let_declaration_to_expr(&mut self, name: &str, expr: &Expr) {
+        self.push_open_let_declaration(name);
+        self.generate_expr(expr, None);
+    }
+
+    pub(crate) fn push_let_declaration_to_identifier(&mut self, name: &str, value: &str) {
+        self.push_open_let_declaration(name);
+        self.push_str(value);
+        self.push_str(";\n");
+    }
+
     fn generate_literal(&mut self, literal: &Literal) {
         match literal {
             Literal::Integer(value) => {
@@ -277,7 +307,8 @@ impl CodegenJS {
                 // Halp I made a mess
             } else {
                 self.push_indent();
-                self.push_str(&format!("let {completion_tmp_var};{{\n"));
+                self.push_let_declaration(&completion_tmp_var);
+                self.push_str("{\n");
                 self.indent_level += 1;
             }
         }
@@ -295,7 +326,8 @@ impl CodegenJS {
         }
 
         self.push_indent();
-        self.push_str(&format!("{completion_tmp_var} = "));
+        self.push_str(&completion_tmp_var);
+        self.push_str(" = ");
         self.generate_optional_expr(&block.expression, None);
         self.push_str(";\n");
         if !has_completion_var {
@@ -366,7 +398,7 @@ impl CodegenJS {
             TokenKind::SingleLineComment(comment) => {
                 self.push_str("//");
                 self.push_str(comment);
-                self.push_str("\n");
+                self.push_newline();
             }
             TokenKind::MultiLineComment(comment) => {
                 self.push_str("/*");
@@ -396,7 +428,7 @@ impl CodegenJS {
                 self.context_stack.pop();
 
                 if let ExprKind::IfElse { .. } = expr.kind {
-                    self.push_char('\n');
+                    self.push_newline();
                     return;
                 }
 
@@ -566,16 +598,14 @@ impl CodegenJS {
     }
 
     fn generate_variable_declaration_identifier(&mut self, name: &str, value: &Expr) {
-        self.push_indent();
         let shadowed_name = self.current_scope().resolve_variable(name);
         let var_name = self.current_scope().declare_variable(name);
-        self.push_str(&format!("let {var_name} = "));
         self.context_stack.push(BlockContext::Expression);
         if let Some(shadowed_name) = shadowed_name {
             self.current_scope()
                 .declare_variable_alias(name, &shadowed_name);
         }
-        self.generate_expr(value, None);
+        self.push_let_declaration_to_expr(&var_name, value);
         self.current_scope().declare_variable_alias(name, &var_name);
         self.context_stack.pop();
         self.push_str(";\n");
@@ -645,8 +675,7 @@ impl CodegenJS {
         if has_block_completions {
             lhs = self.replace_statement_buffer(String::new());
             let completion_tmp_var = self.scopes.declare_tmp_variable();
-            self.push_indent();
-            self.push_str(&format!("let {completion_tmp_var};"));
+            self.push_let_declaration(&completion_tmp_var);
             self.completion_variables.push(Some(completion_tmp_var));
         } else {
             self.completion_variables.push(None);
@@ -685,7 +714,7 @@ impl CodegenJS {
         self.push_indent();
         self.push_char('}');
         if has_block_completions {
-            self.push_str("\n");
+            self.push_newline();
 
             let completion_var = self.completion_variables.last().unwrap().clone().unwrap();
 
@@ -807,23 +836,24 @@ impl CodegenJS {
                         .collect::<Vec<_>>();
 
                     for (i, arg) in expr.arguments.iter().enumerate() {
-                        self.push_indent();
-                        self.push_str(&format!("let {} = ", tmp_vars[i]));
-                        self.generate_expr(arg, None);
+                        self.push_let_declaration_to_expr(&tmp_vars[i], arg);
                         self.push_str(";\n");
                     }
 
-                    if remap_to_rest_args {
-                        for (i, arg_name) in parameter_bindings.iter().enumerate() {
-                            self.push_indent();
-                            self.push_str(&format!("{arg_name} = {};\n", tmp_vars[i]));
-                        }
+                    let params = if remap_to_rest_args {
+                        parameter_bindings
                     } else {
-                        for (i, arg_name) in params.iter().enumerate() {
-                            self.push_indent();
-                            self.push_str(&format!("{arg_name} = {};\n", tmp_vars[i]));
-                        }
+                        params
+                    };
+
+                    for (i, arg_name) in params.iter().enumerate() {
+                        self.push_indent();
+                        self.push_str(arg_name);
+                        self.push_str(" = ");
+                        self.push_str(&tmp_vars[i]);
+                        self.push_str(";\n");
                     }
+
                     return;
                 }
             }
