@@ -129,7 +129,7 @@ fn test_dotdot_dot() {
 fn test_namespace_separator() {
     let mut lexer = Lexer::new("::");
 
-    assert_tokens!(lexer, [TokenKind::NamespaceSeparator]);
+    assert_tokens!(lexer, [TokenKind::PathSeparator]);
 }
 
 #[test]

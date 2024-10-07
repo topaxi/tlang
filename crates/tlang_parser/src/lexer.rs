@@ -297,7 +297,7 @@ impl Lexer<'_> {
                 if self.next_char == ':' {
                     self.advance();
                     self.advance();
-                    self.token(TokenKind::NamespaceSeparator, start)
+                    self.token(TokenKind::PathSeparator, start)
                 } else {
                     self.advance();
                     self.token(TokenKind::Colon, start)

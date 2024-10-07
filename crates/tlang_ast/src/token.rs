@@ -49,7 +49,7 @@ pub enum TokenKind {
     Semicolon,
     DoubleQuote,
     SingleQuote,
-    NamespaceSeparator,
+    PathSeparator,
 
     // Tokens for parentheses
     LParen,

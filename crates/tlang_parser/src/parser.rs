@@ -325,7 +325,7 @@ impl<'src> Parser<'src> {
 
     fn parse_path(&mut self) -> Path {
         let mut path = Path::from_ident(self.consume_identifier());
-        while let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
+        while let Some(TokenKind::PathSeparator) = self.current_token_kind() {
             self.advance();
             path.push(self.consume_identifier());
         }
@@ -884,7 +884,7 @@ impl<'src> Parser<'src> {
                 let mut path = Path::from_ident(Ident::new(&identifier, identifier_span));
                 let mut span = path.span;
 
-                while let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
+                while let Some(TokenKind::PathSeparator) = self.current_token_kind() {
                     self.advance();
                     path.push(self.consume_identifier());
                 }
@@ -981,7 +981,7 @@ impl<'src> Parser<'src> {
             TokenKind::Identifier(_)
                 | TokenKind::GreaterThan
                 | TokenKind::LessThan
-                | TokenKind::NamespaceSeparator
+                | TokenKind::PathSeparator
         )
     }
 
@@ -1373,7 +1373,7 @@ impl<'src> Parser<'src> {
             // Identifiers can be namespaced identifiers or call expressions, which should be pattern matched.
             // Simple identifiers will be used as is and mapped to a function parameter.
             Some(TokenKind::Identifier(_)) => {
-                if let Some(TokenKind::NamespaceSeparator) = self.peek_token_kind() {
+                if let Some(TokenKind::PathSeparator) = self.peek_token_kind() {
                     self.parse_enum_extraction()
                 } else if let Some(TokenKind::LParen | TokenKind::LBrace) = self.peek_token_kind() {
                     self.parse_enum_extraction()
