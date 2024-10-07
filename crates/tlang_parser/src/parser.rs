@@ -2,8 +2,8 @@ use tlang_ast::node::{
     self, Associativity, BinaryOpExpression, BinaryOpKind, Block, CallExpression, ElseClause,
     EnumDeclaration, EnumVariant, Expr, ExprKind, FieldAccessExpression, FunctionDeclaration,
     FunctionParameter, Ident, IfElseExpression, IndexAccessExpression, LetDeclaration, MatchArm,
-    MatchExpression, Module, OperatorInfo, Path, Pattern, PatternKind, Stmt, StmtKind,
-    StructDeclaration, StructField, Ty, UnaryOp,
+    MatchExpression, Module, OperatorInfo, Path, Pattern, Stmt, StmtKind, StructDeclaration,
+    StructField, Ty, UnaryOp,
 };
 use tlang_ast::span::Span;
 use tlang_ast::symbols::SymbolId;
@@ -589,17 +589,23 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_identifier_pattern(&mut self) -> Pattern {
+        let current_token = self.current_token.as_ref().unwrap();
+
+        // TODO: We only do this because we call `parse_identifier_pattern` within
+        // `parse_enum_extraction` and that code there is quite messy.
+        if let TokenKind::Keyword(Keyword::Underscore) = current_token.kind {
+            let wildcard_pattern = node::pat!(Wildcard).with_span(current_token.span);
+            self.advance();
+            return wildcard_pattern;
+        }
+
         let name = self.consume_identifier();
         let mut span = name.span;
 
-        let mut node = if name.name == "_" {
-            node::pat!(Wildcard)
-        } else {
-            node::pat!(Identifier {
-                id: self.unique_id(),
-                name: name,
-            })
-        };
+        let mut node = node::pat!(Identifier {
+            id: self.unique_id(),
+            name: name,
+        });
 
         self.end_span_from_previous_token(&mut span);
         node.span = span;
@@ -614,17 +620,21 @@ impl<'src> Parser<'src> {
         while !matches!(self.current_token_kind(), Some(TokenKind::RBracket)) {
             expect_token_matches!(
                 self,
-                "identifier, literal or rest parameter",
+                "identifier, literal, wildcard or rest parameter",
                 TokenKind::Identifier(_)
                     | TokenKind::Literal(_)
+                    | TokenKind::Keyword(Keyword::Underscore)
                     | TokenKind::DotDotDot
                     | TokenKind::LBracket
             );
 
             let element = match self.current_token_kind() {
-                Some(TokenKind::Identifier(_) | TokenKind::Literal(_) | TokenKind::LBracket) => {
-                    self.parse_pattern()
-                }
+                Some(
+                    TokenKind::Identifier(_)
+                    | TokenKind::Literal(_)
+                    | TokenKind::Keyword(Keyword::Underscore)
+                    | TokenKind::LBracket,
+                ) => self.parse_pattern(),
                 Some(TokenKind::DotDotDot) => {
                     self.advance();
                     node::pat!(Rest(Box::new(self.parse_identifier_pattern())))
@@ -816,7 +826,12 @@ impl<'src> Parser<'src> {
                 | TokenKind::LBrace
                 | TokenKind::LBracket
                 | TokenKind::Keyword(
-                    Keyword::If | Keyword::Fn | Keyword::Rec | Keyword::Match | Keyword::Not
+                    Keyword::If
+                        | Keyword::Fn
+                        | Keyword::Rec
+                        | Keyword::Match
+                        | Keyword::Not
+                        | Keyword::Underscore
                 )
                 | TokenKind::Identifier(_)
                 | TokenKind::Literal(_)
@@ -851,6 +866,10 @@ impl<'src> Parser<'src> {
                 node::expr!(RecursiveCall(call_expr)).with_span(expr.span)
             }
             Some(TokenKind::Keyword(Keyword::Match)) => self.parse_match_expression(),
+            Some(TokenKind::Keyword(Keyword::Underscore)) => {
+                self.advance();
+                node::expr!(Wildcard)
+            }
             Some(TokenKind::Literal(literal)) => {
                 let literal = literal.clone();
                 self.advance();
@@ -862,27 +881,23 @@ impl<'src> Parser<'src> {
 
                 self.advance();
 
-                if identifier == "_" {
-                    node::expr!(Wildcard)
-                } else {
-                    let mut path = Path::from_ident(Ident::new(&identifier, identifier_span));
-                    let mut span = path.span;
+                let mut path = Path::from_ident(Ident::new(&identifier, identifier_span));
+                let mut span = path.span;
 
-                    while let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
-                        self.advance();
-                        path.push(self.consume_identifier());
-                    }
-
-                    self.end_span_from_previous_token(&mut span);
-
-                    let mut expr = node::expr!(Path(Box::new(path))).with_span(span);
-
-                    if let Some(TokenKind::LParen | TokenKind::LBrace) = self.current_token_kind() {
-                        expr = self.parse_call_expression(expr);
-                    }
-
-                    expr
+                while let Some(TokenKind::NamespaceSeparator) = self.current_token_kind() {
+                    self.advance();
+                    path.push(self.consume_identifier());
                 }
+
+                self.end_span_from_previous_token(&mut span);
+
+                let mut expr = node::expr!(Path(Box::new(path))).with_span(span);
+
+                if let Some(TokenKind::LParen | TokenKind::LBrace) = self.current_token_kind() {
+                    expr = self.parse_call_expression(expr);
+                }
+
+                expr
             }
             _ => {
                 self.panic_unexpected_token("primary expression", self.current_token.clone());
@@ -1077,16 +1092,7 @@ impl<'src> Parser<'src> {
             self.consume_token(TokenKind::LParen);
             let mut elements = Vec::new();
             while !matches!(self.current_token_kind(), Some(TokenKind::RParen)) {
-                let mut identifier = self.parse_identifier_pattern();
-
-                // Remap identifier of _ to Wildcard
-                if let PatternKind::Identifier { ref name, .. } = identifier.kind {
-                    if name.name == "_" {
-                        identifier = node::pat!(Wildcard);
-                    }
-                }
-
-                elements.push(identifier);
+                elements.push(self.parse_identifier_pattern());
                 if let Some(TokenKind::Comma) = self.current_token_kind() {
                     self.advance();
                 }
@@ -1350,14 +1356,17 @@ impl<'src> Parser<'src> {
         expect_token_matches!(
             self,
             "literal, identifier or list extraction",
-            TokenKind::Literal(_) | TokenKind::Identifier(_) | TokenKind::LBracket
+            TokenKind::Literal(_)
+                | TokenKind::Identifier(_)
+                | TokenKind::Keyword(Keyword::Underscore)
+                | TokenKind::LBracket
         );
 
         let mut span = self.create_span_from_current_token();
         let mut node = match self.current_token_kind() {
             // Literal values will be pattern matched
             Some(TokenKind::Literal(_)) => self.parse_pattern_literal(),
-            Some(TokenKind::Identifier(ref identifier)) if identifier == "_" => {
+            Some(TokenKind::Keyword(Keyword::Underscore)) => {
                 self.advance();
                 node::pat!(Wildcard)
             }

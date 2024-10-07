@@ -15,6 +15,7 @@ pub enum Keyword {
     Not,
     And,
     Or,
+    Underscore,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]

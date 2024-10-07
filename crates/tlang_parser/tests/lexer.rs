@@ -333,3 +333,16 @@ fn test_token_span() {
     assert_eq!(token.span.end.line, 0);
     assert_eq!(token.span.end.column, 5);
 }
+
+#[test]
+fn test_underscore_keyword() {
+    let mut lexer = Lexer::new("_ _test");
+
+    assert_tokens!(
+        lexer,
+        [
+            TokenKind::Keyword(Keyword::Underscore),
+            TokenKind::Identifier("_test".to_string())
+        ]
+    );
+}
