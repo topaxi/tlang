@@ -430,7 +430,7 @@ impl CodegenJS {
 
     pub(crate) fn generate_expr(&mut self, expr: &Expr, parent_op: Option<&BinaryOpKind>) {
         match &expr.kind {
-            ExprKind::None => {}
+            ExprKind::None => unreachable!(),
             ExprKind::Block(block) if self.current_context() == BlockContext::Expression => {
                 self.generate_block_expression(block)
             }
