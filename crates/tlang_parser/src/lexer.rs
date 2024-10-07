@@ -352,6 +352,7 @@ impl Lexer<'_> {
                 "and" => self.token(TokenKind::Keyword(Keyword::And), start),
                 "or" => self.token(TokenKind::Keyword(Keyword::Or), start),
                 "_" => self.token(TokenKind::Keyword(Keyword::Underscore), start),
+                "self" => self.token(TokenKind::Keyword(Keyword::_Self), start),
                 identifier => {
                     let identifier_string = identifier.to_string();
                     self.token(TokenKind::Identifier(identifier_string), start)

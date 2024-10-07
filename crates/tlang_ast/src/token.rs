@@ -16,6 +16,7 @@ pub enum Keyword {
     And,
     Or,
     Underscore,
+    _Self,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]

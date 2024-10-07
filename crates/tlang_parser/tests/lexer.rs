@@ -134,7 +134,7 @@ fn test_namespace_separator() {
 
 #[test]
 fn test_keywords() {
-    let mut lexer = Lexer::new("let fn rec return if else match enum struct and or");
+    let mut lexer = Lexer::new("let fn rec return if else match enum struct and or self");
 
     assert_tokens!(
         lexer,
@@ -150,6 +150,7 @@ fn test_keywords() {
             TokenKind::Keyword(Keyword::Struct),
             TokenKind::Keyword(Keyword::And),
             TokenKind::Keyword(Keyword::Or),
+            TokenKind::Keyword(Keyword::_Self),
         ]
     );
 }
