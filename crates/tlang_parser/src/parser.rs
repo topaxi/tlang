@@ -25,10 +25,6 @@ pub struct Parser<'src> {
     // Id to identifiy symbols, e.g. functions and variables.
     unique_id: SymbolId,
 
-    // We have to copy over the lexers position as we scan ahead of the current token.
-    current_line: usize,
-    current_column: usize,
-
     errors: Vec<ParseError>,
 }
 
@@ -40,8 +36,6 @@ impl<'src> Parser<'src> {
             current_token: None,
             next_token: None,
             unique_id: SymbolId::new(0),
-            current_line: 0,
-            current_column: 0,
             errors: Vec::new(),
             recoverable: false,
         }
@@ -179,10 +173,13 @@ impl<'src> Parser<'src> {
         ident
     }
 
-    fn advance(&mut self) {
-        if matches!(self.current_token_kind(), Some(TokenKind::Eof))
+    fn at_eof(&self) -> bool {
+        matches!(self.current_token_kind(), Some(TokenKind::Eof))
             && matches!(self.peek_token_kind(), Some(TokenKind::Eof))
-        {
+    }
+
+    fn advance(&mut self) {
+        if self.at_eof() {
             // In error recovery we scan ahead and look for the expected token.
             // If we reach the end of the file, we don't want to continue scanning and
             // break our `while let Some(_) = self.current_token` loop.
@@ -192,10 +189,9 @@ impl<'src> Parser<'src> {
             return;
         }
 
-        self.previous_token = std::mem::take(&mut self.current_token);
-        self.current_token = std::mem::take(&mut self.next_token);
-        self.current_column = self.lexer.current_column();
-        self.current_line = self.lexer.current_line();
+        self.previous_token = self.current_token.take();
+        self.current_token = self.next_token.take();
+
         self.next_token = Some(self.lexer.next_token());
         debug!("Advanced to {:?}", self.current_token);
     }
