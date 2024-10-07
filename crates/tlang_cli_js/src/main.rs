@@ -115,9 +115,9 @@ enum ParserError {
     DiagnosticError(Vec<Diagnostic>),
 }
 
-impl From<Vec<ParseError>> for ParserError {
-    fn from(errors: Vec<ParseError>) -> Self {
-        ParserError::ParseError(errors)
+impl From<&[ParseError]> for ParserError {
+    fn from(errors: &[ParseError]) -> Self {
+        ParserError::ParseError(errors.to_vec())
     }
 }
 

@@ -50,7 +50,7 @@ impl<'src> Parser<'src> {
         self.recoverable
     }
 
-    pub fn errors(&self) -> Vec<ParseError> {
+    pub fn get_errors(&self) -> Vec<ParseError> {
         self.errors.clone()
     }
 
@@ -63,7 +63,7 @@ impl<'src> Parser<'src> {
         Parser::new(Lexer::new(source))
     }
 
-    pub fn parse(&mut self) -> Result<Module, Vec<ParseError>> {
+    pub fn parse(&mut self) -> Result<Module, &[ParseError]> {
         self.advance();
         self.advance();
 
@@ -72,7 +72,7 @@ impl<'src> Parser<'src> {
         if self.errors.is_empty() {
             Ok(module)
         } else {
-            Err(self.errors())
+            Err(&self.errors)
         }
     }
 

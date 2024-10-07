@@ -71,7 +71,7 @@ impl SemanticAnalyzer {
         if self.get_errors().is_empty() {
             Ok(())
         } else {
-            Err(self.get_errors().clone())
+            Err(self.get_errors())
         }
     }
 

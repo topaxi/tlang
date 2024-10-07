@@ -44,7 +44,7 @@ impl TlangCompiler {
     fn parse(&mut self) {
         match Parser::from_source(&self.source).parse() {
             Ok(ast) => self.ast = ast,
-            Err(errors) => self.parse_errors = errors,
+            Err(errors) => self.parse_errors = errors.to_vec(),
         }
     }
 
