@@ -114,7 +114,9 @@ impl CodegenJS {
 
     #[inline(always)]
     pub(crate) fn push_indent(&mut self) {
-        self.push_str(&self.get_indent());
+        for _ in 0..self.indent_level {
+            self.push_str("    ");
+        }
     }
 
     #[inline(always)]
@@ -861,11 +863,6 @@ impl CodegenJS {
 
         // For any other referenced function, we do a normal call expression.
         self.generate_call_expression(&expr.callee, &expr.arguments)
-    }
-
-    #[inline(always)]
-    fn get_indent(&self) -> String {
-        "    ".repeat(self.indent_level)
     }
 
     pub fn get_output(&self) -> &str {
