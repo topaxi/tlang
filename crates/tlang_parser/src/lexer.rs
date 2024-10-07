@@ -10,7 +10,6 @@ pub struct Lexer<'src> {
     position: usize,
     current_line: usize,
     current_column: usize,
-    previous_char: char,
     current_char: char,
     next_char: char,
 }
@@ -26,7 +25,6 @@ impl Lexer<'_> {
             position: 0,
             current_line: 0,
             current_column: 0,
-            previous_char: '\0',
             current_char,
             next_char,
             chars,
@@ -46,13 +44,14 @@ impl Lexer<'_> {
     }
 
     fn advance(&mut self) {
-        self.previous_char = self.current_char;
+        let previous_char = self.current_char;
+
         self.current_char = self.next_char;
         self.next_char = self.chars.next().unwrap_or('\0');
 
-        self.position += self.previous_char.len_utf8();
+        self.position += previous_char.len_utf8();
 
-        if self.previous_char == '\n' {
+        if previous_char == '\n' {
             self.current_line += 1;
             self.current_column = 1;
         } else {
