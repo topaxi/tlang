@@ -375,7 +375,7 @@ impl<'src> Parser<'src> {
 
         let name = self.consume_identifier();
         self.consume_token(TokenKind::LBrace);
-        let mut variants = Vec::new();
+        let mut variants = Vec::with_capacity(2);
         while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
             variants.push(self.parse_enum_variant());
             if let Some(TokenKind::Comma) = self.current_token_kind() {
@@ -393,7 +393,7 @@ impl<'src> Parser<'src> {
     /// Parses an enum variant, e.g. `Foo`, `Foo(1, 2, 3)` and
     /// `Foo { bar, baz }`.
     fn parse_enum_variant(&mut self) -> EnumVariant {
-        let mut span = self.create_span_from_current_token();
+        let span = self.create_span_from_current_token();
         let name = self.consume_identifier();
         log::debug!("Parsing enum variant {}", name);
         let mut node = match self.current_token_kind() {
@@ -411,7 +411,7 @@ impl<'src> Parser<'src> {
                     name,
                     named_fields: false,
                     parameters,
-                    span: Default::default(),
+                    span,
                 }
             }
             Some(TokenKind::LBrace) => {
@@ -428,19 +428,18 @@ impl<'src> Parser<'src> {
                     name,
                     named_fields: true,
                     parameters,
-                    span: Default::default(),
+                    span,
                 }
             }
             _ => EnumVariant {
                 name,
                 named_fields: false,
                 parameters: Vec::new(),
-                span: Default::default(),
+                span,
             },
         };
 
-        self.end_span_from_previous_token(&mut span);
-        node.span = span;
+        self.end_span_from_previous_token(&mut node.span);
         node
     }
 
