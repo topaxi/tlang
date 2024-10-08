@@ -348,7 +348,7 @@ impl<'src> Parser<'src> {
         self.consume_keyword_token(Keyword::Struct);
         let name = self.consume_identifier();
         self.consume_token(TokenKind::LBrace);
-        let mut fields = Vec::new();
+        let mut fields = Vec::with_capacity(2);
         while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
             fields.push(self.parse_struct_field());
             if let Some(TokenKind::Comma) = self.current_token_kind() {
