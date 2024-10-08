@@ -180,7 +180,6 @@ impl<'src> Parser<'src> {
 
     fn at_eof(&self) -> bool {
         matches!(self.current_token_kind(), Some(TokenKind::Eof))
-            && matches!(self.peek_token_kind(), Some(TokenKind::Eof))
     }
 
     fn advance(&mut self) {
