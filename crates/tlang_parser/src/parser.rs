@@ -77,11 +77,11 @@ impl<'src> Parser<'src> {
     }
 
     fn create_span_from_current_token(&self) -> Span {
-        Span::from_token(self.current_token.as_ref().unwrap())
+        self.current_token.as_ref().unwrap().span
     }
 
     fn end_span_from_previous_token(&self, span: &mut Span) {
-        span.end_by_token(self.previous_token.as_ref().unwrap());
+        span.end = self.previous_token.as_ref().unwrap().span.end
     }
 
     #[inline(never)]
