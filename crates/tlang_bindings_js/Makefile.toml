@@ -4,6 +4,9 @@ CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = true
 [config]
 skip_core_tasks = true
 
+[tasks.build-release]
+alias = "build"
+
 [tasks.build]
 command = "cargo"
 args = ["build", "--release", "--target", "wasm32-unknown-unknown"]
