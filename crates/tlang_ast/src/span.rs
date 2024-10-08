@@ -23,10 +23,6 @@ impl Span {
         token.span
     }
 
-    pub fn from_start_token(start: &Token) -> Self {
-        start.span
-    }
-
     pub fn end_by_token(&mut self, end: &Token) {
         self.end = end.span.end;
     }
