@@ -1,6 +1,7 @@
+use pretty_assertions::assert_eq;
 use tlang_ast::token::{Keyword, Literal, TokenKind};
 
-use tlang_parser::lexer::Lexer;
+use tlang_lexer::Lexer;
 
 macro_rules! assert_tokens {
     ($lexer:ident, $tokens:expr) => {{

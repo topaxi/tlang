@@ -8,9 +8,9 @@ use tlang_ast::node::{
 use tlang_ast::span::Span;
 use tlang_ast::symbols::SymbolId;
 use tlang_ast::token::{Keyword, Token, TokenKind};
+use tlang_lexer::Lexer;
 
 use crate::error::{ParseError, ParseErrorKind};
-use crate::lexer::Lexer;
 use crate::macros::expect_token_matches;
 use log::debug;
 

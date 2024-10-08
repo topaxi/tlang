@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 tlang_ast = { path = "../tlang_ast" }
+tlang_lexer = { path = "../tlang_lexer" }
 anyhow = { workspace = true }
 log = { workspace = true }
 
