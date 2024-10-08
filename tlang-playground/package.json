@@ -18,7 +18,7 @@
     "codemirror": "^6.0.1",
     "codemirror-lang-tlang": "file:../packages/codemirror-lang-tlang",
     "codemirror-theme-catppuccin": "^0.3.0",
-    "lit": "^3.2.0",
+    "lit": "3.2.1",
     "lz-string": "^1.5.0",
     "tlang_bindings_js": "file:../crates/tlang_bindings_js"
   },
