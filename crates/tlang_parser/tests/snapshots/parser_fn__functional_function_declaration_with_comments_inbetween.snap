@@ -186,7 +186,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pattern(
-                kind: Identifier(
+                kind: Identifier(IdentifierPattern(
                   id: SymbolId(2),
                   name: Ident(
                     name: "n",
@@ -201,7 +201,7 @@ Module(
                       ),
                     ),
                   ),
-                ),
+                )),
                 span: Span(
                   start: LineColumn(
                     line: 2,

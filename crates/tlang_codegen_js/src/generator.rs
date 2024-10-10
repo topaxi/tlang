@@ -1,8 +1,8 @@
 use crate::{function_generator::fn_identifier_to_string, scope::Scope};
 use tlang_ast::{
     node::{
-        BinaryOpKind, Block, CallExpression, ElseClause, Expr, ExprKind, FunctionParameter, Ident,
-        Module, Path, Pattern, PatternKind, Stmt, StmtKind, UnaryOp,
+        BinaryOpKind, Block, CallExpression, ElseClause, EnumPattern, Expr, ExprKind,
+        FunctionParameter, Ident, Module, Path, Pattern, PatternKind, Stmt, StmtKind, UnaryOp,
     },
     token::{Literal, Token, TokenKind},
 };
@@ -216,8 +216,8 @@ impl CodegenJS {
             params: parameters
                 .iter()
                 .map(|param| {
-                    if let PatternKind::Identifier { ref name, .. } = param.pattern.kind {
-                        name.to_string()
+                    if let PatternKind::Identifier(ident_pattern) = &param.pattern.kind {
+                        ident_pattern.name.to_string()
                     } else {
                         // Encountered destructuring/pattern matching or wildcard, declare
                         // tmp variable to potentially dereference from. Unused at the moment.
@@ -570,17 +570,15 @@ impl CodegenJS {
 
     pub(crate) fn generate_pat(&mut self, pattern: &Pattern) {
         match &pattern.kind {
-            PatternKind::Identifier { name, .. } => {
-                let var_name = self.current_scope().declare_variable(name.as_str());
+            PatternKind::Identifier(ident_pattern) => {
+                let var_name = self
+                    .current_scope()
+                    .declare_variable(ident_pattern.name.as_str());
                 self.push_str(&var_name);
                 self.current_scope()
-                    .declare_variable_alias(name.as_str(), &var_name);
+                    .declare_variable_alias(ident_pattern.name.as_str(), &var_name);
             }
-            PatternKind::Enum {
-                identifier,
-                elements,
-                named_fields,
-            } => self.generate_enum_extraction(identifier, elements, *named_fields),
+            PatternKind::Enum(enum_pattern) => self.generate_enum_extraction(enum_pattern),
             PatternKind::Literal(expr) => self.generate_expr(expr, None),
             PatternKind::List(patterns) => {
                 self.push_char('[');
@@ -611,8 +609,8 @@ impl CodegenJS {
 
     fn generate_variable_declaration(&mut self, pattern: &Pattern, value: &Expr) {
         match &pattern.kind {
-            PatternKind::Identifier { name, .. } => {
-                self.generate_variable_declaration_identifier(name.as_str(), value);
+            PatternKind::Identifier(ident_pattern) => {
+                self.generate_variable_declaration_identifier(ident_pattern.name.as_str(), value);
             }
             PatternKind::List(patterns) => {
                 self.generate_variable_declaration_list_pattern(patterns, value);
@@ -646,15 +644,19 @@ impl CodegenJS {
                 self.push_str(", ");
             }
             match &pattern.kind {
-                PatternKind::Identifier { name, .. } => {
-                    let shadowed_name = self.current_scope().resolve_variable(name.as_str());
-                    let var_name = self.current_scope().declare_variable(name.as_str());
+                PatternKind::Identifier(ident_pattern) => {
+                    let shadowed_name = self
+                        .current_scope()
+                        .resolve_variable(ident_pattern.name.as_str());
+                    let var_name = self
+                        .current_scope()
+                        .declare_variable(ident_pattern.name.as_str());
                     self.push_str(&var_name);
                     if let Some(shadowed_name) = shadowed_name {
                         self.current_scope()
-                            .declare_variable_alias(name.as_str(), &shadowed_name);
+                            .declare_variable_alias(ident_pattern.name.as_str(), &shadowed_name);
                     }
-                    bindings.push((name, var_name));
+                    bindings.push((ident_pattern, var_name));
                 }
                 PatternKind::Wildcard => {}
                 pattern_kind => todo!(
@@ -668,9 +670,9 @@ impl CodegenJS {
         self.context_stack.push(BlockContext::Expression);
         self.generate_expr(value, None);
 
-        for (name, var_name) in bindings {
+        for (ident_pattern, var_name) in bindings {
             self.current_scope()
-                .declare_variable_alias(name.as_str(), &var_name);
+                .declare_variable_alias(ident_pattern.name.as_str(), &var_name);
         }
 
         self.context_stack.pop();
@@ -759,12 +761,7 @@ impl CodegenJS {
         self.completion_variables.pop();
     }
 
-    fn generate_enum_extraction(
-        &mut self,
-        _identifier: &Expr,
-        _elements: &[Pattern],
-        _named_fields: bool,
-    ) {
+    fn generate_enum_extraction(&mut self, _enum_pattern: &EnumPattern) {
         todo!("enum extraction outside of function parameters is not implemented yet.")
     }
 

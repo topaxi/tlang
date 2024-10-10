@@ -1,6 +1,6 @@
 ---
 source: crates/tlang_parser/tests/parser_types.rs
-expression: "parse!(\"fn foo(x: i64, y: i64) -> i64 { x }\")"
+expression: "parse! (\"fn foo(x: i64, y: i64) -> i64 { x }\")"
 ---
 Module(
   statements: [
@@ -52,7 +52,7 @@ Module(
         parameters: [
           FunctionParameter(
             pattern: Pattern(
-              kind: Identifier(
+              kind: Identifier(IdentifierPattern(
                 id: SymbolId(2),
                 name: Ident(
                   name: "x",
@@ -67,7 +67,7 @@ Module(
                     ),
                   ),
                 ),
-              ),
+              )),
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -132,7 +132,7 @@ Module(
           ),
           FunctionParameter(
             pattern: Pattern(
-              kind: Identifier(
+              kind: Identifier(IdentifierPattern(
                 id: SymbolId(3),
                 name: Ident(
                   name: "y",
@@ -147,7 +147,7 @@ Module(
                     ),
                   ),
                 ),
-              ),
+              )),
               span: Span(
                 start: LineColumn(
                   line: 0,

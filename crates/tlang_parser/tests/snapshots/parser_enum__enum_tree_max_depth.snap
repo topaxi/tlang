@@ -181,7 +181,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pattern(
-                kind: Enum(
+                kind: Enum(EnumPattern(
                   identifier: Expr(
                     kind: Path(Path(
                       segments: [
@@ -253,7 +253,7 @@ Module(
                     ),
                   ],
                   named_fields: false,
-                ),
+                )),
                 span: Span(
                   start: LineColumn(
                     line: 5,
@@ -371,7 +371,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pattern(
-                kind: Enum(
+                kind: Enum(EnumPattern(
                   identifier: Expr(
                     kind: Path(Path(
                       segments: [
@@ -429,7 +429,7 @@ Module(
                   ),
                   elements: [
                     Pattern(
-                      kind: Identifier(
+                      kind: Identifier(IdentifierPattern(
                         id: SymbolId(3),
                         name: Ident(
                           name: "left",
@@ -444,7 +444,7 @@ Module(
                             ),
                           ),
                         ),
-                      ),
+                      )),
                       span: Span(
                         start: LineColumn(
                           line: 6,
@@ -457,7 +457,7 @@ Module(
                       ),
                     ),
                     Pattern(
-                      kind: Identifier(
+                      kind: Identifier(IdentifierPattern(
                         id: SymbolId(4),
                         name: Ident(
                           name: "right",
@@ -472,7 +472,7 @@ Module(
                             ),
                           ),
                         ),
-                      ),
+                      )),
                       span: Span(
                         start: LineColumn(
                           line: 6,
@@ -486,7 +486,7 @@ Module(
                     ),
                   ],
                   named_fields: true,
-                ),
+                )),
                 span: Span(
                   start: LineColumn(
                     line: 6,
@@ -910,7 +910,7 @@ Module(
             Stmt(
               kind: Let(LetDeclaration(
                 pattern: Pattern(
-                  kind: Identifier(
+                  kind: Identifier(IdentifierPattern(
                     id: SymbolId(6),
                     name: Ident(
                       name: "x",
@@ -925,7 +925,7 @@ Module(
                         ),
                       ),
                     ),
-                  ),
+                  )),
                   span: Span(
                     start: LineColumn(
                       line: 9,

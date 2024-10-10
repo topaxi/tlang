@@ -53,28 +53,27 @@ impl CodegenJS {
             if let Some(ref expr) = declaration.guard {
                 if let ExprKind::Let(pattern, _) = &expr.kind {
                     match &pattern.kind {
-                        PatternKind::Identifier { name, .. } => {
-                            let tmp_variable = self.current_scope().declare_variable(name.as_str());
+                        PatternKind::Identifier(ident_pattern) => {
+                            let tmp_variable = self
+                                .current_scope()
+                                .declare_variable(ident_pattern.name.as_str());
                             self.push_let_declaration(&tmp_variable);
                             self.push_newline();
                         }
                         PatternKind::List(patterns) => {
                             for pattern in patterns {
-                                if let PatternKind::Identifier { name, .. } = &pattern.kind {
-                                    let tmp_variable =
-                                        self.current_scope().declare_variable(name.as_str());
+                                if let PatternKind::Identifier(ident_pattern) = &pattern.kind {
+                                    let tmp_variable = self
+                                        .current_scope()
+                                        .declare_variable(ident_pattern.name.as_str());
                                     self.push_let_declaration(&tmp_variable);
                                     self.push_newline();
                                 }
                             }
                         }
-                        PatternKind::Enum {
-                            identifier,
-                            elements,
-                            named_fields: _,
-                        } => {
+                        PatternKind::Enum(enum_pattern) => {
                             let tmp_variable_enum = self.current_scope().declare_tmp_variable();
-                            let enum_name = match &identifier.kind {
+                            let enum_name = match &enum_pattern.identifier.kind {
                                 ExprKind::Path(path) => path.segments.last().unwrap().as_str(),
                                 _ => unreachable!(),
                             };
@@ -82,11 +81,13 @@ impl CodegenJS {
                             self.push_newline();
                             self.current_scope()
                                 .declare_variable_alias(enum_name, &tmp_variable_enum);
-                            for element in elements {
+                            for element in &enum_pattern.elements {
                                 let identifier = match &element.kind {
                                     // Skip any Wildcards
                                     PatternKind::Wildcard => continue,
-                                    PatternKind::Identifier { name, .. } => name.as_str(),
+                                    PatternKind::Identifier(ident_pattern) => {
+                                        ident_pattern.name.as_str()
+                                    }
                                     _ => unreachable!(),
                                 };
                                 let tmp_variable =
@@ -119,17 +120,19 @@ impl CodegenJS {
 
             for (j, param) in declaration.parameters.iter().enumerate() {
                 match &param.pattern.kind {
-                    PatternKind::Identifier { name, .. } => {
-                        self.current_scope()
-                            .declare_variable_alias(name.as_str(), arg_bindings[j].as_str());
+                    PatternKind::Identifier(ident_pattern) => {
+                        self.current_scope().declare_variable_alias(
+                            ident_pattern.name.as_str(),
+                            arg_bindings[j].as_str(),
+                        );
                     }
                     PatternKind::List(patterns) => {
                         for (i, pattern) in patterns.iter().enumerate() {
-                            if let PatternKind::Identifier { name, .. } = &pattern.kind {
+                            if let PatternKind::Identifier(ident_pattern) = &pattern.kind {
                                 let arg_name = arg_bindings[j].as_str();
 
                                 self.current_scope().declare_variable_alias(
-                                    name.as_str(),
+                                    ident_pattern.name.as_str(),
                                     &format!("{arg_name}[{i}]"),
                                 );
                             }
@@ -209,20 +212,20 @@ impl CodegenJS {
                                         self.generate_pat(pattern);
                                     }
                                     PatternKind::Rest(identifier) => {
-                                        if let PatternKind::Identifier { ref name, .. } =
-                                            identifier.kind
+                                        if let PatternKind::Identifier(ident_pattern) =
+                                            &identifier.kind
                                         {
                                             self.declare_function_pre_body_variable(
-                                                name.as_str(),
+                                                ident_pattern.name.as_str(),
                                                 &format!("{arg_name}.slice({i})"),
                                             );
                                         } else {
                                             unreachable!();
                                         }
                                     }
-                                    PatternKind::Identifier { name, .. } => {
+                                    PatternKind::Identifier(ident_pattern) => {
                                         self.declare_function_pre_body_variable(
-                                            name.as_str(),
+                                            ident_pattern.name.as_str(),
                                             &format!("{arg_name}[{i}]"),
                                         );
                                     }
@@ -231,24 +234,22 @@ impl CodegenJS {
                                 }
                             }
                         }
-                        PatternKind::Enum {
-                            identifier,
-                            elements,
-                            named_fields,
-                        } => {
-                            let identifier = match &identifier.kind {
+                        PatternKind::Enum(enum_pattern) => {
+                            let identifier = match &enum_pattern.identifier.kind {
                                 ExprKind::Path(path) => path.segments.last().unwrap().as_str(),
                                 _ => unreachable!(),
                             };
                             self.push_str(&format!("{arg_name}.tag === \"{identifier}\""));
-                            for (i, element) in elements.iter().enumerate() {
+                            for (i, element) in enum_pattern.elements.iter().enumerate() {
                                 let identifier = match &element.kind {
                                     // Skip any Wildcards
                                     PatternKind::Wildcard => continue,
-                                    PatternKind::Identifier { name, .. } => name.as_str(),
+                                    PatternKind::Identifier(ident_pattern) => {
+                                        ident_pattern.name.as_str()
+                                    }
                                     _ => unreachable!(),
                                 };
-                                if *named_fields {
+                                if enum_pattern.named_fields {
                                     self.declare_function_pre_body_variable(
                                         identifier,
                                         &format!("{arg_name}.{identifier}"),
@@ -290,10 +291,10 @@ impl CodegenJS {
 
             // Alias identifier args back to the parameter names for readability of generated code.
             for (j, param) in declaration.parameters.iter().enumerate() {
-                if let PatternKind::Identifier { ref name, .. } = param.pattern.kind {
+                if let PatternKind::Identifier(ident_pattern) = &param.pattern.kind {
                     let arg_name = arg_bindings[j].as_str();
 
-                    if arg_name == name.name {
+                    if arg_name == ident_pattern.name.name {
                         continue;
                     }
 
@@ -302,7 +303,7 @@ impl CodegenJS {
                     // via `args` instead of normal arguments. We could probably be more precise
                     // and use actual arguments, but given that each signature could define
                     // different names, this is the easiest way to handle this for now.
-                    let name = name.to_string();
+                    let name = ident_pattern.name.to_string();
                     let name = if Some(&name) == arg_binding.as_ref() {
                         self.current_scope().declare_variable("args")
                     } else if arg_bindings.contains(&name) {
@@ -371,29 +372,31 @@ impl CodegenJS {
                 // actual defined name. Otherwise we use `arg{i}` as the name.
                 let arg_name = declarations.iter().find_map(|d| {
                     let param = &d.parameters[i];
-                    match param.pattern.kind {
-                        PatternKind::Identifier { ref name, .. } => Some(name.to_string()),
-                        PatternKind::Enum { ref identifier, .. } => {
-                            Some(get_enum_name(identifier).to_lowercase())
+                    match &param.pattern.kind {
+                        PatternKind::Identifier(ident_pattern) => {
+                            Some(ident_pattern.name.to_string())
+                        }
+                        PatternKind::Enum(enum_pattern) => {
+                            Some(get_enum_name(&enum_pattern.identifier).to_lowercase())
                         }
                         _ => None,
                     }
                 });
 
                 let arg_name = if arg_name.is_some()
-                    && declarations.iter().all(|d| {
-                        let param = &d.parameters[i];
-                        match param.pattern.kind {
-                            PatternKind::Identifier { ref name, .. } => {
-                                Some(name.to_string()) == arg_name
+                    && declarations
+                        .iter()
+                        .all(|d| match &d.parameters[i].pattern.kind {
+                            PatternKind::Identifier(ident_pattern) => {
+                                Some(ident_pattern.name.to_string()) == arg_name
                             }
-                            PatternKind::Enum { ref identifier, .. } => {
-                                Some(get_enum_name(identifier).to_lowercase()) == arg_name
+                            PatternKind::Enum(ident_pattern) => {
+                                Some(get_enum_name(&ident_pattern.identifier).to_lowercase())
+                                    == arg_name
                             }
 
                             _ => true,
-                        }
-                    }) {
+                        }) {
                     #[allow(clippy::unnecessary_unwrap)]
                     arg_name.unwrap()
                 } else {
@@ -428,18 +431,16 @@ impl CodegenJS {
     fn generate_function_definition_guard(&mut self, node: &Expr) {
         if let ExprKind::Let(pattern, expression) = &node.kind {
             match &pattern.kind {
-                PatternKind::Identifier { name, .. } => {
-                    let guard_variable = self.current_scope().resolve_variable(name.as_str());
+                PatternKind::Identifier(ident_pattern) => {
+                    let guard_variable = self
+                        .current_scope()
+                        .resolve_variable(ident_pattern.name.as_str());
                     self.push_str(&format!("({} = ", guard_variable.unwrap()));
                     self.generate_expr(expression, None);
                     self.push_char(')');
                 }
-                PatternKind::Enum {
-                    identifier,
-                    elements,
-                    named_fields,
-                } => {
-                    let enum_name = match &identifier.kind {
+                PatternKind::Enum(enum_pattern) => {
+                    let enum_name = match &enum_pattern.identifier.kind {
                         ExprKind::Path(path) => path.segments.last().unwrap().as_str(),
                         _ => unreachable!(),
                     };
@@ -447,7 +448,7 @@ impl CodegenJS {
                     self.push_str(&format!("({} = ", guard_variable.as_ref().unwrap()));
                     self.generate_expr(expression, None);
                     self.push_char(')');
-                    for (i, element) in elements.iter().enumerate() {
+                    for (i, element) in enum_pattern.elements.iter().enumerate() {
                         if i == 0 {
                             self.push_str(" && ");
                             self.push_str(&format!(
@@ -459,12 +460,12 @@ impl CodegenJS {
                         let identifier = match &element.kind {
                             // Skip any Wildcards
                             PatternKind::Wildcard => continue,
-                            PatternKind::Identifier { name, .. } => name.as_str(),
+                            PatternKind::Identifier(ident_pattern) => ident_pattern.name.as_str(),
                             _ => unreachable!(),
                         };
                         self.push_str(" && ((");
                         let identifier_resolved = self.current_scope().resolve_variable(identifier);
-                        if *named_fields {
+                        if enum_pattern.named_fields {
                             self.push_str(&format!(
                                 "{} = {}.{}",
                                 identifier_resolved.unwrap(),
@@ -572,9 +573,10 @@ impl CodegenJS {
     fn generate_function_parameter(&mut self, pattern: &Pattern) {
         match &pattern.kind {
             // Do not run generate_identifier, as that would resolve the parameter as a variable.
-            PatternKind::Identifier { name, .. } => {
-                self.current_scope().declare_variable(name.as_str());
-                self.push_str(name.as_str());
+            PatternKind::Identifier(ident_pattern) => {
+                self.current_scope()
+                    .declare_variable(ident_pattern.name.as_str());
+                self.push_str(ident_pattern.name.as_str());
             }
             PatternKind::Literal(_) => self.generate_pat(pattern),
             PatternKind::List(_) => todo!(),

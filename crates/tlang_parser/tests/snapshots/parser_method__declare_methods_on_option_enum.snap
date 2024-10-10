@@ -167,7 +167,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pattern(
-                kind: Enum(
+                kind: Enum(EnumPattern(
                   identifier: Expr(
                     kind: Path(Path(
                       segments: [
@@ -239,7 +239,7 @@ Module(
                     ),
                   ],
                   named_fields: false,
-                ),
+                )),
                 span: Span(
                   start: LineColumn(
                     line: 5,
@@ -370,7 +370,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pattern(
-                kind: Enum(
+                kind: Enum(EnumPattern(
                   identifier: Expr(
                     kind: Path(Path(
                       segments: [
@@ -428,7 +428,7 @@ Module(
                   ),
                   elements: [],
                   named_fields: false,
-                ),
+                )),
                 span: Span(
                   start: LineColumn(
                     line: 6,
@@ -724,7 +724,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pattern(
-                kind: Enum(
+                kind: Enum(EnumPattern(
                   identifier: Expr(
                     kind: Path(Path(
                       segments: [
@@ -796,7 +796,7 @@ Module(
                     ),
                   ],
                   named_fields: false,
-                ),
+                )),
                 span: Span(
                   start: LineColumn(
                     line: 9,
@@ -944,7 +944,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pattern(
-                kind: Enum(
+                kind: Enum(EnumPattern(
                   identifier: Expr(
                     kind: Path(Path(
                       segments: [
@@ -1002,7 +1002,7 @@ Module(
                   ),
                   elements: [],
                   named_fields: false,
-                ),
+                )),
                 span: Span(
                   start: LineColumn(
                     line: 10,
@@ -1167,7 +1167,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pattern(
-                kind: Enum(
+                kind: Enum(EnumPattern(
                   identifier: Expr(
                     kind: Path(Path(
                       segments: [
@@ -1225,7 +1225,7 @@ Module(
                   ),
                   elements: [
                     Pattern(
-                      kind: Identifier(
+                      kind: Identifier(IdentifierPattern(
                         id: SymbolId(5),
                         name: Ident(
                           name: "x",
@@ -1240,7 +1240,7 @@ Module(
                             ),
                           ),
                         ),
-                      ),
+                      )),
                       span: Span(
                         start: LineColumn(
                           line: 12,
@@ -1254,7 +1254,7 @@ Module(
                     ),
                   ],
                   named_fields: false,
-                ),
+                )),
                 span: Span(
                   start: LineColumn(
                     line: 12,
@@ -1280,7 +1280,7 @@ Module(
             ),
             FunctionParameter(
               pattern: Pattern(
-                kind: Identifier(
+                kind: Identifier(IdentifierPattern(
                   id: SymbolId(6),
                   name: Ident(
                     name: "f",
@@ -1295,7 +1295,7 @@ Module(
                       ),
                     ),
                   ),
-                ),
+                )),
                 span: Span(
                   start: LineColumn(
                     line: 12,
@@ -1604,7 +1604,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pattern(
-                kind: Enum(
+                kind: Enum(EnumPattern(
                   identifier: Expr(
                     kind: Path(Path(
                       segments: [
@@ -1662,7 +1662,7 @@ Module(
                   ),
                   elements: [],
                   named_fields: false,
-                ),
+                )),
                 span: Span(
                   start: LineColumn(
                     line: 13,

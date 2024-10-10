@@ -7,7 +7,7 @@ Module(
     Stmt(
       kind: Let(LetDeclaration(
         pattern: Pattern(
-          kind: Identifier(
+          kind: Identifier(IdentifierPattern(
             id: SymbolId(1),
             name: Ident(
               name: "x",
@@ -22,7 +22,7 @@ Module(
                 ),
               ),
             ),
-          ),
+          )),
           span: Span(
             start: LineColumn(
               line: 0,
@@ -69,7 +69,7 @@ Module(
     Stmt(
       kind: Let(LetDeclaration(
         pattern: Pattern(
-          kind: Identifier(
+          kind: Identifier(IdentifierPattern(
             id: SymbolId(2),
             name: Ident(
               name: "y",
@@ -84,7 +84,7 @@ Module(
                 ),
               ),
             ),
-          ),
+          )),
           span: Span(
             start: LineColumn(
               line: 0,

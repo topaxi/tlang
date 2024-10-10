@@ -279,10 +279,10 @@ impl DeclarationAnalyzer {
 
     fn collect_pattern(&mut self, pattern: &mut Pattern) {
         match &mut pattern.kind {
-            PatternKind::Identifier { id, name } => {
+            PatternKind::Identifier(ident_pattern) => {
                 self.declare_symbol(SymbolInfo::new(
-                    *id,
-                    name.as_str(),
+                    ident_pattern.id,
+                    ident_pattern.name.as_str(),
                     *self.symbol_type.last().unwrap_or(&SymbolType::Variable),
                     Some(pattern.span),
                 ));
@@ -295,8 +295,8 @@ impl DeclarationAnalyzer {
             PatternKind::Rest(pattern) => {
                 self.collect_pattern(pattern);
             }
-            PatternKind::Enum { elements, .. } => {
-                for element in elements.iter_mut() {
+            PatternKind::Enum(enum_pattern) => {
+                for element in &mut enum_pattern.elements {
                     self.collect_pattern(element);
                 }
             }

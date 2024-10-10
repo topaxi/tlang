@@ -9,7 +9,7 @@ Module(
         kind: IfElse(IfElseExpression(
           condition: Expr(
             kind: Let(Pattern(
-              kind: Enum(
+              kind: Enum(EnumPattern(
                 identifier: Expr(
                   kind: Path(Path(
                     segments: [
@@ -67,7 +67,7 @@ Module(
                 ),
                 elements: [
                   Pattern(
-                    kind: Identifier(
+                    kind: Identifier(IdentifierPattern(
                       id: SymbolId(1),
                       name: Ident(
                         name: "y",
@@ -82,7 +82,7 @@ Module(
                           ),
                         ),
                       ),
-                    ),
+                    )),
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -96,7 +96,7 @@ Module(
                   ),
                 ],
                 named_fields: false,
-              ),
+              )),
               span: Span(
                 start: LineColumn(
                   line: 0,

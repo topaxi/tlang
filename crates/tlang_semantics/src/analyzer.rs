@@ -285,7 +285,7 @@ impl SemanticAnalyzer {
     }
 
     #[allow(clippy::only_used_in_recursion)]
-    fn analyze_pat(&mut self, pat: &mut Pattern) {
+    fn analyze_pat(&self, pat: &mut Pattern) {
         match &mut pat.kind {
             PatternKind::List(patterns) => {
                 for pattern in patterns {
@@ -293,14 +293,10 @@ impl SemanticAnalyzer {
                 }
             }
             PatternKind::Rest(pattern) => self.analyze_pat(pattern),
-            PatternKind::Enum {
-                identifier: _,
-                elements,
-                ..
-            } => {
-                // self.mark_as_used_by_name(identifier.as_str(), &pat.span);
+            PatternKind::Enum(enum_pattern) => {
+                // self.mark_as_used_by_name(enum_pattern.identifier.as_str(), &pat.span);
 
-                for element in elements {
+                for element in &mut enum_pattern.elements {
                     self.analyze_pat(element);
                 }
             }

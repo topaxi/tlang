@@ -154,7 +154,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pattern(
-                kind: Enum(
+                kind: Enum(EnumPattern(
                   identifier: Expr(
                     kind: Path(Path(
                       segments: [
@@ -212,7 +212,7 @@ Module(
                   ),
                   elements: [],
                   named_fields: false,
-                ),
+                )),
                 span: Span(
                   start: LineColumn(
                     line: 5,
@@ -391,7 +391,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pattern(
-                kind: Enum(
+                kind: Enum(EnumPattern(
                   identifier: Expr(
                     kind: Path(Path(
                       segments: [
@@ -449,7 +449,7 @@ Module(
                   ),
                   elements: [
                     Pattern(
-                      kind: Identifier(
+                      kind: Identifier(IdentifierPattern(
                         id: SymbolId(3),
                         name: Ident(
                           name: "value",
@@ -464,7 +464,7 @@ Module(
                             ),
                           ),
                         ),
-                      ),
+                      )),
                       span: Span(
                         start: LineColumn(
                           line: 6,
@@ -478,7 +478,7 @@ Module(
                     ),
                   ],
                   named_fields: false,
-                ),
+                )),
                 span: Span(
                   start: LineColumn(
                     line: 6,

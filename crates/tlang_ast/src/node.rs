@@ -65,14 +65,6 @@ impl FunctionParameter {
         self.type_annotation = Some(type_annotation);
         self
     }
-
-    pub fn name(self) -> Option<String> {
-        match self.pattern.kind {
-            PatternKind::Identifier { ref name, .. } => Some(name.to_string()),
-            PatternKind::Wildcard => Some(String::from("_")),
-            _ => None,
-        }
-    }
 }
 
 #[derive(Debug, Default, PartialEq, Clone, Serialize)]
@@ -280,20 +272,21 @@ impl Pattern {
 
     pub fn get_symbol_id(&self) -> Option<SymbolId> {
         match &self.kind {
-            PatternKind::Identifier { id, .. } => Some(*id),
+            PatternKind::Identifier(ident_pattern) => Some(ident_pattern.id),
             _ => None,
         }
     }
 
     pub fn get_all_symbol_ids(&self) -> Vec<SymbolId> {
         match &self.kind {
-            PatternKind::Identifier { id, .. } => vec![*id],
+            PatternKind::Identifier(ident_pattern) => vec![ident_pattern.id],
             PatternKind::List(patterns) => patterns
                 .iter()
                 .flat_map(Pattern::get_all_symbol_ids)
                 .collect(),
             PatternKind::Rest(pattern) => pattern.get_all_symbol_ids(),
-            PatternKind::Enum { elements, .. } => elements
+            PatternKind::Enum(enum_pattern) => enum_pattern
+                .elements
                 .iter()
                 .flat_map(Pattern::get_all_symbol_ids)
                 .collect(),
@@ -311,19 +304,25 @@ impl Pattern {
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct IdentifierPattern {
+    pub id: SymbolId,
+    pub name: Ident,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct EnumPattern {
+    pub identifier: Expr,
+    pub elements: Vec<Pattern>,
+    pub named_fields: bool,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub enum PatternKind {
-    Identifier {
-        id: SymbolId,
-        name: Ident,
-    },
+    Identifier(Box<IdentifierPattern>),
     Literal(Box<Expr>),
     List(Vec<Pattern>),
     Rest(Box<Pattern>),
-    Enum {
-        identifier: Box<Expr>,
-        elements: Vec<Pattern>,
-        named_fields: bool,
-    },
+    Enum(Box<EnumPattern>),
     Wildcard,
 }
 
@@ -496,11 +495,6 @@ macro_rules! expr {
 
         Expr::new(ExprKind::$kind($($arg),*))
     }};
-
-    ($kind:ident { $( $field:ident : $value:expr ),* $(,)? }) => {{
-        use tlang_ast::node::{Expr, ExprKind};
-        Expr::new(ExprKind::$kind { $( $field : $value ),* })
-    }};
 }
 
 #[macro_export]
@@ -516,12 +510,6 @@ macro_rules! pat {
 
         Pattern::new(PatternKind::$kind($($arg),*))
     }};
-
-    ($kind:ident { $( $field:ident : $value:expr ),* $(,)? }) => {{
-        use tlang_ast::node::{Pattern, PatternKind};
-
-        Pattern::new(PatternKind::$kind { $( $field : $value ),* })
-    }};
 }
 
 #[macro_export]
@@ -534,11 +522,6 @@ macro_rules! stmt {
     ($kind:ident($($arg:expr),* $(,)?)) => {{
         use tlang_ast::node::{Stmt, StmtKind};
         Stmt::new(StmtKind::$kind($($arg),*))
-    }};
-
-    ($kind:ident { $( $field:ident : $value:expr ),* $(,)? }) => {{
-        use tlang_ast::node::{Stmt, StmtKind};
-        Stmt::new(StmtKind::$kind { $( $field : $value ),* })
     }};
 }
 

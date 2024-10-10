@@ -9,7 +9,7 @@ Module(
         kind: IfElse(IfElseExpression(
           condition: Expr(
             kind: Let(Pattern(
-              kind: Identifier(
+              kind: Identifier(IdentifierPattern(
                 id: SymbolId(1),
                 name: Ident(
                   name: "x",
@@ -24,7 +24,7 @@ Module(
                     ),
                   ),
                 ),
-              ),
+              )),
               span: Span(
                 start: LineColumn(
                   line: 0,

@@ -1,9 +1,9 @@
 use tlang_ast::node::{
     self, Associativity, BinaryOpExpression, BinaryOpKind, Block, CallExpression, ElseClause,
-    EnumDeclaration, EnumVariant, Expr, ExprKind, FieldAccessExpression, FunctionDeclaration,
-    FunctionParameter, Ident, IfElseExpression, IndexAccessExpression, LetDeclaration, MatchArm,
-    MatchExpression, Module, OperatorInfo, Path, Pattern, Stmt, StmtKind, StructDeclaration,
-    StructField, Ty, UnaryOp,
+    EnumDeclaration, EnumPattern, EnumVariant, Expr, ExprKind, FieldAccessExpression,
+    FunctionDeclaration, FunctionParameter, Ident, IdentifierPattern, IfElseExpression,
+    IndexAccessExpression, LetDeclaration, MatchArm, MatchExpression, Module, OperatorInfo, Path,
+    Pattern, Stmt, StmtKind, StructDeclaration, StructField, Ty, UnaryOp,
 };
 use tlang_ast::span::Span;
 use tlang_ast::symbols::SymbolId;
@@ -164,7 +164,7 @@ impl<'src> Parser<'src> {
         self.consume_token(TokenKind::Keyword(expected));
     }
 
-    fn consume_identifier(&mut self) -> Ident {
+    fn parse_identifier(&mut self) -> Ident {
         expect_token_matches!(self, TokenKind::Identifier(_));
 
         let current_token = self.current_token.as_ref().unwrap();
@@ -312,23 +312,23 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_single_identifier(&mut self) -> Expr {
-        let path = Path::from_ident(self.consume_identifier());
+        let path = Path::from_ident(self.parse_identifier());
         let span = path.span;
         node::expr!(Path(Box::new(path))).with_span(span)
     }
 
     fn parse_path(&mut self) -> Path {
-        let mut path = Path::from_ident(self.consume_identifier());
+        let mut path = Path::from_ident(self.parse_identifier());
         while let Some(TokenKind::PathSeparator) = self.current_token_kind() {
             self.advance();
-            path.push(self.consume_identifier());
+            path.push(self.parse_identifier());
         }
 
         self.end_span_from_previous_token(&mut path.span);
         path
     }
 
-    fn parse_identifier(&mut self) -> Expr {
+    fn parse_path_expression(&mut self) -> Expr {
         // How do we generalize this span handling?
         // Callbacks come to mind, but I'd rather not.
         // Adding another stack is also not ideal.
@@ -340,7 +340,7 @@ impl<'src> Parser<'src> {
 
     fn parse_struct_declaration(&mut self) -> Stmt {
         self.consume_keyword_token(Keyword::Struct);
-        let name = self.consume_identifier();
+        let name = self.parse_identifier();
         self.consume_token(TokenKind::LBrace);
         let mut fields = Vec::with_capacity(2);
         while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
@@ -358,7 +358,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_struct_field(&mut self) -> StructField {
-        let name = self.consume_identifier();
+        let name = self.parse_identifier();
         self.consume_token(TokenKind::Colon);
         let ty = self.parse_type_annotation();
         (name, ty)
@@ -367,7 +367,7 @@ impl<'src> Parser<'src> {
     fn parse_enum_declaration(&mut self) -> Stmt {
         self.consume_keyword_token(Keyword::Enum);
 
-        let name = self.consume_identifier();
+        let name = self.parse_identifier();
         self.consume_token(TokenKind::LBrace);
         let mut variants = Vec::with_capacity(2);
         while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
@@ -388,14 +388,14 @@ impl<'src> Parser<'src> {
     /// `Foo { bar, baz }`.
     fn parse_enum_variant(&mut self) -> EnumVariant {
         let span = self.create_span_from_current_token();
-        let name = self.consume_identifier();
+        let name = self.parse_identifier();
         log::debug!("Parsing enum variant {}", name);
         let mut node = match self.current_token_kind() {
             Some(TokenKind::LParen) => {
                 self.advance();
                 let mut parameters = Vec::new();
                 while !matches!(self.current_token_kind(), Some(TokenKind::RParen)) {
-                    parameters.push(self.consume_identifier());
+                    parameters.push(self.parse_identifier());
                     if let Some(TokenKind::Comma) = self.current_token_kind() {
                         self.advance();
                     }
@@ -412,7 +412,7 @@ impl<'src> Parser<'src> {
                 self.advance();
                 let mut parameters = Vec::new();
                 while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
-                    parameters.push(self.consume_identifier());
+                    parameters.push(self.parse_identifier());
                     if let Some(TokenKind::Comma) = self.current_token_kind() {
                         self.advance();
                     }
@@ -592,13 +592,13 @@ impl<'src> Parser<'src> {
             return wildcard_pattern;
         }
 
-        let name = self.consume_identifier();
+        let name = self.parse_identifier();
         let mut span = name.span;
 
-        let mut node = node::pat!(Identifier {
+        let mut node = node::pat!(Identifier(Box::new(IdentifierPattern {
             id: self.unique_id(),
-            name: name,
-        });
+            name,
+        })));
 
         self.end_span_from_previous_token(&mut span);
         node.span = span;
@@ -712,14 +712,14 @@ impl<'src> Parser<'src> {
 
     /// Can be a Identifier, NestedIdentifier or FieldExpression with a single field name.
     fn parse_function_name(&mut self) -> Expr {
-        let path = self.parse_identifier();
+        let path = self.parse_path_expression();
         let mut span = path.span;
 
         let mut expr = if let Some(TokenKind::Dot) = self.current_token_kind() {
             self.advance();
             node::expr!(FieldExpression(Box::new(FieldAccessExpression {
                 base: path,
-                field: self.consume_identifier(),
+                field: self.parse_identifier(),
             })))
         } else {
             path
@@ -886,7 +886,7 @@ impl<'src> Parser<'src> {
 
                 while let Some(TokenKind::PathSeparator) = self.current_token_kind() {
                     self.advance();
-                    path.push(self.consume_identifier());
+                    path.push(self.parse_identifier());
                 }
 
                 self.end_span_from_previous_token(&mut span);
@@ -1070,7 +1070,7 @@ impl<'src> Parser<'src> {
     /// Parses an enum extraction, e.g. `Foo(bar, baz)` and `Foo { bar, baz }` within
     /// a function declarations parameter list.
     fn parse_enum_extraction(&mut self) -> Pattern {
-        let identifier = Box::new(self.parse_identifier());
+        let identifier = self.parse_path_expression();
         let is_dict_extraction = matches!(self.current_token_kind(), Some(TokenKind::LBrace));
 
         if is_dict_extraction {
@@ -1083,11 +1083,11 @@ impl<'src> Parser<'src> {
                 }
             }
             self.consume_token(TokenKind::RBrace);
-            node::pat!(Enum {
-                identifier: identifier,
-                elements: elements,
+            node::pat!(Enum(Box::new(EnumPattern {
+                identifier,
+                elements,
                 named_fields: true,
-            })
+            })))
         } else if let Some(TokenKind::LParen) = self.current_token_kind() {
             self.consume_token(TokenKind::LParen);
             let mut elements = Vec::new();
@@ -1098,17 +1098,17 @@ impl<'src> Parser<'src> {
                 }
             }
             self.consume_token(TokenKind::RParen);
-            node::pat!(Enum {
-                identifier: identifier,
-                elements: elements,
+            node::pat!(Enum(Box::new(EnumPattern {
+                identifier,
+                elements,
                 named_fields: false,
-            })
+            })))
         } else {
-            node::pat!(Enum {
-                identifier: identifier,
+            node::pat!(Enum(Box::new(EnumPattern {
+                identifier,
                 elements: Vec::new(),
                 named_fields: false,
-            })
+            })))
         }
     }
 
@@ -1411,7 +1411,7 @@ impl<'src> Parser<'src> {
                 Some(TokenKind::Dot) => {
                     self.advance();
                     lhs.trailing_comments = self.parse_comments();
-                    let field_name = self.consume_identifier();
+                    let field_name = self.parse_identifier();
                     lhs = node::expr!(FieldExpression(Box::new(FieldAccessExpression {
                         base: lhs,
                         field: field_name,

@@ -79,7 +79,7 @@ Module(
             ),
             FunctionParameter(
               pattern: Pattern(
-                kind: Identifier(
+                kind: Identifier(IdentifierPattern(
                   id: SymbolId(2),
                   name: Ident(
                     name: "f",
@@ -94,7 +94,7 @@ Module(
                       ),
                     ),
                   ),
-                ),
+                )),
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -214,7 +214,7 @@ Module(
               pattern: Pattern(
                 kind: List([
                   Pattern(
-                    kind: Identifier(
+                    kind: Identifier(IdentifierPattern(
                       id: SymbolId(3),
                       name: Ident(
                         name: "x",
@@ -229,7 +229,7 @@ Module(
                           ),
                         ),
                       ),
-                    ),
+                    )),
                     span: Span(
                       start: LineColumn(
                         line: 1,
@@ -243,7 +243,7 @@ Module(
                   ),
                   Pattern(
                     kind: Rest(Pattern(
-                      kind: Identifier(
+                      kind: Identifier(IdentifierPattern(
                         id: SymbolId(4),
                         name: Ident(
                           name: "xs",
@@ -258,7 +258,7 @@ Module(
                             ),
                           ),
                         ),
-                      ),
+                      )),
                       span: Span(
                         start: LineColumn(
                           line: 1,
@@ -307,7 +307,7 @@ Module(
             ),
             FunctionParameter(
               pattern: Pattern(
-                kind: Identifier(
+                kind: Identifier(IdentifierPattern(
                   id: SymbolId(5),
                   name: Ident(
                     name: "f",
@@ -322,7 +322,7 @@ Module(
                       ),
                     ),
                   ),
-                ),
+                )),
                 span: Span(
                   start: LineColumn(
                     line: 1,
@@ -349,7 +349,7 @@ Module(
           ],
           guard: Some(Expr(
             kind: Let(Pattern(
-              kind: Identifier(
+              kind: Identifier(IdentifierPattern(
                 id: SymbolId(6),
                 name: Ident(
                   name: "y",
@@ -364,7 +364,7 @@ Module(
                     ),
                   ),
                 ),
-              ),
+              )),
               span: Span(
                 start: LineColumn(
                   line: 1,
@@ -789,7 +789,7 @@ Module(
               pattern: Pattern(
                 kind: List([
                   Pattern(
-                    kind: Identifier(
+                    kind: Identifier(IdentifierPattern(
                       id: SymbolId(7),
                       name: Ident(
                         name: "x",
@@ -804,7 +804,7 @@ Module(
                           ),
                         ),
                       ),
-                    ),
+                    )),
                     span: Span(
                       start: LineColumn(
                         line: 2,
@@ -818,7 +818,7 @@ Module(
                   ),
                   Pattern(
                     kind: Rest(Pattern(
-                      kind: Identifier(
+                      kind: Identifier(IdentifierPattern(
                         id: SymbolId(8),
                         name: Ident(
                           name: "xs",
@@ -833,7 +833,7 @@ Module(
                             ),
                           ),
                         ),
-                      ),
+                      )),
                       span: Span(
                         start: LineColumn(
                           line: 2,
@@ -882,7 +882,7 @@ Module(
             ),
             FunctionParameter(
               pattern: Pattern(
-                kind: Identifier(
+                kind: Identifier(IdentifierPattern(
                   id: SymbolId(9),
                   name: Ident(
                     name: "f",
@@ -897,7 +897,7 @@ Module(
                       ),
                     ),
                   ),
-                ),
+                )),
                 span: Span(
                   start: LineColumn(
                     line: 2,
