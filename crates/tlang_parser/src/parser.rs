@@ -16,7 +16,7 @@ use log::debug;
 
 pub struct Parser<'src> {
     lexer: Lexer<'src>,
-    previous_token: Option<Token>,
+    previous_span: Option<Span>,
     current_token: Option<Token>,
     next_token: Option<Token>,
 
@@ -32,7 +32,7 @@ impl<'src> Parser<'src> {
     pub fn new(lexer: Lexer<'src>) -> Parser<'src> {
         Parser {
             lexer,
-            previous_token: None,
+            previous_span: None,
             current_token: None,
             next_token: None,
             unique_id: SymbolId::new(0),
@@ -81,7 +81,7 @@ impl<'src> Parser<'src> {
     }
 
     fn end_span_from_previous_token(&self, span: &mut Span) {
-        span.end = self.previous_token.as_ref().unwrap().span.end
+        span.end = self.previous_span.unwrap().end
     }
 
     #[inline(never)]
@@ -193,16 +193,11 @@ impl<'src> Parser<'src> {
             return;
         }
 
-        self.previous_token = self.current_token.take();
+        self.previous_span = self.current_token.as_ref().map(|token| token.span);
         self.current_token = self.next_token.take();
 
         self.next_token = Some(self.lexer.next_token());
         debug!("Advanced to {:?}", self.current_token);
-    }
-
-    #[inline(always)]
-    fn previous_token_kind(&self) -> Option<&TokenKind> {
-        self.previous_token.as_ref().map(|token| &token.kind)
     }
 
     #[inline(always)]
@@ -794,17 +789,24 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_unary_expression(&mut self) -> Expr {
-        self.advance();
+        match self.current_token_kind() {
+            Some(TokenKind::Minus) => {
+                self.advance();
 
-        match self.previous_token_kind() {
-            Some(TokenKind::Minus) => node::expr!(UnaryOp(
-                UnaryOp::Minus,
-                Box::new(self.parse_primary_expression())
-            )),
+                node::expr!(UnaryOp(
+                    UnaryOp::Minus,
+                    Box::new(self.parse_primary_expression())
+                ))
+            }
 
-            Some(TokenKind::ExclamationMark | TokenKind::Keyword(Keyword::Not)) => node::expr!(
-                UnaryOp(UnaryOp::Not, Box::new(self.parse_primary_expression()))
-            ),
+            Some(TokenKind::ExclamationMark | TokenKind::Keyword(Keyword::Not)) => {
+                self.advance();
+
+                node::expr!(UnaryOp(
+                    UnaryOp::Not,
+                    Box::new(self.parse_primary_expression())
+                ))
+            }
 
             _ => unreachable!("Unexpected token kind"),
         }
