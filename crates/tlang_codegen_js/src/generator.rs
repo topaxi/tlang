@@ -1,8 +1,8 @@
-use crate::{function_generator::fn_identifier_to_string, scope::Scope};
+use crate::scope::Scope;
 use tlang_ast::{
     node::{
-        BinaryOpKind, Block, CallExpression, ElseClause, EnumPattern, Expr, ExprKind,
-        FunctionParameter, Ident, Module, Path, Pattern, PatternKind, Stmt, StmtKind, UnaryOp,
+        BinaryOpKind, Block, ElseClause, EnumPattern, Expr, ExprKind, FunctionParameter, Ident,
+        Module, Path, Pattern, PatternKind, Stmt, StmtKind, UnaryOp,
     },
     token::{Literal, Token, TokenKind},
 };
@@ -33,18 +33,12 @@ pub(crate) struct FunctionContext {
     // Empty string for anonymous functions.
     pub name: String,
 
-    // The parameters of the current function we're in.
-    pub params: Vec<String>,
-
     // The parameter name bindings of the current function we're in.
     pub parameter_bindings: Vec<String>,
 
     // Is the current function body tail recursive?
     // This is used to determine if we should unwrap the recursion into a while loop.
     pub is_tail_recursive: bool,
-
-    // Should remap to rest args?
-    pub remap_to_rest_args: bool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -209,11 +203,16 @@ impl CodegenJS {
         parameters: &[FunctionParameter],
         parameter_bindings: &[String],
         is_tail_recursive: bool,
-        remap_to_rest_args: bool,
     ) {
-        self.function_context_stack.push(FunctionContext {
-            name: name.to_string(),
-            params: parameters
+        // We currently only need the parameter names/bindings for tail recursive functions.
+        let parameter_bindings = if !is_tail_recursive {
+            vec![]
+        // If we have parameter_bindings provided, we use them to assign the parameters in
+        // recursive function calls.
+        } else if parameters.len() == parameter_bindings.len() {
+            parameter_bindings.to_vec()
+        } else {
+            parameters
                 .iter()
                 .map(|param| {
                     if let PatternKind::Identifier(ident_pattern) = &param.pattern.kind {
@@ -224,10 +223,13 @@ impl CodegenJS {
                         self.scopes.declare_tmp_variable()
                     }
                 })
-                .collect(),
-            parameter_bindings: parameter_bindings.to_vec(),
+                .collect()
+        };
+
+        self.function_context_stack.push(FunctionContext {
+            name: name.to_string(),
+            parameter_bindings,
             is_tail_recursive,
-            remap_to_rest_args,
         });
     }
 
@@ -628,9 +630,9 @@ impl CodegenJS {
                 .declare_variable_alias(name, &shadowed_name);
         }
         self.push_let_declaration_to_expr(&var_name, value);
+        self.push_str(";\n");
         self.current_scope().declare_variable_alias(name, &var_name);
         self.context_stack.pop();
-        self.push_str(";\n");
     }
 
     fn generate_variable_declaration_list_pattern(&mut self, patterns: &[Pattern], value: &Expr) {
@@ -814,7 +816,7 @@ impl CodegenJS {
         self.push_char(')');
     }
 
-    fn generate_call_expression(&mut self, function: &Expr, arguments: &[Expr]) {
+    pub(crate) fn generate_call_expression(&mut self, function: &Expr, arguments: &[Expr]) {
         let wildcard_count = arguments.iter().filter(|arg| arg.is_wildcard()).count();
 
         if wildcard_count > 0 {
@@ -836,52 +838,6 @@ impl CodegenJS {
         }
 
         self.push_char(')');
-    }
-
-    fn generate_recursive_call_expression(&mut self, expr: &CallExpression) {
-        // If call expression is referencing the current function, all we do is update the arguments,
-        // as we are in a while loop.
-        if let ExprKind::Path(_) = &expr.callee.kind {
-            if let Some(function_context) = self.function_context_stack.last() {
-                if function_context.is_tail_recursive
-                        // TODO: Comparing identifier by string might not be the best idea.
-                        && function_context.name == fn_identifier_to_string(&expr.callee)
-                {
-                    let params = function_context.params.clone();
-                    let parameter_bindings = function_context.parameter_bindings.clone();
-                    let remap_to_rest_args = function_context.remap_to_rest_args;
-                    let tmp_vars = function_context
-                        .params
-                        .iter()
-                        .map(|_| self.scopes.declare_tmp_variable())
-                        .collect::<Vec<_>>();
-
-                    for (i, arg) in expr.arguments.iter().enumerate() {
-                        self.push_let_declaration_to_expr(&tmp_vars[i], arg);
-                        self.push_str(";\n");
-                    }
-
-                    let params = if remap_to_rest_args {
-                        parameter_bindings
-                    } else {
-                        params
-                    };
-
-                    for (i, arg_name) in params.iter().enumerate() {
-                        self.push_indent();
-                        self.push_str(arg_name);
-                        self.push_str(" = ");
-                        self.push_str(&tmp_vars[i]);
-                        self.push_str(";\n");
-                    }
-
-                    return;
-                }
-            }
-        }
-
-        // For any other referenced function, we do a normal call expression.
-        self.generate_call_expression(&expr.callee, &expr.arguments)
     }
 
     pub fn get_output(&self) -> &str {

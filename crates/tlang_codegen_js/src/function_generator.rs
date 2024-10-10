@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use tlang_ast::node::{
-    Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, Pattern, PatternKind, Stmt,
-    StmtKind,
+    Block, CallExpression, Expr, ExprKind, FunctionDeclaration, FunctionParameter, Pattern,
+    PatternKind, Stmt, StmtKind,
 };
 use tlang_ast::token::Token;
 
@@ -322,7 +322,6 @@ impl CodegenJS {
                 &declaration.parameters,
                 &arg_bindings,
                 is_any_definition_tail_recursive,
-                true,
             );
             self.generate_function_body(&declaration.body, false);
             self.pop_function_context();
@@ -516,7 +515,6 @@ impl CodegenJS {
             &declaration.parameters,
             &[],
             is_tail_recursive,
-            false,
         );
 
         self.push_indent();
@@ -550,7 +548,6 @@ impl CodegenJS {
             &declaration.parameters,
             &[],
             is_tail_recursive,
-            false,
         );
 
         match name_as_str.as_str() {
@@ -637,6 +634,44 @@ impl CodegenJS {
         }
 
         self.push_str(";\n");
+    }
+
+    pub(crate) fn generate_recursive_call_expression(&mut self, expr: &CallExpression) {
+        // If call expression is referencing the current function, all we do is update the arguments,
+        // as we are in a while loop.
+        if let ExprKind::Path(_) = &expr.callee.kind {
+            if let Some(function_context) = self.get_function_context() {
+                if function_context.is_tail_recursive
+                        // TODO: Comparing identifier by string might not be the best idea.
+                        && function_context.name == fn_identifier_to_string(&expr.callee)
+                {
+                    let params = function_context.parameter_bindings.clone();
+
+                    let tmp_vars = params
+                        .iter()
+                        .map(|_| self.current_scope().declare_tmp_variable())
+                        .collect::<Vec<_>>();
+
+                    for (i, arg) in expr.arguments.iter().enumerate() {
+                        self.push_let_declaration_to_expr(&tmp_vars[i], arg);
+                        self.push_str(";\n");
+                    }
+
+                    for (i, arg_name) in params.iter().enumerate() {
+                        self.push_indent();
+                        self.push_str(arg_name);
+                        self.push_str(" = ");
+                        self.push_str(&tmp_vars[i]);
+                        self.push_str(";\n");
+                    }
+
+                    return;
+                }
+            }
+        }
+
+        // For any other referenced function, we do a normal call expression.
+        self.generate_call_expression(&expr.callee, &expr.arguments)
     }
 
     fn flush_function_pre_body(self: &mut CodegenJS) {

@@ -172,12 +172,12 @@ fn test_foldl_impl() {
                 } else if (arg0.length >= 1) {
                     let x = arg0[0];
                     let xs = arg0.slice(1);
-                    let $tmp$1 = xs;
-                    let $tmp$2 = f(acc, x);
-                    let $tmp$3 = f;
-                    arg0 = $tmp$1;
-                    acc = $tmp$2;
-                    f = $tmp$3;
+                    let $tmp$0 = xs;
+                    let $tmp$1 = f(acc, x);
+                    let $tmp$2 = f;
+                    arg0 = $tmp$0;
+                    acc = $tmp$1;
+                    f = $tmp$2;
                 }
             }
         }
@@ -224,26 +224,26 @@ fn test_partition_impl() {
                     let doesNotSatisfy = args[3];
                     let x = args[0][0];
                     let xs = args[0].slice(1);
+                    let $tmp$0;if (predicate(x)) {
+                        $tmp$0 = [...satisfies, x];
+                    } else {
+                        $tmp$0 = satisfies;
+                    }
+                    let partitionedSatisfies = $tmp$0;
                     let $tmp$1;if (predicate(x)) {
-                        $tmp$1 = [...satisfies, x];
+                        $tmp$1 = doesNotSatisfy;
                     } else {
-                        $tmp$1 = satisfies;
+                        $tmp$1 = [...doesNotSatisfy, x];
                     }
-                    let partitionedSatisfies = $tmp$1;
-                    let $tmp$2;if (predicate(x)) {
-                        $tmp$2 = doesNotSatisfy;
-                    } else {
-                        $tmp$2 = [...doesNotSatisfy, x];
-                    }
-                    let partitionedDoesNotSatisfy = $tmp$2;
-                    let $tmp$3 = xs;
-                    let $tmp$4 = predicate;
-                    let $tmp$5 = partitionedSatisfies;
-                    let $tmp$6 = partitionedDoesNotSatisfy;
-                    args[0] = $tmp$3;
-                    args[1] = $tmp$4;
-                    args[2] = $tmp$5;
-                    args[3] = $tmp$6;
+                    let partitionedDoesNotSatisfy = $tmp$1;
+                    let $tmp$2 = xs;
+                    let $tmp$3 = predicate;
+                    let $tmp$4 = partitionedSatisfies;
+                    let $tmp$5 = partitionedDoesNotSatisfy;
+                    args[0] = $tmp$2;
+                    args[1] = $tmp$3;
+                    args[2] = $tmp$4;
+                    args[3] = $tmp$5;
                 }
             }
         }
@@ -283,12 +283,12 @@ fn test_all_impl() {
                     let predicate = args[1];
                     let acc = args[2];
                     let xs = args[0].slice(1);
-                    let $tmp$1 = xs;
-                    let $tmp$2 = predicate;
-                    let $tmp$3 = acc;
-                    args[0] = $tmp$1;
-                    args[1] = $tmp$2;
-                    args[2] = $tmp$3;
+                    let $tmp$0 = xs;
+                    let $tmp$1 = predicate;
+                    let $tmp$2 = acc;
+                    args[0] = $tmp$0;
+                    args[1] = $tmp$1;
+                    args[2] = $tmp$2;
                 }
             }
         }
