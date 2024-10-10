@@ -8,15 +8,15 @@ pub struct CodemirrorDiagnostic {
     severity: String,
 
     /// Relative position in the document, our diagnostics are line/column based
-    pub from: usize,
+    pub from: u32,
 
     /// Relative position in the document, our diagnostics are line/column based
-    pub to: usize,
+    pub to: u32,
 }
 
 #[wasm_bindgen]
 impl CodemirrorDiagnostic {
-    pub fn new(message: &str, severity: &str, from: usize, to: usize) -> Self {
+    pub fn new(message: &str, severity: &str, from: u32, to: u32) -> Self {
         CodemirrorDiagnostic {
             message: message.to_string(),
             severity: severity.to_string(),
@@ -62,16 +62,16 @@ pub fn from_tlang_diagnostic(src: &str, diagnostic: &Diagnostic) -> CodemirrorDi
     )
 }
 
-fn line_column_to_offset(src: &str, line: usize, column: usize) -> usize {
+fn line_column_to_offset(src: &str, line: u32, column: u32) -> u32 {
     let mut offset = 0;
     let lines = src.lines();
 
     for (i, l) in lines.enumerate() {
-        if i == line {
+        if i as u32 == line {
             offset += column;
             break;
         }
-        offset += l.len() + 1;
+        offset += l.len() as u32 + 1;
     }
 
     offset

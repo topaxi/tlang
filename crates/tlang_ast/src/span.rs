@@ -2,8 +2,8 @@ use serde::Serialize;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
 pub struct LineColumn {
-    pub line: usize,
-    pub column: usize,
+    pub line: u32,
+    pub column: u32,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]

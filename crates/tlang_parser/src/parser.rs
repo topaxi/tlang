@@ -101,8 +101,13 @@ impl<'src> Parser<'src> {
     fn panic_unexpected_token(&self, expected: &str, actual: Option<Token>) {
         let token = actual.as_ref().unwrap();
         let start_span = &token.span.start;
-        let source_line = self.lexer.source().lines().nth(start_span.line).unwrap();
-        let caret = " ".repeat(start_span.column) + "^";
+        let source_line = self
+            .lexer
+            .source()
+            .lines()
+            .nth(start_span.line as usize)
+            .unwrap();
+        let caret = " ".repeat(start_span.column as usize) + "^";
 
         panic!(
             "Expected {} on line {}, column {}, found {:?} instead\n{}\n{}",
@@ -114,8 +119,13 @@ impl<'src> Parser<'src> {
     fn panic_unexpected_stmt(&self, expected: &str, actual: Option<Stmt>) {
         let node = actual.as_ref().unwrap();
         let start_span = &node.span.start;
-        let source_line = self.lexer.source().lines().nth(start_span.line).unwrap();
-        let caret = " ".repeat(start_span.column) + "^";
+        let source_line = self
+            .lexer
+            .source()
+            .lines()
+            .nth(start_span.line as usize)
+            .unwrap();
+        let caret = " ".repeat(start_span.column as usize) + "^";
 
         panic!(
             "Expected {} on line {}, column {}, found {:?} instead\n{}\n{}",
@@ -127,8 +137,13 @@ impl<'src> Parser<'src> {
     fn panic_unexpected_expr(&self, expected: &str, actual: Option<Expr>) {
         let node = actual.as_ref().unwrap();
         let start_span = &node.span.start;
-        let source_line = self.lexer.source().lines().nth(start_span.line).unwrap();
-        let caret = " ".repeat(start_span.column) + "^";
+        let source_line = self
+            .lexer
+            .source()
+            .lines()
+            .nth(start_span.line as usize)
+            .unwrap();
+        let caret = " ".repeat(start_span.column as usize) + "^";
 
         panic!(
             "Expected {} on line {}, column {}, found {:?} instead\n{}\n{}",

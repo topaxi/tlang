@@ -8,8 +8,8 @@ pub struct Lexer<'src> {
     source: &'src str,
     chars: std::str::Chars<'src>, // char iterator over `source`.
     position: usize,
-    current_line: usize,
-    current_column: usize,
+    current_line: u32,
+    current_column: u32,
     current_char: char,
     next_char: char,
 }
@@ -31,11 +31,11 @@ impl Lexer<'_> {
         }
     }
 
-    pub fn current_line(&self) -> usize {
+    pub fn current_line(&self) -> u32 {
         self.current_line
     }
 
-    pub fn current_column(&self) -> usize {
+    pub fn current_column(&self) -> u32 {
         self.current_column
     }
 
