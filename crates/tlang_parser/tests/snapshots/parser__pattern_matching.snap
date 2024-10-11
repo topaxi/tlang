@@ -55,22 +55,7 @@ Module(
             arms: [
               MatchArm(
                 pattern: Pattern(
-                  kind: Literal(Expr(
-                    kind: Literal(Integer(1)),
-                    leading_comments: [],
-                    trailing_comments: [],
-                    symbol_table: None,
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 18,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 19,
-                      ),
-                    ),
-                  )),
+                  kind: Literal(Integer(1)),
                   span: Span(
                     start: LineColumn(
                       line: 0,
@@ -101,22 +86,7 @@ Module(
               ),
               MatchArm(
                 pattern: Pattern(
-                  kind: Literal(Expr(
-                    kind: Literal(Integer(3)),
-                    leading_comments: [],
-                    trailing_comments: [],
-                    symbol_table: None,
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 26,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 27,
-                      ),
-                    ),
-                  )),
+                  kind: Literal(Integer(3)),
                   span: Span(
                     start: LineColumn(
                       line: 0,

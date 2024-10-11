@@ -319,7 +319,7 @@ pub struct EnumPattern {
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub enum PatternKind {
     Identifier(Box<IdentifierPattern>),
-    Literal(Box<Expr>),
+    Literal(Box<Literal>),
     List(Vec<Pattern>),
     Rest(Box<Pattern>),
     Enum(Box<EnumPattern>),

@@ -7,7 +7,7 @@ use tlang_ast::node::{
 };
 use tlang_ast::span::Span;
 use tlang_ast::symbols::SymbolId;
-use tlang_ast::token::{Keyword, Token, TokenKind};
+use tlang_ast::token::{Keyword, Literal, Token, TokenKind};
 use tlang_lexer::Lexer;
 
 use crate::error::{ParseError, ParseErrorKind};
@@ -1362,9 +1362,22 @@ impl<'src> Parser<'src> {
         op1.precedence > op2.precedence
     }
 
+    fn parse_literal(&mut self) -> Literal {
+        expect_token_matches!(self, "literal", TokenKind::Literal(_));
+        match self.current_token_kind() {
+            Some(TokenKind::Literal(literal)) => {
+                let literal = literal.clone();
+                self.advance();
+                literal
+            }
+            _ => unreachable!("Expected literal"),
+        }
+    }
+
     fn parse_pattern_literal(&mut self) -> Pattern {
         expect_token_matches!(self, "literal", TokenKind::Literal(_));
-        node::pat!(Literal(Box::new(self.parse_expression())))
+
+        node::pat!(Literal(Box::new(self.parse_literal())))
     }
 
     fn parse_pattern(&mut self) -> Pattern {

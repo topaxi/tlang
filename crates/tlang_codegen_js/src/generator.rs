@@ -581,7 +581,7 @@ impl CodegenJS {
                     .declare_variable_alias(ident_pattern.name.as_str(), &var_name);
             }
             PatternKind::Enum(enum_pattern) => self.generate_enum_extraction(enum_pattern),
-            PatternKind::Literal(expr) => self.generate_expr(expr, None),
+            PatternKind::Literal(literal) => self.generate_literal(literal),
             PatternKind::List(patterns) => {
                 self.push_char('[');
                 for (i, pattern) in patterns.iter().enumerate() {
