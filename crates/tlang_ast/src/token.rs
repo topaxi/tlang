@@ -1,22 +1,23 @@
+use crate::define_keywords;
 use crate::span::Span;
 use serde::Serialize;
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
-pub enum Keyword {
-    Let,
-    Fn,
-    Return,
-    Rec,
-    If,
-    Else,
-    Match,
-    Enum,
-    Struct,
-    Not,
-    And,
-    Or,
-    Underscore,
-    _Self,
+define_keywords! {
+    Let => "let",
+    Fn => "fn",
+    Return => "return",
+    Rec => "rec",
+    If => "if",
+    Else => "else",
+    Match => "match",
+    Enum => "enum",
+    Struct => "struct",
+    Not => "not",
+    And => "and",
+    Or => "or",
+    Underscore => "_",
+    // TODO: It might actually be better to just treat this as an identifier.
+    _Self => "self"
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]

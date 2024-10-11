@@ -847,6 +847,7 @@ impl<'src> Parser<'src> {
                         | Keyword::Match
                         | Keyword::Not
                         | Keyword::Underscore
+                        | Keyword::_Self
                 )
                 | TokenKind::Identifier(_)
                 | TokenKind::Literal(_)

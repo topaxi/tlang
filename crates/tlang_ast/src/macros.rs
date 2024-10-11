@@ -41,6 +41,21 @@ macro_rules! stmt {
     }};
 }
 
+#[macro_export]
+macro_rules! define_keywords {
+    ($($keyword:ident => $str_value:expr),*) => {
+        #[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+        pub enum Keyword {
+            $($keyword),*
+        }
+
+        #[allow(non_upper_case_globals)]
+        pub mod kw {
+            $(pub const $keyword: &str = $str_value;)*
+        }
+    };
+}
+
 pub use expr;
 pub use pat;
 pub use stmt;
