@@ -609,6 +609,8 @@ dependencies = [
 name = "tlang_codegen_js"
 version = "0.1.0"
 dependencies = [
+ "ctor",
+ "env_logger",
  "indoc",
  "pretty_assertions",
  "tlang_ast",

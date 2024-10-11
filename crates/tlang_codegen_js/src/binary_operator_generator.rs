@@ -78,6 +78,7 @@ impl CodegenJS {
 
     fn generate_binary_operator_token(self: &mut CodegenJS, op: &BinaryOpKind) {
         match op {
+            BinaryOpKind::Assign => self.push_str(" = "),
             BinaryOpKind::Add => self.push_str(" + "),
             BinaryOpKind::Subtract => self.push_str(" - "),
             BinaryOpKind::Multiply => self.push_str(" * "),
@@ -114,12 +115,16 @@ fn should_wrap_with_parentheses(op: &BinaryOpKind, parent_op: &BinaryOpKind) -> 
 
 fn map_operator_info(op: &BinaryOpKind) -> JSOperatorInfo {
     match op {
+        BinaryOpKind::Assign => JSOperatorInfo {
+            precedence: 1,
+            associativity: JSAssociativity::Right,
+        },
         BinaryOpKind::Add | BinaryOpKind::Subtract => JSOperatorInfo {
-            precedence: 6,
+            precedence: 7,
             associativity: JSAssociativity::Left,
         },
         BinaryOpKind::Multiply | BinaryOpKind::Divide | BinaryOpKind::Modulo => JSOperatorInfo {
-            precedence: 7,
+            precedence: 8,
             associativity: JSAssociativity::Left,
         },
         BinaryOpKind::Equal
@@ -128,25 +133,25 @@ fn map_operator_info(op: &BinaryOpKind) -> JSOperatorInfo {
         | BinaryOpKind::LessThanOrEqual
         | BinaryOpKind::GreaterThan
         | BinaryOpKind::GreaterThanOrEqual => JSOperatorInfo {
-            precedence: 5,
+            precedence: 6,
             associativity: JSAssociativity::Left,
         },
         BinaryOpKind::And => JSOperatorInfo {
-            precedence: 3,
+            precedence: 4,
             associativity: JSAssociativity::Left,
         },
         BinaryOpKind::Or => JSOperatorInfo {
-            precedence: 2,
+            precedence: 3,
             associativity: JSAssociativity::Left,
         },
         BinaryOpKind::BitwiseAnd | BinaryOpKind::BitwiseOr | BinaryOpKind::BitwiseXor => {
             JSOperatorInfo {
-                precedence: 8,
+                precedence: 9,
                 associativity: JSAssociativity::Left,
             }
         }
         BinaryOpKind::Exponentiation => JSOperatorInfo {
-            precedence: 9,
+            precedence: 10,
             associativity: JSAssociativity::Right,
         },
         BinaryOpKind::Pipeline => unreachable!("Pipeline operator does not exist yet in JS"),

@@ -326,6 +326,8 @@ pub enum PatternKind {
     Rest(Box<Pattern>),
     Enum(Box<EnumPattern>),
     Wildcard,
+    // TODO: As mentioned on the Keyword enum, we might want this to just be an Identifier(Pattern)
+    _Self(SymbolId),
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
@@ -462,6 +464,7 @@ pub struct OperatorInfo {
 
 #[derive(Debug, PartialEq, Clone, Copy, Serialize)]
 pub enum BinaryOpKind {
+    Assign,
     Add,
     Subtract,
     Multiply,

@@ -534,11 +534,16 @@ impl CodegenJS {
     }
 
     fn generate_path_expression(&mut self, path: &Path) {
-        if path.segments.len() == 1 {
-            self.generate_identifier(path.segments.first().unwrap());
-        } else {
-            self.push_str(&path.join("."));
-        }
+        let first_segment = path.segments.first().unwrap();
+
+        self.generate_identifier(first_segment);
+        self.push_str(
+            &path.segments[1..]
+                .iter()
+                .fold("".to_string(), |acc, segment| {
+                    acc + "." + segment.name.as_str()
+                }),
+        );
     }
 
     fn generate_list_expression(&mut self, items: &[Expr]) {
@@ -579,6 +584,9 @@ impl CodegenJS {
                 self.push_str(&var_name);
                 self.current_scope()
                     .declare_variable_alias(ident_pattern.name.as_str(), &var_name);
+            }
+            PatternKind::_Self(_) => {
+                self.current_scope().declare_variable_alias("self", "this");
             }
             PatternKind::Enum(enum_pattern) => self.generate_enum_extraction(enum_pattern),
             PatternKind::Literal(literal) => self.generate_literal(literal),

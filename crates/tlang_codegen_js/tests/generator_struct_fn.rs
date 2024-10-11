@@ -19,6 +19,10 @@ fn test_function_definition_on_struct() {
         fn Test.get_field(self) -> int {
             self.field
         }
+
+        fn Test.set_field(self, field: int) {
+            self.field = field;
+        }
     "});
     let expected_output = indoc! {"
         function TestConstructor(field) {
@@ -31,10 +35,13 @@ fn test_function_definition_on_struct() {
             return Test({
                 field: 0,
             });
-        };
+        }
         TestConstructor.prototype.get_field = function get_field() {
             return this.field;
-        };
+        }
+        TestConstructor.prototype.set_field = function set_field(field) {
+            this.field = field;
+        }
     "};
     assert_eq!(output, expected_output);
 }

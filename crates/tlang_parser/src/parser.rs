@@ -891,6 +891,31 @@ impl<'src> Parser<'src> {
                 self.advance();
                 node::expr!(Literal(Box::new(literal)))
             }
+            // TODO: Mostly copied from Identifier further below, `self` might be easier to just be
+            //       an identifier.
+            Some(TokenKind::Keyword(Keyword::_Self)) => {
+                let identifier_span = self.create_span_from_current_token();
+
+                self.advance();
+
+                let mut path = Path::from_ident(Ident::new("self", identifier_span));
+                let mut span = path.span;
+
+                while let Some(TokenKind::Dot) = self.current_token_kind() {
+                    self.advance();
+                    path.push(self.parse_identifier());
+                }
+
+                self.end_span_from_previous_token(&mut span);
+
+                let mut expr = node::expr!(Path(Box::new(path))).with_span(span);
+
+                if let Some(TokenKind::LParen | TokenKind::LBrace) = self.current_token_kind() {
+                    expr = self.parse_call_expression(expr);
+                }
+
+                expr
+            }
             Some(TokenKind::Identifier(identifier)) => {
                 let identifier = identifier.clone();
                 let identifier_span = self.create_span_from_current_token();
@@ -1271,6 +1296,7 @@ impl<'src> Parser<'src> {
                 | TokenKind::Slash
                 | TokenKind::Percent
                 | TokenKind::Caret
+                | TokenKind::EqualSign
                 | TokenKind::EqualEqual
                 | TokenKind::NotEqual
                 | TokenKind::LessThan
@@ -1294,6 +1320,7 @@ impl<'src> Parser<'src> {
             TokenKind::AsteriskAsterisk => BinaryOpKind::Exponentiation,
             TokenKind::Slash => BinaryOpKind::Divide,
             TokenKind::Percent => BinaryOpKind::Modulo,
+            TokenKind::EqualSign => BinaryOpKind::Assign,
             TokenKind::EqualEqual => BinaryOpKind::Equal,
             TokenKind::NotEqual => BinaryOpKind::NotEqual,
             TokenKind::LessThan => BinaryOpKind::LessThan,
@@ -1316,12 +1343,16 @@ impl<'src> Parser<'src> {
 
     fn map_operator_info(operator: &BinaryOpKind) -> OperatorInfo {
         match operator {
+            BinaryOpKind::Assign => OperatorInfo {
+                precedence: 1,
+                associativity: Associativity::Right,
+            },
             BinaryOpKind::Add | BinaryOpKind::Subtract => OperatorInfo {
-                precedence: 6,
+                precedence: 7,
                 associativity: Associativity::Left,
             },
             BinaryOpKind::Multiply | BinaryOpKind::Divide | BinaryOpKind::Modulo => OperatorInfo {
-                precedence: 7,
+                precedence: 8,
                 associativity: Associativity::Left,
             },
             BinaryOpKind::Equal
@@ -1330,29 +1361,29 @@ impl<'src> Parser<'src> {
             | BinaryOpKind::LessThanOrEqual
             | BinaryOpKind::GreaterThan
             | BinaryOpKind::GreaterThanOrEqual => OperatorInfo {
-                precedence: 5,
+                precedence: 6,
                 associativity: Associativity::Left,
             },
             BinaryOpKind::And => OperatorInfo {
-                precedence: 3,
+                precedence: 4,
                 associativity: Associativity::Left,
             },
             BinaryOpKind::Or => OperatorInfo {
-                precedence: 2,
+                precedence: 3,
                 associativity: Associativity::Left,
             },
             BinaryOpKind::BitwiseAnd | BinaryOpKind::BitwiseOr | BinaryOpKind::BitwiseXor => {
                 OperatorInfo {
-                    precedence: 8,
+                    precedence: 9,
                     associativity: Associativity::Left,
                 }
             }
             BinaryOpKind::Exponentiation => OperatorInfo {
-                precedence: 9,
+                precedence: 10,
                 associativity: Associativity::Right,
             },
             BinaryOpKind::Pipeline => OperatorInfo {
-                precedence: 1,
+                precedence: 2,
                 associativity: Associativity::Left,
             },
         }
@@ -1390,7 +1421,7 @@ impl<'src> Parser<'src> {
             "literal, identifier or list extraction",
             TokenKind::Literal(_)
                 | TokenKind::Identifier(_)
-                | TokenKind::Keyword(Keyword::Underscore)
+                | TokenKind::Keyword(Keyword::Underscore | Keyword::_Self)
                 | TokenKind::LBracket
         );
 
@@ -1398,6 +1429,10 @@ impl<'src> Parser<'src> {
         let mut node = match self.current_token_kind() {
             // Literal values will be pattern matched
             Some(TokenKind::Literal(_)) => self.parse_pattern_literal(),
+            Some(TokenKind::Keyword(Keyword::_Self)) => {
+                self.advance();
+                node::pat!(_Self(self.unique_id()))
+            }
             Some(TokenKind::Keyword(Keyword::Underscore)) => {
                 self.advance();
                 node::pat!(Wildcard)

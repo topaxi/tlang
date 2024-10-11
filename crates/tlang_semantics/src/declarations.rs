@@ -287,6 +287,14 @@ impl DeclarationAnalyzer {
                     Some(pattern.span),
                 ));
             }
+            PatternKind::_Self(id) => {
+                self.declare_symbol(SymbolInfo::new(
+                    *id,
+                    "self",
+                    SymbolType::Variable,
+                    Some(pattern.span),
+                ));
+            }
             PatternKind::List(patterns) => {
                 for pattern in patterns {
                     self.collect_pattern(pattern);

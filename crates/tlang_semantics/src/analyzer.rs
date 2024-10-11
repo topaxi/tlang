@@ -300,7 +300,10 @@ impl SemanticAnalyzer {
                     self.analyze_pat(element);
                 }
             }
-            PatternKind::Wildcard | PatternKind::Identifier { .. } | PatternKind::Literal(_) => {}
+            PatternKind::Wildcard
+            | PatternKind::Identifier { .. }
+            | PatternKind::Literal(_)
+            | PatternKind::_Self(_) => {}
         }
     }
 

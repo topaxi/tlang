@@ -355,7 +355,8 @@ impl CodegenJS {
         &mut self,
         declarations: &[FunctionDeclaration],
     ) -> (Option<String>, Vec<String>) {
-        let is_member_method = is_member_method(&declarations[0].name);
+        // TODO: What was my plan here?
+        //let is_member_method = is_member_method(&declarations[0].name);
         let first_declaration_number_of_args = declarations[0].parameters.len();
         // check whether all declarations have the same number of parameters
         let same_number_of_args = declarations
@@ -501,6 +502,14 @@ impl CodegenJS {
 
         if let Some(param) = iter.next() {
             self.generate_pat(&param.pattern);
+
+            // If the first param was the self param, we didn't render anything and we need to skip
+            // the comma being rendered in the loop ahead.
+            if matches!(param.pattern.kind, PatternKind::_Self(_)) {
+                if let Some(param) = iter.next() {
+                    self.generate_pat(&param.pattern);
+                }
+            }
         }
 
         for param in iter {
