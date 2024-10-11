@@ -961,6 +961,9 @@ impl<'src> Parser<'src> {
             while !matches!(self.current_token_kind(), Some(TokenKind::RParen)) {
                 if !is_first_parameter {
                     self.consume_token(TokenKind::Comma);
+                    if matches!(self.current_token_kind(), Some(TokenKind::RParen)) {
+                        break;
+                    }
                 } else {
                     is_first_parameter = false;
                 }

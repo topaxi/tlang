@@ -1,0 +1,152 @@
+---
+source: crates/tlang_parser/tests/parser_fn.rs
+expression: "parse! (\"fn foo(x,) {}\")"
+---
+Module(
+  statements: [
+    Stmt(
+      kind: FunctionDeclaration(FunctionDeclaration(
+        id: SymbolId(1),
+        name: Expr(
+          kind: Path(Path(
+            segments: [
+              Ident(
+                name: "foo",
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 3,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 6,
+                  ),
+                ),
+              ),
+            ],
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 3,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 6,
+              ),
+            ),
+          )),
+          leading_comments: [],
+          trailing_comments: [],
+          symbol_table: None,
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 3,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 6,
+            ),
+          ),
+        ),
+        parameters: [
+          FunctionParameter(
+            pattern: Pattern(
+              kind: Identifier(IdentifierPattern(
+                id: SymbolId(2),
+                name: Ident(
+                  name: "x",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 7,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 8,
+                    ),
+                  ),
+                ),
+              )),
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 7,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 8,
+                ),
+              ),
+            ),
+            type_annotation: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 7,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 8,
+              ),
+            ),
+          ),
+        ],
+        guard: None,
+        return_type_annotation: None,
+        body: Block(
+          statements: [],
+          expression: None,
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 11,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 13,
+            ),
+          ),
+          symbol_table: None,
+        ),
+        leading_comments: [],
+        trailing_comments: [],
+        symbol_table: None,
+        span: Span(
+          start: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+          end: LineColumn(
+            line: 0,
+            column: 13,
+          ),
+        ),
+      )),
+      span: Span(
+        start: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end: LineColumn(
+          line: 0,
+          column: 13,
+        ),
+      ),
+      leading_comments: [],
+      trailing_comments: [],
+      symbol_table: None,
+    ),
+  ],
+  symbol_table: None,
+  span: Span(
+    start: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+  ),
+)
