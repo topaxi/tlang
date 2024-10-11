@@ -100,7 +100,7 @@ impl<'src> Parser<'src> {
     #[inline(never)]
     fn panic_unexpected_token(&self, expected: &str, actual: Option<Token>) {
         let token = actual.as_ref().unwrap();
-        let start_span = &token.span.start;
+        let start_span = token.span.start;
         let source_line = self
             .lexer
             .source()
@@ -118,7 +118,7 @@ impl<'src> Parser<'src> {
     #[inline(never)]
     fn panic_unexpected_stmt(&self, expected: &str, actual: Option<Stmt>) {
         let node = actual.as_ref().unwrap();
-        let start_span = &node.span.start;
+        let start_span = node.span.start;
         let source_line = self
             .lexer
             .source()
@@ -136,7 +136,7 @@ impl<'src> Parser<'src> {
     #[inline(never)]
     fn panic_unexpected_expr(&self, expected: &str, actual: Option<Expr>) {
         let node = actual.as_ref().unwrap();
-        let start_span = &node.span.start;
+        let start_span = node.span.start;
         let source_line = self
             .lexer
             .source()
