@@ -2,3 +2,7 @@
 /node_modules
 
 tsconfig.tsbuildinfo
+
+# Profiling files
+/perf.data*
+/*.perf
