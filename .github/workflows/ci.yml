@@ -41,9 +41,14 @@ jobs:
         if: ${{ steps.cache.outputs.cache-hit != 'true' }}
         run: |
           cargo install -f rustup-toolchain-install-master
-          # wasm-bindgen-cli must match wasm-bindgen package
-          cargo install -f wasm-bindgen-cli --version $(grep -oP 'wasm-bindgen = "\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
           cargo install -f cargo-make
+
+      # We always install wasm-bindgen-cli as it must match the installed
+      # wasm-bindgen package version, and we can't include this in the cache
+      # keys easily.
+      - name: Install wasm-bindgen
+        run: |
+          cargo install -f wasm-bindgen-cli --version $(grep -oP 'wasm-bindgen = "\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
 
       - name: Install binaryen
         run: sudo apt install -y binaryen
