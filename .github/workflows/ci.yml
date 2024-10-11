@@ -34,7 +34,7 @@ jobs:
             # changed. Especially useful while working on playground/non-rust
             # code.
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-0
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-1
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Install rustup-toolchain-install-master
