@@ -1493,11 +1493,7 @@ impl<'src> Parser<'src> {
             ExprKind::Path(path) => path.join("::"),
 
             ExprKind::FieldExpression(field) => {
-                format!(
-                    "{}.{}",
-                    self.fn_name_identifier_to_string(&field.base),
-                    field.field
-                )
+                self.fn_name_identifier_to_string(&field.base) + "." + field.field.as_str()
             }
             _ => {
                 self.panic_unexpected_expr(

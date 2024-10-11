@@ -757,7 +757,10 @@ impl CodegenJS {
                     [self.completion_variables.len() - 2]
                     .clone()
                     .unwrap();
-                self.push_str(&format!("{prev_completion_var} = {completion_var};\n"));
+                self.push_str(&prev_completion_var);
+                self.push_str(" = ");
+                self.push_str(&completion_var);
+                self.push_str(";\n");
             }
         }
         self.completion_variables.pop();

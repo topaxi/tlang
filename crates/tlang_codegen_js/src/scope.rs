@@ -26,7 +26,7 @@ impl Scope {
             return name.to_string();
         }
         // If already declared, generate a new name with a suffix (e.g., $a, $b)
-        let new_name = self.get_unique_variable_name(&format!("{name}$"));
+        let new_name = self.get_unique_variable_name(&(name.to_string() + "$"));
         self.variables.insert(name.to_string(), new_name.clone());
         new_name
     }
@@ -36,9 +36,9 @@ impl Scope {
     }
 
     fn get_unique_variable_name(&self, prefix: &str) -> String {
-        let mut suffix = 0;
+        let mut suffix = 0usize;
         loop {
-            let new_name = format!("{prefix}{suffix}");
+            let new_name = prefix.to_string() + &suffix.to_string();
             if !self.has_variable_in_scope(&new_name) {
                 return new_name;
             }

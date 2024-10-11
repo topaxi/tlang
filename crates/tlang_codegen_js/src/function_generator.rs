@@ -409,7 +409,8 @@ impl CodegenJS {
             (None, bindings)
         } else {
             let args_binding = self.current_scope().declare_variable("args");
-            self.push_str(&format!("...{args_binding}"));
+            self.push_str("...");
+            self.push_str(&args_binding);
 
             let max_args = declarations
                 .iter()
@@ -550,9 +551,14 @@ impl CodegenJS {
             is_tail_recursive,
         );
 
+        self.push_str("function");
+
         match name_as_str.as_str() {
-            "anonymous" => self.push_str("function"),
-            _ => self.push_str(&format!("function {name_as_str}")),
+            "anonymous" => {}
+            _ => {
+                self.push_char(' ');
+                self.push_str(&name_as_str);
+            }
         };
 
         self.generate_function_parameter_list(&declaration.parameters);
