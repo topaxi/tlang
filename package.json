@@ -4,6 +4,7 @@
   "description": "",
   "scripts": {
     "dev": "npm run dev -w tlang-playground",
+    "prebuild": "cargo make build-release",
     "build": "npm run build -w tlang-playground",
     "prepreview": "npm run build",
     "preview": "npx serve tlang-playground/dist",

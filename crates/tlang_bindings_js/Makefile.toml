@@ -5,11 +5,15 @@ CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = true
 skip_core_tasks = true
 
 [tasks.build-release]
-alias = "build"
+dependencies = ["release", "wasm-bindgen-release", "wasm-opt", "wasm-opt-cleanup"]
+
+[tasks.release]
+command = "cargo"
+args = ["build", "--release", "--target", "wasm32-unknown-unknown"]
 
 [tasks.build]
 command = "cargo"
-args = ["build", "--release", "--target", "wasm32-unknown-unknown"]
+args = ["build", "--target", "wasm32-unknown-unknown"]
 
 [tasks.cargo-clean]
 command = "cargo"
@@ -22,7 +26,7 @@ args = ["-rf", "wasm"]
 [tasks.clean]
 dependencies = ["cargo-clean", "wasm-clean"]
 
-[tasks.wasm-bindgen]
+[tasks.wasm-bindgen-release]
 command = "wasm-bindgen"
 args = [
   "--split-linked-modules",
@@ -31,6 +35,17 @@ args = [
   "--out-dir",
   "wasm",
   "../../target/wasm32-unknown-unknown/release/tlang_bindings_js.wasm",
+]
+
+[tasks.wasm-bindgen]
+command = "wasm-bindgen"
+args = [
+  "--split-linked-modules",
+  "--target",
+  "web",
+  "--out-dir",
+  "wasm",
+  "../../target/wasm32-unknown-unknown/debug/tlang_bindings_js.wasm",
 ]
 
 [tasks.wasm-opt-prepare]
@@ -76,7 +91,7 @@ script_extension = "ps1"
 script = "rm wasm/tlang_bindings_js_bg.unoptimized.wasm"
 
 [tasks.custom-default]
-dependencies = ["build", "wasm-bindgen", "wasm-opt", "wasm-opt-cleanup"]
+dependencies = ["build", "wasm-bindgen"]
 
 [tasks.default]
 alias = "custom-default"
