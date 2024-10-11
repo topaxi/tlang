@@ -190,10 +190,6 @@ export class TlangPlayground extends LitElement {
   }
 
   private compile(source: string) {
-    if (this.compiler != null) {
-      this.compiler.free();
-    }
-
     this.compiler = compile(source);
     this.output = this.compiler.output;
   }
@@ -238,16 +234,12 @@ export class TlangPlayground extends LitElement {
   }
 
   private mapAndFreeCodemirrorDiagnosticToJS(diagnostic: CodemirrorDiagnostic) {
-    let mapped = {
+    return {
       from: diagnostic.from,
       to: diagnostic.to,
       message: diagnostic.message,
       severity: diagnostic.severity as CodemirrorSeverity,
     };
-
-    diagnostic.free();
-
-    return mapped;
   }
 
   protected update(changedProperties: PropertyValueMap<this>): void {
