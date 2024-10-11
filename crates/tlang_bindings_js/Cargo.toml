@@ -11,7 +11,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 console_error_panic_hook = "0.1"
-wasm-bindgen = "0.2.93"
+wasm-bindgen = "0.2.95"
 tlang_ast = { path = "../tlang_ast" }               # Adjust the path as necessary
 tlang_parser = { path = "../tlang_parser" }
 tlang_semantics = { path = "../tlang_semantics" }
