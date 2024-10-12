@@ -1,9 +1,9 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use tlang_ast::{
     node::{
         Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, LetDeclaration, Module,
-        Pattern, PatternKind, Stmt, StmtKind,
+        Pattern, PatternKind, Stmt, StmtKind, StructDeclaration,
     },
     span::Span,
     symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
@@ -18,6 +18,7 @@ pub struct SemanticAnalyzer {
     declaration_analyzer: DeclarationAnalyzer,
     symbol_table_stack: Vec<Rc<RefCell<SymbolTable>>>,
     diagnostics: Vec<Diagnostic>,
+    struct_declarations: HashMap<String, StructDeclaration>,
 }
 
 impl Default for SemanticAnalyzer {
@@ -32,6 +33,7 @@ impl SemanticAnalyzer {
             declaration_analyzer,
             symbol_table_stack: vec![],
             diagnostics: vec![],
+            struct_declarations: HashMap::new(),
         }
     }
 
@@ -45,6 +47,10 @@ impl SemanticAnalyzer {
             .filter(|diagnostic| diagnostic.is_error())
             .cloned()
             .collect()
+    }
+
+    pub fn get_struct_declaration(&self, name: &str) -> Option<&StructDeclaration> {
+        self.struct_declarations.get(name)
     }
 
     fn get_last_symbol_table(&self) -> Rc<RefCell<SymbolTable>> {
@@ -156,8 +162,9 @@ impl SemanticAnalyzer {
             StmtKind::EnumDeclaration(_decl) => {
                 // TODO
             }
-            StmtKind::StructDeclaration(_decl) => {
-                // TODO
+            StmtKind::StructDeclaration(decl) => {
+                self.struct_declarations
+                    .insert(decl.name.to_string(), *decl.clone());
             }
         }
 
