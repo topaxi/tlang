@@ -12,7 +12,7 @@ enum Result {
 fn len(list) { list.length }
 
 // random_int(int) -> int
-fn random_int(max) { random() * max |> floor() }
+fn random_int(max) { math::random() * max |> math::floor() }
 
 // compose(fn(a) -> b, fn(b) -> c) -> fn(a) -> c
 fn compose(f, g) { fn(x) { f(g(x)) } }

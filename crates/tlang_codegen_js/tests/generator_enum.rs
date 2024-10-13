@@ -129,7 +129,7 @@ fn test_maximum_depth_tree() {
         }
 
         fn maximum_depth(Tree::Leaf(_)) { 1 }
-        fn maximum_depth(Tree::Node { left, right }) { 1 + max(maximum_depth(left), maximum_depth(right)) }
+        fn maximum_depth(Tree::Node { left, right }) { 1 + math::max(maximum_depth(left), maximum_depth(right)) }
 
         fn main() {
             let x = Tree::Node {
@@ -188,7 +188,7 @@ fn test_maximum_depth_tree_positional() {
         }
 
         fn maximum_depth(Tree::Leaf(_)) { 1 }
-        fn maximum_depth(Tree::Node(left, right)) { 1 + max(maximum_depth(left), maximum_depth(right)) }
+        fn maximum_depth(Tree::Node(left, right)) { 1 + math::max(maximum_depth(left), maximum_depth(right)) }
     "});
     let expected_output = indoc! {"
         const Tree = {

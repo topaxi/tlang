@@ -36,8 +36,10 @@ macro_rules! compile {
             $source,
             &[
                 ("log", SymbolType::Function),
-                ("max", SymbolType::Function),
-                ("min", SymbolType::Function),
+                ("math", SymbolType::Module),
+                ("math::max", SymbolType::Function),
+                ("math::min", SymbolType::Function),
+                ("math::sqrt", SymbolType::Function),
                 ("Some", SymbolType::EnumVariant),
                 ("None", SymbolType::EnumVariant),
             ],

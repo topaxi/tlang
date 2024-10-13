@@ -7,6 +7,7 @@ use crate::span::Span;
 
 #[derive(Debug, PartialEq, Copy, Clone, Serialize)]
 pub enum SymbolType {
+    Module,
     Variable,
     Function,
     Parameter,
@@ -18,6 +19,7 @@ pub enum SymbolType {
 impl Display for SymbolType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
+            SymbolType::Module => write!(f, "module"),
             SymbolType::Variable => write!(f, "variable"),
             SymbolType::Function => write!(f, "function"),
             SymbolType::Parameter => write!(f, "parameter"),

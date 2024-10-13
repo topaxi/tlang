@@ -14,7 +14,7 @@ fn test_pipeline_operator() {
     "};
     assert_eq!(output, expected_output);
 
-    let output = compile!("fn main() { 1 |> min |> max; }");
+    let output = compile!("fn main() { 1 |> math::min |> math::max; }");
     let expected_output = indoc! {"
         function main() {
             Math.max(Math.min(1));
@@ -25,7 +25,7 @@ fn test_pipeline_operator() {
 
 #[test]
 fn test_pipeline_operator_with_call_parenthesis() {
-    let output = compile!("fn main() { 1 |> max(); }");
+    let output = compile!("fn main() { 1 |> math::max(); }");
     let expected_output = indoc! {"
         function main() {
             Math.max(1);

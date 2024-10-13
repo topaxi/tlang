@@ -2,7 +2,7 @@
 fn len(list) { list.length }
 
 // random_int(int) -> int
-fn random_int(max) { random() * max |> floor() }
+fn random_int(max) { math::random() * max |> math::floor() }
 
 // partition(a[], fn(a) -> bool) -> (a[], a[])
 fn partition([], _) { [[], []] }

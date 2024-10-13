@@ -97,10 +97,11 @@ impl Default for Scope {
                 ("Ok".to_string(), "Result::Ok".to_string()),
                 ("Err".to_string(), "Result::Err".to_string()),
                 ("log".to_string(), "console.log".to_string()),
-                ("min".to_string(), "Math.min".to_string()),
-                ("max".to_string(), "Math.max".to_string()),
-                ("floor".to_string(), "Math.floor".to_string()),
-                ("random".to_string(), "Math.random".to_string()),
+                ("math".to_string(), "Math".to_string()),
+                ("math::min".to_string(), "Math.min".to_string()),
+                ("math::max".to_string(), "Math.max".to_string()),
+                ("math::floor".to_string(), "Math.floor".to_string()),
+                ("math::random".to_string(), "Math.random".to_string()),
             ]),
         }
     }

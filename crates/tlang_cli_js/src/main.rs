@@ -133,10 +133,11 @@ fn compile(source: &str) -> Result<String, ParserError> {
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.add_builtin_symbols(&[
         ("log", SymbolType::Function),
-        ("max", SymbolType::Function),
-        ("min", SymbolType::Function),
-        ("floor", SymbolType::Function),
-        ("random", SymbolType::Function),
+        ("math::max", SymbolType::Function),
+        ("math::min", SymbolType::Function),
+        ("math::floor", SymbolType::Function),
+        ("math::random", SymbolType::Function),
+        ("math::sqrt", SymbolType::Function),
     ]);
     match semantic_analyzer.analyze(&mut ast) {
         Ok(()) => {
