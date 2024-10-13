@@ -6,7 +6,7 @@ Module(
   statements: [
     Stmt(
       kind: EnumDeclaration(EnumDeclaration(
-        id: SymbolId(1),
+        id: SymbolId(3),
         name: Ident(
           name: "Option",
           span: Span(
@@ -22,6 +22,7 @@ Module(
         ),
         variants: [
           EnumVariant(
+            id: SymbolId(1),
             name: Ident(
               name: "Some",
               span: Span(
@@ -63,6 +64,7 @@ Module(
             ),
           ),
           EnumVariant(
+            id: SymbolId(2),
             name: Ident(
               name: "None",
               span: Span(
@@ -108,7 +110,7 @@ Module(
     Stmt(
       kind: FunctionDeclarations([
         FunctionDeclaration(
-          id: SymbolId(2),
+          id: SymbolId(4),
           name: Expr(
             kind: Path(Path(
               segments: [
@@ -345,7 +347,7 @@ Module(
           ),
         ),
         FunctionDeclaration(
-          id: SymbolId(2),
+          id: SymbolId(4),
           name: Expr(
             kind: Path(Path(
               segments: [
@@ -450,7 +452,7 @@ Module(
                   elements: [
                     Pattern(
                       kind: Identifier(IdentifierPattern(
-                        id: SymbolId(3),
+                        id: SymbolId(5),
                         name: Ident(
                           name: "value",
                           span: Span(

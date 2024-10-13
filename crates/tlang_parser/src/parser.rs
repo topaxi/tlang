@@ -417,6 +417,7 @@ impl<'src> Parser<'src> {
                 }
                 self.consume_token(TokenKind::RParen);
                 EnumVariant {
+                    id: self.unique_id(),
                     name,
                     named_fields: false,
                     parameters,
@@ -434,6 +435,7 @@ impl<'src> Parser<'src> {
                 }
                 self.consume_token(TokenKind::RBrace);
                 EnumVariant {
+                    id: self.unique_id(),
                     name,
                     named_fields: true,
                     parameters,
@@ -441,6 +443,7 @@ impl<'src> Parser<'src> {
                 }
             }
             _ => EnumVariant {
+                id: self.unique_id(),
                 name,
                 named_fields: false,
                 parameters: Vec::new(),
@@ -901,7 +904,7 @@ impl<'src> Parser<'src> {
                 let mut path = Path::from_ident(Ident::new("self", identifier_span));
                 let mut span = path.span;
 
-                while let Some(TokenKind::Dot) = self.current_token_kind() {
+                while let Some(TokenKind::PathSeparator) = self.current_token_kind() {
                     self.advance();
                     path.push(self.parse_identifier());
                 }

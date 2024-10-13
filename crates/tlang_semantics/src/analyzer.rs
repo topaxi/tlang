@@ -262,11 +262,13 @@ impl SemanticAnalyzer {
                 self.analyze_fn_decl(decl);
             }
             ExprKind::Path(path) => {
-                if let Some(first_ident) = path.segments.first() {
-                    self.mark_as_used_by_name(first_ident.as_str(), &expr.span);
-                }
+                let mut segments = Vec::with_capacity(path.segments.len());
 
-                // TODO: Handle nested identifiers
+                for segment in &path.segments {
+                    segments.push(segment.to_string());
+
+                    self.mark_as_used_by_name(&segments.join("::"), &expr.span);
+                }
             }
             ExprKind::Match(expr) => {
                 self.analyze_expr(&mut expr.expression);
@@ -292,7 +294,7 @@ impl SemanticAnalyzer {
     }
 
     #[allow(clippy::only_used_in_recursion)]
-    fn analyze_pat(&self, pat: &mut Pattern) {
+    fn analyze_pat(&mut self, pat: &mut Pattern) {
         match &mut pat.kind {
             PatternKind::List(patterns) => {
                 for pattern in patterns {
@@ -301,16 +303,16 @@ impl SemanticAnalyzer {
             }
             PatternKind::Rest(pattern) => self.analyze_pat(pattern),
             PatternKind::Enum(enum_pattern) => {
-                // self.mark_as_used_by_name(enum_pattern.identifier.as_str(), &pat.span);
+                self.analyze_expr(&mut enum_pattern.identifier);
 
                 for element in &mut enum_pattern.elements {
                     self.analyze_pat(element);
                 }
             }
-            PatternKind::Wildcard
-            | PatternKind::Identifier { .. }
-            | PatternKind::Literal(_)
-            | PatternKind::_Self(_) => {}
+            PatternKind::_Self(_) => {
+                self.mark_as_used_by_name("self", &pat.span);
+            }
+            PatternKind::Wildcard | PatternKind::Identifier { .. } | PatternKind::Literal(_) => {}
         }
     }
 

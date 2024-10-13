@@ -332,6 +332,7 @@ pub enum PatternKind {
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct EnumVariant {
+    pub id: SymbolId,
     pub name: Ident,
     pub named_fields: bool,
     pub parameters: Vec<Ident>,

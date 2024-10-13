@@ -106,6 +106,15 @@ impl DeclarationAnalyzer {
                     SymbolType::Enum,
                     Some(stmt.span),
                 ));
+
+                for element in &mut decl.variants {
+                    self.declare_symbol(SymbolInfo::new(
+                        element.id,
+                        &(decl.name.to_string() + "::" + element.name.as_str()),
+                        SymbolType::EnumVariant,
+                        Some(element.span),
+                    ));
+                }
             }
             StmtKind::StructDeclaration(decl) => {
                 self.declare_symbol(SymbolInfo::new(

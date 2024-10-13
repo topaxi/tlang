@@ -38,6 +38,8 @@ macro_rules! compile {
                 ("log", SymbolType::Function),
                 ("max", SymbolType::Function),
                 ("min", SymbolType::Function),
+                ("Some", SymbolType::EnumVariant),
+                ("None", SymbolType::EnumVariant),
             ],
         )
     }};

@@ -6,7 +6,7 @@ Module(
   statements: [
     Stmt(
       kind: EnumDeclaration(EnumDeclaration(
-        id: SymbolId(1),
+        id: SymbolId(3),
         name: Ident(
           name: "Option",
           span: Span(
@@ -22,6 +22,7 @@ Module(
         ),
         variants: [
           EnumVariant(
+            id: SymbolId(1),
             name: Ident(
               name: "Some",
               span: Span(
@@ -63,6 +64,7 @@ Module(
             ),
           ),
           EnumVariant(
+            id: SymbolId(2),
             name: Ident(
               name: "None",
               span: Span(
@@ -109,7 +111,7 @@ Module(
       kind: Let(LetDeclaration(
         pattern: Pattern(
           kind: Identifier(IdentifierPattern(
-            id: SymbolId(2),
+            id: SymbolId(4),
             name: Ident(
               name: "x",
               span: Span(
