@@ -5,8 +5,12 @@ CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = true
 skip_core_tasks = true
 
 [tasks.build-release]
-#dependencies = ["release", "wasm-bindgen-release", "wasm-opt", "wasm-opt-cleanup"]
-dependencies = ["release", "wasm-bindgen-release"]
+dependencies = [
+  "release",
+  "wasm-bindgen-release",
+  "wasm-opt",
+  "wasm-opt-cleanup",
+]
 
 [tasks.release]
 command = "cargo"
@@ -69,8 +73,9 @@ script = "mv -force wasm/tlang_bindings_js_bg.wasm wasm/tlang_bindings_js_bg.uno
 [tasks.wasm-opt]
 command = "wasm-opt"
 args = [
-  "-Oz", # aggressively optimize for file size
-  "-g",  # but still emit names for debugging/profiling
+  "-Oz",                                        # aggressively optimize for file size
+  "-g",                                         # but still emit names for debugging/profiling
+  "--enable-reference-types",                   # enable reference types, as wasm-bindgen uses them if available.
   "-o",
   "wasm/tlang_bindings_js_bg.wasm",
   "wasm/tlang_bindings_js_bg.unoptimized.wasm",
