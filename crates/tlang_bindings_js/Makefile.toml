@@ -8,8 +8,10 @@ skip_core_tasks = true
 dependencies = [
   "release",
   "wasm-bindgen-release",
-  "wasm-opt",
-  "wasm-opt-cleanup",
+  # Disable wasm opt, as this seems to break the deployed playground.
+  # Unsure why this happens though, as a local test build works fine.
+  #"wasm-opt",
+  #"wasm-opt-cleanup",
 ]
 
 [tasks.release]
