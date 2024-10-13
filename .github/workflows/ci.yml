@@ -52,8 +52,9 @@ jobs:
 
       - name: Install binaryen
         run: |
-          sudo apt install -y binaryen
-          wasm-opt --version
+          wget https://github.com/WebAssembly/binaryen/releases/download/version_119/binaryen-version_119-x86_64-linux.tar.gz
+          tar xzf binaryen-version_119-x86_64-linux.tar.gz
+          export PATH=$(pwd)/binaryen-version_119/bin:$PATH
 
       - name: Install wasm toolchain
         run: |
