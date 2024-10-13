@@ -420,3 +420,43 @@ fn test_and_or_as_keywords() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_dict_literal() {
+    let output = compile!(indoc! {"
+        fn main() {
+            let x = { a: 1, b: 2 };
+        }
+    "});
+    let expected_output = indoc! {"
+        function main() {
+            let x = {
+                a: 1,
+                b: 2,
+            };
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn test_dict_literal_shorthand() {
+    let output = compile!(indoc! {"
+        fn main() {
+            let a = 1;
+            let b = 2;
+            let x = { a, b };
+        }
+    "});
+    let expected_output = indoc! {"
+        function main() {
+            let a = 1;
+            let b = 2;
+            let x = {
+                a,
+                b,
+            };
+        }
+    "};
+    assert_eq!(output, expected_output);
+}

@@ -5,10 +5,7 @@ struct Vector {
 
 // Vector::new(int, int) -> Vector
 fn Vector::new(x: int, y: int) -> Vector {
-    Vector {
-        x: x,
-        y: y,
-    }
+    Vector { x, y }
 }
 
 // Vector.add(self, Vector) -> Vector

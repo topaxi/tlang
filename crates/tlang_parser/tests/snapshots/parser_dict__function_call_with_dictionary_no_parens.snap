@@ -1,5 +1,5 @@
 ---
-source: crates/tlang_parser/tests/parser.rs
+source: crates/tlang_parser/tests/parser_dict.rs
 expression: "parse! (r\"foo { foo: 1, bar: 2 };\")"
 ---
 Module(

@@ -1,6 +1,6 @@
 ---
-source: crates/tlang_parser/tests/parser.rs
-expression: "parse! (r\"let x = { foo: 1, bar: 2 };\")"
+source: crates/tlang_parser/tests/parser_dict.rs
+expression: "parse! (r\"let x = { foo, bar, };\")"
 ---
 Module(
   statements: [
@@ -78,18 +78,44 @@ Module(
                 ),
               ),
             ), Expr(
-              kind: Literal(Integer(1)),
+              kind: Path(Path(
+                segments: [
+                  Ident(
+                    name: "foo",
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 10,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 13,
+                      ),
+                    ),
+                  ),
+                ],
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 10,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 13,
+                  ),
+                ),
+              )),
               leading_comments: [],
               trailing_comments: [],
               symbol_table: None,
               span: Span(
                 start: LineColumn(
                   line: 0,
-                  column: 15,
+                  column: 10,
                 ),
                 end: LineColumn(
                   line: 0,
-                  column: 16,
+                  column: 13,
                 ),
               ),
             )),
@@ -101,11 +127,11 @@ Module(
                     span: Span(
                       start: LineColumn(
                         line: 0,
-                        column: 18,
+                        column: 15,
                       ),
                       end: LineColumn(
                         line: 0,
-                        column: 21,
+                        column: 18,
                       ),
                     ),
                   ),
@@ -113,11 +139,11 @@ Module(
                 span: Span(
                   start: LineColumn(
                     line: 0,
-                    column: 18,
+                    column: 15,
                   ),
                   end: LineColumn(
                     line: 0,
-                    column: 21,
+                    column: 18,
                   ),
                 ),
               )),
@@ -127,26 +153,52 @@ Module(
               span: Span(
                 start: LineColumn(
                   line: 0,
-                  column: 18,
+                  column: 15,
                 ),
                 end: LineColumn(
                   line: 0,
-                  column: 21,
+                  column: 18,
                 ),
               ),
             ), Expr(
-              kind: Literal(Integer(2)),
+              kind: Path(Path(
+                segments: [
+                  Ident(
+                    name: "bar",
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 15,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 18,
+                      ),
+                    ),
+                  ),
+                ],
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 15,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 18,
+                  ),
+                ),
+              )),
               leading_comments: [],
               trailing_comments: [],
               symbol_table: None,
               span: Span(
                 start: LineColumn(
                   line: 0,
-                  column: 23,
+                  column: 15,
                 ),
                 end: LineColumn(
                   line: 0,
-                  column: 24,
+                  column: 18,
                 ),
               ),
             )),
@@ -161,7 +213,7 @@ Module(
             ),
             end: LineColumn(
               line: 0,
-              column: 26,
+              column: 21,
             ),
           ),
         ),
@@ -174,7 +226,7 @@ Module(
         ),
         end: LineColumn(
           line: 0,
-          column: 27,
+          column: 22,
         ),
       ),
       leading_comments: [],

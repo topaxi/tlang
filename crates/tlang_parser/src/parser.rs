@@ -697,22 +697,45 @@ impl<'src> Parser<'src> {
         node::expr!(List(elements))
     }
 
+    fn parse_dict_elements(&mut self) -> Vec<(Expr, Expr)> {
+        let mut elements = Vec::new();
+        while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
+            let key = self.parse_expression();
+
+            // If key is an single identifier and we follow up with a comma or rbrace, then we are
+            // using the short hand syntax for dictionary elements.
+            if let ExprKind::Path(path) = &key.kind {
+                if path.segments.len() == 1
+                    && matches!(
+                        self.current_token_kind(),
+                        Some(TokenKind::Comma | TokenKind::RBrace)
+                    )
+                {
+                    if matches!(self.current_token_kind(), Some(TokenKind::Comma)) {
+                        self.advance();
+                    }
+                    elements.push((key.clone(), key));
+                    continue;
+                }
+            }
+
+            self.consume_token(TokenKind::Colon);
+            let value = self.parse_expression();
+            elements.push((key, value));
+            if let Some(TokenKind::Comma) = self.current_token_kind() {
+                self.advance();
+            }
+        }
+        elements
+    }
+
     fn parse_block_or_dict(&mut self) -> Expr {
         let mut span = self.create_span_from_current_token();
         self.consume_token(TokenKind::LBrace);
-        // If the first token is a identifier followed by a colon, we assume a dict.
+        // If the first token is a identifier followed by a colon or comma, we assume a dict.
         if let Some(TokenKind::Identifier(_)) = self.current_token_kind() {
-            if let Some(TokenKind::Colon) = self.peek_token_kind() {
-                let mut elements = Vec::new();
-                while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
-                    let key = self.parse_primary_expression();
-                    self.consume_token(TokenKind::Colon);
-                    let value = self.parse_expression();
-                    elements.push((key, value));
-                    if let Some(TokenKind::Comma) = self.current_token_kind() {
-                        self.advance();
-                    }
-                }
+            if let Some(TokenKind::Colon | TokenKind::Comma) = self.peek_token_kind() {
+                let elements = self.parse_dict_elements();
                 self.consume_token(TokenKind::RBrace);
                 return node::expr!(Dict(elements));
             }

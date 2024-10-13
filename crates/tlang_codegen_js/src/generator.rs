@@ -566,8 +566,11 @@ impl CodegenJS {
             }
             self.push_indent();
             self.generate_expr(key, None);
-            self.push_str(": ");
-            self.generate_expr(value, None);
+
+            if key != value {
+                self.push_str(": ");
+                self.generate_expr(value, None);
+            }
         }
         self.push_str(",\n");
         self.indent_level -= 1;
