@@ -88,7 +88,7 @@ jobs:
         if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         uses: actions/upload-pages-artifact@v3
         with:
-          path: tlang-playground/dist
+          path: tlang-playground/dist/
 
   deploy-pages:
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
