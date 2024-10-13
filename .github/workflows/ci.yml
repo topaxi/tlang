@@ -50,14 +50,6 @@ jobs:
         run: |
           cargo install -f wasm-bindgen-cli --version $(grep -oP 'wasm-bindgen = "\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
 
-      - name: Install binaryen
-        run: |
-          wget https://github.com/WebAssembly/binaryen/releases/download/version_119/binaryen-version_119-x86_64-linux.tar.gz
-          tar xvzf binaryen-version_119-x86_64-linux.tar.gz
-          export PATH=$(pwd)/binaryen-version_119/bin:$PATH
-          ls $(pwd)/binaryen-version_119/bin
-          echo $PATH
-
       - name: Install wasm toolchain
         run: |
           rustup target add wasm32-unknown-unknown
@@ -71,6 +63,11 @@ jobs:
 
       - name: Cargo Make
         run: cargo make
+
+      - name: Install binaryen
+        run: |
+          wget https://github.com/WebAssembly/binaryen/releases/download/version_119/binaryen-version_119-x86_64-linux.tar.gz
+          tar xvzf binaryen-version_119-x86_64-linux.tar.gz
 
       - uses: actions/setup-node@v4
         with:
@@ -87,7 +84,9 @@ jobs:
         run: npm run typecheck
 
       - name: Build playground
-        run: npm run build -- -- --base=/tlang
+        run: |
+          PATH=$(pwd)/binaryen-version_119/bin:$PATH
+          npm run build -- -- --base=/tlang
 
       - name: Upload artifact
         if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
