@@ -321,8 +321,8 @@ impl SemanticAnalyzer {
 
     fn report_unused_symbols(&mut self, symbol_table: &Rc<RefCell<SymbolTable>>, span: &Span) {
         let symbol_table = symbol_table.borrow();
-        let local_symbols = symbol_table.get_all_local_symbols();
-        let mut unused_symbols = local_symbols
+        let mut unused_symbols = symbol_table
+            .get_all_local_symbols()
             .iter()
             .filter(|symbol| symbol.id != SymbolId::new(0))
             .filter(|symbol| !symbol.used)
