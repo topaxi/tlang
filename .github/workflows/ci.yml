@@ -51,7 +51,9 @@ jobs:
           cargo install -f wasm-bindgen-cli --version $(grep -oP 'wasm-bindgen = "\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
 
       - name: Install binaryen
-        run: sudo apt install -y binaryen
+        run: |
+          sudo apt install -y binaryen
+          wasm-opt --version
 
       - name: Install wasm toolchain
         run: |
