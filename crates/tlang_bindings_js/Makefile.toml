@@ -5,7 +5,8 @@ CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = true
 skip_core_tasks = true
 
 [tasks.build-release]
-dependencies = ["release", "wasm-bindgen-release", "wasm-opt", "wasm-opt-cleanup"]
+#dependencies = ["release", "wasm-bindgen-release", "wasm-opt", "wasm-opt-cleanup"]
+dependencies = ["release", "wasm-bindgen-release"]
 
 [tasks.release]
 command = "cargo"
