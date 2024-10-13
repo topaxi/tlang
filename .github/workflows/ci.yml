@@ -53,8 +53,10 @@ jobs:
       - name: Install binaryen
         run: |
           wget https://github.com/WebAssembly/binaryen/releases/download/version_119/binaryen-version_119-x86_64-linux.tar.gz
-          tar xzf binaryen-version_119-x86_64-linux.tar.gz
+          tar xvzf binaryen-version_119-x86_64-linux.tar.gz
           export PATH=$(pwd)/binaryen-version_119/bin:$PATH
+          ls $(pwd)/binaryen-version_119/bin
+          echo $PATH
 
       - name: Install wasm toolchain
         run: |
