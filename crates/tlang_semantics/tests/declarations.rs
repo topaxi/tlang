@@ -345,7 +345,7 @@ fn should_collect_function_arguments_with_enum_extraction() {
     assert_eq!(
         program_symbols.borrow().get_by_name("unwrap"),
         Some(SymbolInfo {
-            id: SymbolId::new(2),
+            id: SymbolId::new(4),
             name: "unwrap".to_string(),
             symbol_type: SymbolType::Function,
             defined_at: Some(Span::new(
