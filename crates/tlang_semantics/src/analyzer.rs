@@ -339,6 +339,9 @@ impl SemanticAnalyzer {
             .filter(|symbol| symbol.id != SymbolId::new(0))
             .filter(|symbol| !symbol.used)
             .filter(|symbol| !symbol.name.starts_with('_'))
+            // TODO: We currently do not track member methods, as we do not have any type
+            //       information yet.
+            .filter(|symbol| !symbol.name.contains('.'))
             .collect::<Vec<_>>();
 
         for unused_symbol in &mut unused_symbols {
