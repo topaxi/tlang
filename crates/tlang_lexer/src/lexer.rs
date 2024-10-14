@@ -356,6 +356,15 @@ impl Lexer<'_> {
                 "or" => self.token(TokenKind::Keyword(Keyword::Or), start),
                 "_" => self.token(TokenKind::Keyword(Keyword::Underscore), start),
                 "self" => self.token(TokenKind::Keyword(Keyword::_Self), start),
+                "Self" => self.token(TokenKind::Keyword(Keyword::SelfUpper), start),
+                "as" => self.token(TokenKind::Keyword(Keyword::As), start),
+                "for" => self.token(TokenKind::Keyword(Keyword::For), start),
+                "in" => self.token(TokenKind::Keyword(Keyword::In), start),
+                "loop" => self.token(TokenKind::Keyword(Keyword::Loop), start),
+                "pub" => self.token(TokenKind::Keyword(Keyword::Pub), start),
+                "use" => self.token(TokenKind::Keyword(Keyword::Use), start),
+                "while" => self.token(TokenKind::Keyword(Keyword::While), start),
+                "with" => self.token(TokenKind::Keyword(Keyword::With), start),
                 identifier => {
                     let identifier_string = identifier.to_string();
                     self.token(TokenKind::Identifier(identifier_string), start)

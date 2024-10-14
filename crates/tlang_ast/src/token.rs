@@ -18,7 +18,18 @@ define_keywords! {
     // TODO: Similar to `self`, we might want to treat this as an identifier.
     Underscore => "_",
     // TODO: It might actually be better to just treat this as an identifier.
-    _Self => "self"
+    _Self => "self",
+
+    // Reserved keywords, unused at the moment
+    As => "as",
+    For => "for",
+    In => "in",
+    Loop => "loop",
+    Pub => "pub",
+    SelfUpper => "Self",
+    Use => "use",
+    While => "while",
+    With => "with"
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
