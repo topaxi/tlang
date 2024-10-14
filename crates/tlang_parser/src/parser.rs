@@ -183,10 +183,7 @@ impl<'src> Parser<'src> {
         expect_token_matches!(self, TokenKind::Identifier(_));
 
         let current_token = self.current_token.as_ref().unwrap();
-        let ident = Ident::new(
-            current_token.kind.get_identifier().unwrap(),
-            current_token.span,
-        );
+        let ident = Ident::new(current_token.get_identifier().unwrap(), current_token.span);
 
         self.advance();
 
@@ -270,7 +267,7 @@ impl<'src> Parser<'src> {
         }
 
         let mut span = self.create_span_from_current_token();
-        let mut node = match self.current_token_kind().and_then(|tk| tk.get_keyword()) {
+        let mut node = match self.current_token.as_ref().and_then(|token| token.get_keyword()) {
             Some(Keyword::Let) => self.parse_variable_declaration(),
             Some(Keyword::Fn)
                 // If the next token is an identifier, we assume a function declaration.

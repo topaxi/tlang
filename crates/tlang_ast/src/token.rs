@@ -90,22 +90,6 @@ pub enum TokenKind {
     Eof,
 }
 
-impl TokenKind {
-    pub fn get_identifier(&self) -> Option<&String> {
-        match self {
-            TokenKind::Identifier(identifier) => Some(identifier),
-            _ => None,
-        }
-    }
-
-    pub fn get_keyword(&self) -> Option<&Keyword> {
-        match self {
-            TokenKind::Keyword(keyword) => Some(keyword),
-            _ => None,
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub enum Literal {
     Boolean(bool),
@@ -125,6 +109,20 @@ pub struct Token {
 impl Token {
     pub fn new(kind: TokenKind, span: Span) -> Self {
         Self { kind, span }
+    }
+
+    pub fn get_identifier(&self) -> Option<&String> {
+        match &self.kind {
+            TokenKind::Identifier(identifier) => Some(identifier),
+            _ => None,
+        }
+    }
+
+    pub fn get_keyword(&self) -> Option<&Keyword> {
+        match &self.kind {
+            TokenKind::Keyword(keyword) => Some(keyword),
+            _ => None,
+        }
     }
 
     pub fn get_comment(&self) -> Option<&String> {
