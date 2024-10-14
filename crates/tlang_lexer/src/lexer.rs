@@ -323,6 +323,10 @@ impl Lexer<'_> {
                     self.token(TokenKind::Dot, start)
                 }
             }
+            '#' => {
+                self.advance();
+                self.token(TokenKind::Hash, start)
+            }
             '0'..='9' => self.read_number_literal(start),
             '"' | '\'' => {
                 let quote = ch;

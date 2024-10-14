@@ -68,8 +68,8 @@ fn test_typed_float() {
 }
 
 #[test]
-fn test_single_char_operators() {
-    let mut lexer = Lexer::new(". + - * / % ( ) | & ^");
+fn test_single_char_tokens() {
+    let mut lexer = Lexer::new(". + - * / % ( ) | & ^ #");
 
     assert_tokens!(
         lexer,
@@ -85,12 +85,13 @@ fn test_single_char_operators() {
             TokenKind::Pipe,
             TokenKind::Ampersand,
             TokenKind::Caret,
+            TokenKind::Hash,
         ]
     );
 }
 
 #[test]
-fn test_multi_char_operators() {
+fn test_multi_char_tokens() {
     let mut lexer = Lexer::new("|| && == != >= <= ** |>");
 
     assert_tokens!(
@@ -117,17 +118,13 @@ fn test_arrows() {
 
 #[test]
 fn test_dotdot_dot() {
-    let mut lexer = Lexer::new("..");
+    let mut lexer = Lexer::new(".. ...");
 
-    assert_tokens!(lexer, [TokenKind::DotDot]);
-
-    let mut lexer = Lexer::new("...");
-
-    assert_tokens!(lexer, [TokenKind::DotDotDot]);
+    assert_tokens!(lexer, [TokenKind::DotDot, TokenKind::DotDotDot]);
 }
 
 #[test]
-fn test_namespace_separator() {
+fn test_path_separator() {
     let mut lexer = Lexer::new("::");
 
     assert_tokens!(lexer, [TokenKind::PathSeparator]);

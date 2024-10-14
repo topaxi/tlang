@@ -52,6 +52,7 @@ pub enum TokenKind {
     DoubleQuote,
     SingleQuote,
     PathSeparator,
+    Hash,
 
     // Tokens for parentheses
     LParen,
