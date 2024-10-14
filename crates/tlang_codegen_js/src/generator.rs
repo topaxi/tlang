@@ -1,8 +1,9 @@
 use crate::scope::Scope;
 use tlang_ast::{
     node::{
-        BinaryOpKind, Block, ElseClause, EnumPattern, Expr, ExprKind, FunctionParameter, Ident,
-        Module, Path, Pattern, PatternKind, Stmt, StmtKind, UnaryOp,
+        BinaryOpKind, Block, CallExpression, EnumPattern, Expr, ExprKind, FieldAccessExpression,
+        FunctionParameter, Ident, IfElseExpression, IndexAccessExpression, Module, Path, Pattern,
+        PatternKind, Stmt, StmtKind, UnaryOp,
     },
     token::{Literal, Token, TokenKind},
 };
@@ -493,44 +494,47 @@ impl CodegenJS {
                 self.generate_block_expression(block)
             }
             ExprKind::Block(block) => self.generate_block(block),
-            ExprKind::Call(expr) => self.generate_call_expression(&expr.callee, &expr.arguments),
-            ExprKind::FieldExpression(expr) => {
-                self.generate_expr(&expr.base, None);
-                self.push_char('.');
-                self.push_str(expr.field.as_str());
-            }
+            ExprKind::Call(expr) => self.generate_call_expression(expr),
+            ExprKind::FieldExpression(expr) => self.generate_field_access_expression(expr),
             ExprKind::Path(path) => self.generate_path_expression(path),
-            ExprKind::IndexExpression(expr) => {
-                self.generate_expr(&expr.base, None);
-                self.push_char('[');
-                self.generate_expr(&expr.index, None);
-                self.push_char(']');
-            }
+            ExprKind::IndexExpression(expr) => self.generate_index_access_expression(expr),
             ExprKind::Let(_pattern, _expr) => todo!("Let expression not implemented yet."),
             ExprKind::Literal(literal) => self.generate_literal(literal),
             ExprKind::List(items) => self.generate_list_expression(items),
             ExprKind::Dict(kvs) => self.generate_dict_expression(kvs),
-            ExprKind::UnaryOp(op, expr) => {
-                match op {
-                    UnaryOp::Minus => self.push_char('-'),
-                    UnaryOp::Not => self.push_char('!'),
-                    UnaryOp::Spread => self.push_str("..."),
-                    _ => unimplemented!("PrefixOp {:?} not implemented yet.", op),
-                }
-                self.generate_expr(expr, None);
-            }
-            ExprKind::BinaryOp(expr) => {
-                self.generate_binary_op(&expr.op, &expr.lhs, &expr.rhs, parent_op)
-            }
-            ExprKind::Match(expr) => self.generate_match_expression(&expr.expression, &expr.arms),
-            ExprKind::IfElse(expr) => {
-                self.generate_if_else(&expr.condition, &expr.then_branch, &expr.else_branches)
-            }
+            ExprKind::UnaryOp(op, expr) => self.generate_unary_op(op, expr),
+            ExprKind::BinaryOp(expr) => self.generate_binary_op(expr, parent_op),
+            ExprKind::Match(expr) => self.generate_match_expression(expr),
+            ExprKind::IfElse(expr) => self.generate_if_else(expr),
             ExprKind::FunctionExpression(decl) => self.generate_function_expression(decl),
             ExprKind::RecursiveCall(expr) => self.generate_recursive_call_expression(expr),
             ExprKind::Range(_) => todo!("Range expression not implemented yet."),
             ExprKind::Wildcard => {}
         }
+    }
+
+    fn generate_unary_op(&mut self, op: &UnaryOp, expr: &Expr) {
+        match op {
+            UnaryOp::Not => self.push_char('!'),
+            UnaryOp::Minus => self.push_char('-'),
+            UnaryOp::Spread => self.push_str("..."),
+            _ => unimplemented!("PrefixOp {:?} not implemented yet.", op),
+        }
+
+        self.generate_expr(expr, None);
+    }
+
+    fn generate_field_access_expression(&mut self, field_access_expr: &FieldAccessExpression) {
+        self.generate_expr(&field_access_expr.base, None);
+        self.push_char('.');
+        self.push_str(field_access_expr.field.as_str());
+    }
+
+    fn generate_index_access_expression(&mut self, index_access_expr: &IndexAccessExpression) {
+        self.generate_expr(&index_access_expr.base, None);
+        self.push_char('[');
+        self.generate_expr(&index_access_expr.index, None);
+        self.push_char(']');
     }
 
     fn generate_path_expression(&mut self, path: &Path) {
@@ -692,12 +696,7 @@ impl CodegenJS {
         self.push_str(";\n");
     }
 
-    fn generate_if_else(
-        &mut self,
-        condition: &Expr,
-        then_branch: &Expr,
-        else_branches: &[ElseClause],
-    ) {
+    fn generate_if_else(&mut self, if_else_expr: &IfElseExpression) {
         let mut lhs = String::new();
         // TODO: Potentially in a return position or other expression, before we generate the if
         //       statement, replace the current statement buffer with a new one, generate the if
@@ -707,7 +706,7 @@ impl CodegenJS {
         //       statements in JavaScript.
         // TODO: In case of recursive calls in tail position, we'll want to omit lhs.
         let has_block_completions = self.current_context() == BlockContext::Expression
-            && match &then_branch.kind {
+            && match &if_else_expr.then_branch.kind {
                 ExprKind::Block(block) => block.has_completion(),
                 _ => false,
             };
@@ -722,15 +721,15 @@ impl CodegenJS {
         self.push_str("if (");
         let indent_level = self.indent_level;
         self.indent_level = 0;
-        self.generate_expr(condition, None);
+        self.generate_expr(&if_else_expr.condition, None);
         self.indent_level = indent_level;
         self.push_str(") {\n");
         self.indent_level += 1;
         self.flush_statement_buffer();
-        self.generate_expr(then_branch, None);
+        self.generate_expr(&if_else_expr.then_branch, None);
         self.indent_level -= 1;
 
-        for else_branch in else_branches {
+        for else_branch in &if_else_expr.else_branches {
             self.push_indent();
             self.push_str("} else");
 
@@ -781,12 +780,7 @@ impl CodegenJS {
         todo!("enum extraction outside of function parameters is not implemented yet.")
     }
 
-    fn generate_partial_application(
-        &mut self,
-        function: &Expr,
-        arguments: &[Expr],
-        wildcard_count: usize,
-    ) {
+    fn generate_partial_application(&mut self, call_expr: &CallExpression, wildcard_count: usize) {
         let mut placeholders = Vec::with_capacity(wildcard_count);
 
         self.push_char('(');
@@ -810,11 +804,11 @@ impl CodegenJS {
 
         self.push_str(") => ");
 
-        self.generate_expr(function, None);
+        self.generate_expr(&call_expr.callee, None);
         self.push_char('(');
 
         let mut wildcard_index = 0;
-        for (i, arg) in arguments.iter().enumerate() {
+        for (i, arg) in call_expr.arguments.iter().enumerate() {
             if i > 0 {
                 self.push_str(", ");
             }
@@ -830,20 +824,20 @@ impl CodegenJS {
         self.push_char(')');
     }
 
-    pub(crate) fn generate_call_expression(&mut self, function: &Expr, arguments: &[Expr]) {
+    pub(crate) fn generate_call_expression(&mut self, call_expr: &CallExpression) {
         // TODO: If the call is to a struct, we instead call it with `new` and map the fields to
         // the positional arguments of the constructor.
 
-        let wildcard_count = arguments.iter().filter(|arg| arg.is_wildcard()).count();
+        let wildcard_count = call_expr.wildcard_count();
 
         if wildcard_count > 0 {
-            return self.generate_partial_application(function, arguments, wildcard_count);
+            return self.generate_partial_application(call_expr, wildcard_count);
         }
 
-        self.generate_expr(function, None);
+        self.generate_expr(&call_expr.callee, None);
         self.push_char('(');
 
-        let mut args_iter = arguments.iter();
+        let mut args_iter = call_expr.arguments.iter();
 
         if let Some(arg) = args_iter.next() {
             self.generate_expr(arg, None);

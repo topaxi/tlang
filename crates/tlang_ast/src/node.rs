@@ -116,6 +116,19 @@ pub struct CallExpression {
     pub arguments: Vec<Expr>,
 }
 
+impl CallExpression {
+    pub fn has_wildcard(&self) -> bool {
+        self.arguments.iter().any(Expr::is_wildcard)
+    }
+
+    pub fn wildcard_count(&self) -> usize {
+        self.arguments
+            .iter()
+            .filter(|expr| expr.is_wildcard())
+            .count()
+    }
+}
+
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct FieldAccessExpression {
     pub base: Expr,

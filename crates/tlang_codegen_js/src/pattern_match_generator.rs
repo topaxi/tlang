@@ -1,4 +1,4 @@
-use tlang_ast::node::{Expr, ExprKind, MatchArm};
+use tlang_ast::node::{Expr, ExprKind, MatchArm, MatchExpression};
 
 use crate::generator::{BlockContext, CodegenJS};
 
@@ -22,12 +22,12 @@ impl CodegenJS {
         }
     }
 
-    pub(crate) fn generate_match_expression(&mut self, expression: &Expr, arms: &[MatchArm]) {
+    pub(crate) fn generate_match_expression(&mut self, match_expr: &MatchExpression) {
         // TODO: A lot here is copied from the if statement generator.
         let lhs = self.replace_statement_buffer(String::new());
-        let has_block_completions = match_args_have_completions(arms);
+        let has_block_completions = match_args_have_completions(&match_expr.arms);
         let match_value_tmp_var = self.current_scope().declare_tmp_variable();
-        self.push_let_declaration_to_expr(&match_value_tmp_var, expression);
+        self.push_let_declaration_to_expr(&match_value_tmp_var, &match_expr.expression);
         if has_block_completions {
             let completion_tmp_var = self.current_scope().declare_tmp_variable();
             self.push_indent();
@@ -45,7 +45,7 @@ impl CodegenJS {
                 pattern,
                 expression,
             },
-        ) in arms.iter().enumerate()
+        ) in match_expr.arms.iter().enumerate()
         {
             if !pattern.is_wildcard() {
                 self.push_str("if (");
@@ -59,7 +59,7 @@ impl CodegenJS {
                 self.pop_context();
                 self.dec_indent();
                 self.push_indent();
-                if i == arms.len() - 1 {
+                if i == match_expr.arms.len() - 1 {
                     self.push_char('}');
                 } else {
                     self.push_str("} else ");

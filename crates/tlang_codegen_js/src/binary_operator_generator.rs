@@ -1,4 +1,4 @@
-use tlang_ast::node::{BinaryOpKind, Expr, ExprKind};
+use tlang_ast::node::{BinaryOpExpression, BinaryOpKind, ExprKind};
 
 use crate::generator::CodegenJS;
 
@@ -17,47 +17,45 @@ struct JSOperatorInfo {
 impl CodegenJS {
     pub(crate) fn generate_binary_op(
         &mut self,
-        op: &BinaryOpKind,
-        lhs: &Expr,
-        rhs: &Expr,
+        binary_expr: &BinaryOpExpression,
         parent_op: Option<&BinaryOpKind>,
     ) {
-        let needs_parentheses =
-            parent_op.map_or(false, |parent| should_wrap_with_parentheses(op, parent));
+        let needs_parentheses = parent_op.map_or(false, |parent| {
+            should_wrap_with_parentheses(&binary_expr.op, parent)
+        });
 
         if needs_parentheses {
             self.push_char('(');
         }
 
-        if let BinaryOpKind::Pipeline = op {
+        if let BinaryOpKind::Pipeline = binary_expr.op {
             // If rhs was an identifier, we just pass lhs it as an argument to a function call.
-            if let ExprKind::Path(_) = rhs.kind {
-                self.generate_expr(rhs, None);
+            if let ExprKind::Path(_) = binary_expr.rhs.kind {
+                self.generate_expr(&binary_expr.rhs, None);
                 self.push_char('(');
-                self.generate_expr(lhs, None);
+                self.generate_expr(&binary_expr.lhs, None);
                 self.push_char(')');
             // If rhs is a Call node and we prepend the lhs to the argument list.
-            } else if let ExprKind::Call(call_expr) = &rhs.kind {
+            } else if let ExprKind::Call(call_expr) = &binary_expr.rhs.kind {
                 self.generate_expr(&call_expr.callee, None);
                 self.push_char('(');
 
                 // If we have a wildcard in the argument list, we instead replace the wildcard with the lhs.
                 // Otherwise we prepend the lhs to the argument list.
-                let has_wildcard = call_expr.arguments.iter().any(|arg| arg.is_wildcard());
-                if has_wildcard {
+                if call_expr.has_wildcard() {
                     for (i, arg) in call_expr.arguments.iter().enumerate() {
                         if i > 0 {
                             self.push_str(", ");
                         }
 
                         if let ExprKind::Wildcard = arg.kind {
-                            self.generate_expr(lhs, None);
+                            self.generate_expr(&binary_expr.lhs, None);
                         } else {
                             self.generate_expr(arg, None);
                         }
                     }
                 } else {
-                    self.generate_expr(lhs, None);
+                    self.generate_expr(&binary_expr.lhs, None);
                     for arg in &call_expr.arguments {
                         self.push_str(", ");
                         self.generate_expr(arg, None);
@@ -66,9 +64,9 @@ impl CodegenJS {
                 self.push_char(')');
             }
         } else {
-            self.generate_expr(lhs, Some(op));
-            self.generate_binary_operator_token(op);
-            self.generate_expr(rhs, Some(op));
+            self.generate_expr(&binary_expr.lhs, Some(&binary_expr.op));
+            self.generate_binary_operator_token(&binary_expr.op);
+            self.generate_expr(&binary_expr.rhs, Some(&binary_expr.op));
         }
 
         if needs_parentheses {

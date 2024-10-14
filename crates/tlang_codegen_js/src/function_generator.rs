@@ -720,7 +720,7 @@ impl CodegenJS {
         }
 
         // For any other referenced function, we do a normal call expression.
-        self.generate_call_expression(&expr.callee, &expr.arguments)
+        self.generate_call_expression(expr)
     }
 
     fn flush_function_pre_body(self: &mut CodegenJS) {
