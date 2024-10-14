@@ -1,9 +1,11 @@
+use std::collections::HashMap;
+
 use crate::scope::Scope;
 use tlang_ast::{
     node::{
         BinaryOpKind, Block, CallExpression, EnumPattern, Expr, ExprKind, FieldAccessExpression,
         FunctionParameter, Ident, IfElseExpression, IndexAccessExpression, Module, Path, Pattern,
-        PatternKind, Stmt, StmtKind, UnaryOp,
+        PatternKind, Stmt, StmtKind, StructDeclaration, UnaryOp,
     },
     token::{Literal, Token, TokenKind},
 };
@@ -52,6 +54,7 @@ pub struct CodegenJS {
     function_pre_body_declarations: Vec<(String, String)>,
     statement_buffer: Vec<String>,
     completion_variables: Vec<Option<String>>,
+    struct_declarations: HashMap<String, StructDeclaration>,
 }
 
 impl Default for CodegenJS {
@@ -63,15 +66,15 @@ impl Default for CodegenJS {
 impl CodegenJS {
     pub fn new() -> Self {
         Self {
-            output: String::new(),
-            indent_level: 0,
-            scopes: Scope::default(),
             context_stack: vec![BlockContext::Program],
-            function_context_stack: vec![],
-            function_pre_body_declarations: vec![],
             statement_buffer: vec![String::with_capacity(STATEMENT_BUFFER_CAPACITY)],
             completion_variables: vec![None],
+            ..Default::default()
         }
+    }
+
+    pub fn set_struct_declarations(&mut self, declarations: HashMap<String, StructDeclaration>) {
+        self.struct_declarations = declarations;
     }
 
     pub fn get_standard_library_source() -> String {

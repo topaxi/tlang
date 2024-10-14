@@ -20,6 +20,7 @@ pub fn compile_src(source: &str, builtin_symbols: &[(&str, SymbolType)]) -> Stri
     match semantic_analyzer.analyze(&mut ast) {
         Ok(()) => {
             let mut codegen = CodegenJS::default();
+            codegen.set_struct_declarations(semantic_analyzer.take_struct_declarations());
             codegen.generate_code(&ast);
             codegen.get_output().to_string()
         }

@@ -53,6 +53,14 @@ impl SemanticAnalyzer {
         self.struct_declarations.get(name)
     }
 
+    pub fn get_struct_declarations(&self) -> &HashMap<String, StructDeclaration> {
+        &self.struct_declarations
+    }
+
+    pub fn take_struct_declarations(&mut self) -> HashMap<String, StructDeclaration> {
+        std::mem::take(&mut self.struct_declarations)
+    }
+
     fn get_last_symbol_table(&self) -> Rc<RefCell<SymbolTable>> {
         Rc::clone(self.symbol_table_stack.last().unwrap())
     }
