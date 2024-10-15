@@ -1443,6 +1443,8 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_pattern(&mut self) -> Pattern {
+        let comments = self.parse_comments();
+
         expect_token_matches!(
             self,
             "literal, identifier or list extraction",
@@ -1483,6 +1485,8 @@ impl<'src> Parser<'src> {
 
         self.end_span_from_previous_token(&mut span);
         node.span = span;
+        node.leading_comments = comments;
+        node.trailing_comments = self.parse_comments();
         node
     }
 

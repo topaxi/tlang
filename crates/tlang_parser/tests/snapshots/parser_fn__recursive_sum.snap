@@ -54,6 +54,8 @@ Module(
             FunctionParameter(
               pattern: Pattern(
                 kind: List([]),
+                leading_comments: [],
+                trailing_comments: [],
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -189,6 +191,8 @@ Module(
                         ),
                       ),
                     )),
+                    leading_comments: [],
+                    trailing_comments: [],
                     span: Span(
                       start: LineColumn(
                         line: 1,
@@ -218,6 +222,8 @@ Module(
                           ),
                         ),
                       )),
+                      leading_comments: [],
+                      trailing_comments: [],
                       span: Span(
                         start: LineColumn(
                           line: 1,
@@ -229,6 +235,8 @@ Module(
                         ),
                       ),
                     )),
+                    leading_comments: [],
+                    trailing_comments: [],
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -241,6 +249,8 @@ Module(
                     ),
                   ),
                 ]),
+                leading_comments: [],
+                trailing_comments: [],
                 span: Span(
                   start: LineColumn(
                     line: 1,

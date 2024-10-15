@@ -30,14 +30,12 @@ impl CodegenJS {
         self.push_let_declaration_to_expr(&match_value_tmp_var, &match_expr.expression);
         if has_block_completions {
             let completion_tmp_var = self.current_scope().declare_tmp_variable();
-            self.push_indent();
             self.push_str(&format!(",{completion_tmp_var};"));
             self.push_completion_variable(Some(completion_tmp_var));
         } else {
+            self.push_indent();
             self.push_completion_variable(None);
         }
-
-        self.push_indent();
 
         for (
             i,

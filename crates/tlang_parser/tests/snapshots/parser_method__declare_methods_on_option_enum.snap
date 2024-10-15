@@ -228,6 +228,8 @@ Module(
                   elements: [
                     Pattern(
                       kind: Wildcard,
+                      leading_comments: [],
+                      trailing_comments: [],
                       span: Span(
                         start: LineColumn(
                           line: 5,
@@ -242,6 +244,8 @@ Module(
                   ],
                   named_fields: false,
                 )),
+                leading_comments: [],
+                trailing_comments: [],
                 span: Span(
                   start: LineColumn(
                     line: 5,
@@ -431,6 +435,8 @@ Module(
                   elements: [],
                   named_fields: false,
                 )),
+                leading_comments: [],
+                trailing_comments: [],
                 span: Span(
                   start: LineColumn(
                     line: 6,
@@ -562,6 +568,8 @@ Module(
             FunctionParameter(
               pattern: Pattern(
                 kind: Wildcard,
+                leading_comments: [],
+                trailing_comments: [],
                 span: Span(
                   start: LineColumn(
                     line: 7,
@@ -785,6 +793,8 @@ Module(
                   elements: [
                     Pattern(
                       kind: Wildcard,
+                      leading_comments: [],
+                      trailing_comments: [],
                       span: Span(
                         start: LineColumn(
                           line: 9,
@@ -799,6 +809,8 @@ Module(
                   ],
                   named_fields: false,
                 )),
+                leading_comments: [],
+                trailing_comments: [],
                 span: Span(
                   start: LineColumn(
                     line: 9,
@@ -1005,6 +1017,8 @@ Module(
                   elements: [],
                   named_fields: false,
                 )),
+                leading_comments: [],
+                trailing_comments: [],
                 span: Span(
                   start: LineColumn(
                     line: 10,
@@ -1243,6 +1257,8 @@ Module(
                           ),
                         ),
                       )),
+                      leading_comments: [],
+                      trailing_comments: [],
                       span: Span(
                         start: LineColumn(
                           line: 12,
@@ -1257,6 +1273,8 @@ Module(
                   ],
                   named_fields: false,
                 )),
+                leading_comments: [],
+                trailing_comments: [],
                 span: Span(
                   start: LineColumn(
                     line: 12,
@@ -1298,6 +1316,8 @@ Module(
                     ),
                   ),
                 )),
+                leading_comments: [],
+                trailing_comments: [],
                 span: Span(
                   start: LineColumn(
                     line: 12,
@@ -1665,6 +1685,8 @@ Module(
                   elements: [],
                   named_fields: false,
                 )),
+                leading_comments: [],
+                trailing_comments: [],
                 span: Span(
                   start: LineColumn(
                     line: 13,
@@ -1691,6 +1713,8 @@ Module(
             FunctionParameter(
               pattern: Pattern(
                 kind: Wildcard,
+                leading_comments: [],
+                trailing_comments: [],
                 span: Span(
                   start: LineColumn(
                     line: 13,

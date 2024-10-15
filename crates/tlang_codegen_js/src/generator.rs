@@ -285,7 +285,8 @@ impl CodegenJS {
     pub(crate) fn push_let_declaration_to_identifier(&mut self, name: &str, value: &str) {
         self.push_open_let_declaration(name);
         self.push_str(value);
-        self.push_str(";\n");
+        self.push_char(';');
+        self.push_newline();
     }
 
     fn generate_literal(&mut self, literal: &Literal) {
@@ -403,7 +404,8 @@ impl CodegenJS {
             self.push_context(BlockContext::Expression);
             self.generate_optional_expr(&block.expression, None);
             self.pop_context();
-            self.push_str(";\n");
+            self.push_char(';');
+            self.push_newline();
             self.flush_statement_buffer();
         }
 
@@ -430,7 +432,8 @@ impl CodegenJS {
             TokenKind::MultiLineComment(comment) => {
                 self.push_str("/*");
                 self.push_str(comment);
-                self.push_str("*/\n");
+                self.push_str("*/");
+                self.push_newline();
             }
             _ => {}
         }
@@ -611,7 +614,7 @@ impl CodegenJS {
                 self.push_str("...");
                 self.generate_pat(pattern);
             }
-            PatternKind::Wildcard => {}
+            PatternKind::Wildcard | PatternKind::None => {}
         }
     }
 
@@ -674,6 +677,10 @@ impl CodegenJS {
                             .declare_variable_alias(ident_pattern.name.as_str(), &shadowed_name);
                     }
                     bindings.push((ident_pattern, var_name));
+                }
+                PatternKind::Rest(pattern) => {
+                    self.push_str("...");
+                    self.generate_pat(pattern);
                 }
                 PatternKind::Wildcard => {}
                 pattern_kind => todo!(

@@ -1,0 +1,530 @@
+---
+source: crates/tlang_parser/tests/parser.rs
+expression: "parse!\n(r\"\n        match foo; {\n            [] => Ok(bar),\n            [bar, ...baz] => Ok(qux),\n            _ => Err(error),\n        }\n        \")"
+---
+Module(
+  statements: [
+    Stmt(
+      kind: Expr(Expr(
+        kind: Match(MatchExpression(
+          expression: Expr(
+            kind: Path(Path(
+              segments: [
+                Ident(
+                  name: "foo",
+                  span: Span(
+                    start: LineColumn(
+                      line: 1,
+                      column: 15,
+                    ),
+                    end: LineColumn(
+                      line: 1,
+                      column: 18,
+                    ),
+                  ),
+                ),
+              ],
+              span: Span(
+                start: LineColumn(
+                  line: 1,
+                  column: 15,
+                ),
+                end: LineColumn(
+                  line: 1,
+                  column: 18,
+                ),
+              ),
+            )),
+            leading_comments: [],
+            trailing_comments: [],
+            symbol_table: None,
+            span: Span(
+              start: LineColumn(
+                line: 1,
+                column: 15,
+              ),
+              end: LineColumn(
+                line: 1,
+                column: 18,
+              ),
+            ),
+          ),
+          arms: [
+            MatchArm(
+              pattern: Pattern(
+                kind: List([]),
+                leading_comments: [],
+                trailing_comments: [],
+                span: Span(
+                  start: LineColumn(
+                    line: 2,
+                    column: 13,
+                  ),
+                  end: LineColumn(
+                    line: 2,
+                    column: 15,
+                  ),
+                ),
+              ),
+              expression: Expr(
+                kind: Call(CallExpression(
+                  callee: Expr(
+                    kind: Path(Path(
+                      segments: [
+                        Ident(
+                          name: "Ok",
+                          span: Span(
+                            start: LineColumn(
+                              line: 2,
+                              column: 19,
+                            ),
+                            end: LineColumn(
+                              line: 2,
+                              column: 21,
+                            ),
+                          ),
+                        ),
+                      ],
+                      span: Span(
+                        start: LineColumn(
+                          line: 2,
+                          column: 19,
+                        ),
+                        end: LineColumn(
+                          line: 2,
+                          column: 21,
+                        ),
+                      ),
+                    )),
+                    leading_comments: [],
+                    trailing_comments: [],
+                    symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 2,
+                        column: 19,
+                      ),
+                      end: LineColumn(
+                        line: 2,
+                        column: 21,
+                      ),
+                    ),
+                  ),
+                  arguments: [
+                    Expr(
+                      kind: Path(Path(
+                        segments: [
+                          Ident(
+                            name: "bar",
+                            span: Span(
+                              start: LineColumn(
+                                line: 2,
+                                column: 22,
+                              ),
+                              end: LineColumn(
+                                line: 2,
+                                column: 25,
+                              ),
+                            ),
+                          ),
+                        ],
+                        span: Span(
+                          start: LineColumn(
+                            line: 2,
+                            column: 22,
+                          ),
+                          end: LineColumn(
+                            line: 2,
+                            column: 25,
+                          ),
+                        ),
+                      )),
+                      leading_comments: [],
+                      trailing_comments: [],
+                      symbol_table: None,
+                      span: Span(
+                        start: LineColumn(
+                          line: 2,
+                          column: 22,
+                        ),
+                        end: LineColumn(
+                          line: 2,
+                          column: 25,
+                        ),
+                      ),
+                    ),
+                  ],
+                )),
+                leading_comments: [],
+                trailing_comments: [],
+                symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 2,
+                    column: 19,
+                  ),
+                  end: LineColumn(
+                    line: 2,
+                    column: 26,
+                  ),
+                ),
+              ),
+            ),
+            MatchArm(
+              pattern: Pattern(
+                kind: List([
+                  Pattern(
+                    kind: Identifier(IdentifierPattern(
+                      id: SymbolId(1),
+                      name: Ident(
+                        name: "bar",
+                        span: Span(
+                          start: LineColumn(
+                            line: 3,
+                            column: 14,
+                          ),
+                          end: LineColumn(
+                            line: 3,
+                            column: 17,
+                          ),
+                        ),
+                      ),
+                    )),
+                    leading_comments: [],
+                    trailing_comments: [],
+                    span: Span(
+                      start: LineColumn(
+                        line: 3,
+                        column: 14,
+                      ),
+                      end: LineColumn(
+                        line: 3,
+                        column: 17,
+                      ),
+                    ),
+                  ),
+                  Pattern(
+                    kind: Rest(Pattern(
+                      kind: Identifier(IdentifierPattern(
+                        id: SymbolId(2),
+                        name: Ident(
+                          name: "baz",
+                          span: Span(
+                            start: LineColumn(
+                              line: 3,
+                              column: 22,
+                            ),
+                            end: LineColumn(
+                              line: 3,
+                              column: 25,
+                            ),
+                          ),
+                        ),
+                      )),
+                      leading_comments: [],
+                      trailing_comments: [],
+                      span: Span(
+                        start: LineColumn(
+                          line: 3,
+                          column: 22,
+                        ),
+                        end: LineColumn(
+                          line: 3,
+                          column: 25,
+                        ),
+                      ),
+                    )),
+                    leading_comments: [],
+                    trailing_comments: [],
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 0,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 0,
+                      ),
+                    ),
+                  ),
+                ]),
+                leading_comments: [],
+                trailing_comments: [],
+                span: Span(
+                  start: LineColumn(
+                    line: 3,
+                    column: 13,
+                  ),
+                  end: LineColumn(
+                    line: 3,
+                    column: 26,
+                  ),
+                ),
+              ),
+              expression: Expr(
+                kind: Call(CallExpression(
+                  callee: Expr(
+                    kind: Path(Path(
+                      segments: [
+                        Ident(
+                          name: "Ok",
+                          span: Span(
+                            start: LineColumn(
+                              line: 3,
+                              column: 30,
+                            ),
+                            end: LineColumn(
+                              line: 3,
+                              column: 32,
+                            ),
+                          ),
+                        ),
+                      ],
+                      span: Span(
+                        start: LineColumn(
+                          line: 3,
+                          column: 30,
+                        ),
+                        end: LineColumn(
+                          line: 3,
+                          column: 32,
+                        ),
+                      ),
+                    )),
+                    leading_comments: [],
+                    trailing_comments: [],
+                    symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 3,
+                        column: 30,
+                      ),
+                      end: LineColumn(
+                        line: 3,
+                        column: 32,
+                      ),
+                    ),
+                  ),
+                  arguments: [
+                    Expr(
+                      kind: Path(Path(
+                        segments: [
+                          Ident(
+                            name: "qux",
+                            span: Span(
+                              start: LineColumn(
+                                line: 3,
+                                column: 33,
+                              ),
+                              end: LineColumn(
+                                line: 3,
+                                column: 36,
+                              ),
+                            ),
+                          ),
+                        ],
+                        span: Span(
+                          start: LineColumn(
+                            line: 3,
+                            column: 33,
+                          ),
+                          end: LineColumn(
+                            line: 3,
+                            column: 36,
+                          ),
+                        ),
+                      )),
+                      leading_comments: [],
+                      trailing_comments: [],
+                      symbol_table: None,
+                      span: Span(
+                        start: LineColumn(
+                          line: 3,
+                          column: 33,
+                        ),
+                        end: LineColumn(
+                          line: 3,
+                          column: 36,
+                        ),
+                      ),
+                    ),
+                  ],
+                )),
+                leading_comments: [],
+                trailing_comments: [],
+                symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 3,
+                    column: 30,
+                  ),
+                  end: LineColumn(
+                    line: 3,
+                    column: 37,
+                  ),
+                ),
+              ),
+            ),
+            MatchArm(
+              pattern: Pattern(
+                kind: Wildcard,
+                leading_comments: [],
+                trailing_comments: [],
+                span: Span(
+                  start: LineColumn(
+                    line: 4,
+                    column: 13,
+                  ),
+                  end: LineColumn(
+                    line: 4,
+                    column: 14,
+                  ),
+                ),
+              ),
+              expression: Expr(
+                kind: Call(CallExpression(
+                  callee: Expr(
+                    kind: Path(Path(
+                      segments: [
+                        Ident(
+                          name: "Err",
+                          span: Span(
+                            start: LineColumn(
+                              line: 4,
+                              column: 18,
+                            ),
+                            end: LineColumn(
+                              line: 4,
+                              column: 21,
+                            ),
+                          ),
+                        ),
+                      ],
+                      span: Span(
+                        start: LineColumn(
+                          line: 4,
+                          column: 18,
+                        ),
+                        end: LineColumn(
+                          line: 4,
+                          column: 21,
+                        ),
+                      ),
+                    )),
+                    leading_comments: [],
+                    trailing_comments: [],
+                    symbol_table: None,
+                    span: Span(
+                      start: LineColumn(
+                        line: 4,
+                        column: 18,
+                      ),
+                      end: LineColumn(
+                        line: 4,
+                        column: 21,
+                      ),
+                    ),
+                  ),
+                  arguments: [
+                    Expr(
+                      kind: Path(Path(
+                        segments: [
+                          Ident(
+                            name: "error",
+                            span: Span(
+                              start: LineColumn(
+                                line: 4,
+                                column: 22,
+                              ),
+                              end: LineColumn(
+                                line: 4,
+                                column: 27,
+                              ),
+                            ),
+                          ),
+                        ],
+                        span: Span(
+                          start: LineColumn(
+                            line: 4,
+                            column: 22,
+                          ),
+                          end: LineColumn(
+                            line: 4,
+                            column: 27,
+                          ),
+                        ),
+                      )),
+                      leading_comments: [],
+                      trailing_comments: [],
+                      symbol_table: None,
+                      span: Span(
+                        start: LineColumn(
+                          line: 4,
+                          column: 22,
+                        ),
+                        end: LineColumn(
+                          line: 4,
+                          column: 27,
+                        ),
+                      ),
+                    ),
+                  ],
+                )),
+                leading_comments: [],
+                trailing_comments: [],
+                symbol_table: None,
+                span: Span(
+                  start: LineColumn(
+                    line: 4,
+                    column: 18,
+                  ),
+                  end: LineColumn(
+                    line: 4,
+                    column: 28,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        )),
+        leading_comments: [],
+        trailing_comments: [],
+        symbol_table: None,
+        span: Span(
+          start: LineColumn(
+            line: 1,
+            column: 9,
+          ),
+          end: LineColumn(
+            line: 5,
+            column: 10,
+          ),
+        ),
+      )),
+      span: Span(
+        start: LineColumn(
+          line: 1,
+          column: 9,
+        ),
+        end: LineColumn(
+          line: 5,
+          column: 10,
+        ),
+      ),
+      leading_comments: [],
+      trailing_comments: [],
+      symbol_table: None,
+    ),
+  ],
+  symbol_table: None,
+  span: Span(
+    start: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+  ),
+)

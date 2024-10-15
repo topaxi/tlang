@@ -319,6 +319,7 @@ impl DeclarationAnalyzer {
             }
             PatternKind::Wildcard => {} // Wildcard discards values, nothing to do here.
             PatternKind::Literal(_) => {} // Literal patterns don't need to be declared.
+            _ => {}
         }
     }
 }

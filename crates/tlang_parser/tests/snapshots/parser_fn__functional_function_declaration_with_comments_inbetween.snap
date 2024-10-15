@@ -54,6 +54,8 @@ Module(
             FunctionParameter(
               pattern: Pattern(
                 kind: Literal(Integer(1)),
+                leading_comments: [],
+                trailing_comments: [],
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -187,6 +189,8 @@ Module(
                     ),
                   ),
                 )),
+                leading_comments: [],
+                trailing_comments: [],
                 span: Span(
                   start: LineColumn(
                     line: 2,

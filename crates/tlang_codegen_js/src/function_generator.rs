@@ -51,6 +51,11 @@ impl CodegenJS {
         self.inc_indent();
 
         // Declare and output temporary variables for if let guards.
+        // TODO: This should be very similar to match arm let expressions, maybe we can unify them.
+        //       Might even better if this was an AST transform instead, having
+        //       FunctionDeclarations desugar into a FunctionDeclaration with a match stmt.
+        //       Doing this as an AST transformation, we could gather the function declarations in
+        //       after the parsing phase and get rid of the FunctionDeclarations AST node entirely.
         for declaration in declarations {
             if let Some(ref expr) = declaration.guard {
                 if let ExprKind::Let(pattern, _) = &expr.kind {

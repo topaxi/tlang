@@ -266,9 +266,11 @@ impl Path {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub struct Pattern {
     pub kind: PatternKind,
+    pub leading_comments: Vec<Token>,
+    pub trailing_comments: Vec<Token>,
     pub span: Span,
 }
 
@@ -276,7 +278,7 @@ impl Pattern {
     pub fn new(kind: PatternKind) -> Self {
         Pattern {
             kind,
-            span: Span::default(),
+            ..Default::default()
         }
     }
 
@@ -331,8 +333,10 @@ pub struct EnumPattern {
     pub named_fields: bool,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub enum PatternKind {
+    #[default]
+    None,
     Identifier(Box<IdentifierPattern>),
     Literal(Box<Literal>),
     List(Vec<Pattern>),

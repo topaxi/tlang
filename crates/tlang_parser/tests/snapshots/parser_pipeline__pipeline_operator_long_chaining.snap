@@ -191,6 +191,8 @@ Module(
                                           ),
                                         ),
                                       )),
+                                      leading_comments: [],
+                                      trailing_comments: [],
                                       span: Span(
                                         start: LineColumn(
                                           line: 1,
@@ -475,6 +477,8 @@ Module(
                                       ),
                                     ),
                                   )),
+                                  leading_comments: [],
+                                  trailing_comments: [],
                                   span: Span(
                                     start: LineColumn(
                                       line: 2,
@@ -793,6 +797,8 @@ Module(
                                   ),
                                 ),
                               )),
+                              leading_comments: [],
+                              trailing_comments: [],
                               span: Span(
                                 start: LineColumn(
                                   line: 3,
@@ -834,6 +840,8 @@ Module(
                                   ),
                                 ),
                               )),
+                              leading_comments: [],
+                              trailing_comments: [],
                               span: Span(
                                 start: LineColumn(
                                   line: 3,

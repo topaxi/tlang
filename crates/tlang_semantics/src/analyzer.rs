@@ -312,7 +312,7 @@ impl SemanticAnalyzer {
             PatternKind::_Self(_) => {
                 self.mark_as_used_by_name("self", &pat.span);
             }
-            PatternKind::Wildcard | PatternKind::Identifier { .. } | PatternKind::Literal(_) => {}
+            _ => {}
         }
     }
 
