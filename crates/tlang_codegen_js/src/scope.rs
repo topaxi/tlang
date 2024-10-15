@@ -92,10 +92,10 @@ impl Default for Scope {
         Self {
             parent: None,
             variables: HashMap::from_iter(vec![
-                ("Some".to_string(), "Option::Some".to_string()),
-                ("None".to_string(), "Option::None".to_string()),
-                ("Ok".to_string(), "Result::Ok".to_string()),
-                ("Err".to_string(), "Result::Err".to_string()),
+                ("Some".to_string(), "Option.Some".to_string()),
+                ("None".to_string(), "Option.None".to_string()),
+                ("Ok".to_string(), "Result.Ok".to_string()),
+                ("Err".to_string(), "Result.Err".to_string()),
                 ("log".to_string(), "console.log".to_string()),
                 ("math".to_string(), "Math".to_string()),
                 ("math::min".to_string(), "Math.min".to_string()),
