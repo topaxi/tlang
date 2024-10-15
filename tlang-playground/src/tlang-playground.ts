@@ -42,11 +42,12 @@ export class TlangPlayground extends LitElement {
       display: grid;
       width: 100%;
       height: 100vh;
+      --editor-height: minmax(24rem, 1fr);
 
       grid-template:
         'toolbar' auto
-        'editor' 1fr
-        'output' 1fr
+        'editor' var(--editor-height)
+        'output' var(--editor-height)
         'console' auto;
     }
 
@@ -54,7 +55,7 @@ export class TlangPlayground extends LitElement {
       :host {
         grid-template:
           'toolbar toolbar' auto
-          'editor output' 1fr
+          'editor output' var(--editor-height)
           'editor console' auto / 50% 50%;
       }
     }
@@ -85,11 +86,11 @@ export class TlangPlayground extends LitElement {
       max-height: 100%;
 
       grid-area: editor;
+      overflow: auto;
     }
 
     .editor > * {
-      flex: 1 0 50%;
-      overflow: auto;
+      width: 100%;
       max-height: 100%;
     }
 

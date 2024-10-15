@@ -112,6 +112,15 @@ fn test_exponentiation() {
 #[test]
 fn test_pattern_matching() {
     assert_parser_snapshot!("let x = match 1 { 1 => 2, 3 => 4, _ => 5 };");
+    assert_parser_snapshot!(
+        r"
+        match foo; {
+            [] => Ok(bar),
+            [bar, ...baz] => Ok(qux),
+            _ => Err(error),
+        }
+        "
+    );
 }
 
 #[test]

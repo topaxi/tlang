@@ -305,7 +305,7 @@ impl<'src> Parser<'src> {
 
         // Expressions like IfElse as statements also do not need to be terminated with a semicolon.
         if let StmtKind::Expr(ref expr) = node.kind {
-            if let ExprKind::IfElse { .. } = expr.kind {
+            if let ExprKind::IfElse(_) | ExprKind::Match(_) = expr.kind {
                 return (false, Some(node));
             }
         }
@@ -637,17 +637,11 @@ impl<'src> Parser<'src> {
             );
 
             let element = match self.current_token_kind() {
-                Some(
-                    TokenKind::Identifier(_)
-                    | TokenKind::Literal(_)
-                    | TokenKind::Keyword(Keyword::Underscore)
-                    | TokenKind::LBracket,
-                ) => self.parse_pattern(),
                 Some(TokenKind::DotDotDot) => {
                     self.advance();
                     node::pat!(Rest(Box::new(self.parse_identifier_pattern())))
                 }
-                _ => unreachable!("Expected identifier, literal or rest parameter"),
+                _ => self.parse_pattern(),
             };
 
             elements.push(element);
@@ -979,6 +973,16 @@ impl<'src> Parser<'src> {
     fn parse_match_expression(&mut self) -> Expr {
         self.consume_keyword_token(Keyword::Match);
         let expression = self.parse_expression();
+
+        // TODO: Reevaluate whether we want `foo {}` to be a `foo({})` call expression.
+        //       As this collides with `if let` statements.
+        // Semicolon or parenthesis are currently needed to disambiguate call with dictionary and block.
+        // E.g. `if let x = foo { .. }` is recognized as `foo({ .. })`
+        // vs `if let x = foo; { .. }` which will properly parse.
+        if let Some(TokenKind::Semicolon) = self.current_token_kind() {
+            self.advance();
+        }
+
         self.consume_token(TokenKind::LBrace);
 
         let mut arms = Vec::new();
@@ -1447,6 +1451,8 @@ impl<'src> Parser<'src> {
                 | TokenKind::Keyword(Keyword::Underscore | Keyword::_Self)
                 | TokenKind::LBracket
         );
+
+        debug!("Parsing pattern {:?}", self.current_token);
 
         let mut span = self.create_span_from_current_token();
         let mut node = match self.current_token_kind() {
