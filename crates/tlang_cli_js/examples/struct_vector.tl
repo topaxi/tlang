@@ -27,7 +27,8 @@ fn Vector.magnitude(self) -> float {
 let v1 = Vector::new(3, 4);
 
 // Vector addition
-v1.add(Vector::new(1, 2))
+Vector::new(1, 2)
+|> v1.add()
 |> log();
 
 // Scaling a vector
