@@ -24,6 +24,8 @@ pub trait Visitor<'ast>: Sized {
     }
 
     fn visit_struct_decl(&mut self, decl: &'ast node::StructDeclaration) {
+        self.visit_ident(&decl.name);
+
         for (name, ty) in &decl.fields {
             self.visit_ident(name);
             self.visit_ty(ty);
@@ -99,27 +101,23 @@ pub fn walk_path<'ast, V: Visitor<'ast>>(visitor: &mut V, path: &'ast node::Path
 
 pub fn walk_pat<'ast, V: Visitor<'ast>>(visitor: &mut V, pattern: &'ast node::Pattern) {
     match &pattern.kind {
-        node::PatternKind::Identifier { name, .. } => visitor.visit_ident(name),
+        node::PatternKind::Identifier(ident_pattern) => visitor.visit_ident(&ident_pattern.name),
         node::PatternKind::Rest(pattern) => visitor.visit_pat(pattern),
         node::PatternKind::List(patterns) => {
             for pattern in patterns {
                 visitor.visit_pat(pattern);
             }
         }
-        node::PatternKind::Enum {
-            identifier,
-            elements,
-            ..
-        } => {
-            visitor.visit_expr(identifier);
-            for element in elements {
+        node::PatternKind::Enum(enum_pattern) => {
+            visitor.visit_expr(&enum_pattern.identifier);
+            for element in &enum_pattern.elements {
                 visitor.visit_pat(element);
             }
         }
-        node::PatternKind::Literal(literal) => {
-            visitor.visit_expr(literal);
-        }
+        node::PatternKind::Literal(_) => {}
+        node::PatternKind::_Self(_) => {}
         node::PatternKind::Wildcard => {}
+        node::PatternKind::None => {}
     }
 }
 
@@ -148,15 +146,11 @@ pub fn walk_stmt<'ast, V: Visitor<'ast>>(visitor: &mut V, statement: &'ast node:
         node::StmtKind::Expr(expr) => {
             visitor.visit_expr(expr);
         }
-        node::StmtKind::Let {
-            pattern,
-            expression,
-            type_annotation,
-        } => {
-            visitor.visit_pat(pattern);
-            visitor.visit_expr(expression);
+        node::StmtKind::Let(let_decl) => {
+            visitor.visit_pat(&let_decl.pattern);
+            visitor.visit_expr(&let_decl.expression);
 
-            if let Some(ty) = type_annotation.as_ref() {
+            if let Some(ty) = &let_decl.type_annotation {
                 visitor.visit_ty(ty);
             }
         }
@@ -229,25 +223,23 @@ pub fn walk_expr<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'ast node
         node::ExprKind::Block(block) => {
             visitor.visit_block(&block.statements, &block.expression);
         }
-        node::ExprKind::BinaryOp { op: _, lhs, rhs } => {
-            visitor.visit_expr(lhs);
-            visitor.visit_expr(rhs);
+        node::ExprKind::BinaryOp(binary_op_expression) => {
+            visitor.visit_expr(&binary_op_expression.lhs);
+            visitor.visit_expr(&binary_op_expression.rhs);
         }
         node::ExprKind::UnaryOp(_, expression) => {
             visitor.visit_expr(expression);
         }
-        node::ExprKind::FieldExpression { base, field } => {
-            visitor.visit_expr(base);
-            visitor.visit_ident(field);
+        node::ExprKind::FieldExpression(field_expr) => {
+            visitor.visit_expr(&field_expr.base);
+            visitor.visit_ident(&field_expr.field);
         }
-        node::ExprKind::Call {
-            function,
-            arguments,
-        } => {
-            visitor.visit_expr(function);
-            for argument in arguments {
+        node::ExprKind::Call(call_expr) => {
+            for argument in &call_expr.arguments {
                 visitor.visit_expr(argument);
             }
+
+            visitor.visit_expr(&call_expr.callee);
         }
         node::ExprKind::Dict(kvs) => {
             for (key, value) in kvs {
@@ -258,9 +250,9 @@ pub fn walk_expr<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'ast node
         node::ExprKind::FunctionExpression(decl) => {
             visitor.visit_fn_decl(decl);
         }
-        node::ExprKind::IndexExpression { base, index } => {
-            visitor.visit_expr(base);
-            visitor.visit_expr(index);
+        node::ExprKind::IndexExpression(index_expr) => {
+            visitor.visit_expr(&index_expr.base);
+            visitor.visit_expr(&index_expr.index);
         }
         node::ExprKind::Let(pattern, expr) => {
             visitor.visit_pat(pattern);
@@ -272,22 +264,18 @@ pub fn walk_expr<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'ast node
                 visitor.visit_expr(expr);
             }
         }
-        node::ExprKind::IfElse {
-            condition,
-            then_branch,
-            else_branches,
-        } => {
-            visitor.visit_expr(condition);
-            visitor.visit_expr(then_branch);
+        node::ExprKind::IfElse(if_else_expr) => {
+            visitor.visit_expr(&if_else_expr.condition);
+            visitor.visit_expr(&if_else_expr.then_branch);
 
-            for else_branch in else_branches {
+            for else_branch in &if_else_expr.else_branches {
                 visitor.visit_else_clause(else_branch);
             }
         }
-        node::ExprKind::Match { expression, arms } => {
-            visitor.visit_expr(expression);
+        node::ExprKind::Match(match_expr) => {
+            visitor.visit_expr(&match_expr.expression);
 
-            for arm in arms {
+            for arm in &match_expr.arms {
                 visitor.visit_pat(&arm.pattern);
                 visitor.visit_expr(&arm.expression);
             }
@@ -295,12 +283,16 @@ pub fn walk_expr<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'ast node
         node::ExprKind::Path(path) => {
             visitor.visit_path(path);
         }
-        node::ExprKind::RecursiveCall(expr) => {
-            visitor.visit_expr(expr);
+        node::ExprKind::RecursiveCall(call_expr) => {
+            visitor.visit_expr(&call_expr.callee);
+
+            for argument in &call_expr.arguments {
+                visitor.visit_expr(argument);
+            }
         }
-        node::ExprKind::Range { start, end, .. } => {
-            visitor.visit_expr(start);
-            visitor.visit_expr(end);
+        node::ExprKind::Range(range_expr) => {
+            visitor.visit_expr(&range_expr.start);
+            visitor.visit_expr(&range_expr.end);
         }
         node::ExprKind::Wildcard => {}
     }
@@ -308,7 +300,7 @@ pub fn walk_expr<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'ast node
 
 #[cfg(test)]
 mod tests {
-    use self::node::{BinaryOpKind, Ident, Path};
+    use self::node::{BinaryOpExpression, BinaryOpKind, Ident, IdentifierPattern, Path};
     use pretty_assertions::assert_eq;
 
     use super::*;
@@ -401,22 +393,24 @@ mod tests {
                 Ident::new("my_fn", Span::default()),
             ])))),
             parameters: vec![node::FunctionParameter {
-                pattern: node::Pattern::new(node::PatternKind::Identifier {
-                    id: SymbolId::new(1),
-                    name: Ident::new("x", Span::default()),
-                }),
+                pattern: node::Pattern::new(node::PatternKind::Identifier(Box::new(
+                    IdentifierPattern {
+                        id: SymbolId::new(1),
+                        name: Ident::new("x", Span::default()),
+                    },
+                ))),
                 type_annotation: None,
                 span: Span::default(),
             }],
-            guard: Some(node::Expr::new(node::ExprKind::BinaryOp {
-                op: BinaryOpKind::GreaterThanOrEqual,
-                lhs: Box::new(node::Expr::new(node::ExprKind::Path(Box::new(Path::new(
-                    vec![Ident::new("x", Span::default())],
-                ))))),
-                rhs: Box::new(node::Expr::new(node::ExprKind::Literal(Literal::Integer(
-                    5,
-                )))),
-            })),
+            guard: Some(node::Expr::new(node::ExprKind::BinaryOp(Box::new(
+                BinaryOpExpression {
+                    op: BinaryOpKind::GreaterThanOrEqual,
+                    lhs: node::Expr::new(node::ExprKind::Path(Box::new(Path::new(vec![
+                        Ident::new("x", Span::default()),
+                    ])))),
+                    rhs: node::Expr::new(node::ExprKind::Literal(Box::new(Literal::Integer(5)))),
+                },
+            )))),
             return_type_annotation: None,
             body: node::Block::default(),
             ..Default::default()
