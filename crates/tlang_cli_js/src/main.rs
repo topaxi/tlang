@@ -5,7 +5,6 @@ use std::{
 };
 
 use clap::{arg, command, ArgMatches};
-use tlang_ast::symbols::SymbolType;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_parser::error::ParseError;
 use tlang_semantics::{diagnostic::Diagnostic, SemanticAnalyzer};
@@ -131,15 +130,7 @@ fn compile(source: &str) -> Result<String, ParserError> {
     let mut parser = tlang_parser::parser::Parser::from_source(source);
     let mut ast = parser.parse()?;
     let mut semantic_analyzer = SemanticAnalyzer::default();
-    semantic_analyzer.add_builtin_symbols(&[
-        ("log", SymbolType::Function),
-        ("math", SymbolType::Module),
-        ("math::max", SymbolType::Function),
-        ("math::min", SymbolType::Function),
-        ("math::floor", SymbolType::Function),
-        ("math::random", SymbolType::Function),
-        ("math::sqrt", SymbolType::Function),
-    ]);
+    semantic_analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());
     match semantic_analyzer.analyze(&mut ast) {
         Ok(()) => {
             let mut generator = CodegenJS::default();

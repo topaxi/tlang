@@ -1,7 +1,7 @@
 extern crate console_error_panic_hook;
 
 use gloo_utils::format::JsValueSerdeExt;
-use tlang_ast::{node::Module, symbols::SymbolType};
+use tlang_ast::node::Module;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_parser::{error::ParseError, parser::Parser};
 use tlang_semantics::{diagnostic::Diagnostic, SemanticAnalyzer};
@@ -49,36 +49,8 @@ impl TlangCompiler {
     }
 
     fn analyze(&mut self) {
-        self.analyzer.add_builtin_symbols(&[
-            ("Option", SymbolType::Enum),
-            ("Result", SymbolType::Enum),
-            ("Option::Some", SymbolType::EnumVariant),
-            ("Option::None", SymbolType::EnumVariant),
-            ("Result::Ok", SymbolType::EnumVariant),
-            ("Result::Err", SymbolType::EnumVariant),
-            ("Some", SymbolType::Function),
-            ("None", SymbolType::Variable),
-            ("Ok", SymbolType::Function),
-            ("Err", SymbolType::Function),
-            ("len", SymbolType::Function),
-            ("log", SymbolType::Function),
-            ("math", SymbolType::Module),
-            ("math::max", SymbolType::Function),
-            ("math::min", SymbolType::Function),
-            ("math::floor", SymbolType::Function),
-            ("math::random", SymbolType::Function),
-            ("math::sqrt", SymbolType::Function),
-            ("random_int", SymbolType::Function),
-            ("compose", SymbolType::Function),
-            ("map", SymbolType::Function),
-            ("filter", SymbolType::Function),
-            ("filter_map", SymbolType::Function),
-            ("partition", SymbolType::Function),
-            ("foldl", SymbolType::Function),
-            ("foldr", SymbolType::Function),
-            ("sum", SymbolType::Function),
-            ("zip", SymbolType::Function),
-        ]);
+        self.analyzer
+            .add_builtin_symbols(CodegenJS::get_standard_library_symbols());
         let _ = self.analyzer.analyze(&mut self.ast);
         self.analyzer
             .get_diagnostics()
