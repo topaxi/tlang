@@ -619,6 +619,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "tlang_hir"
+version = "0.1.0"
+dependencies = [
+ "pretty_assertions",
+ "tlang_ast",
+]
+
+[[package]]
 name = "tlang_lexer"
 version = "0.1.0"
 dependencies = [
