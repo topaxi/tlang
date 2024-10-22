@@ -1,4 +1,4 @@
-use tlang_ast::node::{BinaryOp, Ident, UnaryOp};
+use tlang_ast::node::{BinaryOpKind, Ident, UnaryOp};
 use tlang_ast::span::Span;
 
 #[derive(Debug)]
@@ -33,9 +33,9 @@ pub struct Stmt {
 
 #[derive(Debug)]
 pub enum StmtKind {
-    Expr(Expr),
-    Let(Pat, Option<Expr>),
-    FunctionDeclaration,
+    Expr(Box<Expr>),
+    Let(Pat, Expr, Ty),
+    FunctionDeclaration(Box<FunctionDeclaration>),
     Return(Expr),
     EnumDeclaration,
     StructDeclaration,
@@ -65,10 +65,11 @@ pub struct Expr {
 
 #[derive(Debug)]
 pub enum ExprKind {
+    Block(Box<Block>),
     Call(Box<Expr>, Vec<Expr>),
     TailCall(Box<Expr>, Vec<Expr>),
     MethodCall(PathSegment, Box<Expr>, Vec<Expr>),
-    Binary(BinaryOp, Box<Expr>, Box<Expr>),
+    Binary(BinaryOpKind, Box<Expr>, Box<Expr>),
     Unary(UnaryOp, Box<Expr>),
     // Let expression, only valid within if conditions and guards
     Let(Box<Pat>, Box<Expr>),
@@ -83,5 +84,22 @@ pub struct Ty {
 
 #[derive(Debug)]
 pub enum TyKind {
+    Unknown,
     Path(Path),
+}
+
+#[derive(Debug)]
+pub struct FunctionParameter {
+    pub pattern: Pat,
+    pub type_annotation: Ty,
+    pub span: Span,
+}
+
+#[derive(Debug)]
+pub struct FunctionDeclaration {
+    pub name: Expr,
+    pub parameters: Vec<FunctionParameter>,
+    pub return_type: Ty,
+    pub body: Block,
+    pub span: Span,
 }
