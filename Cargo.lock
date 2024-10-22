@@ -578,6 +578,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tlang_ast_lowering"
+version = "0.1.0"
+dependencies = [
+ "pretty_assertions",
+ "tlang_ast",
+ "tlang_hir",
+]
+
+[[package]]
 name = "tlang_bindings_js"
 version = "0.1.0"
 dependencies = [
