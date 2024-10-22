@@ -234,11 +234,10 @@ pub fn walk_expr<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'ast node
             visitor.visit_expr(&field_expr.base);
             visitor.visit_ident(&field_expr.field);
         }
-        node::ExprKind::Call(call_expr) => {
+        node::ExprKind::Call(call_expr) | node::ExprKind::RecursiveCall(call_expr) => {
             for argument in &call_expr.arguments {
                 visitor.visit_expr(argument);
             }
-
             visitor.visit_expr(&call_expr.callee);
         }
         node::ExprKind::Dict(kvs) => {
@@ -282,13 +281,6 @@ pub fn walk_expr<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'ast node
         }
         node::ExprKind::Path(path) => {
             visitor.visit_path(path);
-        }
-        node::ExprKind::RecursiveCall(call_expr) => {
-            visitor.visit_expr(&call_expr.callee);
-
-            for argument in &call_expr.arguments {
-                visitor.visit_expr(argument);
-            }
         }
         node::ExprKind::Range(range_expr) => {
             visitor.visit_expr(&range_expr.start);
