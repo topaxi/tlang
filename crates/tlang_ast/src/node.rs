@@ -446,6 +446,7 @@ impl Ty {
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct MatchArm {
     pub pattern: Pattern,
+    pub guard: Option<Expr>,
     pub expression: Expr,
 }
 

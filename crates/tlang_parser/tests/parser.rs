@@ -124,6 +124,11 @@ fn test_pattern_matching() {
 }
 
 #[test]
+fn test_pattern_matching_with_guard() {
+    assert_parser_snapshot!("let x = match 1 { a if a == 1 => 2, _ => 3 };");
+}
+
+#[test]
 fn test_list_literal() {
     assert_parser_snapshot!("let x = [];");
     assert_parser_snapshot!("let x = [1, 2, 3];");

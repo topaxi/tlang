@@ -66,6 +66,7 @@ Module(
                   ),
                 ),
               ),
+              guard: None,
               expression: Expr(
                 kind: Call(CallExpression(
                   callee: Expr(
@@ -261,6 +262,7 @@ Module(
                   ),
                 ),
               ),
+              guard: None,
               expression: Expr(
                 kind: Call(CallExpression(
                   callee: Expr(
@@ -381,6 +383,7 @@ Module(
                   ),
                 ),
               ),
+              guard: None,
               expression: Expr(
                 kind: Call(CallExpression(
                   callee: Expr(

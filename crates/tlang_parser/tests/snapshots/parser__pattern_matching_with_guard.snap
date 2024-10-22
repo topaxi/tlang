@@ -1,6 +1,6 @@
 ---
 source: crates/tlang_parser/tests/parser.rs
-expression: "parse! (\"let x = match 1 { 1 => 2, 3 => 4, _ => 5 };\")"
+expression: "parse! (\"let x = match 1 { a if a == 1 => 2, _ => 3 };\")"
 ---
 Module(
   statements: [
@@ -57,7 +57,22 @@ Module(
             arms: [
               MatchArm(
                 pattern: Pattern(
-                  kind: Literal(Integer(1)),
+                  kind: Identifier(IdentifierPattern(
+                    id: SymbolId(2),
+                    name: Ident(
+                      name: "a",
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 18,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 19,
+                        ),
+                      ),
+                    ),
+                  )),
                   leading_comments: [],
                   trailing_comments: [],
                   span: Span(
@@ -71,9 +86,68 @@ Module(
                     ),
                   ),
                 ),
-                guard: None,
-                expression: Expr(
-                  kind: Literal(Integer(2)),
+                guard: Some(Expr(
+                  kind: BinaryOp(BinaryOpExpression(
+                    op: Equal,
+                    lhs: Expr(
+                      kind: Path(Path(
+                        segments: [
+                          Ident(
+                            name: "a",
+                            span: Span(
+                              start: LineColumn(
+                                line: 0,
+                                column: 23,
+                              ),
+                              end: LineColumn(
+                                line: 0,
+                                column: 24,
+                              ),
+                            ),
+                          ),
+                        ],
+                        span: Span(
+                          start: LineColumn(
+                            line: 0,
+                            column: 23,
+                          ),
+                          end: LineColumn(
+                            line: 0,
+                            column: 24,
+                          ),
+                        ),
+                      )),
+                      leading_comments: [],
+                      trailing_comments: [],
+                      symbol_table: None,
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 23,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 24,
+                        ),
+                      ),
+                    ),
+                    rhs: Expr(
+                      kind: Literal(Integer(1)),
+                      leading_comments: [],
+                      trailing_comments: [],
+                      symbol_table: None,
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 28,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 29,
+                        ),
+                      ),
+                    ),
+                  )),
                   leading_comments: [],
                   trailing_comments: [],
                   symbol_table: None,
@@ -84,41 +158,23 @@ Module(
                     ),
                     end: LineColumn(
                       line: 0,
-                      column: 24,
+                      column: 29,
                     ),
                   ),
-                ),
-              ),
-              MatchArm(
-                pattern: Pattern(
-                  kind: Literal(Integer(3)),
-                  leading_comments: [],
-                  trailing_comments: [],
-                  span: Span(
-                    start: LineColumn(
-                      line: 0,
-                      column: 26,
-                    ),
-                    end: LineColumn(
-                      line: 0,
-                      column: 27,
-                    ),
-                  ),
-                ),
-                guard: None,
+                )),
                 expression: Expr(
-                  kind: Literal(Integer(4)),
+                  kind: Literal(Integer(2)),
                   leading_comments: [],
                   trailing_comments: [],
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
                       line: 0,
-                      column: 31,
+                      column: 33,
                     ),
                     end: LineColumn(
                       line: 0,
-                      column: 32,
+                      column: 34,
                     ),
                   ),
                 ),
@@ -131,28 +187,28 @@ Module(
                   span: Span(
                     start: LineColumn(
                       line: 0,
-                      column: 34,
+                      column: 36,
                     ),
                     end: LineColumn(
                       line: 0,
-                      column: 35,
+                      column: 37,
                     ),
                   ),
                 ),
                 guard: None,
                 expression: Expr(
-                  kind: Literal(Integer(5)),
+                  kind: Literal(Integer(3)),
                   leading_comments: [],
                   trailing_comments: [],
                   symbol_table: None,
                   span: Span(
                     start: LineColumn(
                       line: 0,
-                      column: 39,
+                      column: 41,
                     ),
                     end: LineColumn(
                       line: 0,
-                      column: 40,
+                      column: 42,
                     ),
                   ),
                 ),
@@ -169,7 +225,7 @@ Module(
             ),
             end: LineColumn(
               line: 0,
-              column: 42,
+              column: 44,
             ),
           ),
         ),
@@ -182,7 +238,7 @@ Module(
         ),
         end: LineColumn(
           line: 0,
-          column: 43,
+          column: 45,
         ),
       ),
       leading_comments: [],

@@ -988,10 +988,12 @@ impl<'src> Parser<'src> {
         let mut arms = Vec::new();
         while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
             let pattern = self.parse_pattern();
+            let guard = self.parse_guard_clause();
             self.consume_token(TokenKind::FatArrow);
             let expression = self.parse_expression();
             arms.push(MatchArm {
                 pattern,
+                guard,
                 expression,
             });
             if let Some(TokenKind::Comma) = self.current_token_kind() {

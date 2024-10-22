@@ -41,6 +41,7 @@ impl CodegenJS {
             i,
             MatchArm {
                 pattern,
+                guard,
                 expression,
             },
         ) in match_expr.arms.iter().enumerate()
@@ -50,6 +51,11 @@ impl CodegenJS {
                 self.push_str(&match_value_tmp_var);
                 self.push_str(" === ");
                 self.generate_pat(pattern);
+                // TODO: Implement guard clause.
+                if let Some(guard) = guard {
+                    self.push_str(" && ");
+                    self.generate_expr(guard, None);
+                }
                 self.push_str(") {\n");
                 self.inc_indent();
                 self.push_context(BlockContext::Expression);
