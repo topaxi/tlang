@@ -36,7 +36,7 @@ pub enum StmtKind {
     Expr(Expr),
     Let(Pat, Option<Expr>),
     FunctionDeclaration,
-    Return,
+    Return(Expr),
     EnumDeclaration,
     StructDeclaration,
 }
@@ -50,6 +50,11 @@ pub struct Pat {
 #[derive(Debug)]
 pub enum PatKind {
     Wildcard,
+    Identifier,
+    Literal,
+    List(Vec<Pat>),
+    Rest(Box<Pat>),
+    Enum,
 }
 
 #[derive(Debug)]
@@ -60,8 +65,8 @@ pub struct Expr {
 
 #[derive(Debug)]
 pub enum ExprKind {
-    Call,
-    TailCall,
+    Call(Box<Expr>, Vec<Expr>),
+    TailCall(Box<Expr>, Vec<Expr>),
     MethodCall(PathSegment, Box<Expr>, Vec<Expr>),
     Binary(BinaryOp, Box<Expr>, Box<Expr>),
     Unary(UnaryOp, Box<Expr>),
