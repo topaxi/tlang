@@ -1,5 +1,19 @@
 use tlang_ast::node::{BinaryOpKind, Ident, UnaryOp};
 use tlang_ast::span::Span;
+use tlang_ast::token::Literal;
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct HirId(usize);
+
+impl HirId {
+    pub fn new(id: usize) -> Self {
+        HirId(id)
+    }
+
+    pub fn next(&self) -> Self {
+        HirId(self.0 + 1)
+    }
+}
 
 #[derive(Debug)]
 pub struct Path {
@@ -50,11 +64,11 @@ pub struct Pat {
 #[derive(Debug)]
 pub enum PatKind {
     Wildcard,
-    Identifier,
-    Literal,
+    Identifier(HirId, Box<Ident>),
+    Literal(Box<Literal>),
     List(Vec<Pat>),
     Rest(Box<Pat>),
-    Enum,
+    Enum(Box<Path>, Vec<Pat>),
 }
 
 #[derive(Debug)]
@@ -97,6 +111,7 @@ pub struct FunctionParameter {
 
 #[derive(Debug)]
 pub struct FunctionDeclaration {
+    pub hir_id: HirId,
     pub name: Expr,
     pub parameters: Vec<FunctionParameter>,
     pub return_type: Ty,
