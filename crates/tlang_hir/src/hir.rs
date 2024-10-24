@@ -72,6 +72,26 @@ pub enum PatKind {
 }
 
 #[derive(Debug)]
+pub struct ElseClause {
+    pub condition: Option<Expr>,
+    pub consequence: Block,
+}
+
+#[derive(Debug)]
+pub struct MatchArm {
+    pub pat: Pat,
+    pub guard: Option<Expr>,
+    pub expr: Expr,
+}
+
+#[derive(Debug)]
+pub struct RangeExpression {
+    pub start: Expr,
+    pub end: Expr,
+    pub inclusive: bool,
+}
+
+#[derive(Debug)]
 pub struct Expr {
     pub kind: ExprKind,
     pub span: Span,
@@ -87,7 +107,17 @@ pub enum ExprKind {
     Unary(UnaryOp, Box<Expr>),
     // Let expression, only valid within if conditions and guards
     Let(Box<Pat>, Box<Expr>),
-    IfElse(Box<Expr>, Box<Expr>, Option<Box<Expr>>),
+    IfElse(Box<Expr>, Box<Block>, Vec<ElseClause>),
+    Path(Box<Path>),
+    List(Vec<Expr>),
+    Dict(Vec<(Expr, Expr)>),
+    FunctionExpression(Box<FunctionDeclaration>),
+    FieldAccess(Box<Expr>, Ident),
+    IndexAccess(Box<Expr>, Box<Expr>),
+    Literal(Box<Literal>),
+    Match(Box<Expr>, Vec<MatchArm>),
+    Range(Box<RangeExpression>),
+    Wildcard, // TODO: This might be better to just be an identifier
 }
 
 #[derive(Debug)]

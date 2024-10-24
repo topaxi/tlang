@@ -1,7 +1,8 @@
 #![feature(box_patterns)]
 use tlang_ast as ast;
 use tlang_ast::node::{
-    BinaryOpExpression, EnumPattern, FunctionDeclaration, Ident, IdentifierPattern, LetDeclaration,
+    BinaryOpExpression, CallExpression, EnumPattern, FunctionDeclaration, Ident, IdentifierPattern,
+    LetDeclaration,
 };
 use tlang_ast::token::kw;
 use tlang_hir::hir::{self, HirId};
@@ -49,16 +50,20 @@ impl LoweringContext {
         hir::Block { stmts, expr, span }
     }
 
+    fn lower_exprs(&mut self, exprs: &[ast::node::Expr]) -> Vec<hir::Expr> {
+        exprs.iter().map(|expr| self.lower_expr(expr)).collect()
+    }
+
     fn lower_expr(&mut self, node: &ast::node::Expr) -> hir::Expr {
         match &node.kind {
-            ast::node::ExprKind::BinaryOp(box BinaryOpExpression { op, lhs, rhs }) => hir::Expr {
-                kind: hir::ExprKind::Binary(
-                    *op,
-                    Box::new(self.lower_expr(lhs)),
-                    Box::new(self.lower_expr(rhs)),
-                ),
-                span: node.span,
-            },
+            ast::node::ExprKind::BinaryOp(box BinaryOpExpression { op, lhs, rhs }) => {
+                let lhs = self.lower_expr(lhs);
+                let rhs = self.lower_expr(rhs);
+                self.expr(
+                    node.span,
+                    hir::ExprKind::Binary(*op, Box::new(lhs), Box::new(rhs)),
+                )
+            }
             ast::node::ExprKind::Block(box ast::node::Block {
                 statements,
                 expression,
@@ -67,13 +72,148 @@ impl LoweringContext {
             }) => {
                 let kind =
                     hir::ExprKind::Block(Box::new(self.lower_block(statements, expression, *span)));
-
                 self.expr(*span, kind)
             }
+            ast::node::ExprKind::Call(box CallExpression { callee, arguments }) => {
+                let callee = self.lower_expr(callee);
+                let arguments = self.lower_exprs(arguments);
+                self.expr(node.span, hir::ExprKind::Call(Box::new(callee), arguments))
+            }
+            ast::node::ExprKind::RecursiveCall(box CallExpression { callee, arguments }) => {
+                let callee = self.lower_expr(callee);
+                let arguments = self.lower_exprs(arguments);
+                self.expr(
+                    node.span,
+                    hir::ExprKind::TailCall(Box::new(callee), arguments),
+                )
+            }
+            ast::node::ExprKind::UnaryOp(op, expr) => {
+                let expr = self.lower_expr(expr);
+                self.expr(node.span, hir::ExprKind::Unary(*op, Box::new(expr)))
+            }
+            ast::node::ExprKind::Path(path) => {
+                let path = self.lower_path(path);
+                self.expr(node.span, hir::ExprKind::Path(Box::new(path)))
+            }
+            ast::node::ExprKind::FunctionExpression(decl) => {
+                let decl = self.lower_fn_decl(decl);
+                self.expr(node.span, hir::ExprKind::FunctionExpression(Box::new(decl)))
+            }
+            ast::node::ExprKind::List(exprs) => {
+                let exprs = self.lower_exprs(exprs);
+                self.expr(node.span, hir::ExprKind::List(exprs))
+            }
+            ast::node::ExprKind::Dict(entries) => {
+                let entries = entries
+                    .iter()
+                    .map(|(key, value)| (self.lower_expr(key), self.lower_expr(value)))
+                    .collect();
+                self.expr(node.span, hir::ExprKind::Dict(entries))
+            }
+            ast::node::ExprKind::Let(pat, expr) => {
+                let pattern = self.lower_pat(pat);
+                let expression = self.lower_expr(expr);
+                self.expr(
+                    node.span,
+                    hir::ExprKind::Let(Box::new(pattern), Box::new(expression)),
+                )
+            }
+            ast::node::ExprKind::FieldExpression(box ast::node::FieldAccessExpression {
+                base,
+                field,
+            }) => {
+                let expr = self.lower_expr(base);
+                self.expr(
+                    node.span,
+                    hir::ExprKind::FieldAccess(Box::new(expr), field.clone()),
+                )
+            }
+            ast::node::ExprKind::IndexExpression(box ast::node::IndexAccessExpression {
+                base,
+                index,
+            }) => {
+                let expr = self.lower_expr(base);
+                let index = self.lower_expr(index);
+                self.expr(
+                    node.span,
+                    hir::ExprKind::IndexAccess(Box::new(expr), Box::new(index)),
+                )
+            }
+            ast::node::ExprKind::IfElse(box ast::node::IfElseExpression {
+                condition,
+                then_branch,
+                else_branches,
+            }) => {
+                let condition = self.lower_expr(condition);
+
+                let consequence = if let ast::node::ExprKind::Block(block) = &then_branch.kind {
+                    self.lower_block(&block.statements, &block.expression, block.span)
+                } else {
+                    // TODO: Defensive, technically we do not have then or else branches which are
+                    //       not blocks. We might want to just change the AST instead.
+                    self.lower_block(&[], &Some(then_branch.clone()), then_branch.span)
+                };
+
+                let else_branches = else_branches
+                    .iter()
+                    .map(|clause| hir::ElseClause {
+                        condition: clause.condition.as_ref().map(|expr| self.lower_expr(expr)),
+                        consequence: if let ast::node::ExprKind::Block(block) =
+                            &clause.consequence.kind
+                        {
+                            self.lower_block(&block.statements, &block.expression, block.span)
+                        } else {
+                            // TODO: Defensive, technically we do not have then or else branches which are
+                            //       not blocks. We might want to just change the AST instead.
+                            self.lower_block(&[], &Some(clause.consequence.clone()), node.span)
+                        },
+                    })
+                    .collect();
+
+                self.expr(
+                    node.span,
+                    hir::ExprKind::IfElse(
+                        Box::new(condition),
+                        Box::new(consequence),
+                        else_branches,
+                    ),
+                )
+            }
+            ast::node::ExprKind::Literal(box literal) => {
+                self.expr(node.span, hir::ExprKind::Literal(Box::new(literal.clone())))
+            }
+            ast::node::ExprKind::Match(box ast::node::MatchExpression { expression, arms }) => {
+                let expr = self.lower_expr(expression);
+                let arms = arms
+                    .iter()
+                    .map(|arm| hir::MatchArm {
+                        pat: self.lower_pat(&arm.pattern),
+                        guard: arm.guard.as_ref().map(|expr| self.lower_expr(expr)),
+                        expr: self.lower_expr(&arm.expression),
+                    })
+                    .collect();
+                self.expr(node.span, hir::ExprKind::Match(Box::new(expr), arms))
+            }
+            ast::node::ExprKind::Range(box ast::node::RangeExpression {
+                start,
+                end,
+                inclusive,
+            }) => {
+                let start = self.lower_expr(start);
+                let end = self.lower_expr(end);
+                self.expr(
+                    node.span,
+                    hir::ExprKind::Range(Box::new(hir::RangeExpression {
+                        start,
+                        end,
+                        inclusive: *inclusive,
+                    })),
+                )
+            }
+            ast::node::ExprKind::Wildcard => self.expr(node.span, hir::ExprKind::Wildcard),
             ast::node::ExprKind::None => {
                 unreachable!("ExprKind::None should not be encountered, validate AST first")
             }
-            _ => todo!(),
         }
     }
 
