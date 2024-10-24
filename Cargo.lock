@@ -595,6 +595,7 @@ dependencies = [
  "ron 0.8.1",
  "serde_json",
  "tlang_ast",
+ "tlang_ast_lowering",
  "tlang_codegen_js",
  "tlang_parser",
  "tlang_semantics",
@@ -632,6 +633,7 @@ name = "tlang_hir"
 version = "0.1.0"
 dependencies = [
  "pretty_assertions",
+ "serde",
  "tlang_ast",
 ]
 

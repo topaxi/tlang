@@ -371,7 +371,7 @@ impl LoweringContext {
     }
 }
 
-pub fn lower_to_hir(tlang_ast: ast::node::Module) -> hir::Module {
+pub fn lower_to_hir(tlang_ast: &ast::node::Module) -> hir::Module {
     let mut ctx = LoweringContext::new();
-    ctx.lower_module(&tlang_ast)
+    ctx.lower_module(tlang_ast)
 }

@@ -70,6 +70,16 @@ impl TlangCompiler {
     }
 
     #[wasm_bindgen(getter)]
+    pub fn hir_string(&mut self) -> Result<String, JsError> {
+        let hir = tlang_ast_lowering::lower_to_hir(&self.ast);
+
+        Ok(ron::ser::to_string_pretty(
+            &hir,
+            ron::ser::PrettyConfig::default(),
+        )?)
+    }
+
+    #[wasm_bindgen(getter)]
     pub fn ast_string(&self) -> Result<String, JsError> {
         Ok(ron::ser::to_string_pretty(
             &self.ast,
