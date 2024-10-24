@@ -48,9 +48,9 @@ pub struct Stmt {
 #[derive(Debug)]
 pub enum StmtKind {
     Expr(Box<Expr>),
-    Let(Pat, Expr, Ty),
+    Let(Box<Pat>, Box<Expr>, Box<Ty>),
     FunctionDeclaration(Box<FunctionDeclaration>),
-    Return(Expr),
+    Return(Box<Option<Expr>>),
     EnumDeclaration,
     StructDeclaration,
 }

@@ -233,17 +233,25 @@ impl LoweringContext {
                 type_annotation,
             }) => hir::Stmt {
                 kind: hir::StmtKind::Let(
-                    self.lower_pat(pattern),
-                    self.lower_expr(expression),
-                    self.lower_ty(type_annotation),
+                    Box::new(self.lower_pat(pattern)),
+                    Box::new(self.lower_expr(expression)),
+                    Box::new(self.lower_ty(type_annotation)),
                 ),
                 span: node.span,
             },
-            ast::node::StmtKind::FunctionDeclaration(decl) => {
+            ast::node::StmtKind::FunctionDeclaration(box decl) => {
                 let decl = self.lower_fn_decl(decl);
 
                 hir::Stmt {
                     kind: hir::StmtKind::FunctionDeclaration(Box::new(decl)),
+                    span: node.span,
+                }
+            }
+            ast::node::StmtKind::Return(box expr) => {
+                let expr = expr.as_ref().map(|expr| self.lower_expr(expr));
+
+                hir::Stmt {
+                    kind: hir::StmtKind::Return(Box::new(expr)),
                     span: node.span,
                 }
             }
