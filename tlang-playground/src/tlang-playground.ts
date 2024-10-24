@@ -157,7 +157,7 @@ export class TlangPlayground extends LitElement {
   consoleOutput: Array<unknown[] | string> = [];
 
   @state()
-  display: 'ast' | 'output' = 'output';
+  display: 'ast' | 'hir' | 'output' = 'output';
 
   @state()
   showConsole = true;
@@ -320,6 +320,7 @@ export class TlangPlayground extends LitElement {
         >
           <option value="output">code</option>
           <option value="ast">ast</option>
+          <option value="hir">hir</option>
         </select>
         <div class="repo-link">
           <a href="https://github.com/topaxi/tlang">Source Code</a>
@@ -331,6 +332,9 @@ export class TlangPlayground extends LitElement {
       <div class="output">
         ${this.display === 'ast'
           ? html`<pre class="output-ast">${this.compiler?.ast_string}</pre>`
+          : ''}
+        ${this.display === 'hir'
+          ? html`<pre class="output-ast">${this.compiler?.hir_string}</pre>`
           : ''}
         ${this.display === 'output'
           ? html`<t-codemirror

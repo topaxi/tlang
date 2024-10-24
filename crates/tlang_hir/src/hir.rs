@@ -1,8 +1,9 @@
+use serde::Serialize;
 use tlang_ast::node::{BinaryOpKind, Ident, UnaryOp};
 use tlang_ast::span::Span;
 use tlang_ast::token::Literal;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Serialize)]
 pub struct HirId(usize);
 
 impl HirId {
@@ -15,37 +16,37 @@ impl HirId {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Path {
     pub segments: Vec<PathSegment>,
     pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct PathSegment {
     pub ident: Ident,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Module {
     pub block: Block,
     pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Block {
     pub stmts: Vec<Stmt>,
     pub expr: Option<Expr>,
     pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Stmt {
     pub kind: StmtKind,
     pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum StmtKind {
     Expr(Box<Expr>),
     Let(Box<Pat>, Box<Expr>, Box<Ty>),
@@ -55,13 +56,13 @@ pub enum StmtKind {
     StructDeclaration,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Pat {
     pub kind: PatKind,
     pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum PatKind {
     Wildcard,
     Identifier(HirId, Box<Ident>),
@@ -71,33 +72,33 @@ pub enum PatKind {
     Enum(Box<Path>, Vec<Pat>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct ElseClause {
     pub condition: Option<Expr>,
     pub consequence: Block,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct MatchArm {
     pub pat: Pat,
     pub guard: Option<Expr>,
     pub expr: Expr,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct RangeExpression {
     pub start: Expr,
     pub end: Expr,
     pub inclusive: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Expr {
     pub kind: ExprKind,
     pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum ExprKind {
     Block(Box<Block>),
     Call(Box<Expr>, Vec<Expr>),
@@ -120,26 +121,26 @@ pub enum ExprKind {
     Wildcard, // TODO: This might be better to just be an identifier
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Ty {
     pub kind: TyKind,
     pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum TyKind {
     Unknown,
     Path(Path),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct FunctionParameter {
     pub pattern: Pat,
     pub type_annotation: Ty,
     pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct FunctionDeclaration {
     pub hir_id: HirId,
     pub name: Expr,
