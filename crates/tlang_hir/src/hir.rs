@@ -149,3 +149,23 @@ pub struct FunctionDeclaration {
     pub body: Block,
     pub span: Span,
 }
+
+impl FunctionDeclaration {
+    pub fn new_empty_fn(hir_id: HirId, name: Expr) -> Self {
+        FunctionDeclaration {
+            hir_id,
+            name,
+            parameters: vec![],
+            return_type: Ty {
+                kind: TyKind::Unknown,
+                span: Span::default(),
+            },
+            body: Block {
+                stmts: vec![],
+                expr: None,
+                span: Span::default(),
+            },
+            span: Span::default(),
+        }
+    }
+}

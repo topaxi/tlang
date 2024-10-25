@@ -395,7 +395,7 @@ pub enum StmtKind {
     Expr(Box<Expr>),
     Let(Box<LetDeclaration>),
     FunctionDeclaration(Box<FunctionDeclaration>),
-    // Should this really be handled within the parser or should this be done in later stages?
+    // TODO: We should deal with this in HIR instead.
     FunctionDeclarations(Vec<FunctionDeclaration>),
     Return(Box<Option<Expr>>),
     EnumDeclaration(Box<EnumDeclaration>),
