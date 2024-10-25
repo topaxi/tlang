@@ -52,8 +52,8 @@ pub enum StmtKind {
     Let(Box<Pat>, Box<Expr>, Box<Ty>),
     FunctionDeclaration(Box<FunctionDeclaration>),
     Return(Box<Option<Expr>>),
-    EnumDeclaration,
-    StructDeclaration,
+    EnumDeclaration(Box<EnumDeclaration>),
+    StructDeclaration(Box<StructDeclaration>),
 }
 
 #[derive(Debug, Serialize)]
@@ -168,4 +168,33 @@ impl FunctionDeclaration {
             span: Span::default(),
         }
     }
+}
+
+#[derive(Debug, Serialize)]
+pub struct StructDeclaration {
+    pub hir_id: HirId,
+    pub name: Ident,
+    pub fields: Vec<StructField>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct StructField {
+    pub hir_id: HirId,
+    pub name: Ident,
+    pub ty: Ty,
+}
+
+#[derive(Debug, Serialize)]
+pub struct EnumDeclaration {
+    pub hir_id: HirId,
+    pub name: Ident,
+    pub variants: Vec<EnumVariant>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct EnumVariant {
+    pub hir_id: HirId,
+    pub name: Ident,
+    pub parameters: Vec<Ident>,
+    pub span: Span,
 }

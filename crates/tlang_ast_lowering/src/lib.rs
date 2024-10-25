@@ -20,12 +20,17 @@ impl LoweringContext {
         }
     }
 
+    fn unique_id(&mut self) -> HirId {
+        let id = self.unique_id;
+        self.unique_id = self.unique_id.next();
+        id
+    }
+
     fn lower_symbol_id(&mut self, id: &ast::symbols::SymbolId) -> HirId {
         if let Some(hir_id) = self.symbol_id_to_hir_id.get(id) {
             *hir_id
         } else {
-            let hir_id = self.unique_id;
-            self.unique_id = self.unique_id.next();
+            let hir_id = self.unique_id();
             self.symbol_id_to_hir_id.insert(*id, hir_id);
             hir_id
         }
@@ -388,10 +393,51 @@ impl LoweringContext {
                     span: node.span,
                 }]
             }
+            ast::node::StmtKind::StructDeclaration(decl) => {
+                let decl = hir::StructDeclaration {
+                    hir_id: self.lower_symbol_id(&decl.id),
+                    name: decl.name.clone(),
+                    fields: decl
+                        .fields
+                        .iter()
+                        .map(|field| hir::StructField {
+                            // TODO: We might want/need an id on the AST already.
+                            hir_id: self.unique_id(),
+                            name: field.0.clone(),
+                            ty: self.lower_ty(&Some(field.1.clone())),
+                        })
+                        .collect(),
+                };
+
+                vec![hir::Stmt {
+                    kind: hir::StmtKind::StructDeclaration(Box::new(decl)),
+                    span: node.span,
+                }]
+            }
+            ast::node::StmtKind::EnumDeclaration(decl) => {
+                let decl = hir::EnumDeclaration {
+                    hir_id: self.lower_symbol_id(&decl.id),
+                    name: decl.name.clone(),
+                    variants: decl
+                        .variants
+                        .iter()
+                        .map(|variant| hir::EnumVariant {
+                            hir_id: self.unique_id(),
+                            name: variant.name.clone(),
+                            parameters: variant.parameters.clone(),
+                            span: variant.span,
+                        })
+                        .collect::<Vec<_>>(),
+                };
+
+                vec![hir::Stmt {
+                    kind: hir::StmtKind::EnumDeclaration(Box::new(decl)),
+                    span: node.span,
+                }]
+            }
             ast::node::StmtKind::None => {
                 unreachable!("StmtKind::None should not be encountered, validate AST first")
             }
-            _ => todo!(),
         }
     }
 
