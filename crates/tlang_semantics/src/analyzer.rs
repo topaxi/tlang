@@ -204,9 +204,7 @@ impl SemanticAnalyzer {
             self.push_symbol_table(symbol_table);
         }
 
-        let mut kind = std::mem::take(&mut expr.kind);
-
-        match &mut kind {
+        match &mut expr.kind {
             ExprKind::BinaryOp(expr) => {
                 self.analyze_expr(&mut expr.lhs);
                 self.analyze_expr(&mut expr.rhs);
@@ -284,8 +282,6 @@ impl SemanticAnalyzer {
             }
             ExprKind::None | ExprKind::Literal(_) | ExprKind::Wildcard => {}
         }
-
-        expr.kind = kind;
 
         if let Some(symbol_table) = &expr.symbol_table {
             self.report_unused_symbols(symbol_table, &expr.span);

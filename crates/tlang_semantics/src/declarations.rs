@@ -82,9 +82,7 @@ impl DeclarationAnalyzer {
     }
 
     fn collect_declarations_stmt(&mut self, stmt: &mut Stmt) {
-        let mut kind = std::mem::take(&mut stmt.kind);
-
-        match &mut kind {
+        match &mut stmt.kind {
             StmtKind::None => {
                 // Nothing to do here
             }
@@ -125,8 +123,6 @@ impl DeclarationAnalyzer {
                 ));
             }
         }
-
-        stmt.kind = kind;
     }
 
     fn collect_declarations_from_fn(&mut self, function_decl: &mut FunctionDeclaration) {
