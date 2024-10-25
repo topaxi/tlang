@@ -3,25 +3,27 @@ source: crates/tlang_parser/tests/parser_if_let.rs
 expression: "parse! (indoc! { \"\n        if let x = 1 {\n            x\n        }\n    \" })"
 ---
 Module(
+  id: NodeId(1),
   statements: [
     Stmt(
+      id: NodeId(2),
       kind: Expr(Expr(
+        id: NodeId(10),
         kind: IfElse(IfElseExpression(
           condition: Expr(
+            id: NodeId(5),
             kind: Let(Pattern(
-              kind: Identifier(IdentifierPattern(
-                id: SymbolId(1),
-                name: Ident(
-                  name: "x",
-                  span: Span(
-                    start: LineColumn(
-                      line: 0,
-                      column: 7,
-                    ),
-                    end: LineColumn(
-                      line: 0,
-                      column: 8,
-                    ),
+              id: NodeId(3),
+              kind: Identifier(Ident(
+                name: "x",
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 7,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 8,
                   ),
                 ),
               )),
@@ -38,10 +40,10 @@ Module(
                 ),
               ),
             ), Expr(
+              id: NodeId(4),
               kind: Literal(Integer(1)),
               leading_comments: [],
               trailing_comments: [],
-              symbol_table: None,
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -55,7 +57,6 @@ Module(
             )),
             leading_comments: [],
             trailing_comments: [],
-            symbol_table: None,
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -68,9 +69,12 @@ Module(
             ),
           ),
           then_branch: Expr(
+            id: NodeId(6),
             kind: Block(Block(
+              id: NodeId(9),
               statements: [],
               expression: Some(Expr(
+                id: NodeId(8),
                 kind: Path(Path(
                   segments: [
                     Ident(
@@ -100,7 +104,6 @@ Module(
                 )),
                 leading_comments: [],
                 trailing_comments: [],
-                symbol_table: None,
                 span: Span(
                   start: LineColumn(
                     line: 1,
@@ -122,11 +125,9 @@ Module(
                   column: 2,
                 ),
               ),
-              symbol_table: None,
             )),
             leading_comments: [],
             trailing_comments: [],
-            symbol_table: None,
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -142,7 +143,6 @@ Module(
         )),
         leading_comments: [],
         trailing_comments: [],
-        symbol_table: None,
         span: Span(
           start: LineColumn(
             line: 0,
@@ -166,10 +166,8 @@ Module(
       ),
       leading_comments: [],
       trailing_comments: [],
-      symbol_table: None,
     ),
   ],
-  symbol_table: None,
   span: Span(
     start: LineColumn(
       line: 0,

@@ -3,11 +3,15 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse!\n(r\"\n        match foo; {\n            [] => Ok(bar),\n            [bar, ...baz] => Ok(qux),\n            _ => Err(error),\n        }\n        \")"
 ---
 Module(
+  id: NodeId(1),
   statements: [
     Stmt(
+      id: NodeId(2),
       kind: Expr(Expr(
+        id: NodeId(22),
         kind: Match(MatchExpression(
           expression: Expr(
+            id: NodeId(3),
             kind: Path(Path(
               segments: [
                 Ident(
@@ -37,7 +41,6 @@ Module(
             )),
             leading_comments: [],
             trailing_comments: [],
-            symbol_table: None,
             span: Span(
               start: LineColumn(
                 line: 1,
@@ -51,7 +54,9 @@ Module(
           ),
           arms: [
             MatchArm(
+              id: NodeId(8),
               pattern: Pattern(
+                id: NodeId(4),
                 kind: List([]),
                 leading_comments: [],
                 trailing_comments: [],
@@ -68,8 +73,10 @@ Module(
               ),
               guard: None,
               expression: Expr(
+                id: NodeId(7),
                 kind: Call(CallExpression(
                   callee: Expr(
+                    id: NodeId(5),
                     kind: Path(Path(
                       segments: [
                         Ident(
@@ -99,7 +106,6 @@ Module(
                     )),
                     leading_comments: [],
                     trailing_comments: [],
-                    symbol_table: None,
                     span: Span(
                       start: LineColumn(
                         line: 2,
@@ -113,6 +119,7 @@ Module(
                   ),
                   arguments: [
                     Expr(
+                      id: NodeId(6),
                       kind: Path(Path(
                         segments: [
                           Ident(
@@ -142,7 +149,6 @@ Module(
                       )),
                       leading_comments: [],
                       trailing_comments: [],
-                      symbol_table: None,
                       span: Span(
                         start: LineColumn(
                           line: 2,
@@ -158,7 +164,6 @@ Module(
                 )),
                 leading_comments: [],
                 trailing_comments: [],
-                symbol_table: None,
                 span: Span(
                   start: LineColumn(
                     line: 2,
@@ -172,22 +177,22 @@ Module(
               ),
             ),
             MatchArm(
+              id: NodeId(16),
               pattern: Pattern(
+                id: NodeId(12),
                 kind: List([
                   Pattern(
-                    kind: Identifier(IdentifierPattern(
-                      id: SymbolId(1),
-                      name: Ident(
-                        name: "bar",
-                        span: Span(
-                          start: LineColumn(
-                            line: 3,
-                            column: 14,
-                          ),
-                          end: LineColumn(
-                            line: 3,
-                            column: 17,
-                          ),
+                    id: NodeId(9),
+                    kind: Identifier(Ident(
+                      name: "bar",
+                      span: Span(
+                        start: LineColumn(
+                          line: 3,
+                          column: 14,
+                        ),
+                        end: LineColumn(
+                          line: 3,
+                          column: 17,
                         ),
                       ),
                     )),
@@ -205,20 +210,19 @@ Module(
                     ),
                   ),
                   Pattern(
+                    id: NodeId(10),
                     kind: Rest(Pattern(
-                      kind: Identifier(IdentifierPattern(
-                        id: SymbolId(2),
-                        name: Ident(
-                          name: "baz",
-                          span: Span(
-                            start: LineColumn(
-                              line: 3,
-                              column: 22,
-                            ),
-                            end: LineColumn(
-                              line: 3,
-                              column: 25,
-                            ),
+                      id: NodeId(11),
+                      kind: Identifier(Ident(
+                        name: "baz",
+                        span: Span(
+                          start: LineColumn(
+                            line: 3,
+                            column: 22,
+                          ),
+                          end: LineColumn(
+                            line: 3,
+                            column: 25,
                           ),
                         ),
                       )),
@@ -264,8 +268,10 @@ Module(
               ),
               guard: None,
               expression: Expr(
+                id: NodeId(15),
                 kind: Call(CallExpression(
                   callee: Expr(
+                    id: NodeId(13),
                     kind: Path(Path(
                       segments: [
                         Ident(
@@ -295,7 +301,6 @@ Module(
                     )),
                     leading_comments: [],
                     trailing_comments: [],
-                    symbol_table: None,
                     span: Span(
                       start: LineColumn(
                         line: 3,
@@ -309,6 +314,7 @@ Module(
                   ),
                   arguments: [
                     Expr(
+                      id: NodeId(14),
                       kind: Path(Path(
                         segments: [
                           Ident(
@@ -338,7 +344,6 @@ Module(
                       )),
                       leading_comments: [],
                       trailing_comments: [],
-                      symbol_table: None,
                       span: Span(
                         start: LineColumn(
                           line: 3,
@@ -354,7 +359,6 @@ Module(
                 )),
                 leading_comments: [],
                 trailing_comments: [],
-                symbol_table: None,
                 span: Span(
                   start: LineColumn(
                     line: 3,
@@ -368,7 +372,9 @@ Module(
               ),
             ),
             MatchArm(
+              id: NodeId(21),
               pattern: Pattern(
+                id: NodeId(17),
                 kind: Wildcard,
                 leading_comments: [],
                 trailing_comments: [],
@@ -385,8 +391,10 @@ Module(
               ),
               guard: None,
               expression: Expr(
+                id: NodeId(20),
                 kind: Call(CallExpression(
                   callee: Expr(
+                    id: NodeId(18),
                     kind: Path(Path(
                       segments: [
                         Ident(
@@ -416,7 +424,6 @@ Module(
                     )),
                     leading_comments: [],
                     trailing_comments: [],
-                    symbol_table: None,
                     span: Span(
                       start: LineColumn(
                         line: 4,
@@ -430,6 +437,7 @@ Module(
                   ),
                   arguments: [
                     Expr(
+                      id: NodeId(19),
                       kind: Path(Path(
                         segments: [
                           Ident(
@@ -459,7 +467,6 @@ Module(
                       )),
                       leading_comments: [],
                       trailing_comments: [],
-                      symbol_table: None,
                       span: Span(
                         start: LineColumn(
                           line: 4,
@@ -475,7 +482,6 @@ Module(
                 )),
                 leading_comments: [],
                 trailing_comments: [],
-                symbol_table: None,
                 span: Span(
                   start: LineColumn(
                     line: 4,
@@ -492,7 +498,6 @@ Module(
         )),
         leading_comments: [],
         trailing_comments: [],
-        symbol_table: None,
         span: Span(
           start: LineColumn(
             line: 1,
@@ -516,10 +521,8 @@ Module(
       ),
       leading_comments: [],
       trailing_comments: [],
-      symbol_table: None,
     ),
   ],
-  symbol_table: None,
   span: Span(
     start: LineColumn(
       line: 0,

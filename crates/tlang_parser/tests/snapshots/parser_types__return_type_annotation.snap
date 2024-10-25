@@ -1,13 +1,16 @@
 ---
 source: crates/tlang_parser/tests/parser_types.rs
-expression: "parse!(\"fn foo() -> i64 { 1 }\")"
+expression: "parse! (\"fn foo() -> i64 { 1 }\")"
 ---
 Module(
+  id: NodeId(1),
   statements: [
     Stmt(
+      id: NodeId(8),
       kind: FunctionDeclaration(FunctionDeclaration(
-        id: SymbolId(1),
+        id: NodeId(7),
         name: Expr(
+          id: NodeId(2),
           kind: Path(Path(
             segments: [
               Ident(
@@ -37,7 +40,6 @@ Module(
           )),
           leading_comments: [],
           trailing_comments: [],
-          symbol_table: None,
           span: Span(
             start: LineColumn(
               line: 0,
@@ -52,6 +54,7 @@ Module(
         parameters: [],
         guard: None,
         return_type_annotation: Some(Ty(
+          id: NodeId(3),
           name: Path(
             segments: [
               Ident(
@@ -92,12 +95,13 @@ Module(
           ),
         )),
         body: Block(
+          id: NodeId(6),
           statements: [],
           expression: Some(Expr(
+            id: NodeId(5),
             kind: Literal(Integer(1)),
             leading_comments: [],
             trailing_comments: [],
-            symbol_table: None,
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -119,11 +123,9 @@ Module(
               column: 21,
             ),
           ),
-          symbol_table: None,
         ),
         leading_comments: [],
         trailing_comments: [],
-        symbol_table: None,
         span: Span(
           start: LineColumn(
             line: 0,
@@ -147,10 +149,8 @@ Module(
       ),
       leading_comments: [],
       trailing_comments: [],
-      symbol_table: None,
     ),
   ],
-  symbol_table: None,
   span: Span(
     start: LineColumn(
       line: 0,

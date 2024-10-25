@@ -35,7 +35,7 @@ impl TlangCompiler {
             source: source.to_string(),
             codegen: CodegenJS::default(),
             analyzer: SemanticAnalyzer::default(),
-            ast: Module::new(vec![]),
+            ast: Module::default(),
             diagnostics: Vec::new(),
             parse_errors: Vec::new(),
         }

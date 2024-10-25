@@ -3,11 +3,14 @@ source: crates/tlang_parser/tests/parser_fn.rs
 expression: "parse! (\"fn foo() { bar(); 1 + 2; }\")"
 ---
 Module(
+  id: NodeId(1),
   statements: [
     Stmt(
+      id: NodeId(12),
       kind: FunctionDeclaration(FunctionDeclaration(
-        id: SymbolId(1),
+        id: NodeId(11),
         name: Expr(
+          id: NodeId(2),
           kind: Path(Path(
             segments: [
               Ident(
@@ -37,7 +40,6 @@ Module(
           )),
           leading_comments: [],
           trailing_comments: [],
-          symbol_table: None,
           span: Span(
             start: LineColumn(
               line: 0,
@@ -53,11 +55,15 @@ Module(
         guard: None,
         return_type_annotation: None,
         body: Block(
+          id: NodeId(10),
           statements: [
             Stmt(
+              id: NodeId(3),
               kind: Expr(Expr(
+                id: NodeId(5),
                 kind: Call(CallExpression(
                   callee: Expr(
+                    id: NodeId(4),
                     kind: Path(Path(
                       segments: [
                         Ident(
@@ -87,7 +93,6 @@ Module(
                     )),
                     leading_comments: [],
                     trailing_comments: [],
-                    symbol_table: None,
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -103,7 +108,6 @@ Module(
                 )),
                 leading_comments: [],
                 trailing_comments: [],
-                symbol_table: None,
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -127,17 +131,18 @@ Module(
               ),
               leading_comments: [],
               trailing_comments: [],
-              symbol_table: None,
             ),
             Stmt(
+              id: NodeId(6),
               kind: Expr(Expr(
+                id: NodeId(9),
                 kind: BinaryOp(BinaryOpExpression(
                   op: Add,
                   lhs: Expr(
+                    id: NodeId(7),
                     kind: Literal(Integer(1)),
                     leading_comments: [],
                     trailing_comments: [],
-                    symbol_table: None,
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -150,10 +155,10 @@ Module(
                     ),
                   ),
                   rhs: Expr(
+                    id: NodeId(8),
                     kind: Literal(Integer(2)),
                     leading_comments: [],
                     trailing_comments: [],
-                    symbol_table: None,
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -168,7 +173,6 @@ Module(
                 )),
                 leading_comments: [],
                 trailing_comments: [],
-                symbol_table: None,
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -192,7 +196,6 @@ Module(
               ),
               leading_comments: [],
               trailing_comments: [],
-              symbol_table: None,
             ),
           ],
           expression: None,
@@ -206,11 +209,9 @@ Module(
               column: 26,
             ),
           ),
-          symbol_table: None,
         ),
         leading_comments: [],
         trailing_comments: [],
-        symbol_table: None,
         span: Span(
           start: LineColumn(
             line: 0,
@@ -234,10 +235,8 @@ Module(
       ),
       leading_comments: [],
       trailing_comments: [],
-      symbol_table: None,
     ),
   ],
-  symbol_table: None,
   span: Span(
     start: LineColumn(
       line: 0,

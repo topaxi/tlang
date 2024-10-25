@@ -3,16 +3,19 @@ source: crates/tlang_parser/tests/parser_pipeline.rs
 expression: "parse! (\"1 |> foo(2, _);\")"
 ---
 Module(
+  id: NodeId(1),
   statements: [
     Stmt(
+      id: NodeId(2),
       kind: Expr(Expr(
+        id: NodeId(8),
         kind: BinaryOp(BinaryOpExpression(
           op: Pipeline,
           lhs: Expr(
+            id: NodeId(3),
             kind: Literal(Integer(1)),
             leading_comments: [],
             trailing_comments: [],
-            symbol_table: None,
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -25,8 +28,10 @@ Module(
             ),
           ),
           rhs: Expr(
+            id: NodeId(7),
             kind: Call(CallExpression(
               callee: Expr(
+                id: NodeId(4),
                 kind: Path(Path(
                   segments: [
                     Ident(
@@ -56,7 +61,6 @@ Module(
                 )),
                 leading_comments: [],
                 trailing_comments: [],
-                symbol_table: None,
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -70,10 +74,10 @@ Module(
               ),
               arguments: [
                 Expr(
+                  id: NodeId(5),
                   kind: Literal(Integer(2)),
                   leading_comments: [],
                   trailing_comments: [],
-                  symbol_table: None,
                   span: Span(
                     start: LineColumn(
                       line: 0,
@@ -86,10 +90,10 @@ Module(
                   ),
                 ),
                 Expr(
+                  id: NodeId(6),
                   kind: Wildcard,
                   leading_comments: [],
                   trailing_comments: [],
-                  symbol_table: None,
                   span: Span(
                     start: LineColumn(
                       line: 0,
@@ -105,7 +109,6 @@ Module(
             )),
             leading_comments: [],
             trailing_comments: [],
-            symbol_table: None,
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -120,7 +123,6 @@ Module(
         )),
         leading_comments: [],
         trailing_comments: [],
-        symbol_table: None,
         span: Span(
           start: LineColumn(
             line: 0,
@@ -144,10 +146,8 @@ Module(
       ),
       leading_comments: [],
       trailing_comments: [],
-      symbol_table: None,
     ),
   ],
-  symbol_table: None,
   span: Span(
     start: LineColumn(
       line: 0,

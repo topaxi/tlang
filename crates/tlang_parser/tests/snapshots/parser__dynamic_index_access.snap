@@ -3,23 +3,23 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse! (\"let x = foo[1];\")"
 ---
 Module(
+  id: NodeId(1),
   statements: [
     Stmt(
+      id: NodeId(6),
       kind: Let(LetDeclaration(
         pattern: Pattern(
-          kind: Identifier(IdentifierPattern(
-            id: SymbolId(1),
-            name: Ident(
-              name: "x",
-              span: Span(
-                start: LineColumn(
-                  line: 0,
-                  column: 4,
-                ),
-                end: LineColumn(
-                  line: 0,
-                  column: 5,
-                ),
+          id: NodeId(2),
+          kind: Identifier(Ident(
+            name: "x",
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 4,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 5,
               ),
             ),
           )),
@@ -37,8 +37,10 @@ Module(
           ),
         ),
         expression: Expr(
+          id: NodeId(5),
           kind: IndexExpression(IndexAccessExpression(
             base: Expr(
+              id: NodeId(3),
               kind: Path(Path(
                 segments: [
                   Ident(
@@ -68,7 +70,6 @@ Module(
               )),
               leading_comments: [],
               trailing_comments: [],
-              symbol_table: None,
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -81,10 +82,10 @@ Module(
               ),
             ),
             index: Expr(
+              id: NodeId(4),
               kind: Literal(Integer(1)),
               leading_comments: [],
               trailing_comments: [],
-              symbol_table: None,
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -99,7 +100,6 @@ Module(
           )),
           leading_comments: [],
           trailing_comments: [],
-          symbol_table: None,
           span: Span(
             start: LineColumn(
               line: 0,
@@ -125,10 +125,8 @@ Module(
       ),
       leading_comments: [],
       trailing_comments: [],
-      symbol_table: None,
     ),
   ],
-  symbol_table: None,
   span: Span(
     start: LineColumn(
       line: 0,

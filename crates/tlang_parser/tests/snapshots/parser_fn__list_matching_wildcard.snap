@@ -3,11 +3,14 @@ source: crates/tlang_parser/tests/parser_fn.rs
 expression: "parse! (\"fn tail([_, ...xs]) { xs }\")"
 ---
 Module(
+  id: NodeId(1),
   statements: [
     Stmt(
+      id: NodeId(11),
       kind: FunctionDeclaration(FunctionDeclaration(
-        id: SymbolId(1),
+        id: NodeId(10),
         name: Expr(
+          id: NodeId(2),
           kind: Path(Path(
             segments: [
               Ident(
@@ -37,7 +40,6 @@ Module(
           )),
           leading_comments: [],
           trailing_comments: [],
-          symbol_table: None,
           span: Span(
             start: LineColumn(
               line: 0,
@@ -52,8 +54,10 @@ Module(
         parameters: [
           FunctionParameter(
             pattern: Pattern(
+              id: NodeId(6),
               kind: List([
                 Pattern(
+                  id: NodeId(3),
                   kind: Wildcard,
                   leading_comments: [],
                   trailing_comments: [],
@@ -69,20 +73,19 @@ Module(
                   ),
                 ),
                 Pattern(
+                  id: NodeId(4),
                   kind: Rest(Pattern(
-                    kind: Identifier(IdentifierPattern(
-                      id: SymbolId(2),
-                      name: Ident(
-                        name: "xs",
-                        span: Span(
-                          start: LineColumn(
-                            line: 0,
-                            column: 15,
-                          ),
-                          end: LineColumn(
-                            line: 0,
-                            column: 17,
-                          ),
+                    id: NodeId(5),
+                    kind: Identifier(Ident(
+                      name: "xs",
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 15,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 17,
                         ),
                       ),
                     )),
@@ -142,8 +145,10 @@ Module(
         guard: None,
         return_type_annotation: None,
         body: Block(
+          id: NodeId(9),
           statements: [],
           expression: Some(Expr(
+            id: NodeId(8),
             kind: Path(Path(
               segments: [
                 Ident(
@@ -173,7 +178,6 @@ Module(
             )),
             leading_comments: [],
             trailing_comments: [],
-            symbol_table: None,
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -195,11 +199,9 @@ Module(
               column: 26,
             ),
           ),
-          symbol_table: None,
         ),
         leading_comments: [],
         trailing_comments: [],
-        symbol_table: None,
         span: Span(
           start: LineColumn(
             line: 0,
@@ -223,10 +225,8 @@ Module(
       ),
       leading_comments: [],
       trailing_comments: [],
-      symbol_table: None,
     ),
   ],
-  symbol_table: None,
   span: Span(
     start: LineColumn(
       line: 0,

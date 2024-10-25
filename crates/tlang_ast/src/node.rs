@@ -1,11 +1,10 @@
 use serde::Serialize;
-use std::rc::Rc;
-use std::{cell::RefCell, fmt::Display};
+use std::fmt::Display;
 
+use crate::node_id::NodeId;
 use crate::token::Token;
 use crate::{
     span::{Span, Spanned},
-    symbols::{SymbolId, SymbolTable},
     token::Literal,
 };
 
@@ -71,7 +70,7 @@ impl FunctionParameter {
 
 #[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub struct FunctionDeclaration {
-    pub id: SymbolId,
+    pub id: NodeId,
     pub name: Expr,
     pub parameters: Vec<FunctionParameter>,
     pub guard: Option<Expr>,
@@ -79,21 +78,21 @@ pub struct FunctionDeclaration {
     pub body: Block,
     pub leading_comments: Vec<Token>,
     pub trailing_comments: Vec<Token>,
-    pub symbol_table: Option<Rc<RefCell<SymbolTable>>>,
     pub span: Span,
 }
 
 #[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub struct Block {
+    pub id: NodeId,
     pub statements: Vec<Stmt>,
     pub expression: Option<Expr>,
     pub span: Span,
-    pub symbol_table: Option<Rc<RefCell<SymbolTable>>>,
 }
 
 impl Block {
-    pub fn new(statements: Vec<Stmt>, expression: Option<Expr>) -> Self {
+    pub fn new(id: NodeId, statements: Vec<Stmt>, expression: Option<Expr>) -> Self {
         Block {
+            id,
             statements,
             expression,
             ..Default::default()
@@ -150,16 +149,17 @@ pub struct IfElseExpression {
 
 #[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub struct Expr {
+    pub id: NodeId,
     pub kind: ExprKind,
     pub leading_comments: Vec<Token>,
     pub trailing_comments: Vec<Token>,
-    pub symbol_table: Option<Rc<RefCell<SymbolTable>>>,
     pub span: Span,
 }
 
 impl Expr {
-    pub fn new(kind: ExprKind) -> Self {
+    pub fn new(id: NodeId, kind: ExprKind) -> Self {
         Expr {
+            id,
             kind,
             ..Default::default()
         }
@@ -268,6 +268,7 @@ impl Path {
 
 #[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub struct Pattern {
+    pub id: NodeId,
     pub kind: PatternKind,
     pub leading_comments: Vec<Token>,
     pub trailing_comments: Vec<Token>,
@@ -275,8 +276,9 @@ pub struct Pattern {
 }
 
 impl Pattern {
-    pub fn new(kind: PatternKind) -> Self {
+    pub fn new(id: NodeId, kind: PatternKind) -> Self {
         Pattern {
+            id,
             kind,
             ..Default::default()
         }
@@ -287,43 +289,37 @@ impl Pattern {
         self
     }
 
-    pub fn get_symbol_id(&self) -> Option<SymbolId> {
-        match &self.kind {
-            PatternKind::Identifier(ident_pattern) => Some(ident_pattern.id),
-            _ => None,
-        }
-    }
+    pub fn get_all_node_ids(&self) -> Vec<NodeId> {
+        let mut ids = vec![self.id];
 
-    pub fn get_all_symbol_ids(&self) -> Vec<SymbolId> {
         match &self.kind {
-            PatternKind::Identifier(ident_pattern) => vec![ident_pattern.id],
-            PatternKind::List(patterns) => patterns
-                .iter()
-                .flat_map(Pattern::get_all_symbol_ids)
-                .collect(),
-            PatternKind::Rest(pattern) => pattern.get_all_symbol_ids(),
-            PatternKind::Enum(enum_pattern) => enum_pattern
-                .elements
-                .iter()
-                .flat_map(Pattern::get_all_symbol_ids)
-                .collect(),
-            PatternKind::Wildcard => vec![],
-            pattern_kind => todo!(
-                "Getting symbol ids for pattern kind {:?} not implemented yet",
-                pattern_kind
-            ),
+            PatternKind::List(patterns) => {
+                ids.extend(patterns.iter().flat_map(Pattern::get_all_node_ids));
+            }
+            PatternKind::Rest(pattern) => {
+                ids.extend(pattern.get_all_node_ids());
+            }
+            PatternKind::Enum(enum_pattern) => {
+                ids.extend(
+                    enum_pattern
+                        .elements
+                        .iter()
+                        .flat_map(Pattern::get_all_node_ids),
+                );
+            }
+            PatternKind::None
+            | PatternKind::Literal(_)
+            | PatternKind::Identifier(_)
+            | PatternKind::_Self
+            | PatternKind::Wildcard => {}
         }
+
+        ids
     }
 
     pub fn is_wildcard(&self) -> bool {
         matches!(self.kind, PatternKind::Wildcard)
     }
-}
-
-#[derive(Debug, PartialEq, Clone, Serialize)]
-pub struct IdentifierPattern {
-    pub id: SymbolId,
-    pub name: Ident,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
@@ -337,19 +333,19 @@ pub struct EnumPattern {
 pub enum PatternKind {
     #[default]
     None,
-    Identifier(Box<IdentifierPattern>),
+    Identifier(Box<Ident>),
     Literal(Box<Literal>),
     List(Vec<Pattern>),
     Rest(Box<Pattern>),
     Enum(Box<EnumPattern>),
     Wildcard,
     // TODO: As mentioned on the Keyword enum, we might want this to just be an Identifier(Pattern)
-    _Self(SymbolId),
+    _Self,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct EnumVariant {
-    pub id: SymbolId,
+    pub id: NodeId,
     pub name: Ident,
     pub named_fields: bool,
     pub parameters: Vec<Ident>,
@@ -358,23 +354,23 @@ pub struct EnumVariant {
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct EnumDeclaration {
-    pub id: SymbolId,
     pub name: Ident,
     pub variants: Vec<EnumVariant>,
 }
 
 #[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub struct Stmt {
+    pub id: NodeId,
     pub kind: StmtKind,
     pub span: Span,
     pub leading_comments: Vec<Token>,
     pub trailing_comments: Vec<Token>,
-    pub symbol_table: Option<Rc<RefCell<SymbolTable>>>,
 }
 
 impl Stmt {
-    pub fn new(kind: StmtKind) -> Self {
+    pub fn new(id: NodeId, kind: StmtKind) -> Self {
         Stmt {
+            id,
             kind,
             ..Default::default()
         }
@@ -409,23 +405,25 @@ pub struct LetDeclaration {
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct StructDeclaration {
-    pub id: SymbolId,
     pub name: Ident,
     pub fields: Vec<StructField>,
 }
 
+// TODO: Add NodeId to StructField
 pub type StructField = (Ident, Ty);
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct Ty {
+    pub id: NodeId,
     pub name: Path,
     pub parameters: Vec<Ty>,
     pub span: Span,
 }
 
 impl Ty {
-    pub fn new(name: Path) -> Self {
+    pub fn new(id: NodeId, name: Path) -> Self {
         Ty {
+            id,
             name,
             parameters: vec![],
             span: Span::default(),
@@ -445,23 +443,24 @@ impl Ty {
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct MatchArm {
+    pub id: NodeId,
     pub pattern: Pattern,
     pub guard: Option<Expr>,
     pub expression: Expr,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub struct Module {
+    pub id: NodeId,
     pub statements: Vec<Stmt>,
-    pub symbol_table: Option<Rc<RefCell<SymbolTable>>>,
     pub span: Span,
 }
 
 impl Module {
-    pub fn new(statements: Vec<Stmt>) -> Self {
+    pub fn new(id: NodeId, statements: Vec<Stmt>) -> Self {
         Module {
+            id,
             statements,
-            symbol_table: None,
             span: Span::default(),
         }
     }

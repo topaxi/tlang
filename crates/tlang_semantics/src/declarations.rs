@@ -1,5 +1,7 @@
-use std::cell::RefCell;
 use std::rc::Rc;
+use std::{cell::RefCell, collections::HashMap};
+use tlang_ast::node_id::NodeId;
+use tlang_ast::span::Span;
 use tlang_ast::{
     node::{
         Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, LetDeclaration, Module,
@@ -8,9 +10,14 @@ use tlang_ast::{
     symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
 };
 
+/**
+ * The declaration analyzer is responsible for collecting all the declarations in a module.
+ */
 pub struct DeclarationAnalyzer {
+    unique_id: SymbolId,
+    symbol_tables: HashMap<NodeId, Rc<RefCell<SymbolTable>>>,
     symbol_table_stack: Vec<Rc<RefCell<SymbolTable>>>,
-    symbol_type: Vec<SymbolType>,
+    symbol_type_context: Vec<SymbolType>,
 }
 
 impl Default for DeclarationAnalyzer {
@@ -22,9 +29,21 @@ impl Default for DeclarationAnalyzer {
 impl DeclarationAnalyzer {
     pub fn new() -> Self {
         DeclarationAnalyzer {
+            unique_id: SymbolId::new(0),
+            symbol_tables: HashMap::new(),
             symbol_table_stack: vec![Rc::new(RefCell::new(SymbolTable::default()))],
-            symbol_type: vec![],
+            symbol_type_context: vec![],
         }
+    }
+
+    #[inline(always)]
+    pub fn get_symbol_tables(&self) -> &HashMap<NodeId, Rc<RefCell<SymbolTable>>> {
+        &self.symbol_tables
+    }
+
+    fn unique_id(&mut self) -> SymbolId {
+        self.unique_id = self.unique_id.next();
+        self.unique_id
     }
 
     fn root_symbol_table(&self) -> &Rc<RefCell<SymbolTable>> {
@@ -35,9 +54,11 @@ impl DeclarationAnalyzer {
         self.symbol_table_stack.last().unwrap()
     }
 
-    fn push_symbol_table(&mut self) -> Rc<RefCell<SymbolTable>> {
+    fn push_symbol_table(&mut self, node_id: NodeId) -> Rc<RefCell<SymbolTable>> {
         let parent = Rc::clone(self.get_last_symbol_table());
         let new_symbol_table = Rc::new(RefCell::new(SymbolTable::new(parent)));
+        self.symbol_tables
+            .insert(node_id, Rc::clone(&new_symbol_table));
         self.symbol_table_stack.push(Rc::clone(&new_symbol_table));
 
         new_symbol_table
@@ -48,30 +69,27 @@ impl DeclarationAnalyzer {
     }
 
     #[inline(always)]
-    fn declare_symbol(&mut self, symbol_info: SymbolInfo) {
+    fn declare_symbol(&mut self, node_id: NodeId, name: &str, symbol_type: SymbolType, span: Span) {
+        let symbol_info = SymbolInfo::new(node_id, self.unique_id(), name, symbol_type, span);
         let symbol_table = self.get_last_symbol_table();
 
-        // Multiple function declarations with the same name result in SymbolInfo with the same ID.
-        if symbol_table.borrow().get(symbol_info.id).is_none() {
-            symbol_table.borrow_mut().insert(symbol_info);
-        }
+        symbol_table.borrow_mut().insert(symbol_info);
     }
 
     pub fn add_builtin_symbols(&mut self, symbols: &[(&str, SymbolType)]) {
         for (name, symbol_type) in symbols {
             self.root_symbol_table()
                 .borrow_mut()
-                .insert(SymbolInfo::new(
-                    SymbolId::new(0), // Builtins have ID 0 for now.
-                    name,
-                    *symbol_type,
-                    None,
-                ));
+                .insert(SymbolInfo::new_builtin(name, *symbol_type));
         }
     }
 
     pub fn analyze(&mut self, module: &mut Module) {
         self.collect_module_declarations(module);
+
+        // After collecting all declarations, we should be left with the root symbol table on the
+        // symbol table stack.
+        debug_assert_eq!(self.symbol_table_stack.len(), 1);
     }
 
     #[inline(always)]
@@ -83,54 +101,64 @@ impl DeclarationAnalyzer {
 
     fn collect_declarations_stmt(&mut self, stmt: &mut Stmt) {
         match &mut stmt.kind {
-            StmtKind::None => {
-                // Nothing to do here
-            }
             StmtKind::Expr(expr) => self.collect_declarations_expr(expr),
             StmtKind::Let(decl) => self.collect_variable_declaration(decl),
             StmtKind::FunctionDeclaration(declaration) => {
+                let name_as_str = self.fn_identifier_to_string(&declaration.name);
+
+                self.declare_symbol(
+                    declaration.id,
+                    &name_as_str,
+                    SymbolType::Function,
+                    declaration.name.span,
+                );
+
                 self.collect_function_declaration(declaration);
             }
             StmtKind::FunctionDeclarations(declarations) => {
+                // TODO: We might want to be more clever about this in the future.
+                let first_declaration = &declarations[0];
+                let name_as_str = self.fn_identifier_to_string(&first_declaration.name);
+
+                self.declare_symbol(
+                    stmt.id,
+                    &name_as_str,
+                    SymbolType::Function,
+                    first_declaration.name.span,
+                );
+
                 for declaration in declarations {
                     self.collect_function_declaration(declaration);
                 }
             }
             StmtKind::Return(expr) => self.collect_optional_declarations_expr(expr),
             StmtKind::EnumDeclaration(decl) => {
-                self.declare_symbol(SymbolInfo::new(
-                    decl.id,
-                    decl.name.as_str(),
-                    SymbolType::Enum,
-                    Some(stmt.span),
-                ));
+                self.declare_symbol(stmt.id, decl.name.as_str(), SymbolType::Enum, stmt.span);
 
                 for element in &mut decl.variants {
-                    self.declare_symbol(SymbolInfo::new(
+                    self.declare_symbol(
                         element.id,
                         &(decl.name.to_string() + "::" + element.name.as_str()),
                         SymbolType::EnumVariant,
-                        Some(element.span),
-                    ));
+                        element.span,
+                    );
                 }
             }
             StmtKind::StructDeclaration(decl) => {
-                self.declare_symbol(SymbolInfo::new(
-                    decl.id,
-                    decl.name.as_str(),
-                    SymbolType::Struct,
-                    Some(stmt.span),
-                ));
+                self.declare_symbol(stmt.id, decl.name.as_str(), SymbolType::Struct, stmt.span);
+            }
+            StmtKind::None => {
+                // Nothing to do here
             }
         }
     }
 
     fn collect_declarations_from_fn(&mut self, function_decl: &mut FunctionDeclaration) {
-        self.symbol_type.push(SymbolType::Parameter);
+        self.symbol_type_context.push(SymbolType::Parameter);
         for param in &mut function_decl.parameters {
             self.collect_declarations_from_fn_param(param);
         }
-        self.symbol_type.pop();
+        self.symbol_type_context.pop();
         self.collect_optional_declarations_expr(&mut function_decl.guard);
         self.collect_declarations_block(&mut function_decl.body);
     }
@@ -140,7 +168,7 @@ impl DeclarationAnalyzer {
     }
 
     fn collect_declarations_block(&mut self, block: &mut Block) {
-        block.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
+        self.push_symbol_table(block.id);
         for stmt in &mut block.statements {
             self.collect_declarations_stmt(stmt);
         }
@@ -151,18 +179,20 @@ impl DeclarationAnalyzer {
 
     fn collect_declarations_expr(&mut self, expr: &mut Expr) {
         match &mut expr.kind {
-            ExprKind::Block(block) => self.collect_declarations_block(block),
+            ExprKind::Block(block) => {
+                self.collect_declarations_block(block);
+            }
             ExprKind::FunctionExpression(decl) => {
-                expr.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
+                self.push_symbol_table(decl.id);
                 let name_as_str = self.fn_identifier_to_string(&decl.name);
 
                 if name_as_str != "anonymous" {
-                    self.declare_symbol(SymbolInfo::new(
+                    self.declare_symbol(
                         decl.id,
                         &name_as_str,
                         SymbolType::Function,
-                        Some(decl.name.span),
-                    ));
+                        decl.name.span,
+                    );
                 }
 
                 self.collect_declarations_from_fn(decl);
@@ -230,7 +260,7 @@ impl DeclarationAnalyzer {
     }
 
     fn collect_module_declarations(&mut self, module: &mut Module) {
-        module.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
+        self.push_symbol_table(module.id);
 
         for stmt in &mut module.statements {
             self.collect_declarations_stmt(stmt);
@@ -259,22 +289,13 @@ impl DeclarationAnalyzer {
     }
 
     fn collect_function_declaration(&mut self, declaration: &mut FunctionDeclaration) {
-        let name_as_str = self.fn_identifier_to_string(&declaration.name);
+        self.push_symbol_table(declaration.id);
 
-        self.declare_symbol(SymbolInfo::new(
-            declaration.id,
-            &name_as_str,
-            SymbolType::Function,
-            Some(declaration.name.span),
-        ));
-
-        declaration.symbol_table = Some(Rc::clone(&self.push_symbol_table()));
-
-        self.symbol_type.push(SymbolType::Parameter);
+        self.symbol_type_context.push(SymbolType::Parameter);
         for param in &mut declaration.parameters {
             self.collect_declarations_from_fn_param(param);
         }
-        self.symbol_type.pop();
+        self.symbol_type_context.pop();
 
         self.collect_optional_declarations_expr(&mut declaration.guard);
         self.collect_declarations_block(&mut declaration.body);
@@ -284,21 +305,19 @@ impl DeclarationAnalyzer {
 
     fn collect_pattern(&mut self, pattern: &mut Pattern) {
         match &mut pattern.kind {
-            PatternKind::Identifier(ident_pattern) => {
-                self.declare_symbol(SymbolInfo::new(
-                    ident_pattern.id,
-                    ident_pattern.name.as_str(),
-                    *self.symbol_type.last().unwrap_or(&SymbolType::Variable),
-                    Some(pattern.span),
-                ));
+            PatternKind::Identifier(ident) => {
+                self.declare_symbol(
+                    pattern.id,
+                    ident.name.as_str(),
+                    *self
+                        .symbol_type_context
+                        .last()
+                        .unwrap_or(&SymbolType::Variable),
+                    pattern.span,
+                );
             }
-            PatternKind::_Self(id) => {
-                self.declare_symbol(SymbolInfo::new(
-                    *id,
-                    "self",
-                    SymbolType::Variable,
-                    Some(pattern.span),
-                ));
+            PatternKind::_Self => {
+                self.declare_symbol(pattern.id, "self", SymbolType::Variable, pattern.span);
             }
             PatternKind::List(patterns) => {
                 for pattern in patterns {

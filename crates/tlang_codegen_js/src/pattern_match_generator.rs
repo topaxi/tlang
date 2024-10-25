@@ -40,6 +40,7 @@ impl CodegenJS {
         for (
             i,
             MatchArm {
+                id: _,
                 pattern,
                 guard,
                 expression,

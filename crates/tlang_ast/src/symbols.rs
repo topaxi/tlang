@@ -1,13 +1,16 @@
+// TODO: Does this module belong in the ast crate?
 use serde::Serialize;
 use std::cell::RefCell;
 use std::fmt::Display;
 use std::rc::Rc;
 
+use crate::node_id::NodeId;
 use crate::span::Span;
 
-#[derive(Debug, PartialEq, Copy, Clone, Serialize)]
+#[derive(Debug, Default, PartialEq, Copy, Clone, Serialize)]
 pub enum SymbolType {
     Module,
+    #[default]
     Variable,
     Function,
     Parameter,
@@ -43,39 +46,38 @@ impl SymbolId {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub struct SymbolInfo {
     pub id: SymbolId,
     pub name: String,
     pub symbol_type: SymbolType,
-    pub defined_at: Option<Span>,
+    pub defined_at: Span,
+    pub node_id: NodeId,
     pub used: bool,
-}
-
-impl Default for SymbolInfo {
-    fn default() -> Self {
-        SymbolInfo {
-            id: SymbolId::new(0),
-            name: String::new(),
-            symbol_type: SymbolType::Variable,
-            defined_at: None,
-            used: false,
-        }
-    }
 }
 
 impl SymbolInfo {
     pub fn new(
+        node_id: NodeId,
         id: SymbolId,
         name: &str,
         symbol_type: SymbolType,
-        defined_at: Option<Span>,
+        defined_at: Span,
     ) -> Self {
         SymbolInfo {
             id,
             name: name.to_string(),
             symbol_type,
             defined_at,
+            node_id,
+            ..Default::default()
+        }
+    }
+
+    pub fn new_builtin(name: &str, symbol_type: SymbolType) -> Self {
+        SymbolInfo {
+            name: name.to_string(),
+            symbol_type,
             ..Default::default()
         }
     }
@@ -103,6 +105,14 @@ impl SymbolTable {
 
     fn get_local(&self, id: SymbolId) -> Option<&SymbolInfo> {
         self.symbols.iter().find(|s| s.id == id)
+    }
+
+    fn get_local_mut(&mut self, id: SymbolId) -> Option<&mut SymbolInfo> {
+        self.symbols.iter_mut().find(|s| s.id == id)
+    }
+
+    pub fn get_local_by_node_id(&self, node_id: NodeId) -> Option<&SymbolInfo> {
+        self.symbols.iter().find(|s| s.node_id == node_id)
     }
 
     pub fn get(&self, id: SymbolId) -> Option<SymbolInfo> {
@@ -138,10 +148,8 @@ impl SymbolTable {
     }
 
     pub fn mark_as_used(&mut self, id: SymbolId) {
-        if self.get_local(id).is_some() {
-            if let Some(s) = self.symbols.iter_mut().find(|s| s.id == id) {
-                s.used = true;
-            }
+        if let Some(symbol_info) = self.get_local_mut(id) {
+            symbol_info.used = true;
         } else if let Some(ref parent) = self.parent {
             parent.borrow_mut().mark_as_used(id);
         }

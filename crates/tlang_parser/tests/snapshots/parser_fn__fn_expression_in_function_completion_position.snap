@@ -1,13 +1,16 @@
 ---
 source: crates/tlang_parser/tests/parser_fn.rs
-expression: "parse!(\"fn foo() { fn bar() {} }\")"
+expression: "parse! (\"fn foo() { fn bar() {} }\")"
 ---
 Module(
+  id: NodeId(1),
   statements: [
     Stmt(
+      id: NodeId(10),
       kind: FunctionDeclaration(FunctionDeclaration(
-        id: SymbolId(1),
+        id: NodeId(9),
         name: Expr(
+          id: NodeId(2),
           kind: Path(Path(
             segments: [
               Ident(
@@ -37,7 +40,6 @@ Module(
           )),
           leading_comments: [],
           trailing_comments: [],
-          symbol_table: None,
           span: Span(
             start: LineColumn(
               line: 0,
@@ -53,11 +55,14 @@ Module(
         guard: None,
         return_type_annotation: None,
         body: Block(
+          id: NodeId(8),
           statements: [],
           expression: Some(Expr(
+            id: NodeId(7),
             kind: FunctionExpression(FunctionDeclaration(
-              id: SymbolId(2),
+              id: NodeId(5),
               name: Expr(
+                id: NodeId(3),
                 kind: Path(Path(
                   segments: [
                     Ident(
@@ -87,7 +92,6 @@ Module(
                 )),
                 leading_comments: [],
                 trailing_comments: [],
-                symbol_table: None,
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -103,6 +107,7 @@ Module(
               guard: None,
               return_type_annotation: None,
               body: Block(
+                id: NodeId(4),
                 statements: [],
                 expression: None,
                 span: Span(
@@ -115,11 +120,9 @@ Module(
                     column: 22,
                   ),
                 ),
-                symbol_table: None,
               ),
               leading_comments: [],
               trailing_comments: [],
-              symbol_table: None,
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -133,7 +136,6 @@ Module(
             )),
             leading_comments: [],
             trailing_comments: [],
-            symbol_table: None,
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -155,11 +157,9 @@ Module(
               column: 24,
             ),
           ),
-          symbol_table: None,
         ),
         leading_comments: [],
         trailing_comments: [],
-        symbol_table: None,
         span: Span(
           start: LineColumn(
             line: 0,
@@ -183,10 +183,8 @@ Module(
       ),
       leading_comments: [],
       trailing_comments: [],
-      symbol_table: None,
     ),
   ],
-  symbol_table: None,
   span: Span(
     start: LineColumn(
       line: 0,

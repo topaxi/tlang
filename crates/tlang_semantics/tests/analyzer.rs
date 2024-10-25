@@ -2,6 +2,7 @@ use indoc::indoc;
 use pretty_assertions::assert_eq;
 use tlang_ast::{
     node::StmtKind,
+    node_id::NodeId,
     span::{LineColumn, Span},
     symbols::{SymbolId, SymbolInfo, SymbolType},
 };
@@ -23,7 +24,7 @@ macro_rules! analyze {
         let mut ast = parser.parse().unwrap();
         let mut analyzer = $crate::create_analyzer(&[]);
         match analyzer.analyze(&mut ast) {
-            Ok(_) => ast,
+            Ok(_) => (analyzer, ast),
             Err(diagnostics) => panic!("Expected no error diagnostics, got {:#?}", diagnostics),
         }
     }};
@@ -113,39 +114,41 @@ fn test_should_error_on_self_referencing_symbol() {
 
 #[test]
 fn test_should_allow_shadowing_of_single_variable() {
-    let ast = analyze!(indoc! {"
+    let (analyzer, ast) = analyze!(indoc! {"
         let a = 1;
         let a = 2;
     "});
 
-    let program_symbols = ast
-        .symbol_table
-        .clone()
-        .expect("Program to have a symbol_table");
+    let program_symbols = analyzer
+        .get_symbol_table(ast.id)
+        .expect("Program to have a symbol_table")
+        .clone();
 
     assert_eq!(
         program_symbols.borrow().get(SymbolId::new(1)),
         Some(SymbolInfo {
+            node_id: NodeId::new(2),
             id: SymbolId::new(1),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
-            defined_at: Some(Span::new(
+            defined_at: Span::new(
                 LineColumn { line: 0, column: 4 },
                 LineColumn { line: 0, column: 5 }
-            )),
+            ),
             ..Default::default()
         })
     );
     assert_eq!(
         program_symbols.borrow().get(SymbolId::new(2)),
         Some(SymbolInfo {
+            node_id: NodeId::new(5),
             id: SymbolId::new(2),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
-            defined_at: Some(Span::new(
+            defined_at: Span::new(
                 LineColumn { line: 1, column: 5 },
                 LineColumn { line: 1, column: 6 }
-            )),
+            ),
             ..Default::default()
         })
     );
@@ -153,42 +156,42 @@ fn test_should_allow_shadowing_of_single_variable() {
 
 #[test]
 fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
-    let ast = analyze!(indoc! {"
+    let (analyzer, ast) = analyze!(indoc! {"
         let a = 1;
         let a = a + 1;
     "});
 
-    let program_symbols = ast
-        .symbol_table
-        .clone()
-        .expect("Program to have a symbol_table");
+    let program_symbols = analyzer
+        .get_symbol_table(ast.id)
+        .expect("Program to have a symbol_table")
+        .clone();
 
     assert_eq!(
         program_symbols.borrow().get(SymbolId::new(1)),
         Some(SymbolInfo {
+            node_id: NodeId::new(2),
             id: SymbolId::new(1),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
-            defined_at: Some(Span::new(
+            defined_at: Span::new(
                 LineColumn { line: 0, column: 4 },
                 LineColumn { line: 0, column: 5 }
-            )),
+            ),
             used: true,
-            ..Default::default()
         })
     );
     assert_eq!(
         program_symbols.borrow().get(SymbolId::new(2)),
         Some(SymbolInfo {
+            node_id: NodeId::new(5),
             id: SymbolId::new(2),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
-            defined_at: Some(Span::new(
+            defined_at: Span::new(
                 LineColumn { line: 1, column: 5 },
                 LineColumn { line: 1, column: 6 }
-            )),
+            ),
             used: false,
-            ..Default::default()
         })
     );
 }
@@ -222,7 +225,7 @@ fn test_should_error_on_unused_identifier_in_function_definition() {
 
 #[test]
 fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
-    let ast = analyze!(indoc! {"
+    let (analyzer, ast) = analyze!(indoc! {"
         fn add(a, b) {
             c + a + b
         }
@@ -230,21 +233,22 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
         let c = 1;
     "});
 
-    let program_symbols = ast
-        .symbol_table
-        .clone()
-        .expect("Program to have a symbol_table");
+    let program_symbols = analyzer
+        .get_symbol_table(ast.id)
+        .expect("Program to have a symbol_table")
+        .clone();
 
     assert_eq!(
         program_symbols.borrow().get_by_name("add"),
         Some(SymbolInfo {
+            node_id: NodeId::new(12),
             id: SymbolId::new(1),
             name: "add".to_string(),
             symbol_type: SymbolType::Function,
-            defined_at: Some(Span::new(
+            defined_at: Span::new(
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
-            )),
+            ),
             ..Default::default()
         })
     );
@@ -254,47 +258,36 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
         _ => panic!("Expected function declaration {:?}", ast.statements[0].kind),
     };
 
+    let c_symbol_info = SymbolInfo {
+        node_id: NodeId::new(14),
+        id: SymbolId::new(4),
+        name: "c".to_string(),
+        symbol_type: SymbolType::Variable,
+        defined_at: Span::new(
+            LineColumn { line: 4, column: 5 },
+            LineColumn { line: 4, column: 6 },
+        ),
+        used: true,
+    };
+
     // Verify that c is within the scope of the function arguments
     assert_eq!(
-        function_declaration
-            .symbol_table
-            .clone()
+        analyzer
+            .get_symbol_table(function_declaration.id)
             .unwrap()
             .borrow()
             .get_by_name("c"),
-        Some(SymbolInfo {
-            id: SymbolId::new(4),
-            name: "c".to_string(),
-            symbol_type: SymbolType::Variable,
-            defined_at: Some(Span::new(
-                LineColumn { line: 4, column: 5 },
-                LineColumn { line: 4, column: 6 }
-            )),
-            used: true,
-            ..Default::default()
-        })
+        Some(c_symbol_info.clone())
     );
 
     // Verify that c is within the scope of the function body
     assert_eq!(
-        function_declaration
-            .body
-            .symbol_table
-            .clone()
+        analyzer
+            .get_symbol_table(function_declaration.id)
             .unwrap()
             .borrow()
             .get_by_name("c"),
-        Some(SymbolInfo {
-            id: SymbolId::new(4),
-            name: "c".to_string(),
-            symbol_type: SymbolType::Variable,
-            defined_at: Some(Span::new(
-                LineColumn { line: 4, column: 5 },
-                LineColumn { line: 4, column: 6 }
-            )),
-            used: true,
-            ..Default::default()
-        })
+        Some(c_symbol_info.clone())
     );
 }
 

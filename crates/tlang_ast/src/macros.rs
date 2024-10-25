@@ -1,43 +1,43 @@
 #[macro_export]
 macro_rules! expr {
-    ($kind:ident) => {{
+    ($id:expr, $kind:ident) => {{
         use tlang_ast::node::{Expr, ExprKind};
 
-        Expr::new(ExprKind::$kind)
+        Expr::new($id, ExprKind::$kind)
     }};
 
-    ($kind:ident($($arg:expr),* $(,)?)) => {{
+    ($id:expr, $kind:ident($($arg:expr),* $(,)?)) => {{
         use tlang_ast::node::{Expr, ExprKind};
 
-        Expr::new(ExprKind::$kind($($arg),*))
+        Expr::new($id, ExprKind::$kind($($arg),*))
     }};
 }
 
 #[macro_export]
 macro_rules! pat {
-    ($kind:ident) => {{
+    ($id:expr, $kind:ident) => {{
         use tlang_ast::node::{Pattern, PatternKind};
 
-        Pattern::new(PatternKind::$kind)
+        Pattern::new($id, PatternKind::$kind)
     }};
 
-    ($kind:ident($($arg:expr),* $(,)?)) => {{
+    ($id:expr, $kind:ident($($arg:expr),* $(,)?)) => {{
         use tlang_ast::node::{Pattern, PatternKind};
 
-        Pattern::new(PatternKind::$kind($($arg),*))
+        Pattern::new($id, PatternKind::$kind($($arg),*))
     }};
 }
 
 #[macro_export]
 macro_rules! stmt {
-    ($kind:ident) => {{
+    ($id:expr, $kind:ident) => {{
         use tlang_ast::node::{Stmt, StmtKind};
-        Stmt::new(StmtKind::$kind)
+        Stmt::new($id, StmtKind::$kind)
     }};
 
-    ($kind:ident($($arg:expr),* $(,)?)) => {{
+    ($id:expr, $kind:ident($($arg:expr),* $(,)?)) => {{
         use tlang_ast::node::{Stmt, StmtKind};
-        Stmt::new(StmtKind::$kind($($arg),*))
+        Stmt::new($id, StmtKind::$kind($($arg),*))
     }};
 }
 

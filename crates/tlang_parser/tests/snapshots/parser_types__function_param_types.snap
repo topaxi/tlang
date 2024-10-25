@@ -3,11 +3,14 @@ source: crates/tlang_parser/tests/parser_types.rs
 expression: "parse! (\"fn foo(x: i64, y: i64) -> i64 { x }\")"
 ---
 Module(
+  id: NodeId(1),
   statements: [
     Stmt(
+      id: NodeId(12),
       kind: FunctionDeclaration(FunctionDeclaration(
-        id: SymbolId(1),
+        id: NodeId(11),
         name: Expr(
+          id: NodeId(2),
           kind: Path(Path(
             segments: [
               Ident(
@@ -37,7 +40,6 @@ Module(
           )),
           leading_comments: [],
           trailing_comments: [],
-          symbol_table: None,
           span: Span(
             start: LineColumn(
               line: 0,
@@ -52,19 +54,17 @@ Module(
         parameters: [
           FunctionParameter(
             pattern: Pattern(
-              kind: Identifier(IdentifierPattern(
-                id: SymbolId(2),
-                name: Ident(
-                  name: "x",
-                  span: Span(
-                    start: LineColumn(
-                      line: 0,
-                      column: 7,
-                    ),
-                    end: LineColumn(
-                      line: 0,
-                      column: 8,
-                    ),
+              id: NodeId(3),
+              kind: Identifier(Ident(
+                name: "x",
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 7,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 8,
                   ),
                 ),
               )),
@@ -82,6 +82,7 @@ Module(
               ),
             ),
             type_annotation: Some(Ty(
+              id: NodeId(4),
               name: Path(
                 segments: [
                   Ident(
@@ -134,19 +135,17 @@ Module(
           ),
           FunctionParameter(
             pattern: Pattern(
-              kind: Identifier(IdentifierPattern(
-                id: SymbolId(3),
-                name: Ident(
-                  name: "y",
-                  span: Span(
-                    start: LineColumn(
-                      line: 0,
-                      column: 15,
-                    ),
-                    end: LineColumn(
-                      line: 0,
-                      column: 16,
-                    ),
+              id: NodeId(5),
+              kind: Identifier(Ident(
+                name: "y",
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 15,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 16,
                   ),
                 ),
               )),
@@ -164,6 +163,7 @@ Module(
               ),
             ),
             type_annotation: Some(Ty(
+              id: NodeId(6),
               name: Path(
                 segments: [
                   Ident(
@@ -217,6 +217,7 @@ Module(
         ],
         guard: None,
         return_type_annotation: Some(Ty(
+          id: NodeId(7),
           name: Path(
             segments: [
               Ident(
@@ -257,8 +258,10 @@ Module(
           ),
         )),
         body: Block(
+          id: NodeId(10),
           statements: [],
           expression: Some(Expr(
+            id: NodeId(9),
             kind: Path(Path(
               segments: [
                 Ident(
@@ -288,7 +291,6 @@ Module(
             )),
             leading_comments: [],
             trailing_comments: [],
-            symbol_table: None,
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -310,11 +312,9 @@ Module(
               column: 35,
             ),
           ),
-          symbol_table: None,
         ),
         leading_comments: [],
         trailing_comments: [],
-        symbol_table: None,
         span: Span(
           start: LineColumn(
             line: 0,
@@ -338,10 +338,8 @@ Module(
       ),
       leading_comments: [],
       trailing_comments: [],
-      symbol_table: None,
     ),
   ],
-  symbol_table: None,
   span: Span(
     start: LineColumn(
       line: 0,

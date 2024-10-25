@@ -3,23 +3,23 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse! (\"let x = match 1 { a if a == 1 => 2, _ => 3 };\")"
 ---
 Module(
+  id: NodeId(1),
   statements: [
     Stmt(
+      id: NodeId(14),
       kind: Let(LetDeclaration(
         pattern: Pattern(
-          kind: Identifier(IdentifierPattern(
-            id: SymbolId(1),
-            name: Ident(
-              name: "x",
-              span: Span(
-                start: LineColumn(
-                  line: 0,
-                  column: 4,
-                ),
-                end: LineColumn(
-                  line: 0,
-                  column: 5,
-                ),
+          id: NodeId(2),
+          kind: Identifier(Ident(
+            name: "x",
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 4,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 5,
               ),
             ),
           )),
@@ -37,12 +37,13 @@ Module(
           ),
         ),
         expression: Expr(
+          id: NodeId(13),
           kind: Match(MatchExpression(
             expression: Expr(
+              id: NodeId(3),
               kind: Literal(Integer(1)),
               leading_comments: [],
               trailing_comments: [],
-              symbol_table: None,
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -56,20 +57,19 @@ Module(
             ),
             arms: [
               MatchArm(
+                id: NodeId(9),
                 pattern: Pattern(
-                  kind: Identifier(IdentifierPattern(
-                    id: SymbolId(2),
-                    name: Ident(
-                      name: "a",
-                      span: Span(
-                        start: LineColumn(
-                          line: 0,
-                          column: 18,
-                        ),
-                        end: LineColumn(
-                          line: 0,
-                          column: 19,
-                        ),
+                  id: NodeId(4),
+                  kind: Identifier(Ident(
+                    name: "a",
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 18,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 19,
                       ),
                     ),
                   )),
@@ -87,9 +87,11 @@ Module(
                   ),
                 ),
                 guard: Some(Expr(
+                  id: NodeId(7),
                   kind: BinaryOp(BinaryOpExpression(
                     op: Equal,
                     lhs: Expr(
+                      id: NodeId(5),
                       kind: Path(Path(
                         segments: [
                           Ident(
@@ -119,7 +121,6 @@ Module(
                       )),
                       leading_comments: [],
                       trailing_comments: [],
-                      symbol_table: None,
                       span: Span(
                         start: LineColumn(
                           line: 0,
@@ -132,10 +133,10 @@ Module(
                       ),
                     ),
                     rhs: Expr(
+                      id: NodeId(6),
                       kind: Literal(Integer(1)),
                       leading_comments: [],
                       trailing_comments: [],
-                      symbol_table: None,
                       span: Span(
                         start: LineColumn(
                           line: 0,
@@ -150,7 +151,6 @@ Module(
                   )),
                   leading_comments: [],
                   trailing_comments: [],
-                  symbol_table: None,
                   span: Span(
                     start: LineColumn(
                       line: 0,
@@ -163,10 +163,10 @@ Module(
                   ),
                 )),
                 expression: Expr(
+                  id: NodeId(8),
                   kind: Literal(Integer(2)),
                   leading_comments: [],
                   trailing_comments: [],
-                  symbol_table: None,
                   span: Span(
                     start: LineColumn(
                       line: 0,
@@ -180,7 +180,9 @@ Module(
                 ),
               ),
               MatchArm(
+                id: NodeId(12),
                 pattern: Pattern(
+                  id: NodeId(10),
                   kind: Wildcard,
                   leading_comments: [],
                   trailing_comments: [],
@@ -197,10 +199,10 @@ Module(
                 ),
                 guard: None,
                 expression: Expr(
+                  id: NodeId(11),
                   kind: Literal(Integer(3)),
                   leading_comments: [],
                   trailing_comments: [],
-                  symbol_table: None,
                   span: Span(
                     start: LineColumn(
                       line: 0,
@@ -217,7 +219,6 @@ Module(
           )),
           leading_comments: [],
           trailing_comments: [],
-          symbol_table: None,
           span: Span(
             start: LineColumn(
               line: 0,
@@ -243,10 +244,8 @@ Module(
       ),
       leading_comments: [],
       trailing_comments: [],
-      symbol_table: None,
     ),
   ],
-  symbol_table: None,
   span: Span(
     start: LineColumn(
       line: 0,

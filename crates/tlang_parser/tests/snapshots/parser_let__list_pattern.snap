@@ -3,25 +3,26 @@ source: crates/tlang_parser/tests/parser_let.rs
 expression: "parse! (\"let [x, y, ...z] = [1, 2, 3, 4];\")"
 ---
 Module(
+  id: NodeId(1),
   statements: [
     Stmt(
+      id: NodeId(12),
       kind: Let(LetDeclaration(
         pattern: Pattern(
+          id: NodeId(6),
           kind: List([
             Pattern(
-              kind: Identifier(IdentifierPattern(
-                id: SymbolId(1),
-                name: Ident(
-                  name: "x",
-                  span: Span(
-                    start: LineColumn(
-                      line: 0,
-                      column: 5,
-                    ),
-                    end: LineColumn(
-                      line: 0,
-                      column: 6,
-                    ),
+              id: NodeId(2),
+              kind: Identifier(Ident(
+                name: "x",
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 5,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 6,
                   ),
                 ),
               )),
@@ -39,19 +40,17 @@ Module(
               ),
             ),
             Pattern(
-              kind: Identifier(IdentifierPattern(
-                id: SymbolId(2),
-                name: Ident(
-                  name: "y",
-                  span: Span(
-                    start: LineColumn(
-                      line: 0,
-                      column: 8,
-                    ),
-                    end: LineColumn(
-                      line: 0,
-                      column: 9,
-                    ),
+              id: NodeId(3),
+              kind: Identifier(Ident(
+                name: "y",
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 8,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 9,
                   ),
                 ),
               )),
@@ -69,20 +68,19 @@ Module(
               ),
             ),
             Pattern(
+              id: NodeId(4),
               kind: Rest(Pattern(
-                kind: Identifier(IdentifierPattern(
-                  id: SymbolId(3),
-                  name: Ident(
-                    name: "z",
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 14,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 15,
-                      ),
+                id: NodeId(5),
+                kind: Identifier(Ident(
+                  name: "z",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 14,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 15,
                     ),
                   ),
                 )),
@@ -127,12 +125,13 @@ Module(
           ),
         ),
         expression: Expr(
+          id: NodeId(11),
           kind: List([
             Expr(
+              id: NodeId(7),
               kind: Literal(Integer(1)),
               leading_comments: [],
               trailing_comments: [],
-              symbol_table: None,
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -145,10 +144,10 @@ Module(
               ),
             ),
             Expr(
+              id: NodeId(8),
               kind: Literal(Integer(2)),
               leading_comments: [],
               trailing_comments: [],
-              symbol_table: None,
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -161,10 +160,10 @@ Module(
               ),
             ),
             Expr(
+              id: NodeId(9),
               kind: Literal(Integer(3)),
               leading_comments: [],
               trailing_comments: [],
-              symbol_table: None,
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -177,10 +176,10 @@ Module(
               ),
             ),
             Expr(
+              id: NodeId(10),
               kind: Literal(Integer(4)),
               leading_comments: [],
               trailing_comments: [],
-              symbol_table: None,
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -195,7 +194,6 @@ Module(
           ]),
           leading_comments: [],
           trailing_comments: [],
-          symbol_table: None,
           span: Span(
             start: LineColumn(
               line: 0,
@@ -221,10 +219,8 @@ Module(
       ),
       leading_comments: [],
       trailing_comments: [],
-      symbol_table: None,
     ),
   ],
-  symbol_table: None,
   span: Span(
     start: LineColumn(
       line: 0,

@@ -629,7 +629,7 @@ impl CodegenJS {
                 self.current_scope()
                     .declare_variable_alias(ident_pattern.name.as_str(), &var_name);
             }
-            PatternKind::_Self(_) => {
+            PatternKind::_Self => {
                 self.current_scope().declare_variable_alias("self", "this");
             }
             PatternKind::Enum(enum_pattern) => self.generate_enum_extraction(enum_pattern),

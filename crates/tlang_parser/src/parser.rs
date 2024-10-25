@@ -1,12 +1,12 @@
 use tlang_ast::node::{
     self, Associativity, BinaryOpExpression, BinaryOpKind, Block, CallExpression, ElseClause,
     EnumDeclaration, EnumPattern, EnumVariant, Expr, ExprKind, FieldAccessExpression,
-    FunctionDeclaration, FunctionParameter, Ident, IdentifierPattern, IfElseExpression,
-    IndexAccessExpression, LetDeclaration, MatchArm, MatchExpression, Module, OperatorInfo, Path,
-    Pattern, Stmt, StmtKind, StructDeclaration, StructField, Ty, UnaryOp,
+    FunctionDeclaration, FunctionParameter, Ident, IfElseExpression, IndexAccessExpression,
+    LetDeclaration, MatchArm, MatchExpression, Module, OperatorInfo, Path, Pattern, Stmt, StmtKind,
+    StructDeclaration, StructField, Ty, UnaryOp,
 };
+use tlang_ast::node_id::NodeId;
 use tlang_ast::span::Span;
-use tlang_ast::symbols::SymbolId;
 use tlang_ast::token::{Keyword, Literal, Token, TokenKind};
 use tlang_lexer::Lexer;
 
@@ -22,8 +22,7 @@ pub struct Parser<'src> {
 
     recoverable: bool,
 
-    // Id to identifiy symbols, e.g. functions and variables.
-    unique_id: SymbolId,
+    unique_id: NodeId,
 
     errors: Vec<ParseError>,
 }
@@ -35,7 +34,7 @@ impl<'src> Parser<'src> {
             previous_span: None,
             current_token: None,
             next_token: None,
-            unique_id: SymbolId::new(0),
+            unique_id: NodeId::new(0),
             errors: Vec::new(),
             recoverable: false,
         }
@@ -54,7 +53,7 @@ impl<'src> Parser<'src> {
         self.errors.clone()
     }
 
-    fn unique_id(&mut self) -> SymbolId {
+    fn unique_id(&mut self) -> NodeId {
         self.unique_id = self.unique_id.next();
         self.unique_id
     }
@@ -261,7 +260,7 @@ impl<'src> Parser<'src> {
         let comments = self.parse_comments();
 
         if matches!(self.current_token_kind(), Some(TokenKind::Eof)) {
-            let mut node = node::stmt!(None);
+            let mut node = node::stmt!(self.unique_id(), None);
             node.leading_comments = comments;
             return (false, Some(node));
         }
@@ -279,7 +278,7 @@ impl<'src> Parser<'src> {
             Some(Keyword::Return) => self.parse_return_statement(),
             Some(Keyword::Enum) => self.parse_enum_declaration(),
             Some(Keyword::Struct) => self.parse_struct_declaration(),
-            _ => node::stmt!(Expr(Box::new(self.parse_expression()))),
+            _ => node::stmt!(self.unique_id(), Expr(Box::new(self.parse_expression()))),
         };
         node.leading_comments = comments;
         self.end_span_from_previous_token(&mut span);
@@ -317,16 +316,19 @@ impl<'src> Parser<'src> {
         self.consume_keyword_token(Keyword::Return);
 
         if matches!(self.current_token_kind(), Some(TokenKind::Semicolon)) {
-            return node::stmt!(Return(Box::new(None)));
+            return node::stmt!(self.unique_id(), Return(Box::new(None)));
         }
 
-        node::stmt!(Return(Box::new(Some(self.parse_expression()))))
+        node::stmt!(
+            self.unique_id(),
+            Return(Box::new(Some(self.parse_expression())))
+        )
     }
 
     fn parse_single_identifier(&mut self) -> Expr {
         let path = Path::from_ident(self.parse_identifier());
         let span = path.span;
-        node::expr!(Path(Box::new(path))).with_span(span)
+        node::expr!(self.unique_id(), Path(Box::new(path))).with_span(span)
     }
 
     fn parse_path(&mut self) -> Path {
@@ -347,7 +349,7 @@ impl<'src> Parser<'src> {
         let path = self.parse_path();
         let span = path.span;
 
-        node::expr!(Path(Box::new(path))).with_span(span)
+        node::expr!(self.unique_id(), Path(Box::new(path))).with_span(span)
     }
 
     fn parse_struct_declaration(&mut self) -> Stmt {
@@ -362,11 +364,10 @@ impl<'src> Parser<'src> {
             }
         }
         self.consume_token(TokenKind::RBrace);
-        node::stmt!(StructDeclaration(Box::new(StructDeclaration {
-            id: self.unique_id(),
-            name,
-            fields,
-        })))
+        node::stmt!(
+            self.unique_id(),
+            StructDeclaration(Box::new(StructDeclaration { name, fields }))
+        )
     }
 
     fn parse_struct_field(&mut self) -> StructField {
@@ -389,11 +390,10 @@ impl<'src> Parser<'src> {
             }
         }
         self.consume_token(TokenKind::RBrace);
-        node::stmt!(EnumDeclaration(Box::new(EnumDeclaration {
-            id: self.unique_id(),
-            name,
-            variants,
-        })))
+        node::stmt!(
+            self.unique_id(),
+            EnumDeclaration(Box::new(EnumDeclaration { name, variants }))
+        )
     }
 
     /// Parses an enum variant, e.g. `Foo`, `Foo(1, 2, 3)` and
@@ -473,7 +473,7 @@ impl<'src> Parser<'src> {
                         // Function declaration as completion expression.
                         // We remap the function declaration node to a function expression.
                         StmtKind::FunctionDeclaration(decl) => {
-                            Box::new(node::expr!(FunctionExpression(decl)))
+                            Box::new(node::expr!(self.unique_id(), FunctionExpression(decl)))
                         }
                         _ => {
                             self.panic_unexpected_stmt(
@@ -507,7 +507,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_module(&mut self) -> Module {
-        Module::new(self.parse_statements(false).0)
+        Module::new(self.unique_id(), self.parse_statements(false).0)
     }
 
     fn parse_block(&mut self) -> Block {
@@ -517,7 +517,7 @@ impl<'src> Parser<'src> {
         self.consume_token(TokenKind::RBrace);
         self.end_span_from_previous_token(&mut span);
 
-        Block::new(statements, expression).with_span(span)
+        Block::new(self.unique_id(), statements, expression).with_span(span)
     }
 
     fn parse_let_expression(&mut self) -> Expr {
@@ -525,7 +525,7 @@ impl<'src> Parser<'src> {
         let pattern = self.parse_pattern();
         self.consume_token(TokenKind::EqualSign);
         let value = self.parse_expression();
-        node::expr!(Let(Box::new(pattern), Box::new(value)))
+        node::expr!(self.unique_id(), Let(Box::new(pattern), Box::new(value)))
     }
 
     fn parse_variable_declaration(&mut self) -> Stmt {
@@ -545,11 +545,14 @@ impl<'src> Parser<'src> {
         self.consume_token(TokenKind::EqualSign);
         let expression = self.parse_expression();
 
-        node::stmt!(Let(Box::new(LetDeclaration {
-            pattern,
-            expression,
-            type_annotation,
-        })))
+        node::stmt!(
+            self.unique_id(),
+            Let(Box::new(LetDeclaration {
+                pattern,
+                expression,
+                type_annotation,
+            }))
+        )
     }
 
     /// Parses a function call expression, e.g. `foo()`, `foo(1, 2, 3)` and
@@ -589,20 +592,24 @@ impl<'src> Parser<'src> {
 
         self.end_span_from_previous_token(&mut span);
 
-        node::expr!(Call(Box::new(CallExpression {
-            callee: expr,
-            arguments,
-        })))
+        node::expr!(
+            self.unique_id(),
+            Call(Box::new(CallExpression {
+                callee: expr,
+                arguments,
+            }))
+        )
         .with_span(span)
     }
 
     fn parse_identifier_pattern(&mut self) -> Pattern {
+        let id = self.unique_id();
         let current_token = self.current_token.as_ref().unwrap();
 
         // TODO: We only do this because we call `parse_identifier_pattern` within
         // `parse_enum_extraction` and that code there is quite messy.
         if let TokenKind::Keyword(Keyword::Underscore) = current_token.kind {
-            let wildcard_pattern = node::pat!(Wildcard).with_span(current_token.span);
+            let wildcard_pattern = node::pat!(id, Wildcard).with_span(current_token.span);
             self.advance();
             return wildcard_pattern;
         }
@@ -610,10 +617,7 @@ impl<'src> Parser<'src> {
         let name = self.parse_identifier();
         let mut span = name.span;
 
-        let mut node = node::pat!(Identifier(Box::new(IdentifierPattern {
-            id: self.unique_id(),
-            name,
-        })));
+        let mut node = node::pat!(id, Identifier(Box::new(name)));
 
         self.end_span_from_previous_token(&mut span);
         node.span = span;
@@ -639,7 +643,10 @@ impl<'src> Parser<'src> {
             let element = match self.current_token_kind() {
                 Some(TokenKind::DotDotDot) => {
                     self.advance();
-                    node::pat!(Rest(Box::new(self.parse_identifier_pattern())))
+                    node::pat!(
+                        self.unique_id(),
+                        Rest(Box::new(self.parse_identifier_pattern()))
+                    )
                 }
                 _ => self.parse_pattern(),
             };
@@ -656,7 +663,7 @@ impl<'src> Parser<'src> {
 
         self.consume_token(TokenKind::RBracket);
 
-        node::pat!(List(elements))
+        node::pat!(self.unique_id(), List(elements))
     }
 
     fn parse_list_expression(&mut self) -> Expr {
@@ -668,7 +675,10 @@ impl<'src> Parser<'src> {
                 Some(TokenKind::DotDotDot) => {
                     self.advance();
 
-                    node::expr!(UnaryOp(UnaryOp::Spread, Box::new(self.parse_expression())))
+                    node::expr!(
+                        self.unique_id(),
+                        UnaryOp(UnaryOp::Spread, Box::new(self.parse_expression()))
+                    )
                 }
                 _ => self.parse_expression(),
             };
@@ -685,7 +695,7 @@ impl<'src> Parser<'src> {
 
         self.consume_token(TokenKind::RBracket);
 
-        node::expr!(List(elements))
+        node::expr!(self.unique_id(), List(elements))
     }
 
     fn parse_dict_elements(&mut self) -> Vec<(Expr, Expr)> {
@@ -728,7 +738,7 @@ impl<'src> Parser<'src> {
             if let Some(TokenKind::Colon | TokenKind::Comma) = self.peek_token_kind() {
                 let elements = self.parse_dict_elements();
                 self.consume_token(TokenKind::RBrace);
-                return node::expr!(Dict(elements));
+                return node::expr!(self.unique_id(), Dict(elements));
             }
         }
 
@@ -736,9 +746,12 @@ impl<'src> Parser<'src> {
         self.consume_token(TokenKind::RBrace);
         self.end_span_from_previous_token(&mut span);
 
-        node::expr!(Block(Box::new(
-            Block::new(statements, expression).with_span(span)
-        )))
+        node::expr!(
+            self.unique_id(),
+            Block(Box::new(
+                Block::new(self.unique_id(), statements, expression).with_span(span)
+            ))
+        )
         .with_span(span)
     }
 
@@ -749,10 +762,13 @@ impl<'src> Parser<'src> {
 
         let mut expr = if let Some(TokenKind::Dot) = self.current_token_kind() {
             self.advance();
-            node::expr!(FieldExpression(Box::new(FieldAccessExpression {
-                base: path,
-                field: self.parse_identifier(),
-            })))
+            node::expr!(
+                self.unique_id(),
+                FieldExpression(Box::new(FieldAccessExpression {
+                    base: path,
+                    field: self.parse_identifier(),
+                }))
+            )
         } else {
             path
         };
@@ -787,7 +803,7 @@ impl<'src> Parser<'src> {
         let condition = self.parse_if_condition();
 
         self.expect_token(TokenKind::LBrace);
-        let then_branch = node::expr!(Block(Box::new(self.parse_block())));
+        let then_branch = node::expr!(self.unique_id(), Block(Box::new(self.parse_block())));
 
         let mut else_branches = Vec::new();
         while let Some(TokenKind::Keyword(Keyword::Else)) = self.current_token_kind() {
@@ -801,7 +817,7 @@ impl<'src> Parser<'src> {
             };
 
             self.expect_token(TokenKind::LBrace);
-            let consequence = node::expr!(Block(Box::new(self.parse_block())));
+            let consequence = node::expr!(self.unique_id(), Block(Box::new(self.parse_block())));
 
             if condition.is_none() {
                 self.expect_token_not(TokenKind::Keyword(Keyword::Else));
@@ -813,11 +829,14 @@ impl<'src> Parser<'src> {
             });
         }
 
-        node::expr!(IfElse(Box::new(IfElseExpression {
-            condition,
-            then_branch,
-            else_branches,
-        })))
+        node::expr!(
+            self.unique_id(),
+            IfElse(Box::new(IfElseExpression {
+                condition,
+                then_branch,
+                else_branches,
+            }))
+        )
     }
 
     fn parse_unary_expression(&mut self) -> Expr {
@@ -825,19 +844,19 @@ impl<'src> Parser<'src> {
             Some(TokenKind::Minus) => {
                 self.advance();
 
-                node::expr!(UnaryOp(
-                    UnaryOp::Minus,
-                    Box::new(self.parse_primary_expression())
-                ))
+                node::expr!(
+                    self.unique_id(),
+                    UnaryOp(UnaryOp::Minus, Box::new(self.parse_primary_expression()))
+                )
             }
 
             Some(TokenKind::ExclamationMark | TokenKind::Keyword(Keyword::Not)) => {
                 self.advance();
 
-                node::expr!(UnaryOp(
-                    UnaryOp::Not,
-                    Box::new(self.parse_primary_expression())
-                ))
+                node::expr!(
+                    self.unique_id(),
+                    UnaryOp(UnaryOp::Not, Box::new(self.parse_primary_expression()))
+                )
             }
 
             _ => unreachable!("Unexpected token kind"),
@@ -896,17 +915,17 @@ impl<'src> Parser<'src> {
                     }
                 };
 
-                node::expr!(RecursiveCall(call_expr)).with_span(expr.span)
+                node::expr!(self.unique_id(), RecursiveCall(call_expr)).with_span(expr.span)
             }
             Some(TokenKind::Keyword(Keyword::Match)) => self.parse_match_expression(),
             Some(TokenKind::Keyword(Keyword::Underscore)) => {
                 self.advance();
-                node::expr!(Wildcard)
+                node::expr!(self.unique_id(), Wildcard)
             }
             Some(TokenKind::Literal(literal)) => {
                 let literal = literal.clone();
                 self.advance();
-                node::expr!(Literal(Box::new(literal)))
+                node::expr!(self.unique_id(), Literal(Box::new(literal)))
             }
             // TODO: Mostly copied from Identifier further below, `self` might be easier to just be
             //       an identifier.
@@ -925,7 +944,7 @@ impl<'src> Parser<'src> {
 
                 self.end_span_from_previous_token(&mut span);
 
-                let mut expr = node::expr!(Path(Box::new(path))).with_span(span);
+                let mut expr = node::expr!(self.unique_id(), Path(Box::new(path))).with_span(span);
 
                 if let Some(TokenKind::LParen | TokenKind::LBrace) = self.current_token_kind() {
                     expr = self.parse_call_expression(expr);
@@ -949,7 +968,7 @@ impl<'src> Parser<'src> {
 
                 self.end_span_from_previous_token(&mut span);
 
-                let mut expr = node::expr!(Path(Box::new(path))).with_span(span);
+                let mut expr = node::expr!(self.unique_id(), Path(Box::new(path))).with_span(span);
 
                 if let Some(TokenKind::LParen | TokenKind::LBrace) = self.current_token_kind() {
                     expr = self.parse_call_expression(expr);
@@ -992,6 +1011,7 @@ impl<'src> Parser<'src> {
             self.consume_token(TokenKind::FatArrow);
             let expression = self.parse_expression();
             arms.push(MatchArm {
+                id: self.unique_id(),
                 pattern,
                 guard,
                 expression,
@@ -1003,7 +1023,10 @@ impl<'src> Parser<'src> {
 
         self.consume_token(TokenKind::RBrace);
 
-        node::expr!(Match(Box::new(MatchExpression { expression, arms })))
+        node::expr!(
+            self.unique_id(),
+            Match(Box::new(MatchExpression { expression, arms }))
+        )
     }
 
     fn parse_parameter_list(&mut self) -> Vec<FunctionParameter> {
@@ -1066,7 +1089,7 @@ impl<'src> Parser<'src> {
                 let identifier = self.parse_path();
                 let parameters = self.parse_type_annotation_parameters();
 
-                Ty::new(identifier).with_parameters(parameters)
+                Ty::new(self.unique_id(), identifier).with_parameters(parameters)
             }
             Some(token) => unreachable!("Expected type annotation, found {:?}", token),
             None => unreachable!("Expected type annotation"),
@@ -1116,10 +1139,13 @@ impl<'src> Parser<'src> {
         let name = if let Some(TokenKind::Identifier(_)) = self.current_token_kind() {
             self.parse_single_identifier()
         } else {
-            node::expr!(Path(Box::new(Path::from_ident(Ident::new(
-                "anonymous",
-                Default::default()
-            )))))
+            node::expr!(
+                self.unique_id(),
+                Path(Box::new(Path::from_ident(Ident::new(
+                    "anonymous",
+                    Default::default()
+                ))))
+            )
         };
 
         let parameters = self.parse_parameter_list();
@@ -1128,15 +1154,18 @@ impl<'src> Parser<'src> {
 
         self.end_span_from_previous_token(&mut span);
 
-        node::expr!(FunctionExpression(Box::new(FunctionDeclaration {
-            id: self.unique_id(),
-            name,
-            parameters,
-            body,
-            return_type_annotation: return_type,
-            span,
-            ..Default::default()
-        })))
+        node::expr!(
+            self.unique_id(),
+            FunctionExpression(Box::new(FunctionDeclaration {
+                id: self.unique_id(),
+                name,
+                parameters,
+                body,
+                return_type_annotation: return_type,
+                span,
+                ..Default::default()
+            }))
+        )
         .with_span(span)
     }
 
@@ -1156,11 +1185,14 @@ impl<'src> Parser<'src> {
                 }
             }
             self.consume_token(TokenKind::RBrace);
-            node::pat!(Enum(Box::new(EnumPattern {
-                identifier,
-                elements,
-                named_fields: true,
-            })))
+            node::pat!(
+                self.unique_id(),
+                Enum(Box::new(EnumPattern {
+                    identifier,
+                    elements,
+                    named_fields: true,
+                }))
+            )
         } else if let Some(TokenKind::LParen) = self.current_token_kind() {
             self.consume_token(TokenKind::LParen);
             let mut elements = Vec::new();
@@ -1171,22 +1203,27 @@ impl<'src> Parser<'src> {
                 }
             }
             self.consume_token(TokenKind::RParen);
-            node::pat!(Enum(Box::new(EnumPattern {
-                identifier,
-                elements,
-                named_fields: false,
-            })))
+            node::pat!(
+                self.unique_id(),
+                Enum(Box::new(EnumPattern {
+                    identifier,
+                    elements,
+                    named_fields: false,
+                }))
+            )
         } else {
-            node::pat!(Enum(Box::new(EnumPattern {
-                identifier,
-                elements: Vec::new(),
-                named_fields: false,
-            })))
+            node::pat!(
+                self.unique_id(),
+                Enum(Box::new(EnumPattern {
+                    identifier,
+                    elements: Vec::new(),
+                    named_fields: false,
+                }))
+            )
         }
     }
 
     fn parse_function_declaration(&mut self) -> Stmt {
-        let id = self.unique_id();
         let mut name: Option<Expr> = None;
         let mut declarations: Vec<FunctionDeclaration> = Vec::new();
 
@@ -1261,7 +1298,7 @@ impl<'src> Parser<'src> {
             self.end_span_from_previous_token(&mut span);
 
             declarations.push(FunctionDeclaration {
-                id,
+                id: self.unique_id(),
                 name: name.clone().unwrap(),
                 parameters,
                 guard,
@@ -1274,10 +1311,13 @@ impl<'src> Parser<'src> {
         }
 
         if declarations.len() == 1 {
-            return node::stmt!(FunctionDeclaration(Box::new(declarations.pop().unwrap())));
+            return node::stmt!(
+                self.unique_id(),
+                FunctionDeclaration(Box::new(declarations.pop().unwrap()))
+            );
         }
 
-        node::stmt!(FunctionDeclarations(declarations))
+        node::stmt!(self.unique_id(), FunctionDeclarations(declarations))
     }
 
     fn parse_guard_clause(&mut self) -> Option<Expr> {
@@ -1441,7 +1481,7 @@ impl<'src> Parser<'src> {
     fn parse_pattern_literal(&mut self) -> Pattern {
         expect_token_matches!(self, "literal", TokenKind::Literal(_));
 
-        node::pat!(Literal(Box::new(self.parse_literal())))
+        node::pat!(self.unique_id(), Literal(Box::new(self.parse_literal())))
     }
 
     fn parse_pattern(&mut self) -> Pattern {
@@ -1464,11 +1504,11 @@ impl<'src> Parser<'src> {
             Some(TokenKind::Literal(_)) => self.parse_pattern_literal(),
             Some(TokenKind::Keyword(Keyword::_Self)) => {
                 self.advance();
-                node::pat!(_Self(self.unique_id()))
+                node::pat!(self.unique_id(), _Self)
             }
             Some(TokenKind::Keyword(Keyword::Underscore)) => {
                 self.advance();
-                node::pat!(Wildcard)
+                node::pat!(self.unique_id(), Wildcard)
             }
             // Identifiers can be namespaced identifiers or call expressions, which should be pattern matched.
             // Simple identifiers will be used as is and mapped to a function parameter.
@@ -1514,19 +1554,22 @@ impl<'src> Parser<'src> {
                     self.advance();
                     lhs.trailing_comments = self.parse_comments();
                     let field_name = self.parse_identifier();
-                    lhs = node::expr!(FieldExpression(Box::new(FieldAccessExpression {
-                        base: lhs,
-                        field: field_name,
-                    })));
+                    lhs = node::expr!(
+                        self.unique_id(),
+                        FieldExpression(Box::new(FieldAccessExpression {
+                            base: lhs,
+                            field: field_name,
+                        }))
+                    );
                 }
                 Some(TokenKind::LBracket) => {
                     self.advance();
                     let index = self.parse_expression_with_precedence(0, Associativity::Left);
                     self.consume_token(TokenKind::RBracket);
-                    lhs = node::expr!(IndexExpression(Box::new(IndexAccessExpression {
-                        base: lhs,
-                        index,
-                    })));
+                    lhs = node::expr!(
+                        self.unique_id(),
+                        IndexExpression(Box::new(IndexAccessExpression { base: lhs, index }))
+                    );
                 }
                 Some(TokenKind::LParen) => {
                     lhs = self.parse_call_expression(lhs);
@@ -1552,11 +1595,14 @@ impl<'src> Parser<'src> {
                         operator_info.associativity,
                     );
 
-                    lhs = node::expr!(BinaryOp(Box::new(BinaryOpExpression {
-                        op: operator,
-                        lhs,
-                        rhs,
-                    })));
+                    lhs = node::expr!(
+                        self.unique_id(),
+                        BinaryOp(Box::new(BinaryOpExpression {
+                            op: operator,
+                            lhs,
+                            rhs,
+                        }))
+                    );
                 }
                 _ => break,
             }

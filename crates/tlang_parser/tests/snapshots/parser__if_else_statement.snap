@@ -3,15 +3,18 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse! (\"if true { 1; } else { 2; }\")"
 ---
 Module(
+  id: NodeId(1),
   statements: [
     Stmt(
+      id: NodeId(2),
       kind: Expr(Expr(
+        id: NodeId(12),
         kind: IfElse(IfElseExpression(
           condition: Expr(
+            id: NodeId(3),
             kind: Literal(Boolean(true)),
             leading_comments: [],
             trailing_comments: [],
-            symbol_table: None,
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -24,14 +27,17 @@ Module(
             ),
           ),
           then_branch: Expr(
+            id: NodeId(4),
             kind: Block(Block(
+              id: NodeId(7),
               statements: [
                 Stmt(
+                  id: NodeId(5),
                   kind: Expr(Expr(
+                    id: NodeId(6),
                     kind: Literal(Integer(1)),
                     leading_comments: [],
                     trailing_comments: [],
-                    symbol_table: None,
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -55,7 +61,6 @@ Module(
                   ),
                   leading_comments: [],
                   trailing_comments: [],
-                  symbol_table: None,
                 ),
               ],
               expression: None,
@@ -69,11 +74,9 @@ Module(
                   column: 14,
                 ),
               ),
-              symbol_table: None,
             )),
             leading_comments: [],
             trailing_comments: [],
-            symbol_table: None,
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -89,14 +92,17 @@ Module(
             ElseClause(
               condition: None,
               consequence: Expr(
+                id: NodeId(8),
                 kind: Block(Block(
+                  id: NodeId(11),
                   statements: [
                     Stmt(
+                      id: NodeId(9),
                       kind: Expr(Expr(
+                        id: NodeId(10),
                         kind: Literal(Integer(2)),
                         leading_comments: [],
                         trailing_comments: [],
-                        symbol_table: None,
                         span: Span(
                           start: LineColumn(
                             line: 0,
@@ -120,7 +126,6 @@ Module(
                       ),
                       leading_comments: [],
                       trailing_comments: [],
-                      symbol_table: None,
                     ),
                   ],
                   expression: None,
@@ -134,11 +139,9 @@ Module(
                       column: 26,
                     ),
                   ),
-                  symbol_table: None,
                 )),
                 leading_comments: [],
                 trailing_comments: [],
-                symbol_table: None,
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -155,7 +158,6 @@ Module(
         )),
         leading_comments: [],
         trailing_comments: [],
-        symbol_table: None,
         span: Span(
           start: LineColumn(
             line: 0,
@@ -179,10 +181,8 @@ Module(
       ),
       leading_comments: [],
       trailing_comments: [],
-      symbol_table: None,
     ),
   ],
-  symbol_table: None,
   span: Span(
     start: LineColumn(
       line: 0,

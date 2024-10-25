@@ -3,14 +3,20 @@ source: crates/tlang_parser/tests/parser_if_let.rs
 expression: "parse!\n(indoc!\n{ \"\n        if let Option::Some(y) = x; {\n            y\n        }\n    \" })"
 ---
 Module(
+  id: NodeId(1),
   statements: [
     Stmt(
+      id: NodeId(2),
       kind: Expr(Expr(
+        id: NodeId(12),
         kind: IfElse(IfElseExpression(
           condition: Expr(
+            id: NodeId(7),
             kind: Let(Pattern(
+              id: NodeId(5),
               kind: Enum(EnumPattern(
                 identifier: Expr(
+                  id: NodeId(3),
                   kind: Path(Path(
                     segments: [
                       Ident(
@@ -53,7 +59,6 @@ Module(
                   )),
                   leading_comments: [],
                   trailing_comments: [],
-                  symbol_table: None,
                   span: Span(
                     start: LineColumn(
                       line: 0,
@@ -67,19 +72,17 @@ Module(
                 ),
                 elements: [
                   Pattern(
-                    kind: Identifier(IdentifierPattern(
-                      id: SymbolId(1),
-                      name: Ident(
-                        name: "y",
-                        span: Span(
-                          start: LineColumn(
-                            line: 0,
-                            column: 20,
-                          ),
-                          end: LineColumn(
-                            line: 0,
-                            column: 21,
-                          ),
+                    id: NodeId(4),
+                    kind: Identifier(Ident(
+                      name: "y",
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 20,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 21,
                         ),
                       ),
                     )),
@@ -112,6 +115,7 @@ Module(
                 ),
               ),
             ), Expr(
+              id: NodeId(6),
               kind: Path(Path(
                 segments: [
                   Ident(
@@ -141,7 +145,6 @@ Module(
               )),
               leading_comments: [],
               trailing_comments: [],
-              symbol_table: None,
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -155,7 +158,6 @@ Module(
             )),
             leading_comments: [],
             trailing_comments: [],
-            symbol_table: None,
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -168,9 +170,12 @@ Module(
             ),
           ),
           then_branch: Expr(
+            id: NodeId(8),
             kind: Block(Block(
+              id: NodeId(11),
               statements: [],
               expression: Some(Expr(
+                id: NodeId(10),
                 kind: Path(Path(
                   segments: [
                     Ident(
@@ -200,7 +205,6 @@ Module(
                 )),
                 leading_comments: [],
                 trailing_comments: [],
-                symbol_table: None,
                 span: Span(
                   start: LineColumn(
                     line: 1,
@@ -222,11 +226,9 @@ Module(
                   column: 2,
                 ),
               ),
-              symbol_table: None,
             )),
             leading_comments: [],
             trailing_comments: [],
-            symbol_table: None,
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -242,7 +244,6 @@ Module(
         )),
         leading_comments: [],
         trailing_comments: [],
-        symbol_table: None,
         span: Span(
           start: LineColumn(
             line: 0,
@@ -266,10 +267,8 @@ Module(
       ),
       leading_comments: [],
       trailing_comments: [],
-      symbol_table: None,
     ),
   ],
-  symbol_table: None,
   span: Span(
     start: LineColumn(
       line: 0,

@@ -3,23 +3,23 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse!\n(r\"\n        // this is a third comment\n        let y = /* comment before expr */ 2 /* comment after expr */;\n        // trailing comment\n        [1,2] // trailing comment\n        |> foo // trailing comment\n        //|> bar\n        |> baz;\n        \")"
 ---
 Module(
+  id: NodeId(1),
   statements: [
     Stmt(
+      id: NodeId(4),
       kind: Let(LetDeclaration(
         pattern: Pattern(
-          kind: Identifier(IdentifierPattern(
-            id: SymbolId(1),
-            name: Ident(
-              name: "y",
-              span: Span(
-                start: LineColumn(
-                  line: 2,
-                  column: 13,
-                ),
-                end: LineColumn(
-                  line: 2,
-                  column: 14,
-                ),
+          id: NodeId(2),
+          kind: Identifier(Ident(
+            name: "y",
+            span: Span(
+              start: LineColumn(
+                line: 2,
+                column: 13,
+              ),
+              end: LineColumn(
+                line: 2,
+                column: 14,
               ),
             ),
           )),
@@ -37,6 +37,7 @@ Module(
           ),
         ),
         expression: Expr(
+          id: NodeId(3),
           kind: Literal(Integer(2)),
           leading_comments: [
             Token(
@@ -68,7 +69,6 @@ Module(
               ),
             ),
           ],
-          symbol_table: None,
           span: Span(
             start: LineColumn(
               line: 2,
@@ -108,22 +108,25 @@ Module(
         ),
       ],
       trailing_comments: [],
-      symbol_table: None,
     ),
     Stmt(
+      id: NodeId(5),
       kind: Expr(Expr(
+        id: NodeId(12),
         kind: BinaryOp(BinaryOpExpression(
           op: Pipeline,
           lhs: Expr(
+            id: NodeId(10),
             kind: BinaryOp(BinaryOpExpression(
               op: Pipeline,
               lhs: Expr(
+                id: NodeId(8),
                 kind: List([
                   Expr(
+                    id: NodeId(6),
                     kind: Literal(Integer(1)),
                     leading_comments: [],
                     trailing_comments: [],
-                    symbol_table: None,
                     span: Span(
                       start: LineColumn(
                         line: 4,
@@ -136,10 +139,10 @@ Module(
                     ),
                   ),
                   Expr(
+                    id: NodeId(7),
                     kind: Literal(Integer(2)),
                     leading_comments: [],
                     trailing_comments: [],
-                    symbol_table: None,
                     span: Span(
                       start: LineColumn(
                         line: 4,
@@ -168,7 +171,6 @@ Module(
                     ),
                   ),
                 ],
-                symbol_table: None,
                 span: Span(
                   start: LineColumn(
                     line: 4,
@@ -181,6 +183,7 @@ Module(
                 ),
               ),
               rhs: Expr(
+                id: NodeId(9),
                 kind: Path(Path(
                   segments: [
                     Ident(
@@ -237,7 +240,6 @@ Module(
                     ),
                   ),
                 ],
-                symbol_table: None,
                 span: Span(
                   start: LineColumn(
                     line: 5,
@@ -252,7 +254,6 @@ Module(
             )),
             leading_comments: [],
             trailing_comments: [],
-            symbol_table: None,
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -265,6 +266,7 @@ Module(
             ),
           ),
           rhs: Expr(
+            id: NodeId(11),
             kind: Path(Path(
               segments: [
                 Ident(
@@ -294,7 +296,6 @@ Module(
             )),
             leading_comments: [],
             trailing_comments: [],
-            symbol_table: None,
             span: Span(
               start: LineColumn(
                 line: 7,
@@ -309,7 +310,6 @@ Module(
         )),
         leading_comments: [],
         trailing_comments: [],
-        symbol_table: None,
         span: Span(
           start: LineColumn(
             line: 4,
@@ -347,10 +347,8 @@ Module(
         ),
       ],
       trailing_comments: [],
-      symbol_table: None,
     ),
   ],
-  symbol_table: None,
   span: Span(
     start: LineColumn(
       line: 0,

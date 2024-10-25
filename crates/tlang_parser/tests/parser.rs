@@ -2,6 +2,7 @@ use pretty_assertions::assert_eq;
 
 use tlang_ast::{
     node::{self, Module},
+    node_id::NodeId,
     span::{LineColumn, Span},
     token::Literal,
 };
@@ -156,18 +157,26 @@ fn test_string_literal() {
 
     assert_eq!(
         program,
-        Module::new(vec![node::stmt!(Expr(Box::new(
-            node::expr!(Literal(Box::new(Literal::String("foo".to_string())))).with_span(
-                Span::new(
-                    LineColumn { line: 0, column: 0 },
-                    LineColumn { line: 0, column: 5 }
-                )
+        Module::new(
+            NodeId::new(1),
+            vec![node::stmt!(
+                NodeId::new(2),
+                Expr(Box::new(
+                    node::expr!(
+                        NodeId::new(3),
+                        Literal(Box::new(Literal::String("foo".to_string())))
+                    )
+                    .with_span(Span::new(
+                        LineColumn { line: 0, column: 0 },
+                        LineColumn { line: 0, column: 5 }
+                    ))
+                ))
             )
-        )))
-        .with_span(Span::new(
-            LineColumn { line: 0, column: 0 },
-            LineColumn { line: 0, column: 6 }
-        ))])
+            .with_span(Span::new(
+                LineColumn { line: 0, column: 0 },
+                LineColumn { line: 0, column: 6 }
+            ))]
+        )
     );
 }
 
@@ -177,16 +186,26 @@ fn test_char_literal() {
 
     assert_eq!(
         program,
-        Module::new(vec![node::stmt!(Expr(Box::new(
-            node::expr!(Literal(Box::new(Literal::Char("a".to_string())))).with_span(Span::new(
+        Module::new(
+            NodeId::new(1),
+            vec![node::stmt!(
+                NodeId::new(2),
+                Expr(Box::new(
+                    node::expr!(
+                        NodeId::new(3),
+                        Literal(Box::new(Literal::Char("a".to_string())))
+                    )
+                    .with_span(Span::new(
+                        LineColumn { line: 0, column: 0 },
+                        LineColumn { line: 0, column: 3 }
+                    ))
+                ))
+            )
+            .with_span(Span::new(
                 LineColumn { line: 0, column: 0 },
-                LineColumn { line: 0, column: 3 }
-            ))
-        )))
-        .with_span(Span::new(
-            LineColumn { line: 0, column: 0 },
-            LineColumn { line: 0, column: 4 }
-        ))])
+                LineColumn { line: 0, column: 4 }
+            ))]
+        )
     );
 }
 

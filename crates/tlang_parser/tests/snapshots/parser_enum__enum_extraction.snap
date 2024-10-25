@@ -3,10 +3,11 @@ source: crates/tlang_parser/tests/parser_enum.rs
 expression: "parse!\n(indoc!\n{\n    \"\n        enum Option {\n            Some(value),\n            None,\n        }\n\n        fn unwrap(Option::None) { panic(\\\"Cannot unwrap None\\\") }\n        fn unwrap(Option::Some(value)) { value }\n    \"\n})"
 ---
 Module(
+  id: NodeId(1),
   statements: [
     Stmt(
+      id: NodeId(4),
       kind: EnumDeclaration(EnumDeclaration(
-        id: SymbolId(3),
         name: Ident(
           name: "Option",
           span: Span(
@@ -22,7 +23,7 @@ Module(
         ),
         variants: [
           EnumVariant(
-            id: SymbolId(1),
+            id: NodeId(2),
             name: Ident(
               name: "Some",
               span: Span(
@@ -64,7 +65,7 @@ Module(
             ),
           ),
           EnumVariant(
-            id: SymbolId(2),
+            id: NodeId(3),
             name: Ident(
               name: "None",
               span: Span(
@@ -105,13 +106,14 @@ Module(
       ),
       leading_comments: [],
       trailing_comments: [],
-      symbol_table: None,
     ),
     Stmt(
+      id: NodeId(22),
       kind: FunctionDeclarations([
         FunctionDeclaration(
-          id: SymbolId(4),
+          id: NodeId(13),
           name: Expr(
+            id: NodeId(5),
             kind: Path(Path(
               segments: [
                 Ident(
@@ -141,7 +143,6 @@ Module(
             )),
             leading_comments: [],
             trailing_comments: [],
-            symbol_table: None,
             span: Span(
               start: LineColumn(
                 line: 5,
@@ -156,8 +157,10 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pattern(
+                id: NodeId(7),
                 kind: Enum(EnumPattern(
                   identifier: Expr(
+                    id: NodeId(6),
                     kind: Path(Path(
                       segments: [
                         Ident(
@@ -200,7 +203,6 @@ Module(
                     )),
                     leading_comments: [],
                     trailing_comments: [],
-                    symbol_table: None,
                     span: Span(
                       start: LineColumn(
                         line: 5,
@@ -244,10 +246,13 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
+            id: NodeId(12),
             statements: [],
             expression: Some(Expr(
+              id: NodeId(11),
               kind: Call(CallExpression(
                 callee: Expr(
+                  id: NodeId(9),
                   kind: Path(Path(
                     segments: [
                       Ident(
@@ -277,7 +282,6 @@ Module(
                   )),
                   leading_comments: [],
                   trailing_comments: [],
-                  symbol_table: None,
                   span: Span(
                     start: LineColumn(
                       line: 5,
@@ -291,10 +295,10 @@ Module(
                 ),
                 arguments: [
                   Expr(
+                    id: NodeId(10),
                     kind: Literal(String("Cannot unwrap None")),
                     leading_comments: [],
                     trailing_comments: [],
-                    symbol_table: None,
                     span: Span(
                       start: LineColumn(
                         line: 5,
@@ -310,7 +314,6 @@ Module(
               )),
               leading_comments: [],
               trailing_comments: [],
-              symbol_table: None,
               span: Span(
                 start: LineColumn(
                   line: 5,
@@ -332,11 +335,9 @@ Module(
                 column: 56,
               ),
             ),
-            symbol_table: None,
           ),
           leading_comments: [],
           trailing_comments: [],
-          symbol_table: None,
           span: Span(
             start: LineColumn(
               line: 5,
@@ -349,8 +350,9 @@ Module(
           ),
         ),
         FunctionDeclaration(
-          id: SymbolId(4),
+          id: NodeId(21),
           name: Expr(
+            id: NodeId(14),
             kind: Path(Path(
               segments: [
                 Ident(
@@ -380,7 +382,6 @@ Module(
             )),
             leading_comments: [],
             trailing_comments: [],
-            symbol_table: None,
             span: Span(
               start: LineColumn(
                 line: 6,
@@ -395,8 +396,10 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pattern(
+                id: NodeId(17),
                 kind: Enum(EnumPattern(
                   identifier: Expr(
+                    id: NodeId(15),
                     kind: Path(Path(
                       segments: [
                         Ident(
@@ -439,7 +442,6 @@ Module(
                     )),
                     leading_comments: [],
                     trailing_comments: [],
-                    symbol_table: None,
                     span: Span(
                       start: LineColumn(
                         line: 6,
@@ -453,19 +455,17 @@ Module(
                   ),
                   elements: [
                     Pattern(
-                      kind: Identifier(IdentifierPattern(
-                        id: SymbolId(5),
-                        name: Ident(
-                          name: "value",
-                          span: Span(
-                            start: LineColumn(
-                              line: 6,
-                              column: 24,
-                            ),
-                            end: LineColumn(
-                              line: 6,
-                              column: 29,
-                            ),
+                      id: NodeId(16),
+                      kind: Identifier(Ident(
+                        name: "value",
+                        span: Span(
+                          start: LineColumn(
+                            line: 6,
+                            column: 24,
+                          ),
+                          end: LineColumn(
+                            line: 6,
+                            column: 29,
                           ),
                         ),
                       )),
@@ -514,8 +514,10 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
+            id: NodeId(20),
             statements: [],
             expression: Some(Expr(
+              id: NodeId(19),
               kind: Path(Path(
                 segments: [
                   Ident(
@@ -545,7 +547,6 @@ Module(
               )),
               leading_comments: [],
               trailing_comments: [],
-              symbol_table: None,
               span: Span(
                 start: LineColumn(
                   line: 6,
@@ -567,11 +568,9 @@ Module(
                 column: 41,
               ),
             ),
-            symbol_table: None,
           ),
           leading_comments: [],
           trailing_comments: [],
-          symbol_table: None,
           span: Span(
             start: LineColumn(
               line: 6,
@@ -596,10 +595,8 @@ Module(
       ),
       leading_comments: [],
       trailing_comments: [],
-      symbol_table: None,
     ),
   ],
-  symbol_table: None,
   span: Span(
     start: LineColumn(
       line: 0,

@@ -301,7 +301,7 @@ impl CodegenJS {
                 if let PatternKind::Identifier(ident_pattern) = &param.pattern.kind {
                     let arg_name = arg_bindings[j].as_str();
 
-                    if arg_name == ident_pattern.name.name {
+                    if arg_name == ident_pattern.name {
                         continue;
                     }
 
@@ -310,13 +310,12 @@ impl CodegenJS {
                     // via `args` instead of normal arguments. We could probably be more precise
                     // and use actual arguments, but given that each signature could define
                     // different names, this is the easiest way to handle this for now.
-                    let name = ident_pattern.name.to_string();
-                    let name = if Some(&name) == arg_binding.as_ref() {
+                    let name = if Some(&ident_pattern.name) == arg_binding.as_ref() {
                         self.current_scope().declare_variable("args")
-                    } else if arg_bindings.contains(&name) {
-                        self.current_scope().declare_variable(&name)
+                    } else if arg_bindings.contains(&ident_pattern.name) {
+                        self.current_scope().declare_variable(&ident_pattern.name)
                     } else {
-                        name
+                        ident_pattern.name.clone()
                     };
 
                     self.push_let_declaration_to_identifier(&name, arg_name);
@@ -510,7 +509,7 @@ impl CodegenJS {
 
             // If the first param was the self param, we didn't render anything and we need to skip
             // the comma being rendered in the loop ahead.
-            if matches!(param.pattern.kind, PatternKind::_Self(_)) {
+            if matches!(param.pattern.kind, PatternKind::_Self) {
                 if let Some(param) = iter.next() {
                     self.generate_pat(&param.pattern);
                 }
