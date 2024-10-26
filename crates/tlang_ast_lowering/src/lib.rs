@@ -62,78 +62,62 @@ impl LoweringContext {
     }
 
     fn lower_expr(&mut self, node: &ast::node::Expr) -> hir::Expr {
-        match &node.kind {
+        let kind = match &node.kind {
             ast::node::ExprKind::BinaryOp(box BinaryOpExpression { op, lhs, rhs }) => {
                 let lhs = self.lower_expr(lhs);
                 let rhs = self.lower_expr(rhs);
-                self.expr(
-                    node.span,
-                    hir::ExprKind::Binary(*op, Box::new(lhs), Box::new(rhs)),
-                )
+                hir::ExprKind::Binary(*op, Box::new(lhs), Box::new(rhs))
             }
             ast::node::ExprKind::Block(box ast::node::Block {
                 id: _,
                 statements,
                 expression,
                 span,
-            }) => {
-                let kind =
-                    hir::ExprKind::Block(Box::new(self.lower_block(statements, expression, *span)));
-                self.expr(*span, kind)
-            }
+            }) => hir::ExprKind::Block(Box::new(self.lower_block(statements, expression, *span))),
             ast::node::ExprKind::Call(box CallExpression { callee, arguments }) => {
                 let callee = self.lower_expr(callee);
                 let arguments = self.lower_exprs(arguments);
-                self.expr(node.span, hir::ExprKind::Call(Box::new(callee), arguments))
+                hir::ExprKind::Call(Box::new(callee), arguments)
             }
             ast::node::ExprKind::RecursiveCall(box CallExpression { callee, arguments }) => {
                 let callee = self.lower_expr(callee);
                 let arguments = self.lower_exprs(arguments);
-                self.expr(
-                    node.span,
-                    hir::ExprKind::TailCall(Box::new(callee), arguments),
-                )
+                hir::ExprKind::TailCall(Box::new(callee), arguments)
             }
             ast::node::ExprKind::UnaryOp(op, expr) => {
                 let expr = self.lower_expr(expr);
-                self.expr(node.span, hir::ExprKind::Unary(*op, Box::new(expr)))
+                hir::ExprKind::Unary(*op, Box::new(expr))
             }
             ast::node::ExprKind::Path(path) => {
                 let path = self.lower_path(path);
-                self.expr(node.span, hir::ExprKind::Path(Box::new(path)))
+                hir::ExprKind::Path(Box::new(path))
             }
             ast::node::ExprKind::FunctionExpression(decl) => {
                 let decl = self.lower_fn_decl(decl);
-                self.expr(node.span, hir::ExprKind::FunctionExpression(Box::new(decl)))
+                hir::ExprKind::FunctionExpression(Box::new(decl))
             }
             ast::node::ExprKind::List(exprs) => {
                 let exprs = self.lower_exprs(exprs);
-                self.expr(node.span, hir::ExprKind::List(exprs))
+                hir::ExprKind::List(exprs)
             }
             ast::node::ExprKind::Dict(entries) => {
                 let entries = entries
                     .iter()
                     .map(|(key, value)| (self.lower_expr(key), self.lower_expr(value)))
                     .collect();
-                self.expr(node.span, hir::ExprKind::Dict(entries))
+                hir::ExprKind::Dict(entries)
             }
             ast::node::ExprKind::Let(pat, expr) => {
                 let pattern = self.lower_pat(pat);
                 let expression = self.lower_expr(expr);
-                self.expr(
-                    node.span,
-                    hir::ExprKind::Let(Box::new(pattern), Box::new(expression)),
-                )
+                hir::ExprKind::Let(Box::new(pattern), Box::new(expression))
             }
             ast::node::ExprKind::FieldExpression(box ast::node::FieldAccessExpression {
                 base,
                 field,
             }) => {
                 let expr = self.lower_expr(base);
-                self.expr(
-                    node.span,
-                    hir::ExprKind::FieldAccess(Box::new(expr), field.clone()),
-                )
+                hir::ExprKind::FieldAccess(Box::new(expr), field.clone())
             }
             ast::node::ExprKind::IndexExpression(box ast::node::IndexAccessExpression {
                 base,
@@ -141,10 +125,7 @@ impl LoweringContext {
             }) => {
                 let expr = self.lower_expr(base);
                 let index = self.lower_expr(index);
-                self.expr(
-                    node.span,
-                    hir::ExprKind::IndexAccess(Box::new(expr), Box::new(index)),
-                )
+                hir::ExprKind::IndexAccess(Box::new(expr), Box::new(index))
             }
             ast::node::ExprKind::IfElse(box ast::node::IfElseExpression {
                 condition,
@@ -177,17 +158,10 @@ impl LoweringContext {
                     })
                     .collect();
 
-                self.expr(
-                    node.span,
-                    hir::ExprKind::IfElse(
-                        Box::new(condition),
-                        Box::new(consequence),
-                        else_branches,
-                    ),
-                )
+                hir::ExprKind::IfElse(Box::new(condition), Box::new(consequence), else_branches)
             }
             ast::node::ExprKind::Literal(box literal) => {
-                self.expr(node.span, hir::ExprKind::Literal(Box::new(literal.clone())))
+                hir::ExprKind::Literal(Box::new(literal.clone()))
             }
             ast::node::ExprKind::Match(box ast::node::MatchExpression { expression, arms }) => {
                 let expr = self.lower_expr(expression);
@@ -199,7 +173,7 @@ impl LoweringContext {
                         expr: self.lower_expr(&arm.expression),
                     })
                     .collect();
-                self.expr(node.span, hir::ExprKind::Match(Box::new(expr), arms))
+                hir::ExprKind::Match(Box::new(expr), arms)
             }
             ast::node::ExprKind::Range(box ast::node::RangeExpression {
                 start,
@@ -208,29 +182,37 @@ impl LoweringContext {
             }) => {
                 let start = self.lower_expr(start);
                 let end = self.lower_expr(end);
-                self.expr(
-                    node.span,
-                    hir::ExprKind::Range(Box::new(hir::RangeExpression {
-                        start,
-                        end,
-                        inclusive: *inclusive,
-                    })),
-                )
+                hir::ExprKind::Range(Box::new(hir::RangeExpression {
+                    start,
+                    end,
+                    inclusive: *inclusive,
+                }))
             }
-            ast::node::ExprKind::Wildcard => self.expr(node.span, hir::ExprKind::Wildcard),
+            ast::node::ExprKind::Wildcard => hir::ExprKind::Wildcard,
             ast::node::ExprKind::None => {
                 unreachable!("ExprKind::None should not be encountered, validate AST first")
             }
+        };
+
+        hir::Expr {
+            hir_id: self.lower_node_id(node.id),
+            kind,
+            span: node.span,
         }
     }
 
     fn expr(&mut self, span: ast::span::Span, kind: hir::ExprKind) -> hir::Expr {
-        hir::Expr { kind, span }
+        hir::Expr {
+            hir_id: self.unique_id(),
+            kind,
+            span,
+        }
     }
 
     fn lower_stmt(&mut self, node: &ast::node::Stmt) -> Vec<hir::Stmt> {
         match &node.kind {
             ast::node::StmtKind::Expr(expr) => vec![hir::Stmt {
+                hir_id: self.lower_node_id(node.id),
                 kind: hir::StmtKind::Expr(Box::new(self.lower_expr(expr))),
                 span: node.span,
             }],
@@ -239,6 +221,7 @@ impl LoweringContext {
                 expression,
                 type_annotation,
             }) => vec![hir::Stmt {
+                hir_id: self.lower_node_id(node.id),
                 kind: hir::StmtKind::Let(
                     Box::new(self.lower_pat(pattern)),
                     Box::new(self.lower_expr(expression)),
@@ -250,6 +233,7 @@ impl LoweringContext {
                 let decl = self.lower_fn_decl(decl);
 
                 vec![hir::Stmt {
+                    hir_id: self.lower_node_id(node.id),
                     kind: hir::StmtKind::FunctionDeclaration(Box::new(decl)),
                     span: node.span,
                 }]
@@ -355,30 +339,32 @@ impl LoweringContext {
                         match_arms.push(hir::MatchArm { pat, guard, expr });
                     }
 
-                    let match_value = self.expr(
-                        ast::span::Span::default(),
-                        hir::ExprKind::List(
-                            argument_names
-                                .iter()
-                                .map(|ident| hir::Expr {
-                                    kind: hir::ExprKind::Path(Box::new(hir::Path {
+                    let argument_list = hir::ExprKind::List(
+                        argument_names
+                            .iter()
+                            .map(|ident| {
+                                self.expr(
+                                    node.span,
+                                    hir::ExprKind::Path(Box::new(hir::Path {
                                         segments: vec![hir::PathSegment {
                                             ident: ident.clone(),
                                         }],
                                         span: node.span,
                                     })),
-                                    span: node.span,
-                                })
-                                .collect(),
-                        ),
+                                )
+                            })
+                            .collect(),
                     );
+                    let match_value = self.expr(ast::span::Span::default(), argument_list);
 
                     hir_fn_decl.body.expr = Some(hir::Expr {
+                        hir_id: self.unique_id(),
                         kind: hir::ExprKind::Match(Box::new(match_value), match_arms),
                         span: ast::span::Span::default(),
                     });
 
                     vec![hir::Stmt {
+                        hir_id: self.lower_node_id(node.id),
                         kind: hir::StmtKind::FunctionDeclaration(Box::new(hir_fn_decl)),
                         span: node.span,
                     }]
@@ -388,6 +374,7 @@ impl LoweringContext {
                 let expr = expr.as_ref().map(|expr| self.lower_expr(expr));
 
                 vec![hir::Stmt {
+                    hir_id: self.lower_node_id(node.id),
                     kind: hir::StmtKind::Return(Box::new(expr)),
                     span: node.span,
                 }]
@@ -409,6 +396,7 @@ impl LoweringContext {
                 };
 
                 vec![hir::Stmt {
+                    hir_id: self.lower_node_id(node.id),
                     kind: hir::StmtKind::StructDeclaration(Box::new(decl)),
                     span: node.span,
                 }]
@@ -430,6 +418,7 @@ impl LoweringContext {
                 };
 
                 vec![hir::Stmt {
+                    hir_id: self.lower_node_id(node.id),
                     kind: hir::StmtKind::EnumDeclaration(Box::new(decl)),
                     span: node.span,
                 }]

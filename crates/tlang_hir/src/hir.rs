@@ -42,6 +42,7 @@ pub struct Block {
 
 #[derive(Debug, Serialize)]
 pub struct Stmt {
+    pub hir_id: HirId,
     pub kind: StmtKind,
     pub span: Span,
 }
@@ -94,6 +95,7 @@ pub struct RangeExpression {
 
 #[derive(Debug, Serialize)]
 pub struct Expr {
+    pub hir_id: HirId,
     pub kind: ExprKind,
     pub span: Span,
 }
