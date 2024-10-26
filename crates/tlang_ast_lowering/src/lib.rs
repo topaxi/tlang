@@ -1,22 +1,21 @@
 #![feature(box_patterns)]
 use tlang_ast as ast;
 use tlang_ast::node::{
-    BinaryOpExpression, CallExpression, EnumPattern, FunctionDeclaration, Ident, IdentifierPattern,
-    LetDeclaration,
+    BinaryOpExpression, CallExpression, EnumPattern, FunctionDeclaration, Ident, LetDeclaration,
 };
 use tlang_ast::token::kw;
 use tlang_hir::hir::{self, HirId};
 
 struct LoweringContext {
     unique_id: HirId,
-    symbol_id_to_hir_id: std::collections::HashMap<ast::symbols::SymbolId, HirId>,
+    node_id_to_hir_id: std::collections::HashMap<ast::node_id::NodeId, HirId>,
 }
 
 impl LoweringContext {
     pub fn new() -> Self {
         Self {
             unique_id: HirId::new(0),
-            symbol_id_to_hir_id: std::collections::HashMap::default(),
+            node_id_to_hir_id: std::collections::HashMap::default(),
         }
     }
 
@@ -26,12 +25,12 @@ impl LoweringContext {
         id
     }
 
-    fn lower_symbol_id(&mut self, id: &ast::symbols::SymbolId) -> HirId {
-        if let Some(hir_id) = self.symbol_id_to_hir_id.get(id) {
+    fn lower_node_id(&mut self, id: ast::node_id::NodeId) -> HirId {
+        if let Some(hir_id) = self.node_id_to_hir_id.get(&id) {
             *hir_id
         } else {
             let hir_id = self.unique_id();
-            self.symbol_id_to_hir_id.insert(*id, hir_id);
+            self.node_id_to_hir_id.insert(id, hir_id);
             hir_id
         }
     }
@@ -73,10 +72,10 @@ impl LoweringContext {
                 )
             }
             ast::node::ExprKind::Block(box ast::node::Block {
+                id: _,
                 statements,
                 expression,
                 span,
-                symbol_table: _,
             }) => {
                 let kind =
                     hir::ExprKind::Block(Box::new(self.lower_block(statements, expression, *span)));
@@ -308,7 +307,7 @@ impl LoweringContext {
                     // parameters, for each parameter/argument we reuse the existing plain
                     // identifier if it exists, otherwise we create a new one which will be reused
                     // in a match expression in the resulting block.
-                    let hir_id = self.lower_symbol_id(&first_declaration.id);
+                    let hir_id = self.lower_node_id(first_declaration.id);
                     let mut hir_fn_decl = hir::FunctionDeclaration::new_empty_fn(
                         hir_id,
                         self.lower_expr(&first_declaration.name),
@@ -325,7 +324,7 @@ impl LoweringContext {
                     for decl in decls {
                         // All declarations with the same amount of arguments refer to the same
                         // function now, we map this in our symbol_id_to_hir_id table.
-                        self.symbol_id_to_hir_id.insert(decl.id, hir_id);
+                        self.node_id_to_hir_id.insert(decl.id, hir_id);
 
                         // Mapping argument pattern and signature guard into a match arm
                         let pat = hir::Pat {
@@ -395,7 +394,7 @@ impl LoweringContext {
             }
             ast::node::StmtKind::StructDeclaration(decl) => {
                 let decl = hir::StructDeclaration {
-                    hir_id: self.lower_symbol_id(&decl.id),
+                    hir_id: self.lower_node_id(node.id),
                     name: decl.name.clone(),
                     fields: decl
                         .fields
@@ -416,7 +415,7 @@ impl LoweringContext {
             }
             ast::node::StmtKind::EnumDeclaration(decl) => {
                 let decl = hir::EnumDeclaration {
-                    hir_id: self.lower_symbol_id(&decl.id),
+                    hir_id: self.lower_node_id(node.id),
                     name: decl.name.clone(),
                     variants: decl
                         .variants
@@ -460,7 +459,7 @@ impl LoweringContext {
         let return_type = self.lower_ty(&decl.return_type_annotation);
 
         hir::FunctionDeclaration {
-            hir_id: self.lower_symbol_id(&decl.id),
+            hir_id: self.lower_node_id(decl.id),
             name,
             parameters,
             return_type,
@@ -496,8 +495,11 @@ impl LoweringContext {
                 kind: hir::PatKind::Literal(Box::new(literal.clone())),
                 span: node.span,
             },
-            ast::node::PatternKind::Identifier(box IdentifierPattern { id, name }) => hir::Pat {
-                kind: hir::PatKind::Identifier(self.lower_symbol_id(id), Box::new(name.clone())),
+            ast::node::PatternKind::Identifier(box ident) => hir::Pat {
+                kind: hir::PatKind::Identifier(
+                    self.lower_node_id(node.id),
+                    Box::new(ident.clone()),
+                ),
                 span: node.span,
             },
             ast::node::PatternKind::List(patterns) => hir::Pat {
@@ -529,9 +531,9 @@ impl LoweringContext {
                     span: node.span,
                 }
             }
-            ast::node::PatternKind::_Self(id) => hir::Pat {
+            ast::node::PatternKind::_Self => hir::Pat {
                 kind: hir::PatKind::Identifier(
-                    self.lower_symbol_id(id),
+                    self.lower_node_id(node.id),
                     Box::new(Ident::new(kw::_Self, node.span)),
                 ),
                 span: node.span,
