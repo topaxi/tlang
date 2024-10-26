@@ -609,7 +609,9 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "indoc",
+ "ron 0.8.1",
  "tlang_ast",
+ "tlang_ast_lowering",
  "tlang_codegen_js",
  "tlang_parser",
  "tlang_semantics",

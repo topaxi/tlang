@@ -26,6 +26,13 @@ impl LoweringContext {
     }
 
     fn lower_node_id(&mut self, id: ast::node_id::NodeId) -> HirId {
+        // TODO: We need this as we lower function declarations by creating new AST nodes and
+        //       lowering those. Instead we should either build the AST different or transform on
+        //       the HIR itself or both.
+        if id == ast::node_id::NodeId::new(0) {
+            return self.unique_id();
+        }
+
         if let Some(hir_id) = self.node_id_to_hir_id.get(&id) {
             *hir_id
         } else {
@@ -245,7 +252,7 @@ impl LoweringContext {
                 let first_declaration = decls.first().unwrap();
                 let has_variadic_arguments = decls
                     .iter()
-                    .all(|decl| decl.parameters.len() == first_declaration.parameters.len());
+                    .any(|decl| decl.parameters.len() != first_declaration.parameters.len());
 
                 if has_variadic_arguments {
                     // Group by arguments length and emit a function for each variant.
@@ -259,14 +266,12 @@ impl LoweringContext {
                     args_lengths.sort();
                     args_lengths.dedup();
 
-                    // TODO!
-                    // Currently the best way might be to create a new
-                    // ast::node::SmtKind::FunctionDeclarations split up by argument length
-                    // create a new unique name for the declarations and recurse into lower_stmt
-                    // again.
-                    // At last, we emit a wrapping function using the original name with a new
-                    // hir id which wraps and dynamically dispatches the function based on
-                    // argument length.
+                    // Currently the easiest way is to split up
+                    // ast::node::SmtKind::FunctionDeclarations by argument length and create a
+                    // new unique name for each declaration.
+                    // TODO: At last, we should  emit a wrapping function using the original name
+                    // with a new hir id which wraps and dynamically dispatches the function based
+                    // on argument length.
                     let mut grouped_decls = vec![];
 
                     for arg_len in args_lengths {
@@ -274,95 +279,37 @@ impl LoweringContext {
                             .iter()
                             .filter(|decl| decl.parameters.len() == arg_len)
                             .cloned()
+                            .map(|mut decl| {
+                                match &mut decl.name.kind {
+                                    ast::node::ExprKind::Path(path) => {
+                                        let ident = path.segments.last_mut().unwrap();
+                                        ident.name = format!("{}$${}", ident.name, arg_len);
+                                    }
+                                    ast::node::ExprKind::FieldExpression(fe) => {
+                                        let ident = &mut fe.field;
+                                        ident.name = format!("{}$${}", ident.name, arg_len);
+                                    }
+                                    _ => unreachable!(),
+                                };
+                                decl
+                            })
                             .collect::<Vec<_>>();
 
-                        let stmts = self.lower_stmt(&ast::node::Stmt {
-                            kind: ast::node::StmtKind::FunctionDeclarations(decls),
-                            span: node.span,
-                            ..Default::default()
-                        });
+                        let decl = self.lower_fn_decl_matching(&decls);
 
-                        grouped_decls.extend(stmts);
+                        grouped_decls.push(hir::Stmt {
+                            // TODO: Hope this will not mess with us in the future, we generate
+                            // more statements than initially in the AST, so we are not able to
+                            // lower the original node id here.
+                            hir_id: self.unique_id(),
+                            kind: hir::StmtKind::FunctionDeclaration(Box::new(decl)),
+                            span: node.span,
+                        });
                     }
 
                     grouped_decls
                 } else {
-                    // Create hir::FunctionDeclaration with an empty block, and fill out the
-                    // parameters, for each parameter/argument we reuse the existing plain
-                    // identifier if it exists, otherwise we create a new one which will be reused
-                    // in a match expression in the resulting block.
-                    let hir_id = self.lower_node_id(first_declaration.id);
-                    let mut hir_fn_decl = hir::FunctionDeclaration::new_empty_fn(
-                        hir_id,
-                        self.lower_expr(&first_declaration.name),
-                    );
-
-                    // TODO: As a starting point, we generate all argument names manually, later we
-                    //       might want to try to keep given names if possible.
-                    let argument_names = (0..first_declaration.parameters.len())
-                        .map(|i| Ident::new(&format!("arg{}", i), node.span))
-                        .collect::<Vec<_>>();
-
-                    let mut match_arms = Vec::with_capacity(decls.len());
-
-                    for decl in decls {
-                        // All declarations with the same amount of arguments refer to the same
-                        // function now, we map this in our symbol_id_to_hir_id table.
-                        self.node_id_to_hir_id.insert(decl.id, hir_id);
-
-                        // Mapping argument pattern and signature guard into a match arm
-                        let pat = hir::Pat {
-                            kind: hir::PatKind::List(
-                                decl.parameters
-                                    .iter()
-                                    // We lose type information of each declaration here, as we
-                                    // lower a whole FunctionParameter into a pattern. They
-                                    // should probably match for each declaration and we might want
-                                    // to verify this now or earlier in the pipeline.
-                                    // Ignored for now as types are basically a NOOP everywhere.
-                                    .map(|param| self.lower_pat(&param.pattern))
-                                    .collect(),
-                            ),
-                            span: decl.span,
-                        };
-
-                        let guard = decl.guard.as_ref().map(|expr| self.lower_expr(expr));
-
-                        let body = self.lower_block(
-                            &decl.body.statements,
-                            &decl.body.expression,
-                            decl.body.span,
-                        );
-
-                        let expr = self.expr(decl.body.span, hir::ExprKind::Block(Box::new(body)));
-
-                        match_arms.push(hir::MatchArm { pat, guard, expr });
-                    }
-
-                    let argument_list = hir::ExprKind::List(
-                        argument_names
-                            .iter()
-                            .map(|ident| {
-                                self.expr(
-                                    node.span,
-                                    hir::ExprKind::Path(Box::new(hir::Path {
-                                        segments: vec![hir::PathSegment {
-                                            ident: ident.clone(),
-                                        }],
-                                        span: node.span,
-                                    })),
-                                )
-                            })
-                            .collect(),
-                    );
-                    let match_value = self.expr(ast::span::Span::default(), argument_list);
-
-                    hir_fn_decl.body.expr = Some(hir::Expr {
-                        hir_id: self.unique_id(),
-                        kind: hir::ExprKind::Match(Box::new(match_value), match_arms),
-                        span: ast::span::Span::default(),
-                    });
-
+                    let hir_fn_decl = self.lower_fn_decl_matching(decls);
                     vec![hir::Stmt {
                         hir_id: self.lower_node_id(node.id),
                         kind: hir::StmtKind::FunctionDeclaration(Box::new(hir_fn_decl)),
@@ -409,7 +356,7 @@ impl LoweringContext {
                         .variants
                         .iter()
                         .map(|variant| hir::EnumVariant {
-                            hir_id: self.unique_id(),
+                            hir_id: self.lower_node_id(variant.id),
                             name: variant.name.clone(),
                             parameters: variant.parameters.clone(),
                             span: variant.span,
@@ -427,6 +374,95 @@ impl LoweringContext {
                 unreachable!("StmtKind::None should not be encountered, validate AST first")
             }
         }
+    }
+
+    fn lower_fn_decl_matching(
+        &mut self,
+        decls: &[FunctionDeclaration],
+    ) -> hir::FunctionDeclaration {
+        if decls.len() == 1 {
+            return self.lower_fn_decl(&decls[0]);
+        }
+
+        let mut span = decls[0].span;
+        span.end = decls.last().unwrap().span.end;
+
+        let first_declaration = decls.first().unwrap();
+
+        // Create hir::FunctionDeclaration with an empty block, and fill out the
+        // parameters, for each parameter/argument we reuse the existing plain
+        // identifier if it exists, otherwise we create a new one which will be reused
+        // in a match expression in the resulting block.
+        let hir_id = self.lower_node_id(first_declaration.id);
+        let mut hir_fn_decl = hir::FunctionDeclaration::new_empty_fn(
+            hir_id,
+            self.lower_expr(&first_declaration.name),
+        );
+
+        // TODO: As a starting point, we generate all argument names manually, later we
+        //       might want to try to keep given names if possible.
+        let argument_names = (0..first_declaration.parameters.len())
+            .map(|i| Ident::new(&format!("arg{}", i), span))
+            .collect::<Vec<_>>();
+
+        let mut match_arms = Vec::with_capacity(decls.len());
+
+        for decl in decls {
+            // All declarations with the same amount of arguments refer to the same
+            // function now, we map this in our symbol_id_to_hir_id table.
+            self.node_id_to_hir_id.insert(decl.id, hir_id);
+
+            // Mapping argument pattern and signature guard into a match arm
+            let pat = hir::Pat {
+                kind: hir::PatKind::List(
+                    decl.parameters
+                        .iter()
+                        // We lose type information of each declaration here, as we
+                        // lower a whole FunctionParameter into a pattern. They
+                        // should probably match for each declaration and we might want
+                        // to verify this now or earlier in the pipeline.
+                        // Ignored for now as types are basically a NOOP everywhere.
+                        .map(|param| self.lower_pat(&param.pattern))
+                        .collect(),
+                ),
+                span: decl.span,
+            };
+
+            let guard = decl.guard.as_ref().map(|expr| self.lower_expr(expr));
+
+            let body =
+                self.lower_block(&decl.body.statements, &decl.body.expression, decl.body.span);
+
+            let expr = self.expr(decl.body.span, hir::ExprKind::Block(Box::new(body)));
+
+            match_arms.push(hir::MatchArm { pat, guard, expr });
+        }
+
+        let argument_list = hir::ExprKind::List(
+            argument_names
+                .iter()
+                .map(|ident| {
+                    self.expr(
+                        span,
+                        hir::ExprKind::Path(Box::new(hir::Path {
+                            segments: vec![hir::PathSegment {
+                                ident: ident.clone(),
+                            }],
+                            span,
+                        })),
+                    )
+                })
+                .collect(),
+        );
+        let match_value = self.expr(ast::span::Span::default(), argument_list);
+
+        hir_fn_decl.body.expr = Some(hir::Expr {
+            hir_id: self.unique_id(),
+            kind: hir::ExprKind::Match(Box::new(match_value), match_arms),
+            span: ast::span::Span::default(),
+        });
+
+        hir_fn_decl
     }
 
     fn lower_fn_param(&mut self, node: &ast::node::FunctionParameter) -> hir::FunctionParameter {
