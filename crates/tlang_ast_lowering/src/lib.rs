@@ -6,13 +6,16 @@ use tlang_ast::node::{
 use tlang_ast::token::kw;
 use tlang_hir::hir::{self, HirId};
 
+// TODO: Add scopes and variable resolutions. There should be two kinds of bindings, one for a
+// whole block (declarations) and one for variable definitions (from definition forward).
+// See: https://github.com/rust-lang/rust/blob/de7cef75be8fab7a7e1b4d5bb01b51b4bac925c3/compiler/rustc_resolve/src/lib.rs#L408
 struct LoweringContext {
     unique_id: HirId,
     node_id_to_hir_id: std::collections::HashMap<ast::node_id::NodeId, HirId>,
 }
 
 impl LoweringContext {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             unique_id: HirId::new(0),
             node_id_to_hir_id: std::collections::HashMap::default(),
