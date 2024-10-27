@@ -26,12 +26,7 @@ impl LoweringContext {
     }
 
     fn lower_node_id(&mut self, id: ast::node_id::NodeId) -> HirId {
-        // TODO: We need this as we lower function declarations by creating new AST nodes and
-        //       lowering those. Instead we should either build the AST different or transform on
-        //       the HIR itself or both.
-        if id == ast::node_id::NodeId::new(0) {
-            return self.unique_id();
-        }
+        debug_assert!(id != ast::node_id::NodeId::new(0));
 
         if let Some(hir_id) = self.node_id_to_hir_id.get(&id) {
             *hir_id
