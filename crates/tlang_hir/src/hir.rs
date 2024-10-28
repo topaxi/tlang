@@ -27,6 +27,18 @@ pub struct PathSegment {
     pub ident: Ident,
 }
 
+impl PathSegment {
+    pub fn new(ident: Ident) -> Self {
+        PathSegment { ident }
+    }
+
+    pub fn from_str(name: &str, span: Span) -> Self {
+        PathSegment {
+            ident: Ident::new(name, span),
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct Module {
     pub block: Block,

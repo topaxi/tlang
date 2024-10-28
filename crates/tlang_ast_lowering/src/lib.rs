@@ -1,4 +1,6 @@
 #![feature(box_patterns)]
+use std::collections::HashMap;
+
 use tlang_ast as ast;
 use tlang_ast::node::{
     BinaryOpExpression, CallExpression, EnumPattern, FunctionDeclaration, Ident, LetDeclaration,
@@ -6,12 +8,51 @@ use tlang_ast::node::{
 use tlang_ast::token::kw;
 use tlang_hir::hir::{self, HirId};
 
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq)]
+enum ScopeContext {
+    #[default]
+    Block,
+    FunctionArgs,
+}
+
+#[derive(Debug)]
+struct Scope {
+    context: ScopeContext,
+    bindings: HashMap<String, String>,
+}
+
+impl Scope {
+    fn new() -> Self {
+        Self {
+            context: ScopeContext::Block,
+            bindings: HashMap::new(),
+        }
+    }
+
+    pub fn insert(&mut self, name: &str, binding: &str) {
+        self.bindings.insert(name.to_string(), binding.to_string());
+    }
+
+    pub fn lookup(&self, name: &str) -> Option<&str> {
+        self.bindings.get(name).map(|s| s.as_str())
+    }
+
+    pub fn context(&self) -> ScopeContext {
+        self.context
+    }
+
+    pub fn set_context(&mut self, context: ScopeContext) {
+        self.context = context;
+    }
+}
+
 // TODO: Add scopes and variable resolutions. There should be two kinds of bindings, one for a
 // whole block (declarations) and one for variable definitions (from definition forward).
 // See: https://github.com/rust-lang/rust/blob/de7cef75be8fab7a7e1b4d5bb01b51b4bac925c3/compiler/rustc_resolve/src/lib.rs#L408
 struct LoweringContext {
     unique_id: HirId,
     node_id_to_hir_id: std::collections::HashMap<ast::node_id::NodeId, HirId>,
+    scopes: Vec<Scope>,
 }
 
 impl LoweringContext {
@@ -19,7 +60,75 @@ impl LoweringContext {
         Self {
             unique_id: HirId::new(0),
             node_id_to_hir_id: std::collections::HashMap::default(),
+            scopes: vec![Scope::new()],
         }
+    }
+
+    #[inline(always)]
+    pub(crate) fn push_scope(&mut self) {
+        self.scopes.push(Scope::new());
+    }
+
+    #[inline(always)]
+    pub(crate) fn pop_scope(&mut self) {
+        self.scopes.pop();
+    }
+
+    #[inline(always)]
+    pub(crate) fn scope(&mut self) -> &mut Scope {
+        self.scopes.last_mut().unwrap()
+    }
+
+    pub(crate) fn create_binding(&mut self, name: &str) {
+        self.scope().insert(name, name)
+    }
+
+    #[must_use]
+    pub(crate) fn create_unique_binding(&mut self, name: &str) -> String {
+        let mut prefix: usize = 0;
+
+        if !self.has_binding(name) {
+            self.scope().insert(name, name);
+        }
+
+        let mut binding = format!("{}${}", name, prefix);
+        while self.has_binding(&binding) {
+            prefix += 1;
+            binding = format!("{}${}", name, prefix);
+        }
+
+        self.scope().insert(name, &binding);
+        binding
+    }
+
+    fn has_binding(&self, name: &str) -> bool {
+        for scope in self.scopes.iter().rev() {
+            if scope.lookup(name).is_some() {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub(crate) fn lookup<'a>(&'a self, name: &'a str) -> &'a str {
+        for scope in self.scopes.iter().rev() {
+            if let Some(binding) = scope.lookup(name) {
+                return binding;
+            }
+        }
+
+        name
+    }
+
+    pub(crate) fn with_new_scope<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        self.push_scope();
+        let result = f(self);
+        self.pop_scope();
+        result
     }
 
     fn unique_id(&mut self) -> HirId {
@@ -41,10 +150,10 @@ impl LoweringContext {
     }
 
     fn lower_module(&mut self, module: &ast::node::Module) -> hir::Module {
-        hir::Module {
-            block: self.lower_block(&module.statements, &None, module.span),
+        self.with_new_scope(|this| hir::Module {
+            block: this.lower_block(&module.statements, &None, module.span),
             span: module.span,
-        }
+        })
     }
 
     fn lower_block(
@@ -53,13 +162,15 @@ impl LoweringContext {
         expr: &Option<ast::node::Expr>,
         span: ast::span::Span,
     ) -> hir::Block {
-        let stmts = stmts
-            .iter()
-            .flat_map(|stmt| self.lower_stmt(stmt))
-            .collect();
-        let expr = expr.as_ref().map(|expr| self.lower_expr(expr));
+        self.with_new_scope(|this| {
+            let stmts = stmts
+                .iter()
+                .flat_map(|stmt| this.lower_stmt(stmt))
+                .collect();
+            let expr = expr.as_ref().map(|expr| this.lower_expr(expr));
 
-        hir::Block { stmts, expr, span }
+            hir::Block { stmts, expr, span }
+        })
     }
 
     fn lower_exprs(&mut self, exprs: &[ast::node::Expr]) -> Vec<hir::Expr> {
@@ -472,26 +583,41 @@ impl LoweringContext {
     }
 
     fn lower_fn_decl(&mut self, decl: &FunctionDeclaration) -> hir::FunctionDeclaration {
-        let name = self.lower_expr(&decl.name);
-        let parameters = decl
-            .parameters
-            .iter()
-            .map(|param| self.lower_fn_param(param))
-            .collect();
-        let body = self.lower_block(&decl.body.statements, &decl.body.expression, decl.body.span);
-        let return_type = self.lower_ty(&decl.return_type_annotation);
+        self.with_new_scope(|this| {
+            let name = this.lower_expr(&decl.name);
+            this.scope().set_context(ScopeContext::FunctionArgs);
+            let parameters = decl
+                .parameters
+                .iter()
+                .map(|param| this.lower_fn_param(param))
+                .collect();
+            this.scope().set_context(ScopeContext::Block);
+            let body =
+                this.lower_block(&decl.body.statements, &decl.body.expression, decl.body.span);
+            let return_type = this.lower_ty(&decl.return_type_annotation);
 
-        hir::FunctionDeclaration {
-            hir_id: self.lower_node_id(decl.id),
-            name,
-            parameters,
-            return_type,
-            body,
-            span: decl.span,
-        }
+            hir::FunctionDeclaration {
+                hir_id: this.lower_node_id(decl.id),
+                name,
+                parameters,
+                return_type,
+                body,
+                span: decl.span,
+            }
+        })
     }
 
     fn lower_path(&mut self, path: &ast::node::Path) -> hir::Path {
+        if path.segments.len() == 1 {
+            let segment = path.segments.first().unwrap();
+            let segment = hir::PathSegment::from_str(self.lookup(segment.as_str()), segment.span);
+
+            return hir::Path {
+                segments: vec![segment],
+                span: path.span,
+            };
+        }
+
         let segments = path
             .segments
             .iter()
@@ -518,13 +644,21 @@ impl LoweringContext {
                 kind: hir::PatKind::Literal(Box::new(literal.clone())),
                 span: node.span,
             },
-            ast::node::PatternKind::Identifier(box ident) => hir::Pat {
-                kind: hir::PatKind::Identifier(
-                    self.lower_node_id(node.id),
-                    Box::new(ident.clone()),
-                ),
-                span: node.span,
-            },
+            ast::node::PatternKind::Identifier(box ident) => {
+                // There are cases where we do not want a unique binding, for example
+                // function arguments should be fine to fully shadow the identifier.
+                let ident = if self.scope().context() != ScopeContext::FunctionArgs {
+                    Ident::new(&self.create_unique_binding(ident.as_str()), ident.span)
+                } else {
+                    self.create_binding(ident.as_str());
+                    ident.clone()
+                };
+
+                hir::Pat {
+                    kind: hir::PatKind::Identifier(self.lower_node_id(node.id), Box::new(ident)),
+                    span: node.span,
+                }
+            }
             ast::node::PatternKind::List(patterns) => hir::Pat {
                 kind: hir::PatKind::List(patterns.iter().map(|pat| self.lower_pat(pat)).collect()),
                 span: node.span,
