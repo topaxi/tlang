@@ -13,7 +13,7 @@
     "src/components/**/*"
   ],
   "dependencies": {
-    "@catppuccin/palette": "^1.4.0",
+    "@catppuccin/palette": "^1.5.0",
     "@codemirror/lang-javascript": "^6.2.2",
     "codemirror": "^6.0.1",
     "codemirror-lang-tlang": "file:../packages/codemirror-lang-tlang",
