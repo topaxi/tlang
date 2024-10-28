@@ -1,0 +1,253 @@
+---
+source: crates/tlang_parser/tests/parser.rs
+expression: "parse! (\"let x = match 1 { Foo([bar]) => bar };\")"
+---
+Module(
+  id: NodeId(1),
+  statements: [
+    Stmt(
+      id: NodeId(11),
+      kind: Let(LetDeclaration(
+        pattern: Pattern(
+          id: NodeId(2),
+          kind: Identifier(Ident(
+            name: "x",
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 4,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 5,
+              ),
+            ),
+          )),
+          leading_comments: [],
+          trailing_comments: [],
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 4,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 5,
+            ),
+          ),
+        ),
+        expression: Expr(
+          id: NodeId(10),
+          kind: Match(MatchExpression(
+            expression: Expr(
+              id: NodeId(3),
+              kind: Literal(Integer(1)),
+              leading_comments: [],
+              trailing_comments: [],
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 14,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 15,
+                ),
+              ),
+            ),
+            arms: [
+              MatchArm(
+                id: NodeId(9),
+                pattern: Pattern(
+                  id: NodeId(7),
+                  kind: Enum(EnumPattern(
+                    identifier: Expr(
+                      id: NodeId(4),
+                      kind: Path(Path(
+                        segments: [
+                          Ident(
+                            name: "Foo",
+                            span: Span(
+                              start: LineColumn(
+                                line: 0,
+                                column: 18,
+                              ),
+                              end: LineColumn(
+                                line: 0,
+                                column: 21,
+                              ),
+                            ),
+                          ),
+                        ],
+                        span: Span(
+                          start: LineColumn(
+                            line: 0,
+                            column: 18,
+                          ),
+                          end: LineColumn(
+                            line: 0,
+                            column: 21,
+                          ),
+                        ),
+                      )),
+                      leading_comments: [],
+                      trailing_comments: [],
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 18,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 21,
+                        ),
+                      ),
+                    ),
+                    elements: [
+                      Pattern(
+                        id: NodeId(6),
+                        kind: List([
+                          Pattern(
+                            id: NodeId(5),
+                            kind: Identifier(Ident(
+                              name: "bar",
+                              span: Span(
+                                start: LineColumn(
+                                  line: 0,
+                                  column: 23,
+                                ),
+                                end: LineColumn(
+                                  line: 0,
+                                  column: 26,
+                                ),
+                              ),
+                            )),
+                            leading_comments: [],
+                            trailing_comments: [],
+                            span: Span(
+                              start: LineColumn(
+                                line: 0,
+                                column: 23,
+                              ),
+                              end: LineColumn(
+                                line: 0,
+                                column: 26,
+                              ),
+                            ),
+                          ),
+                        ]),
+                        leading_comments: [],
+                        trailing_comments: [],
+                        span: Span(
+                          start: LineColumn(
+                            line: 0,
+                            column: 22,
+                          ),
+                          end: LineColumn(
+                            line: 0,
+                            column: 27,
+                          ),
+                        ),
+                      ),
+                    ],
+                    named_fields: false,
+                  )),
+                  leading_comments: [],
+                  trailing_comments: [],
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 18,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 28,
+                    ),
+                  ),
+                ),
+                guard: None,
+                expression: Expr(
+                  id: NodeId(8),
+                  kind: Path(Path(
+                    segments: [
+                      Ident(
+                        name: "bar",
+                        span: Span(
+                          start: LineColumn(
+                            line: 0,
+                            column: 32,
+                          ),
+                          end: LineColumn(
+                            line: 0,
+                            column: 35,
+                          ),
+                        ),
+                      ),
+                    ],
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 32,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 35,
+                      ),
+                    ),
+                  )),
+                  leading_comments: [],
+                  trailing_comments: [],
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 32,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 35,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          )),
+          leading_comments: [],
+          trailing_comments: [],
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 8,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 37,
+            ),
+          ),
+        ),
+        type_annotation: None,
+      )),
+      span: Span(
+        start: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end: LineColumn(
+          line: 0,
+          column: 38,
+        ),
+      ),
+      leading_comments: [],
+      trailing_comments: [],
+    ),
+  ],
+  span: Span(
+    start: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+  ),
+)

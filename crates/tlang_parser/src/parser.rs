@@ -1169,8 +1169,7 @@ impl<'src> Parser<'src> {
         .with_span(span)
     }
 
-    /// Parses an enum extraction, e.g. `Foo(bar, baz)` and `Foo { bar, baz }` within
-    /// a function declarations parameter list.
+    /// Parses an enum extraction, e.g. `Foo(bar, baz)` and `Foo { bar, baz }`
     fn parse_enum_extraction(&mut self) -> Pattern {
         let identifier = self.parse_path_expression();
         let is_dict_extraction = matches!(self.current_token_kind(), Some(TokenKind::LBrace));
@@ -1179,6 +1178,8 @@ impl<'src> Parser<'src> {
             self.consume_token(TokenKind::LBrace);
             let mut elements = Vec::new();
             while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
+                // TODO: This currently only supports Foo { bar }, but we'd like to also support
+                //       subpatterns here Foo { bar: [firstbar, ...restbar] }.
                 elements.push(self.parse_identifier_pattern());
                 if let Some(TokenKind::Comma) = self.current_token_kind() {
                     self.advance();
@@ -1197,7 +1198,7 @@ impl<'src> Parser<'src> {
             self.consume_token(TokenKind::LParen);
             let mut elements = Vec::new();
             while !matches!(self.current_token_kind(), Some(TokenKind::RParen)) {
-                elements.push(self.parse_identifier_pattern());
+                elements.push(self.parse_pattern());
                 if let Some(TokenKind::Comma) = self.current_token_kind() {
                     self.advance();
                 }

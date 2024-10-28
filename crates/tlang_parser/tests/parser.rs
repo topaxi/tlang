@@ -130,6 +130,11 @@ fn test_pattern_matching_with_guard() {
 }
 
 #[test]
+fn test_pattern_matching_enum() {
+    assert_parser_snapshot!("let x = match 1 { Foo([bar]) => bar };");
+}
+
+#[test]
 fn test_list_literal() {
     assert_parser_snapshot!("let x = [];");
     assert_parser_snapshot!("let x = [1, 2, 3];");
