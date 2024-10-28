@@ -49,13 +49,13 @@ impl PathSegment {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Default, Serialize)]
 pub struct Module {
     pub block: Block,
     pub span: Span,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Default, Serialize)]
 pub struct Block {
     pub stmts: Vec<Stmt>,
     pub expr: Option<Expr>,

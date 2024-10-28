@@ -182,7 +182,8 @@ fn compile(source: &str) -> Result<String, ParserError> {
     match semantic_analyzer.analyze(&ast) {
         Ok(()) => {
             let mut generator = CodegenJS::default();
-            generator.generate_code(&ast);
+            let hir = lower_to_hir(&ast);
+            generator.generate_code(&hir);
             Ok(generator.get_output().to_string())
         }
         Err(diagnostics) => Err(diagnostics.into()),

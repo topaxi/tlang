@@ -207,10 +207,9 @@ impl CodegenJS {
     fn generate_function_parameter(&mut self, pattern: &hir::Pat) {
         match &pattern.kind {
             // Do not run generate_identifier, as that would resolve the parameter as a variable.
-            hir::PatKind::Identifier(ident_pattern) => {
-                self.current_scope()
-                    .declare_variable(ident_pattern.name.as_str());
-                self.push_str(ident_pattern.name.as_str());
+            hir::PatKind::Identifier(_, ident) => {
+                self.current_scope().declare_variable(ident.as_str());
+                self.push_str(ident.as_str());
             }
             hir::PatKind::Literal(_) => self.generate_pat(pattern),
             hir::PatKind::List(_) => todo!(),
@@ -271,9 +270,9 @@ impl CodegenJS {
         // We do not render a return statement if we are in a tail recursive function body.
         // Which calls the current function recursively.
         if expr.is_some() {
-            if let hir::ExprKind::TailCall(callee, ..) = &expr.as_ref().unwrap().kind {
-                let call_identifier = if let hir::ExprKind::Path(_) = callee.kind {
-                    Some(fn_identifier_to_string(&callee))
+            if let hir::ExprKind::TailCall(call_expr) = &expr.as_ref().unwrap().kind {
+                let call_identifier = if let hir::ExprKind::Path(_) = &call_expr.callee.kind {
+                    Some(fn_identifier_to_string(&call_expr.callee))
                 } else {
                     None
                 };
@@ -398,14 +397,18 @@ fn is_function_body_tail_recursive(function_name: &str, node: &hir::Expr) -> boo
             false
         }
         hir::ExprKind::Block(block) => is_function_body_tail_recursive_block(function_name, block),
-        hir::ExprKind::Match(expr) => {
-            is_function_body_tail_recursive(function_name, &expr.expression)
-        }
-        hir::ExprKind::IfElse(expr) => {
-            is_function_body_tail_recursive(function_name, &expr.condition)
-                || is_function_body_tail_recursive(function_name, &expr.then_branch)
-                || expr.else_branches.iter().any(|else_clause| {
-                    is_function_body_tail_recursive(function_name, &else_clause.consequence)
+        hir::ExprKind::Match(expr, ..) => is_function_body_tail_recursive(function_name, expr),
+        hir::ExprKind::IfElse(expr, then_branch, else_branches) => {
+            is_function_body_tail_recursive(function_name, expr)
+                || is_function_body_tail_recursive(
+                    function_name,
+                    then_branch.expr.as_ref().unwrap(),
+                )
+                || else_branches.iter().any(|else_clause| {
+                    is_function_body_tail_recursive(
+                        function_name,
+                        else_clause.consequence.expr.as_ref().unwrap(),
+                    )
                 })
         }
         _ => false,
@@ -413,7 +416,7 @@ fn is_function_body_tail_recursive(function_name: &str, node: &hir::Expr) -> boo
 }
 
 fn is_member_method(node: &hir::Expr) -> bool {
-    matches!(&node.kind, hir::ExprKind::FieldExpression(_))
+    matches!(&node.kind, hir::ExprKind::FieldAccess(..))
 }
 
 fn is_static_method(node: &hir::Expr) -> bool {
@@ -427,7 +430,7 @@ fn is_static_method(node: &hir::Expr) -> bool {
 pub(crate) fn fn_identifier_to_string(expr: &hir::Expr) -> String {
     match &expr.kind {
         hir::ExprKind::Path(path) => path.join("__"),
-        hir::ExprKind::FieldExpression(expr) => expr.field.to_string(),
+        hir::ExprKind::FieldAccess(_base, field) => field.to_string(),
         kind => todo!("fn_identifier_to_string: {:?}", kind),
     }
 }

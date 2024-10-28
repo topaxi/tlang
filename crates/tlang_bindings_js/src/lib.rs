@@ -1,8 +1,9 @@
 extern crate console_error_panic_hook;
 
 use gloo_utils::format::JsValueSerdeExt;
-use tlang_ast::node::Module;
+use tlang_ast::node::{self as ast};
 use tlang_codegen_js::generator::CodegenJS;
+use tlang_hir::hir;
 use tlang_parser::{error::ParseError, parser::Parser};
 use tlang_semantics::{diagnostic::Diagnostic, SemanticAnalyzer};
 use wasm_bindgen::prelude::*;
@@ -19,7 +20,8 @@ pub struct TlangCompiler {
     source: String,
     codegen: CodegenJS,
     analyzer: SemanticAnalyzer,
-    ast: Module,
+    ast: ast::Module,
+    hir: hir::Module,
 
     diagnostics: Vec<Diagnostic>,
     parse_errors: Vec<ParseError>,
@@ -35,7 +37,8 @@ impl TlangCompiler {
             source: source.to_string(),
             codegen: CodegenJS::default(),
             analyzer: SemanticAnalyzer::default(),
-            ast: Module::default(),
+            ast: ast::Module::default(),
+            hir: hir::Module::default(),
             diagnostics: Vec::new(),
             parse_errors: Vec::new(),
         }
@@ -57,11 +60,16 @@ impl TlangCompiler {
             .clone_into(&mut self.diagnostics);
     }
 
+    fn lower_to_hir(&mut self) {
+        self.hir = tlang_ast_lowering::lower_to_hir(&self.ast);
+    }
+
     #[wasm_bindgen]
     pub fn compile(&mut self) {
         self.parse();
         self.analyze();
-        self.codegen.generate_code(&self.ast);
+        self.lower_to_hir();
+        self.codegen.generate_code(&self.hir);
     }
 
     #[wasm_bindgen(getter)]
