@@ -1,7 +1,7 @@
 use serde::Serialize;
 use tlang_ast::node::{BinaryOpKind, Ident, UnaryOp};
 use tlang_ast::span::Span;
-use tlang_ast::token::Literal;
+use tlang_ast::token::{Literal, Token};
 
 #[derive(Debug, PartialEq, Clone, Copy, Serialize)]
 pub struct HirId(usize);
@@ -20,6 +20,16 @@ impl HirId {
 pub struct Path {
     pub segments: Vec<PathSegment>,
     pub span: Span,
+}
+
+impl Path {
+    pub fn join(&self, separator: &str) -> String {
+        self.segments
+            .iter()
+            .map(|segment| segment.ident.as_str())
+            .collect::<Vec<_>>()
+            .join(separator)
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -52,11 +62,21 @@ pub struct Block {
     pub span: Span,
 }
 
+impl Block {
+    pub fn has_completion(&self) -> bool {
+        self.expr.is_some()
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct Stmt {
     pub hir_id: HirId,
     pub kind: StmtKind,
     pub span: Span,
+    // TODO: We might want to handle this somehow different, as we pass them on from the AST to
+    //       HIR, which feels somewhat unnecessary.
+    pub leading_comments: Vec<Token>,
+    pub trailing_comments: Vec<Token>,
 }
 
 #[derive(Debug, Serialize)]
@@ -73,6 +93,19 @@ pub enum StmtKind {
 pub struct Pat {
     pub kind: PatKind,
     pub span: Span,
+}
+
+impl Pat {
+    pub fn is_self(&self) -> bool {
+        match self.kind {
+            PatKind::Identifier(_, ref ident) => ident.name == "self",
+            _ => false,
+        }
+    }
+
+    pub fn is_wildcard(&self) -> bool {
+        matches!(self.kind, PatKind::Wildcard)
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -106,18 +139,42 @@ pub struct RangeExpression {
 }
 
 #[derive(Debug, Serialize)]
+pub struct CallExpression {
+    pub callee: Expr,
+    pub arguments: Vec<Expr>,
+}
+
+impl CallExpression {
+    pub fn has_wildcard(&self) -> bool {
+        self.arguments.iter().any(|arg| arg.is_wildcard())
+    }
+
+    pub fn wildcard_count(&self) -> usize {
+        self.arguments
+            .iter()
+            .filter(|arg| arg.is_wildcard())
+            .count()
+    }
+}
+
+#[derive(Debug, Serialize)]
 pub struct Expr {
     pub hir_id: HirId,
     pub kind: ExprKind,
     pub span: Span,
 }
 
+impl Expr {
+    pub fn is_wildcard(&self) -> bool {
+        matches!(self.kind, ExprKind::Wildcard)
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub enum ExprKind {
     Block(Box<Block>),
-    Call(Box<Expr>, Vec<Expr>),
-    TailCall(Box<Expr>, Vec<Expr>),
-    MethodCall(PathSegment, Box<Expr>, Vec<Expr>),
+    Call(Box<CallExpression>),
+    TailCall(Box<CallExpression>),
     Binary(BinaryOpKind, Box<Expr>, Box<Expr>),
     Unary(UnaryOp, Box<Expr>),
     // Let expression, only valid within if conditions and guards
@@ -210,5 +267,7 @@ pub struct EnumVariant {
     pub hir_id: HirId,
     pub name: Ident,
     pub parameters: Vec<Ident>,
+    // TODO: Do we want/need this in the HIR?
+    pub named_fields: bool,
     pub span: Span,
 }

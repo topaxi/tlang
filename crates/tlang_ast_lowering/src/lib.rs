@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use tlang_ast as ast;
 use tlang_ast::node::{
-    BinaryOpExpression, CallExpression, EnumPattern, FunctionDeclaration, Ident, LetDeclaration,
+    BinaryOpExpression, EnumPattern, FunctionDeclaration, Ident, LetDeclaration,
 };
 use tlang_ast::token::kw;
 use tlang_hir::hir::{self, HirId};
@@ -186,15 +186,18 @@ impl LoweringContext {
                 expression,
                 span,
             }) => hir::ExprKind::Block(Box::new(self.lower_block(statements, expression, *span))),
-            ast::node::ExprKind::Call(box CallExpression { callee, arguments }) => {
+            ast::node::ExprKind::Call(box ast::node::CallExpression { callee, arguments }) => {
                 let callee = self.lower_expr(callee);
                 let arguments = self.lower_exprs(arguments);
-                hir::ExprKind::Call(Box::new(callee), arguments)
+                hir::ExprKind::Call(Box::new(hir::CallExpression { callee, arguments }))
             }
-            ast::node::ExprKind::RecursiveCall(box CallExpression { callee, arguments }) => {
+            ast::node::ExprKind::RecursiveCall(box ast::node::CallExpression {
+                callee,
+                arguments,
+            }) => {
                 let callee = self.lower_expr(callee);
                 let arguments = self.lower_exprs(arguments);
-                hir::ExprKind::TailCall(Box::new(callee), arguments)
+                hir::ExprKind::TailCall(Box::new(hir::CallExpression { callee, arguments }))
             }
             ast::node::ExprKind::UnaryOp(op, expr) => {
                 let expr = self.lower_expr(expr);
@@ -327,6 +330,8 @@ impl LoweringContext {
                 hir_id: self.lower_node_id(node.id),
                 kind: hir::StmtKind::Expr(Box::new(self.lower_expr(expr))),
                 span: node.span,
+                leading_comments: node.leading_comments.clone(),
+                trailing_comments: node.trailing_comments.clone(),
             }],
             ast::node::StmtKind::Let(box LetDeclaration {
                 pattern,
@@ -340,6 +345,8 @@ impl LoweringContext {
                     Box::new(self.lower_ty(type_annotation)),
                 ),
                 span: node.span,
+                leading_comments: node.leading_comments.clone(),
+                trailing_comments: node.trailing_comments.clone(),
             }],
             ast::node::StmtKind::FunctionDeclaration(box decl) => {
                 let decl = self.lower_fn_decl(decl);
@@ -348,6 +355,8 @@ impl LoweringContext {
                     hir_id: self.lower_node_id(node.id),
                     kind: hir::StmtKind::FunctionDeclaration(Box::new(decl)),
                     span: node.span,
+                    leading_comments: node.leading_comments.clone(),
+                    trailing_comments: node.trailing_comments.clone(),
                 }]
             }
             // For multiple function declarations with the same name (which is already grouped
@@ -409,6 +418,8 @@ impl LoweringContext {
                             hir_id: self.unique_id(),
                             kind: hir::StmtKind::FunctionDeclaration(Box::new(decl)),
                             span: node.span,
+                            leading_comments: node.leading_comments.clone(),
+                            trailing_comments: node.trailing_comments.clone(),
                         });
                     }
 
@@ -419,6 +430,8 @@ impl LoweringContext {
                         hir_id: self.lower_node_id(node.id),
                         kind: hir::StmtKind::FunctionDeclaration(Box::new(hir_fn_decl)),
                         span: node.span,
+                        leading_comments: node.leading_comments.clone(),
+                        trailing_comments: node.trailing_comments.clone(),
                     }]
                 }
             }
@@ -429,6 +442,8 @@ impl LoweringContext {
                     hir_id: self.lower_node_id(node.id),
                     kind: hir::StmtKind::Return(Box::new(expr)),
                     span: node.span,
+                    leading_comments: node.leading_comments.clone(),
+                    trailing_comments: node.trailing_comments.clone(),
                 }]
             }
             ast::node::StmtKind::StructDeclaration(decl) => {
@@ -451,6 +466,8 @@ impl LoweringContext {
                     hir_id: self.lower_node_id(node.id),
                     kind: hir::StmtKind::StructDeclaration(Box::new(decl)),
                     span: node.span,
+                    leading_comments: node.leading_comments.clone(),
+                    trailing_comments: node.trailing_comments.clone(),
                 }]
             }
             ast::node::StmtKind::EnumDeclaration(decl) => {
@@ -464,6 +481,7 @@ impl LoweringContext {
                             hir_id: self.lower_node_id(variant.id),
                             name: variant.name.clone(),
                             parameters: variant.parameters.clone(),
+                            named_fields: variant.named_fields,
                             span: variant.span,
                         })
                         .collect::<Vec<_>>(),
@@ -473,6 +491,8 @@ impl LoweringContext {
                     hir_id: self.lower_node_id(node.id),
                     kind: hir::StmtKind::EnumDeclaration(Box::new(decl)),
                     span: node.span,
+                    leading_comments: node.leading_comments.clone(),
+                    trailing_comments: node.trailing_comments.clone(),
                 }]
             }
             ast::node::StmtKind::None => {

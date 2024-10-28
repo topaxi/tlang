@@ -626,6 +626,8 @@ dependencies = [
  "indoc",
  "pretty_assertions",
  "tlang_ast",
+ "tlang_ast_lowering",
+ "tlang_hir",
  "tlang_parser",
  "tlang_semantics",
 ]

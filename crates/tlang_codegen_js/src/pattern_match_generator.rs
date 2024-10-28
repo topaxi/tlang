@@ -1,19 +1,19 @@
 use std::collections::HashSet;
 
-use tlang_ast::node as ast;
+use tlang_hir::hir;
 
 use crate::generator::{BlockContext, CodegenJS};
 
-fn match_args_have_completions(arms: &[ast::MatchArm]) -> bool {
-    arms.iter().any(|arm| match &arm.expression.kind {
-        ast::ExprKind::Block(block) => block.has_completion(),
+fn match_args_have_completions(arms: &[hir::MatchArm]) -> bool {
+    arms.iter().any(|arm| match &arm.expr.kind {
+        hir::ExprKind::Block(block) => block.has_completion(),
         _ => true,
     })
 }
 
 impl CodegenJS {
-    fn generate_match_arm_expression(&mut self, expression: &ast::Expr) {
-        if let ast::ExprKind::Block(_) = &expression.kind {
+    fn generate_match_arm_expression(&mut self, expression: &hir::Expr) {
+        if let hir::ExprKind::Block(_) = &expression.kind {
             self.generate_expr(expression, None);
         } else {
             self.push_indent();
@@ -24,35 +24,34 @@ impl CodegenJS {
         }
     }
 
-    fn get_pat_identifiers(pattern: &ast::Pattern) -> Vec<String> {
+    fn get_pat_identifiers(pattern: &hir::Pat) -> Vec<String> {
         match &pattern.kind {
-            ast::PatternKind::Identifier(ident_pattern) => {
+            hir::PatKind::Identifier(_, ident_pattern) => {
                 vec![ident_pattern.name.to_string()]
             }
-            ast::PatternKind::_Self => vec!["this".to_string()],
-            ast::PatternKind::Enum(enum_pattern) => {
-                let mut bindings = Vec::new();
-                for pattern in &enum_pattern.elements {
-                    bindings.extend(Self::get_pat_identifiers(pattern));
-                }
-                bindings
-            }
-            ast::PatternKind::Literal(_) => Vec::new(),
-            ast::PatternKind::List(patterns) => {
+            hir::PatKind::Enum(_path, patterns) => {
                 let mut bindings = Vec::new();
                 for pattern in patterns {
                     bindings.extend(Self::get_pat_identifiers(pattern));
                 }
                 bindings
             }
-            ast::PatternKind::Rest(pattern) => Self::get_pat_identifiers(pattern),
-            ast::PatternKind::Wildcard | ast::PatternKind::None => Vec::new(),
+            hir::PatKind::Literal(_) => Vec::new(),
+            hir::PatKind::List(patterns) => {
+                let mut bindings = Vec::new();
+                for pattern in patterns {
+                    bindings.extend(Self::get_pat_identifiers(pattern));
+                }
+                bindings
+            }
+            hir::PatKind::Rest(pattern) => Self::get_pat_identifiers(pattern),
+            hir::PatKind::Wildcard => Vec::new(),
         }
     }
 
-    fn generate_pat_condition(&mut self, pat: &ast::Pattern, parent_js_expr: &str) {
+    fn generate_pat_condition(&mut self, pat: &hir::Pat, parent_js_expr: &str) {
         match &pat.kind {
-            ast::PatternKind::Identifier(ident_pattern) => {
+            hir::PatKind::Identifier(_, ident_pattern) => {
                 let binding_name = self
                     .current_scope()
                     .resolve_variable(ident_pattern.as_str())
@@ -60,40 +59,29 @@ impl CodegenJS {
 
                 self.push_str(&format!("({} = {}, true)", binding_name, parent_js_expr));
             }
-            ast::PatternKind::_Self => todo!("Implement self pattern."),
-            ast::PatternKind::Enum(enum_pattern) => {
-                let enum_variant_name = enum_pattern.path.segments.last().unwrap();
+            hir::PatKind::Enum(path, patterns) => {
+                let enum_variant_name = path.segments.last().unwrap();
 
                 self.push_str(&format!(
                     "{}.tag === \"{}\"",
-                    parent_js_expr, enum_variant_name
+                    parent_js_expr,
+                    enum_variant_name.ident.as_str()
                 ));
 
-                if enum_pattern.named_fields {
-                    for _pattern in enum_pattern.elements.iter() {
-                        self.push_str(" && ");
+                for (i, pattern) in patterns.iter().enumerate() {
+                    self.push_str(" && ");
 
-                        todo!("Instead of named fields, we should probably have a key value kinda thing here.");
-                        //let parent_js_expr = format!("{}.{}", parent_js_expr);
+                    let parent_js_expr = format!("{}[{i}]", parent_js_expr);
 
-                        //self.generate_pat_condition(pattern, &parent_js_expr);
-                    }
-                } else {
-                    for (i, pattern) in enum_pattern.elements.iter().enumerate() {
-                        self.push_str(" && ");
-
-                        let parent_js_expr = format!("{}[{i}]", parent_js_expr);
-
-                        self.generate_pat_condition(pattern, &parent_js_expr);
-                    }
+                    self.generate_pat_condition(pattern, &parent_js_expr);
                 }
             }
-            ast::PatternKind::Literal(literal) => {
+            hir::PatKind::Literal(literal) => {
                 self.push_str(parent_js_expr);
                 self.push_str(" === ");
                 self.generate_literal(literal)
             }
-            ast::PatternKind::List(patterns) => {
+            hir::PatKind::List(patterns) => {
                 if patterns.is_empty() {
                     self.push_str(parent_js_expr);
                     self.push_str(".length === 0");
@@ -103,7 +91,7 @@ impl CodegenJS {
                     self.push_str(
                         &patterns
                             .iter()
-                            .filter(|pat| !matches!(pat.kind, ast::PatternKind::Rest(_)))
+                            .filter(|pat| !matches!(pat.kind, hir::PatKind::Rest(_)))
                             .count()
                             .to_string(),
                     );
@@ -112,7 +100,7 @@ impl CodegenJS {
                         self.push_str(" && ");
                         // This feels awkward, could this be handled when we match the Rest pattern
                         // below?
-                        let parent_js_expr = if matches!(pattern.kind, ast::PatternKind::Rest(_)) {
+                        let parent_js_expr = if matches!(pattern.kind, hir::PatKind::Rest(_)) {
                             format!("{}.slice({})", parent_js_expr, i)
                         } else {
                             format!("{}[{}]", parent_js_expr, i)
@@ -121,38 +109,38 @@ impl CodegenJS {
                     }
                 }
             }
-            ast::PatternKind::Rest(pattern) => {
+            hir::PatKind::Rest(pattern) => {
                 self.generate_pat_condition(pattern, parent_js_expr);
             }
-            ast::PatternKind::Wildcard | ast::PatternKind::None => {}
+            hir::PatKind::Wildcard => {}
         }
     }
 
-    pub(crate) fn generate_match_expression(&mut self, match_expr: &ast::MatchExpression) {
+    pub(crate) fn generate_match_expression(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) {
         // TODO: A lot here is copied from the if statement generator.
         let lhs = self.replace_statement_buffer(String::new());
-        let has_block_completions = match_args_have_completions(&match_expr.arms);
+        let has_block_completions = match_args_have_completions(&arms);
         let match_value_tmp_var = self.current_scope().declare_tmp_variable();
-        self.push_let_declaration_to_expr(&match_value_tmp_var, &match_expr.expression);
+        self.push_let_declaration_to_expr(&match_value_tmp_var, &expr);
 
         let mut unique = HashSet::new();
         // There's optimization opportunities in case the match expression is a
         // list of identifiers, then we can just alias the identifiers within the arms. This
         // case should be pretty common in function overloads.
-        let all_pat_identifiers = match_expr.arms.iter().flat_map(|arm| {
+        let all_pat_identifiers = arms.iter().flat_map(|arm| {
             let mut idents = vec![];
-            idents.extend(Self::get_pat_identifiers(&arm.pattern));
+            idents.extend(Self::get_pat_identifiers(&arm.pat));
             if let Some(guard) = &arm.guard {
-                if let ast::ExprKind::Let(pat, _) = &guard.kind {
+                if let hir::ExprKind::Let(pat, _) = &guard.kind {
                     idents.extend(Self::get_pat_identifiers(pat));
                 }
             }
             idents
         });
 
-        let has_let_guard = match_expr.arms.iter().any(|arm| {
+        let has_let_guard = arms.iter().any(|arm| {
             if let Some(guard) = &arm.guard {
-                if let ast::ExprKind::Let(..) = &guard.kind {
+                if let hir::ExprKind::Let(..) = &guard.kind {
                     return true;
                 }
             }
@@ -187,30 +175,21 @@ impl CodegenJS {
 
         self.push_char(';');
 
-        for (
-            i,
-            ast::MatchArm {
-                id: _,
-                pattern,
-                guard,
-                expression,
-            },
-        ) in match_expr.arms.iter().enumerate()
-        {
-            if !pattern.is_wildcard() {
+        for (i, hir::MatchArm { pat, guard, expr }) in arms.iter().enumerate() {
+            if !pat.is_wildcard() {
                 self.push_str("if (");
-                self.generate_pat_condition(pattern, &match_value_tmp_var);
+                self.generate_pat_condition(pat, &match_value_tmp_var);
                 if let Some(guard) = guard {
                     self.generate_match_arm_guard(guard, &let_guard_var);
                 }
                 self.push_str(") {\n");
                 self.inc_indent();
                 self.push_context(BlockContext::Expression);
-                self.generate_match_arm_expression(expression);
+                self.generate_match_arm_expression(expr);
                 self.pop_context();
                 self.dec_indent();
                 self.push_indent();
-                if i == match_expr.arms.len() - 1 {
+                if i == arms.len() - 1 {
                     self.push_char('}');
                 } else {
                     self.push_str("} else ");
@@ -219,7 +198,7 @@ impl CodegenJS {
                 self.push_str("{\n");
                 self.inc_indent();
                 self.push_context(BlockContext::Expression);
-                self.generate_match_arm_expression(expression);
+                self.generate_match_arm_expression(expr);
                 self.pop_context();
                 self.dec_indent();
                 self.push_indent();
@@ -247,11 +226,11 @@ impl CodegenJS {
         self.pop_completion_variable();
     }
 
-    fn generate_match_arm_guard(&mut self, guard: &ast::Expr, let_guard_var: &str) {
+    fn generate_match_arm_guard(&mut self, guard: &hir::Expr, let_guard_var: &str) {
         self.push_str(" && ");
         // If the guard is a let expression, we special case this here, normal if let expressions
         // are handled in the lowering process and will be transformed to a match expression.
-        if let ast::ExprKind::Let(pat, expr) = &guard.kind {
+        if let hir::ExprKind::Let(pat, expr) = &guard.kind {
             self.push_char('(');
             self.push_str(let_guard_var);
             self.push_str(" = ");
