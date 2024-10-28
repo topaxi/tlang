@@ -15,16 +15,16 @@ enum ScopeContext {
     FunctionArgs,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct Scope {
     context: ScopeContext,
     bindings: HashMap<String, String>,
 }
 
 impl Scope {
-    fn new() -> Self {
+    fn new(context: ScopeContext) -> Self {
         Self {
-            context: ScopeContext::Block,
+            context,
             bindings: HashMap::new(),
         }
     }
@@ -39,10 +39,6 @@ impl Scope {
 
     pub fn context(&self) -> ScopeContext {
         self.context
-    }
-
-    pub fn set_context(&mut self, context: ScopeContext) {
-        self.context = context;
     }
 }
 
@@ -60,13 +56,13 @@ impl LoweringContext {
         Self {
             unique_id: HirId::new(0),
             node_id_to_hir_id: std::collections::HashMap::default(),
-            scopes: vec![Scope::new()],
+            scopes: vec![Scope::default()],
         }
     }
 
     #[inline(always)]
-    pub(crate) fn push_scope(&mut self) {
-        self.scopes.push(Scope::new());
+    pub(crate) fn push_scope(&mut self, context: ScopeContext) {
+        self.scopes.push(Scope::new(context));
     }
 
     #[inline(always)]
@@ -121,11 +117,11 @@ impl LoweringContext {
         name
     }
 
-    pub(crate) fn with_new_scope<F, R>(&mut self, f: F) -> R
+    pub(crate) fn with_new_scope<F, R>(&mut self, context: ScopeContext, f: F) -> R
     where
         F: FnOnce(&mut Self) -> R,
     {
-        self.push_scope();
+        self.push_scope(context);
         let result = f(self);
         self.pop_scope();
         result
@@ -150,7 +146,7 @@ impl LoweringContext {
     }
 
     fn lower_module(&mut self, module: &ast::node::Module) -> hir::Module {
-        self.with_new_scope(|this| hir::Module {
+        self.with_new_scope(ScopeContext::Block, |this| hir::Module {
             block: this.lower_block(&module.statements, &None, module.span),
             span: module.span,
         })
@@ -162,7 +158,7 @@ impl LoweringContext {
         expr: &Option<ast::node::Expr>,
         span: ast::span::Span,
     ) -> hir::Block {
-        self.with_new_scope(|this| {
+        self.with_new_scope(ScopeContext::Block, |this| {
             let stmts = stmts
                 .iter()
                 .flat_map(|stmt| this.lower_stmt(stmt))
@@ -583,15 +579,13 @@ impl LoweringContext {
     }
 
     fn lower_fn_decl(&mut self, decl: &FunctionDeclaration) -> hir::FunctionDeclaration {
-        self.with_new_scope(|this| {
+        self.with_new_scope(ScopeContext::FunctionArgs, |this| {
             let name = this.lower_expr(&decl.name);
-            this.scope().set_context(ScopeContext::FunctionArgs);
             let parameters = decl
                 .parameters
                 .iter()
                 .map(|param| this.lower_fn_param(param))
                 .collect();
-            this.scope().set_context(ScopeContext::Block);
             let body =
                 this.lower_block(&decl.body.statements, &decl.body.expression, decl.body.span);
             let return_type = this.lower_ty(&decl.return_type_annotation);
