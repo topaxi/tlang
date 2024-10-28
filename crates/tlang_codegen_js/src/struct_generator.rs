@@ -1,4 +1,4 @@
-use tlang_ast::node::{Ident, StructDeclaration, Ty};
+use tlang_ast::node::{self as ast, Ident};
 
 use crate::generator::CodegenJS;
 
@@ -8,7 +8,7 @@ impl CodegenJS {
     /// For simplicities sake, we will generate a constructor function for the struct
     /// as we would have to track the type of variables/paths to know whether we should
     /// generate a create struct call (using `new`) or normal function call.
-    pub(crate) fn generate_struct_declaration(&mut self, decl: &StructDeclaration) {
+    pub(crate) fn generate_struct_declaration(&mut self, decl: &ast::StructDeclaration) {
         self.push_indent();
         self.push_str("function ");
         self.push_str(decl.name.as_str());
@@ -57,7 +57,7 @@ impl CodegenJS {
         self.dec_indent();
     }
 
-    fn generate_struct_field(&mut self, field_name: &Ident, _field_type: &Ty) {
+    fn generate_struct_field(&mut self, field_name: &Ident, _field_type: &ast::Ty) {
         self.push_indent();
         self.push_str("this.");
         self.push_str(field_name.as_str());

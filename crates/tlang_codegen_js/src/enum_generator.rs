@@ -1,9 +1,9 @@
-use tlang_ast::node::{EnumDeclaration, Ident};
+use tlang_ast::node::{self as ast, Ident};
 
 use crate::generator::CodegenJS;
 
 impl CodegenJS {
-    pub(crate) fn generate_enum_declaration(&mut self, decl: &EnumDeclaration) {
+    pub(crate) fn generate_enum_declaration(&mut self, decl: &ast::EnumDeclaration) {
         self.push_indent();
         self.push_str(&format!("const {} = {{\n", decl.name));
         self.inc_indent();

@@ -1,17 +1,17 @@
-use tlang_ast::node::{Expr, ExprKind, MatchArm, MatchExpression};
+use tlang_ast::node as ast;
 
 use crate::generator::{BlockContext, CodegenJS};
 
-fn match_args_have_completions(arms: &[MatchArm]) -> bool {
+fn match_args_have_completions(arms: &[ast::MatchArm]) -> bool {
     arms.iter().any(|arm| match &arm.expression.kind {
-        ExprKind::Block(block) => block.has_completion(),
+        ast::ExprKind::Block(block) => block.has_completion(),
         _ => true,
     })
 }
 
 impl CodegenJS {
-    fn generate_match_arm_expression(&mut self, expression: &Expr) {
-        if let ExprKind::Block(_) = &expression.kind {
+    fn generate_match_arm_expression(&mut self, expression: &ast::Expr) {
+        if let ast::ExprKind::Block(_) = &expression.kind {
             self.generate_expr(expression, None);
         } else {
             self.push_indent();
@@ -22,7 +22,7 @@ impl CodegenJS {
         }
     }
 
-    pub(crate) fn generate_match_expression(&mut self, match_expr: &MatchExpression) {
+    pub(crate) fn generate_match_expression(&mut self, match_expr: &ast::MatchExpression) {
         // TODO: A lot here is copied from the if statement generator.
         let lhs = self.replace_statement_buffer(String::new());
         let has_block_completions = match_args_have_completions(&match_expr.arms);
@@ -39,7 +39,7 @@ impl CodegenJS {
 
         for (
             i,
-            MatchArm {
+            ast::MatchArm {
                 id: _,
                 pattern,
                 guard,

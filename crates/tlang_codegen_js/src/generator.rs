@@ -1,10 +1,6 @@
 use crate::scope::Scope;
 use tlang_ast::{
-    node::{
-        BinaryOpKind, Block, CallExpression, EnumPattern, Expr, ExprKind, FieldAccessExpression,
-        FunctionParameter, Ident, IfElseExpression, IndexAccessExpression, Module, Path, Pattern,
-        PatternKind, Stmt, StmtKind, UnaryOp,
-    },
+    node::{self as ast, Ident},
     symbols::SymbolType,
     token::{Literal, Token, TokenKind},
 };
@@ -214,7 +210,7 @@ impl CodegenJS {
         self.context_stack.pop();
     }
 
-    pub fn generate_code(&mut self, module: &Module) {
+    pub fn generate_code(&mut self, module: &ast::Module) {
         self.generate_statements(&module.statements);
         self.output.shrink_to_fit();
     }
@@ -235,7 +231,7 @@ impl CodegenJS {
     pub(crate) fn push_function_context(
         &mut self,
         name: &str,
-        parameters: &[FunctionParameter],
+        parameters: &[ast::FunctionParameter],
         parameter_bindings: &[String],
         is_tail_recursive: bool,
     ) {
@@ -250,7 +246,7 @@ impl CodegenJS {
             parameters
                 .iter()
                 .map(|param| {
-                    if let PatternKind::Identifier(ident_pattern) = &param.pattern.kind {
+                    if let ast::PatternKind::Identifier(ident_pattern) = &param.pattern.kind {
                         ident_pattern.name.to_string()
                     } else {
                         // Encountered destructuring/pattern matching or wildcard, declare
@@ -311,7 +307,7 @@ impl CodegenJS {
         self.push_str(" = ");
     }
 
-    pub(crate) fn push_let_declaration_to_expr(&mut self, name: &str, expr: &Expr) {
+    pub(crate) fn push_let_declaration_to_expr(&mut self, name: &str, expr: &ast::Expr) {
         self.push_open_let_declaration(name);
         self.generate_expr(expr, None);
     }
@@ -344,7 +340,7 @@ impl CodegenJS {
     }
 
     /// Generates blocks in expression position.
-    fn generate_block_expression(&mut self, block: &Block) {
+    fn generate_block_expression(&mut self, block: &ast::Block) {
         let has_completion_var = self.completion_variables.last().unwrap().is_some();
         let completion_tmp_var = self
             .completion_variables
@@ -404,7 +400,7 @@ impl CodegenJS {
         self.pop_scope();
     }
 
-    pub(crate) fn generate_block(&mut self, block: &Block) {
+    pub(crate) fn generate_block(&mut self, block: &ast::Block) {
         // Functions handle their scoping themselves
         if self.current_context() != BlockContext::FunctionBody {
             self.push_scope();
@@ -425,7 +421,7 @@ impl CodegenJS {
             if let Some(function_context) = self.function_context_stack.last() {
                 if function_context.is_tail_recursive && block.has_completion() {
                     if let Some(ref expression) = block.expression {
-                        if let ExprKind::RecursiveCall(_) = expression.kind {
+                        if let ast::ExprKind::RecursiveCall(..) = expression.kind {
                             self.generate_expr(expression, None);
                             return;
                         }
@@ -449,7 +445,7 @@ impl CodegenJS {
     }
 
     #[inline(always)]
-    fn generate_statements(&mut self, statements: &[Stmt]) {
+    fn generate_statements(&mut self, statements: &[ast::Stmt]) {
         for statement in statements {
             self.generate_stmt(statement);
             self.flush_statement_buffer();
@@ -480,34 +476,34 @@ impl CodegenJS {
         }
     }
 
-    pub(crate) fn generate_stmt(&mut self, statement: &Stmt) {
+    pub(crate) fn generate_stmt(&mut self, statement: &ast::Stmt) {
         self.generate_comments(&statement.leading_comments);
 
         match &statement.kind {
-            StmtKind::None => {}
-            StmtKind::Expr(expr) => {
+            ast::StmtKind::None => {}
+            ast::StmtKind::Expr(expr) => {
                 self.push_indent();
                 self.context_stack.push(BlockContext::Statement);
                 self.generate_expr(expr, None);
                 self.context_stack.pop();
 
-                if let ExprKind::IfElse { .. } = expr.kind {
+                if let ast::ExprKind::IfElse { .. } = expr.kind {
                     self.push_newline();
                     return;
                 }
 
                 self.push_str(";\n");
             }
-            StmtKind::Let(decl) => {
+            ast::StmtKind::Let(decl) => {
                 self.generate_variable_declaration(&decl.pattern, &decl.expression);
             }
-            StmtKind::FunctionDeclaration(decl) => self.generate_function_declaration(decl),
-            StmtKind::FunctionDeclarations(decls) => {
+            ast::StmtKind::FunctionDeclaration(decl) => self.generate_function_declaration(decl),
+            ast::StmtKind::FunctionDeclarations(decls) => {
                 self.generate_function_declarations(decls, &statement.leading_comments)
             }
-            StmtKind::Return(expr) => self.generate_return_statement(expr),
-            StmtKind::EnumDeclaration(decl) => self.generate_enum_declaration(decl),
-            StmtKind::StructDeclaration(decl) => self.generate_struct_declaration(decl),
+            ast::StmtKind::Return(expr) => self.generate_return_statement(expr),
+            ast::StmtKind::EnumDeclaration(decl) => self.generate_enum_declaration(decl),
+            ast::StmtKind::StructDeclaration(decl) => self.generate_struct_declaration(decl),
         }
 
         self.generate_comments(&statement.trailing_comments);
@@ -516,65 +512,69 @@ impl CodegenJS {
     #[inline(always)]
     pub(crate) fn generate_optional_expr(
         &mut self,
-        expr: &Option<Expr>,
-        parent_op: Option<&BinaryOpKind>,
+        expr: &Option<ast::Expr>,
+        parent_op: Option<&ast::BinaryOpKind>,
     ) {
         if let Some(expr) = expr {
             self.generate_expr(expr, parent_op);
         }
     }
 
-    pub(crate) fn generate_expr(&mut self, expr: &Expr, parent_op: Option<&BinaryOpKind>) {
+    pub(crate) fn generate_expr(
+        &mut self,
+        expr: &ast::Expr,
+        parent_op: Option<&ast::BinaryOpKind>,
+    ) {
         match &expr.kind {
-            ExprKind::None => unreachable!(),
-            ExprKind::Block(block) if self.current_context() == BlockContext::Expression => {
+            ast::ExprKind::None => unreachable!(),
+            ast::ExprKind::Block(block) if self.current_context() == BlockContext::Expression => {
                 self.generate_block_expression(block)
             }
-            ExprKind::Block(block) => self.generate_block(block),
-            ExprKind::Call(expr) => self.generate_call_expression(expr),
-            ExprKind::FieldExpression(expr) => self.generate_field_access_expression(expr),
-            ExprKind::Path(path) => self.generate_path_expression(path),
-            ExprKind::IndexExpression(expr) => self.generate_index_access_expression(expr),
-            ExprKind::Let(_pattern, _expr) => todo!("Let expression not implemented yet."),
-            ExprKind::Literal(literal) => self.generate_literal(literal),
-            ExprKind::List(items) => self.generate_list_expression(items),
-            ExprKind::Dict(kvs) => self.generate_dict_expression(kvs),
-            ExprKind::UnaryOp(op, expr) => self.generate_unary_op(op, expr),
-            ExprKind::BinaryOp(expr) => self.generate_binary_op(expr, parent_op),
-            ExprKind::Match(expr) => self.generate_match_expression(expr),
-            ExprKind::IfElse(expr) => self.generate_if_else(expr),
-            ExprKind::FunctionExpression(decl) => self.generate_function_expression(decl),
-            ExprKind::RecursiveCall(expr) => self.generate_recursive_call_expression(expr),
-            ExprKind::Range(_) => todo!("Range expression not implemented yet."),
-            ExprKind::Wildcard => {}
+            ast::ExprKind::Block(block) => self.generate_block(block),
+            ast::ExprKind::Call(expr) => self.generate_call_expression(expr),
+            ast::ExprKind::FieldExpression(expr) => self.generate_field_access_expression(expr),
+            ast::ExprKind::Path(path) => self.generate_path_expression(path),
+            ast::ExprKind::IndexExpression(expr) => self.generate_index_access_expression(expr),
+            ast::ExprKind::Let(_pattern, _expr) => todo!("Let expression not implemented yet."),
+            ast::ExprKind::Literal(literal) => self.generate_literal(literal),
+            ast::ExprKind::List(items) => self.generate_list_expression(items),
+            ast::ExprKind::Dict(kvs) => self.generate_dict_expression(kvs),
+            ast::ExprKind::UnaryOp(op, expr) => self.generate_unary_op(op, expr),
+            ast::ExprKind::BinaryOp(expr) => self.generate_binary_op(expr, parent_op),
+            ast::ExprKind::Match(expr) => self.generate_match_expression(expr),
+            ast::ExprKind::IfElse(expr) => self.generate_if_else(expr),
+            ast::ExprKind::FunctionExpression(decl) => self.generate_function_expression(decl),
+            ast::ExprKind::RecursiveCall(expr) => self.generate_recursive_call_expression(expr),
+            ast::ExprKind::Range(_) => todo!("Range expression not implemented yet."),
+            ast::ExprKind::Wildcard => {}
         }
     }
 
-    fn generate_unary_op(&mut self, op: &UnaryOp, expr: &Expr) {
+    fn generate_unary_op(&mut self, op: &ast::UnaryOp, expr: &ast::Expr) {
         match op {
-            UnaryOp::Not => self.push_char('!'),
-            UnaryOp::Minus => self.push_char('-'),
-            UnaryOp::Spread => self.push_str("..."),
+            ast::UnaryOp::Not => self.push_char('!'),
+            ast::UnaryOp::Minus => self.push_char('-'),
+            ast::UnaryOp::Spread => self.push_str("..."),
             _ => unimplemented!("PrefixOp {:?} not implemented yet.", op),
         }
 
         self.generate_expr(expr, None);
     }
 
-    fn generate_field_access_expression(&mut self, field_access_expr: &FieldAccessExpression) {
+    fn generate_field_access_expression(&mut self, field_access_expr: &ast::FieldAccessExpression) {
         self.generate_expr(&field_access_expr.base, None);
         self.push_char('.');
         self.push_str(field_access_expr.field.as_str());
     }
 
-    fn generate_index_access_expression(&mut self, index_access_expr: &IndexAccessExpression) {
+    fn generate_index_access_expression(&mut self, index_access_expr: &ast::IndexAccessExpression) {
         self.generate_expr(&index_access_expr.base, None);
         self.push_char('[');
         self.generate_expr(&index_access_expr.index, None);
         self.push_char(']');
     }
 
-    fn generate_path_expression(&mut self, path: &Path) {
+    fn generate_path_expression(&mut self, path: &ast::Path) {
         let first_segment = path.segments.first().unwrap();
 
         self.generate_identifier(first_segment);
@@ -587,7 +587,7 @@ impl CodegenJS {
         );
     }
 
-    fn generate_list_expression(&mut self, items: &[Expr]) {
+    fn generate_list_expression(&mut self, items: &[ast::Expr]) {
         self.push_char('[');
         for (i, item) in items.iter().enumerate() {
             if i > 0 {
@@ -598,7 +598,7 @@ impl CodegenJS {
         self.push_char(']');
     }
 
-    fn generate_dict_expression(&mut self, kvs: &[(Expr, Expr)]) {
+    fn generate_dict_expression(&mut self, kvs: &[(ast::Expr, ast::Expr)]) {
         self.push_str("{\n");
         self.indent_level += 1;
         for (i, (key, value)) in kvs.iter().enumerate() {
@@ -619,9 +619,9 @@ impl CodegenJS {
         self.push_char('}');
     }
 
-    pub(crate) fn generate_pat(&mut self, pattern: &Pattern) {
+    pub(crate) fn generate_pat(&mut self, pattern: &ast::Pattern) {
         match &pattern.kind {
-            PatternKind::Identifier(ident_pattern) => {
+            ast::PatternKind::Identifier(ident_pattern) => {
                 let var_name = self
                     .current_scope()
                     .declare_variable(ident_pattern.name.as_str());
@@ -629,12 +629,12 @@ impl CodegenJS {
                 self.current_scope()
                     .declare_variable_alias(ident_pattern.name.as_str(), &var_name);
             }
-            PatternKind::_Self => {
+            ast::PatternKind::_Self => {
                 self.current_scope().declare_variable_alias("self", "this");
             }
-            PatternKind::Enum(enum_pattern) => self.generate_enum_extraction(enum_pattern),
-            PatternKind::Literal(literal) => self.generate_literal(literal),
-            PatternKind::List(patterns) => {
+            ast::PatternKind::Enum(enum_pattern) => self.generate_enum_extraction(enum_pattern),
+            ast::PatternKind::Literal(literal) => self.generate_literal(literal),
+            ast::PatternKind::List(patterns) => {
                 self.push_char('[');
                 for (i, pattern) in patterns.iter().enumerate() {
                     if i > 0 {
@@ -644,11 +644,11 @@ impl CodegenJS {
                 }
                 self.push_char(']');
             }
-            PatternKind::Rest(pattern) => {
+            ast::PatternKind::Rest(pattern) => {
                 self.push_str("...");
                 self.generate_pat(pattern);
             }
-            PatternKind::Wildcard | PatternKind::None => {}
+            ast::PatternKind::Wildcard | ast::PatternKind::None => {}
         }
     }
 
@@ -661,19 +661,19 @@ impl CodegenJS {
         self.push_str(&identifier);
     }
 
-    fn generate_variable_declaration(&mut self, pattern: &Pattern, value: &Expr) {
+    fn generate_variable_declaration(&mut self, pattern: &ast::Pattern, value: &ast::Expr) {
         match &pattern.kind {
-            PatternKind::Identifier(ident_pattern) => {
+            ast::PatternKind::Identifier(ident_pattern) => {
                 self.generate_variable_declaration_identifier(ident_pattern.name.as_str(), value);
             }
-            PatternKind::List(patterns) => {
+            ast::PatternKind::List(patterns) => {
                 self.generate_variable_declaration_list_pattern(patterns, value);
             }
             _ => todo!("Variable declaration pattern matching is not implemented yet."),
         }
     }
 
-    fn generate_variable_declaration_identifier(&mut self, name: &str, value: &Expr) {
+    fn generate_variable_declaration_identifier(&mut self, name: &str, value: &ast::Expr) {
         let shadowed_name = self.current_scope().resolve_variable(name);
         let var_name = self.current_scope().declare_variable(name);
         self.context_stack.push(BlockContext::Expression);
@@ -687,7 +687,11 @@ impl CodegenJS {
         self.context_stack.pop();
     }
 
-    fn generate_variable_declaration_list_pattern(&mut self, patterns: &[Pattern], value: &Expr) {
+    fn generate_variable_declaration_list_pattern(
+        &mut self,
+        patterns: &[ast::Pattern],
+        value: &ast::Expr,
+    ) {
         self.push_indent();
         self.push_str("let [");
 
@@ -698,7 +702,7 @@ impl CodegenJS {
                 self.push_str(", ");
             }
             match &pattern.kind {
-                PatternKind::Identifier(ident_pattern) => {
+                ast::PatternKind::Identifier(ident_pattern) => {
                     let shadowed_name = self
                         .current_scope()
                         .resolve_variable(ident_pattern.name.as_str());
@@ -712,11 +716,11 @@ impl CodegenJS {
                     }
                     bindings.push((ident_pattern, var_name));
                 }
-                PatternKind::Rest(pattern) => {
+                ast::PatternKind::Rest(pattern) => {
                     self.push_str("...");
                     self.generate_pat(pattern);
                 }
-                PatternKind::Wildcard => {}
+                ast::PatternKind::Wildcard => {}
                 pattern_kind => todo!(
                     "Variable declaration pattern matching for {:?} is not implemented yet.",
                     pattern_kind
@@ -737,7 +741,7 @@ impl CodegenJS {
         self.push_str(";\n");
     }
 
-    fn generate_if_else(&mut self, if_else_expr: &IfElseExpression) {
+    fn generate_if_else(&mut self, if_else_expr: &ast::IfElseExpression) {
         let mut lhs = String::new();
         // TODO: Potentially in a return position or other expression, before we generate the if
         //       statement, replace the current statement buffer with a new one, generate the if
@@ -748,7 +752,7 @@ impl CodegenJS {
         // TODO: In case of recursive calls in tail position, we'll want to omit lhs.
         let has_block_completions = self.current_context() == BlockContext::Expression
             && match &if_else_expr.then_branch.kind {
-                ExprKind::Block(block) => block.has_completion(),
+                ast::ExprKind::Block(block) => block.has_completion(),
                 _ => false,
             };
         if has_block_completions {
@@ -817,11 +821,15 @@ impl CodegenJS {
         self.completion_variables.pop();
     }
 
-    fn generate_enum_extraction(&mut self, _enum_pattern: &EnumPattern) {
+    fn generate_enum_extraction(&mut self, _enum_pattern: &ast::EnumPattern) {
         todo!("enum extraction outside of function parameters is not implemented yet.")
     }
 
-    fn generate_partial_application(&mut self, call_expr: &CallExpression, wildcard_count: usize) {
+    fn generate_partial_application(
+        &mut self,
+        call_expr: &ast::CallExpression,
+        wildcard_count: usize,
+    ) {
         let mut placeholders = Vec::with_capacity(wildcard_count);
 
         self.push_char('(');
@@ -854,7 +862,7 @@ impl CodegenJS {
                 self.push_str(", ");
             }
 
-            if let ExprKind::Wildcard = arg.kind {
+            if let ast::ExprKind::Wildcard = arg.kind {
                 self.push_str(&placeholders[wildcard_index]);
                 wildcard_index += 1;
             } else {
@@ -865,7 +873,7 @@ impl CodegenJS {
         self.push_char(')');
     }
 
-    pub(crate) fn generate_call_expression(&mut self, call_expr: &CallExpression) {
+    pub(crate) fn generate_call_expression(&mut self, call_expr: &ast::CallExpression) {
         // TODO: If the call is to a struct, we instead call it with `new` and map the fields to
         // the positional arguments of the constructor.
 

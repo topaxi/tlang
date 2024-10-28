@@ -1,9 +1,6 @@
 use std::collections::HashSet;
 
-use tlang_ast::node::{
-    Block, CallExpression, Expr, ExprKind, FunctionDeclaration, FunctionParameter, Pattern,
-    PatternKind, Stmt, StmtKind,
-};
+use tlang_ast::node as ast;
 use tlang_ast::token::Token;
 
 use crate::generator::{BlockContext, CodegenJS};
@@ -11,7 +8,7 @@ use crate::generator::{BlockContext, CodegenJS};
 impl CodegenJS {
     pub(crate) fn generate_function_declarations(
         &mut self,
-        declarations: &[FunctionDeclaration],
+        declarations: &[ast::FunctionDeclaration],
         first_declaration_comments: &[Token],
     ) {
         let first_declaration = declarations.first().unwrap();
@@ -58,18 +55,18 @@ impl CodegenJS {
         //       after the parsing phase and get rid of the FunctionDeclarations AST node entirely.
         for declaration in declarations {
             if let Some(ref expr) = declaration.guard {
-                if let ExprKind::Let(pattern, _) = &expr.kind {
+                if let ast::ExprKind::Let(pattern, _) = &expr.kind {
                     match &pattern.kind {
-                        PatternKind::Identifier(ident_pattern) => {
+                        ast::PatternKind::Identifier(ident_pattern) => {
                             let tmp_variable = self
                                 .current_scope()
                                 .declare_variable(ident_pattern.name.as_str());
                             self.push_let_declaration(&tmp_variable);
                             self.push_newline();
                         }
-                        PatternKind::List(patterns) => {
+                        ast::PatternKind::List(patterns) => {
                             for pattern in patterns {
-                                if let PatternKind::Identifier(ident_pattern) = &pattern.kind {
+                                if let ast::PatternKind::Identifier(ident_pattern) = &pattern.kind {
                                     let tmp_variable = self
                                         .current_scope()
                                         .declare_variable(ident_pattern.name.as_str());
@@ -78,10 +75,10 @@ impl CodegenJS {
                                 }
                             }
                         }
-                        PatternKind::Enum(enum_pattern) => {
+                        ast::PatternKind::Enum(enum_pattern) => {
                             let tmp_variable_enum = self.current_scope().declare_tmp_variable();
                             let enum_name = match &enum_pattern.identifier.kind {
-                                ExprKind::Path(path) => path.segments.last().unwrap().as_str(),
+                                ast::ExprKind::Path(path) => path.segments.last().unwrap().as_str(),
                                 _ => unreachable!(),
                             };
                             self.push_let_declaration(&tmp_variable_enum);
@@ -91,8 +88,8 @@ impl CodegenJS {
                             for element in &enum_pattern.elements {
                                 let identifier = match &element.kind {
                                     // Skip any Wildcards
-                                    PatternKind::Wildcard => continue,
-                                    PatternKind::Identifier(ident_pattern) => {
+                                    ast::PatternKind::Wildcard => continue,
+                                    ast::PatternKind::Identifier(ident_pattern) => {
                                         ident_pattern.name.as_str()
                                     }
                                     _ => unreachable!(),
@@ -127,15 +124,15 @@ impl CodegenJS {
 
             for (j, param) in declaration.parameters.iter().enumerate() {
                 match &param.pattern.kind {
-                    PatternKind::Identifier(ident_pattern) => {
+                    ast::PatternKind::Identifier(ident_pattern) => {
                         self.current_scope().declare_variable_alias(
                             ident_pattern.name.as_str(),
                             arg_bindings[j].as_str(),
                         );
                     }
-                    PatternKind::List(patterns) => {
+                    ast::PatternKind::List(patterns) => {
                         for (i, pattern) in patterns.iter().enumerate() {
-                            if let PatternKind::Identifier(ident_pattern) = &pattern.kind {
+                            if let ast::PatternKind::Identifier(ident_pattern) = &pattern.kind {
                                 let arg_name = arg_bindings[j].as_str();
 
                                 self.current_scope().declare_variable_alias(
@@ -161,7 +158,9 @@ impl CodegenJS {
                 .filter(|(_, param)| {
                     matches!(
                         param.pattern.kind,
-                        PatternKind::Literal(_) | PatternKind::List(_) | PatternKind::Enum { .. }
+                        ast::PatternKind::Literal(_)
+                            | ast::PatternKind::List(_)
+                            | ast::PatternKind::Enum { .. }
                     )
                 })
                 .collect::<Vec<_>>();
@@ -190,11 +189,11 @@ impl CodegenJS {
                     let arg_name = arg_bindings[k].as_str();
 
                     match &param.pattern.kind {
-                        PatternKind::Identifier { .. } | PatternKind::Literal(_) => {
+                        ast::PatternKind::Identifier { .. } | ast::PatternKind::Literal(_) => {
                             self.push_str(&format!("{arg_name} === "));
                             self.generate_function_parameter(&param.pattern);
                         }
-                        PatternKind::List(patterns) => {
+                        ast::PatternKind::List(patterns) => {
                             if patterns.is_empty() {
                                 self.push_str(&format!("{arg_name}.length === 0"));
                                 continue;
@@ -202,7 +201,10 @@ impl CodegenJS {
 
                             let mut patterns_len = patterns.len();
                             let last_pattern_is_rest = patterns.last().is_some()
-                                && matches!(patterns.last().unwrap().kind, PatternKind::Rest(_));
+                                && matches!(
+                                    patterns.last().unwrap().kind,
+                                    ast::PatternKind::Rest(_)
+                                );
 
                             if last_pattern_is_rest {
                                 patterns_len -= 1;
@@ -212,14 +214,14 @@ impl CodegenJS {
 
                             for (i, pattern) in patterns.iter().enumerate() {
                                 match &pattern.kind {
-                                    PatternKind::Literal(_) => {
+                                    ast::PatternKind::Literal(_) => {
                                         self.push_str(" && ");
 
                                         self.push_str(&format!("{arg_name}[{i}] === "));
                                         self.generate_pat(pattern);
                                     }
-                                    PatternKind::Rest(identifier) => {
-                                        if let PatternKind::Identifier(ident_pattern) =
+                                    ast::PatternKind::Rest(identifier) => {
+                                        if let ast::PatternKind::Identifier(ident_pattern) =
                                             &identifier.kind
                                         {
                                             self.declare_function_pre_body_variable(
@@ -230,28 +232,28 @@ impl CodegenJS {
                                             unreachable!();
                                         }
                                     }
-                                    PatternKind::Identifier(ident_pattern) => {
+                                    ast::PatternKind::Identifier(ident_pattern) => {
                                         self.declare_function_pre_body_variable(
                                             ident_pattern.name.as_str(),
                                             &format!("{arg_name}[{i}]"),
                                         );
                                     }
-                                    PatternKind::Wildcard => {}
+                                    ast::PatternKind::Wildcard => {}
                                     _ => unreachable!(),
                                 }
                             }
                         }
-                        PatternKind::Enum(enum_pattern) => {
+                        ast::PatternKind::Enum(enum_pattern) => {
                             let identifier = match &enum_pattern.identifier.kind {
-                                ExprKind::Path(path) => path.segments.last().unwrap().as_str(),
+                                ast::ExprKind::Path(path) => path.segments.last().unwrap().as_str(),
                                 _ => unreachable!(),
                             };
                             self.push_str(&format!("{arg_name}.tag === \"{identifier}\""));
                             for (i, element) in enum_pattern.elements.iter().enumerate() {
                                 let identifier = match &element.kind {
                                     // Skip any Wildcards
-                                    PatternKind::Wildcard => continue,
-                                    PatternKind::Identifier(ident_pattern) => {
+                                    ast::PatternKind::Wildcard => continue,
+                                    ast::PatternKind::Identifier(ident_pattern) => {
                                         ident_pattern.name.as_str()
                                     }
                                     _ => unreachable!(),
@@ -298,7 +300,7 @@ impl CodegenJS {
 
             // Alias identifier args back to the parameter names for readability of generated code.
             for (j, param) in declaration.parameters.iter().enumerate() {
-                if let PatternKind::Identifier(ident_pattern) = &param.pattern.kind {
+                if let ast::PatternKind::Identifier(ident_pattern) = &param.pattern.kind {
                     let arg_name = arg_bindings[j].as_str();
 
                     if arg_name == ident_pattern.name {
@@ -357,7 +359,7 @@ impl CodegenJS {
 
     fn generate_function_arguments(
         &mut self,
-        declarations: &[FunctionDeclaration],
+        declarations: &[ast::FunctionDeclaration],
     ) -> (Option<String>, Vec<String>) {
         // TODO: What was my plan here?
         //let is_member_method = is_member_method(&declarations[0].name);
@@ -376,10 +378,10 @@ impl CodegenJS {
                 let arg_name = declarations.iter().find_map(|d| {
                     let param = &d.parameters[i];
                     match &param.pattern.kind {
-                        PatternKind::Identifier(ident_pattern) => {
+                        ast::PatternKind::Identifier(ident_pattern) => {
                             Some(ident_pattern.name.to_string())
                         }
-                        PatternKind::Enum(enum_pattern) => {
+                        ast::PatternKind::Enum(enum_pattern) => {
                             Some(get_enum_name(&enum_pattern.identifier).to_lowercase())
                         }
                         _ => None,
@@ -390,10 +392,10 @@ impl CodegenJS {
                     && declarations
                         .iter()
                         .all(|d| match &d.parameters[i].pattern.kind {
-                            PatternKind::Identifier(ident_pattern) => {
+                            ast::PatternKind::Identifier(ident_pattern) => {
                                 Some(ident_pattern.name.to_string()) == arg_name
                             }
-                            PatternKind::Enum(ident_pattern) => {
+                            ast::PatternKind::Enum(ident_pattern) => {
                                 Some(get_enum_name(&ident_pattern.identifier).to_lowercase())
                                     == arg_name
                             }
@@ -437,10 +439,10 @@ impl CodegenJS {
         }
     }
 
-    fn generate_function_definition_guard(&mut self, node: &Expr) {
-        if let ExprKind::Let(pattern, expression) = &node.kind {
+    fn generate_function_definition_guard(&mut self, node: &ast::Expr) {
+        if let ast::ExprKind::Let(pattern, expression) = &node.kind {
             match &pattern.kind {
-                PatternKind::Identifier(ident_pattern) => {
+                ast::PatternKind::Identifier(ident_pattern) => {
                     let guard_variable = self
                         .current_scope()
                         .resolve_variable(ident_pattern.name.as_str());
@@ -448,9 +450,9 @@ impl CodegenJS {
                     self.generate_expr(expression, None);
                     self.push_char(')');
                 }
-                PatternKind::Enum(enum_pattern) => {
+                ast::PatternKind::Enum(enum_pattern) => {
                     let enum_name = match &enum_pattern.identifier.kind {
-                        ExprKind::Path(path) => path.segments.last().unwrap().as_str(),
+                        ast::ExprKind::Path(path) => path.segments.last().unwrap().as_str(),
                         _ => unreachable!(),
                     };
                     let guard_variable = self.current_scope().resolve_variable(enum_name);
@@ -468,8 +470,10 @@ impl CodegenJS {
                         }
                         let identifier = match &element.kind {
                             // Skip any Wildcards
-                            PatternKind::Wildcard => continue,
-                            PatternKind::Identifier(ident_pattern) => ident_pattern.name.as_str(),
+                            ast::PatternKind::Wildcard => continue,
+                            ast::PatternKind::Identifier(ident_pattern) => {
+                                ident_pattern.name.as_str()
+                            }
                             _ => unreachable!(),
                         };
                         self.push_str(" && ((");
@@ -499,7 +503,7 @@ impl CodegenJS {
         }
     }
 
-    fn generate_function_parameter_list(&mut self, parameters: &[FunctionParameter]) {
+    fn generate_function_parameter_list(&mut self, parameters: &[ast::FunctionParameter]) {
         self.push_char('(');
 
         let mut iter = parameters.iter();
@@ -509,7 +513,7 @@ impl CodegenJS {
 
             // If the first param was the self param, we didn't render anything and we need to skip
             // the comma being rendered in the loop ahead.
-            if matches!(param.pattern.kind, PatternKind::_Self) {
+            if matches!(param.pattern.kind, ast::PatternKind::_Self) {
                 if let Some(param) = iter.next() {
                     self.generate_pat(&param.pattern);
                 }
@@ -524,10 +528,10 @@ impl CodegenJS {
         self.push_char(')');
     }
 
-    fn generate_struct_method_binding(&mut self, declaration: &FunctionDeclaration) {
+    fn generate_struct_method_binding(&mut self, declaration: &ast::FunctionDeclaration) {
         if is_static_method(&declaration.name) {
             let lhs = match &declaration.name.kind {
-                ExprKind::Path(path) => path.join("."),
+                ast::ExprKind::Path(path) => path.join("."),
                 _ => unreachable!(),
             };
 
@@ -535,12 +539,12 @@ impl CodegenJS {
             self.push_str(&format!("{} = ", lhs));
         } else if is_member_method(&declaration.name) {
             let target_name: String = match &declaration.name.kind {
-                ExprKind::FieldExpression(expr) => fn_identifier_to_string(&expr.base),
+                ast::ExprKind::FieldExpression(expr) => fn_identifier_to_string(&expr.base),
                 _ => unreachable!(),
             };
 
             let field_name = match &declaration.name.kind {
-                ExprKind::FieldExpression(expr) => expr.field.to_string(),
+                ast::ExprKind::FieldExpression(expr) => expr.field.to_string(),
                 _ => unreachable!(),
             };
 
@@ -554,7 +558,7 @@ impl CodegenJS {
         }
     }
 
-    pub(crate) fn generate_function_declaration(&mut self, declaration: &FunctionDeclaration) {
+    pub(crate) fn generate_function_declaration(&mut self, declaration: &ast::FunctionDeclaration) {
         let name_as_str = fn_identifier_to_string(&declaration.name);
         let is_tail_recursive =
             is_function_body_tail_recursive_block(&name_as_str, &declaration.body);
@@ -583,7 +587,7 @@ impl CodegenJS {
 
     pub(crate) fn generate_function_expression(
         self: &mut CodegenJS,
-        declaration: &FunctionDeclaration,
+        declaration: &ast::FunctionDeclaration,
     ) {
         self.push_scope();
 
@@ -620,25 +624,25 @@ impl CodegenJS {
         self.pop_scope();
     }
 
-    fn generate_function_parameter(&mut self, pattern: &Pattern) {
+    fn generate_function_parameter(&mut self, pattern: &ast::Pattern) {
         match &pattern.kind {
             // Do not run generate_identifier, as that would resolve the parameter as a variable.
-            PatternKind::Identifier(ident_pattern) => {
+            ast::PatternKind::Identifier(ident_pattern) => {
                 self.current_scope()
                     .declare_variable(ident_pattern.name.as_str());
                 self.push_str(ident_pattern.name.as_str());
             }
-            PatternKind::Literal(_) => self.generate_pat(pattern),
-            PatternKind::List(_) => todo!(),
+            ast::PatternKind::Literal(_) => self.generate_pat(pattern),
+            ast::PatternKind::List(_) => todo!(),
             // Wildcards are handled within pipeline and call expressions,
-            PatternKind::Wildcard => {
+            ast::PatternKind::Wildcard => {
                 unreachable!("Unexpected wildcard in function parameter.")
             }
             _ => todo!(),
         }
     }
 
-    fn generate_function_body(&mut self, body: &Block, is_tail_recursive: bool) {
+    fn generate_function_body(&mut self, body: &ast::Block, is_tail_recursive: bool) {
         self.push_context(BlockContext::FunctionBody);
         self.flush_function_pre_body();
         if is_tail_recursive {
@@ -655,12 +659,12 @@ impl CodegenJS {
         self.pop_context();
     }
 
-    pub(crate) fn generate_return_statement(self: &mut CodegenJS, expr: &Option<Expr>) {
+    pub(crate) fn generate_return_statement(self: &mut CodegenJS, expr: &Option<ast::Expr>) {
         // We do not render a return statement if we are in a tail recursive function body.
         // Which calls the current function recursively.
         if expr.is_some() {
-            if let ExprKind::RecursiveCall(call_expr) = &expr.as_ref().unwrap().kind {
-                let call_identifier = if let ExprKind::Path(_) = &call_expr.callee.kind {
+            if let ast::ExprKind::RecursiveCall(call_expr) = &expr.as_ref().unwrap().kind {
+                let call_identifier = if let ast::ExprKind::Path(_) = &call_expr.callee.kind {
                     Some(fn_identifier_to_string(&call_expr.callee))
                 } else {
                     None
@@ -689,10 +693,10 @@ impl CodegenJS {
         self.push_str(";\n");
     }
 
-    pub(crate) fn generate_recursive_call_expression(&mut self, expr: &CallExpression) {
+    pub(crate) fn generate_recursive_call_expression(&mut self, expr: &ast::CallExpression) {
         // If call expression is referencing the current function, all we do is update the arguments,
         // as we are in a while loop.
-        if let ExprKind::Path(_) = &expr.callee.kind {
+        if let ast::ExprKind::Path(_) = &expr.callee.kind {
             if let Some(function_context) = self.get_function_context() {
                 if function_context.is_tail_recursive
                         // TODO: Comparing identifier by string might not be the best idea.
@@ -736,17 +740,17 @@ impl CodegenJS {
     }
 }
 
-fn get_enum_name(identifier: &Expr) -> String {
+fn get_enum_name(identifier: &ast::Expr) -> String {
     match &identifier.kind {
-        ExprKind::Path(path) => path.segments[path.segments.len() - 2].to_string(),
+        ast::ExprKind::Path(path) => path.segments[path.segments.len() - 2].to_string(),
         _ => unreachable!(),
     }
 }
 
-fn is_function_body_tail_recursive_stmt(function_name: &str, stmt: &Stmt) -> bool {
+fn is_function_body_tail_recursive_stmt(function_name: &str, stmt: &ast::Stmt) -> bool {
     match &stmt.kind {
-        StmtKind::Expr(expr) => is_function_body_tail_recursive(function_name, expr),
-        StmtKind::Return(expr) => {
+        ast::StmtKind::Expr(expr) => is_function_body_tail_recursive(function_name, expr),
+        ast::StmtKind::Return(expr) => {
             if let Some(expr) = expr.as_ref() {
                 is_function_body_tail_recursive(function_name, expr)
             } else {
@@ -757,7 +761,7 @@ fn is_function_body_tail_recursive_stmt(function_name: &str, stmt: &Stmt) -> boo
     }
 }
 
-fn is_function_body_tail_recursive_block(function_name: &str, block: &Block) -> bool {
+fn is_function_body_tail_recursive_block(function_name: &str, block: &ast::Block) -> bool {
     for statement in &block.statements {
         if is_function_body_tail_recursive_stmt(function_name, statement) {
             return true;
@@ -771,23 +775,25 @@ fn is_function_body_tail_recursive_block(function_name: &str, block: &Block) -> 
     false
 }
 
-fn is_function_body_tail_recursive(function_name: &str, node: &Expr) -> bool {
+fn is_function_body_tail_recursive(function_name: &str, node: &ast::Expr) -> bool {
     // Recursively traverse nodes to check for tail recursive calls to the function itself.
     // We currently only support tail recursion to the function itself, not any other function.
     // Therefore we look for RecursiveCall nodes which reference the current function name.
     match &node.kind {
-        ExprKind::RecursiveCall(call_expr) => {
+        ast::ExprKind::RecursiveCall(call_expr) => {
             // If the function is an identifier, check if it's the same as the current function name.
-            if let ExprKind::Path(_) = &call_expr.callee.kind {
+            if let ast::ExprKind::Path(_) = &call_expr.callee.kind {
                 if fn_identifier_to_string(&call_expr.callee) == function_name {
                     return true;
                 }
             }
             false
         }
-        ExprKind::Block(block) => is_function_body_tail_recursive_block(function_name, block),
-        ExprKind::Match(expr) => is_function_body_tail_recursive(function_name, &expr.expression),
-        ExprKind::IfElse(expr) => {
+        ast::ExprKind::Block(block) => is_function_body_tail_recursive_block(function_name, block),
+        ast::ExprKind::Match(expr) => {
+            is_function_body_tail_recursive(function_name, &expr.expression)
+        }
+        ast::ExprKind::IfElse(expr) => {
             is_function_body_tail_recursive(function_name, &expr.condition)
                 || is_function_body_tail_recursive(function_name, &expr.then_branch)
                 || expr.else_branches.iter().any(|else_clause| {
@@ -798,22 +804,22 @@ fn is_function_body_tail_recursive(function_name: &str, node: &Expr) -> bool {
     }
 }
 
-fn is_member_method(node: &Expr) -> bool {
-    matches!(&node.kind, ExprKind::FieldExpression(_))
+fn is_member_method(node: &ast::Expr) -> bool {
+    matches!(&node.kind, ast::ExprKind::FieldExpression(_))
 }
 
-fn is_static_method(node: &Expr) -> bool {
-    if let ExprKind::Path(path) = &node.kind {
+fn is_static_method(node: &ast::Expr) -> bool {
+    if let ast::ExprKind::Path(path) = &node.kind {
         return path.segments.len() > 1;
     }
 
     false
 }
 
-pub(crate) fn fn_identifier_to_string(expr: &Expr) -> String {
+pub(crate) fn fn_identifier_to_string(expr: &ast::Expr) -> String {
     match &expr.kind {
-        ExprKind::Path(path) => path.join("__"),
-        ExprKind::FieldExpression(expr) => expr.field.to_string(),
+        ast::ExprKind::Path(path) => path.join("__"),
+        ast::ExprKind::FieldExpression(expr) => expr.field.to_string(),
         kind => todo!("fn_identifier_to_string: {:?}", kind),
     }
 }

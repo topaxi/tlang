@@ -1,4 +1,4 @@
-use tlang_ast::node::{BinaryOpExpression, BinaryOpKind, ExprKind};
+use tlang_ast::node as ast;
 
 use crate::generator::CodegenJS;
 
@@ -17,8 +17,8 @@ struct JSOperatorInfo {
 impl CodegenJS {
     pub(crate) fn generate_binary_op(
         &mut self,
-        binary_expr: &BinaryOpExpression,
-        parent_op: Option<&BinaryOpKind>,
+        binary_expr: &ast::BinaryOpExpression,
+        parent_op: Option<&ast::BinaryOpKind>,
     ) {
         let needs_parentheses = parent_op.map_or(false, |parent| {
             should_wrap_with_parentheses(&binary_expr.op, parent)
@@ -28,15 +28,15 @@ impl CodegenJS {
             self.push_char('(');
         }
 
-        if let BinaryOpKind::Pipeline = binary_expr.op {
+        if let ast::BinaryOpKind::Pipeline = binary_expr.op {
             // If rhs was an identifier, we just pass lhs it as an argument to a function call.
-            if let ExprKind::Path(_) = binary_expr.rhs.kind {
+            if let ast::ExprKind::Path(_) = binary_expr.rhs.kind {
                 self.generate_expr(&binary_expr.rhs, None);
                 self.push_char('(');
                 self.generate_expr(&binary_expr.lhs, None);
                 self.push_char(')');
             // If rhs is a Call node and we prepend the lhs to the argument list.
-            } else if let ExprKind::Call(call_expr) = &binary_expr.rhs.kind {
+            } else if let ast::ExprKind::Call(call_expr) = &binary_expr.rhs.kind {
                 self.generate_expr(&call_expr.callee, None);
                 self.push_char('(');
 
@@ -48,7 +48,7 @@ impl CodegenJS {
                             self.push_str(", ");
                         }
 
-                        if let ExprKind::Wildcard = arg.kind {
+                        if let ast::ExprKind::Wildcard = arg.kind {
                             self.generate_expr(&binary_expr.lhs, None);
                         } else {
                             self.generate_expr(arg, None);
@@ -74,32 +74,34 @@ impl CodegenJS {
         }
     }
 
-    fn generate_binary_operator_token(self: &mut CodegenJS, op: &BinaryOpKind) {
+    fn generate_binary_operator_token(self: &mut CodegenJS, op: &ast::BinaryOpKind) {
         match op {
-            BinaryOpKind::Assign => self.push_str(" = "),
-            BinaryOpKind::Add => self.push_str(" + "),
-            BinaryOpKind::Subtract => self.push_str(" - "),
-            BinaryOpKind::Multiply => self.push_str(" * "),
-            BinaryOpKind::Divide => self.push_str(" / "),
-            BinaryOpKind::Modulo => self.push_str(" % "),
-            BinaryOpKind::Exponentiation => self.push_str(" ** "),
-            BinaryOpKind::Equal => self.push_str(" === "),
-            BinaryOpKind::NotEqual => self.push_str(" !== "),
-            BinaryOpKind::LessThan => self.push_str(" < "),
-            BinaryOpKind::LessThanOrEqual => self.push_str(" <= "),
-            BinaryOpKind::GreaterThan => self.push_str(" > "),
-            BinaryOpKind::GreaterThanOrEqual => self.push_str(" >= "),
-            BinaryOpKind::And => self.push_str(" && "),
-            BinaryOpKind::Or => self.push_str(" || "),
-            BinaryOpKind::BitwiseOr => self.push_str(" | "),
-            BinaryOpKind::BitwiseAnd => self.push_str(" & "),
-            BinaryOpKind::BitwiseXor => self.push_str(" ^ "),
-            BinaryOpKind::Pipeline => unreachable!("Pipeline operator does not exist yet in JS"),
+            ast::BinaryOpKind::Assign => self.push_str(" = "),
+            ast::BinaryOpKind::Add => self.push_str(" + "),
+            ast::BinaryOpKind::Subtract => self.push_str(" - "),
+            ast::BinaryOpKind::Multiply => self.push_str(" * "),
+            ast::BinaryOpKind::Divide => self.push_str(" / "),
+            ast::BinaryOpKind::Modulo => self.push_str(" % "),
+            ast::BinaryOpKind::Exponentiation => self.push_str(" ** "),
+            ast::BinaryOpKind::Equal => self.push_str(" === "),
+            ast::BinaryOpKind::NotEqual => self.push_str(" !== "),
+            ast::BinaryOpKind::LessThan => self.push_str(" < "),
+            ast::BinaryOpKind::LessThanOrEqual => self.push_str(" <= "),
+            ast::BinaryOpKind::GreaterThan => self.push_str(" > "),
+            ast::BinaryOpKind::GreaterThanOrEqual => self.push_str(" >= "),
+            ast::BinaryOpKind::And => self.push_str(" && "),
+            ast::BinaryOpKind::Or => self.push_str(" || "),
+            ast::BinaryOpKind::BitwiseOr => self.push_str(" | "),
+            ast::BinaryOpKind::BitwiseAnd => self.push_str(" & "),
+            ast::BinaryOpKind::BitwiseXor => self.push_str(" ^ "),
+            ast::BinaryOpKind::Pipeline => {
+                unreachable!("Pipeline operator does not exist yet in JS")
+            }
         }
     }
 }
 
-fn should_wrap_with_parentheses(op: &BinaryOpKind, parent_op: &BinaryOpKind) -> bool {
+fn should_wrap_with_parentheses(op: &ast::BinaryOpKind, parent_op: &ast::BinaryOpKind) -> bool {
     let op_info = map_operator_info(op);
     let parent_op_info = map_operator_info(parent_op);
 
@@ -111,47 +113,49 @@ fn should_wrap_with_parentheses(op: &BinaryOpKind, parent_op: &BinaryOpKind) -> 
         && op_info.associativity == JSAssociativity::Right
 }
 
-fn map_operator_info(op: &BinaryOpKind) -> JSOperatorInfo {
+fn map_operator_info(op: &ast::BinaryOpKind) -> JSOperatorInfo {
     match op {
-        BinaryOpKind::Assign => JSOperatorInfo {
+        ast::BinaryOpKind::Assign => JSOperatorInfo {
             precedence: 1,
             associativity: JSAssociativity::Right,
         },
-        BinaryOpKind::Add | BinaryOpKind::Subtract => JSOperatorInfo {
+        ast::BinaryOpKind::Add | ast::BinaryOpKind::Subtract => JSOperatorInfo {
             precedence: 7,
             associativity: JSAssociativity::Left,
         },
-        BinaryOpKind::Multiply | BinaryOpKind::Divide | BinaryOpKind::Modulo => JSOperatorInfo {
-            precedence: 8,
-            associativity: JSAssociativity::Left,
-        },
-        BinaryOpKind::Equal
-        | BinaryOpKind::NotEqual
-        | BinaryOpKind::LessThan
-        | BinaryOpKind::LessThanOrEqual
-        | BinaryOpKind::GreaterThan
-        | BinaryOpKind::GreaterThanOrEqual => JSOperatorInfo {
-            precedence: 6,
-            associativity: JSAssociativity::Left,
-        },
-        BinaryOpKind::And => JSOperatorInfo {
-            precedence: 4,
-            associativity: JSAssociativity::Left,
-        },
-        BinaryOpKind::Or => JSOperatorInfo {
-            precedence: 3,
-            associativity: JSAssociativity::Left,
-        },
-        BinaryOpKind::BitwiseAnd | BinaryOpKind::BitwiseOr | BinaryOpKind::BitwiseXor => {
+        ast::BinaryOpKind::Multiply | ast::BinaryOpKind::Divide | ast::BinaryOpKind::Modulo => {
             JSOperatorInfo {
-                precedence: 9,
+                precedence: 8,
                 associativity: JSAssociativity::Left,
             }
         }
-        BinaryOpKind::Exponentiation => JSOperatorInfo {
+        ast::BinaryOpKind::Equal
+        | ast::BinaryOpKind::NotEqual
+        | ast::BinaryOpKind::LessThan
+        | ast::BinaryOpKind::LessThanOrEqual
+        | ast::BinaryOpKind::GreaterThan
+        | ast::BinaryOpKind::GreaterThanOrEqual => JSOperatorInfo {
+            precedence: 6,
+            associativity: JSAssociativity::Left,
+        },
+        ast::BinaryOpKind::And => JSOperatorInfo {
+            precedence: 4,
+            associativity: JSAssociativity::Left,
+        },
+        ast::BinaryOpKind::Or => JSOperatorInfo {
+            precedence: 3,
+            associativity: JSAssociativity::Left,
+        },
+        ast::BinaryOpKind::BitwiseAnd
+        | ast::BinaryOpKind::BitwiseOr
+        | ast::BinaryOpKind::BitwiseXor => JSOperatorInfo {
+            precedence: 9,
+            associativity: JSAssociativity::Left,
+        },
+        ast::BinaryOpKind::Exponentiation => JSOperatorInfo {
             precedence: 10,
             associativity: JSAssociativity::Right,
         },
-        BinaryOpKind::Pipeline => unreachable!("Pipeline operator does not exist yet in JS"),
+        ast::BinaryOpKind::Pipeline => unreachable!("Pipeline operator does not exist yet in JS"),
     }
 }
