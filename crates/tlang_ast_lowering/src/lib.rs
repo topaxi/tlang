@@ -186,18 +186,11 @@ impl LoweringContext {
                 expression,
                 span,
             }) => hir::ExprKind::Block(Box::new(self.lower_block(statements, expression, *span))),
-            ast::node::ExprKind::Call(box ast::node::CallExpression { callee, arguments }) => {
-                let callee = self.lower_expr(callee);
-                let arguments = self.lower_exprs(arguments);
-                hir::ExprKind::Call(Box::new(hir::CallExpression { callee, arguments }))
+            ast::node::ExprKind::Call(call_expr) => {
+                hir::ExprKind::Call(Box::new(self.lower_call_expr(call_expr)))
             }
-            ast::node::ExprKind::RecursiveCall(box ast::node::CallExpression {
-                callee,
-                arguments,
-            }) => {
-                let callee = self.lower_expr(callee);
-                let arguments = self.lower_exprs(arguments);
-                hir::ExprKind::TailCall(Box::new(hir::CallExpression { callee, arguments }))
+            ast::node::ExprKind::RecursiveCall(call_expr) => {
+                hir::ExprKind::TailCall(Box::new(self.lower_call_expr(call_expr)))
             }
             ast::node::ExprKind::UnaryOp(op, expr) => {
                 let expr = self.lower_expr(expr);
@@ -322,6 +315,19 @@ impl LoweringContext {
             kind,
             span,
         }
+    }
+
+    fn lower_call_expr(&mut self, node: &ast::node::CallExpression) -> hir::CallExpression {
+        let callee = match &node.callee.kind {
+            ast::node::ExprKind::Path(_path) => {
+                // TODO: We should map over statically known call arity to the matching function.
+                self.lower_expr(&node.callee)
+            }
+            _ => self.lower_expr(&node.callee),
+        };
+
+        let arguments = self.lower_exprs(&node.arguments);
+        hir::CallExpression { callee, arguments }
     }
 
     fn lower_stmt(&mut self, node: &ast::node::Stmt) -> Vec<hir::Stmt> {
