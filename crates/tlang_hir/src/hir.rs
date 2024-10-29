@@ -32,7 +32,7 @@ impl Path {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct PathSegment {
     pub ident: Ident,
 }

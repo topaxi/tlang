@@ -5,7 +5,7 @@ use tlang_ast as ast;
 use tlang_ast::node::{
     BinaryOpExpression, EnumPattern, FunctionDeclaration, Ident, LetDeclaration,
 };
-use tlang_ast::token::kw;
+use tlang_ast::token::{kw, Literal};
 use tlang_hir::hir::{self, HirId};
 
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq)]
@@ -393,6 +393,7 @@ impl LoweringContext {
                     // with a new hir id which wraps and dynamically dispatches the function based
                     // on argument length.
                     let mut grouped_decls = vec![];
+                    let mut match_arms = vec![];
 
                     for arg_len in args_lengths {
                         let decls = decls
@@ -416,6 +417,17 @@ impl LoweringContext {
                             .collect::<Vec<_>>();
 
                         let decl = self.lower_fn_decl_matching(&decls);
+                        let fn_name = match &decl.name.kind {
+                            hir::ExprKind::Path(path) => hir::Expr {
+                                hir_id: self.unique_id(),
+                                kind: hir::ExprKind::Path(Box::new(hir::Path {
+                                    segments: path.segments.clone(),
+                                    span: Default::default(),
+                                })),
+                                span: Default::default(),
+                            },
+                            _ => unreachable!(),
+                        };
 
                         grouped_decls.push(hir::Stmt {
                             // TODO: Hope this will not mess with us in the future, we generate
@@ -427,7 +439,71 @@ impl LoweringContext {
                             leading_comments: node.leading_comments.clone(),
                             trailing_comments: node.trailing_comments.clone(),
                         });
+
+                        // Pushing match arm for dynamic dispatch version of the function.
+                        match_arms.push(hir::MatchArm {
+                            pat: hir::Pat {
+                                kind: hir::PatKind::Literal(Box::new(Literal::Integer(
+                                    i64::try_from(arg_len).unwrap(),
+                                ))),
+                                span: Default::default(),
+                            },
+                            guard: None,
+                            expr: hir::Expr {
+                                hir_id: self.unique_id(),
+                                kind: hir::ExprKind::Call(Box::new(hir::CallExpression {
+                                    callee: fn_name,
+                                    arguments: (0..arg_len)
+                                        .map(|i| hir::Expr {
+                                            hir_id: self.unique_id(),
+                                            kind: hir::ExprKind::Path(Box::new(hir::Path {
+                                                segments: vec![hir::PathSegment {
+                                                    ident: Ident::new(
+                                                        &format!("arguments[{}]", i),
+                                                        Default::default(),
+                                                    ),
+                                                }],
+                                                span: Default::default(),
+                                            })),
+                                            span: Default::default(),
+                                        })
+                                        .collect(),
+                                })),
+                                span: Default::default(),
+                            },
+                        })
                     }
+
+                    let fn_name = self.lower_expr(&first_declaration.name);
+
+                    let mut dynamic_dispatch_fn =
+                        hir::FunctionDeclaration::new_empty_fn(self.unique_id(), fn_name, vec![]);
+
+                    dynamic_dispatch_fn.body.expr = Some(hir::Expr {
+                        hir_id: self.unique_id(),
+                        kind: hir::ExprKind::Match(
+                            Box::new(hir::Expr {
+                                hir_id: self.unique_id(),
+                                kind: hir::ExprKind::Path(Box::new(hir::Path {
+                                    segments: vec![hir::PathSegment {
+                                        ident: Ident::new("arguments.length", node.span),
+                                    }],
+                                    span: node.span,
+                                })),
+                                span: node.span,
+                            }),
+                            match_arms,
+                        ),
+                        span: node.span,
+                    });
+
+                    grouped_decls.push(hir::Stmt {
+                        hir_id: self.unique_id(),
+                        kind: hir::StmtKind::FunctionDeclaration(Box::new(dynamic_dispatch_fn)),
+                        span: node.span,
+                        leading_comments: vec![],
+                        trailing_comments: vec![],
+                    });
 
                     grouped_decls
                 } else {
