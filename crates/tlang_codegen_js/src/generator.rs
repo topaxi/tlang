@@ -587,8 +587,10 @@ impl CodegenJS {
     //       language and use pattern matching instead.
     pub(crate) fn generate_pat(&mut self, pattern: &hir::Pat) {
         match &pattern.kind {
+            hir::PatKind::Identifier(..) if pattern.is_self() => {
+                self.current_scope().declare_variable_alias("self", "this");
+            }
             hir::PatKind::Identifier(_, ident) => {
-                // TODO: Deal with `self`
                 let var_name = self.current_scope().declare_variable(ident.name.as_str());
                 self.push_str(&var_name);
                 self.current_scope()
@@ -732,7 +734,7 @@ impl CodegenJS {
         self.push_str(") {\n");
         self.indent_level += 1;
         self.flush_statement_buffer();
-        self.generate_block(then_branch);
+        self.generate_block_expression(then_branch);
         self.indent_level -= 1;
 
         for else_branch in else_branches {
@@ -751,7 +753,7 @@ impl CodegenJS {
             self.push_str(" {\n");
             self.indent_level += 1;
             self.flush_statement_buffer();
-            self.generate_block(&else_branch.consequence);
+            self.generate_block_expression(&else_branch.consequence);
             self.indent_level -= 1;
         }
 
