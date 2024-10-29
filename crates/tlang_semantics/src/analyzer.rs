@@ -216,13 +216,7 @@ impl SemanticAnalyzer {
     }
 
     fn analyze_path(&mut self, path: &Path, span: Span) {
-        let mut segments = Vec::with_capacity(path.segments.len());
-
-        for segment in &path.segments {
-            segments.push(segment.to_string());
-
-            self.mark_as_used_by_name(&segments.join("::"), span);
-        }
+        self.mark_as_used_by_name(&path.join("::"), span);
     }
 
     fn analyze_expr(&mut self, expr: &Expr) {
