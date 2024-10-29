@@ -77,10 +77,7 @@ impl CodegenJS {
                         }
                         ast::PatternKind::Enum(enum_pattern) => {
                             let tmp_variable_enum = self.current_scope().declare_tmp_variable();
-                            let enum_name = match &enum_pattern.identifier.kind {
-                                ast::ExprKind::Path(path) => path.segments.last().unwrap().as_str(),
-                                _ => unreachable!(),
-                            };
+                            let enum_name = enum_pattern.path.segments.last().unwrap().as_str();
                             self.push_let_declaration(&tmp_variable_enum);
                             self.push_newline();
                             self.current_scope()
@@ -244,10 +241,7 @@ impl CodegenJS {
                             }
                         }
                         ast::PatternKind::Enum(enum_pattern) => {
-                            let identifier = match &enum_pattern.identifier.kind {
-                                ast::ExprKind::Path(path) => path.segments.last().unwrap().as_str(),
-                                _ => unreachable!(),
-                            };
+                            let identifier = enum_pattern.path.segments.last().unwrap().as_str();
                             self.push_str(&format!("{arg_name}.tag === \"{identifier}\""));
                             for (i, element) in enum_pattern.elements.iter().enumerate() {
                                 let identifier = match &element.kind {
@@ -382,7 +376,7 @@ impl CodegenJS {
                             Some(ident_pattern.name.to_string())
                         }
                         ast::PatternKind::Enum(enum_pattern) => {
-                            Some(get_enum_name(&enum_pattern.identifier).to_lowercase())
+                            Some(get_enum_name(&enum_pattern.path).to_lowercase())
                         }
                         _ => None,
                     }
@@ -396,8 +390,7 @@ impl CodegenJS {
                                 Some(ident_pattern.name.to_string()) == arg_name
                             }
                             ast::PatternKind::Enum(ident_pattern) => {
-                                Some(get_enum_name(&ident_pattern.identifier).to_lowercase())
-                                    == arg_name
+                                Some(get_enum_name(&ident_pattern.path).to_lowercase()) == arg_name
                             }
 
                             _ => true,
@@ -451,10 +444,7 @@ impl CodegenJS {
                     self.push_char(')');
                 }
                 ast::PatternKind::Enum(enum_pattern) => {
-                    let enum_name = match &enum_pattern.identifier.kind {
-                        ast::ExprKind::Path(path) => path.segments.last().unwrap().as_str(),
-                        _ => unreachable!(),
-                    };
+                    let enum_name = enum_pattern.path.segments.last().unwrap().as_str();
                     let guard_variable = self.current_scope().resolve_variable(enum_name);
                     self.push_str(&format!("({} = ", guard_variable.as_ref().unwrap()));
                     self.generate_expr(expression, None);
@@ -740,11 +730,8 @@ impl CodegenJS {
     }
 }
 
-fn get_enum_name(identifier: &ast::Expr) -> String {
-    match &identifier.kind {
-        ast::ExprKind::Path(path) => path.segments[path.segments.len() - 2].to_string(),
-        _ => unreachable!(),
-    }
+fn get_enum_name(path: &ast::Path) -> String {
+    return path.segments[path.segments.len() - 2].to_string();
 }
 
 fn is_function_body_tail_recursive_stmt(function_name: &str, stmt: &ast::Stmt) -> bool {

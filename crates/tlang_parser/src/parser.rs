@@ -1171,7 +1171,7 @@ impl<'src> Parser<'src> {
 
     /// Parses an enum extraction, e.g. `Foo(bar, baz)` and `Foo { bar, baz }`
     fn parse_enum_extraction(&mut self) -> Pattern {
-        let identifier = self.parse_path_expression();
+        let path = self.parse_path();
         let is_dict_extraction = matches!(self.current_token_kind(), Some(TokenKind::LBrace));
 
         if is_dict_extraction {
@@ -1189,7 +1189,7 @@ impl<'src> Parser<'src> {
             node::pat!(
                 self.unique_id(),
                 Enum(Box::new(EnumPattern {
-                    identifier,
+                    path,
                     elements,
                     named_fields: true,
                 }))
@@ -1207,7 +1207,7 @@ impl<'src> Parser<'src> {
             node::pat!(
                 self.unique_id(),
                 Enum(Box::new(EnumPattern {
-                    identifier,
+                    path,
                     elements,
                     named_fields: false,
                 }))
@@ -1216,7 +1216,7 @@ impl<'src> Parser<'src> {
             node::pat!(
                 self.unique_id(),
                 Enum(Box::new(EnumPattern {
-                    identifier,
+                    path,
                     elements: Vec::new(),
                     named_fields: false,
                 }))

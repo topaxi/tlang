@@ -324,7 +324,7 @@ impl Pattern {
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct EnumPattern {
-    pub identifier: Expr,
+    pub path: Path,
     pub elements: Vec<Pattern>,
     pub named_fields: bool,
 }

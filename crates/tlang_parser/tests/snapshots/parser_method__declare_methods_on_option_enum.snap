@@ -108,10 +108,10 @@ Module(
       trailing_comments: [],
     ),
     Stmt(
-      id: NodeId(28),
+      id: NodeId(26),
       kind: FunctionDeclarations([
         FunctionDeclaration(
-          id: NodeId(12),
+          id: NodeId(11),
           name: Expr(
             id: NodeId(5),
             kind: Path(Path(
@@ -170,52 +170,37 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pattern(
-                id: NodeId(8),
+                id: NodeId(7),
                 kind: Enum(EnumPattern(
-                  identifier: Expr(
-                    id: NodeId(6),
-                    kind: Path(Path(
-                      segments: [
-                        Ident(
-                          name: "Option",
-                          span: Span(
-                            start: LineColumn(
-                              line: 5,
-                              column: 22,
-                            ),
-                            end: LineColumn(
-                              line: 5,
-                              column: 28,
-                            ),
+                  path: Path(
+                    segments: [
+                      Ident(
+                        name: "Option",
+                        span: Span(
+                          start: LineColumn(
+                            line: 5,
+                            column: 22,
                           ),
-                        ),
-                        Ident(
-                          name: "Some",
-                          span: Span(
-                            start: LineColumn(
-                              line: 5,
-                              column: 30,
-                            ),
-                            end: LineColumn(
-                              line: 5,
-                              column: 34,
-                            ),
+                          end: LineColumn(
+                            line: 5,
+                            column: 28,
                           ),
-                        ),
-                      ],
-                      span: Span(
-                        start: LineColumn(
-                          line: 5,
-                          column: 22,
-                        ),
-                        end: LineColumn(
-                          line: 5,
-                          column: 34,
                         ),
                       ),
-                    )),
-                    leading_comments: [],
-                    trailing_comments: [],
+                      Ident(
+                        name: "Some",
+                        span: Span(
+                          start: LineColumn(
+                            line: 5,
+                            column: 30,
+                          ),
+                          end: LineColumn(
+                            line: 5,
+                            column: 34,
+                          ),
+                        ),
+                      ),
+                    ],
                     span: Span(
                       start: LineColumn(
                         line: 5,
@@ -229,7 +214,7 @@ Module(
                   ),
                   elements: [
                     Pattern(
-                      id: NodeId(7),
+                      id: NodeId(6),
                       kind: Wildcard,
                       leading_comments: [],
                       trailing_comments: [],
@@ -276,10 +261,10 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: NodeId(11),
+            id: NodeId(10),
             statements: [],
             expression: Some(Expr(
-              id: NodeId(10),
+              id: NodeId(9),
               kind: Literal(Boolean(true)),
               leading_comments: [],
               trailing_comments: [],
@@ -319,9 +304,9 @@ Module(
           ),
         ),
         FunctionDeclaration(
-          id: NodeId(19),
+          id: NodeId(17),
           name: Expr(
-            id: NodeId(13),
+            id: NodeId(12),
             kind: Path(Path(
               segments: [
                 Ident(
@@ -378,52 +363,37 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pattern(
-                id: NodeId(15),
+                id: NodeId(13),
                 kind: Enum(EnumPattern(
-                  identifier: Expr(
-                    id: NodeId(14),
-                    kind: Path(Path(
-                      segments: [
-                        Ident(
-                          name: "Option",
-                          span: Span(
-                            start: LineColumn(
-                              line: 6,
-                              column: 22,
-                            ),
-                            end: LineColumn(
-                              line: 6,
-                              column: 28,
-                            ),
+                  path: Path(
+                    segments: [
+                      Ident(
+                        name: "Option",
+                        span: Span(
+                          start: LineColumn(
+                            line: 6,
+                            column: 22,
                           ),
-                        ),
-                        Ident(
-                          name: "None",
-                          span: Span(
-                            start: LineColumn(
-                              line: 6,
-                              column: 30,
-                            ),
-                            end: LineColumn(
-                              line: 6,
-                              column: 34,
-                            ),
+                          end: LineColumn(
+                            line: 6,
+                            column: 28,
                           ),
-                        ),
-                      ],
-                      span: Span(
-                        start: LineColumn(
-                          line: 6,
-                          column: 22,
-                        ),
-                        end: LineColumn(
-                          line: 6,
-                          column: 34,
                         ),
                       ),
-                    )),
-                    leading_comments: [],
-                    trailing_comments: [],
+                      Ident(
+                        name: "None",
+                        span: Span(
+                          start: LineColumn(
+                            line: 6,
+                            column: 30,
+                          ),
+                          end: LineColumn(
+                            line: 6,
+                            column: 34,
+                          ),
+                        ),
+                      ),
+                    ],
                     span: Span(
                       start: LineColumn(
                         line: 6,
@@ -467,10 +437,10 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: NodeId(18),
+            id: NodeId(16),
             statements: [],
             expression: Some(Expr(
-              id: NodeId(17),
+              id: NodeId(15),
               kind: Literal(Boolean(true)),
               leading_comments: [],
               trailing_comments: [],
@@ -510,9 +480,9 @@ Module(
           ),
         ),
         FunctionDeclaration(
-          id: NodeId(25),
+          id: NodeId(23),
           name: Expr(
-            id: NodeId(20),
+            id: NodeId(18),
             kind: Path(Path(
               segments: [
                 Ident(
@@ -569,7 +539,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pattern(
-                id: NodeId(21),
+                id: NodeId(19),
                 kind: Wildcard,
                 leading_comments: [],
                 trailing_comments: [],
@@ -600,10 +570,10 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: NodeId(24),
+            id: NodeId(22),
             statements: [],
             expression: Some(Expr(
-              id: NodeId(23),
+              id: NodeId(21),
               kind: Literal(Boolean(false)),
               leading_comments: [],
               trailing_comments: [],
@@ -657,15 +627,15 @@ Module(
       trailing_comments: [],
     ),
     Stmt(
-      id: NodeId(48),
+      id: NodeId(44),
       kind: FunctionDeclarations([
         FunctionDeclaration(
-          id: NodeId(37),
+          id: NodeId(34),
           name: Expr(
-            id: NodeId(30),
+            id: NodeId(28),
             kind: FieldExpression(FieldAccessExpression(
               base: Expr(
-                id: NodeId(29),
+                id: NodeId(27),
                 kind: Path(Path(
                   segments: [
                     Ident(
@@ -736,52 +706,37 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pattern(
-                id: NodeId(33),
+                id: NodeId(30),
                 kind: Enum(EnumPattern(
-                  identifier: Expr(
-                    id: NodeId(31),
-                    kind: Path(Path(
-                      segments: [
-                        Ident(
-                          name: "Option",
-                          span: Span(
-                            start: LineColumn(
-                              line: 9,
-                              column: 19,
-                            ),
-                            end: LineColumn(
-                              line: 9,
-                              column: 25,
-                            ),
+                  path: Path(
+                    segments: [
+                      Ident(
+                        name: "Option",
+                        span: Span(
+                          start: LineColumn(
+                            line: 9,
+                            column: 19,
                           ),
-                        ),
-                        Ident(
-                          name: "Some",
-                          span: Span(
-                            start: LineColumn(
-                              line: 9,
-                              column: 27,
-                            ),
-                            end: LineColumn(
-                              line: 9,
-                              column: 31,
-                            ),
+                          end: LineColumn(
+                            line: 9,
+                            column: 25,
                           ),
-                        ),
-                      ],
-                      span: Span(
-                        start: LineColumn(
-                          line: 9,
-                          column: 19,
-                        ),
-                        end: LineColumn(
-                          line: 9,
-                          column: 31,
                         ),
                       ),
-                    )),
-                    leading_comments: [],
-                    trailing_comments: [],
+                      Ident(
+                        name: "Some",
+                        span: Span(
+                          start: LineColumn(
+                            line: 9,
+                            column: 27,
+                          ),
+                          end: LineColumn(
+                            line: 9,
+                            column: 31,
+                          ),
+                        ),
+                      ),
+                    ],
                     span: Span(
                       start: LineColumn(
                         line: 9,
@@ -795,7 +750,7 @@ Module(
                   ),
                   elements: [
                     Pattern(
-                      id: NodeId(32),
+                      id: NodeId(29),
                       kind: Wildcard,
                       leading_comments: [],
                       trailing_comments: [],
@@ -842,10 +797,10 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: NodeId(36),
+            id: NodeId(33),
             statements: [],
             expression: Some(Expr(
-              id: NodeId(35),
+              id: NodeId(32),
               kind: Literal(Boolean(true)),
               leading_comments: [],
               trailing_comments: [],
@@ -885,12 +840,12 @@ Module(
           ),
         ),
         FunctionDeclaration(
-          id: NodeId(45),
+          id: NodeId(41),
           name: Expr(
-            id: NodeId(39),
+            id: NodeId(36),
             kind: FieldExpression(FieldAccessExpression(
               base: Expr(
-                id: NodeId(38),
+                id: NodeId(35),
                 kind: Path(Path(
                   segments: [
                     Ident(
@@ -961,52 +916,37 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pattern(
-                id: NodeId(41),
+                id: NodeId(37),
                 kind: Enum(EnumPattern(
-                  identifier: Expr(
-                    id: NodeId(40),
-                    kind: Path(Path(
-                      segments: [
-                        Ident(
-                          name: "Option",
-                          span: Span(
-                            start: LineColumn(
-                              line: 10,
-                              column: 19,
-                            ),
-                            end: LineColumn(
-                              line: 10,
-                              column: 25,
-                            ),
+                  path: Path(
+                    segments: [
+                      Ident(
+                        name: "Option",
+                        span: Span(
+                          start: LineColumn(
+                            line: 10,
+                            column: 19,
                           ),
-                        ),
-                        Ident(
-                          name: "None",
-                          span: Span(
-                            start: LineColumn(
-                              line: 10,
-                              column: 27,
-                            ),
-                            end: LineColumn(
-                              line: 10,
-                              column: 31,
-                            ),
+                          end: LineColumn(
+                            line: 10,
+                            column: 25,
                           ),
-                        ),
-                      ],
-                      span: Span(
-                        start: LineColumn(
-                          line: 10,
-                          column: 19,
-                        ),
-                        end: LineColumn(
-                          line: 10,
-                          column: 31,
                         ),
                       ),
-                    )),
-                    leading_comments: [],
-                    trailing_comments: [],
+                      Ident(
+                        name: "None",
+                        span: Span(
+                          start: LineColumn(
+                            line: 10,
+                            column: 27,
+                          ),
+                          end: LineColumn(
+                            line: 10,
+                            column: 31,
+                          ),
+                        ),
+                      ),
+                    ],
                     span: Span(
                       start: LineColumn(
                         line: 10,
@@ -1050,10 +990,10 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: NodeId(44),
+            id: NodeId(40),
             statements: [],
             expression: Some(Expr(
-              id: NodeId(43),
+              id: NodeId(39),
               kind: Literal(Boolean(false)),
               leading_comments: [],
               trailing_comments: [],
@@ -1107,15 +1047,15 @@ Module(
       trailing_comments: [],
     ),
     Stmt(
-      id: NodeId(72),
+      id: NodeId(66),
       kind: FunctionDeclarations([
         FunctionDeclaration(
-          id: NodeId(62),
+          id: NodeId(57),
           name: Expr(
-            id: NodeId(50),
+            id: NodeId(46),
             kind: FieldExpression(FieldAccessExpression(
               base: Expr(
-                id: NodeId(49),
+                id: NodeId(45),
                 kind: Path(Path(
                   segments: [
                     Ident(
@@ -1186,52 +1126,37 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pattern(
-                id: NodeId(53),
+                id: NodeId(48),
                 kind: Enum(EnumPattern(
-                  identifier: Expr(
-                    id: NodeId(51),
-                    kind: Path(Path(
-                      segments: [
-                        Ident(
-                          name: "Option",
-                          span: Span(
-                            start: LineColumn(
-                              line: 12,
-                              column: 15,
-                            ),
-                            end: LineColumn(
-                              line: 12,
-                              column: 21,
-                            ),
+                  path: Path(
+                    segments: [
+                      Ident(
+                        name: "Option",
+                        span: Span(
+                          start: LineColumn(
+                            line: 12,
+                            column: 15,
                           ),
-                        ),
-                        Ident(
-                          name: "Some",
-                          span: Span(
-                            start: LineColumn(
-                              line: 12,
-                              column: 23,
-                            ),
-                            end: LineColumn(
-                              line: 12,
-                              column: 27,
-                            ),
+                          end: LineColumn(
+                            line: 12,
+                            column: 21,
                           ),
-                        ),
-                      ],
-                      span: Span(
-                        start: LineColumn(
-                          line: 12,
-                          column: 15,
-                        ),
-                        end: LineColumn(
-                          line: 12,
-                          column: 27,
                         ),
                       ),
-                    )),
-                    leading_comments: [],
-                    trailing_comments: [],
+                      Ident(
+                        name: "Some",
+                        span: Span(
+                          start: LineColumn(
+                            line: 12,
+                            column: 23,
+                          ),
+                          end: LineColumn(
+                            line: 12,
+                            column: 27,
+                          ),
+                        ),
+                      ),
+                    ],
                     span: Span(
                       start: LineColumn(
                         line: 12,
@@ -1245,7 +1170,7 @@ Module(
                   ),
                   elements: [
                     Pattern(
-                      id: NodeId(52),
+                      id: NodeId(47),
                       kind: Identifier(Ident(
                         name: "x",
                         span: Span(
@@ -1302,7 +1227,7 @@ Module(
             ),
             FunctionParameter(
               pattern: Pattern(
-                id: NodeId(54),
+                id: NodeId(49),
                 kind: Identifier(Ident(
                   name: "f",
                   span: Span(
@@ -1345,13 +1270,13 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: NodeId(61),
+            id: NodeId(56),
             statements: [],
             expression: Some(Expr(
-              id: NodeId(60),
+              id: NodeId(55),
               kind: Call(CallExpression(
                 callee: Expr(
-                  id: NodeId(56),
+                  id: NodeId(51),
                   kind: Path(Path(
                     segments: [
                       Ident(
@@ -1407,10 +1332,10 @@ Module(
                 ),
                 arguments: [
                   Expr(
-                    id: NodeId(59),
+                    id: NodeId(54),
                     kind: Call(CallExpression(
                       callee: Expr(
-                        id: NodeId(57),
+                        id: NodeId(52),
                         kind: Path(Path(
                           segments: [
                             Ident(
@@ -1453,7 +1378,7 @@ Module(
                       ),
                       arguments: [
                         Expr(
-                          id: NodeId(58),
+                          id: NodeId(53),
                           kind: Path(Path(
                             segments: [
                               Ident(
@@ -1549,12 +1474,12 @@ Module(
           ),
         ),
         FunctionDeclaration(
-          id: NodeId(71),
+          id: NodeId(65),
           name: Expr(
-            id: NodeId(64),
+            id: NodeId(59),
             kind: FieldExpression(FieldAccessExpression(
               base: Expr(
-                id: NodeId(63),
+                id: NodeId(58),
                 kind: Path(Path(
                   segments: [
                     Ident(
@@ -1625,52 +1550,37 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pattern(
-                id: NodeId(66),
+                id: NodeId(60),
                 kind: Enum(EnumPattern(
-                  identifier: Expr(
-                    id: NodeId(65),
-                    kind: Path(Path(
-                      segments: [
-                        Ident(
-                          name: "Option",
-                          span: Span(
-                            start: LineColumn(
-                              line: 13,
-                              column: 15,
-                            ),
-                            end: LineColumn(
-                              line: 13,
-                              column: 21,
-                            ),
+                  path: Path(
+                    segments: [
+                      Ident(
+                        name: "Option",
+                        span: Span(
+                          start: LineColumn(
+                            line: 13,
+                            column: 15,
                           ),
-                        ),
-                        Ident(
-                          name: "None",
-                          span: Span(
-                            start: LineColumn(
-                              line: 13,
-                              column: 23,
-                            ),
-                            end: LineColumn(
-                              line: 13,
-                              column: 27,
-                            ),
+                          end: LineColumn(
+                            line: 13,
+                            column: 21,
                           ),
-                        ),
-                      ],
-                      span: Span(
-                        start: LineColumn(
-                          line: 13,
-                          column: 15,
-                        ),
-                        end: LineColumn(
-                          line: 13,
-                          column: 27,
                         ),
                       ),
-                    )),
-                    leading_comments: [],
-                    trailing_comments: [],
+                      Ident(
+                        name: "None",
+                        span: Span(
+                          start: LineColumn(
+                            line: 13,
+                            column: 23,
+                          ),
+                          end: LineColumn(
+                            line: 13,
+                            column: 27,
+                          ),
+                        ),
+                      ),
+                    ],
                     span: Span(
                       start: LineColumn(
                         line: 13,
@@ -1712,7 +1622,7 @@ Module(
             ),
             FunctionParameter(
               pattern: Pattern(
-                id: NodeId(67),
+                id: NodeId(61),
                 kind: Wildcard,
                 leading_comments: [],
                 trailing_comments: [],
@@ -1743,10 +1653,10 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: NodeId(70),
+            id: NodeId(64),
             statements: [],
             expression: Some(Expr(
-              id: NodeId(69),
+              id: NodeId(63),
               kind: Path(Path(
                 segments: [
                   Ident(

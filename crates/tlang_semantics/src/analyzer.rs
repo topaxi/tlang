@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use tlang_ast::{
     node::{
         Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, LetDeclaration, Module,
-        Pattern, PatternKind, Stmt, StmtKind, StructDeclaration,
+        Path, Pattern, PatternKind, Stmt, StmtKind, StructDeclaration,
     },
     node_id::NodeId,
     span::Span,
@@ -80,7 +80,7 @@ impl SemanticAnalyzer {
         self.declaration_analyzer.add_builtin_symbols(symbols);
     }
 
-    pub fn analyze(&mut self, module: &mut Module) -> Result<(), Vec<Diagnostic>> {
+    pub fn analyze(&mut self, module: &Module) -> Result<(), Vec<Diagnostic>> {
         self.collect_declarations(module);
         // self.collect_initializations(ast);
         self.analyze_module(module);
@@ -92,11 +92,11 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn collect_declarations(&mut self, module: &mut Module) {
+    fn collect_declarations(&mut self, module: &Module) {
         self.declaration_analyzer.analyze(module);
     }
 
-    fn mark_as_used_by_name(&mut self, name: &str, span: &Span) {
+    fn mark_as_used_by_name(&mut self, name: &str, span: Span) {
         let symbol_info = self.get_last_symbol_table().borrow().get_by_name(name);
 
         if let Some(symbol_info) = symbol_info {
@@ -111,7 +111,7 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn report_undeclared_variable(&mut self, name: &str, span: &Span) {
+    fn report_undeclared_variable(&mut self, name: &str, span: Span) {
         let did_you_mean = did_you_mean(
             name,
             &self.get_last_symbol_table().borrow().get_all_symbols(),
@@ -124,34 +124,34 @@ impl SemanticAnalyzer {
                     name, suggestion.symbol_type, suggestion.name
                 ),
                 Severity::Error,
-                *span,
+                span,
             ));
         } else {
             self.diagnostics.push(Diagnostic::new(
                 format!("Use of undeclared variable `{name}`"),
                 Severity::Error,
-                *span,
+                span,
             ));
         }
     }
 
     #[inline(always)]
-    fn analyze_optional_expr(&mut self, expr: &mut Option<Expr>) {
+    fn analyze_optional_expr(&mut self, expr: &Option<Expr>) {
         if let Some(expr) = expr {
             self.analyze_expr(expr);
         }
     }
 
-    fn analyze_block(&mut self, block: &mut Block) {
+    fn analyze_block(&mut self, block: &Block) {
         if let Some(symbol_table) = &self.get_symbol_table(block.id) {
             self.push_symbol_table(symbol_table);
         }
 
-        for stmt in &mut block.statements {
+        for stmt in &block.statements {
             self.analyze_stmt(stmt);
         }
 
-        self.analyze_optional_expr(&mut block.expression);
+        self.analyze_optional_expr(&block.expression);
 
         if let Some(symbol_table) = &self.get_symbol_table(block.id) {
             self.report_unused_symbols(symbol_table);
@@ -159,12 +159,12 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn analyze_stmt(&mut self, stmt: &mut Stmt) {
+    fn analyze_stmt(&mut self, stmt: &Stmt) {
         if let Some(symbol_table) = &self.get_symbol_table(stmt.id) {
             self.push_symbol_table(symbol_table);
         }
 
-        match &mut stmt.kind {
+        match &stmt.kind {
             StmtKind::None => {}
             StmtKind::Expr(expr) => self.analyze_expr(expr),
             StmtKind::Let(decl) => self.analyze_variable_declaration(decl),
@@ -190,24 +190,24 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn analyze_fn_param(&mut self, param: &mut FunctionParameter) {
-        self.analyze_pat(&mut param.pattern);
+    fn analyze_fn_param(&mut self, param: &FunctionParameter) {
+        self.analyze_pat(&param.pattern);
     }
 
-    fn analyze_fn_decl(&mut self, decl: &mut FunctionDeclaration) {
+    fn analyze_fn_decl(&mut self, decl: &FunctionDeclaration) {
         if let Some(symbol_table) = &self.get_symbol_table(decl.id) {
             self.push_symbol_table(symbol_table);
         }
 
-        for parameter in &mut decl.parameters {
+        for parameter in &decl.parameters {
             self.analyze_fn_param(parameter);
         }
 
-        if let Some(ref mut guard) = decl.guard {
+        if let Some(ref guard) = decl.guard {
             self.analyze_expr(guard);
         }
 
-        self.analyze_block(&mut decl.body);
+        self.analyze_block(&decl.body);
 
         if let Some(symbol_table) = &self.get_symbol_table(decl.id) {
             self.report_unused_symbols(symbol_table);
@@ -215,34 +215,42 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn analyze_expr(&mut self, expr: &mut Expr) {
+    fn analyze_path(&mut self, path: &Path, span: Span) {
+        let mut segments = Vec::with_capacity(path.segments.len());
+        for segment in &path.segments {
+            segments.push(segment.to_string());
+            self.mark_as_used_by_name(&segments.join("::"), span);
+        }
+    }
+
+    fn analyze_expr(&mut self, expr: &Expr) {
         if let Some(symbol_table) = &self.get_symbol_table(expr.id) {
             self.push_symbol_table(symbol_table);
         }
 
-        match &mut expr.kind {
+        match &expr.kind {
             ExprKind::BinaryOp(expr) => {
-                self.analyze_expr(&mut expr.lhs);
-                self.analyze_expr(&mut expr.rhs);
+                self.analyze_expr(&expr.lhs);
+                self.analyze_expr(&expr.rhs);
             }
             ExprKind::Block(block) => self.analyze_block(block),
             ExprKind::UnaryOp(_, node) => {
                 self.analyze_expr(node);
             }
             ExprKind::Call(expr) | ExprKind::RecursiveCall(expr) => {
-                for argument in &mut expr.arguments {
+                for argument in &expr.arguments {
                     self.analyze_expr(argument);
                 }
 
-                self.analyze_expr(&mut expr.callee);
+                self.analyze_expr(&expr.callee);
             }
             ExprKind::IfElse(expr) => {
-                self.analyze_expr(&mut expr.condition);
-                self.analyze_expr(&mut expr.then_branch);
+                self.analyze_expr(&expr.condition);
+                self.analyze_expr(&expr.then_branch);
 
-                for else_branch in &mut expr.else_branches {
-                    self.analyze_optional_expr(&mut else_branch.condition);
-                    self.analyze_expr(&mut else_branch.consequence);
+                for else_branch in &expr.else_branches {
+                    self.analyze_optional_expr(&else_branch.condition);
+                    self.analyze_expr(&else_branch.consequence);
                 }
             }
             ExprKind::Let(pat, expr) => {
@@ -262,15 +270,15 @@ impl SemanticAnalyzer {
                 }
             }
             ExprKind::IndexExpression(expr) => {
-                self.analyze_expr(&mut expr.index);
-                self.analyze_expr(&mut expr.base);
+                self.analyze_expr(&expr.index);
+                self.analyze_expr(&expr.base);
             }
             ExprKind::FieldExpression(expr) => {
-                self.analyze_expr(&mut expr.base);
+                self.analyze_expr(&expr.base);
                 // TODO: We are checking for unused variables, this should be refactored into
                 //       it's own pass. Skipping analyzing field of variable as we do not have
                 //       any type information yet.
-                // self.analyze_node(&mut expr.field);
+                // self.analyze_node(&expr.field);
             }
             ExprKind::FunctionExpression(decl) => {
                 self.analyze_fn_decl(decl);
@@ -281,20 +289,20 @@ impl SemanticAnalyzer {
                 for segment in &path.segments {
                     segments.push(segment.to_string());
 
-                    self.mark_as_used_by_name(&segments.join("::"), &expr.span);
+                    self.mark_as_used_by_name(&segments.join("::"), expr.span);
                 }
             }
             ExprKind::Match(expr) => {
-                self.analyze_expr(&mut expr.expression);
+                self.analyze_expr(&expr.expression);
 
-                for arm in &mut expr.arms {
-                    self.analyze_pat(&mut arm.pattern);
-                    self.analyze_expr(&mut arm.expression);
+                for arm in &expr.arms {
+                    self.analyze_pat(&arm.pattern);
+                    self.analyze_expr(&arm.expression);
                 }
             }
             ExprKind::Range(expr) => {
-                self.analyze_expr(&mut expr.start);
-                self.analyze_expr(&mut expr.end);
+                self.analyze_expr(&expr.start);
+                self.analyze_expr(&expr.end);
             }
             ExprKind::None | ExprKind::Literal(_) | ExprKind::Wildcard => {}
         }
@@ -305,8 +313,8 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn analyze_pat(&mut self, pat: &mut Pattern) {
-        match &mut pat.kind {
+    fn analyze_pat(&mut self, pat: &Pattern) {
+        match &pat.kind {
             PatternKind::List(patterns) => {
                 for pattern in patterns {
                     self.analyze_pat(pattern);
@@ -314,9 +322,9 @@ impl SemanticAnalyzer {
             }
             PatternKind::Rest(pattern) => self.analyze_pat(pattern),
             PatternKind::Enum(enum_pattern) => {
-                self.analyze_expr(&mut enum_pattern.identifier);
+                self.analyze_path(&enum_pattern.path, pat.span);
 
-                for element in &mut enum_pattern.elements {
+                for element in &enum_pattern.elements {
                     self.analyze_pat(element);
                 }
             }
@@ -324,12 +332,12 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn analyze_module(&mut self, module: &mut Module) {
+    fn analyze_module(&mut self, module: &Module) {
         if let Some(symbol_table) = &self.get_symbol_table(module.id) {
             self.push_symbol_table(symbol_table);
         }
 
-        for stmt in &mut module.statements {
+        for stmt in &module.statements {
             self.analyze_stmt(stmt);
         }
 
@@ -341,7 +349,7 @@ impl SemanticAnalyzer {
 
     fn report_unused_symbols(&mut self, symbol_table: &Rc<RefCell<SymbolTable>>) {
         let symbol_table = symbol_table.borrow();
-        let mut unused_symbols = symbol_table
+        let unused_symbols = symbol_table
             .get_all_local_symbols()
             .iter()
             // Internal symbols are currently represented with id 0 and internal symbols are not
@@ -354,7 +362,7 @@ impl SemanticAnalyzer {
             .filter(|symbol| !symbol.name.contains('.'))
             .collect::<Vec<_>>();
 
-        for unused_symbol in &mut unused_symbols {
+        for unused_symbol in &unused_symbols {
             self.diagnostics.push(Diagnostic::new(
                     format!(
                         "Unused {} `{}`, if this is intentional, prefix the name with an underscore: `_{}`",
@@ -366,8 +374,8 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn analyze_variable_declaration(&mut self, decl: &mut LetDeclaration) {
-        self.analyze_pat(&mut decl.pattern);
+    fn analyze_variable_declaration(&mut self, decl: &LetDeclaration) {
+        self.analyze_pat(&decl.pattern);
 
         // When declaring a variable, we can only reference symbols that were declared before.
         // This includes our own variable name.
@@ -387,7 +395,7 @@ impl SemanticAnalyzer {
             .filter_map(|id| self.get_last_symbol_table().borrow_mut().remove(id))
             .collect::<Vec<_>>();
 
-        self.analyze_expr(&mut decl.expression);
+        self.analyze_expr(&decl.expression);
 
         for symbol in pattern_symbols {
             self.get_last_symbol_table()

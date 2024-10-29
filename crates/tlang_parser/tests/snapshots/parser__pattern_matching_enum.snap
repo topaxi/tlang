@@ -6,7 +6,7 @@ Module(
   id: NodeId(1),
   statements: [
     Stmt(
-      id: NodeId(11),
+      id: NodeId(10),
       kind: Let(LetDeclaration(
         pattern: Pattern(
           id: NodeId(2),
@@ -37,7 +37,7 @@ Module(
           ),
         ),
         expression: Expr(
-          id: NodeId(10),
+          id: NodeId(9),
           kind: Match(MatchExpression(
             expression: Expr(
               id: NodeId(3),
@@ -57,41 +57,26 @@ Module(
             ),
             arms: [
               MatchArm(
-                id: NodeId(9),
+                id: NodeId(8),
                 pattern: Pattern(
-                  id: NodeId(7),
+                  id: NodeId(6),
                   kind: Enum(EnumPattern(
-                    identifier: Expr(
-                      id: NodeId(4),
-                      kind: Path(Path(
-                        segments: [
-                          Ident(
-                            name: "Foo",
-                            span: Span(
-                              start: LineColumn(
-                                line: 0,
-                                column: 18,
-                              ),
-                              end: LineColumn(
-                                line: 0,
-                                column: 21,
-                              ),
+                    path: Path(
+                      segments: [
+                        Ident(
+                          name: "Foo",
+                          span: Span(
+                            start: LineColumn(
+                              line: 0,
+                              column: 18,
+                            ),
+                            end: LineColumn(
+                              line: 0,
+                              column: 21,
                             ),
                           ),
-                        ],
-                        span: Span(
-                          start: LineColumn(
-                            line: 0,
-                            column: 18,
-                          ),
-                          end: LineColumn(
-                            line: 0,
-                            column: 21,
-                          ),
                         ),
-                      )),
-                      leading_comments: [],
-                      trailing_comments: [],
+                      ],
                       span: Span(
                         start: LineColumn(
                           line: 0,
@@ -105,10 +90,10 @@ Module(
                     ),
                     elements: [
                       Pattern(
-                        id: NodeId(6),
+                        id: NodeId(5),
                         kind: List([
                           Pattern(
-                            id: NodeId(5),
+                            id: NodeId(4),
                             kind: Identifier(Ident(
                               name: "bar",
                               span: Span(
@@ -167,7 +152,7 @@ Module(
                 ),
                 guard: None,
                 expression: Expr(
-                  id: NodeId(8),
+                  id: NodeId(7),
                   kind: Path(Path(
                     segments: [
                       Ident(

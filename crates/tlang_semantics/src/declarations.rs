@@ -84,7 +84,7 @@ impl DeclarationAnalyzer {
         }
     }
 
-    pub fn analyze(&mut self, module: &mut Module) {
+    pub fn analyze(&mut self, module: &Module) {
         self.collect_module_declarations(module);
 
         // After collecting all declarations, we should be left with the root symbol table on the
@@ -93,14 +93,14 @@ impl DeclarationAnalyzer {
     }
 
     #[inline(always)]
-    fn collect_optional_declarations_expr(&mut self, node: &mut Option<Expr>) {
+    fn collect_optional_declarations_expr(&mut self, node: &Option<Expr>) {
         if let Some(node) = node {
             self.collect_declarations_expr(node);
         }
     }
 
-    fn collect_declarations_stmt(&mut self, stmt: &mut Stmt) {
-        match &mut stmt.kind {
+    fn collect_declarations_stmt(&mut self, stmt: &Stmt) {
+        match &stmt.kind {
             StmtKind::Expr(expr) => self.collect_declarations_expr(expr),
             StmtKind::Let(decl) => self.collect_variable_declaration(decl),
             StmtKind::FunctionDeclaration(declaration) => {
@@ -135,7 +135,7 @@ impl DeclarationAnalyzer {
             StmtKind::EnumDeclaration(decl) => {
                 self.declare_symbol(stmt.id, decl.name.as_str(), SymbolType::Enum, stmt.span);
 
-                for element in &mut decl.variants {
+                for element in &decl.variants {
                     self.declare_symbol(
                         element.id,
                         &(decl.name.to_string() + "::" + element.name.as_str()),
@@ -153,32 +153,32 @@ impl DeclarationAnalyzer {
         }
     }
 
-    fn collect_declarations_from_fn(&mut self, function_decl: &mut FunctionDeclaration) {
+    fn collect_declarations_from_fn(&mut self, function_decl: &FunctionDeclaration) {
         self.symbol_type_context.push(SymbolType::Parameter);
-        for param in &mut function_decl.parameters {
+        for param in &function_decl.parameters {
             self.collect_declarations_from_fn_param(param);
         }
         self.symbol_type_context.pop();
-        self.collect_optional_declarations_expr(&mut function_decl.guard);
-        self.collect_declarations_block(&mut function_decl.body);
+        self.collect_optional_declarations_expr(&function_decl.guard);
+        self.collect_declarations_block(&function_decl.body);
     }
 
-    fn collect_declarations_from_fn_param(&mut self, param: &mut FunctionParameter) {
-        self.collect_pattern(&mut param.pattern);
+    fn collect_declarations_from_fn_param(&mut self, param: &FunctionParameter) {
+        self.collect_pattern(&param.pattern);
     }
 
-    fn collect_declarations_block(&mut self, block: &mut Block) {
+    fn collect_declarations_block(&mut self, block: &Block) {
         self.push_symbol_table(block.id);
-        for stmt in &mut block.statements {
+        for stmt in &block.statements {
             self.collect_declarations_stmt(stmt);
         }
 
-        self.collect_optional_declarations_expr(&mut block.expression);
+        self.collect_optional_declarations_expr(&block.expression);
         self.pop_symbol_table();
     }
 
-    fn collect_declarations_expr(&mut self, expr: &mut Expr) {
-        match &mut expr.kind {
+    fn collect_declarations_expr(&mut self, expr: &Expr) {
+        match &expr.kind {
             ExprKind::Block(block) => {
                 self.collect_declarations_block(block);
             }
@@ -199,8 +199,8 @@ impl DeclarationAnalyzer {
                 self.pop_symbol_table();
             }
             ExprKind::Call(expr) | ExprKind::RecursiveCall(expr) => {
-                self.collect_declarations_expr(&mut expr.callee);
-                for argument in &mut expr.arguments {
+                self.collect_declarations_expr(&expr.callee);
+                for argument in &expr.arguments {
                     self.collect_declarations_expr(argument);
                 }
             }
@@ -208,8 +208,8 @@ impl DeclarationAnalyzer {
                 self.collect_declarations_expr(node);
             }
             ExprKind::BinaryOp(expr) => {
-                self.collect_declarations_expr(&mut expr.lhs);
-                self.collect_declarations_expr(&mut expr.rhs);
+                self.collect_declarations_expr(&expr.lhs);
+                self.collect_declarations_expr(&expr.rhs);
             }
             ExprKind::List(values) => {
                 for value in values {
@@ -227,31 +227,31 @@ impl DeclarationAnalyzer {
                 self.collect_pattern(pattern);
             }
             ExprKind::IfElse(expr) => {
-                self.collect_declarations_expr(&mut expr.condition);
-                self.collect_declarations_expr(&mut expr.then_branch);
+                self.collect_declarations_expr(&expr.condition);
+                self.collect_declarations_expr(&expr.then_branch);
 
-                for else_branch in &mut expr.else_branches {
-                    self.collect_optional_declarations_expr(&mut else_branch.condition);
-                    self.collect_declarations_expr(&mut else_branch.consequence);
+                for else_branch in &expr.else_branches {
+                    self.collect_optional_declarations_expr(&else_branch.condition);
+                    self.collect_declarations_expr(&else_branch.consequence);
                 }
             }
             ExprKind::FieldExpression(expr) => {
-                self.collect_declarations_expr(&mut expr.base);
+                self.collect_declarations_expr(&expr.base);
             }
             ExprKind::IndexExpression(expr) => {
-                self.collect_declarations_expr(&mut expr.base);
-                self.collect_declarations_expr(&mut expr.index);
+                self.collect_declarations_expr(&expr.base);
+                self.collect_declarations_expr(&expr.index);
             }
             ExprKind::Match(expr) => {
-                self.collect_declarations_expr(&mut expr.expression);
-                for arm in &mut expr.arms {
-                    self.collect_pattern(&mut arm.pattern);
-                    self.collect_declarations_expr(&mut arm.expression);
+                self.collect_declarations_expr(&expr.expression);
+                for arm in &expr.arms {
+                    self.collect_pattern(&arm.pattern);
+                    self.collect_declarations_expr(&arm.expression);
                 }
             }
             ExprKind::Range(expr) => {
-                self.collect_declarations_expr(&mut expr.start);
-                self.collect_declarations_expr(&mut expr.end);
+                self.collect_declarations_expr(&expr.start);
+                self.collect_declarations_expr(&expr.end);
             }
             ExprKind::Path(_) | ExprKind::Literal(_) | ExprKind::Wildcard | ExprKind::None => {
                 // Nothing to do here
@@ -259,19 +259,19 @@ impl DeclarationAnalyzer {
         }
     }
 
-    fn collect_module_declarations(&mut self, module: &mut Module) {
+    fn collect_module_declarations(&mut self, module: &Module) {
         self.push_symbol_table(module.id);
 
-        for stmt in &mut module.statements {
+        for stmt in &module.statements {
             self.collect_declarations_stmt(stmt);
         }
 
         self.pop_symbol_table();
     }
 
-    fn collect_variable_declaration(&mut self, decl: &mut LetDeclaration) {
-        self.collect_declarations_expr(&mut decl.expression);
-        self.collect_pattern(&mut decl.pattern);
+    fn collect_variable_declaration(&mut self, decl: &LetDeclaration) {
+        self.collect_declarations_expr(&decl.expression);
+        self.collect_pattern(&decl.pattern);
     }
 
     /// TODO: This is a temporary solution. We need to find a better way to handle this.
@@ -288,23 +288,23 @@ impl DeclarationAnalyzer {
         }
     }
 
-    fn collect_function_declaration(&mut self, declaration: &mut FunctionDeclaration) {
+    fn collect_function_declaration(&mut self, declaration: &FunctionDeclaration) {
         self.push_symbol_table(declaration.id);
 
         self.symbol_type_context.push(SymbolType::Parameter);
-        for param in &mut declaration.parameters {
+        for param in &declaration.parameters {
             self.collect_declarations_from_fn_param(param);
         }
         self.symbol_type_context.pop();
 
-        self.collect_optional_declarations_expr(&mut declaration.guard);
-        self.collect_declarations_block(&mut declaration.body);
+        self.collect_optional_declarations_expr(&declaration.guard);
+        self.collect_declarations_block(&declaration.body);
 
         self.pop_symbol_table();
     }
 
-    fn collect_pattern(&mut self, pattern: &mut Pattern) {
-        match &mut pattern.kind {
+    fn collect_pattern(&mut self, pattern: &Pattern) {
+        match &pattern.kind {
             PatternKind::Identifier(ident) => {
                 self.declare_symbol(
                     pattern.id,
@@ -328,7 +328,7 @@ impl DeclarationAnalyzer {
                 self.collect_pattern(pattern);
             }
             PatternKind::Enum(enum_pattern) => {
-                for element in &mut enum_pattern.elements {
+                for element in &enum_pattern.elements {
                     self.collect_pattern(element);
                 }
             }
