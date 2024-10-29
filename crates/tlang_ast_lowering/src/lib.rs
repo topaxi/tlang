@@ -514,6 +514,41 @@ impl LoweringContext {
 
         let first_declaration = decls.first().unwrap();
 
+        let first_declaration_number_of_args = decls[0].parameters.len();
+        let mut argument_names: Vec<Ident> = Vec::with_capacity(first_declaration_number_of_args);
+
+        for i in 0..first_declaration_number_of_args {
+            // If the name of this parameter is the same in all declarations, we can reuse the
+            // actual defined name. Otherwise we use `arg{i}` as the name.
+            let arg_name = decls.iter().find_map(|d| {
+                let param = &d.parameters[i];
+                match &param.pattern.kind {
+                    ast::node::PatternKind::Identifier(ident) => Some(ident.to_string()),
+                    ast::node::PatternKind::Enum(enum_pattern) => {
+                        Some(get_enum_name(&enum_pattern.path).to_lowercase())
+                    }
+                    _ => None,
+                }
+            });
+
+            if arg_name.is_some()
+                && decls.iter().all(|d| match &d.parameters[i].pattern.kind {
+                    ast::node::PatternKind::Identifier(ident) => {
+                        Some(ident.to_string()) == arg_name
+                    }
+                    ast::node::PatternKind::Enum(enum_pattern) => {
+                        Some(get_enum_name(&enum_pattern.path).to_lowercase()) == arg_name
+                    }
+                    _ => true,
+                })
+            {
+                #[allow(clippy::unnecessary_unwrap)]
+                argument_names.push(Ident::new(&arg_name.unwrap(), span));
+            } else {
+                argument_names.push(Ident::new(&format!("arg{}", i), span));
+            };
+        }
+
         // Create hir::FunctionDeclaration with an empty block, and fill out the
         // parameters, for each parameter/argument we reuse the existing plain
         // identifier if it exists, otherwise we create a new one which will be reused
@@ -522,13 +557,21 @@ impl LoweringContext {
         let mut hir_fn_decl = hir::FunctionDeclaration::new_empty_fn(
             hir_id,
             self.lower_expr(&first_declaration.name),
+            argument_names
+                .iter()
+                .map(|ident| hir::FunctionParameter {
+                    pattern: hir::Pat {
+                        kind: hir::PatKind::Identifier(self.unique_id(), Box::new(ident.clone())),
+                        span: ident.span,
+                    },
+                    type_annotation: hir::Ty {
+                        kind: hir::TyKind::Unknown,
+                        span: Default::default(),
+                    },
+                    span: ident.span,
+                })
+                .collect(),
         );
-
-        // TODO: As a starting point, we generate all argument names manually, later we
-        //       might want to try to keep given names if possible.
-        let argument_names = (0..first_declaration.parameters.len())
-            .map(|i| Ident::new(&format!("arg{}", i), span))
-            .collect::<Vec<_>>();
 
         let mut match_arms = Vec::with_capacity(decls.len());
 
@@ -682,18 +725,10 @@ impl LoweringContext {
                 span: node.span,
             },
             ast::node::PatternKind::Enum(box EnumPattern {
-                // TODO: We lower the identifier to a path, in the AST this is an Expr, but it is
-                //       always a path, we should update the AST to reflect this.
-                identifier,
+                path,
                 elements,
                 named_fields: _, // In HIR, we no longer care whether it's a named field or not
             }) => {
-                let path = if let ast::node::ExprKind::Path(path) = &identifier.kind {
-                    path
-                } else {
-                    unreachable!("EnumPattern identifier should be a path, validate AST first")
-                };
-
                 let path = self.lower_path(path);
                 let elements = elements.iter().map(|pat| self.lower_pat(pat)).collect();
 
@@ -721,6 +756,10 @@ impl LoweringContext {
             span: ast::span::Span::default(),
         }
     }
+}
+
+fn get_enum_name(path: &ast::node::Path) -> String {
+    path.segments[path.segments.len() - 2].to_string()
 }
 
 pub fn lower_to_hir(tlang_ast: &ast::node::Module) -> hir::Module {

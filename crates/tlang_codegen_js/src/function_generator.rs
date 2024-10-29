@@ -3,86 +3,6 @@ use tlang_hir::hir;
 use crate::generator::{BlockContext, CodegenJS};
 
 impl CodegenJS {
-    fn generate_function_arguments(
-        &mut self,
-        declarations: &[hir::FunctionDeclaration],
-    ) -> (Option<String>, Vec<String>) {
-        // TODO: What was my plan here?
-        //let is_member_method = is_member_method(&declarations[0].name);
-        let first_declaration_number_of_args = declarations[0].parameters.len();
-        // check whether all declarations have the same number of parameters
-        let same_number_of_args = declarations
-            .iter()
-            .all(|d| d.parameters.len() == first_declaration_number_of_args);
-
-        if same_number_of_args {
-            let mut bindings = Vec::with_capacity(first_declaration_number_of_args);
-
-            for i in 0..declarations[0].parameters.len() {
-                // If the name of this parameter is the same in all declarations, we can reuse the
-                // actual defined name. Otherwise we use `arg{i}` as the name.
-                let arg_name = declarations.iter().find_map(|d| {
-                    let param = &d.parameters[i];
-                    match &param.pattern.kind {
-                        hir::PatKind::Identifier(_id, ident_pattern) => {
-                            Some(ident_pattern.name.to_string())
-                        }
-                        hir::PatKind::Enum(identifier, _) => {
-                            Some(get_enum_name(&identifier).to_lowercase())
-                        }
-                        _ => None,
-                    }
-                });
-
-                let arg_name = if arg_name.is_some()
-                    && declarations
-                        .iter()
-                        .all(|d| match &d.parameters[i].pattern.kind {
-                            hir::PatKind::Identifier(_, ident_pattern) => {
-                                Some(ident_pattern.name.to_string()) == arg_name
-                            }
-                            hir::PatKind::Enum(path, _) => {
-                                Some(get_enum_name(&path).to_lowercase()) == arg_name
-                            }
-                            _ => true,
-                        }) {
-                    #[allow(clippy::unnecessary_unwrap)]
-                    arg_name.unwrap()
-                } else {
-                    self.current_scope().declare_variable(&format!("arg{i}"))
-                };
-
-                if i > 0 {
-                    self.push_str(", ");
-                }
-                // TODO: if member method and self, push `this`.
-                self.push_str(&arg_name);
-                bindings.push(arg_name);
-            }
-
-            (None, bindings)
-        } else {
-            let args_binding = self.current_scope().declare_variable("args");
-            self.push_str("...");
-            self.push_str(&args_binding);
-
-            let max_args = declarations
-                .iter()
-                .map(|d| d.parameters.len())
-                .max()
-                .unwrap();
-
-            let mut bindings = Vec::with_capacity(max_args);
-
-            for i in 0..max_args {
-                // TODO: if member method and self, push `this`.
-                bindings.push(format!("args[{i}]"));
-            }
-
-            (Some(args_binding), bindings)
-        }
-    }
-
     fn generate_function_parameter_list(&mut self, parameters: &[hir::FunctionParameter]) {
         self.push_char('(');
 
@@ -202,23 +122,6 @@ impl CodegenJS {
         self.push_char('}');
         self.pop_function_context();
         self.pop_scope();
-    }
-
-    fn generate_function_parameter(&mut self, pattern: &hir::Pat) {
-        match &pattern.kind {
-            // Do not run generate_identifier, as that would resolve the parameter as a variable.
-            hir::PatKind::Identifier(_, ident) => {
-                self.current_scope().declare_variable(ident.as_str());
-                self.push_str(ident.as_str());
-            }
-            hir::PatKind::Literal(_) => self.generate_pat(pattern),
-            hir::PatKind::List(_) => todo!(),
-            // Wildcards are handled within pipeline and call expressions,
-            hir::PatKind::Wildcard => {
-                unreachable!("Unexpected wildcard in function parameter.")
-            }
-            _ => todo!(),
-        }
     }
 
     fn generate_function_body(&mut self, body: &hir::Block, is_tail_recursive: bool) {
@@ -348,10 +251,6 @@ impl CodegenJS {
         }
         self.flush_statement_buffer();
     }
-}
-
-fn get_enum_name(path: &hir::Path) -> String {
-    path.segments[path.segments.len() - 2].ident.to_string()
 }
 
 fn is_function_body_tail_recursive_stmt(function_name: &str, stmt: &hir::Stmt) -> bool {

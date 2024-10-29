@@ -222,11 +222,11 @@ pub struct FunctionDeclaration {
 }
 
 impl FunctionDeclaration {
-    pub fn new_empty_fn(hir_id: HirId, name: Expr) -> Self {
+    pub fn new_empty_fn(hir_id: HirId, name: Expr, parameters: Vec<FunctionParameter>) -> Self {
         FunctionDeclaration {
             hir_id,
             name,
-            parameters: vec![],
+            parameters,
             return_type: Ty {
                 kind: TyKind::Unknown,
                 span: Span::default(),

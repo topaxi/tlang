@@ -458,7 +458,7 @@ impl CodegenJS {
                 self.push_str(";\n");
             }
             hir::StmtKind::Let(pattern, expression, _ty) => {
-                self.generate_variable_declaration(&pattern, &expression);
+                self.generate_variable_declaration(pattern, expression);
             }
             hir::StmtKind::FunctionDeclaration(decl) => self.generate_function_declaration(decl),
             hir::StmtKind::Return(expr) => self.generate_return_statement(expr),

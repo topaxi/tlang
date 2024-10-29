@@ -119,7 +119,7 @@ impl CodegenJS {
     pub(crate) fn generate_match_expression(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) {
         // TODO: A lot here is copied from the if statement generator.
         let lhs = self.replace_statement_buffer(String::new());
-        let has_block_completions = match_args_have_completions(&arms);
+        let has_block_completions = match_args_have_completions(arms);
         let match_value_tmp_var = self.current_scope().declare_tmp_variable();
         self.push_let_declaration_to_expr(&match_value_tmp_var, &expr);
 
