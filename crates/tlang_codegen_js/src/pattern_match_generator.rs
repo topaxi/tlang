@@ -176,12 +176,21 @@ impl CodegenJS {
         self.push_char(';');
 
         for (i, hir::MatchArm { pat, guard, expr }) in arms.iter().enumerate() {
-            if !pat.is_wildcard() {
+            // TODO: Need to generate two separate paths here. First we need to generate a
+            // matching path for the pattern to access the value. Then we need to compare the
+            // value to the pattern. Last we need to alias variables within the scope of the
+            // match arm to the path. Alternatively we declare new variables pointing to the
+            // path, to closer resemble the original code.
+            // Additionally there's optimization opportunities in case the match expression is a
+            // list of identifiers, then we can just alias the identifiers within the arms. This
+            // case should be pretty common in function overloads.
+            if !pat.is_wildcard() || guard.is_some() {
                 self.push_str("if (");
                 self.generate_pat_condition(pat, &match_value_tmp_var);
                 if let Some(guard) = guard {
                     self.generate_match_arm_guard(guard, &let_guard_var);
                 }
+
                 self.push_str(") {\n");
                 self.inc_indent();
                 self.push_context(BlockContext::Expression);
@@ -189,6 +198,7 @@ impl CodegenJS {
                 self.pop_context();
                 self.dec_indent();
                 self.push_indent();
+
                 if i == arms.len() - 1 {
                     self.push_char('}');
                 } else {

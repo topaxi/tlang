@@ -664,20 +664,31 @@ impl LoweringContext {
             self.node_id_to_hir_id.insert(decl.id, hir_id);
 
             // Mapping argument pattern and signature guard into a match arm
-            let pat = hir::Pat {
-                kind: hir::PatKind::List(
-                    decl.parameters
-                        .iter()
-                        // We lose type information of each declaration here, as we
-                        // lower a whole FunctionParameter into a pattern. They
-                        // should probably match for each declaration and we might want
-                        // to verify this now or earlier in the pipeline.
-                        // Ignored for now as types are basically a NOOP everywhere.
-                        .map(|param| self.lower_pat(&param.pattern))
-                        .collect(),
-                ),
-                span: decl.span,
-            };
+            let pat =
+                // If all params are identifiers, we can use a simple wildcard pattern.
+                if decl.parameters.iter().all(|param| {
+                    matches!(param.pattern.kind, ast::node::PatternKind::Identifier(..))
+                }) {
+                    hir::Pat {
+                        kind: hir::PatKind::Wildcard,
+                        span: decl.span,
+                    }
+                } else {
+                    hir::Pat {
+                        kind: hir::PatKind::List(
+                            decl.parameters
+                                .iter()
+                                // We lose type information of each declaration here, as we
+                                // lower a whole FunctionParameter into a pattern. They
+                                // should probably match for each declaration and we might want
+                                // to verify this now or earlier in the pipeline.
+                                // Ignored for now as types are basically a NOOP everywhere.
+                                .map(|param| self.lower_pat(&param.pattern))
+                                .collect(),
+                        ),
+                        span: decl.span,
+                    }
+                };
 
             let guard = decl.guard.as_ref().map(|expr| self.lower_expr(expr));
 
