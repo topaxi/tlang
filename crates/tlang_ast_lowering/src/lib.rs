@@ -320,9 +320,25 @@ impl LoweringContext {
 
     fn lower_call_expr(&mut self, node: &ast::node::CallExpression) -> hir::CallExpression {
         let callee = match &node.callee.kind {
-            ast::node::ExprKind::Path(_path) => {
-                // TODO: We should map over statically known call arity to the matching function.
-                self.lower_expr(&node.callee)
+            ast::node::ExprKind::Path(path) => {
+                let mut path_with_argnum = path.clone();
+                path_with_argnum.segments.last_mut().unwrap().name = format!(
+                    "{}$${}",
+                    path_with_argnum.segments.last().unwrap().name,
+                    node.arguments.len()
+                );
+
+                if self.has_binding(&path_with_argnum.join("::")) {
+                    self.lower_expr(&ast::node::Expr {
+                        id: node.callee.id,
+                        kind: ast::node::ExprKind::Path(path_with_argnum),
+                        span: node.callee.span,
+                        leading_comments: node.callee.leading_comments.clone(),
+                        trailing_comments: node.callee.trailing_comments.clone(),
+                    })
+                } else {
+                    self.lower_expr(&node.callee)
+                }
             }
             _ => self.lower_expr(&node.callee),
         };
@@ -395,6 +411,13 @@ impl LoweringContext {
                     // on argument length.
                     let mut grouped_decls = vec![];
                     let mut match_arms = vec![];
+
+                    for arg_len in &args_lengths {
+                        let function_name = get_function_name(&first_declaration.name);
+                        let function_name = function_name + "$$" + &arg_len.to_string();
+
+                        self.scope().insert(&function_name, &function_name);
+                    }
 
                     for arg_len in args_lengths {
                         let decls = decls
@@ -596,7 +619,6 @@ impl LoweringContext {
         span.end = decls.last().unwrap().span.end;
 
         let first_declaration = decls.first().unwrap();
-
         let first_declaration_number_of_args = decls[0].parameters.len();
         let mut argument_names: Vec<Ident> = Vec::with_capacity(first_declaration_number_of_args);
 
@@ -854,6 +876,16 @@ impl LoweringContext {
 
 fn get_enum_name(path: &ast::node::Path) -> String {
     path.segments[path.segments.len() - 2].to_string()
+}
+
+fn get_function_name(expr: &ast::node::Expr) -> String {
+    match &expr.kind {
+        ast::node::ExprKind::Path(path) => path.join("::"),
+        ast::node::ExprKind::FieldExpression(field_expr) => {
+            get_function_name(&field_expr.base) + "." + &field_expr.field.to_string()
+        }
+        _ => unreachable!(),
+    }
 }
 
 pub fn lower_to_hir(tlang_ast: &ast::node::Module) -> hir::Module {
