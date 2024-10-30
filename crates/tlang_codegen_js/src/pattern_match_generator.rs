@@ -178,9 +178,11 @@ impl CodegenJS {
         for (i, hir::MatchArm { pat, guard, expr }) in arms.iter().enumerate() {
             // TODO: Need to generate two separate paths here. First we need to generate a
             // matching path for the pattern to access the value. Then we need to compare the
-            // value to the pattern. Last we need to alias variables within the scope of the
-            // match arm to the path. Alternatively we declare new variables pointing to the
-            // path, to closer resemble the original code.
+            // value to the pattern (nullish check for identifiers, equality for literals,
+            // min-length for lists, length==0 for empty list patterns).
+            // Last we need to alias variables within the scope of the match arm to the path.
+            // Alternatively we declare new variables pointing to the path, to closer resemble
+            // the original code.
             // Additionally there's optimization opportunities in case the match expression is a
             // list of identifiers, then we can just alias the identifiers within the arms. This
             // case should be pretty common in function overloads.
