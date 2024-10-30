@@ -85,6 +85,7 @@ impl LoweringContext {
 
         if !self.has_binding(name) {
             self.scope().insert(name, name);
+            return name.to_string();
         }
 
         let mut binding = format!("{}${}", name, prefix);
