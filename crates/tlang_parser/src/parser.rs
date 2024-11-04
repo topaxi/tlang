@@ -284,32 +284,21 @@ impl<'src> Parser<'src> {
         self.end_span_from_previous_token(&mut span);
         node.span = span;
 
-        // FunctionDeclaration statements does not need to be terminated with a semicolon.
         match node.kind {
-            StmtKind::FunctionDeclaration { .. } | StmtKind::FunctionDeclarations { .. } => {
-                return (false, Some(node))
+            // FunctionDeclaration statements do not need to be terminated with a semicolon.
+            StmtKind::FunctionDeclaration { .. } | StmtKind::FunctionDeclarations { .. }
+            // Neither do EnumDeclaration statements.
+            | StmtKind::EnumDeclaration { .. }
+            // Nor do StructDeclaration statements.
+            | StmtKind::StructDeclaration { .. } => {
+                (false, Some(node))
             }
-            _ => (),
-        }
-
-        // Neither do EnumDeclaration statements.
-        if let StmtKind::EnumDeclaration { .. } = node.kind {
-            return (false, Some(node));
-        }
-
-        // Nor do StructDeclaration statements.
-        if let StmtKind::StructDeclaration { .. } = node.kind {
-            return (false, Some(node));
-        }
-
-        // Expressions like IfElse as statements also do not need to be terminated with a semicolon.
-        if let StmtKind::Expr(ref expr) = node.kind {
-            if let ExprKind::IfElse(_) | ExprKind::Match(_) = expr.kind {
-                return (false, Some(node));
+            // Expressions like IfElse as statements also do not need to be terminated with a semicolon.
+            StmtKind::Expr(ref expr) if matches!(expr.kind,  ExprKind::IfElse(..) | ExprKind::Match(..)) => {
+                (false, Some(node))
             }
+            _ => (true, Some(node))
         }
-
-        (true, Some(node))
     }
 
     fn parse_return_statement(&mut self) -> Stmt {
