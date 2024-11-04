@@ -216,7 +216,13 @@ impl SemanticAnalyzer {
     }
 
     fn analyze_path(&mut self, path: &Path, span: Span) {
-        self.mark_as_used_by_name(&path.join("::"), span);
+        let mut path_str = String::new();
+
+        for segment in &path.segments {
+            path_str.push_str(&segment.name);
+            self.mark_as_used_by_name(&path_str, span);
+            path_str.push_str("::");
+        }
     }
 
     fn analyze_expr(&mut self, expr: &Expr) {
