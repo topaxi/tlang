@@ -125,7 +125,6 @@ impl CodegenJS {
     }
 
     fn generate_function_body(&mut self, body: &hir::Block, is_tail_recursive: bool) {
-        self.flush_function_pre_body();
         if is_tail_recursive {
             self.push_indent();
             self.push_str("rec:while (true) {\n");
@@ -242,14 +241,6 @@ impl CodegenJS {
 
         // For any other referenced function, we do a normal call expression.
         self.generate_call_expression(expr)
-    }
-
-    fn flush_function_pre_body(self: &mut CodegenJS) {
-        for (name, value) in &self.consume_function_pre_body_declarations() {
-            self.push_let_declaration_to_identifier(name, value);
-            self.current_scope().declare_variable_alias(name, name);
-        }
-        self.flush_statement_buffer();
     }
 }
 

@@ -45,7 +45,6 @@ pub struct CodegenJS {
     scopes: Scope,
     context_stack: Vec<BlockContext>,
     function_context_stack: Vec<FunctionContext>,
-    function_pre_body_declarations: Vec<(String, String)>,
     statement_buffer: Vec<String>,
     completion_variables: Vec<Option<String>>,
 }
@@ -64,7 +63,6 @@ impl CodegenJS {
             scopes: Scope::default(),
             context_stack: vec![BlockContext::Program],
             function_context_stack: vec![],
-            function_pre_body_declarations: vec![],
             statement_buffer: vec![String::with_capacity(STATEMENT_BUFFER_CAPACITY)],
             completion_variables: vec![None],
         }
@@ -212,15 +210,6 @@ impl CodegenJS {
     pub fn generate_code(&mut self, module: &hir::Module) {
         self.generate_statements(&module.block.stmts);
         self.output.shrink_to_fit();
-    }
-
-    pub(crate) fn declare_function_pre_body_variable(&mut self, name: &str, value: &str) {
-        self.function_pre_body_declarations
-            .push((name.to_string(), value.to_string()));
-    }
-
-    pub(crate) fn consume_function_pre_body_declarations(&mut self) -> Vec<(String, String)> {
-        std::mem::take(&mut self.function_pre_body_declarations)
     }
 
     pub(crate) fn get_function_context(&self) -> Option<&FunctionContext> {
