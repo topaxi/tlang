@@ -10,14 +10,14 @@ fn before_all() {
 
 pub fn compile_src(source: &str, builtin_symbols: &[(&str, SymbolType)]) -> String {
     let mut parser = Parser::from_source(source);
-    let mut ast = match parser.parse() {
+    let ast = match parser.parse() {
         Ok(ast) => ast,
         Err(errors) => panic!("{errors:#?}"),
     };
 
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.add_builtin_symbols(builtin_symbols);
-    match semantic_analyzer.analyze(&mut ast) {
+    match semantic_analyzer.analyze(&ast) {
         Ok(()) => {
             let mut codegen = CodegenJS::default();
             codegen.generate_code(&ast);
@@ -40,6 +40,9 @@ macro_rules! compile {
                 ("math::max", SymbolType::Function),
                 ("math::min", SymbolType::Function),
                 ("math::sqrt", SymbolType::Function),
+                ("Option", SymbolType::Enum),
+                ("Option::Some", SymbolType::EnumVariant),
+                ("Option::None", SymbolType::EnumVariant),
                 ("Some", SymbolType::EnumVariant),
                 ("None", SymbolType::EnumVariant),
             ],

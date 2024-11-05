@@ -49,6 +49,7 @@ pub struct CodegenJS {
     function_pre_body_declarations: Vec<(String, String)>,
     statement_buffer: Vec<String>,
     completion_variables: Vec<Option<String>>,
+    pattern_stack: Vec<ast::Pattern>,
 }
 
 impl Default for CodegenJS {
@@ -68,6 +69,7 @@ impl CodegenJS {
             function_pre_body_declarations: vec![],
             statement_buffer: vec![String::with_capacity(STATEMENT_BUFFER_CAPACITY)],
             completion_variables: vec![None],
+            pattern_stack: vec![],
         }
     }
 
@@ -210,6 +212,14 @@ impl CodegenJS {
         self.context_stack.pop();
     }
 
+    pub(crate) fn push_pat(&mut self, pat: &ast::Pattern) {
+        self.pattern_stack.push(pat.clone());
+    }
+
+    pub(crate) fn pop_pat(&mut self) {
+        self.pattern_stack.pop();
+    }
+
     pub fn generate_code(&mut self, module: &ast::Module) {
         self.generate_statements(&module.statements);
         self.output.shrink_to_fit();
@@ -319,7 +329,7 @@ impl CodegenJS {
         self.push_newline();
     }
 
-    fn generate_literal(&mut self, literal: &Literal) {
+    pub(crate) fn generate_literal(&mut self, literal: &Literal) {
         match literal {
             Literal::Integer(value) => {
                 self.push_str(&value.to_string());
@@ -619,6 +629,8 @@ impl CodegenJS {
         self.push_char('}');
     }
 
+    // TODO: This is used for destructuring, we might not want to have destructuring in the
+    //       language and use pattern matching instead.
     pub(crate) fn generate_pat(&mut self, pattern: &ast::Pattern) {
         match &pattern.kind {
             ast::PatternKind::Identifier(ident_pattern) => {
@@ -632,7 +644,9 @@ impl CodegenJS {
             ast::PatternKind::_Self => {
                 self.current_scope().declare_variable_alias("self", "this");
             }
-            ast::PatternKind::Enum(enum_pattern) => self.generate_enum_extraction(enum_pattern),
+            ast::PatternKind::Enum(_enum_pattern) => {
+                todo!("enum extraction outside of function parameters is not implemented yet.")
+            }
             ast::PatternKind::Literal(literal) => self.generate_literal(literal),
             ast::PatternKind::List(patterns) => {
                 self.push_char('[');
@@ -819,10 +833,6 @@ impl CodegenJS {
             }
         }
         self.completion_variables.pop();
-    }
-
-    fn generate_enum_extraction(&mut self, _enum_pattern: &ast::EnumPattern) {
-        todo!("enum extraction outside of function parameters is not implemented yet.")
     }
 
     fn generate_partial_application(
