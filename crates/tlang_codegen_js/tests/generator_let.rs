@@ -1,3 +1,4 @@
+use indoc::indoc;
 use pretty_assertions::assert_eq;
 
 mod common;
@@ -45,5 +46,29 @@ fn test_codegen_list_pattern_repetition() {
     let output = compile!("let [x, x] = [1, 2]; x;");
     let expected_output = "let [x, x$0] = [1, 2];\nx$0;\n";
 
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+#[ignore = "Not implemented yet"]
+fn test_codegen_refutable_pattern() {
+    let output = compile!("let Some(x) = Some(42);");
+    let expected_output = indoc! {"
+        let x = Some(42);if (x.tag === 'Some') {
+            x = x[0];
+        } else {
+            throw new TypeError('Pattern match failed');
+        }
+    "};
+    assert_eq!(output, expected_output);
+
+    let output = compile!("let Some(x) = Some(42) else { return; };");
+    let expected_output = indoc! {"
+        let x = Some(42);if (x.tag === 'Some') {
+            x = x[0];
+        } else {
+            return;
+        }
+    "};
     assert_eq!(output, expected_output);
 }
