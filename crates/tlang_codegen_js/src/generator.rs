@@ -129,7 +129,7 @@ impl CodegenJS {
     }
 
     pub(crate) fn pop_statement_buffer(&mut self) -> String {
-        assert!(
+        debug_assert!(
             self.statement_buffer.len() != 1,
             "Cannot pop last statement buffer."
         );
@@ -555,7 +555,7 @@ impl CodegenJS {
             ast::UnaryOp::Not => self.push_char('!'),
             ast::UnaryOp::Minus => self.push_char('-'),
             ast::UnaryOp::Spread => self.push_str("..."),
-            _ => unimplemented!("PrefixOp {:?} not implemented yet.", op),
+            ast::UnaryOp::Rest => unreachable!("Rest operator is not an operator but a pattern"),
         }
 
         self.generate_expr(expr, None);

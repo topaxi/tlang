@@ -639,13 +639,14 @@ impl CodegenJS {
             self.push_indent();
             self.push_str("while (true) {\n");
             self.inc_indent();
-        }
-        self.generate_block(body);
-        if is_tail_recursive {
+            self.generate_block(body);
             self.dec_indent();
             self.push_indent();
             self.push_str("}\n");
+        } else {
+            self.generate_block(body);
         }
+
         self.pop_context();
     }
 
