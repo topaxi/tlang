@@ -38,7 +38,7 @@ pub(crate) struct FunctionContext {
     pub is_tail_recursive: bool,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct CodegenJS {
     output: String,
     indent_level: usize,
@@ -588,6 +588,7 @@ impl CodegenJS {
             hir::PatKind::Enum(_path, _enum_pattern) => {
                 todo!("enum extraction outside of function parameters is not implemented yet.")
             }
+            hir::PatKind::Literal(literal) => self.generate_literal(literal),
             hir::PatKind::List(patterns) => {
                 self.push_char('[');
                 for (i, pattern) in patterns.iter().enumerate() {

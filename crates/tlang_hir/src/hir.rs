@@ -16,7 +16,7 @@ impl HirId {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Path {
     pub segments: Vec<PathSegment>,
     pub span: Span,
@@ -89,7 +89,7 @@ pub enum StmtKind {
     StructDeclaration(Box<StructDeclaration>),
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Pat {
     pub kind: PatKind,
     pub span: Span,
@@ -108,7 +108,7 @@ impl Pat {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub enum PatKind {
     Wildcard,
     Identifier(HirId, Box<Ident>),
