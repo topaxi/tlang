@@ -395,8 +395,10 @@ impl<'src> Parser<'src> {
             Some(TokenKind::LParen) => {
                 self.advance();
                 let mut parameters = Vec::new();
+                let index = 0;
                 while !matches!(self.current_token_kind(), Some(TokenKind::RParen)) {
-                    parameters.push(self.parse_identifier());
+                    let ident = Ident::new(&index.to_string(), Span::default());
+                    parameters.push((ident, self.parse_type_annotation()));
                     if let Some(TokenKind::Comma) = self.current_token_kind() {
                         self.advance();
                     }
@@ -405,7 +407,6 @@ impl<'src> Parser<'src> {
                 EnumVariant {
                     id: self.unique_id(),
                     name,
-                    named_fields: false,
                     parameters,
                     span,
                 }
@@ -414,7 +415,7 @@ impl<'src> Parser<'src> {
                 self.advance();
                 let mut parameters = Vec::new();
                 while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
-                    parameters.push(self.parse_identifier());
+                    parameters.push((self.parse_identifier(), self.parse_type_annotation()));
                     if let Some(TokenKind::Comma) = self.current_token_kind() {
                         self.advance();
                     }
@@ -423,7 +424,6 @@ impl<'src> Parser<'src> {
                 EnumVariant {
                     id: self.unique_id(),
                     name,
-                    named_fields: true,
                     parameters,
                     span,
                 }
@@ -431,7 +431,6 @@ impl<'src> Parser<'src> {
             _ => EnumVariant {
                 id: self.unique_id(),
                 name,
-                named_fields: false,
                 parameters: Vec::new(),
                 span,
             },
@@ -1167,9 +1166,19 @@ impl<'src> Parser<'src> {
             self.consume_token(TokenKind::LBrace);
             let mut elements = Vec::new();
             while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
-                // TODO: This currently only supports Foo { bar }, but we'd like to also support
-                //       subpatterns here Foo { bar: [firstbar, ...restbar] }.
-                elements.push(self.parse_identifier_pattern());
+                let ident = self.parse_identifier();
+
+                if let Some(TokenKind::Colon) = self.current_token_kind() {
+                    self.advance();
+                    let pattern = self.parse_pattern();
+                    elements.push((ident, pattern));
+                } else {
+                    elements.push((
+                        ident.clone(),
+                        node::pat!(self.unique_id(), Identifier(Box::new(ident))),
+                    ));
+                }
+
                 if let Some(TokenKind::Comma) = self.current_token_kind() {
                     self.advance();
                 }
@@ -1177,17 +1186,16 @@ impl<'src> Parser<'src> {
             self.consume_token(TokenKind::RBrace);
             node::pat!(
                 self.unique_id(),
-                Enum(Box::new(EnumPattern {
-                    path,
-                    elements,
-                    named_fields: true,
-                }))
+                Enum(Box::new(EnumPattern { path, elements }))
             )
         } else if let Some(TokenKind::LParen) = self.current_token_kind() {
             self.consume_token(TokenKind::LParen);
             let mut elements = Vec::new();
+            let mut index = 0;
             while !matches!(self.current_token_kind(), Some(TokenKind::RParen)) {
-                elements.push(self.parse_pattern());
+                let ident = Ident::new(&index.to_string(), Span::default());
+                index += 1;
+                elements.push((ident, self.parse_pattern()));
                 if let Some(TokenKind::Comma) = self.current_token_kind() {
                     self.advance();
                 }
@@ -1195,11 +1203,7 @@ impl<'src> Parser<'src> {
             self.consume_token(TokenKind::RParen);
             node::pat!(
                 self.unique_id(),
-                Enum(Box::new(EnumPattern {
-                    path,
-                    elements,
-                    named_fields: false,
-                }))
+                Enum(Box::new(EnumPattern { path, elements }))
             )
         } else {
             node::pat!(
@@ -1207,7 +1211,6 @@ impl<'src> Parser<'src> {
                 Enum(Box::new(EnumPattern {
                     path,
                     elements: Vec::new(),
-                    named_fields: false,
                 }))
             )
         }

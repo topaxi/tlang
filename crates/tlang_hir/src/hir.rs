@@ -87,6 +87,8 @@ pub enum StmtKind {
     Return(Box<Option<Expr>>),
     EnumDeclaration(Box<EnumDeclaration>),
     StructDeclaration(Box<StructDeclaration>),
+    // TODO: We shouldn't need to have this in HIR
+    None,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -115,7 +117,7 @@ pub enum PatKind {
     Literal(Box<Literal>),
     List(Vec<Pat>),
     Rest(Box<Pat>),
-    Enum(Box<Path>, Vec<Pat>),
+    Enum(Box<Path>, Vec<(Ident, Pat)>),
 }
 
 #[derive(Debug, Serialize)]
@@ -266,8 +268,6 @@ pub struct EnumDeclaration {
 pub struct EnumVariant {
     pub hir_id: HirId,
     pub name: Ident,
-    pub parameters: Vec<Ident>,
-    // TODO: Do we want/need this in the HIR?
-    pub named_fields: bool,
+    pub parameters: Vec<StructField>,
     pub span: Span,
 }

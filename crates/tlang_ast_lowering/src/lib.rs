@@ -559,12 +559,7 @@ impl LoweringContext {
                     fields: decl
                         .fields
                         .iter()
-                        .map(|field| hir::StructField {
-                            // TODO: We might want/need an id on the AST already.
-                            hir_id: self.unique_id(),
-                            name: field.0.clone(),
-                            ty: self.lower_ty(&Some(field.1.clone())),
-                        })
+                        .map(|field| self.lower_struct_field(field))
                         .collect(),
                 };
 
@@ -586,8 +581,11 @@ impl LoweringContext {
                         .map(|variant| hir::EnumVariant {
                             hir_id: self.lower_node_id(variant.id),
                             name: variant.name.clone(),
-                            parameters: variant.parameters.clone(),
-                            named_fields: variant.named_fields,
+                            parameters: variant
+                                .parameters
+                                .iter()
+                                .map(|field| self.lower_struct_field(&field))
+                                .collect(),
                             span: variant.span,
                         })
                         .collect::<Vec<_>>(),
@@ -602,8 +600,23 @@ impl LoweringContext {
                 }]
             }
             ast::node::StmtKind::None => {
-                unreachable!("StmtKind::None should not be encountered, validate AST first")
+                vec![hir::Stmt {
+                    hir_id: self.lower_node_id(node.id),
+                    kind: hir::StmtKind::None,
+                    span: node.span,
+                    leading_comments: node.leading_comments.clone(),
+                    trailing_comments: node.trailing_comments.clone(),
+                }]
             }
+        }
+    }
+
+    fn lower_struct_field(&mut self, field: &ast::node::StructField) -> hir::StructField {
+        hir::StructField {
+            // TODO: We might want/need an id on the AST already.
+            hir_id: self.unique_id(),
+            name: field.0.clone(),
+            ty: self.lower_ty(&Some(field.1.clone())),
         }
     }
 
@@ -695,7 +708,7 @@ impl LoweringContext {
                         kind: hir::PatKind::Wildcard,
                         span: decl.span,
                     }
-                } else {
+                } else if decl.parameters.len() > 1 {
                     hir::Pat {
                         kind: hir::PatKind::List(
                             decl.parameters
@@ -710,6 +723,8 @@ impl LoweringContext {
                         ),
                         span: decl.span,
                     }
+                } else {
+                    self.lower_pat(&decl.parameters[0].pattern)
                 };
 
             let guard = decl.guard.as_ref().map(|expr| self.lower_expr(expr));
@@ -722,23 +737,36 @@ impl LoweringContext {
             match_arms.push(hir::MatchArm { pat, guard, expr });
         }
 
-        let argument_list = hir::ExprKind::List(
-            argument_names
-                .iter()
-                .map(|ident| {
-                    self.expr(
-                        span,
-                        hir::ExprKind::Path(Box::new(hir::Path {
-                            segments: vec![hir::PathSegment {
-                                ident: ident.clone(),
-                            }],
+        let match_value = if argument_names.len() > 1 {
+            let argument_list = hir::ExprKind::List(
+                argument_names
+                    .iter()
+                    .map(|ident| {
+                        self.expr(
                             span,
-                        })),
-                    )
-                })
-                .collect(),
-        );
-        let match_value = self.expr(ast::span::Span::default(), argument_list);
+                            hir::ExprKind::Path(Box::new(hir::Path {
+                                segments: vec![hir::PathSegment {
+                                    ident: ident.clone(),
+                                }],
+                                span,
+                            })),
+                        )
+                    })
+                    .collect(),
+            );
+
+            self.expr(ast::span::Span::default(), argument_list)
+        } else {
+            self.expr(
+                ast::span::Span::default(),
+                hir::ExprKind::Path(Box::new(hir::Path {
+                    segments: vec![hir::PathSegment {
+                        ident: argument_names.first().unwrap().clone(),
+                    }],
+                    span,
+                })),
+            )
+        };
 
         hir_fn_decl.body.expr = Some(hir::Expr {
             hir_id: self.unique_id(),
@@ -840,13 +868,12 @@ impl LoweringContext {
                 kind: hir::PatKind::Rest(Box::new(self.lower_pat(pattern))),
                 span: node.span,
             },
-            ast::node::PatternKind::Enum(box EnumPattern {
-                path,
-                elements,
-                named_fields: _, // In HIR, we no longer care whether it's a named field or not
-            }) => {
+            ast::node::PatternKind::Enum(box EnumPattern { path, elements }) => {
                 let path = self.lower_path(path);
-                let elements = elements.iter().map(|pat| self.lower_pat(pat)).collect();
+                let elements = elements
+                    .iter()
+                    .map(|(ident, pat)| (ident.clone(), self.lower_pat(pat)))
+                    .collect();
 
                 hir::Pat {
                     kind: hir::PatKind::Enum(Box::new(path), elements),

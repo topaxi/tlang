@@ -213,7 +213,19 @@ Module(
                     ),
                   ),
                   elements: [
-                    Pattern(
+                    (Ident(
+                      name: "0",
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 0,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 0,
+                        ),
+                      ),
+                    ), Pattern(
                       id: NodeId(6),
                       kind: Wildcard,
                       leading_comments: [],
@@ -228,9 +240,8 @@ Module(
                           column: 36,
                         ),
                       ),
-                    ),
+                    )),
                   ],
-                  named_fields: false,
                 )),
                 leading_comments: [],
                 trailing_comments: [],
@@ -406,7 +417,6 @@ Module(
                     ),
                   ),
                   elements: [],
-                  named_fields: false,
                 )),
                 leading_comments: [],
                 trailing_comments: [],
@@ -749,7 +759,19 @@ Module(
                     ),
                   ),
                   elements: [
-                    Pattern(
+                    (Ident(
+                      name: "0",
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 0,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 0,
+                        ),
+                      ),
+                    ), Pattern(
                       id: NodeId(29),
                       kind: Wildcard,
                       leading_comments: [],
@@ -764,9 +786,8 @@ Module(
                           column: 33,
                         ),
                       ),
-                    ),
+                    )),
                   ],
-                  named_fields: false,
                 )),
                 leading_comments: [],
                 trailing_comments: [],
@@ -959,7 +980,6 @@ Module(
                     ),
                   ),
                   elements: [],
-                  named_fields: false,
                 )),
                 leading_comments: [],
                 trailing_comments: [],
@@ -1169,7 +1189,19 @@ Module(
                     ),
                   ),
                   elements: [
-                    Pattern(
+                    (Ident(
+                      name: "0",
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 0,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 0,
+                        ),
+                      ),
+                    ), Pattern(
                       id: NodeId(47),
                       kind: Identifier(Ident(
                         name: "x",
@@ -1196,9 +1228,8 @@ Module(
                           column: 29,
                         ),
                       ),
-                    ),
+                    )),
                   ],
-                  named_fields: false,
                 )),
                 leading_comments: [],
                 trailing_comments: [],
@@ -1593,7 +1624,6 @@ Module(
                     ),
                   ),
                   elements: [],
-                  named_fields: false,
                 )),
                 leading_comments: [],
                 trailing_comments: [],

@@ -300,13 +300,6 @@ impl CodegenJS {
         self.generate_expr(expr, None);
     }
 
-    pub(crate) fn push_let_declaration_to_identifier(&mut self, name: &str, value: &str) {
-        self.push_open_let_declaration(name);
-        self.push_str(value);
-        self.push_char(';');
-        self.push_newline();
-    }
-
     pub(crate) fn generate_literal(&mut self, literal: &Literal) {
         match literal {
             Literal::Integer(value) => {
@@ -453,6 +446,7 @@ impl CodegenJS {
             hir::StmtKind::Return(expr) => self.generate_return_statement(expr),
             hir::StmtKind::EnumDeclaration(decl) => self.generate_enum_declaration(decl),
             hir::StmtKind::StructDeclaration(decl) => self.generate_struct_declaration(decl),
+            hir::StmtKind::None => {}
         }
 
         self.generate_comments(&statement.trailing_comments);

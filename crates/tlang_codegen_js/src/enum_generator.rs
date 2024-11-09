@@ -9,15 +9,23 @@ impl CodegenJS {
         self.push_str(&format!("const {} = {{\n", decl.name));
         self.inc_indent();
         for variant in &decl.variants {
-            self.generate_enum_variant(&variant.name, variant.named_fields, &variant.parameters);
+            self.generate_enum_variant(&variant.name, &variant.parameters);
         }
         self.dec_indent();
         self.push_indent();
         self.push_str("};\n");
     }
 
-    fn generate_enum_variant(&mut self, name: &Ident, named_fields: bool, parameters: &[Ident]) {
+    fn is_numeric(str: &str) -> bool {
+        str.chars().all(char::is_numeric)
+    }
+
+    fn generate_enum_variant(&mut self, name: &Ident, parameters: &[hir::StructField]) {
         self.push_indent();
+
+        let named_fields = parameters
+            .iter()
+            .any(|param| !Self::is_numeric(param.name.as_str()));
 
         if parameters.is_empty() {
             self.push_str(&format!("{name}: {{ tag: \"{name}\" }},\n"));
@@ -32,7 +40,7 @@ impl CodegenJS {
             if i > 0 {
                 self.push_str(", ");
             }
-            self.push_str(param.as_str());
+            self.push_str(param.name.as_str());
         }
         if named_fields {
             self.push_str(" }");
@@ -48,14 +56,14 @@ impl CodegenJS {
         if named_fields {
             for param in parameters {
                 self.push_indent();
-                self.push_str(param.as_str());
+                self.push_str(param.name.as_str());
                 self.push_str(",\n");
             }
         } else {
             for (i, param) in parameters.iter().enumerate() {
                 self.push_indent();
                 self.push_str(&format!("[{i}]: "));
-                self.push_str(param.as_str());
+                self.push_str(param.name.as_str());
                 self.push_str(",\n");
             }
         }

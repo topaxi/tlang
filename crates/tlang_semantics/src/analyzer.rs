@@ -329,8 +329,8 @@ impl SemanticAnalyzer {
             PatternKind::Enum(enum_pattern) => {
                 self.analyze_path(&enum_pattern.path, pat.span);
 
-                for element in &enum_pattern.elements {
-                    self.analyze_pat(element);
+                for (_ident, pat) in &enum_pattern.elements {
+                    self.analyze_pat(pat);
                 }
             }
             _ => {}

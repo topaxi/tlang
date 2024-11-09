@@ -31,7 +31,7 @@ impl CodegenJS {
             }
             hir::PatKind::Enum(_path, patterns) => {
                 let mut bindings = Vec::new();
-                for pattern in patterns {
+                for (_ident, pattern) in patterns {
                     bindings.extend(Self::get_pat_identifiers(pattern));
                 }
                 bindings
@@ -68,10 +68,10 @@ impl CodegenJS {
                     enum_variant_name.ident.as_str()
                 ));
 
-                for (i, pattern) in patterns.iter().enumerate() {
+                for (ident, pattern) in patterns.iter().filter(|(_, pat)| !pat.is_wildcard()) {
                     self.push_str(" && ");
 
-                    let parent_js_expr = format!("{}[{i}]", parent_js_expr);
+                    let parent_js_expr = format!("{}[\"{ident}\"]", parent_js_expr);
 
                     self.generate_pat_condition(pattern, &parent_js_expr);
                 }
@@ -120,8 +120,34 @@ impl CodegenJS {
         // TODO: A lot here is copied from the if statement generator.
         let lhs = self.replace_statement_buffer(String::new());
         let has_block_completions = match_args_have_completions(arms);
-        let match_value_tmp_var = self.current_scope().declare_tmp_variable();
-        self.push_let_declaration_to_expr(&match_value_tmp_var, &expr);
+        let mut has_let = false;
+        if has_block_completions {
+            let completion_tmp_var = self.current_scope().declare_tmp_variable();
+            self.push_indent();
+            self.push_str("let ");
+            self.push_str(&completion_tmp_var);
+            self.push_completion_variable(Some(completion_tmp_var));
+            has_let = true;
+        } else {
+            self.push_completion_variable(None);
+        }
+
+        let match_value_binding = if let hir::ExprKind::Path(path) = &expr.kind {
+            path.segments.last().unwrap().ident.to_string()
+        } else {
+            let match_value_binding = self.current_scope().declare_tmp_variable();
+
+            if has_let {
+                self.push_char(',');
+                self.push_str(&match_value_binding);
+                self.generate_expr(expr, None);
+            } else {
+                self.push_let_declaration_to_expr(&match_value_binding, expr);
+                has_let = true;
+            }
+
+            match_value_binding
+        };
 
         let mut unique = HashSet::new();
         // There's optimization opportunities in case the match expression is a
@@ -156,6 +182,13 @@ impl CodegenJS {
             String::new()
         };
 
+        // TODO: Ugly workaround, as we always push a comma when generating pat identifiers
+        //       bindings.
+        if !has_let {
+            self.push_indent();
+            self.push_str("let _");
+        }
+
         for binding in all_pat_identifiers {
             if unique.insert(binding.clone()) {
                 let binding = self.current_scope().declare_variable(&binding);
@@ -164,31 +197,12 @@ impl CodegenJS {
             }
         }
 
-        if has_block_completions {
-            let completion_tmp_var = self.current_scope().declare_tmp_variable();
-            self.push_char(',');
-            self.push_str(&completion_tmp_var);
-            self.push_completion_variable(Some(completion_tmp_var));
-        } else {
-            self.push_completion_variable(None);
-        }
-
         self.push_char(';');
 
         for (i, hir::MatchArm { pat, guard, expr }) in arms.iter().enumerate() {
-            // TODO: Need to generate two separate paths here. First we need to generate a
-            // matching path for the pattern to access the value. Then we need to compare the
-            // value to the pattern (nullish check for identifiers, equality for literals,
-            // min-length for lists, length==0 for empty list patterns).
-            // Last we need to alias variables within the scope of the match arm to the path.
-            // Alternatively we declare new variables pointing to the path, to closer resemble
-            // the original code.
-            // Additionally there's optimization opportunities in case the match expression is a
-            // list of identifiers, then we can just alias the identifiers within the arms. This
-            // case should be pretty common in function overloads.
             if !pat.is_wildcard() || guard.is_some() {
                 self.push_str("if (");
-                self.generate_pat_condition(pat, &match_value_tmp_var);
+                self.generate_pat_condition(pat, &match_value_binding);
                 if let Some(guard) = guard {
                     self.generate_match_arm_guard(guard, &let_guard_var);
                 }

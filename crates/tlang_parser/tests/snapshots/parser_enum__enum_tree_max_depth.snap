@@ -227,7 +227,19 @@ Module(
                     ),
                   ),
                   elements: [
-                    Pattern(
+                    (Ident(
+                      name: "0",
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 0,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 0,
+                        ),
+                      ),
+                    ), Pattern(
                       id: NodeId(6),
                       kind: Wildcard,
                       leading_comments: [],
@@ -242,9 +254,8 @@ Module(
                           column: 30,
                         ),
                       ),
-                    ),
+                    )),
                   ],
-                  named_fields: false,
                 )),
                 leading_comments: [],
                 trailing_comments: [],
@@ -407,7 +418,19 @@ Module(
                     ),
                   ),
                   elements: [
-                    Pattern(
+                    (Ident(
+                      name: "left",
+                      span: Span(
+                        start: LineColumn(
+                          line: 6,
+                          column: 31,
+                        ),
+                        end: LineColumn(
+                          line: 6,
+                          column: 35,
+                        ),
+                      ),
+                    ), Pattern(
                       id: NodeId(13),
                       kind: Identifier(Ident(
                         name: "left",
@@ -426,16 +449,28 @@ Module(
                       trailing_comments: [],
                       span: Span(
                         start: LineColumn(
+                          line: 0,
+                          column: 0,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 0,
+                        ),
+                      ),
+                    )),
+                    (Ident(
+                      name: "right",
+                      span: Span(
+                        start: LineColumn(
                           line: 6,
-                          column: 31,
+                          column: 37,
                         ),
                         end: LineColumn(
                           line: 6,
-                          column: 35,
+                          column: 42,
                         ),
                       ),
-                    ),
-                    Pattern(
+                    ), Pattern(
                       id: NodeId(14),
                       kind: Identifier(Ident(
                         name: "right",
@@ -454,17 +489,16 @@ Module(
                       trailing_comments: [],
                       span: Span(
                         start: LineColumn(
-                          line: 6,
-                          column: 37,
+                          line: 0,
+                          column: 0,
                         ),
                         end: LineColumn(
-                          line: 6,
-                          column: 42,
+                          line: 0,
+                          column: 0,
                         ),
                       ),
-                    ),
+                    )),
                   ],
-                  named_fields: true,
                 )),
                 leading_comments: [],
                 trailing_comments: [],
