@@ -71,7 +71,11 @@ impl CodegenJS {
                 for (ident, pattern) in patterns.iter().filter(|(_, pat)| !pat.is_wildcard()) {
                     self.push_str(" && ");
 
-                    let parent_js_expr = format!("{}[\"{ident}\"]", parent_js_expr);
+                    let parent_js_expr = if ident.as_str().chars().all(char::is_numeric) {
+                        format!("{}[{}]", parent_js_expr, ident)
+                    } else {
+                        format!("{}.{}", parent_js_expr, ident.as_str())
+                    };
 
                     self.generate_pat_condition(pattern, &parent_js_expr);
                 }
