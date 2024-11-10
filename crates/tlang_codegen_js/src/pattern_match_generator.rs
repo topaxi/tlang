@@ -100,7 +100,8 @@ impl CodegenJS {
                             .to_string(),
                     );
 
-                    for (i, pattern) in patterns.iter().enumerate() {
+                    for (i, pattern) in patterns.iter().filter(|pat| !pat.is_wildcard()).enumerate()
+                    {
                         self.push_str(" && ");
                         // This feels awkward, could this be handled when we match the Rest pattern
                         // below?
@@ -144,6 +145,7 @@ impl CodegenJS {
             if has_let {
                 self.push_char(',');
                 self.push_str(&match_value_binding);
+                self.push_str(" = ");
                 self.generate_expr(expr, None);
             } else {
                 self.push_let_declaration_to_expr(&match_value_binding, expr);
