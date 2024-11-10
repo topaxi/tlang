@@ -20,12 +20,31 @@ impl CodegenJS {
         str.chars().all(char::is_numeric)
     }
 
+    fn infer_parameter_name_from_type(&mut self, ty: &hir::Ty) -> String {
+        match &ty.kind {
+            hir::TyKind::Path(path) => self.current_scope().declare_variable(&path.join("_")),
+            _ => self.current_scope().declare_variable("arg"),
+        }
+    }
+
     fn generate_enum_variant(&mut self, name: &Ident, parameters: &[hir::StructField]) {
         self.push_indent();
 
         let named_fields = parameters
             .iter()
             .any(|param| !Self::is_numeric(param.name.as_str()));
+
+        let parameter_names = if named_fields {
+            parameters
+                .iter()
+                .map(|param| param.name.to_string())
+                .collect::<Vec<_>>()
+        } else {
+            parameters
+                .iter()
+                .map(|param| self.infer_parameter_name_from_type(&param.ty))
+                .collect::<Vec<_>>()
+        };
 
         if parameters.is_empty() {
             self.push_str(&format!("{name}: {{ tag: \"{name}\" }},\n"));
@@ -36,11 +55,11 @@ impl CodegenJS {
         if named_fields {
             self.push_str("{ ");
         }
-        for (i, param) in parameters.iter().enumerate() {
+        for (i, parameter_name) in parameter_names.iter().enumerate() {
             if i > 0 {
                 self.push_str(", ");
             }
-            self.push_str(param.name.as_str());
+            self.push_str(parameter_name);
         }
         if named_fields {
             self.push_str(" }");
@@ -51,7 +70,7 @@ impl CodegenJS {
         self.push_str("return {\n");
         self.inc_indent();
         self.push_indent();
-        self.push_str(format!("tag: \"{name}\",\n").as_str());
+        self.push_str(&format!("tag: \"{name}\",\n"));
 
         if named_fields {
             for param in parameters {
@@ -60,10 +79,10 @@ impl CodegenJS {
                 self.push_str(",\n");
             }
         } else {
-            for (i, param) in parameters.iter().enumerate() {
+            for (i, parameter_name) in parameter_names.iter().enumerate() {
                 self.push_indent();
                 self.push_str(&format!("[{i}]: "));
-                self.push_str(param.name.as_str());
+                self.push_str(parameter_name);
                 self.push_str(",\n");
             }
         }

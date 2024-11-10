@@ -893,10 +893,17 @@ impl LoweringContext {
         }
     }
 
-    fn lower_ty(&mut self, _node: &Option<ast::node::Ty>) -> hir::Ty {
-        hir::Ty {
-            kind: hir::TyKind::Unknown,
-            span: ast::span::Span::default(),
+    fn lower_ty(&mut self, node: &Option<ast::node::Ty>) -> hir::Ty {
+        if let Some(node) = node {
+            hir::Ty {
+                kind: hir::TyKind::Path(self.lower_path(&node.name)),
+                span: node.span,
+            }
+        } else {
+            hir::Ty {
+                kind: hir::TyKind::Unknown,
+                span: ast::span::Span::default(),
+            }
         }
     }
 }

@@ -415,7 +415,20 @@ impl<'src> Parser<'src> {
                 self.advance();
                 let mut parameters = Vec::new();
                 while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
-                    parameters.push((self.parse_identifier(), self.parse_type_annotation()));
+                    let ident = self.parse_identifier();
+                    let ty = if matches!(self.current_token_kind(), Some(TokenKind::Colon)) {
+                        self.advance();
+                        self.parse_type_annotation()
+                    } else {
+                        node::Ty {
+                            id: self.unique_id(),
+                            name: Path::new(vec![Ident::new("Unknown", Span::default())]),
+                            parameters: Vec::new(),
+                            span: Span::default(),
+                        }
+                    };
+
+                    parameters.push((ident, ty));
                     if let Some(TokenKind::Comma) = self.current_token_kind() {
                         self.advance();
                     }
