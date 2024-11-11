@@ -33,6 +33,7 @@ updates:
           - 'eslint'
           - 'eslint-*'
           - '@eslint/*'
+          - 'typescript-eslint'
           - '@typescript-eslint/*'
           - 'prettier'
       lit:
