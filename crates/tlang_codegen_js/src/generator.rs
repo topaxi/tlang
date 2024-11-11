@@ -554,8 +554,8 @@ impl CodegenJS {
             self.push_indent();
             self.generate_expr(key, None);
 
-            // TODO: If both key and value are the same identifier, we can use shorthand syntax.
-            if key.hir_id != value.hir_id {
+            // If both key and value are the same identifier, we can use shorthand syntax.
+            if key.path() != value.path() {
                 self.push_str(": ");
                 self.generate_expr(value, None);
             }

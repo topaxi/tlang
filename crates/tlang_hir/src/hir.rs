@@ -22,6 +22,12 @@ pub struct Path {
     pub span: Span,
 }
 
+impl PartialEq for Path {
+    fn eq(&self, other: &Self) -> bool {
+        self.segments == other.segments
+    }
+}
+
 impl Path {
     pub fn join(&self, separator: &str) -> String {
         self.segments
@@ -32,7 +38,7 @@ impl Path {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct PathSegment {
     pub ident: Ident,
 }
@@ -169,6 +175,13 @@ pub struct Expr {
 impl Expr {
     pub fn is_wildcard(&self) -> bool {
         matches!(self.kind, ExprKind::Wildcard)
+    }
+
+    pub fn path(&self) -> Option<&Path> {
+        match &self.kind {
+            ExprKind::Path(path) => Some(path),
+            _ => None,
+        }
     }
 }
 
