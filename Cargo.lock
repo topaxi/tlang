@@ -598,6 +598,7 @@ dependencies = [
  "tlang_ast_lowering",
  "tlang_codegen_js",
  "tlang_hir",
+ "tlang_hir_pretty",
  "tlang_parser",
  "tlang_semantics",
  "wasm-bindgen",
@@ -640,6 +641,14 @@ dependencies = [
  "pretty_assertions",
  "serde",
  "tlang_ast",
+]
+
+[[package]]
+name = "tlang_hir_pretty"
+version = "0.1.0"
+dependencies = [
+ "tlang_ast",
+ "tlang_hir",
 ]
 
 [[package]]

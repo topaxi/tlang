@@ -4,6 +4,7 @@ use gloo_utils::format::JsValueSerdeExt;
 use tlang_ast::node::{self as ast};
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_hir::hir;
+use tlang_hir_pretty::HirPretty;
 use tlang_parser::{error::ParseError, parser::Parser};
 use tlang_semantics::{diagnostic::Diagnostic, SemanticAnalyzer};
 use wasm_bindgen::prelude::*;
@@ -79,12 +80,15 @@ impl TlangCompiler {
 
     #[wasm_bindgen(getter)]
     pub fn hir_string(&mut self) -> Result<String, JsError> {
-        let hir = tlang_ast_lowering::lower_to_hir(&self.ast);
-
         Ok(ron::ser::to_string_pretty(
-            &hir,
+            &self.hir,
             ron::ser::PrettyConfig::default(),
         )?)
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn hir_pretty(&mut self) -> String {
+        HirPretty::pretty_print(&self.hir)
     }
 
     #[wasm_bindgen(getter)]
