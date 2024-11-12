@@ -140,22 +140,20 @@ impl CodegenJS {
         self.push_let_declaration_to_expr(&match_value_tmp_var, &match_expr.expression);
 
         let mut unique = HashSet::new();
+        // There's optimization opportunities in case the match expression is a
+        // list of identifiers, then we can just alias the identifiers within the arms. This
+        // case should be pretty common in function overloads.
         let all_pat_identifiers = match_expr
             .arms
             .iter()
             .flat_map(|arm| Self::get_pat_identifiers(&arm.pattern));
 
-        let mut pat_identifiers = Vec::new();
-
         for binding in all_pat_identifiers {
             if unique.insert(binding.clone()) {
-                pat_identifiers.push(self.current_scope().declare_variable(&binding));
+                let binding = self.current_scope().declare_variable(&binding);
+                self.push_char(',');
+                self.push_str(&binding);
             }
-        }
-
-        for binding in pat_identifiers {
-            self.push_char(',');
-            self.push_str(&binding);
         }
 
         if has_block_completions {
