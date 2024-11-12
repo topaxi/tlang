@@ -8,23 +8,14 @@ use tlang_ast::node::{
 use tlang_ast::token::{kw, Literal};
 use tlang_hir::hir::{self, HirId};
 
-#[derive(Debug, Default, Clone, Copy, Eq, PartialEq)]
-enum ScopeContext {
-    #[default]
-    Block,
-    FunctionArgs,
-}
-
 #[derive(Debug, Default)]
 struct Scope {
-    context: ScopeContext,
     bindings: HashMap<String, String>,
 }
 
 impl Scope {
-    fn new(context: ScopeContext) -> Self {
+    fn new() -> Self {
         Self {
-            context,
             bindings: HashMap::new(),
         }
     }
@@ -35,10 +26,6 @@ impl Scope {
 
     pub fn lookup(&self, name: &str) -> Option<&str> {
         self.bindings.get(name).map(|s| s.as_str())
-    }
-
-    pub fn context(&self) -> ScopeContext {
-        self.context
     }
 }
 
@@ -61,8 +48,8 @@ impl LoweringContext {
     }
 
     #[inline(always)]
-    pub(crate) fn push_scope(&mut self, context: ScopeContext) {
-        self.scopes.push(Scope::new(context));
+    pub(crate) fn push_scope(&mut self) {
+        self.scopes.push(Scope::new());
     }
 
     #[inline(always)]
@@ -75,6 +62,7 @@ impl LoweringContext {
         self.scopes.last_mut().unwrap()
     }
 
+    #[inline(always)]
     pub(crate) fn create_binding(&mut self, name: &str) {
         self.scope().insert(name, name)
     }
@@ -84,7 +72,7 @@ impl LoweringContext {
         let mut prefix: usize = 0;
 
         if !self.has_binding(name) {
-            self.scope().insert(name, name);
+            self.create_binding(name);
             return name.to_string();
         }
 
@@ -118,11 +106,11 @@ impl LoweringContext {
         name
     }
 
-    pub(crate) fn with_new_scope<F, R>(&mut self, context: ScopeContext, f: F) -> R
+    pub(crate) fn with_new_scope<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce(&mut Self) -> R,
     {
-        self.push_scope(context);
+        self.push_scope();
         let result = f(self);
         self.pop_scope();
         result
@@ -147,7 +135,7 @@ impl LoweringContext {
     }
 
     fn lower_module(&mut self, module: &ast::node::Module) -> hir::Module {
-        self.with_new_scope(ScopeContext::Block, |this| hir::Module {
+        self.with_new_scope(|this| hir::Module {
             block: this.lower_block(&module.statements, &None, module.span),
             span: module.span,
         })
@@ -159,7 +147,7 @@ impl LoweringContext {
         expr: &Option<ast::node::Expr>,
         span: ast::span::Span,
     ) -> hir::Block {
-        self.with_new_scope(ScopeContext::Block, |this| {
+        self.with_new_scope(|this| {
             let stmts = stmts
                 .iter()
                 .flat_map(|stmt| this.lower_stmt(stmt))
@@ -273,11 +261,12 @@ impl LoweringContext {
                 hir::ExprKind::Literal(Box::new(literal.clone()))
             }
             ast::node::ExprKind::Match(box ast::node::MatchExpression { expression, arms }) => {
+                let mut idents = HashMap::new();
                 let expr = self.lower_expr(expression);
                 let arms = arms
                     .iter()
                     .map(|arm| hir::MatchArm {
-                        pat: self.lower_pat(&arm.pattern),
+                        pat: self.lower_pat_with_idents(&arm.pattern, &mut idents),
                         guard: arm.guard.as_ref().map(|expr| self.lower_expr(expr)),
                         expr: self.lower_expr(&arm.expression),
                     })
@@ -691,6 +680,7 @@ impl LoweringContext {
                 .collect(),
         );
 
+        let mut idents = HashMap::new();
         let mut match_arms = Vec::with_capacity(decls.len());
 
         for decl in decls {
@@ -699,33 +689,24 @@ impl LoweringContext {
             self.node_id_to_hir_id.insert(decl.id, hir_id);
 
             // Mapping argument pattern and signature guard into a match arm
-            let pat =
-                // If all params are identifiers, we can use a simple wildcard pattern.
-                if decl.parameters.iter().all(|param| {
-                    matches!(param.pattern.kind, ast::node::PatternKind::Identifier(..))
-                }) {
-                    hir::Pat {
-                        kind: hir::PatKind::Wildcard,
-                        span: decl.span,
-                    }
-                } else if decl.parameters.len() > 1 {
-                    hir::Pat {
-                        kind: hir::PatKind::List(
-                            decl.parameters
-                                .iter()
-                                // We lose type information of each declaration here, as we
-                                // lower a whole FunctionParameter into a pattern. They
-                                // should probably match for each declaration and we might want
-                                // to verify this now or earlier in the pipeline.
-                                // Ignored for now as types are basically a NOOP everywhere.
-                                .map(|param| self.lower_pat(&param.pattern))
-                                .collect(),
-                        ),
-                        span: decl.span,
-                    }
-                } else {
-                    self.lower_pat(&decl.parameters[0].pattern)
-                };
+            let pat = if decl.parameters.len() > 1 {
+                hir::Pat {
+                    kind: hir::PatKind::List(
+                        decl.parameters
+                            .iter()
+                            // We lose type information of each declaration here, as we
+                            // lower a whole FunctionParameter into a pattern. They
+                            // should probably match for each declaration and we might want
+                            // to verify this now or earlier in the pipeline.
+                            // Ignored for now as types are basically a NOOP everywhere.
+                            .map(|param| self.lower_pat_with_idents(&param.pattern, &mut idents))
+                            .collect(),
+                    ),
+                    span: decl.span,
+                }
+            } else {
+                self.lower_pat(&decl.parameters[0].pattern)
+            };
 
             let guard = decl.guard.as_ref().map(|expr| self.lower_expr(expr));
 
@@ -786,7 +767,7 @@ impl LoweringContext {
     }
 
     fn lower_fn_decl(&mut self, decl: &FunctionDeclaration) -> hir::FunctionDeclaration {
-        self.with_new_scope(ScopeContext::FunctionArgs, |this| {
+        self.with_new_scope(|this| {
             let name = this.lower_expr(&decl.name);
             let parameters = decl
                 .parameters
@@ -835,7 +816,19 @@ impl LoweringContext {
         hir::PathSegment { ident: seg.clone() }
     }
 
+    /// Lower a pattern into a HIR pattern. Only use for single patterns, not match arms or
+    /// function matching.
     fn lower_pat(&mut self, node: &ast::node::Pattern) -> hir::Pat {
+        self.lower_pat_with_idents(node, &mut HashMap::new())
+    }
+
+    // We only create one binding for each identifier found, especially when used multiple
+    // times. As then each of them have to match the same pattern/value.
+    fn lower_pat_with_idents(
+        &mut self,
+        node: &ast::node::Pattern,
+        idents: &mut HashMap<String, String>,
+    ) -> hir::Pat {
         match &node.kind {
             ast::node::PatternKind::Wildcard => hir::Pat {
                 kind: hir::PatKind::Wildcard,
@@ -846,13 +839,12 @@ impl LoweringContext {
                 span: node.span,
             },
             ast::node::PatternKind::Identifier(box ident) => {
-                // There are cases where we do not want a unique binding, for example
-                // function arguments should be fine to fully shadow the identifier.
-                let ident = if self.scope().context() != ScopeContext::FunctionArgs {
-                    Ident::new(&self.create_unique_binding(ident.as_str()), ident.span)
+                let ident = if let Some(binding) = idents.get(ident.as_str()) {
+                    Ident::new(binding, ident.span)
                 } else {
-                    self.create_binding(ident.as_str());
-                    ident.clone()
+                    let binding = self.create_unique_binding(ident.as_str());
+                    idents.insert(ident.to_string(), binding.clone());
+                    Ident::new(&binding, ident.span)
                 };
 
                 hir::Pat {
