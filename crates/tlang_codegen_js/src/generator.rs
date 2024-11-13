@@ -736,9 +736,9 @@ impl CodegenJS {
             lhs = self.replace_statement_buffer_with_empty_string();
             let completion_tmp_var = self.scopes.declare_tmp_variable();
             self.push_let_declaration(&completion_tmp_var);
-            self.completion_variables.push(Some(completion_tmp_var));
+            self.push_completion_variable(Some(completion_tmp_var));
         } else {
-            self.completion_variables.push(None);
+            self.push_completion_variable(None);
         }
         self.push_str("if (");
         let indent_level = self.indent_level;
