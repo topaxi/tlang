@@ -423,7 +423,7 @@ impl<'src> Parser<'src> {
                     } else {
                         node::Ty {
                             id: self.unique_id(),
-                            name: Path::new(vec![Ident::new("Unknown", Span::default())]),
+                            name: Path::new(vec![Ident::new("unknown", Span::default())]),
                             parameters: Vec::new(),
                             span: Span::default(),
                         }
