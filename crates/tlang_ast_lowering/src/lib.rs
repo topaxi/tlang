@@ -69,13 +69,12 @@ impl LoweringContext {
 
     #[must_use]
     pub(crate) fn create_unique_binding(&mut self, name: &str) -> String {
-        let mut prefix: usize = 0;
-
         if !self.has_binding(name) {
             self.create_binding(name);
             return name.to_string();
         }
 
+        let mut prefix: usize = 0;
         let mut binding = format!("{}${}", name, prefix);
         while self.has_binding(&binding) {
             prefix += 1;
@@ -267,10 +266,12 @@ impl LoweringContext {
                 let expr = self.lower_expr(expression);
                 let arms = arms
                     .iter()
-                    .map(|arm| hir::MatchArm {
-                        pat: self.lower_pat_with_idents(&arm.pattern, &mut idents),
-                        guard: arm.guard.as_ref().map(|expr| self.lower_expr(expr)),
-                        expr: self.lower_expr(&arm.expression),
+                    .map(|arm| {
+                        self.with_new_scope(|this| hir::MatchArm {
+                            pat: this.lower_pat_with_idents(&arm.pattern, &mut idents),
+                            guard: arm.guard.as_ref().map(|expr| this.lower_expr(expr)),
+                            expr: this.lower_expr(&arm.expression),
+                        })
                     })
                     .collect();
                 hir::ExprKind::Match(Box::new(expr), arms)
@@ -627,6 +628,7 @@ impl LoweringContext {
         let first_declaration = decls.first().unwrap();
         let first_declaration_number_of_args = decls[0].parameters.len();
         let mut argument_names: Vec<Ident> = Vec::with_capacity(first_declaration_number_of_args);
+        let mut idents = HashMap::new();
 
         for i in 0..first_declaration_number_of_args {
             // If the name of this parameter is the same in all declarations, we can reuse the
@@ -684,42 +686,45 @@ impl LoweringContext {
                 .collect(),
         );
 
-        let mut idents = HashMap::new();
         let mut match_arms = Vec::with_capacity(decls.len());
 
         for decl in decls {
-            // All declarations with the same amount of arguments refer to the same
-            // function now, we map this in our symbol_id_to_hir_id table.
-            self.node_id_to_hir_id.insert(decl.id, hir_id);
+            self.with_new_scope(|this| {
+                // All declarations with the same amount of arguments refer to the same
+                // function now, we map this in our symbol_id_to_hir_id table.
+                this.node_id_to_hir_id.insert(decl.id, hir_id);
 
-            // Mapping argument pattern and signature guard into a match arm
-            let pat = if decl.parameters.len() > 1 {
-                hir::Pat {
-                    kind: hir::PatKind::List(
-                        decl.parameters
-                            .iter()
-                            // We lose type information of each declaration here, as we
-                            // lower a whole FunctionParameter into a pattern. They
-                            // should probably match for each declaration and we might want
-                            // to verify this now or earlier in the pipeline.
-                            // Ignored for now as types are basically a NOOP everywhere.
-                            .map(|param| self.lower_pat_with_idents(&param.pattern, &mut idents))
-                            .collect(),
-                    ),
-                    span: decl.span,
-                }
-            } else {
-                self.lower_pat(&decl.parameters[0].pattern)
-            };
+                // Mapping argument pattern and signature guard into a match arm
+                let pat = if decl.parameters.len() > 1 {
+                    hir::Pat {
+                        kind: hir::PatKind::List(
+                            decl.parameters
+                                .iter()
+                                // We lose type information of each declaration here, as we
+                                // lower a whole FunctionParameter into a pattern. They
+                                // should probably match for each declaration and we might want
+                                // to verify this now or earlier in the pipeline.
+                                // Ignored for now as types are basically a NOOP everywhere.
+                                .map(|param| {
+                                    this.lower_pat_with_idents(&param.pattern, &mut idents)
+                                })
+                                .collect(),
+                        ),
+                        span: decl.span,
+                    }
+                } else {
+                    this.lower_pat(&decl.parameters[0].pattern)
+                };
 
-            let guard = decl.guard.as_ref().map(|expr| self.lower_expr(expr));
+                let guard = decl.guard.as_ref().map(|expr| this.lower_expr(expr));
 
-            let body =
-                self.lower_block(&decl.body.statements, &decl.body.expression, decl.body.span);
+                let body =
+                    this.lower_block(&decl.body.statements, &decl.body.expression, decl.body.span);
 
-            let expr = self.expr(decl.body.span, hir::ExprKind::Block(Box::new(body)));
+                let expr = this.expr(decl.body.span, hir::ExprKind::Block(Box::new(body)));
 
-            match_arms.push(hir::MatchArm { pat, guard, expr });
+                match_arms.push(hir::MatchArm { pat, guard, expr });
+            });
         }
 
         let match_value = if argument_names.len() > 1 {
