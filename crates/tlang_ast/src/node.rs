@@ -10,10 +10,16 @@ use crate::{
 
 pub use crate::macros::*;
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Ident {
     pub name: String,
     pub span: Span,
+}
+
+impl PartialEq for Ident {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
 }
 
 impl Ident {
