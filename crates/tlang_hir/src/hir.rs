@@ -177,6 +177,10 @@ impl Expr {
         matches!(self.kind, ExprKind::Wildcard)
     }
 
+    pub fn is_tail_call(&self) -> bool {
+        matches!(self.kind, ExprKind::TailCall(_))
+    }
+
     pub fn path(&self) -> Option<&Path> {
         match &self.kind {
             ExprKind::Path(path) => Some(path),

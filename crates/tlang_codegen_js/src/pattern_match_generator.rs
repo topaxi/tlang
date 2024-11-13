@@ -16,10 +16,14 @@ impl CodegenJS {
         if let hir::ExprKind::Block(_) = &expression.kind {
             self.generate_expr(expression, None);
         } else if self.current_completion_variable() == Some("return") {
-            self.push_indent();
-            self.push_str("return ");
-            self.generate_expr(expression, None);
-            self.push_str(";\n");
+            if expression.is_tail_call() {
+                self.generate_expr(expression, None);
+            } else {
+                self.push_indent();
+                self.push_str("return ");
+                self.generate_expr(expression, None);
+                self.push_str(";\n");
+            }
         } else {
             self.push_indent();
             let completion_tmp_var = self.current_completion_variable().unwrap();
