@@ -20,7 +20,10 @@ impl Scope {
     }
 
     pub(crate) fn declare_variable(&mut self, name: &str) -> String {
-        if !self.has_local_variable(name) {
+        // TODO: Local variable was enough before HIR, now HIR already gives some unique names to
+        //       variables, which makes this a bit harder as we add and define more variables.
+        //       Can this be solved in a better way?
+        if !self.has_variable_in_scope(name) {
             self.variables.insert(name.to_string(), name.to_string());
 
             return name.to_string();
