@@ -100,8 +100,11 @@ impl CodegenJS {
                             .to_string(),
                     );
 
-                    for (i, pattern) in patterns.iter().filter(|pat| !pat.is_wildcard()).enumerate()
-                    {
+                    for (i, pattern) in patterns.iter().enumerate() {
+                        if pattern.is_wildcard() {
+                            continue;
+                        }
+
                         self.push_str(" && ");
                         // This feels awkward, could this be handled when we match the Rest pattern
                         // below?
