@@ -718,10 +718,16 @@ impl LoweringContext {
 
                 let guard = decl.guard.as_ref().map(|expr| this.lower_expr(expr));
 
-                let body =
-                    this.lower_block(&decl.body.statements, &decl.body.expression, decl.body.span);
-
-                let expr = this.expr(decl.body.span, hir::ExprKind::Block(Box::new(body)));
+                let expr = if decl.body.statements.is_empty() && decl.body.expression.is_some() {
+                    this.lower_expr(decl.body.expression.as_ref().unwrap())
+                } else {
+                    let body = this.lower_block(
+                        &decl.body.statements,
+                        &decl.body.expression,
+                        decl.body.span,
+                    );
+                    this.expr(body.span, hir::ExprKind::Block(Box::new(body)))
+                };
 
                 match_arms.push(hir::MatchArm { pat, guard, expr });
             });

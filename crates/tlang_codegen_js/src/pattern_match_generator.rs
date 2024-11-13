@@ -15,6 +15,11 @@ impl CodegenJS {
     fn generate_match_arm_expression(&mut self, expression: &hir::Expr) {
         if let hir::ExprKind::Block(_) = &expression.kind {
             self.generate_expr(expression, None);
+        } else if self.current_completion_variable() == Some("return") {
+            self.push_indent();
+            self.push_str("return ");
+            self.generate_expr(expression, None);
+            self.push_str(";\n");
         } else {
             self.push_indent();
             let completion_tmp_var = self.current_completion_variable().unwrap();
