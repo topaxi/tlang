@@ -633,21 +633,48 @@ impl CodegenJS {
     }
 
     fn generate_function_body(&mut self, body: &ast::Block, is_tail_recursive: bool) {
-        self.push_context(BlockContext::FunctionBody);
         self.flush_function_pre_body();
         if is_tail_recursive {
             self.push_indent();
             self.push_str("while (true) {\n");
             self.inc_indent();
-            self.generate_block(body);
+            self.generate_function_body_block(body);
             self.dec_indent();
             self.push_indent();
             self.push_str("}\n");
         } else {
-            self.generate_block(body);
+            self.generate_function_body_block(body);
+        }
+    }
+
+    fn generate_function_body_block(&mut self, block: &ast::Block) {
+        self.generate_statements(&block.statements);
+
+        if !block.has_completion() {
+            return;
         }
 
+        // We only render the return statement if we are not in a tail recursive function body
+        // and the node is RecursiveCall pointing to the current function.
+        if let Some(function_context) = self.get_function_context() {
+            if function_context.is_tail_recursive && block.has_completion() {
+                if let Some(ref expression) = block.expression {
+                    if let ast::ExprKind::RecursiveCall(..) = expression.kind {
+                        self.generate_expr(expression, None);
+                        return;
+                    }
+                }
+            }
+        }
+
+        self.push_indent();
+        self.push_str("return ");
+        self.push_context(BlockContext::Expression);
+        self.generate_optional_expr(&block.expression, None);
         self.pop_context();
+        self.push_char(';');
+        self.push_newline();
+        self.flush_statement_buffer();
     }
 
     pub(crate) fn generate_return_statement(self: &mut CodegenJS, expr: &Option<ast::Expr>) {

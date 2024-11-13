@@ -19,8 +19,6 @@ pub(crate) enum BlockContext {
     Program,
     // Are we in a StatementExpression with a Block?
     Statement,
-    // Are we in a FunctionDeclaration or FunctionExpression with a Block?
-    FunctionBody,
     // Are we in an expression with a Block?
     Expression,
 }
@@ -411,51 +409,16 @@ impl CodegenJS {
     }
 
     pub(crate) fn generate_block(&mut self, block: &ast::Block) {
-        // Functions handle their scoping themselves
-        if self.current_context() != BlockContext::FunctionBody {
-            self.push_scope();
-        }
+        self.push_scope();
 
         self.generate_statements(&block.statements);
+        self.generate_optional_expr(&block.expression, None);
 
-        if !block.has_completion() {
-            if self.current_context() != BlockContext::FunctionBody {
-                self.pop_scope();
-            }
-            return;
-        }
-
-        if let BlockContext::FunctionBody = self.current_context() {
-            // We only render the return statement if we are not in a tail recursive function body
-            // and the node is RecursiveCall pointing to the current function.
-            if let Some(function_context) = self.function_context_stack.last() {
-                if function_context.is_tail_recursive && block.has_completion() {
-                    if let Some(ref expression) = block.expression {
-                        if let ast::ExprKind::RecursiveCall(..) = expression.kind {
-                            self.generate_expr(expression, None);
-                            return;
-                        }
-                    }
-                }
-            }
-
-            self.push_indent();
-            self.push_str("return ");
-            self.push_context(BlockContext::Expression);
-            self.generate_optional_expr(&block.expression, None);
-            self.pop_context();
-            self.push_char(';');
-            self.push_newline();
-            self.flush_statement_buffer();
-        }
-
-        if self.current_context() != BlockContext::FunctionBody {
-            self.pop_scope();
-        }
+        self.pop_scope();
     }
 
     #[inline(always)]
-    fn generate_statements(&mut self, statements: &[ast::Stmt]) {
+    pub(crate) fn generate_statements(&mut self, statements: &[ast::Stmt]) {
         for statement in statements {
             self.generate_stmt(statement);
             self.flush_statement_buffer();
