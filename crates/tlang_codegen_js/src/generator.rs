@@ -408,7 +408,7 @@ impl CodegenJS {
         self.pop_scope();
     }
 
-    pub(crate) fn generate_block(&mut self, block: &ast::Block) {
+    fn generate_block(&mut self, block: &ast::Block) {
         self.push_scope();
 
         self.generate_statements(&block.statements);
