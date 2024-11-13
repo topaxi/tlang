@@ -245,9 +245,11 @@ impl DeclarationAnalyzer {
             ExprKind::Match(expr) => {
                 self.collect_declarations_expr(&expr.expression);
                 for arm in &expr.arms {
+                    self.push_symbol_table(arm.id);
                     self.collect_pattern(&arm.pattern);
                     self.collect_optional_declarations_expr(&arm.guard);
                     self.collect_declarations_expr(&arm.expression);
+                    self.pop_symbol_table();
                 }
             }
             ExprKind::Range(expr) => {

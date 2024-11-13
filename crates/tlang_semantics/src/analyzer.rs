@@ -292,8 +292,17 @@ impl SemanticAnalyzer {
                 self.analyze_expr(&expr.expression);
 
                 for arm in &expr.arms {
+                    if let Some(symbol_table) = &self.get_symbol_table(arm.id) {
+                        self.push_symbol_table(symbol_table);
+                    }
+
                     self.analyze_pat(&arm.pattern);
                     self.analyze_expr(&arm.expression);
+
+                    if let Some(symbol_table) = &self.get_symbol_table(arm.id) {
+                        self.report_unused_symbols(symbol_table);
+                        self.pop_symbol_table();
+                    }
                 }
             }
             ExprKind::Range(expr) => {
