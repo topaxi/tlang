@@ -28,6 +28,7 @@ impl CodegenJS {
     }
 
     fn generate_enum_variant(&mut self, name: &Ident, parameters: &[hir::StructField]) {
+        self.push_scope();
         self.push_indent();
 
         let named_fields = parameters
@@ -95,5 +96,6 @@ impl CodegenJS {
         self.dec_indent();
         self.push_indent();
         self.push_str("},\n");
+        self.pop_scope();
     }
 }
