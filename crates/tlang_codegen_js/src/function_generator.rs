@@ -139,6 +139,7 @@ impl CodegenJS {
     }
 
     fn generate_function_body_block(&mut self, block: &hir::Block) {
+        self.flush_statement_buffer();
         self.generate_statements(&block.stmts);
 
         if !block.has_completion() {
@@ -287,7 +288,9 @@ fn is_function_body_tail_recursive(function_name: &str, node: &hir::Expr) -> boo
             false
         }
         hir::ExprKind::Block(block) => is_function_body_tail_recursive_block(function_name, block),
-        hir::ExprKind::Match(expr, ..) => is_function_body_tail_recursive(function_name, expr),
+        hir::ExprKind::Match(_, arms, ..) => arms
+            .iter()
+            .any(|arm| is_function_body_tail_recursive(function_name, &arm.expr)),
         hir::ExprKind::IfElse(expr, then_branch, else_branches) => {
             is_function_body_tail_recursive(function_name, expr)
                 || is_function_body_tail_recursive(
