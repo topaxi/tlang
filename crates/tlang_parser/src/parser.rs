@@ -395,13 +395,14 @@ impl<'src> Parser<'src> {
             Some(TokenKind::LParen) => {
                 self.advance();
                 let mut parameters = Vec::new();
-                let index = 0;
+                let mut index = 0;
                 while !matches!(self.current_token_kind(), Some(TokenKind::RParen)) {
                     let ident = Ident::new(&index.to_string(), Span::default());
                     parameters.push((ident, self.parse_type_annotation()));
                     if let Some(TokenKind::Comma) = self.current_token_kind() {
                         self.advance();
                     }
+                    index += 1;
                 }
                 self.consume_token(TokenKind::RParen);
                 EnumVariant {

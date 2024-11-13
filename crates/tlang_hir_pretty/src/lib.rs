@@ -187,13 +187,8 @@ impl HirPretty {
             hir::ExprKind::IfElse(cond, then_branch, else_branches) => {
                 self.push_str("if ");
                 self.print_expr(cond);
-                self.push_str(" {");
-                self.push_newline();
-                self.inc_indent();
+                self.push_char(' ');
                 self.print_block(then_branch);
-                self.dec_indent();
-                self.push_indent();
-                self.push_str("}");
 
                 for else_branch in else_branches {
                     self.push_str(" else ");
@@ -201,15 +196,10 @@ impl HirPretty {
                     if let Some(cond) = &else_branch.condition {
                         self.push_str("if ");
                         self.print_expr(cond);
+                        self.push_char(' ');
                     }
 
-                    self.push_str(" {");
-                    self.push_newline();
-                    self.inc_indent();
                     self.print_block(&else_branch.consequence);
-                    self.dec_indent();
-                    self.push_indent();
-                    self.push_str("}");
                 }
             }
             hir::ExprKind::Let(pat, expr) => {

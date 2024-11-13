@@ -72,19 +72,21 @@ impl CodegenJS {
         self.push_indent();
         self.push_str(&format!("tag: \"{name}\",\n"));
 
-        if named_fields {
-            for param in parameters {
-                self.push_indent();
-                self.push_str(param.name.as_str());
-                self.push_str(",\n");
+        for (i, param) in parameters.iter().enumerate() {
+            self.push_indent();
+            let parameter_name = parameter_names[i].as_str();
+            let param_field_name = param.name.as_str();
+
+            if parameter_name != param_field_name {
+                if param.name.as_str().chars().all(char::is_numeric) {
+                    self.push_str(&format!("[{}]: ", param_field_name))
+                } else {
+                    self.push_str(&format!("{}: ", param_field_name));
+                }
             }
-        } else {
-            for (i, parameter_name) in parameter_names.iter().enumerate() {
-                self.push_indent();
-                self.push_str(&format!("[{i}]: "));
-                self.push_str(parameter_name);
-                self.push_str(",\n");
-            }
+
+            self.push_str(parameter_name);
+            self.push_str(",\n");
         }
 
         self.dec_indent();

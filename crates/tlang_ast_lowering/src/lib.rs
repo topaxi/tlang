@@ -577,7 +577,7 @@ impl LoweringContext {
                             parameters: variant
                                 .parameters
                                 .iter()
-                                .map(|field| self.lower_struct_field(&field))
+                                .map(|field| self.lower_struct_field(field))
                                 .collect(),
                             span: variant.span,
                         })
