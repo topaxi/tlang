@@ -215,6 +215,8 @@ impl CodegenJS {
 
         if has_let {
             self.push_char(';');
+        } else {
+            self.push_indent();
         }
 
         for (i, hir::MatchArm { pat, guard, expr }) in arms.iter().enumerate() {

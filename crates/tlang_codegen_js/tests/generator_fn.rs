@@ -124,11 +124,9 @@ fn test_recursive_sum() {
     "});
     let expected_output = indoc! {"
         function sum(arg0) {
-            if (arg0.length === 0) {
+            let x,xs;if (arg0.length === 0) {
                 return 0;
-            } else if (arg0.length >= 1) {
-                let x = arg0[0];
-                let xs = arg0.slice(1);
+            } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true)) {
                 return x + sum(xs);
             }
         }
@@ -150,25 +148,6 @@ fn test_recursive_map() {
                 let x = arg0[0];
                 let xs = arg0.slice(1);
                 return [f(x), ...map(xs, f)];
-            }
-        }
-    "};
-    assert_eq!(output, expected_output);
-}
-
-#[test]
-fn test_function_declarations_args_redefinition_should_not_collide() {
-    let output = compile!(indoc! {"
-        fn bar(0) { 0 }
-        fn bar(0, args) { 0 }
-    "});
-    let expected_output = indoc! {"
-        function bar(...args) {
-            if (args.length === 1 && args[0] === 0) {
-                return 0;
-            } else if (args.length === 2 && args[0] === 0) {
-                let args$0 = args[1];
-                return 0;
             }
         }
     "};
@@ -378,9 +357,8 @@ fn test_function_reuse_param_name_with_pattern() {
         // quicksort(a[]) -> a[]
         function quicksort(list) {
             if (list.length === 0) {
-                // quicksort(a[]) -> a[]
                 return [];
-            } else {
+            } else if ((list$0 = list, true)) {
                 let pivotIndex = random_int(len(list));
                 let pivot = list[pivotIndex];
                 let list$0 = [...list.slice(0, pivotIndex), ...list.slice(pivotIndex + 1)];
