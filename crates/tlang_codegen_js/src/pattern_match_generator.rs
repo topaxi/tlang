@@ -126,16 +126,22 @@ impl CodegenJS {
 
     pub(crate) fn generate_match_expression(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) {
         // TODO: A lot here is copied from the if statement generator.
-        let lhs = self.replace_statement_buffer(String::new());
+        let mut lhs = self.replace_statement_buffer(String::new());
         let has_block_completions = match_args_have_completions(arms);
         let mut has_let = false;
         if has_block_completions {
-            let completion_tmp_var = self.current_scope().declare_tmp_variable();
-            self.push_indent();
-            self.push_str("let ");
-            self.push_str(&completion_tmp_var);
-            self.push_completion_variable(Some(completion_tmp_var));
-            has_let = true;
+            // TODO: We could probably reuse existing completion vars here.
+            if let Some("return") = self.current_completion_variable() {
+                self.push_completion_variable(Some("return".to_string()));
+                lhs = self.replace_statement_buffer_with_empty_string();
+            } else {
+                let completion_tmp_var = self.current_scope().declare_tmp_variable();
+                self.push_indent();
+                self.push_str("let ");
+                self.push_str(&completion_tmp_var);
+                self.push_completion_variable(Some(completion_tmp_var));
+                has_let = true;
+            }
         } else {
             self.push_completion_variable(None);
         }
@@ -191,22 +197,25 @@ impl CodegenJS {
             String::new()
         };
 
-        // TODO: Ugly workaround, as we always push a comma when generating pat identifiers
-        //       bindings.
-        if !has_let {
-            self.push_indent();
-            self.push_str("let _");
-        }
-
         for binding in all_pat_identifiers {
             if unique.insert(binding.clone()) {
                 let binding = self.current_scope().declare_variable(&binding);
-                self.push_char(',');
+                // TODO: Ugly workaround, as we always push a comma when generating pat identifiers
+                //       bindings.
+                if has_let {
+                    self.push_char(',');
+                } else {
+                    self.push_indent();
+                    self.push_str("let ");
+                    has_let = true;
+                }
                 self.push_str(&binding);
             }
         }
 
-        self.push_char(';');
+        if has_let {
+            self.push_char(';');
+        }
 
         for (i, hir::MatchArm { pat, guard, expr }) in arms.iter().enumerate() {
             if !pat.is_wildcard() || guard.is_some() {
@@ -241,7 +250,7 @@ impl CodegenJS {
             }
         }
 
-        if has_block_completions {
+        if has_block_completions && self.current_completion_variable() != Some("return") {
             self.push_newline();
             // If we have an lhs, put the completion var as the rhs of the lhs.
             // Otherwise, we assign the completion_var to the previous completion_var.

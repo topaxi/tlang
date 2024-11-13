@@ -1,6 +1,6 @@
 use tlang_hir::hir;
 
-use crate::generator::{BlockContext, CodegenJS};
+use crate::generator::{needs_semicolon, BlockContext, CodegenJS};
 
 impl CodegenJS {
     fn generate_function_parameter_list(&mut self, parameters: &[hir::FunctionParameter]) {
@@ -162,9 +162,13 @@ impl CodegenJS {
         self.push_indent();
         self.push_str("return ");
         self.push_context(BlockContext::Expression);
+        self.push_completion_variable(Some("return".to_string()));
         self.generate_optional_expr(&block.expr, None);
+        self.pop_completion_variable();
         self.pop_context();
-        self.push_char(';');
+        if needs_semicolon(&block.expr) {
+            self.push_char(';');
+        }
         self.push_newline();
         self.flush_statement_buffer();
     }
@@ -200,7 +204,10 @@ impl CodegenJS {
             self.generate_expr(expr, None);
         }
 
-        self.push_str(";\n");
+        if needs_semicolon(expr) {
+            self.push_char(';');
+        }
+        self.push_newline();
     }
 
     pub(crate) fn generate_recursive_call_expression(&mut self, expr: &hir::CallExpression) {

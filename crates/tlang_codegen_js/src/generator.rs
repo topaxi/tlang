@@ -365,10 +365,15 @@ impl CodegenJS {
         }
 
         self.push_indent();
-        self.push_str(&completion_tmp_var);
-        self.push_str(" = ");
+        if completion_tmp_var == "return" {
+            self.push_str("return ");
+        } else {
+            self.push_str(&completion_tmp_var);
+            self.push_str(" = ");
+        }
         self.generate_optional_expr(&block.expr, None);
-        self.push_str(";\n");
+        self.push_char(';');
+        self.push_newline();
         if !has_completion_var {
             self.indent_level -= 1;
             self.push_indent();
@@ -703,10 +708,17 @@ impl CodegenJS {
         let has_block_completions =
             self.current_context() == BlockContext::Expression && then_branch.has_completion();
         if has_block_completions {
-            lhs = self.replace_statement_buffer_with_empty_string();
-            let completion_tmp_var = self.scopes.declare_tmp_variable();
-            self.push_let_declaration(&completion_tmp_var);
-            self.push_completion_variable(Some(completion_tmp_var));
+            // TODO: We could probably reuse existing completion vars here.
+            if let Some("return") = self.current_completion_variable() {
+                self.push_completion_variable(Some("return".to_string()));
+                lhs = self.replace_statement_buffer_with_empty_string();
+                self.push_indent();
+            } else {
+                lhs = self.replace_statement_buffer_with_empty_string();
+                let completion_tmp_var = self.scopes.declare_tmp_variable();
+                self.push_let_declaration(&completion_tmp_var);
+                self.push_completion_variable(Some(completion_tmp_var));
+            }
         } else {
             self.push_completion_variable(None);
         }
@@ -743,7 +755,7 @@ impl CodegenJS {
 
         self.push_indent();
         self.push_char('}');
-        if has_block_completions {
+        if has_block_completions && self.current_completion_variable() != Some("return") {
             self.push_newline();
 
             let completion_var = self.completion_variables.last().unwrap().clone().unwrap();
@@ -845,5 +857,16 @@ impl CodegenJS {
 
     pub fn get_output(&self) -> &str {
         &self.output
+    }
+}
+
+pub(crate) fn needs_semicolon(expr: &Option<hir::Expr>) -> bool {
+    if let Some(expr) = expr {
+        !matches!(
+            &expr.kind,
+            hir::ExprKind::Block(..) | hir::ExprKind::IfElse(..) | hir::ExprKind::Match(..)
+        )
+    } else {
+        true
     }
 }

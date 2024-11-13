@@ -140,12 +140,11 @@ fn test_if_else_as_expression_as_fn_completion() {
     let output = compile!("fn main() { if true { 1 } else { 2 } }");
     let expected_output = indoc! {"
         function main() {
-            let $tmp$0;if (true) {
-                $tmp$0 = 1;
+            if (true) {
+                return 1;
             } else {
-                $tmp$0 = 2;
+                return 2;
             }
-            return $tmp$0;
         }
     "};
     assert_eq!(output, expected_output);
