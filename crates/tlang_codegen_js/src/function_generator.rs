@@ -105,7 +105,7 @@ impl CodegenJS {
 
         if is_any_definition_tail_recursive {
             self.push_indent();
-            self.push_str("while (true) {\n");
+            self.push_str("rec:while (true) {\n");
             self.inc_indent();
         }
 
@@ -636,7 +636,7 @@ impl CodegenJS {
         self.flush_function_pre_body();
         if is_tail_recursive {
             self.push_indent();
-            self.push_str("while (true) {\n");
+            self.push_str("rec:while (true) {\n");
             self.inc_indent();
             self.generate_function_body_block(body);
             self.dec_indent();
@@ -739,6 +739,9 @@ impl CodegenJS {
                         self.push_str(&tmp_vars[i]);
                         self.push_str(";\n");
                     }
+
+                    self.push_indent();
+                    self.push_str("continue rec;\n");
 
                     return;
                 }

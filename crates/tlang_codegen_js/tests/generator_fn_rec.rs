@@ -16,7 +16,7 @@ fn test_simple_self_recursive_tail_call_converted_to_loop() {
     "});
     let expected_output = indoc! {"
         function factorial(n, acc) {
-            while (true) {
+            rec:while (true) {
                 if (n === 0) {
                     return acc;
                 } else {
@@ -24,6 +24,7 @@ fn test_simple_self_recursive_tail_call_converted_to_loop() {
                     let $tmp$1 = n * acc;
                     n = $tmp$0;
                     acc = $tmp$1;
+                    continue rec;
                 }
             }
         }
@@ -49,7 +50,7 @@ fn test_fn_expression_explicit_tail_recursive_call_converted_to_loop() {
     let expected_output = indoc! {"
         function factorial(n) {
             let factorial_rec = function rec_helper(n, acc) {
-                while (true) {
+                rec:while (true) {
                     if (n === 0) {
                         return acc;
                     } else {
@@ -57,6 +58,7 @@ fn test_fn_expression_explicit_tail_recursive_call_converted_to_loop() {
                         let $tmp$1 = n * acc;
                         n = $tmp$0;
                         acc = $tmp$1;
+                        continue rec;
                     }
                 }
             };
@@ -74,7 +76,7 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_simple() {
     "});
     let expected_output = indoc! {"
         function factorial(n, acc) {
-            while (true) {
+            rec:while (true) {
                 if (n === 0) {
                     return acc;
                 } else {
@@ -82,6 +84,7 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_simple() {
                     let $tmp$1 = n * acc;
                     n = $tmp$0;
                     acc = $tmp$1;
+                    continue rec;
                 }
             }
         }
@@ -98,7 +101,7 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_convenient() {
     "});
     let expected_output = indoc! {"
         function factorial(...args) {
-            while (true) {
+            rec:while (true) {
                 if (args.length === 1) {
                     let n = args[0];
                     return factorial(n, 1);
@@ -112,6 +115,7 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_convenient() {
                     let $tmp$1 = n * acc;
                     args[0] = $tmp$0;
                     args[1] = $tmp$1;
+                    continue rec;
                 }
             }
         }
@@ -129,7 +133,7 @@ fn test_tail_recursive_fibonacci() {
     "});
     let expected_output = indoc! {"
         function fibonacci(...args) {
-            while (true) {
+            rec:while (true) {
                 if (args.length === 1) {
                     let n = args[0];
                     return fibonacci(n, 0, 1);
@@ -151,6 +155,7 @@ fn test_tail_recursive_fibonacci() {
                     args[0] = $tmp$0;
                     args[1] = $tmp$1;
                     args[2] = $tmp$2;
+                    continue rec;
                 }
             }
         }
@@ -166,7 +171,7 @@ fn test_foldl_impl() {
     "});
     let expected_output = indoc! {"
         function foldl(arg0, acc, f) {
-            while (true) {
+            rec:while (true) {
                 if (arg0.length === 0) {
                     return acc;
                 } else if (arg0.length >= 1) {
@@ -178,6 +183,7 @@ fn test_foldl_impl() {
                     arg0 = $tmp$0;
                     acc = $tmp$1;
                     f = $tmp$2;
+                    continue rec;
                 }
             }
         }
@@ -204,7 +210,7 @@ fn test_partition_impl() {
         // partition(a[], fn(a) -> bool) -> (a[], a[])
         // partition(a[], fn(a) -> bool, a[], a[]) -> (a[], a[])
         function partition(...args) {
-            while (true) {
+            rec:while (true) {
                 if (args.length === 2 && args[0].length === 0) {
                     // partition(a[], fn(a) -> bool) -> (a[], a[])
                     return [[], []];
@@ -244,6 +250,7 @@ fn test_partition_impl() {
                     args[1] = $tmp$3;
                     args[2] = $tmp$4;
                     args[3] = $tmp$5;
+                    continue rec;
                 }
             }
         }
@@ -265,7 +272,7 @@ fn test_all_impl() {
         // all(a[], fn(a) -> bool) -> bool
         // all(a[], fn(a) -> bool, bool) -> bool
         function all(...args) {
-            while (true) {
+            rec:while (true) {
                 if (args.length === 2) {
                     // all(a[], fn(a) -> bool) -> bool
                     let list = args[0];
@@ -289,6 +296,7 @@ fn test_all_impl() {
                     args[0] = $tmp$0;
                     args[1] = $tmp$1;
                     args[2] = $tmp$2;
+                    continue rec;
                 }
             }
         }
