@@ -169,8 +169,17 @@ fn test_if_else_as_expression() {
 
 #[test]
 fn test_if_else_as_expression_nested() {
-    let output =
-        compile!("fn main() { let result = if true { if true { 1 } else { 2 } } else { 3 }; }");
+    let output = compile!(indoc! {"
+        fn main() {
+            let result = if true {
+                let x = if true { 1 } else { 2 };
+
+                if x == 1 { 3 } else { 4 }
+            } else {
+                5
+            };
+        }
+    "});
     let expected_output = indoc! {"
         function main() {
             let $tmp$0;if (true) {
@@ -179,9 +188,15 @@ fn test_if_else_as_expression_nested() {
                 } else {
                     $tmp$1 = 2;
                 }
-                $tmp$0 = $tmp$1;
+                let x = $tmp$1;
+                let $tmp$2;if (x === 1) {
+                    $tmp$2 = 3;
+                } else {
+                    $tmp$2 = 4;
+                }
+                $tmp$0 = $tmp$2;
             } else {
-                $tmp$0 = 3;
+                $tmp$0 = 5;
             }
             let result = $tmp$0;
         }
