@@ -51,7 +51,7 @@ impl TlangCompiler {
     fn analyze(&mut self) {
         self.analyzer
             .add_builtin_symbols(CodegenJS::get_standard_library_symbols());
-        let _ = self.analyzer.analyze(&mut self.ast);
+        let _ = self.analyzer.analyze(&self.ast);
         self.analyzer
             .get_diagnostics()
             .clone_into(&mut self.diagnostics);
