@@ -97,7 +97,7 @@ pub enum StmtKind {
     None,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Serialize)]
 pub struct Pat {
     pub kind: PatKind,
     pub span: Span,
@@ -116,7 +116,7 @@ impl Pat {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Serialize)]
 pub enum PatKind {
     Wildcard,
     Identifier(HirId, Box<Ident>),
