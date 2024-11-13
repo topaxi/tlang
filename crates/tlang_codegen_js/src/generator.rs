@@ -47,7 +47,6 @@ pub struct CodegenJS {
     function_pre_body_declarations: Vec<(String, String)>,
     statement_buffer: Vec<String>,
     completion_variables: Vec<Option<String>>,
-    pattern_stack: Vec<ast::Pattern>,
 }
 
 impl Default for CodegenJS {
@@ -67,7 +66,6 @@ impl CodegenJS {
             function_pre_body_declarations: vec![],
             statement_buffer: vec![String::with_capacity(STATEMENT_BUFFER_CAPACITY)],
             completion_variables: vec![None],
-            pattern_stack: vec![],
         }
     }
 
@@ -208,14 +206,6 @@ impl CodegenJS {
 
     pub(crate) fn pop_context(&mut self) {
         self.context_stack.pop();
-    }
-
-    pub(crate) fn push_pat(&mut self, pat: &ast::Pattern) {
-        self.pattern_stack.push(pat.clone());
-    }
-
-    pub(crate) fn pop_pat(&mut self) {
-        self.pattern_stack.pop();
     }
 
     pub fn generate_code(&mut self, module: &ast::Module) {

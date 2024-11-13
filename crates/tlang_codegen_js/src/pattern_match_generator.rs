@@ -51,8 +51,6 @@ impl CodegenJS {
     }
 
     fn generate_pat_condition(&mut self, pat: &ast::Pattern, parent_js_expr: &str) {
-        self.push_pat(pat);
-
         match &pat.kind {
             ast::PatternKind::Identifier(ident_pattern) => {
                 let binding_name = self
@@ -128,8 +126,6 @@ impl CodegenJS {
             }
             ast::PatternKind::Wildcard | ast::PatternKind::None => {}
         }
-
-        self.pop_pat();
     }
 
     pub(crate) fn generate_match_expression(&mut self, match_expr: &ast::MatchExpression) {
