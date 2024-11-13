@@ -246,6 +246,7 @@ impl DeclarationAnalyzer {
                 self.collect_declarations_expr(&expr.expression);
                 for arm in &expr.arms {
                     self.collect_pattern(&arm.pattern);
+                    self.collect_optional_declarations_expr(&arm.guard);
                     self.collect_declarations_expr(&arm.expression);
                 }
             }

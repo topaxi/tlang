@@ -226,3 +226,41 @@ fn test_codegen_pattern_match_nested_enum() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_codegen_pattern_match_guards() {
+    let output = compile!(indoc! {"
+        let x = match 42 {
+            n if n > 0 => 1,
+            _ => 0,
+        };
+    "});
+    let expected_output = indoc! {"
+        let $tmp$0 = 42,n,$tmp$1;if ((n = $tmp$0, true) && n > 0) {
+            $tmp$1 = 1;
+        } else {
+            $tmp$1 = 0;
+        }
+        let x = $tmp$1;
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn test_codegen_pattern_match_let_guards() {
+    let output = compile!(indoc! {"
+        let x = match Some(42) {
+            n if let Some(y) = n * 2 => y,
+            _ => 0,
+        };
+    "});
+    let expected_output = indoc! {"
+        let $tmp$0 = Option.Some(42),$tmp$1,n,y,$tmp$2;if ((n = $tmp$0, true) && ($tmp$1 = n * 2, true) && $tmp$1.tag === \"Some\" && (y = $tmp$1[0], true)) {
+            $tmp$2 = y;
+        } else {
+            $tmp$2 = 0;
+        }
+        let x = $tmp$2;
+    "};
+    assert_eq!(output, expected_output);
+}

@@ -143,10 +143,34 @@ impl CodegenJS {
         // There's optimization opportunities in case the match expression is a
         // list of identifiers, then we can just alias the identifiers within the arms. This
         // case should be pretty common in function overloads.
-        let all_pat_identifiers = match_expr
-            .arms
-            .iter()
-            .flat_map(|arm| Self::get_pat_identifiers(&arm.pattern));
+        let all_pat_identifiers = match_expr.arms.iter().flat_map(|arm| {
+            let mut idents = vec![];
+            idents.extend(Self::get_pat_identifiers(&arm.pattern));
+            if let Some(guard) = &arm.guard {
+                if let ast::ExprKind::Let(pat, _) = &guard.kind {
+                    idents.extend(Self::get_pat_identifiers(pat));
+                }
+            }
+            idents
+        });
+
+        let has_let_guard = match_expr.arms.iter().any(|arm| {
+            if let Some(guard) = &arm.guard {
+                if let ast::ExprKind::Let(..) = &guard.kind {
+                    return true;
+                }
+            }
+            false
+        });
+
+        let let_guard_var = if has_let_guard {
+            let binding = self.current_scope().declare_tmp_variable();
+            self.push_char(',');
+            self.push_str(&binding);
+            binding
+        } else {
+            String::new()
+        };
 
         for binding in all_pat_identifiers {
             if unique.insert(binding.clone()) {
@@ -181,8 +205,7 @@ impl CodegenJS {
                 self.push_str("if (");
                 self.generate_pat_condition(pattern, &match_value_tmp_var);
                 if let Some(guard) = guard {
-                    self.push_str(" && ");
-                    self.generate_expr(guard, None);
+                    self.generate_match_arm_guard(guard, &let_guard_var);
                 }
                 self.push_str(") {\n");
                 self.inc_indent();
@@ -226,5 +249,21 @@ impl CodegenJS {
             }
         }
         self.pop_completion_variable();
+    }
+
+    fn generate_match_arm_guard(&mut self, guard: &ast::Expr, let_guard_var: &str) {
+        self.push_str(" && ");
+        // If the guard is a let expression, we special case this here, normal if let expressions
+        // are handled in the lowering process and will be transformed to a match expression.
+        if let ast::ExprKind::Let(pat, expr) = &guard.kind {
+            self.push_char('(');
+            self.push_str(let_guard_var);
+            self.push_str(" = ");
+            self.generate_expr(expr, None);
+            self.push_str(", true) && ");
+            self.generate_pat_condition(pat, let_guard_var);
+        } else {
+            self.generate_expr(guard, None);
+        }
     }
 }
