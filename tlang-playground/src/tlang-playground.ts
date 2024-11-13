@@ -14,11 +14,15 @@ import {
 
 type CodemirrorSeverity = 'hint' | 'info' | 'warning' | 'error';
 
+function getHashParams() {
+  return new URLSearchParams(window.location.hash.slice(1));
+}
+
 // Default source code is either the code provided via hashcode "source"
 // compressed by lz-string or the "example" hashcode with the corresponding
 // example file name. Default is the first example.
 async function defaultSource() {
-  let params = new URLSearchParams(window.location.hash.slice(1));
+  let params = getHashParams();
 
   if (params.has('source')) {
     return await decompressSource(params.get('source')!);
@@ -31,8 +35,36 @@ async function defaultSource() {
   return examples[Object.keys(examples)[0]];
 }
 
+function defaultDisplay() {
+  let params = getHashParams();
+  if (params.has('display')) {
+    return params.get('display') as 'ast' | 'hir' | 'hir pretty' | 'output';
+  }
+  return 'output';
+}
+
+function updateHashParam(key: string, value: string) {
+  let params = getHashParams();
+  params.set(key, value);
+  window.location.hash = params.toString();
+}
+
 async function updateSourceHashparam(source: string) {
-  window.location.hash = `source=${await compressSource(source)}`;
+  let params = getHashParams();
+  params.set('source', await compressSource(source));
+  params.delete('example');
+  window.location.hash = params.toString();
+}
+
+function updateExampleHashparam(example: string) {
+  let params = getHashParams();
+  params.set('example', example);
+  params.delete('source');
+  window.location.hash = params.toString();
+}
+
+async function updateDisplayHashparam(display: string) {
+  updateHashParam('display', display);
 }
 
 @customElement('tlang-playground')
@@ -157,7 +189,7 @@ export class TlangPlayground extends LitElement {
   consoleOutput: Array<unknown[] | string> = [];
 
   @state()
-  display: 'ast' | 'hir' | 'hir pretty' | 'output' = 'output';
+  display: 'ast' | 'hir' | 'hir pretty' | 'output' = defaultDisplay();
 
   @state()
   showConsole = true;
@@ -291,8 +323,14 @@ export class TlangPlayground extends LitElement {
     const target = event.target as HTMLSelectElement;
     this.consoleOutput = [];
     this.codemirror.source = examples[target.value];
-    window.location.hash = `example=${encodeURIComponent(target.value)}`;
+    updateExampleHashparam(target.value);
     this.run();
+  }
+
+  handleDisplayChange(event: Event) {
+    const target = event.target as HTMLSelectElement;
+    this.display = target.value as 'ast' | 'hir' | 'hir pretty' | 'output';
+    updateDisplayHashparam(this.display);
   }
 
   renderLogMessage(args: string | unknown[]) {
@@ -313,11 +351,7 @@ export class TlangPlayground extends LitElement {
         <select @change=${this.handleExampleSelect}>
           ${Object.keys(examples).map((key) => html`<option>${key}</option>`)}
         </select>
-        <select
-          @change=${(event: Event) =>
-            (this.display = (event.target as HTMLSelectElement)
-              .value as typeof this.display)}
-        >
+        <select @change=${this.handleDisplayChange} .value=${this.display}>
           <option value="output">code</option>
           <option value="ast">ast</option>
           <option value="hir">hir</option>
@@ -338,7 +372,12 @@ export class TlangPlayground extends LitElement {
           ? html`<pre class="output-ast">${this.compiler?.hir_string}</pre>`
           : ''}
         ${this.display === 'hir pretty'
-          ? html`<pre class="output-ast">${this.compiler?.hir_pretty}</pre>`
+          ? html`<t-codemirror
+              class="output-code"
+              language="tlang"
+              .source=${this.compiler?.hir_pretty}
+              readonly
+            ></t-codemirror>`
           : ''}
         ${this.display === 'output'
           ? html`<t-codemirror

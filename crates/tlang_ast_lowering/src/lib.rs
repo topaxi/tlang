@@ -82,6 +82,8 @@ impl LoweringContext {
             binding = format!("{}${}", name, prefix);
         }
 
+        self.create_binding(&binding);
+        // Alias the binding to the new explicit name.
         self.scope().insert(name, &binding);
         binding
     }
@@ -205,8 +207,8 @@ impl LoweringContext {
                 hir::ExprKind::Dict(entries)
             }
             ast::node::ExprKind::Let(pat, expr) => {
-                let pattern = self.lower_pat(pat);
                 let expression = self.lower_expr(expr);
+                let pattern = self.lower_pat(pat);
                 hir::ExprKind::Let(Box::new(pattern), Box::new(expression))
             }
             ast::node::ExprKind::FieldExpression(box ast::node::FieldAccessExpression {
@@ -349,17 +351,19 @@ impl LoweringContext {
                 pattern,
                 expression,
                 type_annotation,
-            }) => vec![hir::Stmt {
-                hir_id: self.lower_node_id(node.id),
-                kind: hir::StmtKind::Let(
-                    Box::new(self.lower_pat(pattern)),
-                    Box::new(self.lower_expr(expression)),
-                    Box::new(self.lower_ty(type_annotation)),
-                ),
-                span: node.span,
-                leading_comments: node.leading_comments.clone(),
-                trailing_comments: node.trailing_comments.clone(),
-            }],
+            }) => {
+                let expr = self.lower_expr(expression);
+                let ty = self.lower_ty(type_annotation);
+                let pat = self.lower_pat(pattern);
+
+                vec![hir::Stmt {
+                    hir_id: self.lower_node_id(node.id),
+                    kind: hir::StmtKind::Let(Box::new(pat), Box::new(expr), Box::new(ty)),
+                    span: node.span,
+                    leading_comments: node.leading_comments.clone(),
+                    trailing_comments: node.trailing_comments.clone(),
+                }]
+            }
             ast::node::StmtKind::FunctionDeclaration(box decl) => {
                 let decl = self.lower_fn_decl(decl);
 
