@@ -276,17 +276,14 @@ fn test_function_declarations_with_comments_inbetween() {
         // Comment 2
         // Comment 3
         function filter_map(arg0, f) {
-            let $tmp$0;if (arg0.length === 0) {
+            let $tmp$0,x,xs;if (arg0.length === 0) {
                 // Comment 1
                 return [];
-            } else if (arg0.length >= 1 && ($tmp$0 = f(arg0[0])) && $tmp$0.tag === \"Some\" && ((value = $tmp$0.value), true)) {
+            } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && ($tmp$0 = f(x)) && $tmp$0.tag === \"Some\" && ((value = $tmp$0.value), true)) {
                 // Comment 2
-                let x = arg0[0];
-                let xs = arg0.slice(1);
                 return [value, ...filter_map(xs, f)];
-            } else if (arg0.length >= 1) {
+            } else if (arg0.length >= 1 && (xs = arg0.slice(1), true)) {
                 // Comment 3
-                let xs = arg0.slice(1);
                 return filter_map(xs, f);
             }
         }

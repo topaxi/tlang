@@ -36,6 +36,14 @@ impl Path {
             .collect::<Vec<_>>()
             .join(separator)
     }
+
+    pub fn first_ident(&self) -> &Ident {
+        &self.segments[0].ident
+    }
+
+    pub fn last_ident(&self) -> &Ident {
+        &self.segments[self.segments.len() - 1].ident
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -156,6 +164,18 @@ pub struct MatchArm {
     pub trailing_comments: Vec<Token>,
 }
 
+impl MatchArm {
+    pub fn has_let_guard(&self) -> bool {
+        if let Some(guard) = &self.guard {
+            if let ExprKind::Let(..) = &guard.kind {
+                return true;
+            }
+        }
+
+        false
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct RangeExpression {
     pub start: Expr,
@@ -192,6 +212,10 @@ pub struct Expr {
 impl Expr {
     pub fn is_wildcard(&self) -> bool {
         matches!(self.kind, ExprKind::Wildcard)
+    }
+
+    pub fn is_path(&self) -> bool {
+        matches!(self.kind, ExprKind::Path(_))
     }
 
     pub fn is_tail_call(&self) -> bool {

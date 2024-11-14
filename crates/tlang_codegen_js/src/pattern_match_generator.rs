@@ -21,35 +21,43 @@ impl MatchContextStack {
     }
 
     fn has_fixed_ident(&self) -> bool {
-        self.last()
-            .map_or(false, |context| context.fixed_ident.is_some())
+        self.last().map_or(false, |context| {
+            matches!(context, MatchContext::Identifier(_))
+        })
     }
 
     fn get_fixed_ident(&self) -> Option<&str> {
-        self.last()
-            .and_then(|context| context.fixed_ident.as_deref())
+        self.last().and_then(|context| {
+            if let MatchContext::Identifier(ident) = context {
+                Some(ident.as_str())
+            } else {
+                None
+            }
+        })
     }
 
     fn fixed_list(&self) -> bool {
-        self.last().map_or(false, |context| context.fixed_list)
+        self.last().map_or(false, |context| {
+            matches!(context, MatchContext::ListOfIdentifiers(_))
+        })
     }
 
     fn get_fixed_list_identifier(&self, index: usize) -> Option<&String> {
-        self.last()
-            .and_then(|context| context.fixed_list_identifiers.get(index))
+        self.last().and_then(|context| {
+            if let MatchContext::ListOfIdentifiers(identifiers) = context {
+                identifiers.get(index)
+            } else {
+                None
+            }
+        })
     }
 }
 
 #[derive(Debug)]
-struct MatchContext {
-    // Are we matching a fixed identifier?
-    fixed_ident: Option<String>,
-
-    // Are we matching a fixed list containing only identifiers?
-    fixed_list: bool,
-
-    // List of identifiers that are matched in the fixed list.
-    fixed_list_identifiers: Vec<String>,
+enum MatchContext {
+    Dynamic,
+    Identifier(String),
+    ListOfIdentifiers(Vec<String>),
 }
 
 fn match_args_have_completions(arms: &[hir::MatchArm]) -> bool {
@@ -235,78 +243,44 @@ impl CodegenJS {
             self.push_completion_variable(None);
         }
 
-        let matching_value_is_fixed_list = if let hir::ExprKind::List(exprs) = &expr.kind {
-            exprs
-                .iter()
-                .all(|expr| matches!(&expr.kind, hir::ExprKind::Path(_)))
-        } else {
-            false
-        };
-        let matching_value_fixed_ident = if let hir::ExprKind::Path(path) = &expr.kind {
-            Some(path.join("::"))
-        } else {
-            None
-        };
-
-        let fixed_list_identifiers = if matching_value_is_fixed_list {
-            match &expr.kind {
-                hir::ExprKind::List(exprs) => exprs
-                    .iter()
-                    .map(|expr| {
-                        if let hir::ExprKind::Path(path) = &expr.kind {
-                            path.join("::")
-                        } else {
-                            unreachable!()
-                        }
-                    })
-                    .collect(),
-                hir::ExprKind::Path(path) => vec![path.join("::")],
-                _ => unreachable!(),
+        match &expr.kind {
+            hir::ExprKind::Path(path) => {
+                self.match_context_stack
+                    .push(MatchContext::Identifier(path.join("::")));
             }
-        } else {
-            vec![]
-        };
+            hir::ExprKind::List(exprs) if exprs.iter().all(|expr| expr.is_path()) => self
+                .match_context_stack
+                .push(MatchContext::ListOfIdentifiers(
+                    exprs
+                        .iter()
+                        .map(|expr| expr.path().unwrap().first_ident().to_string())
+                        .collect(),
+                )),
+            _ => {
+                self.match_context_stack.push(MatchContext::Dynamic);
+            }
+        }
 
-        self.match_context_stack.push(MatchContext {
-            fixed_ident: matching_value_fixed_ident,
-            fixed_list: matching_value_is_fixed_list,
-            fixed_list_identifiers,
-        });
-
-        let fixed_match_arms_match_pattern = arms
-            .iter()
-            .all(|arm| expr_idents_match_pat_idents(expr, &arm.pat));
-
-        let match_value_binding = if let hir::ExprKind::Path(path) = &expr.kind {
-            path.segments.last().unwrap().ident.to_string()
-        } else if matching_value_is_fixed_list {
-            "".to_string()
-        } else {
-            let match_value_binding = self.current_scope().declare_tmp_variable();
-
-            if has_let {
-                self.push_char(',');
-                self.push_str(&match_value_binding);
-                self.push_str(" = ");
-                self.generate_expr(expr, None);
+        let match_value_binding =
+            if let Some(MatchContext::Identifier(identifier)) = self.match_context_stack.last() {
+                identifier.clone()
             } else {
-                self.push_let_declaration_to_expr(&match_value_binding, expr);
-                has_let = true;
-            }
+                let match_value_binding = self.current_scope().declare_tmp_variable();
 
-            match_value_binding
-        };
-
-        let has_let_guard = arms.iter().any(|arm| {
-            if let Some(guard) = &arm.guard {
-                if let hir::ExprKind::Let(..) = &guard.kind {
-                    return true;
+                if has_let {
+                    self.push_char(',');
+                    self.push_str(&match_value_binding);
+                    self.push_str(" = ");
+                    self.generate_expr(expr, None);
+                } else {
+                    self.push_let_declaration_to_expr(&match_value_binding, expr);
+                    has_let = true;
                 }
-            }
-            false
-        });
 
-        let let_guard_var = if has_let_guard {
+                match_value_binding
+            };
+
+        let let_guard_var = if arms.iter().any(|arm| arm.has_let_guard()) {
             if !has_let {
                 self.push_indent();
                 self.push_str("let ");
@@ -338,7 +312,9 @@ impl CodegenJS {
         for binding in all_pat_identifiers {
             if unique.insert(binding.clone()) {
                 let binding = self.current_scope().declare_variable(&binding);
-                if !matching_value_is_fixed_list && !fixed_match_arms_match_pattern {
+                if !self.match_context_stack.fixed_list()
+                /* && !fixed_match_arms_match_pattern*/
+                {
                     // TODO: Ugly workaround, as we always push a comma when generating pat identifiers
                     //       bindings.
                     if has_let {
@@ -370,13 +346,14 @@ impl CodegenJS {
             },
         ) in arms.iter().enumerate()
         {
-            let no_cond_need = !(pat.is_wildcard()
-                || (matching_value_is_fixed_list
+            let no_cond_need = pat.is_wildcard()
+                || (
                     // TODO: We need to know this up front, to declare variables if this is false.
-                    && expr_idents_match_pat_idents(expr, pat)));
+                    expr_idents_match_pat_idents(expr, pat)
+                );
             let need_cond = guard.is_some();
 
-            if no_cond_need || need_cond {
+            if !no_cond_need || need_cond {
                 self.push_str("if (");
                 self.generate_pat_condition(pat, &match_value_binding);
                 if !match_value_binding.is_empty() && guard.is_some() {
