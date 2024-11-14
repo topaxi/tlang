@@ -20,22 +20,6 @@ impl MatchContextStack {
         self.0.last()
     }
 
-    fn has_fixed_ident(&self) -> bool {
-        self.last().map_or(false, |context| {
-            matches!(context, MatchContext::Identifier(_))
-        })
-    }
-
-    fn get_fixed_ident(&self) -> Option<&str> {
-        self.last().and_then(|context| {
-            if let MatchContext::Identifier(ident) = context {
-                Some(ident.as_str())
-            } else {
-                None
-            }
-        })
-    }
-
     fn fixed_list(&self) -> bool {
         self.last().map_or(false, |context| {
             matches!(context, MatchContext::ListOfIdentifiers(_))
@@ -114,7 +98,7 @@ impl CodegenJS {
         }
     }
 
-    fn generate_pat_condition(&mut self, pat: &hir::Pat, parent_js_expr: &str) {
+    fn generate_pat_condition(&mut self, pat: &hir::Pat, root_pat: bool, parent_js_expr: &str) {
         match &pat.kind {
             hir::PatKind::Identifier(_, ident_pattern) => {
                 // If you ended up here due to a `somevar = somevar`, we shouldn't have rendered
@@ -123,13 +107,6 @@ impl CodegenJS {
                     .current_scope()
                     .resolve_variable(ident_pattern.as_str())
                     .unwrap();
-
-                let matching_value = if let Some(ident) = self.match_context_stack.get_fixed_ident()
-                {
-                    ident
-                } else {
-                    parent_js_expr
-                };
 
                 self.push_str(&format!("({} = {}, true)", binding_name, parent_js_expr));
             }
@@ -151,7 +128,7 @@ impl CodegenJS {
                         format!("{}.{}", parent_js_expr, ident.as_str())
                     };
 
-                    self.generate_pat_condition(pattern, &parent_js_expr);
+                    self.generate_pat_condition(pattern, false, &parent_js_expr);
                 }
             }
             hir::PatKind::Literal(literal) => {
@@ -164,7 +141,7 @@ impl CodegenJS {
                 self.push_str(".length === 0");
             }
             hir::PatKind::List(patterns) => {
-                if self.match_context_stack.fixed_list() {
+                if root_pat && self.match_context_stack.fixed_list() {
                     let mut push_and = false;
                     for (i, pattern) in patterns.iter().enumerate() {
                         if pattern.is_wildcard() || pattern.is_identifier() {
@@ -183,7 +160,7 @@ impl CodegenJS {
                             .unwrap()
                             .clone();
 
-                        self.generate_pat_condition(pattern, &parent_js_expr);
+                        self.generate_pat_condition(pattern, false, &parent_js_expr);
                     }
                     return;
                 }
@@ -211,11 +188,11 @@ impl CodegenJS {
                     } else {
                         format!("{}[{}]", parent_js_expr, i)
                     };
-                    self.generate_pat_condition(pattern, &parent_js_expr);
+                    self.generate_pat_condition(pattern, false, &parent_js_expr);
                 }
             }
             hir::PatKind::Rest(pattern) => {
-                self.generate_pat_condition(pattern, parent_js_expr);
+                self.generate_pat_condition(pattern, false, parent_js_expr);
             }
             hir::PatKind::Wildcard => {}
         }
@@ -246,7 +223,7 @@ impl CodegenJS {
         match &expr.kind {
             hir::ExprKind::Path(path) => {
                 self.match_context_stack
-                    .push(MatchContext::Identifier(path.join("::")));
+                    .push(MatchContext::Identifier(path.first_ident().to_string()));
             }
             hir::ExprKind::List(exprs) if exprs.iter().all(|expr| expr.is_path()) => self
                 .match_context_stack
@@ -261,10 +238,10 @@ impl CodegenJS {
             }
         }
 
-        let match_value_binding =
-            if let Some(MatchContext::Identifier(identifier)) = self.match_context_stack.last() {
-                identifier.clone()
-            } else {
+        let match_value_binding = match self.match_context_stack.last() {
+            Some(MatchContext::Identifier(identifier)) => identifier.clone(),
+            Some(MatchContext::ListOfIdentifiers(_)) => "".to_string(), // ohoh...
+            _ => {
                 let match_value_binding = self.current_scope().declare_tmp_variable();
 
                 if has_let {
@@ -278,7 +255,8 @@ impl CodegenJS {
                 }
 
                 match_value_binding
-            };
+            }
+        };
 
         let let_guard_var = if arms.iter().any(|arm| arm.has_let_guard()) {
             if !has_let {
@@ -299,33 +277,43 @@ impl CodegenJS {
         // There's optimization opportunities in case the match expression is a
         // list of identifiers, then we can just alias the identifiers within the arms. This
         // case should be pretty common in function overloads.
-        let all_pat_identifiers = arms.iter().flat_map(|arm| {
-            let mut idents = vec![];
-            idents.extend(Self::get_pat_identifiers(&arm.pat));
-            if let Some(guard) = &arm.guard {
-                if let hir::ExprKind::Let(pat, _) = &guard.kind {
-                    idents.extend(Self::get_pat_identifiers(pat));
+        let mut all_pat_identifiers = arms
+            .iter()
+            .flat_map(|arm| {
+                let mut idents = vec![];
+                idents.extend(Self::get_pat_identifiers(&arm.pat));
+                if let Some(guard) = &arm.guard {
+                    if let hir::ExprKind::Let(pat, _) = &guard.kind {
+                        idents.extend(Self::get_pat_identifiers(pat));
+                    }
                 }
+                idents
+            })
+            .collect::<Vec<_>>();
+
+        match self.match_context_stack.last() {
+            Some(MatchContext::Identifier(ident)) => {
+                all_pat_identifiers.retain(|pat_ident| pat_ident != ident);
             }
-            idents
-        });
+            Some(MatchContext::ListOfIdentifiers(idents)) => {
+                all_pat_identifiers.retain(|pat_ident| !idents.contains(pat_ident));
+            }
+            _ => {}
+        }
+
         for binding in all_pat_identifiers {
             if unique.insert(binding.clone()) {
                 let binding = self.current_scope().declare_variable(&binding);
-                if !self.match_context_stack.fixed_list()
-                /* && !fixed_match_arms_match_pattern*/
-                {
-                    // TODO: Ugly workaround, as we always push a comma when generating pat identifiers
-                    //       bindings.
-                    if has_let {
-                        self.push_char(',');
-                    } else {
-                        self.push_indent();
-                        self.push_str("let ");
-                        has_let = true;
-                    }
-                    self.push_str(&binding);
+                // TODO: Ugly workaround, as we always push a comma when generating pat identifiers
+                //       bindings.
+                if has_let {
+                    self.push_char(',');
+                } else {
+                    self.push_indent();
+                    self.push_str("let ");
+                    has_let = true;
                 }
+                self.push_str(&binding);
             }
         }
 
@@ -355,8 +343,8 @@ impl CodegenJS {
 
             if !no_cond_need || need_cond {
                 self.push_str("if (");
-                self.generate_pat_condition(pat, &match_value_binding);
-                if !match_value_binding.is_empty() && guard.is_some() {
+                self.generate_pat_condition(pat, true, &match_value_binding);
+                if guard.is_some() {
                     self.push_str(" && ");
                 }
                 if let Some(guard) = guard {
@@ -412,7 +400,7 @@ impl CodegenJS {
             self.push_str(" = ");
             self.generate_expr(expr, None);
             self.push_str(", true) && ");
-            self.generate_pat_condition(pat, let_guard_var);
+            self.generate_pat_condition(pat, false, let_guard_var);
         } else {
             self.generate_expr(guard, None);
         }

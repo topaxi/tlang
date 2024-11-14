@@ -111,10 +111,16 @@ pub enum Literal {
     Char(String),
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Token {
     pub kind: TokenKind,
     pub span: Span,
+}
+
+impl PartialEq for Token {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind
+    }
 }
 
 impl Token {
