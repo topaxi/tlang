@@ -1,4 +1,4 @@
-use crate::scope::Scope;
+use crate::{pattern_match_generator::MatchContextStack, scope::Scope};
 use tlang_ast::{
     node::{self as ast, Ident},
     symbols::SymbolType,
@@ -45,6 +45,7 @@ pub struct CodegenJS {
     scopes: Scope,
     context_stack: Vec<BlockContext>,
     function_context_stack: Vec<FunctionContext>,
+    pub(crate) match_context_stack: MatchContextStack,
     statement_buffer: Vec<String>,
     completion_variables: Vec<Option<String>>,
 }
@@ -63,6 +64,7 @@ impl CodegenJS {
             scopes: Scope::default(),
             context_stack: vec![BlockContext::Program],
             function_context_stack: vec![],
+            match_context_stack: Default::default(),
             statement_buffer: vec![String::with_capacity(STATEMENT_BUFFER_CAPACITY)],
             completion_variables: vec![None],
         }

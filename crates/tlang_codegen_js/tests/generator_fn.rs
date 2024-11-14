@@ -263,7 +263,7 @@ fn test_function_declarations_with_comments_inbetween() {
     let output = compile!(
         indoc! {"
         // Comment 1
-        fn filter_map([], f) { [] }
+        fn filter_map([], _) { [] }
         // Comment 2
         fn filter_map([x, ...xs], f) if let Some { value } = f(x) { [value, ...filter_map(xs, f)] }
         // Comment 3
@@ -276,9 +276,7 @@ fn test_function_declarations_with_comments_inbetween() {
         // Comment 2
         // Comment 3
         function filter_map(arg0, f) {
-            let $tmp$0;
-            let value;
-            if (arg0.length === 0) {
+            let $tmp$0;if (arg0.length === 0) {
                 // Comment 1
                 return [];
             } else if (arg0.length >= 1 && ($tmp$0 = f(arg0[0])) && $tmp$0.tag === \"Some\" && ((value = $tmp$0.value), true)) {
@@ -357,8 +355,9 @@ fn test_function_reuse_param_name_with_pattern() {
         // quicksort(a[]) -> a[]
         function quicksort(list) {
             if (list.length === 0) {
+                // quicksort(a[]) -> a[]
                 return [];
-            } else if ((list$0 = list, true)) {
+            } else {
                 let pivotIndex = random_int(len(list));
                 let pivot = list[pivotIndex];
                 let list$0 = [...list.slice(0, pivotIndex), ...list.slice(pivotIndex + 1)];

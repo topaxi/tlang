@@ -114,6 +114,19 @@ impl Pat {
     pub fn is_wildcard(&self) -> bool {
         matches!(self.kind, PatKind::Wildcard)
     }
+
+    pub fn is_identifier(&self) -> bool {
+        matches!(self.kind, PatKind::Identifier(_, _))
+    }
+
+    pub fn is_fixed_list(&self) -> bool {
+        match &self.kind {
+            PatKind::List(pats) => pats
+                .iter()
+                .all(|pat| pat.is_wildcard() || pat.is_identifier()),
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
