@@ -228,7 +228,17 @@ impl CodegenJS {
             self.push_indent();
         }
 
-        for (i, hir::MatchArm { pat, guard, expr }) in arms.iter().enumerate() {
+        for (
+            i,
+            hir::MatchArm {
+                pat,
+                guard,
+                expr,
+                leading_comments,
+                trailing_comments,
+            },
+        ) in arms.iter().enumerate()
+        {
             if !pat.is_wildcard() || guard.is_some() {
                 self.push_str("if (");
                 self.generate_pat_condition(pat, &match_value_binding);
@@ -238,9 +248,11 @@ impl CodegenJS {
 
                 self.push_str(") {\n");
                 self.inc_indent();
+                self.generate_comments(leading_comments);
                 self.push_context(BlockContext::Expression);
                 self.generate_match_arm_expression(expr);
                 self.pop_context();
+                self.generate_comments(trailing_comments);
                 self.dec_indent();
                 self.push_indent();
 
@@ -252,9 +264,11 @@ impl CodegenJS {
             } else {
                 self.push_str("{\n");
                 self.inc_indent();
+                self.generate_comments(leading_comments);
                 self.push_context(BlockContext::Expression);
                 self.generate_match_arm_expression(expr);
                 self.pop_context();
+                self.generate_comments(trailing_comments);
                 self.dec_indent();
                 self.push_indent();
                 self.push_char('}');

@@ -271,6 +271,8 @@ impl LoweringContext {
                             pat: this.lower_pat_with_idents(&arm.pattern, &mut idents),
                             guard: arm.guard.as_ref().map(|expr| this.lower_expr(expr)),
                             expr: this.lower_expr(&arm.expression),
+                            leading_comments: vec![],
+                            trailing_comments: vec![],
                         })
                     })
                     .collect();
@@ -434,7 +436,7 @@ impl LoweringContext {
                             })
                             .collect::<Vec<_>>();
 
-                        let decl = self.lower_fn_decl_matching(&decls);
+                        let decl = self.lower_fn_decl_matching(node, &decls);
                         let fn_name = match &decl.name.kind {
                             hir::ExprKind::Path(path) => hir::Expr {
                                 hir_id: self.unique_id(),
@@ -447,6 +449,11 @@ impl LoweringContext {
                             _ => unreachable!(),
                         };
 
+                        let mut leading_comments = node.leading_comments.clone();
+                        for decl in &decls {
+                            leading_comments.extend(decl.leading_comments.clone());
+                        }
+
                         grouped_decls.push(hir::Stmt {
                             // TODO: Hope this will not mess with us in the future, we generate
                             // more statements than initially in the AST, so we are not able to
@@ -454,7 +461,7 @@ impl LoweringContext {
                             hir_id: self.unique_id(),
                             kind: hir::StmtKind::FunctionDeclaration(Box::new(decl)),
                             span: node.span,
-                            leading_comments: node.leading_comments.clone(),
+                            leading_comments,
                             trailing_comments: node.trailing_comments.clone(),
                         });
 
@@ -489,6 +496,8 @@ impl LoweringContext {
                                 })),
                                 span: Default::default(),
                             },
+                            leading_comments: vec![],
+                            trailing_comments: vec![],
                         })
                     }
 
@@ -525,12 +534,18 @@ impl LoweringContext {
 
                     grouped_decls
                 } else {
-                    let hir_fn_decl = self.lower_fn_decl_matching(decls);
+                    let hir_fn_decl = self.lower_fn_decl_matching(node, decls);
+
+                    let mut leading_comments = node.leading_comments.clone();
+                    for decl in decls {
+                        leading_comments.extend(decl.leading_comments.clone());
+                    }
+
                     vec![hir::Stmt {
                         hir_id: self.lower_node_id(node.id),
                         kind: hir::StmtKind::FunctionDeclaration(Box::new(hir_fn_decl)),
                         span: node.span,
-                        leading_comments: node.leading_comments.clone(),
+                        leading_comments,
                         trailing_comments: node.trailing_comments.clone(),
                     }]
                 }
@@ -616,6 +631,7 @@ impl LoweringContext {
 
     fn lower_fn_decl_matching(
         &mut self,
+        node: &ast::node::Stmt,
         decls: &[FunctionDeclaration],
     ) -> hir::FunctionDeclaration {
         if decls.len() == 1 {
@@ -688,7 +704,7 @@ impl LoweringContext {
 
         let mut match_arms = Vec::with_capacity(decls.len());
 
-        for decl in decls {
+        for (i, decl) in decls.iter().enumerate() {
             self.with_new_scope(|this| {
                 // All declarations with the same amount of arguments refer to the same
                 // function now, we map this in our symbol_id_to_hir_id table.
@@ -729,7 +745,19 @@ impl LoweringContext {
                     this.expr(body.span, hir::ExprKind::Block(Box::new(body)))
                 };
 
-                match_arms.push(hir::MatchArm { pat, guard, expr });
+                match_arms.push(hir::MatchArm {
+                    pat,
+                    guard,
+                    expr,
+                    leading_comments: if i == 0 {
+                        // The first declaration never has leading comments, as they are attached
+                        // to the Stmt node instead.
+                        node.leading_comments.clone()
+                    } else {
+                        decl.leading_comments.clone()
+                    },
+                    trailing_comments: decl.trailing_comments.clone(),
+                });
             });
         }
 

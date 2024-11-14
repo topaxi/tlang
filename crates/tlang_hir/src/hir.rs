@@ -137,6 +137,10 @@ pub struct MatchArm {
     pub pat: Pat,
     pub guard: Option<Expr>,
     pub expr: Expr,
+    // TODO: We might want to handle this somehow different, as we pass them on from the AST to
+    //       HIR, which feels somewhat unnecessary.
+    pub leading_comments: Vec<Token>,
+    pub trailing_comments: Vec<Token>,
 }
 
 #[derive(Debug, Serialize)]
