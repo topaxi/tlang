@@ -127,11 +127,21 @@ impl Pat {
         matches!(self.kind, PatKind::Identifier(_, _))
     }
 
+    pub fn is_empty_list(&self) -> bool {
+        match &self.kind {
+            PatKind::List(pats) => pats.is_empty(),
+            _ => false,
+        }
+    }
+
     pub fn is_fixed_list(&self) -> bool {
         match &self.kind {
-            PatKind::List(pats) => pats
-                .iter()
-                .all(|pat| pat.is_wildcard() || pat.is_identifier()),
+            PatKind::List(pats) => {
+                !pats.is_empty()
+                    && pats
+                        .iter()
+                        .all(|pat| pat.is_wildcard() || pat.is_identifier())
+            }
             _ => false,
         }
     }

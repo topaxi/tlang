@@ -53,6 +53,7 @@ fn match_args_have_completions(arms: &[hir::MatchArm]) -> bool {
 
 impl CodegenJS {
     fn generate_match_arm_expression(&mut self, expression: &hir::Expr) {
+        self.flush_statement_buffer();
         if let hir::ExprKind::Block(_) = &expression.kind {
             self.generate_expr(expression, None);
         } else if self.current_completion_variable() == Some("return") {
@@ -225,14 +226,17 @@ impl CodegenJS {
                 self.match_context_stack
                     .push(MatchContext::Identifier(path.first_ident().to_string()));
             }
-            hir::ExprKind::List(exprs) if exprs.iter().all(|expr| expr.is_path()) => self
-                .match_context_stack
-                .push(MatchContext::ListOfIdentifiers(
-                    exprs
-                        .iter()
-                        .map(|expr| expr.path().unwrap().first_ident().to_string())
-                        .collect(),
-                )),
+            hir::ExprKind::List(exprs)
+                if !exprs.is_empty() && exprs.iter().all(|expr| expr.is_path()) =>
+            {
+                self.match_context_stack
+                    .push(MatchContext::ListOfIdentifiers(
+                        exprs
+                            .iter()
+                            .map(|expr| expr.path().unwrap().first_ident().to_string())
+                            .collect(),
+                    ))
+            }
             _ => {
                 self.match_context_stack.push(MatchContext::Dynamic);
             }
@@ -280,8 +284,7 @@ impl CodegenJS {
         let mut all_pat_identifiers = arms
             .iter()
             .flat_map(|arm| {
-                let mut idents = vec![];
-                idents.extend(Self::get_pat_identifiers(&arm.pat));
+                let mut idents = Self::get_pat_identifiers(&arm.pat);
                 if let Some(guard) = &arm.guard {
                     if let hir::ExprKind::Let(pat, _) = &guard.kind {
                         idents.extend(Self::get_pat_identifiers(pat));
@@ -334,17 +337,13 @@ impl CodegenJS {
             },
         ) in arms.iter().enumerate()
         {
-            let no_cond_need = pat.is_wildcard()
-                || (
-                    // TODO: We need to know this up front, to declare variables if this is false.
-                    expr_idents_match_pat_idents(expr, pat)
-                );
-            let need_cond = guard.is_some();
+            let no_cond_need = pat.is_wildcard() || expr_idents_match_pat_idents(expr, pat);
+            let need_cond = guard.is_some() || pat.is_empty_list();
 
             if !no_cond_need || need_cond {
                 self.push_str("if (");
                 self.generate_pat_condition(pat, true, &match_value_binding);
-                if guard.is_some() {
+                if guard.is_some() && !pat.is_fixed_list() {
                     self.push_str(" && ");
                 }
                 if let Some(guard) = guard {

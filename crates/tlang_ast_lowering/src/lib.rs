@@ -67,7 +67,12 @@ impl LoweringContext {
         self.scope().insert(name, name)
     }
 
+    /// Create a unique binding for the given name. If the name already exists, a new unique
+    /// name is created by appending a number to the name. This was used to distinguish shadowed
+    /// names to make variables more explicit, which should also help in codegen. Due to some
+    /// awkward regressions and edge cases, this function is currently not used anymore.
     #[must_use]
+    #[allow(dead_code)]
     pub(crate) fn create_unique_binding(&mut self, name: &str) -> String {
         if !self.has_binding(name) {
             self.create_binding(name);
@@ -386,6 +391,7 @@ impl LoweringContext {
                 let has_variadic_arguments = decls
                     .iter()
                     .any(|decl| decl.parameters.len() != first_declaration.parameters.len());
+                let all_param_names = get_param_names(decls);
 
                 if has_variadic_arguments {
                     // Group by arguments length and emit a function for each variant.
@@ -402,9 +408,6 @@ impl LoweringContext {
                     // Currently the easiest way is to split up
                     // ast::node::SmtKind::FunctionDeclarations by argument length and create a
                     // new unique name for each declaration.
-                    // TODO: At last, we should  emit a wrapping function using the original name
-                    // with a new hir id which wraps and dynamically dispatches the function based
-                    // on argument length.
                     let mut grouped_decls = vec![];
                     let mut match_arms = vec![];
 
@@ -415,7 +418,7 @@ impl LoweringContext {
                         self.scope().insert(&function_name, &function_name);
                     }
 
-                    for arg_len in args_lengths {
+                    for (i, arg_len) in args_lengths.into_iter().enumerate() {
                         let decls = decls
                             .iter()
                             .filter(|decl| decl.parameters.len() == arg_len)
@@ -436,7 +439,24 @@ impl LoweringContext {
                             })
                             .collect::<Vec<_>>();
 
-                        let decl = self.lower_fn_decl_matching(node, &decls);
+                        let mut leading_comments = decls
+                            .iter()
+                            .flat_map(|d| d.leading_comments.clone())
+                            .collect::<Vec<_>>();
+
+                        if i == 0 {
+                            leading_comments.extend(node.leading_comments.clone());
+                        }
+
+                        let decl = self.lower_fn_decl_matching(
+                            &decls,
+                            &all_param_names,
+                            if i == 0 {
+                                node.leading_comments.as_slice()
+                            } else {
+                                &[]
+                            },
+                        );
                         let fn_name = match &decl.name.kind {
                             hir::ExprKind::Path(path) => hir::Expr {
                                 hir_id: self.unique_id(),
@@ -449,11 +469,6 @@ impl LoweringContext {
                             _ => unreachable!(),
                         };
 
-                        let mut leading_comments = node.leading_comments.clone();
-                        for decl in &decls {
-                            leading_comments.extend(decl.leading_comments.clone());
-                        }
-
                         grouped_decls.push(hir::Stmt {
                             // TODO: Hope this will not mess with us in the future, we generate
                             // more statements than initially in the AST, so we are not able to
@@ -462,7 +477,7 @@ impl LoweringContext {
                             kind: hir::StmtKind::FunctionDeclaration(Box::new(decl)),
                             span: node.span,
                             leading_comments,
-                            trailing_comments: node.trailing_comments.clone(),
+                            trailing_comments: vec![],
                         });
 
                         // Pushing match arm for dynamic dispatch version of the function.
@@ -534,12 +549,14 @@ impl LoweringContext {
 
                     grouped_decls
                 } else {
-                    let hir_fn_decl = self.lower_fn_decl_matching(node, decls);
-
                     let mut leading_comments = node.leading_comments.clone();
-                    for decl in decls {
-                        leading_comments.extend(decl.leading_comments.clone());
-                    }
+                    leading_comments.extend(decls.iter().flat_map(|d| d.leading_comments.clone()));
+
+                    let hir_fn_decl = self.lower_fn_decl_matching(
+                        decls,
+                        &all_param_names,
+                        &node.leading_comments,
+                    );
 
                     vec![hir::Stmt {
                         hir_id: self.lower_node_id(node.id),
@@ -631,8 +648,9 @@ impl LoweringContext {
 
     fn lower_fn_decl_matching(
         &mut self,
-        node: &ast::node::Stmt,
         decls: &[FunctionDeclaration],
+        all_param_names: &[Option<Ident>],
+        leading_comments: &[ast::token::Token],
     ) -> hir::FunctionDeclaration {
         if decls.len() == 1 {
             return self.lower_fn_decl(&decls[0]);
@@ -641,42 +659,22 @@ impl LoweringContext {
         let mut span = decls[0].span;
         span.end = decls.last().unwrap().span.end;
 
-        let first_declaration = decls.first().unwrap();
-        let first_declaration_number_of_args = decls[0].parameters.len();
-        let mut argument_names: Vec<Ident> = Vec::with_capacity(first_declaration_number_of_args);
-        let mut idents = HashMap::new();
-
-        for i in 0..first_declaration_number_of_args {
-            // If the name of this parameter is the same in all declarations, we can reuse the
-            // actual defined name. Otherwise we use `arg{i}` as the name.
-            let arg_name = decls.iter().find_map(|d| {
-                let param = &d.parameters[i];
-                match &param.pattern.kind {
-                    ast::node::PatternKind::Identifier(ident) => Some(ident.to_string()),
-                    ast::node::PatternKind::Enum(enum_pattern) => {
-                        Some(get_enum_name(&enum_pattern.path).to_lowercase())
-                    }
-                    _ => None,
+        let first_declaration = &decls[0];
+        let param_names = get_param_names(decls)
+            .iter()
+            .enumerate()
+            .map(|(i, param_name)| {
+                if let Some(param_name) = param_name {
+                    param_name.clone()
+                } else if let Some(Some(ident)) = all_param_names.get(i) {
+                    ident.clone()
+                } else {
+                    Ident::new(&format!("arg{i}"), Default::default())
                 }
-            });
+            })
+            .collect::<Vec<_>>();
 
-            if arg_name.is_some()
-                && decls.iter().all(|d| match &d.parameters[i].pattern.kind {
-                    ast::node::PatternKind::Identifier(ident) => {
-                        Some(ident.to_string()) == arg_name
-                    }
-                    ast::node::PatternKind::Enum(enum_pattern) => {
-                        Some(get_enum_name(&enum_pattern.path).to_lowercase()) == arg_name
-                    }
-                    _ => true,
-                })
-            {
-                #[allow(clippy::unnecessary_unwrap)]
-                argument_names.push(Ident::new(&arg_name.unwrap(), span));
-            } else {
-                argument_names.push(Ident::new(&format!("arg{}", i), span));
-            };
-        }
+        let mut idents = HashMap::new();
 
         // Create hir::FunctionDeclaration with an empty block, and fill out the
         // parameters, for each parameter/argument we reuse the existing plain
@@ -686,7 +684,7 @@ impl LoweringContext {
         let mut hir_fn_decl = hir::FunctionDeclaration::new_empty_fn(
             hir_id,
             self.lower_expr(&first_declaration.name),
-            argument_names
+            param_names
                 .iter()
                 .map(|ident| hir::FunctionParameter {
                     pattern: hir::Pat {
@@ -745,25 +743,25 @@ impl LoweringContext {
                     this.expr(body.span, hir::ExprKind::Block(Box::new(body)))
                 };
 
+                let mut arm_leading_comments = vec![];
+                if i == 0 {
+                    arm_leading_comments.extend(leading_comments.iter().cloned());
+                }
+                arm_leading_comments.extend(decl.leading_comments.clone());
+
                 match_arms.push(hir::MatchArm {
                     pat,
                     guard,
                     expr,
-                    leading_comments: if i == 0 {
-                        // The first declaration never has leading comments, as they are attached
-                        // to the Stmt node instead.
-                        node.leading_comments.clone()
-                    } else {
-                        decl.leading_comments.clone()
-                    },
+                    leading_comments: arm_leading_comments,
                     trailing_comments: decl.trailing_comments.clone(),
                 });
             });
         }
 
-        let match_value = if argument_names.len() > 1 {
+        let match_value = if param_names.len() > 1 {
             let argument_list = hir::ExprKind::List(
-                argument_names
+                param_names
                     .iter()
                     .map(|ident| {
                         self.expr(
@@ -785,7 +783,7 @@ impl LoweringContext {
                 ast::span::Span::default(),
                 hir::ExprKind::Path(Box::new(hir::Path {
                     segments: vec![hir::PathSegment {
-                        ident: argument_names.first().unwrap().clone(),
+                        ident: param_names.first().unwrap().clone(),
                     }],
                     span,
                 })),
@@ -870,7 +868,7 @@ impl LoweringContext {
     fn lower_pat_with_idents(
         &mut self,
         node: &ast::node::Pattern,
-        idents: &mut HashMap<String, String>,
+        _idents: &mut HashMap<String, String>,
     ) -> hir::Pat {
         match &node.kind {
             ast::node::PatternKind::Wildcard => hir::Pat {
@@ -882,16 +880,24 @@ impl LoweringContext {
                 span: node.span,
             },
             ast::node::PatternKind::Identifier(box ident) => {
-                let ident = if let Some(binding) = idents.get(ident.as_str()) {
-                    Ident::new(binding, ident.span)
-                } else {
-                    let binding = self.create_unique_binding(ident.as_str());
-                    idents.insert(ident.to_string(), binding.clone());
-                    Ident::new(&binding, ident.span)
-                };
+                self.create_binding(ident.as_str());
+                // TODO: As mentioned above, create_unique_binding was supposed to help with
+                // resolving shadowed variables by giving them unique names. Due to some
+                // regressions as this was a too generic solution, this is disabled. As a first
+                // step we might only apply this for let declarations.
+                //let ident = if let Some(binding) = idents.get(ident.as_str()) {
+                //    Ident::new(binding, ident.span)
+                //} else {
+                //    let binding = self.create_unique_binding(ident.as_str());
+                //    idents.insert(ident.to_string(), binding.clone());
+                //    Ident::new(&binding, ident.span)
+                //};
 
                 hir::Pat {
-                    kind: hir::PatKind::Identifier(self.lower_node_id(node.id), Box::new(ident)),
+                    kind: hir::PatKind::Identifier(
+                        self.lower_node_id(node.id),
+                        Box::new(ident.clone()),
+                    ),
                     span: node.span,
                 }
             }
@@ -960,4 +966,50 @@ fn get_function_name(expr: &ast::node::Expr) -> String {
 pub fn lower_to_hir(tlang_ast: &ast::node::Module) -> hir::Module {
     let mut ctx = LoweringContext::new();
     ctx.lower_module(tlang_ast)
+}
+
+fn get_param_names(decls: &[FunctionDeclaration]) -> Vec<Option<Ident>> {
+    let num_args = decls
+        .iter()
+        .map(|d| d.parameters.len())
+        .max()
+        .unwrap_or_default();
+    let mut argument_names = Vec::with_capacity(num_args);
+
+    for i in 0..num_args {
+        // If the name of this parameter is the same in all declarations, we can reuse the
+        // actual defined name. Otherwise we use return None and generate a name where necessary.
+        let arg_name = decls.iter().find_map(|d| {
+            let param_pattern_kind = &d.parameters.get(i).map(|p| &p.pattern.kind);
+
+            match &param_pattern_kind {
+                Some(ast::node::PatternKind::Identifier(ident)) => Some(ident.to_string()),
+                Some(ast::node::PatternKind::Enum(enum_pattern)) => {
+                    Some(get_enum_name(&enum_pattern.path).to_lowercase())
+                }
+                _ => None,
+            }
+        });
+
+        if arg_name.is_some()
+            && decls
+                .iter()
+                .all(|d| match &d.parameters.get(i).map(|p| &p.pattern.kind) {
+                    Some(ast::node::PatternKind::Identifier(ident)) => {
+                        Some(ident.to_string()) == arg_name
+                    }
+                    Some(ast::node::PatternKind::Enum(enum_pattern)) => {
+                        Some(get_enum_name(&enum_pattern.path).to_lowercase()) == arg_name
+                    }
+                    _ => true,
+                })
+        {
+            #[allow(clippy::unnecessary_unwrap)]
+            argument_names.push(Some(Ident::new(&arg_name.unwrap(), Default::default())));
+        } else {
+            argument_names.push(None);
+        };
+    }
+
+    argument_names
 }

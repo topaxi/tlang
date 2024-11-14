@@ -354,7 +354,9 @@ impl CodegenJS {
             }
         }
 
+        self.push_completion_variable(None);
         self.generate_statements(&block.stmts);
+        self.pop_completion_variable();
 
         if !block.has_completion() {
             self.push_statement_buffer();
@@ -366,16 +368,25 @@ impl CodegenJS {
             return;
         }
 
-        self.push_indent();
+        let completion = block.expr.as_ref().unwrap();
         if completion_tmp_var == "return" {
-            self.push_str("return ");
+            if completion.is_tail_call() {
+                self.generate_expr(completion, None);
+            } else {
+                self.push_indent();
+                self.push_str("return ");
+                self.generate_expr(completion, None);
+                self.push_char(';');
+                self.push_newline();
+            }
         } else {
+            self.push_indent();
             self.push_str(&completion_tmp_var);
             self.push_str(" = ");
+            self.generate_expr(completion, None);
+            self.push_char(';');
+            self.push_newline();
         }
-        self.generate_optional_expr(&block.expr, None);
-        self.push_char(';');
-        self.push_newline();
         if !has_completion_var {
             self.indent_level -= 1;
             self.push_indent();

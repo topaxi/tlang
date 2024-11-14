@@ -3,19 +3,39 @@ use tlang_hir::hir;
 use crate::generator::{needs_semicolon, BlockContext, CodegenJS};
 
 impl CodegenJS {
+    fn generate_function_param(&mut self, param: &hir::FunctionParameter) {
+        match &param.pattern.kind {
+            hir::PatKind::Identifier(..) if param.pattern.is_self() => {
+                self.current_scope().declare_variable_alias("self", "this");
+            }
+            hir::PatKind::Identifier(_, ident) => {
+                let var_name = self
+                    .current_scope()
+                    .declare_local_variable(ident.name.as_str());
+                self.push_str(&var_name);
+                self.current_scope()
+                    .declare_variable_alias(ident.name.as_str(), &var_name);
+            }
+            hir::PatKind::Wildcard => {}
+            _ => unreachable!(
+                "Patterns in function parameters should be lowered into a match statement first"
+            ),
+        }
+    }
+
     fn generate_function_parameter_list(&mut self, parameters: &[hir::FunctionParameter]) {
         self.push_char('(');
 
         let mut iter = parameters.iter();
 
         if let Some(param) = iter.next() {
-            self.generate_pat(&param.pattern);
+            self.generate_function_param(param);
 
             // If the first param was the self param, we didn't render anything and we need to skip
             // the comma being rendered in the loop ahead.
             if param.pattern.is_self() {
                 if let Some(param) = iter.next() {
-                    self.generate_pat(&param.pattern);
+                    self.generate_function_param(param)
                 }
             }
         }
@@ -300,15 +320,27 @@ fn is_function_body_tail_recursive(function_name: &str, node: &hir::Expr) -> boo
             .any(|arm| is_function_body_tail_recursive(function_name, &arm.expr)),
         hir::ExprKind::IfElse(expr, then_branch, else_branches) => {
             is_function_body_tail_recursive(function_name, expr)
-                || is_function_body_tail_recursive(
-                    function_name,
-                    then_branch.expr.as_ref().unwrap(),
-                )
-                || else_branches.iter().any(|else_clause| {
+                || if then_branch.expr.is_some() {
                     is_function_body_tail_recursive(
                         function_name,
-                        else_clause.consequence.expr.as_ref().unwrap(),
+                        then_branch.expr.as_ref().unwrap(),
                     )
+                } else if let Some(stmt) = then_branch.stmts.last() {
+                    is_function_body_tail_recursive_stmt(function_name, stmt)
+                } else {
+                    false
+                }
+                || else_branches.iter().any(|else_clause| {
+                    if else_clause.consequence.expr.is_some() {
+                        is_function_body_tail_recursive(
+                            function_name,
+                            else_clause.consequence.expr.as_ref().unwrap(),
+                        )
+                    } else if let Some(stmt) = else_clause.consequence.stmts.last() {
+                        is_function_body_tail_recursive_stmt(function_name, stmt)
+                    } else {
+                        false
+                    }
                 })
         }
         _ => false,

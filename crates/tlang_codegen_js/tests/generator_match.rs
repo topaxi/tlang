@@ -46,12 +46,12 @@ fn test_codegen_pattern_match_expressions() {
     "});
     let expected_output = indoc! {"
         let x = 42;
-        let $tmp$0 = x,$tmp$1;if ($tmp$0 === 42) {
-            $tmp$1 = 1;
+        let $tmp$0;if (x === 42) {
+            $tmp$0 = 1;
         } else {
-            $tmp$1 = 0;
+            $tmp$0 = 0;
         }
-        let y = $tmp$1;
+        let y = $tmp$0;
     "};
 
     assert_eq!(output, expected_output);
@@ -68,12 +68,12 @@ fn test_codegen_pattern_match_blocks() {
     "});
     let expected_output = indoc! {"
         let x = 42;
-        let $tmp$0 = x,$tmp$1;if ($tmp$0 === 42) {
-            $tmp$1 = 1;
+        let $tmp$0;if (x === 42) {
+            $tmp$0 = 1;
         } else {
-            $tmp$1 = 0;
+            $tmp$0 = 0;
         }
-        let y = $tmp$1;
+        let y = $tmp$0;
     "};
 
     assert_eq!(output, expected_output);
@@ -83,19 +83,19 @@ fn test_codegen_pattern_match_blocks() {
 fn test_codegen_pattern_match_list_bindings() {
     let output = compile!(indoc! {"
         let x = 42;
-        let y = match ([42, 43]) {
+        let y = match [42, 43] {
             [x, y] => x + y,
             _ => 0,
         };
     "});
     let expected_output = indoc! {"
         let x = 42;
-        let $tmp$0 = [42, 43],x$0,y$0,$tmp$1;if ($tmp$0.length >= 2 && (x$0 = $tmp$0[0], true) && (y$0 = $tmp$0[1], true)) {
-            $tmp$1 = x$0 + y$0;
+        let $tmp$0,$tmp$1 = [42, 43],x$0,y$0;if ($tmp$1.length >= 2 && (x$0 = $tmp$1[0], true) && (y$0 = $tmp$1[1], true)) {
+            $tmp$0 = x$0 + y$0;
         } else {
-            $tmp$1 = 0;
+            $tmp$0 = 0;
         }
-        let y = $tmp$1;
+        let y = $tmp$0;
     "};
     assert_eq!(output, expected_output);
 }
@@ -109,12 +109,12 @@ fn test_codegen_pattern_match_list_empty() {
         };
     "});
     let expected_output = indoc! {"
-        let $tmp$0 = [],$tmp$1;if ($tmp$0.length === 0) {
-            $tmp$1 = 1;
+        let $tmp$0,$tmp$1 = [];if ($tmp$1.length === 0) {
+            $tmp$0 = 1;
         } else {
-            $tmp$1 = 0;
+            $tmp$0 = 0;
         }
-        let x = $tmp$1;
+        let x = $tmp$0;
     "};
     assert_eq!(output, expected_output);
 }
@@ -128,12 +128,12 @@ fn test_codegen_pattern_match_list_rest_elements() {
         };
     "});
     let expected_output = indoc! {"
-        let $tmp$0 = [1, 2, 3, 4, 5],n,rest,$tmp$1;if ($tmp$0.length >= 1 && (n = $tmp$0[0], true) && (rest = $tmp$0.slice(1), true)) {
-            $tmp$1 = n + rest.length;
+        let $tmp$0,$tmp$1 = [1, 2, 3, 4, 5],n,rest;if ($tmp$1.length >= 1 && (n = $tmp$1[0], true) && (rest = $tmp$1.slice(1), true)) {
+            $tmp$0 = n + rest.length;
         } else {
-            $tmp$1 = 0;
+            $tmp$0 = 0;
         }
-        let x = $tmp$1;
+        let x = $tmp$0;
     "};
     assert_eq!(output, expected_output);
 }
@@ -147,12 +147,12 @@ fn test_codegen_pattern_match_enum_bindings() {
         };
     "});
     let expected_output = indoc! {"
-        let $tmp$0 = Option.Some(42),x,$tmp$1;if ($tmp$0.tag === \"Some\" && (x = $tmp$0[0], true)) {
-            $tmp$1 = x;
+        let $tmp$0,$tmp$1 = Option.Some(42),x;if ($tmp$1.tag === \"Some\" && (x = $tmp$1[0], true)) {
+            $tmp$0 = x;
         } else {
-            $tmp$1 = 0;
+            $tmp$0 = 0;
         }
-        let y = $tmp$1;
+        let y = $tmp$0;
     "};
     assert_eq!(output, expected_output);
 }
@@ -190,14 +190,14 @@ fn test_codegen_pattern_match_positional_enum() {
             },
         };
         let expr = Expr.Value(42);
-        let $tmp$0 = expr,x,y,$tmp$1;if ($tmp$0.tag === \"Value\" && (x = $tmp$0[0], true)) {
-            $tmp$1 = x;
-        } else if ($tmp$0.tag === \"Add\" && (x = $tmp$0[0], true) && (y = $tmp$0[1], true)) {
-            $tmp$1 = x + y;
+        let $tmp$0,x,y;if (expr.tag === \"Value\" && (x = expr[0], true)) {
+            $tmp$0 = x;
+        } else if (expr.tag === \"Add\" && (x = expr[0], true) && (y = expr[1], true)) {
+            $tmp$0 = x + y;
         } else {
-            $tmp$1 = 0;
+            $tmp$0 = 0;
         }
-        let z = $tmp$1;
+        let z = $tmp$0;
     "};
     assert_eq!(output, expected_output);
 }
@@ -215,14 +215,14 @@ fn test_codegen_pattern_match_nested_enum() {
     "});
     let expected_output = indoc! {"
         let x = 42;
-        let $tmp$0 = Option.Some(Option.Some(42)),x$0,$tmp$1;if ($tmp$0.tag === \"Some\" && $tmp$0[0].tag === \"Some\" && (x$0 = $tmp$0[0][0], true)) {
-            $tmp$1 = x$0;
-        } else if ($tmp$0.tag === \"Some\" && $tmp$0[0].tag === \"None\") {
-            $tmp$1 = 0;
-        } else if ($tmp$0.tag === \"None\") {
-            $tmp$1 = 0;
+        let $tmp$0,$tmp$1 = Option.Some(Option.Some(42)),x$0;if ($tmp$1.tag === \"Some\" && $tmp$1[0].tag === \"Some\" && (x$0 = $tmp$1[0][0], true)) {
+            $tmp$0 = x$0;
+        } else if ($tmp$1.tag === \"Some\" && $tmp$1[0].tag === \"None\") {
+            $tmp$0 = 0;
+        } else if ($tmp$1.tag === \"None\") {
+            $tmp$0 = 0;
         }
-        let y = $tmp$1;
+        let y = $tmp$0;
     "};
     assert_eq!(output, expected_output);
 }
@@ -236,12 +236,12 @@ fn test_codegen_pattern_match_guards() {
         };
     "});
     let expected_output = indoc! {"
-        let $tmp$0 = 42,n,$tmp$1;if ((n = $tmp$0, true) && n > 0) {
-            $tmp$1 = 1;
+        let $tmp$0,$tmp$1 = 42,n;if ((n = $tmp$1, true) && n > 0) {
+            $tmp$0 = 1;
         } else {
-            $tmp$1 = 0;
+            $tmp$0 = 0;
         }
-        let x = $tmp$1;
+        let x = $tmp$0;
     "};
     assert_eq!(output, expected_output);
 }
@@ -255,12 +255,12 @@ fn test_codegen_pattern_match_let_guards() {
         };
     "});
     let expected_output = indoc! {"
-        let $tmp$0 = Option.Some(42),$tmp$1,n,y,$tmp$2;if ((n = $tmp$0, true) && ($tmp$1 = n * 2, true) && $tmp$1.tag === \"Some\" && (y = $tmp$1[0], true)) {
-            $tmp$2 = y;
+        let $tmp$0,$tmp$1 = Option.Some(42),$tmp$2,n,y;if ((n = $tmp$1, true) && ($tmp$2 = n * 2, true) && $tmp$2.tag === \"Some\" && (y = $tmp$2[0], true)) {
+            $tmp$0 = y;
         } else {
-            $tmp$2 = 0;
+            $tmp$0 = 0;
         }
-        let x = $tmp$2;
+        let x = $tmp$0;
     "};
     assert_eq!(output, expected_output);
 }

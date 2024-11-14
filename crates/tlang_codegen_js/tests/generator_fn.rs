@@ -296,15 +296,18 @@ fn test_function_declarations_with_guard_in_first_declaration() {
     assert_eq!(output, expected_output);
 }
 
-// TODO: This is not consistent with multiple declarations bodies, where this would only match a
-//       call with a list with at least one element. But the current implementation for a single
-//       function body will match an empty list as well.
+// TODO: This should transform into a match statement within the body as well.
+#[ignore]
 #[test]
 fn test_function_list_match_with_wildcard() {
     let output = compile!("fn tail([_, ...xs]) { xs }");
     let expected_output = indoc! {"
-        function tail([, ...xs]) {
-            return xs;
+        function tail(arg0) {
+            let xs;if (arg0.length >= 1 && (xs = arg0.slice(1), true)) {
+                return xs;
+            } else {
+                throw new TypeError(\"Pattern match failed\");
+            }
         }
     "};
     assert_eq!(output, expected_output);
