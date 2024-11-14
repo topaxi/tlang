@@ -1,4 +1,5 @@
 use tlang_ast::node as ast;
+use tlang_hir::hir;
 
 use crate::generator::CodegenJS;
 
@@ -17,26 +18,27 @@ struct JSOperatorInfo {
 impl CodegenJS {
     pub(crate) fn generate_binary_op(
         &mut self,
-        binary_expr: &ast::BinaryOpExpression,
-        parent_op: Option<&ast::BinaryOpKind>,
+        op: ast::BinaryOpKind,
+        lhs: &hir::Expr,
+        rhs: &hir::Expr,
+        parent_op: Option<ast::BinaryOpKind>,
     ) {
-        let needs_parentheses = parent_op.map_or(false, |parent| {
-            should_wrap_with_parentheses(&binary_expr.op, parent)
-        });
+        let needs_parentheses =
+            parent_op.map_or(false, |parent| should_wrap_with_parentheses(op, parent));
 
         if needs_parentheses {
             self.push_char('(');
         }
 
-        if let ast::BinaryOpKind::Pipeline = binary_expr.op {
+        if let ast::BinaryOpKind::Pipeline = op {
             // If rhs was an identifier, we just pass lhs it as an argument to a function call.
-            if let ast::ExprKind::Path(_) = binary_expr.rhs.kind {
-                self.generate_expr(&binary_expr.rhs, None);
+            if let hir::ExprKind::Path(_) = &rhs.kind {
+                self.generate_expr(rhs, None);
                 self.push_char('(');
-                self.generate_expr(&binary_expr.lhs, None);
+                self.generate_expr(lhs, None);
                 self.push_char(')');
             // If rhs is a Call node and we prepend the lhs to the argument list.
-            } else if let ast::ExprKind::Call(call_expr) = &binary_expr.rhs.kind {
+            } else if let hir::ExprKind::Call(call_expr) = &rhs.kind {
                 self.generate_expr(&call_expr.callee, None);
                 self.push_char('(');
 
@@ -48,14 +50,14 @@ impl CodegenJS {
                             self.push_str(", ");
                         }
 
-                        if let ast::ExprKind::Wildcard = arg.kind {
-                            self.generate_expr(&binary_expr.lhs, None);
+                        if let hir::ExprKind::Wildcard = arg.kind {
+                            self.generate_expr(lhs, None);
                         } else {
                             self.generate_expr(arg, None);
                         }
                     }
                 } else {
-                    self.generate_expr(&binary_expr.lhs, None);
+                    self.generate_expr(lhs, None);
                     for arg in &call_expr.arguments {
                         self.push_str(", ");
                         self.generate_expr(arg, None);
@@ -64,9 +66,9 @@ impl CodegenJS {
                 self.push_char(')');
             }
         } else {
-            self.generate_expr(&binary_expr.lhs, Some(&binary_expr.op));
-            self.generate_binary_operator_token(&binary_expr.op);
-            self.generate_expr(&binary_expr.rhs, Some(&binary_expr.op));
+            self.generate_expr(lhs, Some(op));
+            self.generate_binary_operator_token(op);
+            self.generate_expr(rhs, Some(op));
         }
 
         if needs_parentheses {
@@ -74,7 +76,7 @@ impl CodegenJS {
         }
     }
 
-    fn generate_binary_operator_token(self: &mut CodegenJS, op: &ast::BinaryOpKind) {
+    fn generate_binary_operator_token(self: &mut CodegenJS, op: ast::BinaryOpKind) {
         match op {
             ast::BinaryOpKind::Assign => self.push_str(" = "),
             ast::BinaryOpKind::Add => self.push_str(" + "),
@@ -101,7 +103,7 @@ impl CodegenJS {
     }
 }
 
-fn should_wrap_with_parentheses(op: &ast::BinaryOpKind, parent_op: &ast::BinaryOpKind) -> bool {
+fn should_wrap_with_parentheses(op: ast::BinaryOpKind, parent_op: ast::BinaryOpKind) -> bool {
     let op_info = map_operator_info(op);
     let parent_op_info = map_operator_info(parent_op);
 
@@ -113,7 +115,7 @@ fn should_wrap_with_parentheses(op: &ast::BinaryOpKind, parent_op: &ast::BinaryO
         && op_info.associativity == JSAssociativity::Right
 }
 
-fn map_operator_info(op: &ast::BinaryOpKind) -> JSOperatorInfo {
+fn map_operator_info(op: ast::BinaryOpKind) -> JSOperatorInfo {
     match op {
         ast::BinaryOpKind::Assign => JSOperatorInfo {
             precedence: 1,

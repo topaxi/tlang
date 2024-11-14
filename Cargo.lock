@@ -578,6 +578,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tlang_ast_lowering"
+version = "0.1.0"
+dependencies = [
+ "pretty_assertions",
+ "tlang_ast",
+ "tlang_hir",
+]
+
+[[package]]
 name = "tlang_bindings_js"
 version = "0.1.0"
 dependencies = [
@@ -586,7 +595,10 @@ dependencies = [
  "ron 0.8.1",
  "serde_json",
  "tlang_ast",
+ "tlang_ast_lowering",
  "tlang_codegen_js",
+ "tlang_hir",
+ "tlang_hir_pretty",
  "tlang_parser",
  "tlang_semantics",
  "wasm-bindgen",
@@ -599,7 +611,9 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "indoc",
+ "ron 0.8.1",
  "tlang_ast",
+ "tlang_ast_lowering",
  "tlang_codegen_js",
  "tlang_parser",
  "tlang_semantics",
@@ -614,8 +628,27 @@ dependencies = [
  "indoc",
  "pretty_assertions",
  "tlang_ast",
+ "tlang_ast_lowering",
+ "tlang_hir",
  "tlang_parser",
  "tlang_semantics",
+]
+
+[[package]]
+name = "tlang_hir"
+version = "0.1.0"
+dependencies = [
+ "pretty_assertions",
+ "serde",
+ "tlang_ast",
+]
+
+[[package]]
+name = "tlang_hir_pretty"
+version = "0.1.0"
+dependencies = [
+ "tlang_ast",
+ "tlang_hir",
 ]
 
 [[package]]

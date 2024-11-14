@@ -20,7 +20,8 @@ pub fn compile_src(source: &str, builtin_symbols: &[(&str, SymbolType)]) -> Stri
     match semantic_analyzer.analyze(&ast) {
         Ok(()) => {
             let mut codegen = CodegenJS::default();
-            codegen.generate_code(&ast);
+            let hir = tlang_ast_lowering::lower_to_hir(&ast);
+            codegen.generate_code(&hir);
             codegen.get_output().to_string()
         }
         Err(diagnostics) => panic!("{diagnostics:#?}"),

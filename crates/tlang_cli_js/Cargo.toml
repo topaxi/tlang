@@ -6,7 +6,9 @@ edition.workspace = true
 [dependencies]
 tlang_ast = { path = "../tlang_ast" }
 tlang_parser = { path = "../tlang_parser" }
+tlang_ast_lowering = { path = "../tlang_ast_lowering" }
 tlang_codegen_js = { path = "../tlang_codegen_js" }
 tlang_semantics = { path = "../tlang_semantics" }
+ron = { workspace = true }
 clap = { version = "4", features = ["cargo"] }
 indoc = { workspace = true }

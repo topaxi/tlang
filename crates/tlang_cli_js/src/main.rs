@@ -5,14 +5,23 @@ use std::{
 };
 
 use clap::{arg, command, ArgMatches};
+use tlang_ast_lowering::lower_to_hir;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_parser::error::ParseError;
 use tlang_semantics::{diagnostic::Diagnostic, SemanticAnalyzer};
+
+#[derive(Debug, PartialEq)]
+enum OutputType {
+    Ast,
+    Hir,
+    Js,
+}
 
 #[derive(Debug)]
 struct Args {
     input_file: Option<String>,
     output_file: Option<String>,
+    output_type: OutputType,
     output_stdlib: bool,
     silent: bool,
 }
@@ -32,9 +41,23 @@ fn validate_args(matches: &ArgMatches) -> Args {
         std::process::exit(1);
     }
 
+    let output_type = matches.get_one::<String>("output_type").cloned();
+    let output_type = match output_type.as_deref() {
+        Some("ast") => OutputType::Ast,
+        Some("hir") => OutputType::Hir,
+        Some("js") | None => OutputType::Js,
+        _ => {
+            eprintln!("Error: output_type must be one of 'ast', 'hir', or 'js'.");
+            std::process::exit(1);
+        }
+    };
+
+    let output_file = matches.get_one::<String>("output_file").cloned();
+
     Args {
         input_file,
-        output_file: matches.get_one::<String>("output_file").cloned(),
+        output_file,
+        output_type,
         output_stdlib,
         silent,
     }
@@ -44,7 +67,8 @@ fn get_args() -> Args {
     let matches = command!()
         .arg(arg!(input_file: <INPUT_FILE> "Input file").required(false))
         .arg(arg!(output_file: -o --"output-file" <OUTPUT_FILE> "Output file").required(false))
-        .arg(arg!(output_stdlib: --"output-stdlib" "Flag to use stdlib"))
+        .arg(arg!(output_stdlib: --"output-stdlib" "Flag to output the stdlib"))
+        .arg(arg!(output_type: -t --"output-type" <OUTPUT_TYPE> "Output type, defaults to js"))
         .arg(arg!(silent: -s --"silent" "Flag to suppress output"))
         .get_matches();
 
@@ -78,7 +102,14 @@ fn main() {
         if let Err(why) = file.read_to_string(&mut source) {
             panic!("couldn't read {}: {}", path.display(), why)
         };
-        let output = match compile(&source) {
+
+        let output = match args.output_type {
+            OutputType::Ast => compile_to_ast(&source),
+            OutputType::Hir => compile_to_hir(&source),
+            OutputType::Js => compile(&source),
+        };
+
+        let output = match output {
             Ok(output) => output,
             Err(errors) => {
                 eprintln!("{errors:?}");
@@ -86,8 +117,12 @@ fn main() {
             }
         };
 
-        let std_lib_source = compile_standard_library().unwrap();
-        let output = format!("{std_lib_source}\n{{{output}}}");
+        let output = if args.output_type == OutputType::Js {
+            let std_lib_source = compile_standard_library().unwrap();
+            format!("{std_lib_source}\n{{{output}}}")
+        } else {
+            output
+        };
 
         if args.output_file.is_none() {
             println!("{output}");
@@ -126,6 +161,19 @@ impl From<Vec<Diagnostic>> for ParserError {
     }
 }
 
+fn compile_to_ast(source: &str) -> Result<String, ParserError> {
+    let mut parser = tlang_parser::parser::Parser::from_source(source);
+    let ast = parser.parse()?;
+    Ok(ron::ser::to_string_pretty(&ast, ron::ser::PrettyConfig::default()).unwrap())
+}
+
+fn compile_to_hir(source: &str) -> Result<String, ParserError> {
+    let mut parser = tlang_parser::parser::Parser::from_source(source);
+    let ast = parser.parse()?;
+    let hir = lower_to_hir(&ast);
+    Ok(ron::ser::to_string_pretty(&hir, ron::ser::PrettyConfig::default()).unwrap())
+}
+
 fn compile(source: &str) -> Result<String, ParserError> {
     let mut parser = tlang_parser::parser::Parser::from_source(source);
     let ast = parser.parse()?;
@@ -134,7 +182,8 @@ fn compile(source: &str) -> Result<String, ParserError> {
     match semantic_analyzer.analyze(&ast) {
         Ok(()) => {
             let mut generator = CodegenJS::default();
-            generator.generate_code(&ast);
+            let hir = lower_to_hir(&ast);
+            generator.generate_code(&hir);
             Ok(generator.get_output().to_string())
         }
         Err(diagnostics) => Err(diagnostics.into()),

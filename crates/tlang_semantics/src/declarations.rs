@@ -331,8 +331,8 @@ impl DeclarationAnalyzer {
                 self.collect_pattern(pattern);
             }
             PatternKind::Enum(enum_pattern) => {
-                for element in &enum_pattern.elements {
-                    self.collect_pattern(element);
+                for (_ident, pat) in &enum_pattern.elements {
+                    self.collect_pattern(pat);
                 }
             }
             PatternKind::Wildcard => {} // Wildcard discards values, nothing to do here.

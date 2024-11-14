@@ -310,7 +310,7 @@ impl Pattern {
                     enum_pattern
                         .elements
                         .iter()
-                        .flat_map(Pattern::get_all_node_ids),
+                        .flat_map(|(_, pattern)| pattern.get_all_node_ids()),
                 );
             }
             PatternKind::None
@@ -331,8 +331,7 @@ impl Pattern {
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct EnumPattern {
     pub path: Path,
-    pub elements: Vec<Pattern>,
-    pub named_fields: bool,
+    pub elements: Vec<(Ident, Pattern)>,
 }
 
 #[derive(Debug, Default, PartialEq, Clone, Serialize)]
@@ -353,8 +352,7 @@ pub enum PatternKind {
 pub struct EnumVariant {
     pub id: NodeId,
     pub name: Ident,
-    pub named_fields: bool,
-    pub parameters: Vec<Ident>,
+    pub parameters: Vec<StructField>,
     pub span: Span,
 }
 
@@ -395,7 +393,7 @@ pub enum StmtKind {
     Expr(Box<Expr>),
     Let(Box<LetDeclaration>),
     FunctionDeclaration(Box<FunctionDeclaration>),
-    // Should this really be handled within the parser or should this be done in later stages?
+    // TODO: We should deal with this in HIR instead.
     FunctionDeclarations(Vec<FunctionDeclaration>),
     Return(Box<Option<Expr>>),
     EnumDeclaration(Box<EnumDeclaration>),

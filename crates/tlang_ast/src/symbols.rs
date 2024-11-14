@@ -33,7 +33,7 @@ impl Display for SymbolType {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Copy, Serialize)]
+#[derive(Debug, Default, Eq, PartialEq, Clone, Copy, Serialize, Hash)]
 pub struct SymbolId(usize);
 
 impl SymbolId {

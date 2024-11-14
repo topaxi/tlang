@@ -19,14 +19,39 @@ impl Scope {
         self.parent.as_deref()
     }
 
-    pub(crate) fn declare_variable(&mut self, name: &str) -> String {
+    pub(crate) fn declare_local_variable(&mut self, name: &str) -> String {
         if !self.has_local_variable(name) {
             self.variables.insert(name.to_string(), name.to_string());
 
             return name.to_string();
         }
         // If already declared, generate a new name with a suffix (e.g., $a, $b)
-        let new_name = self.get_unique_variable_name(&(name.to_string() + "$"));
+        let name_without_suffix = name
+            .contains('$')
+            .then(|| &name[..name.rfind('$').unwrap()])
+            .unwrap_or(name);
+        let new_name = self.get_unique_variable_name(&(name_without_suffix.to_string() + "$"));
+        self.variables.insert(new_name.clone(), new_name.clone());
+        self.variables.insert(name.to_string(), new_name.clone());
+        new_name
+    }
+
+    pub(crate) fn declare_variable(&mut self, name: &str) -> String {
+        // TODO: Local variable was enough before HIR, now HIR already gives some unique names to
+        //       variables, which makes this a bit harder as we add and define more variables.
+        //       Can this be solved in a better way?
+        if !self.has_variable_in_scope(name) {
+            self.variables.insert(name.to_string(), name.to_string());
+
+            return name.to_string();
+        }
+        // If already declared, generate a new name with a suffix (e.g., $a, $b)
+        let name_without_suffix = name
+            .contains('$')
+            .then(|| &name[..name.rfind('$').unwrap()])
+            .unwrap_or(name);
+        let new_name = self.get_unique_variable_name(&(name_without_suffix.to_string() + "$"));
+        self.variables.insert(new_name.clone(), new_name.clone());
         self.variables.insert(name.to_string(), new_name.clone());
         new_name
     }

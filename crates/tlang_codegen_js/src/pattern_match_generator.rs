@@ -1,20 +1,70 @@
 use std::collections::HashSet;
 
-use tlang_ast::node as ast;
+use tlang_hir::hir;
 
 use crate::generator::{BlockContext, CodegenJS};
 
-fn match_args_have_completions(arms: &[ast::MatchArm]) -> bool {
-    arms.iter().any(|arm| match &arm.expression.kind {
-        ast::ExprKind::Block(block) => block.has_completion(),
+#[derive(Debug, Default)]
+pub(crate) struct MatchContextStack(Vec<MatchContext>);
+
+impl MatchContextStack {
+    fn push(&mut self, context: MatchContext) {
+        self.0.push(context);
+    }
+
+    fn pop(&mut self) -> Option<MatchContext> {
+        self.0.pop()
+    }
+
+    fn last(&self) -> Option<&MatchContext> {
+        self.0.last()
+    }
+
+    fn fixed_list(&self) -> bool {
+        self.last().map_or(false, |context| {
+            matches!(context, MatchContext::ListOfIdentifiers(_))
+        })
+    }
+
+    fn get_fixed_list_identifier(&self, index: usize) -> Option<&String> {
+        self.last().and_then(|context| {
+            if let MatchContext::ListOfIdentifiers(identifiers) = context {
+                identifiers.get(index)
+            } else {
+                None
+            }
+        })
+    }
+}
+
+#[derive(Debug)]
+enum MatchContext {
+    Dynamic,
+    Identifier(String),
+    ListOfIdentifiers(Vec<String>),
+}
+
+fn match_args_have_completions(arms: &[hir::MatchArm]) -> bool {
+    arms.iter().any(|arm| match &arm.expr.kind {
+        hir::ExprKind::Block(block) => block.has_completion(),
         _ => true,
     })
 }
 
 impl CodegenJS {
-    fn generate_match_arm_expression(&mut self, expression: &ast::Expr) {
-        if let ast::ExprKind::Block(_) = &expression.kind {
+    fn generate_match_arm_expression(&mut self, expression: &hir::Expr) {
+        self.flush_statement_buffer();
+        if let hir::ExprKind::Block(_) = &expression.kind {
             self.generate_expr(expression, None);
+        } else if self.current_completion_variable() == Some("return") {
+            if expression.is_tail_call() {
+                self.generate_expr(expression, None);
+            } else {
+                self.push_indent();
+                self.push_str("return ");
+                self.generate_expr(expression, None);
+                self.push_str(";\n");
+            }
         } else {
             self.push_indent();
             let completion_tmp_var = self.current_completion_variable().unwrap();
@@ -24,35 +74,36 @@ impl CodegenJS {
         }
     }
 
-    fn get_pat_identifiers(pattern: &ast::Pattern) -> Vec<String> {
+    fn get_pat_identifiers(pattern: &hir::Pat) -> Vec<String> {
         match &pattern.kind {
-            ast::PatternKind::Identifier(ident_pattern) => {
+            hir::PatKind::Identifier(_, ident_pattern) => {
                 vec![ident_pattern.name.to_string()]
             }
-            ast::PatternKind::_Self => vec!["this".to_string()],
-            ast::PatternKind::Enum(enum_pattern) => {
+            hir::PatKind::Enum(_path, patterns) => {
                 let mut bindings = Vec::new();
-                for pattern in &enum_pattern.elements {
+                for (_ident, pattern) in patterns {
                     bindings.extend(Self::get_pat_identifiers(pattern));
                 }
                 bindings
             }
-            ast::PatternKind::Literal(_) => Vec::new(),
-            ast::PatternKind::List(patterns) => {
+            hir::PatKind::Literal(_) => Vec::new(),
+            hir::PatKind::List(patterns) => {
                 let mut bindings = Vec::new();
                 for pattern in patterns {
                     bindings.extend(Self::get_pat_identifiers(pattern));
                 }
                 bindings
             }
-            ast::PatternKind::Rest(pattern) => Self::get_pat_identifiers(pattern),
-            ast::PatternKind::Wildcard | ast::PatternKind::None => Vec::new(),
+            hir::PatKind::Rest(pattern) => Self::get_pat_identifiers(pattern),
+            hir::PatKind::Wildcard => Vec::new(),
         }
     }
 
-    fn generate_pat_condition(&mut self, pat: &ast::Pattern, parent_js_expr: &str) {
+    fn generate_pat_condition(&mut self, pat: &hir::Pat, root_pat: bool, parent_js_expr: &str) {
         match &pat.kind {
-            ast::PatternKind::Identifier(ident_pattern) => {
+            hir::PatKind::Identifier(_, ident_pattern) => {
+                // If you ended up here due to a `somevar = somevar`, we shouldn't have rendered
+                // the match arm condition in the first place.
                 let binding_name = self
                     .current_scope()
                     .resolve_variable(ident_pattern.as_str())
@@ -60,174 +111,265 @@ impl CodegenJS {
 
                 self.push_str(&format!("({} = {}, true)", binding_name, parent_js_expr));
             }
-            ast::PatternKind::_Self => todo!("Implement self pattern."),
-            ast::PatternKind::Enum(enum_pattern) => {
-                let enum_variant_name = enum_pattern.path.segments.last().unwrap();
+            hir::PatKind::Enum(path, patterns) => {
+                let enum_variant_name = path.segments.last().unwrap();
 
                 self.push_str(&format!(
                     "{}.tag === \"{}\"",
-                    parent_js_expr, enum_variant_name
+                    parent_js_expr,
+                    enum_variant_name.ident.as_str()
                 ));
 
-                if enum_pattern.named_fields {
-                    for _pattern in enum_pattern.elements.iter() {
-                        self.push_str(" && ");
+                for (ident, pattern) in patterns.iter().filter(|(_, pat)| !pat.is_wildcard()) {
+                    self.push_str(" && ");
 
-                        todo!("Instead of named fields, we should probably have a key value kinda thing here.");
-                        //let parent_js_expr = format!("{}.{}", parent_js_expr);
+                    let parent_js_expr = if ident.as_str().chars().all(char::is_numeric) {
+                        format!("{}[{}]", parent_js_expr, ident)
+                    } else {
+                        format!("{}.{}", parent_js_expr, ident.as_str())
+                    };
 
-                        //self.generate_pat_condition(pattern, &parent_js_expr);
-                    }
-                } else {
-                    for (i, pattern) in enum_pattern.elements.iter().enumerate() {
-                        self.push_str(" && ");
-
-                        let parent_js_expr = format!("{}[{i}]", parent_js_expr);
-
-                        self.generate_pat_condition(pattern, &parent_js_expr);
-                    }
+                    self.generate_pat_condition(pattern, false, &parent_js_expr);
                 }
             }
-            ast::PatternKind::Literal(literal) => {
+            hir::PatKind::Literal(literal) => {
                 self.push_str(parent_js_expr);
                 self.push_str(" === ");
                 self.generate_literal(literal)
             }
-            ast::PatternKind::List(patterns) => {
-                if patterns.is_empty() {
-                    self.push_str(parent_js_expr);
-                    self.push_str(".length === 0");
-                } else {
-                    self.push_str(parent_js_expr);
-                    self.push_str(".length >= ");
-                    self.push_str(
-                        &patterns
-                            .iter()
-                            .filter(|pat| !matches!(pat.kind, ast::PatternKind::Rest(_)))
-                            .count()
-                            .to_string(),
-                    );
-
+            hir::PatKind::List(patterns) if patterns.is_empty() => {
+                self.push_str(parent_js_expr);
+                self.push_str(".length === 0");
+            }
+            hir::PatKind::List(patterns) => {
+                if root_pat && self.match_context_stack.fixed_list() {
+                    let mut push_and = false;
                     for (i, pattern) in patterns.iter().enumerate() {
-                        self.push_str(" && ");
-                        // This feels awkward, could this be handled when we match the Rest pattern
-                        // below?
-                        let parent_js_expr = if matches!(pattern.kind, ast::PatternKind::Rest(_)) {
-                            format!("{}.slice({})", parent_js_expr, i)
+                        if pattern.is_wildcard() || pattern.is_identifier() {
+                            continue;
+                        }
+
+                        if push_and {
+                            self.push_str(" && ");
                         } else {
-                            format!("{}[{}]", parent_js_expr, i)
-                        };
-                        self.generate_pat_condition(pattern, &parent_js_expr);
+                            push_and = true;
+                        }
+
+                        let parent_js_expr = self
+                            .match_context_stack
+                            .get_fixed_list_identifier(i)
+                            .unwrap()
+                            .clone();
+
+                        self.generate_pat_condition(pattern, false, &parent_js_expr);
                     }
+                    return;
+                }
+
+                self.push_str(parent_js_expr);
+                self.push_str(".length >= ");
+                self.push_str(
+                    &patterns
+                        .iter()
+                        .filter(|pat| !matches!(pat.kind, hir::PatKind::Rest(_)))
+                        .count()
+                        .to_string(),
+                );
+
+                for (i, pattern) in patterns.iter().enumerate() {
+                    if pattern.is_wildcard() {
+                        continue;
+                    }
+
+                    self.push_str(" && ");
+                    // This feels awkward, could this be handled when we match the Rest pattern
+                    // below?
+                    let parent_js_expr = if matches!(pattern.kind, hir::PatKind::Rest(_)) {
+                        format!("{}.slice({})", parent_js_expr, i)
+                    } else {
+                        format!("{}[{}]", parent_js_expr, i)
+                    };
+                    self.generate_pat_condition(pattern, false, &parent_js_expr);
                 }
             }
-            ast::PatternKind::Rest(pattern) => {
-                self.generate_pat_condition(pattern, parent_js_expr);
+            hir::PatKind::Rest(pattern) => {
+                self.generate_pat_condition(pattern, false, parent_js_expr);
             }
-            ast::PatternKind::Wildcard | ast::PatternKind::None => {}
+            hir::PatKind::Wildcard => {}
         }
     }
 
-    pub(crate) fn generate_match_expression(&mut self, match_expr: &ast::MatchExpression) {
+    pub(crate) fn generate_match_expression(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) {
         // TODO: A lot here is copied from the if statement generator.
-        let lhs = self.replace_statement_buffer(String::new());
-        let has_block_completions = match_args_have_completions(&match_expr.arms);
-        let match_value_tmp_var = self.current_scope().declare_tmp_variable();
-        self.push_let_declaration_to_expr(&match_value_tmp_var, &match_expr.expression);
-
-        let mut unique = HashSet::new();
-        // There's optimization opportunities in case the match expression is a
-        // list of identifiers, then we can just alias the identifiers within the arms. This
-        // case should be pretty common in function overloads.
-        let all_pat_identifiers = match_expr.arms.iter().flat_map(|arm| {
-            let mut idents = vec![];
-            idents.extend(Self::get_pat_identifiers(&arm.pattern));
-            if let Some(guard) = &arm.guard {
-                if let ast::ExprKind::Let(pat, _) = &guard.kind {
-                    idents.extend(Self::get_pat_identifiers(pat));
-                }
+        let mut lhs = self.replace_statement_buffer(String::new());
+        let has_block_completions = match_args_have_completions(arms);
+        let mut has_let = false;
+        if has_block_completions {
+            // TODO: We could probably reuse existing completion vars here.
+            if let Some("return") = self.current_completion_variable() {
+                self.push_completion_variable(Some("return".to_string()));
+                lhs = self.replace_statement_buffer_with_empty_string();
+            } else {
+                let completion_tmp_var = self.current_scope().declare_tmp_variable();
+                self.push_indent();
+                self.push_str("let ");
+                self.push_str(&completion_tmp_var);
+                self.push_completion_variable(Some(completion_tmp_var));
+                has_let = true;
             }
-            idents
-        });
+        } else {
+            self.push_completion_variable(None);
+        }
 
-        let has_let_guard = match_expr.arms.iter().any(|arm| {
-            if let Some(guard) = &arm.guard {
-                if let ast::ExprKind::Let(..) = &guard.kind {
-                    return true;
-                }
+        match &expr.kind {
+            hir::ExprKind::Path(path) => {
+                self.match_context_stack
+                    .push(MatchContext::Identifier(path.first_ident().to_string()));
             }
-            false
-        });
+            hir::ExprKind::List(exprs)
+                if !exprs.is_empty() && exprs.iter().all(|expr| expr.is_path()) =>
+            {
+                self.match_context_stack
+                    .push(MatchContext::ListOfIdentifiers(
+                        exprs
+                            .iter()
+                            .map(|expr| expr.path().unwrap().first_ident().to_string())
+                            .collect(),
+                    ))
+            }
+            _ => {
+                self.match_context_stack.push(MatchContext::Dynamic);
+            }
+        }
 
-        let let_guard_var = if has_let_guard {
+        let match_value_binding = match self.match_context_stack.last() {
+            Some(MatchContext::Identifier(identifier)) => identifier.clone(),
+            Some(MatchContext::ListOfIdentifiers(_)) => "".to_string(), // ohoh...
+            _ => {
+                let match_value_binding = self.current_scope().declare_tmp_variable();
+
+                if has_let {
+                    self.push_char(',');
+                    self.push_str(&match_value_binding);
+                    self.push_str(" = ");
+                    self.generate_expr(expr, None);
+                } else {
+                    self.push_let_declaration_to_expr(&match_value_binding, expr);
+                    has_let = true;
+                }
+
+                match_value_binding
+            }
+        };
+
+        let let_guard_var = if arms.iter().any(|arm| arm.has_let_guard()) {
+            if !has_let {
+                self.push_indent();
+                self.push_str("let ");
+                has_let = true;
+            } else {
+                self.push_char(',');
+            }
             let binding = self.current_scope().declare_tmp_variable();
-            self.push_char(',');
             self.push_str(&binding);
             binding
         } else {
             String::new()
         };
 
+        let mut unique = HashSet::new();
+        // There's optimization opportunities in case the match expression is a
+        // list of identifiers, then we can just alias the identifiers within the arms. This
+        // case should be pretty common in function overloads.
+        let mut all_pat_identifiers = arms
+            .iter()
+            .flat_map(|arm| {
+                let mut idents = Self::get_pat_identifiers(&arm.pat);
+                if let Some(guard) = &arm.guard {
+                    if let hir::ExprKind::Let(pat, _) = &guard.kind {
+                        idents.extend(Self::get_pat_identifiers(pat));
+                    }
+                }
+                idents
+            })
+            .collect::<Vec<_>>();
+
+        match self.match_context_stack.last() {
+            Some(MatchContext::Identifier(ident)) => {
+                all_pat_identifiers.retain(|pat_ident| pat_ident != ident);
+            }
+            Some(MatchContext::ListOfIdentifiers(idents)) => {
+                all_pat_identifiers.retain(|pat_ident| !idents.contains(pat_ident));
+            }
+            _ => {}
+        }
+
         for binding in all_pat_identifiers {
             if unique.insert(binding.clone()) {
                 let binding = self.current_scope().declare_variable(&binding);
-                self.push_char(',');
+                // TODO: Ugly workaround, as we always push a comma when generating pat identifiers
+                //       bindings.
+                if has_let {
+                    self.push_char(',');
+                } else {
+                    self.push_indent();
+                    self.push_str("let ");
+                    has_let = true;
+                }
                 self.push_str(&binding);
             }
         }
 
-        if has_block_completions {
-            let completion_tmp_var = self.current_scope().declare_tmp_variable();
-            self.push_char(',');
-            self.push_str(&completion_tmp_var);
-            self.push_completion_variable(Some(completion_tmp_var));
+        if has_let {
+            self.push_char(';');
         } else {
-            self.push_completion_variable(None);
+            self.push_indent();
         }
-
-        self.push_char(';');
 
         for (
             i,
-            ast::MatchArm {
-                id: _,
-                pattern,
+            hir::MatchArm {
+                pat,
                 guard,
-                expression,
+                expr: arm_expr,
+                leading_comments,
+                trailing_comments,
             },
-        ) in match_expr.arms.iter().enumerate()
+        ) in arms.iter().enumerate()
         {
-            if !pattern.is_wildcard() {
+            let no_cond_need = pat.is_wildcard() || expr_idents_match_pat_idents(expr, pat);
+            let need_cond = guard.is_some() || pat.is_empty_list();
+
+            if !no_cond_need || need_cond {
                 self.push_str("if (");
-                self.generate_pat_condition(pattern, &match_value_tmp_var);
+                self.generate_pat_condition(pat, true, &match_value_binding);
+                if guard.is_some() && !pat.is_fixed_list() {
+                    self.push_str(" && ");
+                }
                 if let Some(guard) = guard {
                     self.generate_match_arm_guard(guard, &let_guard_var);
                 }
-                self.push_str(") {\n");
-                self.inc_indent();
-                self.push_context(BlockContext::Expression);
-                self.generate_match_arm_expression(expression);
-                self.pop_context();
-                self.dec_indent();
-                self.push_indent();
-                if i == match_expr.arms.len() - 1 {
-                    self.push_char('}');
-                } else {
-                    self.push_str("} else ");
-                }
-            } else {
-                self.push_str("{\n");
-                self.inc_indent();
-                self.push_context(BlockContext::Expression);
-                self.generate_match_arm_expression(expression);
-                self.pop_context();
-                self.dec_indent();
-                self.push_indent();
+                self.push_str(") ");
+            }
+
+            self.push_str("{\n");
+            self.inc_indent();
+            self.generate_comments(leading_comments);
+            self.push_context(BlockContext::Expression);
+            self.generate_match_arm_expression(arm_expr);
+            self.pop_context();
+            self.generate_comments(trailing_comments);
+            self.dec_indent();
+            self.push_indent();
+
+            if i == arms.len() - 1 {
                 self.push_char('}');
+            } else {
+                self.push_str("} else ");
             }
         }
 
-        if has_block_completions {
+        if has_block_completions && self.current_completion_variable() != Some("return") {
             self.push_newline();
             // If we have an lhs, put the completion var as the rhs of the lhs.
             // Otherwise, we assign the completion_var to the previous completion_var.
@@ -245,21 +387,61 @@ impl CodegenJS {
             }
         }
         self.pop_completion_variable();
+        self.match_context_stack.pop();
     }
 
-    fn generate_match_arm_guard(&mut self, guard: &ast::Expr, let_guard_var: &str) {
-        self.push_str(" && ");
+    fn generate_match_arm_guard(&mut self, guard: &hir::Expr, let_guard_var: &str) {
         // If the guard is a let expression, we special case this here, normal if let expressions
         // are handled in the lowering process and will be transformed to a match expression.
-        if let ast::ExprKind::Let(pat, expr) = &guard.kind {
+        if let hir::ExprKind::Let(pat, expr) = &guard.kind {
             self.push_char('(');
             self.push_str(let_guard_var);
             self.push_str(" = ");
             self.generate_expr(expr, None);
             self.push_str(", true) && ");
-            self.generate_pat_condition(pat, let_guard_var);
+            self.generate_pat_condition(pat, false, let_guard_var);
         } else {
             self.generate_expr(guard, None);
         }
     }
+}
+
+fn expr_idents_match_pat_idents(expr: &hir::Expr, pat: &hir::Pat) -> bool {
+    if let hir::PatKind::Identifier(_, ident) = &pat.kind {
+        if let hir::ExprKind::Path(path) = &expr.kind {
+            return ident.as_str() == path.join("::");
+        }
+    }
+
+    if let hir::PatKind::List(list_pats) = &pat.kind {
+        if let hir::ExprKind::List(list_exprs) = &expr.kind {
+            return list_pats.len() == list_exprs.len()
+                && list_pats
+                    .iter()
+                    .all(|pat| pat.is_identifier() || pat.is_wildcard())
+                && list_exprs
+                    .iter()
+                    .all(|expr| matches!(&expr.kind, hir::ExprKind::Path(_)))
+                && list_pats.iter().zip(list_exprs.iter()).all(|(pat, expr)| {
+                    if pat.is_wildcard() {
+                        return true;
+                    }
+
+                    let pat_ident = if let hir::PatKind::Identifier(_, ident) = &pat.kind {
+                        ident.as_str()
+                    } else {
+                        unreachable!()
+                    };
+                    let expr_ident = if let hir::ExprKind::Path(path) = &expr.kind {
+                        path.join("::")
+                    } else {
+                        unreachable!()
+                    };
+
+                    pat_ident == expr_ident
+                });
+        }
+    }
+
+    false
 }
