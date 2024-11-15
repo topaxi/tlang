@@ -67,8 +67,9 @@ impl CodegenJS {
             }
         } else {
             self.push_indent();
-            let completion_tmp_var = self.current_completion_variable().unwrap();
-            self.push_str(&format!("{completion_tmp_var} = "));
+            let completion_tmp_var = self.current_completion_variable().unwrap().to_string();
+            self.push_str(&completion_tmp_var);
+            self.push_str(" = ");
             self.generate_expr(expression, None);
             self.push_str(";\n");
         }
@@ -109,7 +110,11 @@ impl CodegenJS {
                     .resolve_variable(ident_pattern.as_str())
                     .unwrap();
 
-                self.push_str(&format!("({} = {}, true)", binding_name, parent_js_expr));
+                self.push_char('(');
+                self.push_str(&binding_name);
+                self.push_str(" = ");
+                self.push_str(parent_js_expr);
+                self.push_str(", true)");
             }
             hir::PatKind::Enum(path, patterns) => {
                 let enum_variant_name = path.segments.last().unwrap();
