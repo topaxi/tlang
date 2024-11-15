@@ -78,7 +78,7 @@ impl CodegenJS {
     fn get_pat_identifiers(pattern: &hir::Pat) -> Vec<String> {
         match &pattern.kind {
             hir::PatKind::Identifier(_, ident_pattern) => {
-                vec![ident_pattern.name.to_string()]
+                vec![ident_pattern.to_string()]
             }
             hir::PatKind::Enum(_path, patterns) => {
                 let mut bindings = Vec::new();

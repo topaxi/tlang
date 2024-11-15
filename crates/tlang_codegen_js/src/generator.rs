@@ -594,10 +594,10 @@ impl CodegenJS {
                 self.current_scope().declare_variable_alias("self", "this");
             }
             hir::PatKind::Identifier(_, ident) => {
-                let var_name = self.current_scope().declare_variable(ident.name.as_str());
+                let var_name = self.current_scope().declare_variable(ident.as_str());
                 self.push_str(&var_name);
                 self.current_scope()
-                    .declare_variable_alias(ident.name.as_str(), &var_name);
+                    .declare_variable_alias(ident.as_str(), &var_name);
             }
             hir::PatKind::Enum(_path, _enum_pattern) => {
                 todo!("enum extraction outside of function parameters is not implemented yet.")
@@ -699,7 +699,7 @@ impl CodegenJS {
 
         for (ident_pattern, var_name) in bindings {
             self.current_scope()
-                .declare_variable_alias(ident_pattern.name.as_str(), &var_name);
+                .declare_variable_alias(ident_pattern.as_str(), &var_name);
         }
 
         self.context_stack.pop();

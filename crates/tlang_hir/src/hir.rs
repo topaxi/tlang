@@ -114,7 +114,7 @@ pub struct Pat {
 impl Pat {
     pub fn is_self(&self) -> bool {
         match self.kind {
-            PatKind::Identifier(_, ref ident) => ident.name == "self",
+            PatKind::Identifier(_, ref ident) => ident.is_self(),
             _ => false,
         }
     }

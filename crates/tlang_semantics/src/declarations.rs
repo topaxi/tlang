@@ -311,7 +311,7 @@ impl DeclarationAnalyzer {
             PatternKind::Identifier(ident) => {
                 self.declare_symbol(
                     pattern.id,
-                    ident.name.as_str(),
+                    ident.as_str(),
                     *self
                         .symbol_type_context
                         .last()

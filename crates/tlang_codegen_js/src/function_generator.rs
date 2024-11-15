@@ -9,12 +9,10 @@ impl CodegenJS {
                 self.current_scope().declare_variable_alias("self", "this");
             }
             hir::PatKind::Identifier(_, ident) => {
-                let var_name = self
-                    .current_scope()
-                    .declare_local_variable(ident.name.as_str());
+                let var_name = self.current_scope().declare_local_variable(ident.as_str());
                 self.push_str(&var_name);
                 self.current_scope()
-                    .declare_variable_alias(ident.name.as_str(), &var_name);
+                    .declare_variable_alias(ident.as_str(), &var_name);
             }
             hir::PatKind::Wildcard => {}
             _ => unreachable!(

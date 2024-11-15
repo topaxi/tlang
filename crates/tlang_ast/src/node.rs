@@ -12,7 +12,7 @@ pub use crate::macros::*;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Ident {
-    pub name: String,
+    name: Box<str>,
     pub span: Span,
 }
 
@@ -25,9 +25,17 @@ impl PartialEq for Ident {
 impl Ident {
     pub fn new(name: &str, span: Span) -> Self {
         Ident {
-            name: name.to_string(),
+            name: name.into(),
             span,
         }
+    }
+
+    pub fn set_name(&mut self, name: &str) {
+        self.name = name.into();
+    }
+
+    pub fn is_self(&self) -> bool {
+        *self.name == *"self"
     }
 
     pub fn as_str(&self) -> &str {

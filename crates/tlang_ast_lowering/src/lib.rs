@@ -363,11 +363,16 @@ impl LoweringContext {
         match &callee.kind {
             ast::node::ExprKind::Path(path) => {
                 let mut path_with_argnum = path.clone();
-                path_with_argnum.segments.last_mut().unwrap().name = format!(
+                let new_name = format!(
                     "{}$${}",
-                    path_with_argnum.segments.last().unwrap().name,
+                    path_with_argnum.segments.last().unwrap().as_str(),
                     arg_len
                 );
+                path_with_argnum
+                    .segments
+                    .last_mut()
+                    .unwrap()
+                    .set_name(&new_name);
 
                 if self.has_binding(&path_with_argnum.join("::")) {
                     self.lower_expr(&ast::node::Expr {
@@ -473,11 +478,11 @@ impl LoweringContext {
                                 match &mut decl.name.kind {
                                     ast::node::ExprKind::Path(path) => {
                                         let ident = path.segments.last_mut().unwrap();
-                                        ident.name = format!("{}$${}", ident.name, arg_len);
+                                        ident.set_name(&format!("{}$${}", ident.as_str(), arg_len));
                                     }
                                     ast::node::ExprKind::FieldExpression(fe) => {
                                         let ident = &mut fe.field;
-                                        ident.name = format!("{}$${}", ident.name, arg_len);
+                                        ident.set_name(&format!("{}$${}", ident.as_str(), arg_len));
                                     }
                                     _ => unreachable!(),
                                 };

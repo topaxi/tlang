@@ -219,7 +219,7 @@ impl SemanticAnalyzer {
         let mut path_str = String::new();
 
         for segment in &path.segments {
-            path_str.push_str(&segment.name);
+            path_str.push_str(segment.as_str());
             self.mark_as_used_by_name(&path_str, span);
             path_str.push_str("::");
         }
