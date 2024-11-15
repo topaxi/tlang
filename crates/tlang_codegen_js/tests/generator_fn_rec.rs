@@ -3,16 +3,15 @@ use pretty_assertions::assert_eq;
 
 mod common;
 
-// TODO: Something is off with the temp variables, we seem to define too many ^^'
 #[test]
 fn test_simple_self_recursive_tail_call_converted_to_loop() {
     let output = compile!(indoc! {"
         fn factorial(n, acc) {
             if n == 0 {
-                return acc;
+                acc
             } else {
-                return rec factorial(n - 1, n * acc);
-            };
+                rec factorial(n - 1, n * acc)
+            }
         }
     "});
     let expected_output = indoc! {"
@@ -21,10 +20,10 @@ fn test_simple_self_recursive_tail_call_converted_to_loop() {
                 if (n === 0) {
                     return acc;
                 } else {
-                    let $tmp$2 = n - 1;
-                    let $tmp$3 = n * acc;
-                    n = $tmp$2;
-                    acc = $tmp$3;
+                    let $tmp$0 = n - 1;
+                    let $tmp$1 = n * acc;
+                    n = $tmp$0;
+                    acc = $tmp$1;
                     continue rec;
                 }
             }
@@ -39,10 +38,10 @@ fn test_fn_expression_explicit_tail_recursive_call_converted_to_loop() {
         fn factorial(n) {
             let factorial_rec = fn rec_helper(n, acc) {
                 if n == 0 {
-                    return acc;
+                    acc
                 } else {
-                    return rec rec_helper(n - 1, n * acc);
-                };
+                    rec rec_helper(n - 1, n * acc)
+                }
             };
 
             factorial_rec(n, 1)
@@ -55,10 +54,10 @@ fn test_fn_expression_explicit_tail_recursive_call_converted_to_loop() {
                     if (n === 0) {
                         return acc;
                     } else {
-                        let $tmp$2 = n - 1;
-                        let $tmp$3 = n * acc;
-                        n = $tmp$2;
-                        acc = $tmp$3;
+                        let $tmp$0 = n - 1;
+                        let $tmp$1 = n * acc;
+                        n = $tmp$0;
+                        acc = $tmp$1;
                         continue rec;
                     }
                 }

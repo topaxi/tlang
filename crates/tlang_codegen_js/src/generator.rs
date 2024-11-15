@@ -324,13 +324,15 @@ impl CodegenJS {
 
     /// Generates blocks in expression position.
     fn generate_block_expression(&mut self, block: &hir::Block) {
-        let has_completion_var = self.completion_variables.last().unwrap().is_some();
-        let completion_tmp_var = self
-            .completion_variables
-            .last()
-            .unwrap_or(&None)
-            .clone()
-            .unwrap_or_else(|| self.scopes.declare_tmp_variable());
+        let has_completion_var = self.current_completion_variable().is_some();
+        let completion_tmp_var = if block.has_completion() {
+            self.current_completion_variable()
+                .map(str::to_string)
+                .unwrap_or_else(|| self.scopes.declare_tmp_variable())
+        } else {
+            String::new()
+        };
+
         self.push_scope();
 
         // In a case of `let a = { 1 }`, we want to render the expression as a statement.
