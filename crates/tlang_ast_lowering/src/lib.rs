@@ -1,4 +1,5 @@
 #![feature(box_patterns)]
+#![feature(if_let_guard)]
 use std::collections::HashMap;
 
 use tlang_ast as ast;
@@ -225,6 +226,43 @@ impl LoweringContext {
                 let expr = self.lower_expr(base);
                 let index = self.lower_expr(index);
                 hir::ExprKind::IndexAccess(Box::new(expr), Box::new(index))
+            }
+            ast::node::ExprKind::IfElse(box ast::node::IfElseExpression {
+                condition,
+                then_branch,
+                else_branches,
+            }) if let ast::node::ExprKind::Let(pat, expr) = &condition.kind => {
+                let expr = self.lower_expr(expr);
+                let mut arms = Vec::with_capacity(else_branches.len() + 1);
+
+                arms.push(hir::MatchArm {
+                    pat: self.lower_pat(pat),
+                    guard: None,
+                    expr: self.lower_expr(then_branch),
+                    leading_comments: condition.leading_comments.clone(),
+                    trailing_comments: condition.trailing_comments.clone(),
+                });
+
+                for else_branch in else_branches {
+                    let condition = else_branch
+                        .condition
+                        .as_ref()
+                        .map(|expr| self.lower_expr(expr));
+                    let consequence = self.lower_expr(&else_branch.consequence);
+
+                    arms.push(hir::MatchArm {
+                        pat: hir::Pat {
+                            kind: hir::PatKind::Wildcard,
+                            span: Default::default(),
+                        },
+                        guard: condition,
+                        expr: consequence,
+                        leading_comments: vec![],
+                        trailing_comments: vec![],
+                    });
+                }
+
+                hir::ExprKind::Match(Box::new(expr), arms)
             }
             ast::node::ExprKind::IfElse(box ast::node::IfElseExpression {
                 condition,

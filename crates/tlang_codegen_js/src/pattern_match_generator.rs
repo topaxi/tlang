@@ -206,7 +206,8 @@ impl CodegenJS {
     pub(crate) fn generate_match_expression(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) {
         // TODO: A lot here is copied from the if statement generator.
         let mut lhs = self.replace_statement_buffer(String::new());
-        let has_block_completions = match_args_have_completions(arms);
+        let has_block_completions =
+            self.current_context() == BlockContext::Expression && match_args_have_completions(arms);
         let mut has_let = false;
         if has_block_completions {
             // TODO: We could probably reuse existing completion vars here.
@@ -347,7 +348,7 @@ impl CodegenJS {
             if !no_cond_need || need_cond {
                 self.push_str("if (");
                 self.generate_pat_condition(pat, true, &match_value_binding);
-                if guard.is_some() && !pat.is_fixed_list() {
+                if !pat.is_wildcard() && guard.is_some() && !pat.is_fixed_list() {
                     self.push_str(" && ");
                 }
                 if let Some(guard) = guard {

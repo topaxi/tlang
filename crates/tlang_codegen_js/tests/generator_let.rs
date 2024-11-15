@@ -72,3 +72,60 @@ fn test_codegen_refutable_pattern() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_codegen_if_let() {
+    // TODO: This does not work yet in module body.
+    let output = compile!("fn main() { if let Some(x) = Some(42) { x } }");
+    let expected_output = indoc! {"
+        function main() {
+            let $tmp$0 = Option.Some(42),x;if ($tmp$0.tag === \"Some\" && (x = $tmp$0[0], true)) {
+                return x;
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+
+    let output = compile!("fn main() { if let Some(x) = Some(42) { x } else { 0 } }");
+    let expected_output = indoc! {"
+        function main() {
+            let $tmp$0 = Option.Some(42),x;if ($tmp$0.tag === \"Some\" && (x = $tmp$0[0], true)) {
+                return x;
+            } else {
+                return 0;
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+
+    let output = compile!(indoc! {"
+        fn main() {
+            let value = Some(42);
+
+            if let Some(42) = value; {
+                9000
+            } else if let Some(x) = value; {
+                x
+            } else if value == Some(100) {
+                100
+            } else {
+                5
+            }
+        }
+    "});
+    let expected_output = indoc! {"
+        function main() {
+            let value = Option.Some(42);
+            let $tmp$0,x;if (value.tag === \"Some\" && value[0] === 42) {
+                return 9000;
+            } else if (($tmp$0 = value, true) && $tmp$0.tag === \"Some\" && (x = $tmp$0[0], true)) {
+                return x;
+            } else if (value === Option.Some(100)) {
+                return 100;
+            } else {
+                return 5;
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
