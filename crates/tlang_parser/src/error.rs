@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 
 use tlang_ast::{span::Span, token::Token};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct ParseError {
     pub msg: String,
     pub kind: ParseErrorKind,
@@ -19,7 +19,7 @@ impl Display for ParseError {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum ParseErrorKind {
     UnexpectedToken(Token),
     UnexpectedEof,

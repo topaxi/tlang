@@ -117,12 +117,6 @@ pub struct Token {
     pub span: Span,
 }
 
-impl PartialEq for Token {
-    fn eq(&self, other: &Self) -> bool {
-        self.kind == other.kind
-    }
-}
-
 impl Token {
     pub fn new(kind: TokenKind, span: Span) -> Self {
         Self { kind, span }

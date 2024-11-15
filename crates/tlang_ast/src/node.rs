@@ -47,7 +47,7 @@ pub enum Associativity {
     Right,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct FunctionParameter {
     pub pattern: Pattern,
     pub type_annotation: Option<Ty>,
@@ -74,7 +74,7 @@ impl FunctionParameter {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct FunctionDeclaration {
     pub id: NodeId,
     pub name: Expr,
@@ -87,7 +87,7 @@ pub struct FunctionDeclaration {
     pub span: Span,
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct Block {
     pub id: NodeId,
     pub statements: Vec<Stmt>,
@@ -115,7 +115,7 @@ impl Block {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct CallExpression {
     pub callee: Expr,
     pub arguments: Vec<Expr>,
@@ -134,26 +134,26 @@ impl CallExpression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct FieldAccessExpression {
     pub base: Expr,
     pub field: Ident,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct IndexAccessExpression {
     pub base: Expr,
     pub index: Expr,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct IfElseExpression {
     pub condition: Expr,
     pub then_branch: Expr,
     pub else_branches: Vec<ElseClause>,
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct Expr {
     pub id: NodeId,
     pub kind: ExprKind,
@@ -181,33 +181,33 @@ impl Expr {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ElseClause {
     pub condition: Option<Expr>,
     pub consequence: Expr,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct BinaryOpExpression {
     pub op: BinaryOpKind,
     pub lhs: Expr,
     pub rhs: Expr,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct MatchExpression {
     pub expression: Expr,
     pub arms: Vec<MatchArm>,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct RangeExpression {
     pub start: Expr,
     pub end: Expr,
     pub inclusive: bool,
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub enum ExprKind {
     #[default]
     None,
@@ -231,7 +231,7 @@ pub enum ExprKind {
     Wildcard,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Path {
     pub segments: Vec<Ident>,
     pub span: Span,
@@ -272,7 +272,7 @@ impl Path {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct Pattern {
     pub id: NodeId,
     pub kind: PatternKind,
@@ -328,13 +328,13 @@ impl Pattern {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct EnumPattern {
     pub path: Path,
     pub elements: Vec<(Ident, Pattern)>,
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub enum PatternKind {
     #[default]
     None,
@@ -348,7 +348,7 @@ pub enum PatternKind {
     _Self,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct EnumVariant {
     pub id: NodeId,
     pub name: Ident,
@@ -356,13 +356,13 @@ pub struct EnumVariant {
     pub span: Span,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct EnumDeclaration {
     pub name: Ident,
     pub variants: Vec<EnumVariant>,
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct Stmt {
     pub id: NodeId,
     pub kind: StmtKind,
@@ -386,7 +386,7 @@ impl Stmt {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub enum StmtKind {
     #[default]
     None,
@@ -400,14 +400,14 @@ pub enum StmtKind {
     StructDeclaration(Box<StructDeclaration>),
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct LetDeclaration {
     pub pattern: Pattern,
     pub expression: Expr,
     pub type_annotation: Option<Ty>,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct StructDeclaration {
     pub name: Ident,
     pub fields: Vec<StructField>,
@@ -416,7 +416,7 @@ pub struct StructDeclaration {
 // TODO: Add NodeId to StructField
 pub type StructField = (Ident, Ty);
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Ty {
     pub id: NodeId,
     pub name: Path,
@@ -445,7 +445,7 @@ impl Ty {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct MatchArm {
     pub id: NodeId,
     pub pattern: Pattern,
@@ -453,7 +453,7 @@ pub struct MatchArm {
     pub expression: Expr,
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct Module {
     pub id: NodeId,
     pub statements: Vec<Stmt>,

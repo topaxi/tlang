@@ -158,60 +158,12 @@ fn test_multi_line_comments() {
 
 #[test]
 fn test_string_literal() {
-    let program = parse!(r#""foo";"#);
-
-    assert_eq!(
-        program,
-        Module::new(
-            NodeId::new(1),
-            vec![node::stmt!(
-                NodeId::new(2),
-                Expr(Box::new(
-                    node::expr!(
-                        NodeId::new(3),
-                        Literal(Box::new(Literal::String("foo".to_string())))
-                    )
-                    .with_span(Span::new(
-                        LineColumn { line: 0, column: 0 },
-                        LineColumn { line: 0, column: 5 }
-                    ))
-                ))
-            )
-            .with_span(Span::new(
-                LineColumn { line: 0, column: 0 },
-                LineColumn { line: 0, column: 6 }
-            ))]
-        )
-    );
+    assert_parser_snapshot!(r#""foo";"#);
 }
 
 #[test]
 fn test_char_literal() {
-    let program = parse!(r"'a';");
-
-    assert_eq!(
-        program,
-        Module::new(
-            NodeId::new(1),
-            vec![node::stmt!(
-                NodeId::new(2),
-                Expr(Box::new(
-                    node::expr!(
-                        NodeId::new(3),
-                        Literal(Box::new(Literal::Char("a".to_string())))
-                    )
-                    .with_span(Span::new(
-                        LineColumn { line: 0, column: 0 },
-                        LineColumn { line: 0, column: 3 }
-                    ))
-                ))
-            )
-            .with_span(Span::new(
-                LineColumn { line: 0, column: 0 },
-                LineColumn { line: 0, column: 4 }
-            ))]
-        )
-    );
+    assert_parser_snapshot!(r"'a';");
 }
 
 #[test]

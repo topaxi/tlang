@@ -1,0 +1,50 @@
+---
+source: crates/tlang_parser/tests/parser.rs
+expression: "parse! (r\"'a';\")"
+---
+Module(
+  id: NodeId(1),
+  statements: [
+    Stmt(
+      id: NodeId(2),
+      kind: Expr(Expr(
+        id: NodeId(3),
+        kind: Literal(Char("a")),
+        leading_comments: [],
+        trailing_comments: [],
+        span: Span(
+          start: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+          end: LineColumn(
+            line: 0,
+            column: 3,
+          ),
+        ),
+      )),
+      span: Span(
+        start: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end: LineColumn(
+          line: 0,
+          column: 4,
+        ),
+      ),
+      leading_comments: [],
+      trailing_comments: [],
+    ),
+  ],
+  span: Span(
+    start: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+  ),
+)
