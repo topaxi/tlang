@@ -344,12 +344,8 @@ fn test_function_reuse_param_name_with_pattern() {
                 let pivotIndex = random_int(len(list));
                 let pivot = list[pivotIndex];
                 let list$0 = [...list.slice(0, pivotIndex), ...list.slice(pivotIndex + 1)];
-                let smaller = filter(list$0, (y) => {
-                    return y <= pivot;
-                });
-                let greater = filter(list$0, (y) => {
-                    return y > pivot;
-                });
+                let smaller = filter(list$0, (y) => y <= pivot);
+                let greater = filter(list$0, (y) => y > pivot);
                 return [...quicksort(smaller), pivot, ...quicksort(greater)];
             }
         }

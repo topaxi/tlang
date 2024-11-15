@@ -138,13 +138,22 @@ impl CodegenJS {
             self.generate_function_parameter_list(&declaration.parameters);
         }
 
-        self.push_str(" {\n");
-        self.inc_indent();
-        self.flush_statement_buffer();
-        self.generate_function_body(&declaration.body, is_tail_recursive);
-        self.dec_indent();
-        self.push_indent();
-        self.push_char('}');
+        if generate_arrow
+            && declaration.body.expr.is_some()
+            && expr_can_render_as_js_expr(declaration.body.expr.as_ref().unwrap())
+        {
+            self.push_char(' ');
+            self.generate_expr(declaration.body.expr.as_ref().unwrap(), None);
+        } else {
+            self.push_str(" {\n");
+            self.inc_indent();
+            self.flush_statement_buffer();
+            self.generate_function_body(&declaration.body, is_tail_recursive);
+            self.dec_indent();
+            self.push_indent();
+            self.push_char('}');
+        }
+
         self.pop_function_context();
         self.pop_scope();
     }
@@ -369,5 +378,35 @@ pub(crate) fn fn_identifier_to_string(expr: &hir::Expr) -> String {
         hir::ExprKind::Path(path) => path.join("__"),
         hir::ExprKind::FieldAccess(_base, field) => field.to_string(),
         kind => todo!("fn_identifier_to_string: {:?}", kind),
+    }
+}
+
+fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
+    match &expr.kind {
+        hir::ExprKind::Path(..) => true,
+        hir::ExprKind::Let(..) => false,
+        hir::ExprKind::Literal(..) => true,
+        hir::ExprKind::Binary(_, lhs, rhs) => {
+            expr_can_render_as_js_expr(lhs) && expr_can_render_as_js_expr(rhs)
+        }
+        hir::ExprKind::Unary(_, expr) => expr_can_render_as_js_expr(expr),
+        hir::ExprKind::Block(..) => false,
+        hir::ExprKind::IfElse(..) => false,
+        hir::ExprKind::Match(..) => false,
+        hir::ExprKind::Call(call_expr) => {
+            call_expr.arguments.iter().all(expr_can_render_as_js_expr)
+        }
+        hir::ExprKind::FieldAccess(base, _) => expr_can_render_as_js_expr(base),
+        hir::ExprKind::IndexAccess(base, index) => {
+            expr_can_render_as_js_expr(base) && expr_can_render_as_js_expr(index)
+        }
+        hir::ExprKind::TailCall(_) => false,
+        hir::ExprKind::List(exprs) => exprs.iter().all(expr_can_render_as_js_expr),
+        hir::ExprKind::Dict(exprs) => exprs
+            .iter()
+            .all(|kv| expr_can_render_as_js_expr(&kv.0) && expr_can_render_as_js_expr(&kv.1)),
+        hir::ExprKind::FunctionExpression(..) => true,
+        hir::ExprKind::Range(..) => true,
+        hir::ExprKind::Wildcard => true,
     }
 }
