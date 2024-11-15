@@ -143,7 +143,7 @@ impl LoweringContext {
 
     fn lower_module(&mut self, module: &ast::node::Module) -> hir::Module {
         self.with_new_scope(|this| hir::Module {
-            block: this.lower_block(&module.statements, &None, module.span),
+            block: this.lower_block(&module.statements, None, module.span),
             span: module.span,
         })
     }
@@ -151,7 +151,7 @@ impl LoweringContext {
     fn lower_block(
         &mut self,
         stmts: &[ast::node::Stmt],
-        expr: &Option<ast::node::Expr>,
+        expr: Option<&ast::node::Expr>,
         span: ast::span::Span,
     ) -> hir::Block {
         self.with_new_scope(|this| {
@@ -177,7 +177,11 @@ impl LoweringContext {
                 statements,
                 expression,
                 span,
-            }) => hir::ExprKind::Block(Box::new(self.lower_block(statements, expression, *span))),
+            }) => hir::ExprKind::Block(Box::new(self.lower_block(
+                statements,
+                expression.as_ref(),
+                *span,
+            ))),
             ast::node::ExprKind::Call(call_expr) => {
                 hir::ExprKind::Call(Box::new(self.lower_call_expr(call_expr)))
             }
@@ -272,11 +276,11 @@ impl LoweringContext {
                 let condition = self.lower_expr(condition);
 
                 let consequence = if let ast::node::ExprKind::Block(block) = &then_branch.kind {
-                    self.lower_block(&block.statements, &block.expression, block.span)
+                    self.lower_block(&block.statements, block.expression.as_ref(), block.span)
                 } else {
                     // TODO: Defensive, technically we do not have then or else branches which are
                     //       not blocks. We might want to just change the AST instead.
-                    self.lower_block(&[], &Some(then_branch.clone()), then_branch.span)
+                    self.lower_block(&[], Some(&then_branch), then_branch.span)
                 };
 
                 let else_branches = else_branches
@@ -286,11 +290,15 @@ impl LoweringContext {
                         consequence: if let ast::node::ExprKind::Block(block) =
                             &clause.consequence.kind
                         {
-                            self.lower_block(&block.statements, &block.expression, block.span)
+                            self.lower_block(
+                                &block.statements,
+                                block.expression.as_ref(),
+                                block.span,
+                            )
                         } else {
                             // TODO: Defensive, technically we do not have then or else branches which are
                             //       not blocks. We might want to just change the AST instead.
-                            self.lower_block(&[], &Some(clause.consequence.clone()), node.span)
+                            self.lower_block(&[], Some(&clause.consequence), node.span)
                         },
                     })
                     .collect();
@@ -399,7 +407,7 @@ impl LoweringContext {
                 type_annotation,
             }) => {
                 let expr = self.lower_expr(expression);
-                let ty = self.lower_ty(type_annotation);
+                let ty = self.lower_ty(type_annotation.as_ref());
                 let pat = self.lower_pat(pattern);
 
                 vec![hir::Stmt {
@@ -680,7 +688,7 @@ impl LoweringContext {
             // TODO: We might want/need an id on the AST already.
             hir_id: self.unique_id(),
             name: field.0.clone(),
-            ty: self.lower_ty(&Some(field.1.clone())),
+            ty: self.lower_ty(Some(&field.1)),
         }
     }
 
@@ -775,7 +783,7 @@ impl LoweringContext {
                 } else {
                     let body = this.lower_block(
                         &decl.body.statements,
-                        &decl.body.expression,
+                        decl.body.expression.as_ref(),
                         decl.body.span,
                     );
                     this.expr(body.span, hir::ExprKind::Block(Box::new(body)))
@@ -840,7 +848,7 @@ impl LoweringContext {
     fn lower_fn_param(&mut self, node: &ast::node::FunctionParameter) -> hir::FunctionParameter {
         hir::FunctionParameter {
             pattern: self.lower_pat(&node.pattern),
-            type_annotation: self.lower_ty(&node.type_annotation),
+            type_annotation: self.lower_ty(node.type_annotation.as_ref()),
             span: node.span,
         }
     }
@@ -853,9 +861,12 @@ impl LoweringContext {
                 .iter()
                 .map(|param| this.lower_fn_param(param))
                 .collect();
-            let body =
-                this.lower_block(&decl.body.statements, &decl.body.expression, decl.body.span);
-            let return_type = this.lower_ty(&decl.return_type_annotation);
+            let body = this.lower_block(
+                &decl.body.statements,
+                decl.body.expression.as_ref(),
+                decl.body.span,
+            );
+            let return_type = this.lower_ty(decl.return_type_annotation.as_ref());
 
             hir::FunctionDeclaration {
                 hir_id: this.lower_node_id(decl.id),
@@ -972,7 +983,7 @@ impl LoweringContext {
         }
     }
 
-    fn lower_ty(&mut self, node: &Option<ast::node::Ty>) -> hir::Ty {
+    fn lower_ty(&mut self, node: Option<&ast::node::Ty>) -> hir::Ty {
         if let Some(node) = node {
             hir::Ty {
                 kind: hir::TyKind::Path(self.lower_path(&node.name)),

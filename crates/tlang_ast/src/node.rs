@@ -453,7 +453,7 @@ pub struct MatchArm {
     pub expression: Expr,
 }
 
-#[derive(Debug, Default, Clone, Serialize)]
+#[derive(Debug, Default, Serialize)]
 pub struct Module {
     pub id: NodeId,
     pub statements: Vec<Stmt>,
