@@ -313,32 +313,36 @@ impl LoweringContext {
         }
     }
 
-    fn lower_call_expr(&mut self, node: &ast::node::CallExpression) -> hir::CallExpression {
-        let callee = match &node.callee.kind {
+    fn lower_callee(&mut self, callee: &ast::node::Expr, arg_len: usize) -> hir::Expr {
+        match &callee.kind {
             ast::node::ExprKind::Path(path) => {
                 let mut path_with_argnum = path.clone();
                 path_with_argnum.segments.last_mut().unwrap().name = format!(
                     "{}$${}",
                     path_with_argnum.segments.last().unwrap().name,
-                    node.arguments.len()
+                    arg_len
                 );
 
                 if self.has_binding(&path_with_argnum.join("::")) {
                     self.lower_expr(&ast::node::Expr {
-                        id: node.callee.id,
+                        id: callee.id,
                         kind: ast::node::ExprKind::Path(path_with_argnum),
-                        span: node.callee.span,
-                        leading_comments: node.callee.leading_comments.clone(),
-                        trailing_comments: node.callee.trailing_comments.clone(),
+                        span: callee.span,
+                        leading_comments: callee.leading_comments.clone(),
+                        trailing_comments: callee.trailing_comments.clone(),
                     })
                 } else {
-                    self.lower_expr(&node.callee)
+                    self.lower_expr(callee)
                 }
             }
-            _ => self.lower_expr(&node.callee),
-        };
+            _ => self.lower_expr(callee),
+        }
+    }
 
+    fn lower_call_expr(&mut self, node: &ast::node::CallExpression) -> hir::CallExpression {
         let arguments = self.lower_exprs(&node.arguments);
+        let callee = self.lower_callee(&node.callee, node.arguments.len());
+
         hir::CallExpression { callee, arguments }
     }
 
@@ -968,7 +972,7 @@ impl LoweringContext {
                 return match &node.rhs.kind {
                     ast::node::ExprKind::Path(_) => {
                         let lhs = self.lower_expr(&node.lhs);
-                        let rhs = self.lower_expr(&node.rhs);
+                        let rhs = self.lower_callee(&node.rhs, 1);
 
                         hir::ExprKind::Call(Box::new(hir::CallExpression {
                             callee: rhs,
@@ -976,7 +980,6 @@ impl LoweringContext {
                         }))
                     }
                     ast::node::ExprKind::Call(call_expr) => {
-                        let callee = self.lower_expr(&call_expr.callee);
                         let arguments = if call_expr.has_wildcard() {
                             call_expr
                                 .arguments
@@ -995,6 +998,7 @@ impl LoweringContext {
                             arguments.extend(self.lower_exprs(&call_expr.arguments));
                             arguments
                         };
+                        let callee = self.lower_callee(&call_expr.callee, arguments.len());
 
                         hir::ExprKind::Call(Box::new(hir::CallExpression { callee, arguments }))
                     }
