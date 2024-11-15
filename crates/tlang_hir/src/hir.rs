@@ -1,5 +1,5 @@
 use serde::Serialize;
-use tlang_ast::node::{BinaryOpKind, Ident, UnaryOp};
+use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::span::Span;
 use tlang_ast::token::{Literal, Token};
 
@@ -338,4 +338,26 @@ pub struct EnumVariant {
     pub name: Ident,
     pub parameters: Vec<StructField>,
     pub span: Span,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy, Serialize)]
+pub enum BinaryOpKind {
+    Assign,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Exp,
+    Eq,
+    NotEq,
+    Less,
+    LessEq,
+    Greater,
+    GreaterEq,
+    And,
+    Or,
+    BitwiseAnd,
+    BitwiseOr,
+    BitwiseXor,
 }

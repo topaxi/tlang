@@ -474,14 +474,14 @@ impl CodegenJS {
     pub(crate) fn generate_optional_expr(
         &mut self,
         expr: &Option<hir::Expr>,
-        parent_op: Option<ast::BinaryOpKind>,
+        parent_op: Option<hir::BinaryOpKind>,
     ) {
         if let Some(expr) = expr {
             self.generate_expr(expr, parent_op);
         }
     }
 
-    pub(crate) fn generate_expr(&mut self, expr: &hir::Expr, parent_op: Option<ast::BinaryOpKind>) {
+    pub(crate) fn generate_expr(&mut self, expr: &hir::Expr, parent_op: Option<hir::BinaryOpKind>) {
         match &expr.kind {
             hir::ExprKind::Block(block) if self.current_context() == BlockContext::Expression => {
                 self.generate_block_expression(block)

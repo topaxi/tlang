@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use tlang_ast as ast;
 use tlang_ast::node::{
-    BinaryOpExpression, EnumPattern, FunctionDeclaration, Ident, LetDeclaration,
+    BinaryOpExpression, BinaryOpKind, EnumPattern, FunctionDeclaration, Ident, LetDeclaration,
 };
 use tlang_ast::token::{kw, Literal};
 use tlang_hir::hir::{self, HirId};
@@ -170,11 +170,7 @@ impl LoweringContext {
 
     fn lower_expr(&mut self, node: &ast::node::Expr) -> hir::Expr {
         let kind = match &node.kind {
-            ast::node::ExprKind::BinaryOp(box BinaryOpExpression { op, lhs, rhs }) => {
-                let lhs = self.lower_expr(lhs);
-                let rhs = self.lower_expr(rhs);
-                hir::ExprKind::Binary(*op, Box::new(lhs), Box::new(rhs))
-            }
+            ast::node::ExprKind::BinaryOp(binary_expr) => self.lower_binary_expr(binary_expr),
             ast::node::ExprKind::Block(box ast::node::Block {
                 id: _,
                 statements,
@@ -946,6 +942,71 @@ impl LoweringContext {
                 span: ast::span::Span::default(),
             }
         }
+    }
+
+    fn lower_binary_expr(&mut self, node: &BinaryOpExpression) -> hir::ExprKind {
+        let binary_op_kind = match node.op {
+            BinaryOpKind::Assign => hir::BinaryOpKind::Assign,
+            BinaryOpKind::Add => hir::BinaryOpKind::Add,
+            BinaryOpKind::Subtract => hir::BinaryOpKind::Sub,
+            BinaryOpKind::Multiply => hir::BinaryOpKind::Mul,
+            BinaryOpKind::Divide => hir::BinaryOpKind::Div,
+            BinaryOpKind::Modulo => hir::BinaryOpKind::Mod,
+            BinaryOpKind::Exponentiation => hir::BinaryOpKind::Exp,
+            BinaryOpKind::And => hir::BinaryOpKind::And,
+            BinaryOpKind::Or => hir::BinaryOpKind::Or,
+            BinaryOpKind::Equal => hir::BinaryOpKind::Eq,
+            BinaryOpKind::NotEqual => hir::BinaryOpKind::NotEq,
+            BinaryOpKind::LessThan => hir::BinaryOpKind::Less,
+            BinaryOpKind::LessThanOrEqual => hir::BinaryOpKind::LessEq,
+            BinaryOpKind::GreaterThan => hir::BinaryOpKind::Greater,
+            BinaryOpKind::GreaterThanOrEqual => hir::BinaryOpKind::GreaterEq,
+            BinaryOpKind::BitwiseAnd => hir::BinaryOpKind::BitwiseAnd,
+            BinaryOpKind::BitwiseOr => hir::BinaryOpKind::BitwiseOr,
+            BinaryOpKind::BitwiseXor => hir::BinaryOpKind::BitwiseXor,
+            BinaryOpKind::Pipeline => {
+                return match &node.rhs.kind {
+                    ast::node::ExprKind::Path(_) => {
+                        let lhs = self.lower_expr(&node.lhs);
+                        let rhs = self.lower_expr(&node.rhs);
+
+                        hir::ExprKind::Call(Box::new(hir::CallExpression {
+                            callee: rhs,
+                            arguments: vec![lhs],
+                        }))
+                    }
+                    ast::node::ExprKind::Call(call_expr) => {
+                        let callee = self.lower_expr(&call_expr.callee);
+                        let arguments = if call_expr.has_wildcard() {
+                            call_expr
+                                .arguments
+                                .iter()
+                                .map(|arg| {
+                                    if matches!(arg.kind, ast::node::ExprKind::Wildcard) {
+                                        self.lower_expr(&node.lhs)
+                                    } else {
+                                        self.lower_expr(arg)
+                                    }
+                                })
+                                .collect()
+                        } else {
+                            let mut arguments = Vec::with_capacity(call_expr.arguments.len() + 1);
+                            arguments.push(self.lower_expr(&node.lhs));
+                            arguments.extend(self.lower_exprs(&call_expr.arguments));
+                            arguments
+                        };
+
+                        hir::ExprKind::Call(Box::new(hir::CallExpression { callee, arguments }))
+                    }
+                    _ => unreachable!("Validate AST before lowering"),
+                }
+            }
+        };
+
+        let lhs = self.lower_expr(&node.lhs);
+        let rhs = self.lower_expr(&node.rhs);
+
+        hir::ExprKind::Binary(binary_op_kind, Box::new(lhs), Box::new(rhs))
     }
 }
 

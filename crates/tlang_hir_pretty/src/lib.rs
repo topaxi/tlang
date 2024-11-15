@@ -1,4 +1,4 @@
-use tlang_ast::node::{BinaryOpKind, UnaryOp};
+use tlang_ast::node::UnaryOp;
 use tlang_ast::token::Literal;
 use tlang_hir::hir;
 
@@ -266,31 +266,30 @@ impl HirPretty {
         self.push_char('}');
     }
 
-    fn print_binary_expr(&mut self, op: &BinaryOpKind, lhs: &hir::Expr, rhs: &hir::Expr) {
+    fn print_binary_expr(&mut self, op: &hir::BinaryOpKind, lhs: &hir::Expr, rhs: &hir::Expr) {
         self.push_char('(');
         self.print_expr(lhs);
         self.push_char(' ');
 
         match op {
-            BinaryOpKind::Add => self.push_str("+"),
-            BinaryOpKind::Assign => self.push_str("="),
-            BinaryOpKind::Subtract => self.push_str("-"),
-            BinaryOpKind::Multiply => self.push_str("*"),
-            BinaryOpKind::Divide => self.push_str("/"),
-            BinaryOpKind::Modulo => self.push_str("%"),
-            BinaryOpKind::Exponentiation => self.push_str("**"),
-            BinaryOpKind::And => self.push_str("&&"),
-            BinaryOpKind::Or => self.push_str("||"),
-            BinaryOpKind::Equal => self.push_str("=="),
-            BinaryOpKind::NotEqual => self.push_str("!="),
-            BinaryOpKind::LessThan => self.push_str("<"),
-            BinaryOpKind::LessThanOrEqual => self.push_str("<="),
-            BinaryOpKind::GreaterThan => self.push_str(">"),
-            BinaryOpKind::GreaterThanOrEqual => self.push_str(">="),
-            BinaryOpKind::BitwiseOr => self.push_str("|"),
-            BinaryOpKind::BitwiseAnd => self.push_str("&"),
-            BinaryOpKind::BitwiseXor => self.push_str("^"),
-            BinaryOpKind::Pipeline => self.push_str("|>"),
+            hir::BinaryOpKind::Add => self.push_str("+"),
+            hir::BinaryOpKind::Assign => self.push_str("="),
+            hir::BinaryOpKind::Sub => self.push_str("-"),
+            hir::BinaryOpKind::Mul => self.push_str("*"),
+            hir::BinaryOpKind::Div => self.push_str("/"),
+            hir::BinaryOpKind::Mod => self.push_str("%"),
+            hir::BinaryOpKind::Exp => self.push_str("**"),
+            hir::BinaryOpKind::And => self.push_str("&&"),
+            hir::BinaryOpKind::Or => self.push_str("||"),
+            hir::BinaryOpKind::Eq => self.push_str("=="),
+            hir::BinaryOpKind::NotEq => self.push_str("!="),
+            hir::BinaryOpKind::Less => self.push_str("<"),
+            hir::BinaryOpKind::LessEq => self.push_str("<="),
+            hir::BinaryOpKind::Greater => self.push_str(">"),
+            hir::BinaryOpKind::GreaterEq => self.push_str(">="),
+            hir::BinaryOpKind::BitwiseOr => self.push_str("|"),
+            hir::BinaryOpKind::BitwiseAnd => self.push_str("&"),
+            hir::BinaryOpKind::BitwiseXor => self.push_str("^"),
         }
 
         self.push_char(' ');
