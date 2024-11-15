@@ -13,9 +13,9 @@ fn binary_search(list, target, low, high) {
     if midValue == target; {
         mid
     } else if midValue < target; {
-        binary_search(list, target, mid + 1, high)
+        rec binary_search(list, target, mid + 1, high)
     } else {
-        binary_search(list, target, low, mid - 1)
+        rec binary_search(list, target, low, mid - 1)
     }
 }
 
