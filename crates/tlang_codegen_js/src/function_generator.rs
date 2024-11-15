@@ -112,8 +112,10 @@ impl CodegenJS {
         self.push_scope();
 
         let name_as_str = fn_identifier_to_string(&declaration.name);
+        let is_anonymous = name_as_str == "anonymous";
         let is_tail_recursive =
-            is_function_body_tail_recursive_block(&name_as_str, &declaration.body);
+            !is_anonymous && is_function_body_tail_recursive_block(&name_as_str, &declaration.body);
+        let generate_arrow = is_anonymous && declaration.body.stmts.is_empty();
 
         self.push_function_context(
             &name_as_str,
@@ -122,17 +124,20 @@ impl CodegenJS {
             is_tail_recursive,
         );
 
-        self.push_str("function");
+        if generate_arrow {
+            self.generate_function_parameter_list(&declaration.parameters);
+            self.push_str(" =>");
+        } else {
+            self.push_str("function");
 
-        match name_as_str.as_str() {
-            "anonymous" => {}
-            _ => {
+            if !is_anonymous {
                 self.push_char(' ');
                 self.push_str(&name_as_str);
             }
-        };
 
-        self.generate_function_parameter_list(&declaration.parameters);
+            self.generate_function_parameter_list(&declaration.parameters);
+        }
+
         self.push_str(" {\n");
         self.inc_indent();
         self.flush_statement_buffer();
