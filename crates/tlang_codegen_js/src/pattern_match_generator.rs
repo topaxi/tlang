@@ -119,19 +119,18 @@ impl CodegenJS {
             hir::PatKind::Enum(path, patterns) => {
                 let enum_variant_name = path.segments.last().unwrap();
 
-                self.push_str(&format!(
-                    "{}.tag === \"{}\"",
-                    parent_js_expr,
-                    enum_variant_name.ident.as_str()
-                ));
+                self.push_str(parent_js_expr);
+                self.push_str(".tag === \"");
+                self.push_str(enum_variant_name.ident.as_str());
+                self.push_str("\"");
 
                 for (ident, pattern) in patterns.iter().filter(|(_, pat)| !pat.is_wildcard()) {
                     self.push_str(" && ");
 
                     let parent_js_expr = if ident.as_str().chars().all(char::is_numeric) {
-                        format!("{}[{}]", parent_js_expr, ident)
+                        parent_js_expr.to_string() + "[" + ident.as_str() + "]"
                     } else {
-                        format!("{}.{}", parent_js_expr, ident.as_str())
+                        parent_js_expr.to_string() + "." + ident.as_str()
                     };
 
                     self.generate_pat_condition(pattern, false, &parent_js_expr);
@@ -190,9 +189,9 @@ impl CodegenJS {
                     // This feels awkward, could this be handled when we match the Rest pattern
                     // below?
                     let parent_js_expr = if matches!(pattern.kind, hir::PatKind::Rest(_)) {
-                        format!("{}.slice({})", parent_js_expr, i)
+                        parent_js_expr.to_string() + ".slice(" + &i.to_string() + ")"
                     } else {
-                        format!("{}[{}]", parent_js_expr, i)
+                        parent_js_expr.to_string() + "[" + &i.to_string() + "]"
                     };
                     self.generate_pat_condition(pattern, false, &parent_js_expr);
                 }
@@ -384,11 +383,16 @@ impl CodegenJS {
                 self.push_str(&completion_var);
             } else {
                 self.push_indent();
-                let completion_var = self.current_completion_variable().unwrap();
+                let completion_var = self.current_completion_variable().unwrap().to_string();
                 let prev_completion_var = self
                     .nth_completion_variable(self.current_completion_variable_count() - 2)
-                    .unwrap();
-                self.push_str(&format!("{prev_completion_var} = {completion_var};\n"));
+                    .unwrap()
+                    .to_string();
+                self.push_str(&prev_completion_var);
+                self.push_str(" = ");
+                self.push_str(&completion_var);
+                self.push_char(';');
+                self.push_newline();
             }
         }
         self.pop_completion_variable();
