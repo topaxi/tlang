@@ -8,7 +8,7 @@ Module(
     Stmt(
       id: NodeId(2),
       kind: Expr(Expr(
-        id: NodeId(11),
+        id: NodeId(10),
         kind: IfElse(IfElseExpression(
           condition: Expr(
             id: NodeId(6),
@@ -165,42 +165,27 @@ Module(
               ),
             ),
           ),
-          then_branch: Expr(
-            id: NodeId(7),
-            kind: Block(Block(
-              id: NodeId(10),
-              statements: [],
-              expression: Some(Expr(
-                id: NodeId(9),
-                kind: Path(Path(
-                  segments: [
-                    Ident(
-                      name: "y",
-                      span: Span(
-                        start: LineColumn(
-                          line: 1,
-                          column: 5,
-                        ),
-                        end: LineColumn(
-                          line: 1,
-                          column: 6,
-                        ),
+          then_branch: Block(
+            id: NodeId(9),
+            statements: [],
+            expression: Some(Expr(
+              id: NodeId(8),
+              kind: Path(Path(
+                segments: [
+                  Ident(
+                    name: "y",
+                    span: Span(
+                      start: LineColumn(
+                        line: 1,
+                        column: 5,
+                      ),
+                      end: LineColumn(
+                        line: 1,
+                        column: 6,
                       ),
                     ),
-                  ],
-                  span: Span(
-                    start: LineColumn(
-                      line: 1,
-                      column: 5,
-                    ),
-                    end: LineColumn(
-                      line: 1,
-                      column: 6,
-                    ),
                   ),
-                )),
-                leading_comments: [],
-                trailing_comments: [],
+                ],
                 span: Span(
                   start: LineColumn(
                     line: 1,
@@ -212,27 +197,27 @@ Module(
                   ),
                 ),
               )),
+              leading_comments: [],
+              trailing_comments: [],
               span: Span(
                 start: LineColumn(
-                  line: 0,
-                  column: 28,
+                  line: 1,
+                  column: 5,
                 ),
                 end: LineColumn(
-                  line: 2,
-                  column: 2,
+                  line: 1,
+                  column: 6,
                 ),
               ),
             )),
-            leading_comments: [],
-            trailing_comments: [],
             span: Span(
               start: LineColumn(
                 line: 0,
-                column: 0,
+                column: 28,
               ),
               end: LineColumn(
-                line: 0,
-                column: 0,
+                line: 2,
+                column: 2,
               ),
             ),
           ),

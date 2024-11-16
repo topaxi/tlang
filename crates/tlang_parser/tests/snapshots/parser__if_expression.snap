@@ -6,7 +6,7 @@ Module(
   id: NodeId(1),
   statements: [
     Stmt(
-      id: NodeId(13),
+      id: NodeId(11),
       kind: Let(LetDeclaration(
         pattern: Pattern(
           id: NodeId(2),
@@ -37,7 +37,7 @@ Module(
           ),
         ),
         expression: Expr(
-          id: NodeId(12),
+          id: NodeId(10),
           kind: IfElse(IfElseExpression(
             condition: Expr(
               id: NodeId(3),
@@ -55,29 +55,16 @@ Module(
                 ),
               ),
             ),
-            then_branch: Expr(
-              id: NodeId(4),
-              kind: Block(Block(
-                id: NodeId(7),
-                statements: [
-                  Stmt(
+            then_branch: Block(
+              id: NodeId(6),
+              statements: [
+                Stmt(
+                  id: NodeId(4),
+                  kind: Expr(Expr(
                     id: NodeId(5),
-                    kind: Expr(Expr(
-                      id: NodeId(6),
-                      kind: Literal(Integer(1)),
-                      leading_comments: [],
-                      trailing_comments: [],
-                      span: Span(
-                        start: LineColumn(
-                          line: 0,
-                          column: 20,
-                        ),
-                        end: LineColumn(
-                          line: 0,
-                          column: 21,
-                        ),
-                      ),
-                    )),
+                    kind: Literal(Integer(1)),
+                    leading_comments: [],
+                    trailing_comments: [],
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -85,64 +72,49 @@ Module(
                       ),
                       end: LineColumn(
                         line: 0,
-                        column: 22,
+                        column: 21,
                       ),
                     ),
-                    leading_comments: [],
-                    trailing_comments: [],
+                  )),
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 20,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 22,
+                    ),
                   ),
-                ],
-                expression: None,
-                span: Span(
-                  start: LineColumn(
-                    line: 0,
-                    column: 18,
-                  ),
-                  end: LineColumn(
-                    line: 0,
-                    column: 24,
-                  ),
+                  leading_comments: [],
+                  trailing_comments: [],
                 ),
-              )),
-              leading_comments: [],
-              trailing_comments: [],
+              ],
+              expression: None,
               span: Span(
                 start: LineColumn(
                   line: 0,
-                  column: 0,
+                  column: 18,
                 ),
                 end: LineColumn(
                   line: 0,
-                  column: 0,
+                  column: 24,
                 ),
               ),
             ),
             else_branches: [
               ElseClause(
                 condition: None,
-                consequence: Expr(
-                  id: NodeId(8),
-                  kind: Block(Block(
-                    id: NodeId(11),
-                    statements: [
-                      Stmt(
-                        id: NodeId(9),
-                        kind: Expr(Expr(
-                          id: NodeId(10),
-                          kind: Literal(Integer(2)),
-                          leading_comments: [],
-                          trailing_comments: [],
-                          span: Span(
-                            start: LineColumn(
-                              line: 0,
-                              column: 32,
-                            ),
-                            end: LineColumn(
-                              line: 0,
-                              column: 33,
-                            ),
-                          ),
-                        )),
+                consequence: Block(
+                  id: NodeId(9),
+                  statements: [
+                    Stmt(
+                      id: NodeId(7),
+                      kind: Expr(Expr(
+                        id: NodeId(8),
+                        kind: Literal(Integer(2)),
+                        leading_comments: [],
+                        trailing_comments: [],
                         span: Span(
                           start: LineColumn(
                             line: 0,
@@ -150,35 +122,33 @@ Module(
                           ),
                           end: LineColumn(
                             line: 0,
-                            column: 34,
+                            column: 33,
                           ),
                         ),
-                        leading_comments: [],
-                        trailing_comments: [],
+                      )),
+                      span: Span(
+                        start: LineColumn(
+                          line: 0,
+                          column: 32,
+                        ),
+                        end: LineColumn(
+                          line: 0,
+                          column: 34,
+                        ),
                       ),
-                    ],
-                    expression: None,
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 30,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 36,
-                      ),
+                      leading_comments: [],
+                      trailing_comments: [],
                     ),
-                  )),
-                  leading_comments: [],
-                  trailing_comments: [],
+                  ],
+                  expression: None,
                   span: Span(
                     start: LineColumn(
                       line: 0,
-                      column: 0,
+                      column: 30,
                     ),
                     end: LineColumn(
                       line: 0,
-                      column: 0,
+                      column: 36,
                     ),
                   ),
                 ),

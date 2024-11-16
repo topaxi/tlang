@@ -248,11 +248,11 @@ impl SemanticAnalyzer {
             }
             ExprKind::IfElse(expr) => {
                 self.analyze_expr(&expr.condition);
-                self.analyze_expr(&expr.then_branch);
+                self.analyze_block(&expr.then_branch);
 
                 for else_branch in &expr.else_branches {
                     self.analyze_optional_expr(&else_branch.condition);
-                    self.analyze_expr(&else_branch.consequence);
+                    self.analyze_block(&else_branch.consequence);
                 }
             }
             ExprKind::Let(pat, expr) => {

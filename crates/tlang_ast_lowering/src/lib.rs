@@ -238,11 +238,16 @@ impl LoweringContext {
             }) if let ast::node::ExprKind::Let(pat, expr) = &condition.kind => {
                 let expr = self.lower_expr(expr);
                 let mut arms = Vec::with_capacity(else_branches.len() + 1);
+                let block = self.lower_block(
+                    &then_branch.statements,
+                    then_branch.expression.as_ref(),
+                    node.span,
+                );
 
                 arms.push(hir::MatchArm {
                     pat: self.lower_pat(pat),
                     guard: None,
-                    expr: self.lower_expr(then_branch),
+                    expr: self.expr(node.span, hir::ExprKind::Block(Box::new(block))),
                     leading_comments: condition.leading_comments.clone(),
                     trailing_comments: condition.trailing_comments.clone(),
                 });
@@ -252,7 +257,12 @@ impl LoweringContext {
                         .condition
                         .as_ref()
                         .map(|expr| self.lower_expr(expr));
-                    let consequence = self.lower_expr(&else_branch.consequence);
+                    let block = self.lower_block(
+                        &else_branch.consequence.statements,
+                        else_branch.consequence.expression.as_ref(),
+                        node.span,
+                    );
+                    let consequence = self.expr(node.span, hir::ExprKind::Block(Box::new(block)));
 
                     arms.push(hir::MatchArm {
                         pat: hir::Pat {
@@ -275,31 +285,21 @@ impl LoweringContext {
             }) => {
                 let condition = self.lower_expr(condition);
 
-                let consequence = if let ast::node::ExprKind::Block(block) = &then_branch.kind {
-                    self.lower_block(&block.statements, block.expression.as_ref(), block.span)
-                } else {
-                    // TODO: Defensive, technically we do not have then or else branches which are
-                    //       not blocks. We might want to just change the AST instead.
-                    self.lower_block(&[], Some(then_branch), then_branch.span)
-                };
+                let consequence = self.lower_block(
+                    &then_branch.statements,
+                    then_branch.expression.as_ref(),
+                    then_branch.span,
+                );
 
                 let else_branches = else_branches
                     .iter()
                     .map(|clause| hir::ElseClause {
                         condition: clause.condition.as_ref().map(|expr| self.lower_expr(expr)),
-                        consequence: if let ast::node::ExprKind::Block(block) =
-                            &clause.consequence.kind
-                        {
-                            self.lower_block(
-                                &block.statements,
-                                block.expression.as_ref(),
-                                block.span,
-                            )
-                        } else {
-                            // TODO: Defensive, technically we do not have then or else branches which are
-                            //       not blocks. We might want to just change the AST instead.
-                            self.lower_block(&[], Some(&clause.consequence), node.span)
-                        },
+                        consequence: self.lower_block(
+                            &clause.consequence.statements,
+                            clause.consequence.expression.as_ref(),
+                            clause.consequence.span,
+                        ),
                     })
                     .collect();
 

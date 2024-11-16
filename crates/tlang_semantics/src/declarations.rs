@@ -229,11 +229,11 @@ impl DeclarationAnalyzer {
             }
             ExprKind::IfElse(expr) => {
                 self.collect_declarations_expr(&expr.condition);
-                self.collect_declarations_expr(&expr.then_branch);
+                self.collect_declarations_block(&expr.then_branch);
 
                 for else_branch in &expr.else_branches {
                     self.collect_optional_declarations_expr(&else_branch.condition);
-                    self.collect_declarations_expr(&else_branch.consequence);
+                    self.collect_declarations_block(&else_branch.consequence);
                 }
             }
             ExprKind::FieldExpression(expr) => {

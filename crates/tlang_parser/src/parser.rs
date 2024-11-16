@@ -805,7 +805,7 @@ impl<'src> Parser<'src> {
         let condition = self.parse_if_condition();
 
         self.expect_token(TokenKind::LBrace);
-        let then_branch = node::expr!(self.unique_id(), Block(Box::new(self.parse_block())));
+        let then_branch = self.parse_block();
 
         let mut else_branches = Vec::new();
         while let Some(TokenKind::Keyword(Keyword::Else)) = self.current_token_kind() {
@@ -819,7 +819,7 @@ impl<'src> Parser<'src> {
             };
 
             self.expect_token(TokenKind::LBrace);
-            let consequence = node::expr!(self.unique_id(), Block(Box::new(self.parse_block())));
+            let consequence = self.parse_block();
 
             if condition.is_none() {
                 self.expect_token_not(TokenKind::Keyword(Keyword::Else));

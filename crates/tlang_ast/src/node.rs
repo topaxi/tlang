@@ -157,7 +157,7 @@ pub struct IndexAccessExpression {
 #[derive(Debug, Clone, Serialize)]
 pub struct IfElseExpression {
     pub condition: Expr,
-    pub then_branch: Expr,
+    pub then_branch: Block,
     pub else_branches: Vec<ElseClause>,
 }
 
@@ -192,7 +192,7 @@ impl Expr {
 #[derive(Debug, Clone, Serialize)]
 pub struct ElseClause {
     pub condition: Option<Expr>,
-    pub consequence: Expr,
+    pub consequence: Block,
 }
 
 #[derive(Debug, Clone, Serialize)]
