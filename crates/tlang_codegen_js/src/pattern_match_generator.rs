@@ -67,8 +67,7 @@ impl CodegenJS {
             }
         } else {
             self.push_indent();
-            let completion_tmp_var = self.current_completion_variable().unwrap().to_string();
-            self.push_str(&completion_tmp_var);
+            self.push_current_completion_variable();
             self.push_str(" = ");
             self.generate_expr(expression, None);
             self.push_str(";\n");
@@ -212,14 +211,14 @@ impl CodegenJS {
         if has_block_completions {
             // TODO: We could probably reuse existing completion vars here.
             if let Some("return") = self.current_completion_variable() {
-                self.push_completion_variable(Some("return".to_string()));
+                self.push_completion_variable(Some("return"));
                 lhs = self.replace_statement_buffer_with_empty_string();
             } else {
                 let completion_tmp_var = self.current_scope().declare_tmp_variable();
                 self.push_indent();
                 self.push_str("let ");
                 self.push_str(&completion_tmp_var);
-                self.push_completion_variable(Some(completion_tmp_var));
+                self.push_completion_variable(Some(&completion_tmp_var));
                 has_let = true;
             }
         } else {
@@ -380,18 +379,16 @@ impl CodegenJS {
             // Otherwise, we assign the completion_var to the previous completion_var.
             if !lhs.is_empty() {
                 self.push_str(&lhs);
-                let completion_var = self.current_completion_variable().unwrap().to_string();
-                self.push_str(&completion_var);
+                self.push_current_completion_variable();
             } else {
                 self.push_indent();
-                let completion_var = self.current_completion_variable().unwrap().to_string();
                 let prev_completion_var = self
                     .nth_completion_variable(self.current_completion_variable_count() - 2)
                     .unwrap()
                     .to_string();
                 self.push_str(&prev_completion_var);
                 self.push_str(" = ");
-                self.push_str(&completion_var);
+                self.push_current_completion_variable();
                 self.push_char(';');
                 self.push_newline();
             }

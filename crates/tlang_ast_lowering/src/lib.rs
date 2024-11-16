@@ -280,7 +280,7 @@ impl LoweringContext {
                 } else {
                     // TODO: Defensive, technically we do not have then or else branches which are
                     //       not blocks. We might want to just change the AST instead.
-                    self.lower_block(&[], Some(&then_branch), then_branch.span)
+                    self.lower_block(&[], Some(then_branch), then_branch.span)
                 };
 
                 let else_branches = else_branches

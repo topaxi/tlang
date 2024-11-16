@@ -196,7 +196,7 @@ impl CodegenJS {
         self.push_indent();
         self.push_str("return ");
         self.push_context(BlockContext::Expression);
-        self.push_completion_variable(Some("return".to_string()));
+        self.push_completion_variable(Some("return"));
         self.generate_optional_expr(&block.expr, None);
         self.pop_completion_variable();
         self.pop_context();
