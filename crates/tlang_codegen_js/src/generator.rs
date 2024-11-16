@@ -2,7 +2,7 @@ use crate::{pattern_match_generator::MatchContextStack, scope::Scope};
 use tlang_ast::{
     node::{self as ast, Ident},
     symbols::SymbolType,
-    token::{Literal, Token, TokenKind},
+    token::{kw, Literal, Token, TokenKind},
 };
 use tlang_hir::hir;
 
@@ -591,7 +591,8 @@ impl CodegenJS {
     pub(crate) fn generate_pat(&mut self, pattern: &hir::Pat) {
         match &pattern.kind {
             hir::PatKind::Identifier(..) if pattern.is_self() => {
-                self.current_scope().declare_variable_alias("self", "this");
+                self.current_scope()
+                    .declare_variable_alias(kw::_Self, "this");
             }
             hir::PatKind::Identifier(_, ident) => {
                 let var_name = self.current_scope().declare_variable(ident.as_str());

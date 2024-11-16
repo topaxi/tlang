@@ -1,3 +1,4 @@
+use tlang_ast::token::kw;
 use tlang_hir::hir;
 
 use crate::generator::{needs_semicolon, BlockContext, CodegenJS};
@@ -6,7 +7,8 @@ impl CodegenJS {
     fn generate_function_param(&mut self, param: &hir::FunctionParameter) {
         match &param.pattern.kind {
             hir::PatKind::Identifier(..) if param.pattern.is_self() => {
-                self.current_scope().declare_variable_alias("self", "this");
+                self.current_scope()
+                    .declare_variable_alias(kw::_Self, "this");
             }
             hir::PatKind::Identifier(_, ident) => {
                 let var_name = self.current_scope().declare_local_variable(ident.as_str());

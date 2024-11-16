@@ -2,7 +2,7 @@ use serde::Serialize;
 use std::fmt::Display;
 
 use crate::node_id::NodeId;
-use crate::token::Token;
+use crate::token::{kw, Token};
 use crate::{
     span::{Span, Spanned},
     token::Literal,
@@ -35,7 +35,7 @@ impl Ident {
     }
 
     pub fn is_self(&self) -> bool {
-        *self.name == *"self"
+        *self.name == *kw::_Self
     }
 
     pub fn as_str(&self) -> &str {

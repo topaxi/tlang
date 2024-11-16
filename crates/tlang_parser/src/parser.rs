@@ -7,7 +7,7 @@ use tlang_ast::node::{
 };
 use tlang_ast::node_id::NodeId;
 use tlang_ast::span::Span;
-use tlang_ast::token::{Keyword, Literal, Token, TokenKind};
+use tlang_ast::token::{kw, Keyword, Literal, Token, TokenKind};
 use tlang_lexer::Lexer;
 
 use crate::error::{ParseError, ParseErrorKind};
@@ -936,7 +936,7 @@ impl<'src> Parser<'src> {
 
                 self.advance();
 
-                let mut path = Path::from_ident(Ident::new("self", identifier_span));
+                let mut path = Path::from_ident(Ident::new(kw::_Self, identifier_span));
                 let mut span = path.span;
 
                 while let Some(TokenKind::PathSeparator) = self.current_token_kind() {

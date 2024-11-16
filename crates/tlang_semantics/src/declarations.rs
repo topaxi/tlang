@@ -2,6 +2,7 @@ use std::rc::Rc;
 use std::{cell::RefCell, collections::HashMap};
 use tlang_ast::node_id::NodeId;
 use tlang_ast::span::Span;
+use tlang_ast::token::kw;
 use tlang_ast::{
     node::{
         Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, LetDeclaration, Module,
@@ -320,7 +321,7 @@ impl DeclarationAnalyzer {
                 );
             }
             PatternKind::_Self => {
-                self.declare_symbol(pattern.id, "self", SymbolType::Variable, pattern.span);
+                self.declare_symbol(pattern.id, kw::_Self, SymbolType::Variable, pattern.span);
             }
             PatternKind::List(patterns) => {
                 for pattern in patterns {
