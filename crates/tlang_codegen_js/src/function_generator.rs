@@ -1,7 +1,8 @@
 use tlang_ast::token::kw;
 use tlang_hir::hir;
 
-use crate::generator::{needs_semicolon, BlockContext, CodegenJS};
+use crate::expr_generator::expr_can_render_as_js_expr;
+use crate::generator::{BlockContext, CodegenJS};
 
 impl CodegenJS {
     fn generate_function_param(&mut self, param: &hir::FunctionParameter) {
@@ -176,72 +177,49 @@ impl CodegenJS {
         self.flush_statement_buffer();
         self.generate_statements(&block.stmts);
 
-        if !block.has_completion() {
-            return;
+        if block.has_completion() {
+            self.generate_return_statement(block.expr.as_ref());
+            self.flush_statement_buffer();
         }
-
-        // We only render the return statement if we are not in a tail recursive function body
-        // and the node is RecursiveCall pointing to the current function.
-        if let Some(function_context) = self.get_function_context() {
-            if function_context.is_tail_recursive && block.has_completion() {
-                if let Some(ref expression) = block.expr {
-                    if let hir::ExprKind::TailCall(..) = expression.kind {
-                        self.generate_expr(expression, None);
-                        return;
-                    }
-                }
-            }
-        }
-
-        self.push_indent();
-        self.push_str("return ");
-        self.push_context(BlockContext::Expression);
-        self.push_completion_variable(Some("return"));
-        self.generate_optional_expr(&block.expr, None);
-        self.pop_completion_variable();
-        self.pop_context();
-        if needs_semicolon(&block.expr) {
-            self.push_char(';');
-        }
-        self.push_newline();
-        self.flush_statement_buffer();
     }
 
-    pub(crate) fn generate_return_statement(self: &mut CodegenJS, expr: &Option<hir::Expr>) {
+    pub(crate) fn generate_return_statement(self: &mut CodegenJS, expr: Option<&hir::Expr>) {
         // We do not render a return statement if we are in a tail recursive function body.
         // Which calls the current function recursively.
-        if expr.is_some() {
-            if let hir::ExprKind::TailCall(call_expr) = &expr.as_ref().unwrap().kind {
-                let call_identifier = if let hir::ExprKind::Path(_) = &call_expr.callee.kind {
-                    Some(fn_identifier_to_string(&call_expr.callee))
-                } else {
-                    None
-                };
+        if let Some(hir::ExprKind::TailCall(call_expr)) = expr.map(|e| &e.kind) {
+            let call_identifier = if let hir::ExprKind::Path(_) = &call_expr.callee.kind {
+                Some(fn_identifier_to_string(&call_expr.callee))
+            } else {
+                None
+            };
 
-                if call_identifier.is_some() {
-                    if let Some(function_context) = self.get_function_context() {
-                        if function_context.is_tail_recursive
-                            && function_context.name == call_identifier.unwrap()
-                        {
-                            return self.generate_optional_expr(expr, None);
-                        }
+            if call_identifier.is_some() {
+                if let Some(function_context) = self.get_function_context() {
+                    if function_context.is_tail_recursive
+                        && function_context.name == call_identifier.unwrap()
+                    {
+                        return self.generate_optional_expr(expr, None);
                     }
                 }
             }
         }
 
         self.push_indent();
+        self.push_context(BlockContext::Expression);
         self.push_str("return");
 
         if let Some(expr) = expr {
             self.push_char(' ');
+            self.push_completion_variable(Some("return"));
             self.generate_expr(expr, None);
+            self.pop_completion_variable();
         }
 
-        if needs_semicolon(expr) {
+        if self.needs_semicolon(expr) {
             self.push_char(';');
         }
         self.push_newline();
+        self.pop_context();
     }
 
     pub(crate) fn generate_recursive_call_expression(&mut self, expr: &hir::CallExpression) {
@@ -378,35 +356,5 @@ pub(crate) fn fn_identifier_to_string(expr: &hir::Expr) -> String {
         hir::ExprKind::Path(path) => path.join("__"),
         hir::ExprKind::FieldAccess(_base, field) => field.to_string(),
         kind => todo!("fn_identifier_to_string: {:?}", kind),
-    }
-}
-
-fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
-    match &expr.kind {
-        hir::ExprKind::Path(..) => true,
-        hir::ExprKind::Let(..) => false,
-        hir::ExprKind::Literal(..) => true,
-        hir::ExprKind::Binary(_, lhs, rhs) => {
-            expr_can_render_as_js_expr(lhs) && expr_can_render_as_js_expr(rhs)
-        }
-        hir::ExprKind::Unary(_, expr) => expr_can_render_as_js_expr(expr),
-        hir::ExprKind::Block(..) => false,
-        hir::ExprKind::IfElse(..) => false,
-        hir::ExprKind::Match(..) => false,
-        hir::ExprKind::Call(call_expr) => {
-            call_expr.arguments.iter().all(expr_can_render_as_js_expr)
-        }
-        hir::ExprKind::FieldAccess(base, _) => expr_can_render_as_js_expr(base),
-        hir::ExprKind::IndexAccess(base, index) => {
-            expr_can_render_as_js_expr(base) && expr_can_render_as_js_expr(index)
-        }
-        hir::ExprKind::TailCall(_) => false,
-        hir::ExprKind::List(exprs) => exprs.iter().all(expr_can_render_as_js_expr),
-        hir::ExprKind::Dict(exprs) => exprs
-            .iter()
-            .all(|kv| expr_can_render_as_js_expr(&kv.0) && expr_can_render_as_js_expr(&kv.1)),
-        hir::ExprKind::FunctionExpression(..) => true,
-        hir::ExprKind::Range(..) => true,
-        hir::ExprKind::Wildcard => true,
     }
 }

@@ -2,6 +2,9 @@ use tlang_ast::node::{self as ast, Ident};
 use tlang_ast::token::Literal;
 use tlang_hir::hir;
 
+use crate::binary_operator_generator::{
+    map_operator_info, should_wrap_with_parentheses, JSAssociativity, JSOperatorInfo,
+};
 use crate::generator::{BlockContext, CodegenJS};
 
 impl CodegenJS {
@@ -108,7 +111,7 @@ impl CodegenJS {
         self.push_scope();
 
         self.generate_statements(&block.stmts);
-        self.generate_optional_expr(&block.expr, None);
+        self.generate_optional_expr(block.expr.as_ref(), None);
 
         self.pop_scope();
     }
@@ -116,7 +119,7 @@ impl CodegenJS {
     #[inline(always)]
     pub(crate) fn generate_optional_expr(
         &mut self,
-        expr: &Option<hir::Expr>,
+        expr: Option<&hir::Expr>,
         parent_op: Option<hir::BinaryOpKind>,
     ) {
         if let Some(expr) = expr {
@@ -148,7 +151,7 @@ impl CodegenJS {
             }
             hir::ExprKind::Match(expr, arms) => self.generate_match_expression(expr, arms),
             hir::ExprKind::IfElse(expr, then_branch, else_branches) => {
-                self.generate_if_else(expr, then_branch, else_branches)
+                self.generate_if_else(expr, then_branch, else_branches, parent_op)
             }
             hir::ExprKind::FunctionExpression(decl) => self.generate_function_expression(decl),
             hir::ExprKind::TailCall(expr) => self.generate_recursive_call_expression(expr),
@@ -236,12 +239,69 @@ impl CodegenJS {
         self.push_str(&identifier);
     }
 
+    fn generate_ternary_op(
+        &mut self,
+        expr: &hir::Expr,
+        then_expr: &hir::Expr,
+        else_expr: &hir::Expr,
+        parent_op: Option<hir::BinaryOpKind>,
+    ) {
+        let needs_parenthesis = if let Some(parent_op) = parent_op {
+            should_wrap_with_parentheses(
+                map_operator_info(parent_op),
+                JSOperatorInfo {
+                    precedence: 0,
+                    associativity: JSAssociativity::Right,
+                },
+            )
+        } else {
+            false
+        };
+
+        if needs_parenthesis {
+            self.push_char('(');
+        }
+
+        self.generate_expr(expr, None);
+        self.push_str(" ? ");
+        self.generate_expr(then_expr, None);
+        self.push_str(" : ");
+        self.generate_expr(else_expr, None);
+
+        if needs_parenthesis {
+            self.push_char(')');
+        }
+    }
+
+    pub(crate) fn should_render_if_else_as_ternary(
+        &self,
+        expr: &hir::Expr,
+        then_branch: &hir::Block,
+        else_branches: &[hir::ElseClause],
+    ) -> bool {
+        self.get_render_ternary()
+            && self.current_context() == BlockContext::Expression
+            && else_branches.len() == 1 // Let's not nest ternary expressions for now.
+            && if_else_can_render_as_ternary(expr, then_branch, else_branches)
+    }
+
     fn generate_if_else(
         &mut self,
         expr: &hir::Expr,
         then_branch: &hir::Block,
         else_branches: &[hir::ElseClause],
+        parent_op: Option<hir::BinaryOpKind>,
     ) {
+        if self.should_render_if_else_as_ternary(expr, then_branch, else_branches) {
+            self.generate_ternary_op(
+                expr,
+                then_branch.expr.as_ref().unwrap(),
+                else_branches[0].consequence.expr.as_ref().unwrap(),
+                parent_op,
+            );
+            return;
+        }
+
         let mut lhs = String::new();
         // TODO: Potentially in a return position or other expression, before we generate the if
         //       statement, replace the current statement buffer with a new one, generate the if
@@ -396,5 +456,51 @@ impl CodegenJS {
         }
 
         self.push_char(')');
+    }
+}
+
+fn if_else_can_render_as_ternary(
+    expr: &hir::Expr,
+    then_branch: &hir::Block,
+    else_branches: &[hir::ElseClause],
+) -> bool {
+    then_branch.stmts.is_empty()
+        && expr_can_render_as_js_expr(expr)
+        && expr_can_render_as_js_expr(then_branch.expr.as_ref().unwrap())
+        && else_branches.iter().all(|else_branch| {
+            else_branch.consequence.stmts.is_empty()
+                && (else_branch.condition.is_none()
+                    || expr_can_render_as_js_expr(else_branch.condition.as_ref().unwrap()))
+                && expr_can_render_as_js_expr(else_branch.consequence.expr.as_ref().unwrap())
+        })
+}
+
+pub(crate) fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
+    match &expr.kind {
+        hir::ExprKind::Path(..) => true,
+        hir::ExprKind::Let(..) => false,
+        hir::ExprKind::Literal(..) => true,
+        hir::ExprKind::Binary(_, lhs, rhs) => {
+            expr_can_render_as_js_expr(lhs) && expr_can_render_as_js_expr(rhs)
+        }
+        hir::ExprKind::Unary(_, expr) => expr_can_render_as_js_expr(expr),
+        hir::ExprKind::Block(..) => false,
+        hir::ExprKind::IfElse(..) => false,
+        hir::ExprKind::Match(..) => false,
+        hir::ExprKind::Call(call_expr) => {
+            call_expr.arguments.iter().all(expr_can_render_as_js_expr)
+        }
+        hir::ExprKind::FieldAccess(base, _) => expr_can_render_as_js_expr(base),
+        hir::ExprKind::IndexAccess(base, index) => {
+            expr_can_render_as_js_expr(base) && expr_can_render_as_js_expr(index)
+        }
+        hir::ExprKind::TailCall(_) => false,
+        hir::ExprKind::List(exprs) => exprs.iter().all(expr_can_render_as_js_expr),
+        hir::ExprKind::Dict(exprs) => exprs
+            .iter()
+            .all(|kv| expr_can_render_as_js_expr(&kv.0) && expr_can_render_as_js_expr(&kv.1)),
+        hir::ExprKind::FunctionExpression(..) => true,
+        hir::ExprKind::Range(..) => true,
+        hir::ExprKind::Wildcard => true,
     }
 }

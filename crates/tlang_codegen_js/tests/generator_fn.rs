@@ -1,6 +1,5 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
-use tlang_ast::symbols::SymbolType;
 
 mod common;
 
@@ -243,17 +242,14 @@ fn test_function_declarations_with_if_let_guard_named_fields_enum() {
 
 #[test]
 fn test_function_declarations_with_comments_inbetween() {
-    let output = compile!(
-        indoc! {"
+    let output = compile!(indoc! {"
         // Comment 1
         fn filter_map([], _) { [] }
         // Comment 2
         fn filter_map([x, ...xs], f) if let Some { value } = f(x) { [value, ...filter_map(xs, f)] }
         // Comment 3
         fn filter_map([_, ...xs], f) { filter_map(xs, f) }
-    "},
-        &[("Some", SymbolType::Variable)]
-    );
+    "});
     let expected_output = indoc! {"
         // Comment 1
         // Comment 2
@@ -315,8 +311,7 @@ fn test_function_list_match_with_wildcard() {
 
 #[test]
 fn test_function_reuse_param_name_with_pattern() {
-    let output = compile!(
-        indoc! {"
+    let output = compile!(indoc! {"
         // quicksort(a[]) -> a[]
         fn quicksort([]) { [] }
         fn quicksort(list) {
@@ -327,13 +322,7 @@ fn test_function_reuse_param_name_with_pattern() {
           let greater = list |> filter(fn(y) { y > pivot });
           [...quicksort(smaller), pivot, ...quicksort(greater)]
         }
-    "},
-        &[
-            ("filter", SymbolType::Function),
-            ("len", SymbolType::Function),
-            ("random_int", SymbolType::Function)
-        ]
-    );
+    "});
     let expected_output = indoc! {"
         // quicksort(a[]) -> a[]
         function quicksort(list) {

@@ -1,6 +1,5 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
-use tlang_ast::symbols::SymbolType;
 
 mod common;
 
@@ -66,21 +65,13 @@ fn test_pipeline_operator_to_function_call_with_wildcards() {
 
 #[test]
 fn test_pipeline_operator_long_chaining() {
-    let output = compile!(
-        indoc! {"
+    let output = compile!(indoc! {"
         [1,2,3]
         |> map(fn (x) { x ** 2 })
         |> filter(fn (x) { x % 2 == 0 })
         |> foldl(fn (acc, x) { acc + x }, 0)
         |> log();
-    "},
-        &[
-            ("map", SymbolType::Function),
-            ("filter", SymbolType::Function),
-            ("foldl", SymbolType::Function),
-            ("log", SymbolType::Function),
-        ]
-    );
+    "});
     let expected_output = indoc! {"
         console.log(foldl(filter(map([1, 2, 3], (x) => x ** 2), (x) => x % 2 === 0), (acc, x) => acc + x, 0));
     "};

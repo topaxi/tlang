@@ -21,9 +21,8 @@ impl MatchContextStack {
     }
 
     fn fixed_list(&self) -> bool {
-        self.last().map_or(false, |context| {
-            matches!(context, MatchContext::ListOfIdentifiers(_))
-        })
+        self.last()
+            .is_some_and(|context| matches!(context, MatchContext::ListOfIdentifiers(_)))
     }
 
     fn get_fixed_list_identifier(&self, index: usize) -> Option<&String> {

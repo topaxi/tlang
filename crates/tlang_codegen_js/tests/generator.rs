@@ -2,6 +2,8 @@ use indoc::indoc;
 use pretty_assertions::assert_eq;
 use tlang_ast::symbols::SymbolType;
 
+use self::common::CodegenOptions;
+
 mod common;
 
 #[test]
@@ -135,7 +137,10 @@ fn test_if_else_if() {
 
 #[test]
 fn test_if_else_as_expression_as_fn_completion() {
-    let output = compile!("fn main() { if true { 1 } else { 2 } }");
+    let output = compile!(
+        "fn main() { if true { 1 } else { 2 } }",
+        CodegenOptions::default().set_render_ternary(false)
+    );
     let expected_output = indoc! {"
         function main() {
             if (true) {
@@ -150,7 +155,10 @@ fn test_if_else_as_expression_as_fn_completion() {
 
 #[test]
 fn test_if_else_as_expression() {
-    let output = compile!("fn main() { let result = if true { 1 } else { 2 }; }");
+    let output = compile!(
+        "fn main() { let result = if true { 1 } else { 2 }; }",
+        CodegenOptions::default().set_render_ternary(false)
+    );
     let expected_output = indoc! {"
         function main() {
             let $tmp$0;if (true) {
@@ -166,7 +174,8 @@ fn test_if_else_as_expression() {
 
 #[test]
 fn test_if_else_as_expression_nested() {
-    let output = compile!(indoc! {"
+    let output = compile!(
+        indoc! {"
         fn main() {
             let result = if true {
                 let x = if true { 1 } else { 2 };
@@ -176,7 +185,9 @@ fn test_if_else_as_expression_nested() {
                 5
             };
         }
-    "});
+    "},
+        CodegenOptions::default().set_render_ternary(false)
+    );
     let expected_output = indoc! {"
         function main() {
             let $tmp$0;if (true) {
@@ -221,6 +232,28 @@ fn test_if_else_if_as_expression() {
 }
 
 #[test]
+fn test_if_else_ternary() {
+    let output = compile!("fn main() { if true { 1 } else { 2 } }");
+    let expected_output = indoc! {"
+        function main() {
+            return true ? 1 : 2;
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn test_if_else_ternary_precedence() {
+    let output = compile!("fn main() { false && if true { 1 } else { 2 } }");
+    let expected_output = indoc! {"
+        function main() {
+            return false && (true ? 1 : 2);
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
 fn test_list_literal() {
     let output = compile!("fn main() { [1, 2, 3] }");
     let expected_output = indoc! {"
@@ -233,7 +266,7 @@ fn test_list_literal() {
 
 #[test]
 fn test_partial_application() {
-    let output = compile!("let add1 = add(_, 1);", &[("add", SymbolType::Function)]);
+    let output = compile!("let add1 = add(_, 1);", vec![("add", SymbolType::Function)]);
     let expected_output = indoc! {"
         let add1 = (_) => add(_, 1);
     "};
@@ -242,7 +275,10 @@ fn test_partial_application() {
 
 #[test]
 fn test_partial_application_with_multiple_arguments() {
-    let output = compile!("let add1 = add(_, 1, _);", &[("add", SymbolType::Function)]);
+    let output = compile!(
+        "let add1 = add(_, 1, _);",
+        vec![("add", SymbolType::Function)]
+    );
     let expected_output = indoc! {"
         let add1 = (_0, _1) => add(_0, 1, _1);
     "};

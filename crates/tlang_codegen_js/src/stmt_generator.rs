@@ -13,18 +13,16 @@ impl CodegenJS {
                 self.generate_expr(expr, None);
                 self.pop_context();
 
-                if let hir::ExprKind::IfElse { .. } = expr.kind {
-                    self.push_newline();
-                    return;
+                if self.needs_semicolon(Some(expr)) {
+                    self.push_char(';');
                 }
-
-                self.push_str(";\n");
+                self.push_newline();
             }
             hir::StmtKind::Let(pattern, expression, _ty) => {
                 self.generate_variable_declaration(pattern, expression);
             }
             hir::StmtKind::FunctionDeclaration(decl) => self.generate_function_declaration(decl),
-            hir::StmtKind::Return(expr) => self.generate_return_statement(expr),
+            hir::StmtKind::Return(box expr) => self.generate_return_statement(expr.as_ref()),
             hir::StmtKind::EnumDeclaration(decl) => self.generate_enum_declaration(decl),
             hir::StmtKind::StructDeclaration(decl) => self.generate_struct_declaration(decl),
             hir::StmtKind::None => {}

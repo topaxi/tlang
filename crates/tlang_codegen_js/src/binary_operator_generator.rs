@@ -3,15 +3,15 @@ use tlang_hir::hir;
 use crate::generator::CodegenJS;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum JSAssociativity {
+pub(crate) enum JSAssociativity {
     Left,
     Right,
 }
 
 #[derive(Debug, Clone, Copy)]
-struct JSOperatorInfo {
-    precedence: u8,
-    associativity: JSAssociativity,
+pub(crate) struct JSOperatorInfo {
+    pub precedence: u8,
+    pub associativity: JSAssociativity,
 }
 
 impl CodegenJS {
@@ -22,8 +22,9 @@ impl CodegenJS {
         rhs: &hir::Expr,
         parent_op: Option<hir::BinaryOpKind>,
     ) {
-        let needs_parentheses =
-            parent_op.map_or(false, |parent| should_wrap_with_parentheses(op, parent));
+        let needs_parentheses = parent_op.is_some_and(|parent| {
+            should_wrap_with_parentheses(map_operator_info(parent), map_operator_info(op))
+        });
 
         if needs_parentheses {
             self.push_char('(');
@@ -62,19 +63,16 @@ impl CodegenJS {
     }
 }
 
-fn should_wrap_with_parentheses(op: hir::BinaryOpKind, parent_op: hir::BinaryOpKind) -> bool {
-    let op_info = map_operator_info(op);
-    let parent_op_info = map_operator_info(parent_op);
-
-    if op_info.precedence < parent_op_info.precedence {
-        return true;
-    }
-
-    op_info.precedence == parent_op_info.precedence
-        && op_info.associativity == JSAssociativity::Right
+pub(crate) fn should_wrap_with_parentheses(
+    parent_op_info: JSOperatorInfo,
+    op_info: JSOperatorInfo,
+) -> bool {
+    op_info.precedence < parent_op_info.precedence
+        || (op_info.precedence == parent_op_info.precedence
+            && op_info.associativity == JSAssociativity::Right)
 }
 
-fn map_operator_info(op: hir::BinaryOpKind) -> JSOperatorInfo {
+pub(crate) fn map_operator_info(op: hir::BinaryOpKind) -> JSOperatorInfo {
     match op {
         hir::BinaryOpKind::Assign => JSOperatorInfo {
             precedence: 1,

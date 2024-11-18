@@ -47,6 +47,7 @@ pub struct CodegenJS {
     pub(crate) match_context_stack: MatchContextStack,
     statement_buffer: Vec<String>,
     completion_variables: Vec<Option<Box<str>>>,
+    render_ternary: bool,
 }
 
 impl Default for CodegenJS {
@@ -66,7 +67,16 @@ impl CodegenJS {
             match_context_stack: Default::default(),
             statement_buffer: vec![String::with_capacity(STATEMENT_BUFFER_CAPACITY)],
             completion_variables: vec![None],
+            render_ternary: true,
         }
+    }
+
+    pub fn set_render_ternary(&mut self, render_ternary: bool) {
+        self.render_ternary = render_ternary;
+    }
+
+    pub(crate) fn get_render_ternary(&self) -> bool {
+        self.render_ternary
     }
 
     pub fn get_standard_library_source() -> String {
@@ -385,18 +395,17 @@ impl CodegenJS {
         }
     }
 
+    pub(crate) fn needs_semicolon(&self, expr: Option<&hir::Expr>) -> bool {
+        match expr.map(|expr| &expr.kind) {
+            Some(hir::ExprKind::Block(..) | hir::ExprKind::Match(..)) => false,
+            Some(hir::ExprKind::IfElse(expr, then_branch, else_branches)) => {
+                self.should_render_if_else_as_ternary(expr, then_branch, else_branches)
+            }
+            _ => true,
+        }
+    }
+
     pub fn get_output(&self) -> &str {
         &self.output
-    }
-}
-
-pub(crate) fn needs_semicolon(expr: &Option<hir::Expr>) -> bool {
-    if let Some(expr) = expr {
-        !matches!(
-            &expr.kind,
-            hir::ExprKind::Block(..) | hir::ExprKind::IfElse(..) | hir::ExprKind::Match(..)
-        )
-    } else {
-        true
     }
 }

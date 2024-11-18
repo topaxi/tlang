@@ -225,26 +225,16 @@ fn test_partition_impl() {
                     // partition(a[], fn(a) -> bool, a[], a[]) -> (a[], a[])
                     return [satisfies, doesNotSatisfy];
                 } else if (list.length >= 1 && (x = list[0], true) && (xs = list.slice(1), true)) {
-                    let $tmp$0;if (predicate(x)) {
-                        $tmp$0 = [...satisfies, x];
-                    } else {
-                        $tmp$0 = satisfies;
-                    }
-                    let partitionedSatisfies = $tmp$0;
-                    let $tmp$1;if (predicate(x)) {
-                        $tmp$1 = doesNotSatisfy;
-                    } else {
-                        $tmp$1 = [...doesNotSatisfy, x];
-                    }
-                    let partitionedDoesNotSatisfy = $tmp$1;
-                    let $tmp$2 = xs;
-                    let $tmp$3 = predicate;
-                    let $tmp$4 = partitionedSatisfies;
-                    let $tmp$5 = partitionedDoesNotSatisfy;
-                    list = $tmp$2;
-                    predicate = $tmp$3;
-                    satisfies = $tmp$4;
-                    doesNotSatisfy = $tmp$5;
+                    let partitionedSatisfies = predicate(x) ? [...satisfies, x] : satisfies;
+                    let partitionedDoesNotSatisfy = predicate(x) ? doesNotSatisfy : [...doesNotSatisfy, x];
+                    let $tmp$0 = xs;
+                    let $tmp$1 = predicate;
+                    let $tmp$2 = partitionedSatisfies;
+                    let $tmp$3 = partitionedDoesNotSatisfy;
+                    list = $tmp$0;
+                    predicate = $tmp$1;
+                    satisfies = $tmp$2;
+                    doesNotSatisfy = $tmp$3;
                     continue rec;
                 }
             }
