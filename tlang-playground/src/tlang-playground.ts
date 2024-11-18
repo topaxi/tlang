@@ -3,6 +3,7 @@ import { customElement, query, state } from 'lit/decorators.js';
 import { examples } from './examples';
 
 import './components/t-codemirror';
+import './components/t-split';
 import { type TCodeMirror } from './components/t-codemirror';
 import { compressSource, decompressSource } from './utils/lz';
 import {
@@ -11,6 +12,7 @@ import {
   TlangCompiler,
   CodemirrorDiagnostic,
 } from './tlang';
+import { MediaController } from './controllers/media-controller';
 
 type CodemirrorSeverity = 'hint' | 'info' | 'warning' | 'error';
 
@@ -71,31 +73,15 @@ async function updateDisplayHashparam(display: string) {
 export class TlangPlayground extends LitElement {
   static styles = css`
     :host {
-      display: grid;
+      display: flex;
+      flex-direction: column;
       width: 100%;
       height: 100vh;
-      --editor-height: minmax(24rem, 1fr);
-
-      grid-template:
-        'toolbar' auto
-        'editor' var(--editor-height)
-        'output' var(--editor-height)
-        'console' auto;
-    }
-
-    @media (min-width: 1000px) {
-      :host {
-        grid-template:
-          'toolbar toolbar' auto
-          'editor output' var(--editor-height)
-          'editor console' auto / 50% 50%;
-      }
     }
 
     .toolbar {
       display: flex;
       gap: 1ch;
-      grid-area: toolbar;
     }
 
     .repo-link {
@@ -112,18 +98,19 @@ export class TlangPlayground extends LitElement {
       text-decoration: underline;
     }
 
-    .editor {
-      display: flex;
-      flex: 1 1 auto;
-      max-height: 100%;
-
-      grid-area: editor;
-      overflow: auto;
+    .editor-split {
+      overflow: hidden;
     }
 
-    .editor > * {
+    .editor,
+    .output {
+      display: flex;
+    }
+
+    .editor > *,
+    .output > * {
       width: 100%;
-      max-height: 100%;
+      overflow: auto;
     }
 
     pre {
@@ -136,48 +123,32 @@ export class TlangPlayground extends LitElement {
       padding-left: 1ch;
     }
 
-    .output {
-      display: flex;
-      flex-direction: column;
-      grid-area: output;
-      max-height: 100%;
-      overflow: hidden;
-    }
-
-    @media (min-width: 1000px) {
-      .output {
-        padding-left: 1ch;
-        border-left: 1px solid var(--ctp-macchiato-surface0);
-      }
-    }
-
-    .output > * {
-      overflow: auto;
-    }
-
     .output-error {
       min-height: 5em;
     }
 
     .console {
+      display: flex;
+      flex-direction: column;
       border-left: 1px solid var(--ctp-macchiato-surface0);
-      padding-top: 1rem;
-      grid-area: console;
+      flex: 1 0 25px;
     }
 
     .console-toolbar {
       display: flex;
       gap: 1rem;
       padding-left: 1ch;
+      padding-top: 1rem;
       border-bottom: 1px solid var(--ctp-macchiato-surface0);
     }
 
     .console-output {
-      height: 24em;
       overflow: auto;
       scroll-behavior: smooth;
     }
   `;
+
+  private desktop = new MediaController(this, '(min-width: 980px)');
 
   @state()
   selectedExample = Object.keys(examples)[0];
@@ -361,46 +332,57 @@ export class TlangPlayground extends LitElement {
           <a href="https://github.com/topaxi/tlang">Source Code</a>
         </div>
       </div>
-      <div class="editor">
-        <t-codemirror @source-change=${this.handleSourceChange}></t-codemirror>
-      </div>
-      <div class="output">
-        ${this.display === 'ast'
-          ? html`<pre class="output-ast">${this.compiler?.ast_string}</pre>`
-          : ''}
-        ${this.display === 'hir'
-          ? html`<pre class="output-ast">${this.compiler?.hir_string}</pre>`
-          : ''}
-        ${this.display === 'hir pretty'
-          ? html`<t-codemirror
-              class="output-code"
-              language="tlang"
-              .source=${this.compiler?.hir_pretty}
-              readonly
-            ></t-codemirror>`
-          : ''}
-        ${this.display === 'output'
-          ? html`<t-codemirror
-              class="output-code"
-              language="javascript"
-              .source=${this.output}
-              readonly
-            ></t-codemirror>`
-          : ''}
-        ${this.error ? html`<pre class="output-error">${this.error}</pre>` : ''}
-      </div>
-      <div class="console">
-        <div class="console-toolbar">
-          <div>Console</div>
-          <button @click=${() => (this.showConsole = !this.showConsole)}>
-            ${this.showConsole ? 'Hide' : 'Show'}
-          </button>
-          <button @click=${() => (this.consoleOutput = [])}>Clear</button>
+      <t-split
+        class="editor-split"
+        direction=${this.desktop.matches ? 'vertical' : 'horizontal'}
+      >
+        <div slot="first" class="editor">
+          <t-codemirror
+            @source-change=${this.handleSourceChange}
+          ></t-codemirror>
         </div>
-        <div class="console-output" .hidden=${!this.showConsole}>
-          ${this.consoleOutput.map((args) => this.renderLogMessage(args))}
-        </div>
-      </div>
+        <t-split slot="second" direction="horizontal" class="output">
+          <div slot="first">
+            ${this.display === 'ast'
+              ? html`<pre class="output-ast">${this.compiler?.ast_string}</pre>`
+              : ''}
+            ${this.display === 'hir'
+              ? html`<pre class="output-ast">${this.compiler?.hir_string}</pre>`
+              : ''}
+            ${this.display === 'hir pretty'
+              ? html`<t-codemirror
+                  class="output-code"
+                  language="tlang"
+                  .source=${this.compiler?.hir_pretty}
+                  readonly
+                ></t-codemirror>`
+              : ''}
+            ${this.display === 'output'
+              ? html`<t-codemirror
+                  class="output-code"
+                  language="javascript"
+                  .source=${this.output}
+                  readonly
+                ></t-codemirror>`
+              : ''}
+            ${this.error
+              ? html`<pre class="output-error">${this.error}</pre>`
+              : ''}
+          </div>
+          <div slot="second" class="console">
+            <div class="console-toolbar">
+              <div>Console</div>
+              <button @click=${() => (this.showConsole = !this.showConsole)}>
+                ${this.showConsole ? 'Hide' : 'Show'}
+              </button>
+              <button @click=${() => (this.consoleOutput = [])}>Clear</button>
+            </div>
+            <div class="console-output" .hidden=${!this.showConsole}>
+              ${this.consoleOutput.map((args) => this.renderLogMessage(args))}
+            </div>
+          </div>
+        </t-split>
+      </t-split>
     `;
   }
 }

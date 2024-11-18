@@ -10,6 +10,10 @@ import { customElement, property } from 'lit/decorators.js';
 @customElement('t-codemirror')
 export class TCodeMirror extends LitElement {
   static styles = css`
+    :host {
+      display: block;
+    }
+
     :host .cm-scroller {
       font-family: inherit;
     }
