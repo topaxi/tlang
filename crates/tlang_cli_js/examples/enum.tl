@@ -1,9 +1,9 @@
 enum Expr {
     Value(int),
-    Add(LExpr, RExpr),
-    Subtract(LExpr, RExpr),
-    Multiply(LExpr, RExpr),
-    Divide(LExpr, RExpr),
+    Add(Expr, Expr),
+    Subtract(Expr, Expr),
+    Multiply(Expr, Expr),
+    Divide(Expr, Expr),
 }
 
 // evaluate(Expr) -> int
