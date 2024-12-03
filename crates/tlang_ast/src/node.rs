@@ -421,8 +421,12 @@ pub struct StructDeclaration {
     pub fields: Vec<StructField>,
 }
 
-// TODO: Add NodeId to StructField
-pub type StructField = (Ident, Ty);
+#[derive(Debug, Clone, Serialize)]
+pub struct StructField {
+    pub id: NodeId,
+    pub name: Ident,
+    pub ty: Ty,
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Ty {

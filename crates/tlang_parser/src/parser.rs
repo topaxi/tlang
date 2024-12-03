@@ -363,7 +363,11 @@ impl<'src> Parser<'src> {
         let name = self.parse_identifier();
         self.consume_token(TokenKind::Colon);
         let ty = self.parse_type_annotation();
-        (name, ty)
+        StructField {
+            id: self.unique_id(),
+            name,
+            ty,
+        }
     }
 
     fn parse_enum_declaration(&mut self) -> Stmt {
@@ -398,7 +402,12 @@ impl<'src> Parser<'src> {
                 let mut index = 0;
                 while !matches!(self.current_token_kind(), Some(TokenKind::RParen)) {
                     let ident = Ident::new(&index.to_string(), Span::default());
-                    parameters.push((ident, self.parse_type_annotation()));
+                    let ty = self.parse_type_annotation();
+                    parameters.push(StructField {
+                        id: self.unique_id(),
+                        name: ident,
+                        ty,
+                    });
                     if let Some(TokenKind::Comma) = self.current_token_kind() {
                         self.advance();
                     }
@@ -429,7 +438,11 @@ impl<'src> Parser<'src> {
                         }
                     };
 
-                    parameters.push((ident, ty));
+                    parameters.push(StructField {
+                        id: self.unique_id(),
+                        name: ident,
+                        ty,
+                    });
                     if let Some(TokenKind::Comma) = self.current_token_kind() {
                         self.advance();
                     }

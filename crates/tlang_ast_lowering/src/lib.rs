@@ -690,10 +690,9 @@ impl LoweringContext {
 
     fn lower_struct_field(&mut self, field: &ast::node::StructField) -> hir::StructField {
         hir::StructField {
-            // TODO: We might want/need an id on the AST already.
-            hir_id: self.unique_id(),
-            name: field.0.clone(),
-            ty: self.lower_ty(Some(&field.1)),
+            hir_id: self.lower_node_id(field.id),
+            name: field.name.clone(),
+            ty: self.lower_ty(Some(&field.ty)),
         }
     }
 
