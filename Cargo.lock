@@ -676,6 +676,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "tlang_interpreter"
+version = "0.1.0"
+dependencies = [
+ "ctor",
+ "env_logger",
+ "indoc",
+ "pretty_assertions",
+ "tlang_ast",
+ "tlang_ast_lowering",
+ "tlang_hir",
+ "tlang_parser",
+ "tlang_semantics",
+]
+
+[[package]]
 name = "tlang_lexer"
 version = "0.1.0"
 dependencies = [
