@@ -5,7 +5,7 @@ use tlang_ast::node::{self as ast};
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_hir::hir;
 use tlang_hir_pretty::HirPretty;
-use tlang_parser::{error::ParseError, parser::Parser};
+use tlang_parser::{error::ParseIssue, parser::Parser};
 use tlang_semantics::{diagnostic::Diagnostic, SemanticAnalyzer};
 use wasm_bindgen::prelude::*;
 
@@ -25,7 +25,7 @@ pub struct TlangCompiler {
     hir: hir::Module,
 
     diagnostics: Vec<Diagnostic>,
-    parse_errors: Vec<ParseError>,
+    parse_issues: Vec<ParseIssue>,
 }
 
 #[wasm_bindgen]
@@ -41,14 +41,14 @@ impl TlangCompiler {
             ast: ast::Module::default(),
             hir: hir::Module::default(),
             diagnostics: Vec::new(),
-            parse_errors: Vec::new(),
+            parse_issues: Vec::new(),
         }
     }
 
     fn parse(&mut self) {
         match Parser::from_source(&self.source).parse() {
             Ok(ast) => self.ast = ast,
-            Err(errors) => self.parse_errors = errors.to_vec(),
+            Err(error) => self.parse_issues = error.issues().to_vec(),
         }
     }
 
@@ -116,15 +116,15 @@ impl TlangCompiler {
 
     #[wasm_bindgen(getter, js_name = "parseErrors")]
     pub fn parse_error_messages(&self) -> Vec<String> {
-        self.parse_errors.iter().map(|e| e.to_string()).collect()
+        self.parse_issues.iter().map(|e| e.to_string()).collect()
     }
 
     #[wasm_bindgen(getter, js_name = "codemirrorDiagnostics")]
     pub fn codemirror_diagnostics(&self) -> Vec<codemirror::CodemirrorDiagnostic> {
         let parse_errors = self
-            .parse_errors
+            .parse_issues
             .iter()
-            .map(|e| codemirror::from_parse_error(&self.source, e));
+            .map(|e| codemirror::from_parse_issue(&self.source, e));
         let diagnostics = self
             .diagnostics
             .iter()

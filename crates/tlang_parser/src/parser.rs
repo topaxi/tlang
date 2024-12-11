@@ -10,7 +10,7 @@ use tlang_ast::span::Span;
 use tlang_ast::token::{kw, Keyword, Literal, Token, TokenKind};
 use tlang_lexer::Lexer;
 
-use crate::error::{ParseError, ParseErrorKind};
+use crate::error::{ParseError, ParseIssue, ParseIssueKind};
 use crate::macros::expect_token_matches;
 use log::debug;
 
@@ -24,7 +24,7 @@ pub struct Parser<'src> {
 
     unique_id: NodeId,
 
-    errors: Vec<ParseError>,
+    errors: Vec<ParseIssue>,
 }
 
 impl<'src> Parser<'src> {
@@ -49,8 +49,8 @@ impl<'src> Parser<'src> {
         self.recoverable
     }
 
-    pub fn get_errors(&self) -> Vec<ParseError> {
-        self.errors.clone()
+    pub fn get_errors(&self) -> &[ParseIssue] {
+        &self.errors
     }
 
     fn unique_id(&mut self) -> NodeId {
@@ -62,7 +62,7 @@ impl<'src> Parser<'src> {
         Parser::new(Lexer::new(source))
     }
 
-    pub fn parse(&mut self) -> Result<Module, &[ParseError]> {
+    pub fn parse(&mut self) -> Result<Module, ParseError> {
         self.advance();
         self.advance();
 
@@ -71,7 +71,7 @@ impl<'src> Parser<'src> {
         if self.errors.is_empty() {
             Ok(module)
         } else {
-            Err(&self.errors)
+            Err(ParseError::new(self.errors.to_vec()))
         }
     }
 
@@ -85,13 +85,13 @@ impl<'src> Parser<'src> {
 
     #[inline(never)]
     fn push_unexpected_token_error(&mut self, expected: &str, actual: Option<Token>) {
-        self.errors.push(ParseError {
+        self.errors.push(ParseIssue {
             msg: format!(
                 "Expected {}, found {:?}",
                 expected,
                 actual.as_ref().unwrap().kind
             ),
-            kind: ParseErrorKind::UnexpectedToken(actual.clone().unwrap()),
+            kind: ParseIssueKind::UnexpectedToken(actual.clone().unwrap()),
             span: actual.as_ref().unwrap().span,
         });
     }

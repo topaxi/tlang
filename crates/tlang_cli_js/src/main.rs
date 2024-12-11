@@ -7,7 +7,7 @@ use std::{
 use clap::{arg, command, ArgMatches};
 use tlang_ast_lowering::lower_to_hir;
 use tlang_codegen_js::generator::CodegenJS;
-use tlang_parser::error::ParseError;
+use tlang_parser::error::ParseIssue;
 use tlang_semantics::{diagnostic::Diagnostic, SemanticAnalyzer};
 
 #[derive(Debug, PartialEq)]
@@ -144,14 +144,14 @@ fn main() {
 #[derive(Debug)]
 enum ParserError {
     #[allow(dead_code)]
-    ParseError(Vec<ParseError>),
+    ParseError(Vec<ParseIssue>),
     #[allow(dead_code)]
     DiagnosticError(Vec<Diagnostic>),
 }
 
-impl From<&[ParseError]> for ParserError {
-    fn from(errors: &[ParseError]) -> Self {
-        ParserError::ParseError(errors.to_vec())
+impl From<tlang_parser::error::ParseError> for ParserError {
+    fn from(errors: tlang_parser::error::ParseError) -> Self {
+        ParserError::ParseError(errors.issues().to_vec())
     }
 }
 

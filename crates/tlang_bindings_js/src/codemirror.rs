@@ -1,4 +1,4 @@
-use tlang_parser::error::ParseError;
+use tlang_parser::error::ParseIssue;
 use tlang_semantics::diagnostic::Diagnostic;
 use wasm_bindgen::prelude::*;
 
@@ -31,7 +31,7 @@ impl CodemirrorDiagnostic {
     }
 }
 
-pub fn from_parse_error(src: &str, error: &ParseError) -> CodemirrorDiagnostic {
+pub fn from_parse_issue(src: &str, error: &ParseIssue) -> CodemirrorDiagnostic {
     CodemirrorDiagnostic::new(
         &error.msg,
         "error",
