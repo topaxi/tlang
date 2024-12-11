@@ -639,6 +639,7 @@ dependencies = [
  "tlang_ast",
  "tlang_ast_lowering",
  "tlang_codegen_js",
+ "tlang_interpreter",
  "tlang_parser",
  "tlang_semantics",
 ]

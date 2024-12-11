@@ -9,6 +9,7 @@ tlang_parser = { path = "../tlang_parser" }
 tlang_ast_lowering = { path = "../tlang_ast_lowering" }
 tlang_codegen_js = { path = "../tlang_codegen_js" }
 tlang_semantics = { path = "../tlang_semantics" }
+tlang_interpreter = { path = "../tlang_interpreter" }
 ron = { workspace = true }
 clap = { version = "4", features = ["cargo"] }
 indoc = { workspace = true }
