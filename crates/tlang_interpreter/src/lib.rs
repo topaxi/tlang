@@ -1,5 +1,88 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
+
 use tlang_ast::token;
 use tlang_hir::hir;
+
+trait Resolver {
+    fn resolve_path(&self, path: &hir::Path) -> Option<TlangValue>;
+    fn resolve_fn(&self, path: &hir::Path) -> Option<&hir::FunctionDeclaration>;
+    fn resolve_struct(&self, path: &hir::Path) -> Option<&hir::StructDeclaration>;
+}
+
+#[derive(Debug, Default)]
+pub struct Scope {
+    pub parent: Option<Rc<RefCell<Scope>>>,
+    pub values: HashMap<String, TlangValue>,
+    pub fn_decls: HashMap<String, hir::FunctionDeclaration>,
+    pub struct_decls: HashMap<String, hir::StructDeclaration>,
+}
+
+impl Resolver for Scope {
+    fn resolve_path(&self, path: &hir::Path) -> Option<TlangValue> {
+        let path_name = path.join("::");
+        let value = self.values.get(&path_name);
+        match value {
+            Some(value) => Some(*value),
+            None => match &self.parent {
+                Some(parent) => parent.borrow().resolve_path(path),
+                None => None,
+            },
+        }
+    }
+
+    fn resolve_fn(&self, path: &hir::Path) -> Option<&hir::FunctionDeclaration> {
+        let path_name = path.join("::");
+        let decl = self.fn_decls.get(&path_name);
+        match decl {
+            Some(decl) => Some(&decl),
+            None => match &self.parent {
+                Some(parent) => parent.borrow().resolve_fn(path),
+                None => None,
+            },
+        }
+    }
+
+    fn resolve_struct(&self, path: &hir::Path) -> Option<&hir::StructDeclaration> {
+        let path_name = path.join("::");
+        let decl = self.struct_decls.get(&path_name);
+        match decl {
+            Some(decl) => Some(&decl),
+            None => match &self.parent {
+                Some(parent) => parent.borrow().resolve_struct(path),
+                None => None,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct RootScope {
+    pub scope: Rc<RefCell<Scope>>,
+    pub native_fn_decls: HashMap<String, ()>,
+    pub native_struct_decls: HashMap<String, ()>,
+}
+
+#[derive(Debug)]
+pub struct TlangClosure {
+    pub id: u64,
+    // Closures hold a reference to the parent scope.
+    pub scope: Option<Rc<RefCell<Scope>>>,
+    pub decl: hir::FunctionDeclaration,
+}
+
+#[derive(Debug)]
+pub struct TlangStruct {
+    pub id: u64,
+    pub field_values: Vec<TlangValue>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum TlangObject {
+    Struct(u64),
+    Fn(u64),
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum TlangValue {
@@ -7,14 +90,18 @@ pub enum TlangValue {
     Int(i64),
     Float(f64),
     Bool(bool),
+    Object(TlangObject),
 }
 
-#[derive(Debug)]
-pub struct Interpreter {}
+#[derive(Debug, Default)]
+pub struct Interpreter {
+    root_scope: RootScope,
+    scopes: Vec<Rc<RefCell<Scope>>>,
+}
 
 impl Interpreter {
     pub fn new() -> Self {
-        Interpreter {}
+        Interpreter::default()
     }
 
     pub fn eval(&mut self, input: &hir::Module) -> TlangValue {
@@ -75,18 +162,18 @@ impl Interpreter {
                     (TlangValue::Float(lhs), TlangValue::Float(rhs)) => {
                         TlangValue::Float(lhs + rhs)
                     }
+                    (TlangValue::Float(lhs), TlangValue::Int(rhs)) => {
+                        TlangValue::Float(lhs + rhs as f64)
+                    }
+                    (TlangValue::Int(lhs), TlangValue::Float(rhs)) => {
+                        TlangValue::Float(lhs as f64 + rhs)
+                    }
                     _ => todo!("eval_binary: Add: {:?} + {:?}", lhs, rhs),
                 }
             }
 
             _ => todo!("eval_binary: {:?}", op),
         }
-    }
-}
-
-impl Default for Interpreter {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -134,5 +221,13 @@ mod tests {
         let mut interpreter = interpreter("");
         let result = eval(&mut interpreter, "1 + 2");
         assert_matches!(result, TlangValue::Int(3));
+    }
+
+    #[test]
+    fn test_addition_of_mixed_ints_and_floats() {
+        let mut interpreter = interpreter("");
+
+        assert_matches!(eval(&mut interpreter, "1 + 2.0"), TlangValue::Float(3.0));
+        assert_matches!(eval(&mut interpreter, "1.0 + 2"), TlangValue::Float(3.0));
     }
 }
