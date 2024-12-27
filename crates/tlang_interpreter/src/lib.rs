@@ -174,11 +174,17 @@ impl Interpreter {
         }
     }
 
-    fn eval_stmt(&mut self, stmt: &hir::Stmt) -> TlangValue {
+    fn eval_stmt(&mut self, stmt: &hir::Stmt) {
         match &stmt.kind {
-            hir::StmtKind::Expr(expr) => self.eval_expr(expr),
-            hir::StmtKind::FunctionDeclaration(decl) => self.eval_fn_decl(decl),
-            hir::StmtKind::StructDeclaration(decl) => self.eval_struct_decl(decl),
+            hir::StmtKind::Expr(expr) => {
+                self.eval_expr(expr);
+            }
+            hir::StmtKind::FunctionDeclaration(decl) => {
+                self.eval_fn_decl(decl);
+            }
+            hir::StmtKind::StructDeclaration(decl) => {
+                self.eval_struct_decl(decl);
+            }
             _ => todo!("eval_stmt: {:?}", stmt),
         }
     }
@@ -188,6 +194,7 @@ impl Interpreter {
             hir::ExprKind::Literal(value) => self.eval_literal(value),
             hir::ExprKind::Block(block) => self.eval_block(block),
             hir::ExprKind::Binary(op, lhs, rhs) => self.eval_binary(*op, lhs, rhs),
+            hir::ExprKind::Call(call_expr) => self.eval_call(call_expr),
             _ => todo!("eval_expr: {:?}", expr),
         }
     }
@@ -232,11 +239,43 @@ impl Interpreter {
         }
     }
 
-    fn eval_fn_decl(&mut self, _decl: &hir::FunctionDeclaration) -> TlangValue {
+    fn eval_fn_decl(&mut self, decl: &hir::FunctionDeclaration) {
+        match decl.name.kind {
+            hir::ExprKind::Path(ref path) => {
+                let path_name = path.join("::");
+
+                self.current_scope
+                    .borrow_mut()
+                    .fn_decls
+                    .insert(path_name, Rc::new(decl.clone()));
+            }
+            _ => todo!("eval_fn_decl: {:?}", decl.name),
+        }
+    }
+
+    fn eval_struct_decl(&mut self, _decl: &hir::StructDeclaration) {
         todo!();
     }
 
-    fn eval_struct_decl(&mut self, _decl: &hir::StructDeclaration) -> TlangValue {
+    fn eval_call(&mut self, call_expr: &hir::CallExpression) -> TlangValue {
+        match &call_expr.callee.kind {
+            hir::ExprKind::Path(path) => {
+                let fn_decl = self.resolve_fn(path).unwrap();
+                let mut args = Vec::new();
+                for arg in &call_expr.arguments {
+                    args.push(self.eval_expr(arg));
+                }
+                self.eval_fn_call(&fn_decl, &args)
+            }
+            _ => todo!("eval_call: {:?}", call_expr.callee),
+        }
+    }
+
+    fn eval_fn_call(
+        &mut self,
+        _fn_decl: &hir::FunctionDeclaration,
+        _args: &[TlangValue],
+    ) -> TlangValue {
         todo!();
     }
 }
@@ -293,5 +332,12 @@ mod tests {
 
         assert_matches!(eval(&mut interpreter, "1 + 2.0"), TlangValue::Float(3.0));
         assert_matches!(eval(&mut interpreter, "1.0 + 2"), TlangValue::Float(3.0));
+    }
+
+    #[test]
+    fn test_simple_function_declaration_and_call() {
+        let mut interpreter = interpreter("fn add(a: Int, b: Int) -> Int { a + b }");
+
+        assert_matches!(eval(&mut interpreter, "add(1, 2)"), TlangValue::Int(3));
     }
 }

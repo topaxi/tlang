@@ -63,13 +63,13 @@ impl PathSegment {
     }
 }
 
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct Module {
     pub block: Block,
     pub span: Span,
 }
 
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct Block {
     pub stmts: Vec<Stmt>,
     pub expr: Option<Expr>,
@@ -82,7 +82,7 @@ impl Block {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Stmt {
     pub hir_id: HirId,
     pub kind: StmtKind,
@@ -93,7 +93,7 @@ pub struct Stmt {
     pub trailing_comments: Vec<Token>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub enum StmtKind {
     Expr(Box<Expr>),
     Let(Box<Pat>, Box<Expr>, Box<Ty>),
@@ -105,7 +105,7 @@ pub enum StmtKind {
     None,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Pat {
     pub kind: PatKind,
     pub span: Span,
@@ -147,7 +147,7 @@ impl Pat {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub enum PatKind {
     Wildcard,
     Identifier(HirId, Box<Ident>),
@@ -157,13 +157,13 @@ pub enum PatKind {
     Enum(Box<Path>, Vec<(Ident, Pat)>),
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ElseClause {
     pub condition: Option<Expr>,
     pub consequence: Block,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct MatchArm {
     pub pat: Pat,
     pub guard: Option<Expr>,
@@ -186,14 +186,14 @@ impl MatchArm {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct RangeExpression {
     pub start: Expr,
     pub end: Expr,
     pub inclusive: bool,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct CallExpression {
     pub callee: Expr,
     pub arguments: Vec<Expr>,
@@ -212,7 +212,7 @@ impl CallExpression {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Expr {
     pub hir_id: HirId,
     pub kind: ExprKind,
@@ -240,7 +240,7 @@ impl Expr {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub enum ExprKind {
     Block(Box<Block>),
     Call(Box<CallExpression>),
@@ -262,26 +262,26 @@ pub enum ExprKind {
     Wildcard, // TODO: This might be better to just be an identifier
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Ty {
     pub kind: TyKind,
     pub span: Span,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub enum TyKind {
     Unknown,
     Path(Path),
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct FunctionParameter {
     pub name: Ident,
     pub type_annotation: Ty,
     pub span: Span,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct FunctionDeclaration {
     pub hir_id: HirId,
     pub name: Expr,
@@ -311,28 +311,28 @@ impl FunctionDeclaration {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct StructDeclaration {
     pub hir_id: HirId,
     pub name: Ident,
     pub fields: Vec<StructField>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct StructField {
     pub hir_id: HirId,
     pub name: Ident,
     pub ty: Ty,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct EnumDeclaration {
     pub hir_id: HirId,
     pub name: Ident,
     pub variants: Vec<EnumVariant>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct EnumVariant {
     pub hir_id: HirId,
     pub name: Ident,
