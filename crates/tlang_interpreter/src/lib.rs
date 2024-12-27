@@ -7,23 +7,23 @@ use tlang_hir::hir;
 
 trait Resolver {
     fn resolve_path(&self, path: &hir::Path) -> Option<TlangValue>;
-    fn resolve_fn(&self, path: &hir::Path) -> Option<&hir::FunctionDeclaration>;
-    fn resolve_struct(&self, path: &hir::Path) -> Option<&hir::StructDeclaration>;
+    fn resolve_fn(&self, path: &hir::Path) -> Option<Rc<hir::FunctionDeclaration>>;
+    fn resolve_struct(&self, path: &hir::Path) -> Option<Rc<hir::StructDeclaration>>;
 }
 
 #[derive(Debug, Default)]
 pub struct Scope {
     pub parent: Option<Rc<RefCell<Scope>>>,
     pub values: HashMap<String, TlangValue>,
-    pub fn_decls: HashMap<String, hir::FunctionDeclaration>,
-    pub struct_decls: HashMap<String, hir::StructDeclaration>,
+    pub fn_decls: HashMap<String, Rc<hir::FunctionDeclaration>>,
+    pub struct_decls: HashMap<String, Rc<hir::StructDeclaration>>,
 }
 
 impl Resolver for Scope {
     fn resolve_path(&self, path: &hir::Path) -> Option<TlangValue> {
         let path_name = path.join("::");
-        let value = self.values.get(&path_name);
-        match value {
+
+        match self.values.get(&path_name) {
             Some(value) => Some(*value),
             None => match &self.parent {
                 Some(parent) => parent.borrow().resolve_path(path),
@@ -32,11 +32,11 @@ impl Resolver for Scope {
         }
     }
 
-    fn resolve_fn(&self, path: &hir::Path) -> Option<&hir::FunctionDeclaration> {
+    fn resolve_fn(&self, path: &hir::Path) -> Option<Rc<hir::FunctionDeclaration>> {
         let path_name = path.join("::");
-        let decl = self.fn_decls.get(&path_name);
-        match decl {
-            Some(decl) => Some(&decl),
+
+        match self.fn_decls.get(&path_name) {
+            Some(decl) => Some(decl.clone()),
             None => match &self.parent {
                 Some(parent) => parent.borrow().resolve_fn(path),
                 None => None,
@@ -44,11 +44,11 @@ impl Resolver for Scope {
         }
     }
 
-    fn resolve_struct(&self, path: &hir::Path) -> Option<&hir::StructDeclaration> {
+    fn resolve_struct(&self, path: &hir::Path) -> Option<Rc<hir::StructDeclaration>> {
         let path_name = path.join("::");
-        let decl = self.struct_decls.get(&path_name);
-        match decl {
-            Some(decl) => Some(&decl),
+
+        match self.struct_decls.get(&path_name) {
+            Some(decl) => Some(decl.clone()),
             None => match &self.parent {
                 Some(parent) => parent.borrow().resolve_struct(path),
                 None => None,
@@ -59,9 +59,21 @@ impl Resolver for Scope {
 
 #[derive(Debug, Default)]
 pub struct RootScope {
-    pub scope: Rc<RefCell<Scope>>,
+    pub scope: Rc<Scope>,
     pub native_fn_decls: HashMap<String, ()>,
     pub native_struct_decls: HashMap<String, ()>,
+}
+
+impl Resolver for RootScope {
+    fn resolve_path(&self, path: &hir::Path) -> Option<TlangValue> {
+        self.scope.resolve_path(path)
+    }
+    fn resolve_fn(&self, path: &hir::Path) -> Option<Rc<hir::FunctionDeclaration>> {
+        self.scope.resolve_fn(path)
+    }
+    fn resolve_struct(&self, path: &hir::Path) -> Option<Rc<hir::StructDeclaration>> {
+        self.scope.resolve_struct(path)
+    }
 }
 
 #[derive(Debug)]
@@ -96,12 +108,54 @@ pub enum TlangValue {
 #[derive(Debug, Default)]
 pub struct Interpreter {
     root_scope: RootScope,
-    scopes: Vec<Rc<RefCell<Scope>>>,
+    current_scope: Rc<RefCell<Scope>>,
+}
+
+impl Resolver for Interpreter {
+    fn resolve_path(&self, path: &hir::Path) -> Option<TlangValue> {
+        match self.current_scope.borrow().resolve_path(path) {
+            Some(value) => Some(value),
+            None => self.root_scope.resolve_path(path),
+        }
+    }
+    fn resolve_fn(&self, path: &hir::Path) -> Option<Rc<hir::FunctionDeclaration>> {
+        match self.current_scope.borrow().resolve_fn(path) {
+            Some(decl) => Some(decl),
+            None => self.root_scope.resolve_fn(path),
+        }
+    }
+    fn resolve_struct(&self, path: &hir::Path) -> Option<Rc<hir::StructDeclaration>> {
+        match self.current_scope.borrow().resolve_struct(path) {
+            Some(decl) => Some(decl),
+            None => self.root_scope.resolve_struct(path),
+        }
+    }
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         Interpreter::default()
+    }
+
+    fn enter_scope(&mut self) {
+        let new_scope = Rc::new(RefCell::new(Scope {
+            parent: Some(self.current_scope.clone()),
+            ..Default::default()
+        }));
+        self.current_scope = new_scope;
+    }
+
+    fn exit_scope(&mut self) {
+        let parent_scope = {
+            let current_scope = self.current_scope.borrow();
+            current_scope.parent.clone()
+        };
+
+        if let Some(parent) = parent_scope {
+            self.current_scope = parent;
+        } else {
+            panic!("Attempted to exit root scope!");
+        }
     }
 
     pub fn eval(&mut self, input: &hir::Module) -> TlangValue {
@@ -123,6 +177,8 @@ impl Interpreter {
     fn eval_stmt(&mut self, stmt: &hir::Stmt) -> TlangValue {
         match &stmt.kind {
             hir::StmtKind::Expr(expr) => self.eval_expr(expr),
+            hir::StmtKind::FunctionDeclaration(decl) => self.eval_fn_decl(decl),
+            hir::StmtKind::StructDeclaration(decl) => self.eval_struct_decl(decl),
             _ => todo!("eval_stmt: {:?}", stmt),
         }
     }
@@ -174,6 +230,14 @@ impl Interpreter {
 
             _ => todo!("eval_binary: {:?}", op),
         }
+    }
+
+    fn eval_fn_decl(&mut self, _decl: &hir::FunctionDeclaration) -> TlangValue {
+        todo!();
+    }
+
+    fn eval_struct_decl(&mut self, _decl: &hir::StructDeclaration) -> TlangValue {
+        todo!();
     }
 }
 
