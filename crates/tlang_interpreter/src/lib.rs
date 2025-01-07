@@ -327,6 +327,7 @@ mod tests {
     use std::error::Error;
 
     use super::*;
+    use indoc::indoc;
     use pretty_assertions::assert_matches;
     use tlang_ast_lowering::lower_to_hir;
 
@@ -378,7 +379,11 @@ mod tests {
 
     #[test]
     fn test_simple_function_declaration_and_call() {
-        let mut interpreter = interpreter("fn add(a: Int, b: Int) -> Int { a + b }");
+        let mut interpreter = interpreter(indoc! {"
+            fn add(a: Int, b: Int) -> Int {
+                a + b
+            }
+        "});
 
         assert_matches!(eval(&mut interpreter, "add(1, 2)"), TlangValue::Int(3));
     }
