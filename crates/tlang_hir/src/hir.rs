@@ -3,7 +3,7 @@ use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::span::Span;
 use tlang_ast::token::{Literal, Token};
 
-#[derive(Debug, PartialEq, Clone, Copy, Serialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Hash, Serialize)]
 pub struct HirId(usize);
 
 impl HirId {
