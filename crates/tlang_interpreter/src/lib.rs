@@ -375,8 +375,11 @@ impl Interpreter {
         }
     }
 
-    fn eval_struct_decl(&mut self, _decl: &hir::StructDeclaration) {
-        todo!();
+    fn eval_struct_decl(&mut self, decl: &hir::StructDeclaration) {
+        self.current_scope
+            .borrow_mut()
+            .struct_decls
+            .insert(decl.name.to_string(), Rc::new(decl.clone()));
     }
 
     fn eval_call(&mut self, call_expr: &hir::CallExpression) -> TlangValue {
