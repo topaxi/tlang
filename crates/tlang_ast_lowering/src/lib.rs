@@ -737,10 +737,7 @@ impl LoweringContext {
             param_names
                 .iter()
                 .map(|ident| hir::FunctionParameter {
-                    pattern: hir::Pat {
-                        kind: hir::PatKind::Identifier(self.unique_id(), Box::new(ident.clone())),
-                        span: ident.span,
-                    },
+                    name: ident.clone(),
                     type_annotation: hir::Ty {
                         kind: hir::TyKind::Unknown,
                         span: Default::default(),
@@ -849,9 +846,23 @@ impl LoweringContext {
         hir_fn_decl
     }
 
+    fn lower_fn_param_pat(&mut self, node: &ast::node::FunctionParameter) -> Ident {
+        match &node.pattern.kind {
+            ast::node::PatternKind::Identifier(box ident) => ident.clone(),
+            ast::node::PatternKind::_Self => Ident::new(kw::_Self, node.span),
+            ast::node::PatternKind::Wildcard => Ident::new(kw::Underscore, node.span),
+            _ => {
+                unimplemented!(
+                    "Only identifier patterns are supported for function parameters, found {:?}",
+                    node.pattern.kind
+                )
+            }
+        }
+    }
+
     fn lower_fn_param(&mut self, node: &ast::node::FunctionParameter) -> hir::FunctionParameter {
         hir::FunctionParameter {
-            pattern: self.lower_pat(&node.pattern),
+            name: self.lower_fn_param_pat(node),
             type_annotation: self.lower_ty(node.type_annotation.as_ref()),
             span: node.span,
         }

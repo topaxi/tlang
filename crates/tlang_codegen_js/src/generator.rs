@@ -258,12 +258,12 @@ impl CodegenJS {
             parameters
                 .iter()
                 .map(|param| {
-                    if let hir::PatKind::Identifier(_, ident) = &param.pattern.kind {
-                        ident.to_string()
-                    } else {
-                        // Encountered destructuring/pattern matching or wildcard, declare
-                        // tmp variable to potentially dereference from. Unused at the moment.
+                    if param.name.is_wildcard() {
+                        // Encountered wildcard, declare tmp variable to potentially dereference
+                        // from. Unused at the moment, as there's no way to reference a wildcard.
                         self.scopes.declare_tmp_variable()
+                    } else {
+                        param.name.to_string()
                     }
                 })
                 .collect()

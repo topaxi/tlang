@@ -276,7 +276,7 @@ pub enum TyKind {
 
 #[derive(Debug, Serialize)]
 pub struct FunctionParameter {
-    pub pattern: Pat,
+    pub name: Ident,
     pub type_annotation: Ty,
     pub span: Span,
 }

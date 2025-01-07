@@ -6,21 +6,18 @@ use crate::generator::{BlockContext, CodegenJS};
 
 impl CodegenJS {
     fn generate_function_param(&mut self, param: &hir::FunctionParameter) {
-        match &param.pattern.kind {
-            hir::PatKind::Identifier(..) if param.pattern.is_self() => {
-                self.current_scope()
-                    .declare_variable_alias(kw::_Self, "this");
-            }
-            hir::PatKind::Identifier(_, ident) => {
-                let var_name = self.current_scope().declare_local_variable(ident.as_str());
-                self.push_str(&var_name);
-                self.current_scope()
-                    .declare_variable_alias(ident.as_str(), &var_name);
-            }
-            hir::PatKind::Wildcard => {}
-            _ => unreachable!(
-                "Patterns in function parameters should be lowered into a match statement first"
-            ),
+        if param.name.is_self() {
+            self.current_scope()
+                .declare_variable_alias(kw::_Self, "this");
+        } else if param.name.is_wildcard() {
+            // nothing to do
+        } else {
+            let var_name = self
+                .current_scope()
+                .declare_local_variable(param.name.as_str());
+            self.push_str(&var_name);
+            self.current_scope()
+                .declare_variable_alias(param.name.as_str(), &var_name);
         }
     }
 
@@ -34,7 +31,7 @@ impl CodegenJS {
 
             // If the first param was the self param, we didn't render anything and we need to skip
             // the comma being rendered in the loop ahead.
-            if param.pattern.is_self() {
+            if param.name.is_self() {
                 if let Some(param) = iter.next() {
                     self.generate_function_param(param)
                 }
@@ -43,7 +40,7 @@ impl CodegenJS {
 
         for param in iter {
             self.push_str(", ");
-            self.generate_pat(&param.pattern);
+            self.push_str(param.name.as_str());
         }
 
         self.push_char(')');

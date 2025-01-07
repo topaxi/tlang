@@ -38,6 +38,10 @@ impl Ident {
         *self.name == *kw::_Self
     }
 
+    pub fn is_wildcard(&self) -> bool {
+        *self.name == *kw::Underscore
+    }
+
     pub fn as_str(&self) -> &str {
         &self.name
     }

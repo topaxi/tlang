@@ -1,4 +1,4 @@
-use tlang_ast::node::UnaryOp;
+use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token::Literal;
 use tlang_hir::hir;
 
@@ -104,7 +104,7 @@ impl HirPretty {
 
     fn print_struct_field(&mut self, field: &hir::StructField) {
         self.push_indent();
-        self.push_str(field.name.as_str());
+        self.print_ident(&field.name);
         self.push_str(": ");
         self.print_ty(&field.ty);
         self.push_str(",");
@@ -113,13 +113,13 @@ impl HirPretty {
 
     fn print_enum_declaration(&mut self, decl: &hir::EnumDeclaration) {
         self.push_str("enum ");
-        self.push_str(decl.name.as_str());
+        self.print_ident(&decl.name);
         self.push_str(" {");
         self.push_newline();
         self.inc_indent();
         for variant in &decl.variants {
             self.push_indent();
-            self.push_str(variant.name.as_str());
+            self.print_ident(&variant.name);
             self.push_str(" {");
             self.push_newline();
             self.inc_indent();
@@ -138,7 +138,7 @@ impl HirPretty {
 
     fn print_struct_declaration(&mut self, decl: &hir::StructDeclaration) {
         self.push_str("struct ");
-        self.push_str(decl.name.as_str());
+        self.print_ident(&decl.name);
         self.push_str(" {");
         self.push_newline();
         self.inc_indent();
@@ -176,7 +176,7 @@ impl HirPretty {
             hir::ExprKind::FieldAccess(expr, ident) => {
                 self.print_expr(expr);
                 self.push_str(".");
-                self.push_str(ident.as_str());
+                self.print_ident(ident);
             }
             hir::ExprKind::IndexAccess(expr, index) => {
                 self.print_expr(expr);
@@ -318,7 +318,7 @@ impl HirPretty {
                 self.push_str(", ");
             }
 
-            self.print_pat(&param.pattern);
+            self.print_ident(&param.name);
             self.push_str(": ");
             self.print_ty(&param.type_annotation);
         }
@@ -337,9 +337,14 @@ impl HirPretty {
         self.print_expr(expr);
     }
 
+    #[inline(always)]
+    fn print_ident(&mut self, ident: &Ident) {
+        self.push_str(ident.as_str());
+    }
+
     fn print_pat(&mut self, pat: &hir::Pat) {
         match &pat.kind {
-            hir::PatKind::Identifier(_id, name) => self.push_str(name.as_str()),
+            hir::PatKind::Identifier(_id, name) => self.print_ident(name),
             hir::PatKind::Enum(path, fields) => {
                 self.print_path(path);
                 self.push_str(" { ");
@@ -347,7 +352,7 @@ impl HirPretty {
                     if i > 0 {
                         self.push_str(", ");
                     }
-                    self.push_str(ident.as_str());
+                    self.print_ident(ident);
                     self.push_str(": ");
                     self.print_pat(pat);
                 }
