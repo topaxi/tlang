@@ -158,6 +158,16 @@ impl Interpreter {
         }
     }
 
+    fn with_new_scope<F>(&mut self, f: F) -> TlangValue
+    where
+        F: FnOnce(&mut Self) -> TlangValue,
+    {
+        self.enter_scope();
+        let result = f(self);
+        self.exit_scope();
+        result
+    }
+
     pub fn eval(&mut self, input: &hir::Module) -> TlangValue {
         self.eval_block(&input.block)
     }
@@ -276,7 +286,7 @@ impl Interpreter {
         _fn_decl: &hir::FunctionDeclaration,
         _args: &[TlangValue],
     ) -> TlangValue {
-        todo!();
+        self.with_new_scope(|_this| todo!())
     }
 }
 
