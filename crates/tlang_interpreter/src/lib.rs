@@ -351,16 +351,6 @@ impl Interpreter {
         }
     }
 
-    fn eval_boolean_op<F>(&self, lhs: TlangValue, rhs: TlangValue, op: F) -> TlangValue
-    where
-        F: Fn(bool, bool) -> bool,
-    {
-        match (lhs, rhs) {
-            (TlangValue::Bool(lhs), TlangValue::Bool(rhs)) => TlangValue::Bool(op(lhs, rhs)),
-            _ => todo!("eval_boolean_op: incompatible types"),
-        }
-    }
-
     fn eval_bitwise_op<F>(&self, lhs: TlangValue, rhs: TlangValue, op: F) -> TlangValue
     where
         F: Fn(i64, i64) -> i64,
