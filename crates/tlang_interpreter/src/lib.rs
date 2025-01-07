@@ -13,7 +13,7 @@ trait Resolver {
 }
 
 #[derive(Debug, Default)]
-pub struct Scope {
+pub(crate) struct Scope {
     pub parent: Option<Rc<RefCell<Scope>>>,
     pub values: HashMap<String, TlangValue>,
     pub fn_decls: HashMap<String, Rc<hir::FunctionDeclaration>>,
@@ -59,7 +59,7 @@ impl Resolver for Scope {
 }
 
 #[derive(Debug, Default)]
-pub struct RootScope {
+pub(crate) struct RootScope {
     pub scope: Rc<Scope>,
     pub native_fn_decls: HashMap<String, ()>,
     pub native_struct_decls: HashMap<String, ()>,
@@ -81,7 +81,7 @@ impl Resolver for RootScope {
 pub struct TlangClosure {
     pub id: u64,
     // Closures hold a reference to the parent scope.
-    pub scope: Option<Rc<RefCell<Scope>>>,
+    pub(crate) scope: Option<Rc<RefCell<Scope>>>,
     pub decl: hir::FunctionDeclaration,
 }
 
@@ -191,7 +191,7 @@ impl Interpreter {
         }
     }
 
-    pub fn eval_block(&mut self, block: &hir::Block) -> TlangValue {
+    fn eval_block(&mut self, block: &hir::Block) -> TlangValue {
         self.with_new_scope(|this| {
             this.eval_block_stmts(&block.stmts);
             this.eval_block_expr(block)
