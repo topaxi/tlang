@@ -225,8 +225,7 @@ impl Interpreter {
     where
         F: FnOnce(&mut Self) -> R,
     {
-        let previous_scope = self.current_scope.clone();
-        self.current_scope = scope;
+        let previous_scope = std::mem::replace(&mut self.current_scope, scope);
         let result = f(self);
         self.current_scope = previous_scope;
         result
