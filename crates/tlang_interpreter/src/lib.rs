@@ -1,3 +1,4 @@
+#![feature(if_let_guard)]
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -158,9 +159,10 @@ impl Interpreter {
         }
     }
 
-    fn with_new_scope<F>(&mut self, f: F) -> TlangValue
+    #[inline(always)]
+    fn with_new_scope<F, R>(&mut self, f: F) -> R
     where
-        F: FnOnce(&mut Self) -> TlangValue,
+        F: FnOnce(&mut Self) -> R,
     {
         self.enter_scope();
         let result = f(self);
@@ -169,19 +171,31 @@ impl Interpreter {
     }
 
     pub fn eval(&mut self, input: &hir::Module) -> TlangValue {
-        self.eval_block(&input.block)
+        self.eval_block_stmts(&input.block.stmts);
+        self.eval_block_expr(&input.block)
     }
 
-    pub fn eval_block(&mut self, block: &hir::Block) -> TlangValue {
-        for stmt in &block.stmts {
+    #[inline(always)]
+    fn eval_block_stmts(&mut self, stmts: &[hir::Stmt]) {
+        for stmt in stmts {
             self.eval_stmt(stmt);
         }
+    }
 
+    #[inline(always)]
+    fn eval_block_expr(&mut self, block: &hir::Block) -> TlangValue {
         if let Some(expr) = &block.expr {
             self.eval_expr(expr)
         } else {
             TlangValue::Nil
         }
+    }
+
+    pub fn eval_block(&mut self, block: &hir::Block) -> TlangValue {
+        self.with_new_scope(|this| {
+            this.eval_block_stmts(&block.stmts);
+            this.eval_block_expr(block)
+        })
     }
 
     fn eval_stmt(&mut self, stmt: &hir::Stmt) {
@@ -205,6 +219,7 @@ impl Interpreter {
             hir::ExprKind::Block(block) => self.eval_block(block),
             hir::ExprKind::Binary(op, lhs, rhs) => self.eval_binary(*op, lhs, rhs),
             hir::ExprKind::Call(call_expr) => self.eval_call(call_expr),
+            hir::ExprKind::Path(path) => self.resolve_path(path).unwrap_or(TlangValue::Nil),
             _ => todo!("eval_expr: {:?}", expr),
         }
     }
@@ -269,13 +284,8 @@ impl Interpreter {
 
     fn eval_call(&mut self, call_expr: &hir::CallExpression) -> TlangValue {
         match &call_expr.callee.kind {
-            hir::ExprKind::Path(path) => {
-                let fn_decl = self.resolve_fn(path).unwrap();
-                let mut args = Vec::new();
-                for arg in &call_expr.arguments {
-                    args.push(self.eval_expr(arg));
-                }
-                self.eval_fn_call(&fn_decl, &args)
+            hir::ExprKind::Path(path) if let Some(fn_decl) = self.resolve_fn(path) => {
+                self.eval_fn_call(&fn_decl, &call_expr.arguments)
             }
             _ => todo!("eval_call: {:?}", call_expr.callee),
         }
@@ -283,10 +293,32 @@ impl Interpreter {
 
     fn eval_fn_call(
         &mut self,
-        _fn_decl: &hir::FunctionDeclaration,
-        _args: &[TlangValue],
+        fn_decl: &hir::FunctionDeclaration,
+        call_args: &[hir::Expr],
     ) -> TlangValue {
-        self.with_new_scope(|_this| todo!())
+        if fn_decl.parameters.len() != call_args.len() {
+            todo!("Mismatched number of arguments");
+        }
+
+        let args = self.with_new_scope(|this| {
+            let mut args: Vec<TlangValue> = Vec::with_capacity(call_args.len());
+            for arg in call_args {
+                args.push(this.eval_expr(arg));
+            }
+
+            args
+        });
+
+        self.with_new_scope(|interpreter| {
+            for (param, arg) in fn_decl.parameters.iter().zip(args.iter()) {
+                interpreter
+                    .current_scope
+                    .borrow_mut()
+                    .values
+                    .insert(param.name.to_string(), *arg);
+            }
+            interpreter.eval_block(&fn_decl.body)
+        })
     }
 }
 
