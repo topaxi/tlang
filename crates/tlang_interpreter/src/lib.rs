@@ -1,10 +1,11 @@
 #![feature(if_let_guard)]
+#![feature(box_patterns)]
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 use tlang_ast::token;
-use tlang_hir::hir;
+use tlang_hir::hir::{self, HirId};
 
 trait Resolver {
     fn resolve_path(&self, path: &hir::Path) -> Option<TlangValue>;
@@ -16,6 +17,7 @@ trait Resolver {
 pub(crate) struct Scope {
     pub parent: Option<Rc<RefCell<Scope>>>,
     pub values: HashMap<String, TlangValue>,
+    pub return_value: Option<TlangValue>,
     pub fn_decls: HashMap<String, Rc<hir::FunctionDeclaration>>,
     pub struct_decls: HashMap<String, Rc<hir::StructDeclaration>>,
 }
@@ -79,10 +81,9 @@ impl Resolver for RootScope {
 
 #[derive(Debug)]
 pub struct TlangClosure {
-    pub id: u64,
+    pub id: HirId,
     // Closures hold a reference to the parent scope.
-    pub(crate) scope: Option<Rc<RefCell<Scope>>>,
-    pub decl: hir::FunctionDeclaration,
+    pub(crate) scope: Rc<RefCell<Scope>>,
 }
 
 #[derive(Debug)]
@@ -91,10 +92,26 @@ pub struct TlangStruct {
     pub field_values: Vec<TlangValue>,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum TlangObject {
-    Struct(u64),
-    Fn(u64),
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+pub struct TlangObjectId(u64);
+
+impl Default for TlangObjectId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TlangObjectId {
+    pub fn new() -> Self {
+        static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        TlangObjectId(NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst))
+    }
+}
+
+#[derive(Debug)]
+pub enum TlangObjectKind {
+    Struct,
+    Fn(TlangClosure),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -103,13 +120,28 @@ pub enum TlangValue {
     Int(i64),
     Float(f64),
     Bool(bool),
-    Object(TlangObject),
+    Object(TlangObjectId),
+}
+
+impl TlangValue {
+    pub fn new_object() -> Self {
+        TlangValue::Object(TlangObjectId::new())
+    }
+
+    pub fn get_object_id(&self) -> Option<TlangObjectId> {
+        match self {
+            TlangValue::Object(id) => Some(*id),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Default)]
 pub struct Interpreter {
     root_scope: RootScope,
     current_scope: Rc<RefCell<Scope>>,
+    closures: HashMap<HirId, hir::FunctionDeclaration>,
+    objects: HashMap<TlangObjectId, TlangObjectKind>,
 }
 
 impl Resolver for Interpreter {
@@ -133,9 +165,27 @@ impl Resolver for Interpreter {
     }
 }
 
+#[derive(Debug)]
+enum StmtResult {
+    None,
+    Return,
+}
+
 impl Interpreter {
     pub fn new() -> Self {
         Interpreter::default()
+    }
+
+    fn resolve_closure_decl(&self, id: HirId) -> Option<&hir::FunctionDeclaration> {
+        self.closures.get(&id)
+    }
+
+    fn insert_closure_decl(&mut self, id: HirId, decl: hir::FunctionDeclaration) {
+        self.closures.insert(id, decl);
+    }
+
+    fn get_object(&self, id: TlangObjectId) -> &TlangObjectKind {
+        self.objects.get(&id).unwrap()
     }
 
     fn enter_scope(&mut self) {
@@ -170,16 +220,32 @@ impl Interpreter {
         result
     }
 
+    #[inline(always)]
+    fn with_scope<F, R>(&mut self, scope: Rc<RefCell<Scope>>, f: F) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        let previous_scope = self.current_scope.clone();
+        self.current_scope = scope;
+        let result = f(self);
+        self.current_scope = previous_scope;
+        result
+    }
+
     pub fn eval(&mut self, input: &hir::Module) -> TlangValue {
-        self.eval_block_stmts(&input.block.stmts);
-        self.eval_block_expr(&input.block)
+        self.eval_block_inner(&input.block)
     }
 
     #[inline(always)]
-    fn eval_block_stmts(&mut self, stmts: &[hir::Stmt]) {
+    fn eval_block_stmts(&mut self, stmts: &[hir::Stmt]) -> StmtResult {
         for stmt in stmts {
-            self.eval_stmt(stmt);
+            match self.eval_stmt(stmt) {
+                StmtResult::Return => return StmtResult::Return,
+                StmtResult::None => {}
+            }
         }
+
+        StmtResult::None
     }
 
     #[inline(always)]
@@ -192,13 +258,23 @@ impl Interpreter {
     }
 
     fn eval_block(&mut self, block: &hir::Block) -> TlangValue {
-        self.with_new_scope(|this| {
-            this.eval_block_stmts(&block.stmts);
-            this.eval_block_expr(block)
-        })
+        self.with_new_scope(|this| this.eval_block_inner(block))
     }
 
-    fn eval_stmt(&mut self, stmt: &hir::Stmt) {
+    #[inline(always)]
+    fn eval_block_inner(&mut self, block: &hir::Block) -> TlangValue {
+        match self.eval_block_stmts(&block.stmts) {
+            StmtResult::None => self.eval_block_expr(block),
+            StmtResult::Return => self
+                .current_scope
+                .borrow_mut()
+                .return_value
+                .take()
+                .unwrap_or(TlangValue::Nil),
+        }
+    }
+
+    fn eval_stmt(&mut self, stmt: &hir::Stmt) -> StmtResult {
         match &stmt.kind {
             hir::StmtKind::Expr(expr) => {
                 self.eval_expr(expr);
@@ -209,8 +285,19 @@ impl Interpreter {
             hir::StmtKind::StructDeclaration(decl) => {
                 self.eval_struct_decl(decl);
             }
+            hir::StmtKind::Let(pat, expr, ty) => {
+                self.eval_let_stmt(pat, expr, ty);
+            }
+            hir::StmtKind::Return(box Some(expr)) => {
+                let return_value = self.eval_expr(expr);
+                self.current_scope.borrow_mut().return_value = Some(return_value);
+                return StmtResult::Return;
+            }
+            hir::StmtKind::Return(_) => return StmtResult::Return,
             _ => todo!("eval_stmt: {:?}", stmt),
         }
+
+        StmtResult::None
     }
 
     fn eval_expr(&mut self, expr: &hir::Expr) -> TlangValue {
@@ -236,6 +323,23 @@ impl Interpreter {
                     }
                     TlangValue::Nil
                 }
+            }
+            hir::ExprKind::FunctionExpression(fn_decl) => {
+                if self.resolve_closure_decl(fn_decl.hir_id).is_none() {
+                    self.insert_closure_decl(fn_decl.hir_id, *fn_decl.clone());
+                }
+
+                let closure = TlangValue::new_object();
+
+                self.objects.insert(
+                    closure.get_object_id().unwrap(),
+                    TlangObjectKind::Fn(TlangClosure {
+                        id: fn_decl.hir_id,
+                        scope: self.current_scope.clone(),
+                    }),
+                );
+
+                closure
             }
             _ => todo!("eval_expr: {:?}", expr),
         }
@@ -332,7 +436,11 @@ impl Interpreter {
             (TlangValue::Int(lhs), TlangValue::Float(rhs)) => {
                 TlangValue::Float(op(lhs as f64, rhs))
             }
-            _ => todo!("eval_arithmetic_op: incompatible types"),
+            _ => todo!(
+                "eval_arithmetic_op: incompatible types, {:?} and {:?}",
+                lhs,
+                rhs
+            ),
         }
     }
 
@@ -387,6 +495,20 @@ impl Interpreter {
             hir::ExprKind::Path(path) if let Some(fn_decl) = self.resolve_fn(path) => {
                 self.eval_fn_call(&fn_decl, &call_expr.arguments)
             }
+            hir::ExprKind::Path(path)
+                if let Some(TlangValue::Object(id)) = self.resolve_path(path) =>
+            {
+                match self.get_object(id) {
+                    TlangObjectKind::Fn(closure) => {
+                        let closure_decl = self.resolve_closure_decl(closure.id).unwrap().clone();
+
+                        self.with_scope(closure.scope.clone(), |this| {
+                            this.eval_fn_call(&closure_decl, &call_expr.arguments)
+                        })
+                    }
+                    obj => todo!("eval_call: {:?}", obj),
+                }
+            }
             _ => todo!("eval_call: {:?}", call_expr.callee),
         }
     }
@@ -419,6 +541,19 @@ impl Interpreter {
             }
             interpreter.eval_block(&fn_decl.body)
         })
+    }
+
+    fn eval_let_stmt(&mut self, pat: &hir::Pat, expr: &hir::Expr, _ty: &hir::Ty) {
+        match &pat.kind {
+            hir::PatKind::Identifier(_id, ident) => {
+                let value = self.eval_expr(expr);
+                self.current_scope
+                    .borrow_mut()
+                    .values
+                    .insert(ident.to_string(), value);
+            }
+            _ => todo!("eval_let_stmt: {:?}", pat),
+        }
     }
 }
 
@@ -526,5 +661,22 @@ mod tests {
         "});
 
         assert_matches!(eval(&mut interpreter, "fib(10)"), TlangValue::Int(55));
+        assert_matches!(eval(&mut interpreter, "fib(20)"), TlangValue::Int(6765));
+    }
+
+    #[test]
+    fn test_simple_closure() {
+        let mut interpreter = interpreter(indoc! {"
+            fn make_adder(a: Int) {
+                return fn adder(b: Int) -> Int {
+                    a + b
+                };
+            }
+
+            let add_5 = make_adder(5);
+        "});
+
+        assert_matches!(eval(&mut interpreter, "add_5(10)"), TlangValue::Int(15));
+        assert_matches!(eval(&mut interpreter, "add_5(20)"), TlangValue::Int(25));
     }
 }
