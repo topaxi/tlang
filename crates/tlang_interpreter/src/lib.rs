@@ -220,6 +220,23 @@ impl Interpreter {
             hir::ExprKind::Binary(op, lhs, rhs) => self.eval_binary(*op, lhs, rhs),
             hir::ExprKind::Call(call_expr) => self.eval_call(call_expr),
             hir::ExprKind::Path(path) => self.resolve_path(path).unwrap_or(TlangValue::Nil),
+            hir::ExprKind::IfElse(condition, consequence, else_clauses) => {
+                let condition = self.eval_expr(condition);
+                if let TlangValue::Bool(true) = condition {
+                    self.eval_block(consequence)
+                } else {
+                    for else_clause in else_clauses {
+                        if let Some(condition) = &else_clause.condition {
+                            if let TlangValue::Bool(true) = self.eval_expr(condition) {
+                                return self.eval_block(&else_clause.consequence);
+                            }
+                        } else {
+                            return self.eval_block(&else_clause.consequence);
+                        }
+                    }
+                    TlangValue::Nil
+                }
+            }
             _ => todo!("eval_expr: {:?}", expr),
         }
     }
@@ -241,26 +258,116 @@ impl Interpreter {
         rhs: &hir::Expr,
     ) -> TlangValue {
         match op {
-            hir::BinaryOpKind::Add => {
+            hir::BinaryOpKind::And => {
                 let lhs = self.eval_expr(lhs);
-                let rhs = self.eval_expr(rhs);
 
-                match (lhs, rhs) {
-                    (TlangValue::Int(lhs), TlangValue::Int(rhs)) => TlangValue::Int(lhs + rhs),
-                    (TlangValue::Float(lhs), TlangValue::Float(rhs)) => {
-                        TlangValue::Float(lhs + rhs)
+                if let TlangValue::Bool(true) = lhs {
+                    let rhs = self.eval_expr(rhs);
+
+                    if let TlangValue::Bool(true) = rhs {
+                        return TlangValue::Bool(true);
                     }
-                    (TlangValue::Float(lhs), TlangValue::Int(rhs)) => {
-                        TlangValue::Float(lhs + rhs as f64)
-                    }
-                    (TlangValue::Int(lhs), TlangValue::Float(rhs)) => {
-                        TlangValue::Float(lhs as f64 + rhs)
-                    }
-                    _ => todo!("eval_binary: Add: {:?} + {:?}", lhs, rhs),
                 }
+
+                return TlangValue::Bool(false);
             }
 
-            _ => todo!("eval_binary: {:?}", op),
+            hir::BinaryOpKind::Or => {
+                let lhs = self.eval_expr(lhs);
+
+                if let TlangValue::Bool(true) = lhs {
+                    return TlangValue::Bool(true);
+                }
+
+                return self.eval_expr(rhs);
+            }
+
+            _ => {}
+        }
+
+        let lhs = self.eval_expr(lhs);
+        let rhs = self.eval_expr(rhs);
+
+        match op {
+            hir::BinaryOpKind::Add => self.eval_arithmetic_op(lhs, rhs, |a, b| a + b),
+            hir::BinaryOpKind::Sub => self.eval_arithmetic_op(lhs, rhs, |a, b| a - b),
+            hir::BinaryOpKind::Mul => self.eval_arithmetic_op(lhs, rhs, |a, b| a * b),
+            hir::BinaryOpKind::Div => self.eval_arithmetic_op(lhs, rhs, |a, b| a / b),
+            hir::BinaryOpKind::Mod => self.eval_arithmetic_op(lhs, rhs, |a, b| a % b),
+            hir::BinaryOpKind::Exp => self.eval_arithmetic_op(lhs, rhs, |a, b| a.powf(b)),
+
+            hir::BinaryOpKind::Eq => self.eval_comparison_op(lhs, rhs, |a, b| a == b),
+            hir::BinaryOpKind::NotEq => self.eval_comparison_op(lhs, rhs, |a, b| a != b),
+            hir::BinaryOpKind::Greater => self.eval_comparison_op(lhs, rhs, |a, b| a > b),
+            hir::BinaryOpKind::GreaterEq => self.eval_comparison_op(lhs, rhs, |a, b| a >= b),
+            hir::BinaryOpKind::Less => self.eval_comparison_op(lhs, rhs, |a, b| a < b),
+            hir::BinaryOpKind::LessEq => self.eval_comparison_op(lhs, rhs, |a, b| a <= b),
+
+            hir::BinaryOpKind::BitwiseAnd => self.eval_bitwise_op(lhs, rhs, |a, b| a & b),
+            hir::BinaryOpKind::BitwiseOr => self.eval_bitwise_op(lhs, rhs, |a, b| a | b),
+            hir::BinaryOpKind::BitwiseXor => self.eval_bitwise_op(lhs, rhs, |a, b| a ^ b),
+
+            hir::BinaryOpKind::Assign => {
+                todo!("eval_binary: Assign not implemented");
+            }
+
+            hir::BinaryOpKind::And | hir::BinaryOpKind::Or => {
+                unreachable!();
+            }
+        }
+    }
+
+    fn eval_arithmetic_op<F>(&self, lhs: TlangValue, rhs: TlangValue, op: F) -> TlangValue
+    where
+        F: Fn(f64, f64) -> f64,
+    {
+        match (lhs, rhs) {
+            (TlangValue::Int(lhs), TlangValue::Int(rhs)) => {
+                TlangValue::Int(op(lhs as f64, rhs as f64) as i64)
+            }
+            (TlangValue::Float(lhs), TlangValue::Float(rhs)) => TlangValue::Float(op(lhs, rhs)),
+            (TlangValue::Float(lhs), TlangValue::Int(rhs)) => {
+                TlangValue::Float(op(lhs, rhs as f64))
+            }
+            (TlangValue::Int(lhs), TlangValue::Float(rhs)) => {
+                TlangValue::Float(op(lhs as f64, rhs))
+            }
+            _ => todo!("eval_arithmetic_op: incompatible types"),
+        }
+    }
+
+    fn eval_comparison_op<F>(&self, lhs: TlangValue, rhs: TlangValue, op: F) -> TlangValue
+    where
+        F: Fn(f64, f64) -> bool,
+    {
+        match (lhs, rhs) {
+            (TlangValue::Int(lhs), TlangValue::Int(rhs)) => {
+                TlangValue::Bool(op(lhs as f64, rhs as f64))
+            }
+            (TlangValue::Float(lhs), TlangValue::Float(rhs)) => TlangValue::Bool(op(lhs, rhs)),
+            (TlangValue::Float(lhs), TlangValue::Int(rhs)) => TlangValue::Bool(op(lhs, rhs as f64)),
+            (TlangValue::Int(lhs), TlangValue::Float(rhs)) => TlangValue::Bool(op(lhs as f64, rhs)),
+            _ => todo!("eval_comparison_op: incompatible types"),
+        }
+    }
+
+    fn eval_boolean_op<F>(&self, lhs: TlangValue, rhs: TlangValue, op: F) -> TlangValue
+    where
+        F: Fn(bool, bool) -> bool,
+    {
+        match (lhs, rhs) {
+            (TlangValue::Bool(lhs), TlangValue::Bool(rhs)) => TlangValue::Bool(op(lhs, rhs)),
+            _ => todo!("eval_boolean_op: incompatible types"),
+        }
+    }
+
+    fn eval_bitwise_op<F>(&self, lhs: TlangValue, rhs: TlangValue, op: F) -> TlangValue
+    where
+        F: Fn(i64, i64) -> i64,
+    {
+        match (lhs, rhs) {
+            (TlangValue::Int(lhs), TlangValue::Int(rhs)) => TlangValue::Int(op(lhs, rhs)),
+            _ => todo!("eval_bitwise_op: incompatible types"),
         }
     }
 
@@ -378,6 +485,31 @@ mod tests {
     }
 
     #[test]
+    fn test_simple_logic_operators() {
+        let mut interpreter = interpreter("");
+
+        let tests = [
+            ("true && true", TlangValue::Bool(true)),
+            ("true && false", TlangValue::Bool(false)),
+            ("false && true", TlangValue::Bool(false)),
+            ("false && false", TlangValue::Bool(false)),
+            ("true || true", TlangValue::Bool(true)),
+            ("true || false", TlangValue::Bool(true)),
+            ("false || true", TlangValue::Bool(true)),
+            ("false || false", TlangValue::Bool(false)),
+        ];
+
+        for (src, expected_value) in tests.iter() {
+            match (eval(&mut interpreter, src), expected_value) {
+                (TlangValue::Bool(actual), TlangValue::Bool(expected)) => {
+                    assert_eq!(actual, *expected)
+                }
+                _ => panic!("Unexpected value"),
+            }
+        }
+    }
+
+    #[test]
     fn test_simple_function_declaration_and_call() {
         let mut interpreter = interpreter(indoc! {"
             fn add(a: Int, b: Int) -> Int {
@@ -386,5 +518,20 @@ mod tests {
         "});
 
         assert_matches!(eval(&mut interpreter, "add(1, 2)"), TlangValue::Int(3));
+    }
+
+    #[test]
+    fn test_simple_recursive_fib() {
+        let mut interpreter = interpreter(indoc! {"
+            fn fib(n: Int) -> Int {
+                if n <= 1 {
+                    n
+                } else {
+                    fib(n - 1) + fib(n - 2)
+                }
+            }
+        "});
+
+        assert_matches!(eval(&mut interpreter, "fib(10)"), TlangValue::Int(55));
     }
 }
