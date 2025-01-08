@@ -88,7 +88,6 @@ pub struct TlangClosure {
 
 #[derive(Debug)]
 pub struct TlangStruct {
-    pub id: u64,
     pub field_values: Vec<TlangValue>,
 }
 
@@ -110,7 +109,7 @@ impl TlangObjectId {
 
 #[derive(Debug)]
 pub enum TlangObjectKind {
-    Struct,
+    Struct(TlangStruct),
     Fn(TlangClosure),
 }
 
@@ -302,6 +301,7 @@ impl Interpreter {
     fn eval_expr(&mut self, expr: &hir::Expr) -> TlangValue {
         match &expr.kind {
             hir::ExprKind::Literal(value) => self.eval_literal(value),
+            hir::ExprKind::List(values) => self.eval_list_expr(values),
             hir::ExprKind::Block(block) => self.eval_block(block),
             hir::ExprKind::Binary(op, lhs, rhs) => self.eval_binary(*op, lhs, rhs),
             hir::ExprKind::Call(call_expr) => self.eval_call(call_expr),
@@ -340,6 +340,7 @@ impl Interpreter {
 
                 closure
             }
+            hir::ExprKind::Match(expr, arms) => self.eval_match(expr, arms),
             _ => todo!("eval_expr: {:?}", expr),
         }
     }
@@ -554,6 +555,27 @@ impl Interpreter {
             }
             _ => todo!("eval_let_stmt: {:?}", pat),
         }
+    }
+
+    fn eval_list_expr(&mut self, values: &[hir::Expr]) -> TlangValue {
+        let list = TlangValue::new_object();
+        let mut field_values = Vec::with_capacity(values.len());
+        for value in values {
+            field_values.push(self.eval_expr(value));
+        }
+
+        self.objects.insert(
+            list.get_object_id().unwrap(),
+            TlangObjectKind::Struct(TlangStruct { field_values }),
+        );
+
+        list
+    }
+
+    fn eval_match(&mut self, expr: &hir::Expr, _arms: &[hir::MatchArm]) -> TlangValue {
+        let _match_value = self.eval_expr(expr);
+
+        todo!("eval_match");
     }
 }
 
