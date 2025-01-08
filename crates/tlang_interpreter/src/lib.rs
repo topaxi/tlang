@@ -113,7 +113,23 @@ pub enum TlangObjectKind {
     Fn(TlangClosure),
 }
 
-#[derive(Debug, Clone, Copy)]
+impl TlangObjectKind {
+    pub(crate) fn get_struct(&self) -> Option<&TlangStruct> {
+        match self {
+            TlangObjectKind::Struct(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn get_fn(&self) -> Option<&TlangClosure> {
+        match self {
+            TlangObjectKind::Fn(f) => Some(f),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TlangValue {
     Nil,
     Int(i64),
@@ -529,7 +545,12 @@ impl Interpreter {
         args: &[TlangValue],
     ) -> TlangValue {
         if fn_decl.parameters.len() != args.len() {
-            todo!("Mismatched number of arguments");
+            panic!(
+                "Function `{:?}` expects {} arguments, but got {}",
+                fn_decl.name,
+                fn_decl.parameters.len(),
+                args.len()
+            );
         }
 
         self.with_new_scope(|interpreter| {
@@ -572,57 +593,136 @@ impl Interpreter {
         list
     }
 
-    fn eval_match(&mut self, expr: &hir::Expr, _arms: &[hir::MatchArm]) -> TlangValue {
-        let _match_value = self.eval_expr(expr);
+    fn eval_match(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) -> TlangValue {
+        let match_value = self.eval_expr(expr);
 
-        todo!("eval_match");
+        for arm in arms {
+            if let Some(value) = self.eval_match_arm(arm, &match_value) {
+                return value;
+            }
+        }
+
+        TlangValue::Nil
+    }
+
+    /// Evaluates a match arm and returns the value if it matches, otherwise returns None.
+    fn eval_match_arm(&mut self, arm: &hir::MatchArm, value: &TlangValue) -> Option<TlangValue> {
+        self.with_new_scope(|this| {
+            if this.eval_pat(&arm.pat, value) {
+                Some(this.eval_expr(&arm.expr))
+            } else {
+                None
+            }
+        })
+    }
+
+    fn eval_pat(&mut self, pat: &hir::Pat, value: &TlangValue) -> bool {
+        match &pat.kind {
+            hir::PatKind::Literal(literal) => {
+                let literal_value = self.eval_literal(literal);
+                *value == literal_value
+            }
+            hir::PatKind::List(patterns) => {
+                if let TlangValue::Object(id) = value {
+                    let list_values_length = self
+                        .objects
+                        .get(id)
+                        .and_then(|o| o.get_struct())
+                        .map(|s| s.field_values.len())
+                        .unwrap_or(0);
+
+                    if patterns.len() > list_values_length {
+                        return false;
+                    }
+
+                    let field_values = self
+                        .objects
+                        .get(id)
+                        .and_then(|o| o.get_struct())
+                        .map(|s| s.field_values.clone())
+                        .unwrap_or_default();
+
+                    for (i, pat) in patterns.iter().enumerate() {
+                        let field_value = field_values[i];
+                        if !self.eval_pat(pat, &field_value) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                }
+
+                false
+            }
+            hir::PatKind::Identifier(_id, ident) => {
+                self.current_scope
+                    .borrow_mut()
+                    .values
+                    .insert(ident.to_string(), *value);
+                true
+            }
+            hir::PatKind::Wildcard => true,
+            _ => todo!("eval_pat: {:?}, {:?}", pat, value),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
-
     use super::*;
     use indoc::indoc;
     use pretty_assertions::assert_matches;
-    use tlang_ast_lowering::lower_to_hir;
 
-    fn parse(src: &str) -> Result<hir::Module, Box<dyn Error>> {
-        let mut parser = tlang_parser::parser::Parser::from_source(src);
-        let ast = parser.parse()?;
-        let hir = lower_to_hir(&ast);
-
-        Ok(hir)
+    struct TestInterpreter {
+        lowering_context: tlang_ast_lowering::LoweringContext,
+        interpreter: Interpreter,
     }
 
-    fn interpreter(initial_source: &str) -> Interpreter {
-        let mut interpreter = Interpreter::new();
-        interpreter.eval(&parse(initial_source).unwrap());
-        interpreter
-    }
-
-    fn eval(interpreter: &mut Interpreter, src: &str) -> TlangValue {
-        let block = format!("{{ {} }};", src);
-        let hir = parse(&block).unwrap();
-
-        match &hir.block.stmts[0].kind {
-            hir::StmtKind::Expr(expr) => interpreter.eval_expr(expr),
-            _ => todo!("eval: {:?}", hir),
+    impl TestInterpreter {
+        fn new() -> Self {
+            TestInterpreter {
+                lowering_context: tlang_ast_lowering::LoweringContext::default(),
+                interpreter: Interpreter::new(),
+            }
         }
+
+        fn eval_root(&mut self, src: &str) -> TlangValue {
+            let mut parser = tlang_parser::parser::Parser::from_source(src);
+            let ast = parser.parse().unwrap();
+            let hir = self.lowering_context.lower_module_in_current_scope(&ast);
+            self.interpreter.eval(&hir)
+        }
+
+        fn eval(&mut self, src: &str) -> TlangValue {
+            let block = format!("{{ {} }};", src);
+            let mut parser = tlang_parser::parser::Parser::from_source(&block);
+            let ast = parser.parse().unwrap();
+            let hir = self.lowering_context.lower_module_in_current_scope(&ast);
+
+            match &hir.block.stmts[0].kind {
+                hir::StmtKind::Expr(expr) => self.interpreter.eval_expr(expr),
+                _ => todo!("eval: {:?}", hir),
+            }
+        }
+    }
+
+    fn interpreter(initial_source: &str) -> TestInterpreter {
+        let mut interpreter = TestInterpreter::new();
+        interpreter.eval_root(initial_source);
+        interpreter
     }
 
     #[test]
     fn test_interpreter() {
         let mut interpreter = interpreter("");
-        let result = interpreter.eval(&hir::Module::default());
+        let result = interpreter.eval("");
         assert_matches!(result, TlangValue::Nil);
     }
 
     #[test]
     fn test_basic_arithmetic() {
         let mut interpreter = interpreter("");
-        let result = eval(&mut interpreter, "1 + 2");
+        let result = interpreter.eval("1 + 2");
         assert_matches!(result, TlangValue::Int(3));
     }
 
@@ -630,8 +730,8 @@ mod tests {
     fn test_addition_of_mixed_ints_and_floats() {
         let mut interpreter = interpreter("");
 
-        assert_matches!(eval(&mut interpreter, "1 + 2.0"), TlangValue::Float(3.0));
-        assert_matches!(eval(&mut interpreter, "1.0 + 2"), TlangValue::Float(3.0));
+        assert_matches!(interpreter.eval("1 + 2.0"), TlangValue::Float(3.0));
+        assert_matches!(interpreter.eval("1.0 + 2"), TlangValue::Float(3.0));
     }
 
     #[test]
@@ -650,7 +750,7 @@ mod tests {
         ];
 
         for (src, expected_value) in tests.iter() {
-            match (eval(&mut interpreter, src), expected_value) {
+            match (interpreter.eval(src), expected_value) {
                 (TlangValue::Bool(actual), TlangValue::Bool(expected)) => {
                     assert_eq!(actual, *expected)
                 }
@@ -667,7 +767,7 @@ mod tests {
             }
         "});
 
-        assert_matches!(eval(&mut interpreter, "add(1, 2)"), TlangValue::Int(3));
+        assert_matches!(interpreter.eval("add(1, 2)"), TlangValue::Int(3));
     }
 
     #[test]
@@ -682,8 +782,8 @@ mod tests {
             }
         "});
 
-        assert_matches!(eval(&mut interpreter, "fib(10)"), TlangValue::Int(55));
-        assert_matches!(eval(&mut interpreter, "fib(20)"), TlangValue::Int(6765));
+        assert_matches!(interpreter.eval("fib(10)"), TlangValue::Int(55));
+        assert_matches!(interpreter.eval("fib(20)"), TlangValue::Int(6765));
     }
 
     #[test]
@@ -698,7 +798,66 @@ mod tests {
             let add_5 = make_adder(5);
         "});
 
-        assert_matches!(eval(&mut interpreter, "add_5(10)"), TlangValue::Int(15));
-        assert_matches!(eval(&mut interpreter, "add_5(20)"), TlangValue::Int(25));
+        assert_matches!(interpreter.eval("add_5(10)"), TlangValue::Int(15));
+        assert_matches!(interpreter.eval("add_5(20)"), TlangValue::Int(25));
+    }
+
+    #[test]
+    fn test_simple_pattern_matching() {
+        let mut interpreter = interpreter(indoc! {"
+            fn match_test(x: Int) -> Int {
+                match x; {
+                    1 => 2,
+                    2 => 3,
+                    _ => 4
+                }
+            }
+        "});
+
+        assert_matches!(interpreter.eval("match_test(1)"), TlangValue::Int(2));
+        assert_matches!(interpreter.eval("match_test(2)"), TlangValue::Int(3));
+        assert_matches!(interpreter.eval("match_test(3)"), TlangValue::Int(4));
+    }
+
+    #[test]
+    fn test_list_pattern_matching() {
+        let mut interpreter = interpreter(indoc! {"
+            fn match_test(x: List<Int>) -> Int {
+                match x; {
+                    [1, 2] => 2,
+                    [2, 3] => 3,
+                    _ => 4
+                }
+            }
+        "});
+        assert_matches!(interpreter.eval("match_test([1, 2])"), TlangValue::Int(2));
+        assert_matches!(interpreter.eval("match_test([2, 3])"), TlangValue::Int(3));
+        assert_matches!(interpreter.eval("match_test([3, 4])"), TlangValue::Int(4));
+    }
+
+    #[test]
+    fn test_pattern_matching_with_binding() {
+        let mut interpreter = interpreter(indoc! {"
+            fn match_test(x: Int) -> Int {
+                match x; {
+                    1 => 2,
+                    n => n,
+                }
+            }
+        "});
+        assert_matches!(interpreter.eval("match_test(1)"), TlangValue::Int(2));
+        assert_matches!(interpreter.eval("match_test(2)"), TlangValue::Int(2));
+    }
+
+    #[test]
+    fn test_fn_pattern_matching() {
+        let mut interpreter = interpreter(indoc! {"
+            fn fib(n) { fib(n, 0, 1) }
+            fn fib(0, a, _) { a }
+            fn fib(1, _, b) { b }
+            fn fib(n, a, b) { fib(n - 1, b, a + b) }
+        "});
+
+        assert_matches!(interpreter.eval("fib(10)"), TlangValue::Int(55));
     }
 }

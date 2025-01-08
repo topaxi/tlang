@@ -17,14 +17,14 @@ mod scope;
 // TODO: Add scopes and variable resolutions. There should be two kinds of bindings, one for a
 // whole block (declarations) and one for variable definitions (from definition forward).
 // See: https://github.com/rust-lang/rust/blob/de7cef75be8fab7a7e1b4d5bb01b51b4bac925c3/compiler/rustc_resolve/src/lib.rs#L408
-struct LoweringContext {
+pub struct LoweringContext {
     unique_id: HirId,
     node_id_to_hir_id: std::collections::HashMap<ast::node_id::NodeId, HirId>,
     scopes: Vec<Scope>,
 }
 
 impl LoweringContext {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             unique_id: HirId::new(0),
             node_id_to_hir_id: std::collections::HashMap::default(),
@@ -131,16 +131,20 @@ impl LoweringContext {
         }
     }
 
-    fn lower_module(&mut self, module: &ast::node::Module) -> hir::Module {
+    pub fn lower_module(&mut self, module: &ast::node::Module) -> hir::Module {
+        self.with_new_scope(|this| this.lower_module_in_current_scope(module))
+    }
+
+    pub fn lower_module_in_current_scope(&mut self, module: &ast::node::Module) -> hir::Module {
         debug!(
             "Lowering module with {} statements",
             module.statements.len()
         );
 
-        self.with_new_scope(|this| hir::Module {
-            block: this.lower_block(&module.statements, None, module.span),
+        hir::Module {
+            block: self.lower_block_in_current_scope(&module.statements, None, module.span),
             span: module.span,
-        })
+        }
     }
 
     fn lower_block(
@@ -149,17 +153,23 @@ impl LoweringContext {
         expr: Option<&ast::node::Expr>,
         span: ast::span::Span,
     ) -> hir::Block {
+        self.with_new_scope(|this| this.lower_block_in_current_scope(stmts, expr, span))
+    }
+
+    fn lower_block_in_current_scope(
+        &mut self,
+        stmts: &[ast::node::Stmt],
+        expr: Option<&ast::node::Expr>,
+        span: ast::span::Span,
+    ) -> hir::Block {
         debug!("Lowering block with {} statements", stmts.len());
 
-        self.with_new_scope(|this| {
-            let stmts = stmts
-                .iter()
-                .flat_map(|stmt| this.lower_stmt(stmt))
-                .collect();
-            let expr = expr.as_ref().map(|expr| this.lower_expr(expr));
-
-            hir::Block { stmts, expr, span }
-        })
+        let stmts = stmts
+            .iter()
+            .flat_map(|stmt| self.lower_stmt(stmt))
+            .collect();
+        let expr = expr.as_ref().map(|expr| self.lower_expr(expr));
+        hir::Block { stmts, expr, span }
     }
 
     fn lower_exprs(&mut self, exprs: &[ast::node::Expr]) -> Vec<hir::Expr> {
@@ -1081,6 +1091,12 @@ impl LoweringContext {
         let rhs = self.lower_expr(&node.rhs);
 
         hir::ExprKind::Binary(binary_op_kind, Box::new(lhs), Box::new(rhs))
+    }
+}
+
+impl Default for LoweringContext {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
