@@ -490,9 +490,14 @@ impl Interpreter {
     }
 
     fn eval_call(&mut self, call_expr: &hir::CallExpression) -> TlangValue {
+        let mut args: Vec<TlangValue> = Vec::with_capacity(call_expr.arguments.len());
+        for arg in &call_expr.arguments {
+            args.push(self.eval_expr(arg));
+        }
+
         match &call_expr.callee.kind {
             hir::ExprKind::Path(path) if let Some(fn_decl) = self.resolve_fn(path) => {
-                self.eval_fn_call(&fn_decl, &call_expr.arguments)
+                self.eval_fn_call(&fn_decl, &args)
             }
             hir::ExprKind::Path(path)
                 if let Some(TlangValue::Object(id)) = self.resolve_path(path) =>
@@ -502,11 +507,16 @@ impl Interpreter {
                         let closure_decl = self.resolve_closure_decl(closure.id).unwrap().clone();
 
                         self.with_scope(closure.scope.clone(), |this| {
-                            this.eval_fn_call(&closure_decl, &call_expr.arguments)
+                            this.eval_fn_call(&closure_decl, &args)
                         })
                     }
-                    obj => todo!("eval_call: {:?}", obj),
+                    obj => {
+                        panic!("Object `{}` is not a function: {:?}", path.join("::"), obj);
+                    }
                 }
+            }
+            hir::ExprKind::Path(path) => {
+                panic!("Function `{}` not found", path.join("::"));
             }
             _ => todo!("eval_call: {:?}", call_expr.callee),
         }
@@ -515,20 +525,11 @@ impl Interpreter {
     fn eval_fn_call(
         &mut self,
         fn_decl: &hir::FunctionDeclaration,
-        call_args: &[hir::Expr],
+        args: &[TlangValue],
     ) -> TlangValue {
-        if fn_decl.parameters.len() != call_args.len() {
+        if fn_decl.parameters.len() != args.len() {
             todo!("Mismatched number of arguments");
         }
-
-        let args = self.with_new_scope(|this| {
-            let mut args: Vec<TlangValue> = Vec::with_capacity(call_args.len());
-            for arg in call_args {
-                args.push(this.eval_expr(arg));
-            }
-
-            args
-        });
 
         self.with_new_scope(|interpreter| {
             for (param, arg) in fn_decl.parameters.iter().zip(args.iter()) {

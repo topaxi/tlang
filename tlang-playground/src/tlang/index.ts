@@ -3,7 +3,7 @@ import init, {
   TlangCompiler,
 } from 'tlang_bindings_js';
 
-export { type CodemirrorDiagnostic } from 'tlang_bindings_js';
+export { type CodemirrorDiagnostic, TlangInterpreter } from 'tlang_bindings_js';
 
 await init();
 

@@ -10,6 +10,7 @@ import {
   compile,
   getStandardLibraryCompiled,
   TlangCompiler,
+  TlangInterpreter,
   CodemirrorDiagnostic,
 } from './tlang';
 import { MediaController } from './controllers/media-controller';
@@ -175,6 +176,8 @@ export class TlangPlayground extends LitElement {
 
   @state() output = '';
 
+  @state() runner: 'compiler' | 'interpreter' = 'compiler';
+
   get error() {
     if (this.compiler == null) {
       return '';
@@ -203,6 +206,14 @@ export class TlangPlayground extends LitElement {
       this.consoleOutput.push('---');
     }
 
+    if (this.runner === 'compiler') {
+      this.runCompiled();
+    } else {
+      this.runInterpreted();
+    }
+  }
+
+  private runCompiled() {
     let fn = new Function(
       'console',
       `${getStandardLibraryCompiled()}\n{${this.output}};`,
@@ -213,6 +224,12 @@ export class TlangPlayground extends LitElement {
         this.consoleOutput = [...this.consoleOutput, args];
       },
     });
+  }
+
+  private runInterpreted() {
+    let interpreter = new TlangInterpreter();
+
+    interpreter.eval(this.source);
   }
 
   async share() {
@@ -298,6 +315,11 @@ export class TlangPlayground extends LitElement {
     this.run();
   }
 
+  handleRunnerChange(event: Event) {
+    const target = event.target as HTMLSelectElement;
+    this.runner = target.value as 'compiler' | 'interpreter';
+  }
+
   handleDisplayChange(event: Event) {
     const target = event.target as HTMLSelectElement;
     this.display = target.value as 'ast' | 'hir' | 'hir pretty' | 'output';
@@ -318,6 +340,10 @@ export class TlangPlayground extends LitElement {
     return html`
       <div class="toolbar">
         <button @click=${this.run}>Run</button>
+        <select @change=${this.handleRunnerChange} .value=${this.runner}>
+          <option value="compiler">Compiler</option>
+          <option value="interpreter">Interpreter</option>
+        </select>
         <button @click=${this.share}>Share</button>
         <select @change=${this.handleExampleSelect}>
           ${Object.keys(examples).map((key) => html`<option>${key}</option>`)}
