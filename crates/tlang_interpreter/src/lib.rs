@@ -60,10 +60,12 @@ impl Resolver for Scope {
     }
 }
 
+type TlangNativeFn = Box<dyn Fn(&[TlangValue]) -> TlangValue>;
+
 #[derive(Default)]
 pub(crate) struct RootScope {
     pub scope: Rc<Scope>,
-    pub native_fn_decls: HashMap<String, Box<dyn Fn(&[TlangValue]) -> TlangValue>>,
+    pub native_fn_decls: HashMap<String, TlangNativeFn>,
     pub native_struct_decls: HashMap<String, ()>,
 }
 
@@ -543,17 +545,18 @@ impl Interpreter {
             hir::ExprKind::Path(path)
                 if let Some(TlangValue::Object(id)) = self.resolve_path(path) =>
             {
-                match self.get_object(id) {
-                    TlangObjectKind::Fn(closure) => {
-                        let closure_decl = self.resolve_closure_decl(closure.id).unwrap().clone();
+                if let Some(closure) = self.get_object(id).get_fn() {
+                    let closure_decl = self.resolve_closure_decl(closure.id).unwrap().clone();
 
-                        self.with_scope(closure.scope.clone(), |this| {
-                            this.eval_fn_call(&closure_decl, &args)
-                        })
-                    }
-                    obj => {
-                        panic!("Object `{}` is not a function: {:?}", path.join("::"), obj);
-                    }
+                    self.with_scope(closure.scope.clone(), |this| {
+                        this.eval_fn_call(&closure_decl, &args)
+                    })
+                } else {
+                    panic!(
+                        "`{:?}` is not a function: {:?}",
+                        path.join("::"),
+                        self.get_object(id)
+                    );
                 }
             }
             hir::ExprKind::Path(path)
