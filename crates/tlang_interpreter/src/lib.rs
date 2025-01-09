@@ -60,10 +60,10 @@ impl Resolver for Scope {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub(crate) struct RootScope {
     pub scope: Rc<Scope>,
-    pub native_fn_decls: HashMap<String, ()>,
+    pub native_fn_decls: HashMap<String, Box<dyn Fn(&[TlangValue]) -> TlangValue>>,
     pub native_struct_decls: HashMap<String, ()>,
 }
 
@@ -151,7 +151,6 @@ impl TlangValue {
     }
 }
 
-#[derive(Debug, Default)]
 pub struct Interpreter {
     root_scope: RootScope,
     current_scope: Rc<RefCell<Scope>>,
@@ -186,9 +185,34 @@ enum StmtResult {
     Return,
 }
 
+impl Default for Interpreter {
+    fn default() -> Self {
+        Interpreter::new()
+    }
+}
+
 impl Interpreter {
     pub fn new() -> Self {
-        Interpreter::default()
+        let mut root_scope = RootScope {
+            scope: Rc::new(Scope::default()),
+            native_fn_decls: HashMap::new(),
+            native_struct_decls: HashMap::new(),
+        };
+
+        root_scope.native_fn_decls.insert(
+            "log".to_string(),
+            Box::new(|args| {
+                println!("{:?}", args);
+                TlangValue::Nil
+            }),
+        );
+
+        Self {
+            root_scope,
+            current_scope: Rc::new(RefCell::new(Scope::default())),
+            closures: HashMap::new(),
+            objects: HashMap::new(),
+        }
     }
 
     fn resolve_closure_decl(&self, id: HirId) -> Option<&hir::FunctionDeclaration> {
@@ -532,6 +556,11 @@ impl Interpreter {
                     }
                 }
             }
+            hir::ExprKind::Path(path)
+                if let Some(native_fn) = self.root_scope.native_fn_decls.get(&path.join("::")) =>
+            {
+                native_fn(&args)
+            }
             hir::ExprKind::Path(path) => {
                 panic!("Function `{}` not found", path.join("::"));
             }
@@ -859,5 +888,24 @@ mod tests {
         "});
 
         assert_matches!(interpreter.eval("fib(10)"), TlangValue::Int(55));
+    }
+
+    #[test]
+    fn test_builtin_log() {
+        let mut interpreter = interpreter(indoc! {""});
+        let calls = Rc::new(RefCell::new(vec![]));
+
+        let calls_tracker = calls.clone();
+
+        interpreter.interpreter.root_scope.native_fn_decls.insert(
+            "log".to_string(),
+            Box::new(move |args| {
+                calls_tracker.borrow_mut().push(args.to_vec());
+                TlangValue::Nil
+            }),
+        );
+
+        assert_matches!(interpreter.eval("log(10)"), TlangValue::Nil);
+        assert_matches!(calls.borrow()[0][..], [TlangValue::Int(10)]);
     }
 }
