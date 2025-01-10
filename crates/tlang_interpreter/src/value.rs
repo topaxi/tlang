@@ -35,8 +35,9 @@ impl TlangObjectId {
 
 #[derive(Debug)]
 pub enum TlangObjectKind {
+    Fn, // TODO
     Struct(TlangStruct),
-    Fn(TlangClosure),
+    Closure(TlangClosure),
 }
 
 impl TlangObjectKind {
@@ -49,7 +50,7 @@ impl TlangObjectKind {
 
     pub(crate) fn get_fn(&self) -> Option<&TlangClosure> {
         match self {
-            TlangObjectKind::Fn(f) => Some(f),
+            TlangObjectKind::Closure(f) => Some(f),
             _ => None,
         }
     }
