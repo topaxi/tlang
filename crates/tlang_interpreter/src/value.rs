@@ -76,3 +76,15 @@ impl TlangValue {
         }
     }
 }
+
+impl std::fmt::Display for TlangValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TlangValue::Nil => write!(f, "nil"),
+            TlangValue::Int(i) => write!(f, "{}", i),
+            TlangValue::Float(fl) => write!(f, "{}", fl),
+            TlangValue::Bool(b) => write!(f, "{}", b),
+            TlangValue::Object(id) => write!(f, "Object({})", id.0),
+        }
+    }
+}
