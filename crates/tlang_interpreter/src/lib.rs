@@ -15,32 +15,11 @@ mod resolver;
 mod scope;
 mod value;
 
-#[derive(Debug)]
-struct MatchContextStack(Vec<MatchContext>);
-
-impl MatchContextStack {
-    fn push(&mut self, context: MatchContext) {
-        self.0.push(context);
-    }
-    fn pop(&mut self) -> Option<MatchContext> {
-        self.0.pop()
-    }
-    fn top(&self) -> Option<&MatchContext> {
-        self.0.last()
-    }
-}
-
-#[derive(Debug)]
-enum MatchContext {
-    List { index: usize },
-}
-
 pub struct Interpreter {
     root_scope: RootScope,
     current_scope: Rc<RefCell<Scope>>,
     closures: HashMap<HirId, hir::FunctionDeclaration>,
     objects: HashMap<TlangObjectId, TlangObjectKind>,
-    match_context_stack: MatchContextStack,
 }
 
 impl Resolver for Interpreter {
@@ -103,7 +82,6 @@ impl Interpreter {
             current_scope: Rc::new(RefCell::new(Scope::default())),
             closures: HashMap::new(),
             objects: HashMap::new(),
-            match_context_stack: MatchContextStack(Vec::new()),
         }
     }
 
@@ -265,7 +243,7 @@ impl Interpreter {
 
                 self.objects.insert(
                     closure.get_object_id().unwrap(),
-                    TlangObjectKind::Fn(TlangClosure {
+                    TlangObjectKind::Closure(TlangClosure {
                         id: fn_decl.hir_id,
                         scope: self.current_scope.clone(),
                     }),
@@ -576,44 +554,30 @@ impl Interpreter {
                         .unwrap_or_default();
 
                     for (i, pat) in patterns.iter().enumerate() {
+                        if let hir::PatKind::Rest(pat) = &pat.kind {
+                            let rest_values = field_values[i..].to_vec();
+                            let rest_object = TlangValue::new_object();
+
+                            self.objects.insert(
+                                rest_object.get_object_id().unwrap(),
+                                TlangObjectKind::Struct(TlangStruct {
+                                    field_values: rest_values,
+                                }),
+                            );
+
+                            return self.eval_pat(pat, &rest_object);
+                        }
+
                         let field_value = field_values[i];
-                        self.match_context_stack
-                            .push(MatchContext::List { index: i });
-                        // TODO: On rest params, this passes down the individual item instead of
-                        //       the current list...
                         if !self.eval_pat(pat, &field_value) {
-                            self.match_context_stack.pop();
                             return false;
                         }
-                        self.match_context_stack.pop();
                     }
 
                     return true;
                 }
 
                 false
-            }
-            hir::PatKind::Rest(pattern) => {
-                let list_values = self
-                    .objects
-                    .get(&value.get_object_id().unwrap())
-                    .and_then(|o| o.get_struct())
-                    .map(|s| s.field_values.clone())
-                    .unwrap_or_default();
-                let index = match self.match_context_stack.top() {
-                    Some(MatchContext::List { index }) => *index,
-                    _ => return false,
-                };
-                let rest_values = &list_values[index..];
-
-                let new_list = TlangValue::new_object();
-                self.objects.insert(
-                    new_list.get_object_id().unwrap(),
-                    TlangObjectKind::Struct(TlangStruct {
-                        field_values: rest_values.to_vec(),
-                    }),
-                );
-                self.eval_pat(pattern, &new_list)
             }
             hir::PatKind::Identifier(_id, ident) => {
                 self.current_scope
@@ -623,6 +587,7 @@ impl Interpreter {
                 true
             }
             hir::PatKind::Wildcard => true,
+            hir::PatKind::Rest(_) => unreachable!("Rest patterns can only appear in list patterns"),
             _ => todo!("eval_pat: {:?}, {:?}", pat, value),
         }
     }
