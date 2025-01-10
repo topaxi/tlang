@@ -15,11 +15,32 @@ mod resolver;
 mod scope;
 mod value;
 
+#[derive(Debug)]
+struct MatchContextStack(Vec<MatchContext>);
+
+impl MatchContextStack {
+    fn push(&mut self, context: MatchContext) {
+        self.0.push(context);
+    }
+    fn pop(&mut self) -> Option<MatchContext> {
+        self.0.pop()
+    }
+    fn top(&self) -> Option<&MatchContext> {
+        self.0.last()
+    }
+}
+
+#[derive(Debug)]
+enum MatchContext {
+    List { index: usize },
+}
+
 pub struct Interpreter {
     root_scope: RootScope,
     current_scope: Rc<RefCell<Scope>>,
     closures: HashMap<HirId, hir::FunctionDeclaration>,
     objects: HashMap<TlangObjectId, TlangObjectKind>,
+    match_context_stack: MatchContextStack,
 }
 
 impl Resolver for Interpreter {
@@ -82,6 +103,7 @@ impl Interpreter {
             current_scope: Rc::new(RefCell::new(Scope::default())),
             closures: HashMap::new(),
             objects: HashMap::new(),
+            match_context_stack: MatchContextStack(Vec::new()),
         }
     }
 
@@ -537,6 +559,11 @@ impl Interpreter {
                         .map(|s| s.field_values.len())
                         .unwrap_or(0);
 
+                    // Empty list pattern is a special case, it matches any list with 0 elements.
+                    if patterns.is_empty() && list_values_length > 1 {
+                        return false;
+                    }
+
                     if patterns.len() > list_values_length {
                         return false;
                     }
@@ -550,15 +577,43 @@ impl Interpreter {
 
                     for (i, pat) in patterns.iter().enumerate() {
                         let field_value = field_values[i];
+                        self.match_context_stack
+                            .push(MatchContext::List { index: i });
+                        // TODO: On rest params, this passes down the individual item instead of
+                        //       the current list...
                         if !self.eval_pat(pat, &field_value) {
+                            self.match_context_stack.pop();
                             return false;
                         }
+                        self.match_context_stack.pop();
                     }
 
                     return true;
                 }
 
                 false
+            }
+            hir::PatKind::Rest(pattern) => {
+                let list_values = self
+                    .objects
+                    .get(&value.get_object_id().unwrap())
+                    .and_then(|o| o.get_struct())
+                    .map(|s| s.field_values.clone())
+                    .unwrap_or_default();
+                let index = match self.match_context_stack.top() {
+                    Some(MatchContext::List { index }) => *index,
+                    _ => return false,
+                };
+                let rest_values = &list_values[index..];
+
+                let new_list = TlangValue::new_object();
+                self.objects.insert(
+                    new_list.get_object_id().unwrap(),
+                    TlangObjectKind::Struct(TlangStruct {
+                        field_values: rest_values.to_vec(),
+                    }),
+                );
+                self.eval_pat(pattern, &new_list)
             }
             hir::PatKind::Identifier(_id, ident) => {
                 self.current_scope
