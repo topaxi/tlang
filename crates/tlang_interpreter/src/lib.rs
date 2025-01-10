@@ -66,7 +66,13 @@ impl Interpreter {
         root_scope.native_fn_decls.insert(
             "log".to_string(),
             Box::new(|args| {
-                println!("{:?}", args);
+                println!(
+                    "{}",
+                    args.iter()
+                        .map(|v| v.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                );
                 TlangValue::Nil
             }),
         );
