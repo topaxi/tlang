@@ -1,0 +1,7 @@
+fn fib(n) { fib(n, 0, 1) }
+fn fib(0, a, _) { a }
+fn fib(1, _, b) { b }
+fn fib(n, a, b) { rec fib(n - 1, b, a + b) }
+
+fib(50)
+|> log();
