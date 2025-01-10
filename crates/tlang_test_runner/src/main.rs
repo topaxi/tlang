@@ -49,17 +49,25 @@ fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
     let expected_output = fs::read_to_string(&expected_output_path)
         .map_err(|e| format!("Failed to read {}: {}", expected_output_path.display(), e))?;
 
+    let start = std::time::Instant::now();
+    let mut exec_start = std::time::Instant::now();
     let output = match backend {
-        "interpreter" => Command::new("./target/debug/tlangdi")
-            .arg(file_path)
-            .output()
-            .map_err(|e| format!("Failed to execute interpreter: {}", e))?,
+        "interpreter" => {
+            exec_start = std::time::Instant::now();
+
+            Command::new("./target/debug/tlangdi")
+                .arg(file_path)
+                .output()
+                .map_err(|e| format!("Failed to execute interpreter: {}", e))?
+        }
         "javascript" => {
             let tlang_js_compiler_output = Command::new("./target/debug/tlang_cli_js")
                 .arg(file_path)
                 .stdout(Stdio::piped())
                 .spawn()
                 .expect("Failed to compile to JavaScript");
+
+            exec_start = std::time::Instant::now();
 
             let javascript_output = Command::new("node")
                 .stdin(tlang_js_compiler_output.stdout.unwrap())
@@ -71,10 +79,19 @@ fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
         }
         _ => return Err(format!("Unsupported backend: {}", backend)),
     };
+    let elapsed = start.elapsed();
+    let exec_elapsed = exec_start.elapsed();
 
     let actual_output = String::from_utf8_lossy(&output.stdout);
 
     if actual_output.trim() == expected_output.trim() {
+        println!(
+            "Test passed for {} (backend: {}) in {:?} (total {:?})",
+            file_path.display(),
+            backend,
+            exec_elapsed,
+            elapsed
+        );
         Ok(())
     } else {
         Err(format!(
