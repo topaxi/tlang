@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use glob::glob;
 
@@ -22,17 +22,17 @@ impl Backend {
     }
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pattern = "tests/**/*.tlang";
 
     for backend in Backend::enumerate() {
         for entry in glob(pattern).expect("Failed to read glob pattern") {
             let file_path = entry.expect("Failed to read test file path");
-            if let Err(e) = run_test(&file_path, backend.as_str()) {
-                panic!("{}", e);
-            }
+            run_test(&file_path, backend.as_str())?;
         }
     }
+
+    Ok(())
 }
 
 fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
@@ -50,14 +50,25 @@ fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
         .map_err(|e| format!("Failed to read {}: {}", expected_output_path.display(), e))?;
 
     let output = match backend {
-        "interpreter" => Command::new("./target/debug/tlang_interpreter")
+        "interpreter" => Command::new("./target/debug/tlangdi")
             .arg(file_path)
             .output()
             .map_err(|e| format!("Failed to execute interpreter: {}", e))?,
-        "javascript" => Command::new("node")
-            .arg(file_path.with_extension("js"))
-            .output()
-            .map_err(|e| format!("Failed to execute JavaScript: {}", e))?,
+        "javascript" => {
+            let tlang_js_compiler_output = Command::new("./target/debug/tlang_cli_js")
+                .arg(file_path)
+                .stdout(Stdio::piped())
+                .spawn()
+                .expect("Failed to compile to JavaScript");
+
+            let javascript_output = Command::new("node")
+                .stdin(tlang_js_compiler_output.stdout.unwrap())
+                .stdout(Stdio::piped())
+                .spawn()
+                .expect("Failed to execute JavaScript");
+
+            javascript_output.wait_with_output().unwrap()
+        }
         _ => return Err(format!("Unsupported backend: {}", backend)),
     };
 

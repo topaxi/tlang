@@ -3,8 +3,21 @@ name = "tlang_interpreter"
 version = "0.1.0"
 edition.workspace = true
 
+[lib]
+name = "tlang_interpreter"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tlangdi"
+path = "src/main.rs"
+required-features = ["binary"]
+
+[features]
+binary = ["tlang_ast_lowering"]
+
 [dependencies]
 tlang_ast = { path = "../tlang_ast" }
+tlang_ast_lowering = { path = "../tlang_ast_lowering", optional = true }
 tlang_hir = { path = "../tlang_hir" }
 tlang_parser = { path = "../tlang_parser" }
 tlang_semantics = { path = "../tlang_semantics" }
