@@ -215,6 +215,7 @@ impl Interpreter {
             hir::ExprKind::Block(block) => self.eval_block(block),
             hir::ExprKind::Binary(op, lhs, rhs) => self.eval_binary(*op, lhs, rhs),
             hir::ExprKind::Call(call_expr) => self.eval_call(call_expr),
+            hir::ExprKind::TailCall(call_expr) => self.eval_tail_call(call_expr),
             hir::ExprKind::Path(path) => self.resolve_path(path).unwrap_or(TlangValue::Nil),
             hir::ExprKind::IfElse(condition, consequence, else_clauses) => {
                 let condition = self.eval_expr(condition);
@@ -398,6 +399,11 @@ impl Interpreter {
             .borrow_mut()
             .struct_decls
             .insert(decl.name.to_string(), Rc::new(decl.clone()));
+    }
+
+    fn eval_tail_call(&mut self, call_expr: &hir::CallExpression) -> TlangValue {
+        // For now, we just call the function normally.
+        self.eval_call(call_expr)
     }
 
     fn eval_call(&mut self, call_expr: &hir::CallExpression) -> TlangValue {

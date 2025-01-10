@@ -50,7 +50,7 @@ fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
         .map_err(|e| format!("Failed to read {}: {}", expected_output_path.display(), e))?;
 
     let start = std::time::Instant::now();
-    let mut exec_start = std::time::Instant::now();
+    let exec_start;
     let output = match backend {
         "interpreter" => {
             exec_start = std::time::Instant::now();
@@ -61,6 +61,7 @@ fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
                 .map_err(|e| format!("Failed to execute interpreter: {}", e))?
         }
         "javascript" => {
+            #[allow(clippy::zombie_processes)]
             let tlang_js_compiler_output = Command::new("./target/debug/tlang_cli_js")
                 .arg(file_path)
                 .stdout(Stdio::piped())
@@ -94,12 +95,13 @@ fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
         );
         Ok(())
     } else {
-        Err(format!(
+        println!(
             "Test failed for {} (backend: {}).\nExpected:\n{}\nActual:\n{}",
             file_path.display(),
             backend,
             expected_output,
             actual_output
-        ))
+        );
+        Err("Test failed".to_string())
     }
 }
