@@ -61,6 +61,13 @@ jobs:
       - name: Cargo Make
         run: cargo make
 
+      - name: Test Runner
+        run: |
+          cargo build --features=binary --bin tlangdi
+          cargo run --bin tlang_test_runner
+        env:
+          RUST_BACKTRACE: '1'
+
       - name: Install binaryen
         run: |
           wget https://github.com/WebAssembly/binaryen/releases/download/version_119/binaryen-version_119-x86_64-linux.tar.gz
