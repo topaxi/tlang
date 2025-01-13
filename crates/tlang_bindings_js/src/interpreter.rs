@@ -18,7 +18,9 @@ impl TlangInterpreter {
     pub fn new() -> Self {
         console_error_panic_hook::set_once();
 
-        TlangInterpreter(tlang_interpreter::Interpreter::default())
+        let interpreter = tlang_interpreter::Interpreter::default();
+
+        TlangInterpreter(interpreter)
     }
 
     #[wasm_bindgen]

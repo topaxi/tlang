@@ -53,48 +53,52 @@ impl Default for Interpreter {
 
 impl Interpreter {
     pub fn new() -> Self {
-        let mut root_scope = RootScope {
+        let root_scope = RootScope {
             scope: Rc::new(RefCell::new(Scope::default())),
             native_fns: HashMap::new(),
         };
 
-        let mut objects = HashMap::new();
+        let mut interpreter = Self {
+            current_scope: root_scope.scope.clone(),
+            root_scope,
+            closures: HashMap::new(),
+            objects: HashMap::new(),
+        };
 
-        let log_fn_object = TlangValue::new_object();
+        interpreter.define_native_fn("log", |args| {
+            println!(
+                "{}",
+                args.iter()
+                    .map(|v| v.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            );
+            TlangValue::Nil
+        });
 
-        objects.insert(
-            log_fn_object.get_object_id().unwrap(),
-            TlangObjectKind::NativeFn,
-        );
+        interpreter
+    }
 
-        root_scope
+    pub fn new_object(&mut self, kind: TlangObjectKind) -> TlangValue {
+        let obj = TlangValue::new_object();
+
+        self.objects.insert(obj.get_object_id().unwrap(), kind);
+
+        obj
+    }
+
+    pub fn define_native_fn(&mut self, name: &str, f: fn(&[TlangValue]) -> TlangValue) {
+        let fn_object = self.new_object(TlangObjectKind::NativeFn);
+
+        self.root_scope
             .scope
             .borrow_mut()
             .values
-            .insert("log".to_string(), log_fn_object);
+            .insert(name.to_string(), fn_object);
 
-        root_scope.native_fns.insert(
-            log_fn_object.get_object_id().unwrap(),
-            Box::new(|args| {
-                println!(
-                    "{}",
-                    args.iter()
-                        .map(|v| v.to_string())
-                        .collect::<Vec<_>>()
-                        .join(" ")
-                );
-                TlangValue::Nil
-            }),
-        );
-
-        let current_scope = root_scope.scope.clone();
-
-        Self {
-            root_scope,
-            current_scope,
-            closures: HashMap::new(),
-            objects,
-        }
+        self.root_scope
+            .native_fns
+            .insert(fn_object.get_object_id().unwrap(), Box::new(f));
     }
 
     fn resolve_closure_decl(&self, id: HirId) -> Option<&hir::FunctionDeclaration> {
@@ -252,17 +256,10 @@ impl Interpreter {
                     self.insert_closure_decl(fn_decl.hir_id, *fn_decl.clone());
                 }
 
-                let closure = TlangValue::new_object();
-
-                self.objects.insert(
-                    closure.get_object_id().unwrap(),
-                    TlangObjectKind::Closure(TlangClosure {
-                        id: fn_decl.hir_id,
-                        scope: self.current_scope.clone(),
-                    }),
-                );
-
-                closure
+                self.new_object(TlangObjectKind::Closure(TlangClosure {
+                    id: fn_decl.hir_id,
+                    scope: self.current_scope.clone(),
+                }))
             }
             hir::ExprKind::Match(expr, arms) => self.eval_match(expr, arms),
             _ => todo!("eval_expr: {:?}", expr),
@@ -409,12 +406,7 @@ impl Interpreter {
         match decl.name.kind {
             hir::ExprKind::Path(ref path) => {
                 let path_name = path.join("::");
-
-                let fn_object = TlangValue::new_object();
-                self.objects.insert(
-                    fn_object.get_object_id().unwrap(),
-                    TlangObjectKind::Fn(decl.hir_id),
-                );
+                let fn_object = self.new_object(TlangObjectKind::Fn(decl.hir_id));
 
                 self.current_scope
                     .borrow_mut()
@@ -528,7 +520,6 @@ impl Interpreter {
     }
 
     fn eval_list_expr(&mut self, values: &[hir::Expr]) -> TlangValue {
-        let list = TlangValue::new_object();
         let mut field_values = Vec::with_capacity(values.len());
         for expr in values {
             if let hir::ExprKind::Unary(UnaryOp::Spread, expr) = &expr.kind {
@@ -545,12 +536,7 @@ impl Interpreter {
             }
         }
 
-        self.objects.insert(
-            list.get_object_id().unwrap(),
-            TlangObjectKind::Struct(TlangStruct { field_values }),
-        );
-
-        list
+        self.new_object(TlangObjectKind::Struct(TlangStruct { field_values }))
     }
 
     fn eval_match(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) -> TlangValue {
@@ -620,14 +606,10 @@ impl Interpreter {
                     for (i, pat) in patterns.iter().enumerate() {
                         if let hir::PatKind::Rest(pat) = &pat.kind {
                             let rest_values = field_values[i..].to_vec();
-                            let rest_object = TlangValue::new_object();
-
-                            self.objects.insert(
-                                rest_object.get_object_id().unwrap(),
-                                TlangObjectKind::Struct(TlangStruct {
+                            let rest_object =
+                                self.new_object(TlangObjectKind::Struct(TlangStruct {
                                     field_values: rest_values,
-                                }),
-                            );
+                                }));
 
                             return self.eval_pat(pat, &rest_object);
                         }
