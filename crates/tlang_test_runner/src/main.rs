@@ -17,7 +17,7 @@ impl Backend {
         }
     }
 
-    fn enumerate() -> impl Iterator<Item = Backend> {
+    fn values() -> impl Iterator<Item = Backend> {
         vec![Backend::Interpreter, Backend::JavaScript].into_iter()
     }
 }
@@ -25,7 +25,13 @@ impl Backend {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pattern = "tests/**/*.tlang";
 
-    for backend in Backend::enumerate() {
+    for (i, backend) in Backend::values().enumerate() {
+        if i > 0 {
+            println!();
+        }
+
+        println!("Running tests with backend: {}", backend.as_str());
+
         for entry in glob(pattern).expect("Failed to read glob pattern") {
             let file_path = entry.expect("Failed to read test file path");
             run_test(&file_path, backend.as_str())?;
