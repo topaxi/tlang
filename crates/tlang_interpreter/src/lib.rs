@@ -29,16 +29,11 @@ impl Resolver for Interpreter {
             None => self.root_scope.resolve_path(path),
         }
     }
-    fn resolve_fn(&self, path: &hir::Path) -> Option<Rc<hir::FunctionDeclaration>> {
-        match self.current_scope.borrow().resolve_fn(path) {
+
+    fn resolve_fn_decl(&self, id: hir::HirId) -> Option<Rc<hir::FunctionDeclaration>> {
+        match self.current_scope.borrow().resolve_fn_decl(id) {
             Some(decl) => Some(decl),
-            None => self.root_scope.resolve_fn(path),
-        }
-    }
-    fn resolve_struct(&self, path: &hir::Path) -> Option<Rc<hir::StructDeclaration>> {
-        match self.current_scope.borrow().resolve_struct(path) {
-            Some(decl) => Some(decl),
-            None => self.root_scope.resolve_struct(path),
+            None => self.root_scope.resolve_fn_decl(id),
         }
     }
 }
@@ -58,13 +53,27 @@ impl Default for Interpreter {
 impl Interpreter {
     pub fn new() -> Self {
         let mut root_scope = RootScope {
-            scope: Rc::new(Scope::default()),
-            native_fn_decls: HashMap::new(),
-            native_struct_decls: HashMap::new(),
+            scope: Rc::new(RefCell::new(Scope::default())),
+            native_fns: HashMap::new(),
         };
 
-        root_scope.native_fn_decls.insert(
-            "log".to_string(),
+        let mut objects = HashMap::new();
+
+        let log_fn_object = TlangValue::new_object();
+
+        objects.insert(
+            log_fn_object.get_object_id().unwrap(),
+            TlangObjectKind::NativeFn,
+        );
+
+        root_scope
+            .scope
+            .borrow_mut()
+            .values
+            .insert("log".to_string(), log_fn_object);
+
+        root_scope.native_fns.insert(
+            log_fn_object.get_object_id().unwrap(),
             Box::new(|args| {
                 println!(
                     "{}",
@@ -77,11 +86,13 @@ impl Interpreter {
             }),
         );
 
+        let current_scope = root_scope.scope.clone();
+
         Self {
             root_scope,
-            current_scope: Rc::new(RefCell::new(Scope::default())),
+            current_scope,
             closures: HashMap::new(),
-            objects: HashMap::new(),
+            objects,
         }
     }
 
@@ -381,14 +392,25 @@ impl Interpreter {
     }
 
     fn eval_fn_decl(&mut self, decl: &hir::FunctionDeclaration) {
+        self.current_scope
+            .borrow_mut()
+            .fn_decls
+            .insert(decl.hir_id, Rc::new(decl.clone()));
+
         match decl.name.kind {
             hir::ExprKind::Path(ref path) => {
                 let path_name = path.join("::");
 
+                let fn_object = TlangValue::new_object();
+                self.objects.insert(
+                    fn_object.get_object_id().unwrap(),
+                    TlangObjectKind::Fn(decl.hir_id),
+                );
+
                 self.current_scope
                     .borrow_mut()
-                    .fn_decls
-                    .insert(path_name, Rc::new(decl.clone()));
+                    .values
+                    .insert(path_name, fn_object);
             }
             _ => todo!("eval_fn_decl: {:?}", decl.name),
         }
@@ -398,7 +420,7 @@ impl Interpreter {
         self.current_scope
             .borrow_mut()
             .struct_decls
-            .insert(decl.name.to_string(), Rc::new(decl.clone()));
+            .insert(decl.hir_id, Rc::new(decl.clone()));
     }
 
     fn eval_tail_call(&mut self, call_expr: &hir::CallExpression) -> TlangValue {
@@ -413,18 +435,31 @@ impl Interpreter {
         }
 
         match &call_expr.callee.kind {
-            hir::ExprKind::Path(path) if let Some(fn_decl) = self.resolve_fn(path) => {
-                self.eval_fn_call(&fn_decl, &args)
-            }
             hir::ExprKind::Path(path)
                 if let Some(TlangValue::Object(id)) = self.resolve_path(path) =>
             {
-                if let Some(closure) = self.get_object(id).get_fn() {
+                if let Some(closure) = self.get_object(id).get_closure() {
                     let closure_decl = self.resolve_closure_decl(closure.id).unwrap().clone();
 
                     self.with_scope(closure.scope.clone(), |this| {
                         this.eval_fn_call(&closure_decl, &args)
                     })
+                } else if let Some(id) = self.get_object(id).get_fn_hir_id() {
+                    let fn_decl = self
+                        .resolve_fn_decl(id)
+                        .unwrap_or_else(|| panic!("Function {} not found", path.join("::")))
+                        .clone();
+
+                    self.with_scope(self.root_scope.scope.clone(), |this| {
+                        this.eval_fn_call(&fn_decl, &args)
+                    })
+                } else if let Some(TlangObjectKind::NativeFn) = self.objects.get(&id) {
+                    let current_scope = self.current_scope.clone();
+                    self.current_scope = self.root_scope.scope.clone();
+                    let native_fn = self.root_scope.native_fns.get(&id).unwrap();
+                    let result = native_fn(&args);
+                    self.current_scope = current_scope;
+                    result
                 } else {
                     panic!(
                         "`{:?}` is not a function: {:?}",
@@ -433,13 +468,12 @@ impl Interpreter {
                     );
                 }
             }
-            hir::ExprKind::Path(path)
-                if let Some(native_fn) = self.root_scope.native_fn_decls.get(&path.join("::")) =>
-            {
-                native_fn(&args)
-            }
             hir::ExprKind::Path(path) => {
-                panic!("Function `{}` not found", path.join("::"));
+                panic!(
+                    "Function `{}` not found\nCurrent scope: {:?}",
+                    path.join("::"),
+                    self.current_scope.borrow()
+                );
             }
             _ => todo!("eval_call: {:?}", call_expr.callee),
         }
@@ -537,12 +571,16 @@ impl Interpreter {
                         .map(|s| s.field_values.len())
                         .unwrap_or(0);
 
-                    // Empty list pattern is a special case, it matches any list with 0 elements.
-                    if patterns.is_empty() && list_values_length > 1 {
+                    // Empty list pattern is a special case, it only matches lists with 0 elements.
+                    if patterns.is_empty() && list_values_length >= 1 {
                         return false;
                     }
 
-                    if patterns.len() > list_values_length {
+                    // Not enough values in the list to match the pattern.
+                    // Rest patterns are allowed to match 0 values.
+                    let patterns_len =
+                        patterns.len() - patterns.iter().find(|p| p.is_rest()).map_or(0, |_| 1);
+                    if patterns_len > list_values_length {
                         return false;
                     }
 
@@ -794,8 +832,19 @@ mod tests {
 
         let calls_tracker = calls.clone();
 
-        interpreter.interpreter.root_scope.native_fn_decls.insert(
-            "log".to_string(),
+        let log_fn_object_id = interpreter
+            .interpreter
+            .root_scope
+            .scope
+            .borrow()
+            .values
+            .get("log")
+            .unwrap()
+            .get_object_id()
+            .unwrap();
+
+        interpreter.interpreter.root_scope.native_fns.insert(
+            log_fn_object_id,
             Box::new(move |args| {
                 calls_tracker.borrow_mut().push(args.to_vec());
                 TlangValue::Nil

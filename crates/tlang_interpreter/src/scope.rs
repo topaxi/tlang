@@ -2,18 +2,18 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use tlang_hir::hir;
+use tlang_hir::hir::{self, HirId};
 
 use crate::resolver::Resolver;
-use crate::value::TlangValue;
+use crate::value::{TlangNativeFn, TlangObjectId, TlangValue};
 
 #[derive(Debug, Default)]
 pub(crate) struct Scope {
     pub parent: Option<Rc<RefCell<Scope>>>,
     pub values: HashMap<String, TlangValue>,
     pub return_value: Option<TlangValue>,
-    pub fn_decls: HashMap<String, Rc<hir::FunctionDeclaration>>,
-    pub struct_decls: HashMap<String, Rc<hir::StructDeclaration>>,
+    pub fn_decls: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
+    pub struct_decls: HashMap<HirId, Rc<hir::StructDeclaration>>,
 }
 
 impl Resolver for Scope {
@@ -29,48 +29,31 @@ impl Resolver for Scope {
         }
     }
 
-    fn resolve_fn(&self, path: &hir::Path) -> Option<Rc<hir::FunctionDeclaration>> {
-        let path_name = path.join("::");
-
-        match self.fn_decls.get(&path_name) {
-            Some(decl) => Some(decl.clone()),
-            None => match &self.parent {
-                Some(parent) => parent.borrow().resolve_fn(path),
-                None => None,
-            },
+    fn resolve_fn_decl(&self, id: hir::HirId) -> Option<Rc<hir::FunctionDeclaration>> {
+        if let Some(decl) = self.fn_decls.get(&id) {
+            return Some(decl.clone());
         }
-    }
 
-    fn resolve_struct(&self, path: &hir::Path) -> Option<Rc<hir::StructDeclaration>> {
-        let path_name = path.join("::");
-
-        match self.struct_decls.get(&path_name) {
-            Some(decl) => Some(decl.clone()),
-            None => match &self.parent {
-                Some(parent) => parent.borrow().resolve_struct(path),
-                None => None,
-            },
+        if let Some(parent) = &self.parent {
+            return parent.borrow().resolve_fn_decl(id);
         }
+
+        None
     }
 }
 
-type TlangNativeFn = Box<dyn Fn(&[TlangValue]) -> TlangValue>;
-
 #[derive(Default)]
 pub(crate) struct RootScope {
-    pub scope: Rc<Scope>,
-    pub native_fn_decls: HashMap<String, TlangNativeFn>,
-    pub native_struct_decls: HashMap<String, ()>,
+    pub scope: Rc<RefCell<Scope>>,
+    pub native_fns: HashMap<TlangObjectId, TlangNativeFn>,
 }
 
 impl Resolver for RootScope {
     fn resolve_path(&self, path: &hir::Path) -> Option<TlangValue> {
-        self.scope.resolve_path(path)
+        self.scope.borrow().resolve_path(path)
     }
-    fn resolve_fn(&self, path: &hir::Path) -> Option<Rc<hir::FunctionDeclaration>> {
-        self.scope.resolve_fn(path)
-    }
-    fn resolve_struct(&self, path: &hir::Path) -> Option<Rc<hir::StructDeclaration>> {
-        self.scope.resolve_struct(path)
+
+    fn resolve_fn_decl(&self, id: hir::HirId) -> Option<Rc<hir::FunctionDeclaration>> {
+        self.scope.borrow().resolve_fn_decl(id)
     }
 }
