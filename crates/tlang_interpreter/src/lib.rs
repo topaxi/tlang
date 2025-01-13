@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use tlang_ast::node::UnaryOp;
 use tlang_ast::token;
 use tlang_hir::hir::{self, HirId};
 
@@ -221,13 +222,14 @@ impl Interpreter {
 
     fn eval_expr(&mut self, expr: &hir::Expr) -> TlangValue {
         match &expr.kind {
+            hir::ExprKind::Path(path) => self.resolve_path(path).unwrap_or(TlangValue::Nil),
             hir::ExprKind::Literal(value) => self.eval_literal(value),
             hir::ExprKind::List(values) => self.eval_list_expr(values),
             hir::ExprKind::Block(block) => self.eval_block(block),
             hir::ExprKind::Binary(op, lhs, rhs) => self.eval_binary(*op, lhs, rhs),
             hir::ExprKind::Call(call_expr) => self.eval_call(call_expr),
             hir::ExprKind::TailCall(call_expr) => self.eval_tail_call(call_expr),
-            hir::ExprKind::Path(path) => self.resolve_path(path).unwrap_or(TlangValue::Nil),
+            hir::ExprKind::Unary(op, expr) => self.eval_unary(*op, expr),
             hir::ExprKind::IfElse(condition, consequence, else_clauses) => {
                 let condition = self.eval_expr(condition);
                 if let TlangValue::Bool(true) = condition {
@@ -340,6 +342,13 @@ impl Interpreter {
             hir::BinaryOpKind::And | hir::BinaryOpKind::Or => {
                 unreachable!();
             }
+        }
+    }
+
+    fn eval_unary(&mut self, op: UnaryOp, _expr: &hir::Expr) -> TlangValue {
+        match op {
+            UnaryOp::Rest => unreachable!("Rest operator implemented in eval_list_expr"),
+            _ => todo!("eval_unary: {:?}", op),
         }
     }
 
@@ -521,8 +530,19 @@ impl Interpreter {
     fn eval_list_expr(&mut self, values: &[hir::Expr]) -> TlangValue {
         let list = TlangValue::new_object();
         let mut field_values = Vec::with_capacity(values.len());
-        for value in values {
-            field_values.push(self.eval_expr(value));
+        for expr in values {
+            if let hir::ExprKind::Unary(UnaryOp::Spread, expr) = &expr.kind {
+                let value = self.eval_expr(expr);
+
+                if let TlangValue::Object(id) = value {
+                    let struct_values = &self.get_object(id).get_struct().unwrap().field_values;
+                    field_values.extend(struct_values);
+                } else {
+                    panic!("Expected list, got {:?}", value);
+                }
+            } else {
+                field_values.push(self.eval_expr(expr));
+            }
         }
 
         self.objects.insert(
@@ -549,6 +569,12 @@ impl Interpreter {
     fn eval_match_arm(&mut self, arm: &hir::MatchArm, value: &TlangValue) -> Option<TlangValue> {
         self.with_new_scope(|this| {
             if this.eval_pat(&arm.pat, value) {
+                if let Some(expr) = &arm.guard {
+                    if !this.eval_expr(expr).is_truthy() {
+                        return None;
+                    }
+                }
+
                 Some(this.eval_expr(&arm.expr))
             } else {
                 None

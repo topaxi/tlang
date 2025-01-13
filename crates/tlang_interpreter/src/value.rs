@@ -86,6 +86,16 @@ impl TlangValue {
             _ => None,
         }
     }
+
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            TlangValue::Nil => false,
+            TlangValue::Int(i) => *i != 0,
+            TlangValue::Float(f) => *f != 0.0,
+            TlangValue::Bool(b) => *b,
+            TlangValue::Object(_) => true,
+        }
+    }
 }
 
 impl std::fmt::Display for TlangValue {
