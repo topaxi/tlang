@@ -123,6 +123,10 @@ impl Pat {
         matches!(self.kind, PatKind::Wildcard)
     }
 
+    pub fn is_rest(&self) -> bool {
+        matches!(self.kind, PatKind::Rest(_))
+    }
+
     pub fn is_identifier(&self) -> bool {
         matches!(self.kind, PatKind::Identifier(_, _))
     }

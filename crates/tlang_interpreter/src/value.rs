@@ -33,9 +33,12 @@ impl TlangObjectId {
     }
 }
 
+pub type TlangNativeFn = Box<dyn Fn(&[TlangValue]) -> TlangValue>;
+
 #[derive(Debug)]
 pub enum TlangObjectKind {
-    Fn, // TODO
+    Fn(HirId),
+    NativeFn,
     Struct(TlangStruct),
     Closure(TlangClosure),
 }
@@ -48,9 +51,16 @@ impl TlangObjectKind {
         }
     }
 
-    pub(crate) fn get_fn(&self) -> Option<&TlangClosure> {
+    pub(crate) fn get_closure(&self) -> Option<&TlangClosure> {
         match self {
             TlangObjectKind::Closure(f) => Some(f),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn get_fn_hir_id(&self) -> Option<HirId> {
+        match self {
+            TlangObjectKind::Fn(id) => Some(*id),
             _ => None,
         }
     }
