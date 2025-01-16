@@ -69,6 +69,25 @@ impl InterpreterState {
             panic!("Attempted to exit root scope!");
         }
     }
+
+    pub fn new_object(&mut self, kind: TlangObjectKind) -> TlangValue {
+        let obj = TlangValue::new_object();
+
+        self.objects.insert(obj.get_object_id().unwrap(), kind);
+
+        obj
+    }
+
+    pub fn define_native_fn(&mut self, name: &str, f: fn(&[TlangValue]) -> TlangValue) {
+        let fn_object = self.new_object(TlangObjectKind::NativeFn);
+
+        self.root_scope
+            .borrow_mut()
+            .insert_value(name.to_string(), fn_object);
+
+        self.native_fns
+            .insert(fn_object.get_object_id().unwrap(), Box::new(f));
+    }
 }
 
 pub struct Interpreter {
@@ -118,26 +137,11 @@ impl Interpreter {
     }
 
     pub fn new_object(&mut self, kind: TlangObjectKind) -> TlangValue {
-        let obj = TlangValue::new_object();
-
-        self.state
-            .objects
-            .insert(obj.get_object_id().unwrap(), kind);
-
-        obj
+        self.state.new_object(kind)
     }
 
     pub fn define_native_fn(&mut self, name: &str, f: fn(&[TlangValue]) -> TlangValue) {
-        let fn_object = self.new_object(TlangObjectKind::NativeFn);
-
-        self.state
-            .root_scope
-            .borrow_mut()
-            .insert_value(name.to_string(), fn_object);
-
-        self.state
-            .native_fns
-            .insert(fn_object.get_object_id().unwrap(), Box::new(f));
+        self.state.define_native_fn(name, f);
     }
 
     fn resolve_closure_decl(&self, id: HirId) -> Option<&hir::FunctionDeclaration> {
