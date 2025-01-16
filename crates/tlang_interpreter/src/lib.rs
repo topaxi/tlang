@@ -51,6 +51,26 @@ impl Resolver for InterpreterState {
     }
 }
 
+impl InterpreterState {
+    fn enter_scope(&mut self) {
+        let child_scope = Scope::new_child(self.current_scope.clone());
+        self.current_scope = Rc::new(RefCell::new(child_scope));
+    }
+
+    fn exit_scope(&mut self) {
+        let parent_scope = {
+            let current_scope = self.current_scope.borrow();
+            current_scope.parent.clone()
+        };
+
+        if let Some(parent) = parent_scope {
+            self.current_scope = parent;
+        } else {
+            panic!("Attempted to exit root scope!");
+        }
+    }
+}
+
 pub struct Interpreter {
     state: InterpreterState,
 }
@@ -132,24 +152,14 @@ impl Interpreter {
         self.state.objects.get(&id).unwrap()
     }
 
+    #[inline(always)]
     fn enter_scope(&mut self) {
-        let new_scope = Rc::new(RefCell::new(Scope::new_child(
-            self.state.current_scope.clone(),
-        )));
-        self.state.current_scope = new_scope;
+        self.state.enter_scope();
     }
 
+    #[inline(always)]
     fn exit_scope(&mut self) {
-        let parent_scope = {
-            let current_scope = self.state.current_scope.borrow();
-            current_scope.parent.clone()
-        };
-
-        if let Some(parent) = parent_scope {
-            self.state.current_scope = parent;
-        } else {
-            panic!("Attempted to exit root scope!");
-        }
+        self.state.exit_scope();
     }
 
     #[inline(always)]
