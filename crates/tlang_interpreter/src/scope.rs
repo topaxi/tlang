@@ -5,7 +5,7 @@ use std::rc::Rc;
 use tlang_hir::hir::{self, HirId};
 
 use crate::resolver::Resolver;
-use crate::value::{TlangNativeFn, TlangObjectId, TlangValue};
+use crate::value::TlangValue;
 
 #[derive(Debug, Default)]
 pub(crate) struct Scope {
@@ -42,18 +42,15 @@ impl Resolver for Scope {
     }
 }
 
-#[derive(Default)]
-pub(crate) struct RootScope {
-    pub scope: Rc<RefCell<Scope>>,
-    pub native_fns: HashMap<TlangObjectId, TlangNativeFn>,
-}
-
-impl Resolver for RootScope {
-    fn resolve_path(&self, path: &hir::Path) -> Option<TlangValue> {
-        self.scope.borrow().resolve_path(path)
+impl Scope {
+    pub fn new_child(parent: Rc<RefCell<Scope>>) -> Self {
+        Self {
+            parent: Some(parent),
+            ..Default::default()
+        }
     }
 
-    fn resolve_fn_decl(&self, id: hir::HirId) -> Option<Rc<hir::FunctionDeclaration>> {
-        self.scope.borrow().resolve_fn_decl(id)
+    pub fn insert_value(&mut self, name: String, value: TlangValue) {
+        self.values.insert(name, value);
     }
 }

@@ -9,33 +9,59 @@ use tlang_ast::token;
 use tlang_hir::hir::{self, HirId};
 
 use self::resolver::Resolver;
-use self::scope::{RootScope, Scope};
-use self::value::{TlangClosure, TlangObjectId, TlangObjectKind, TlangStruct, TlangValue};
+use self::scope::Scope;
+use self::value::{
+    TlangClosure, TlangNativeFn, TlangObjectId, TlangObjectKind, TlangStruct, TlangValue,
+};
 
 mod resolver;
 mod scope;
 mod value;
 
-pub struct Interpreter {
-    root_scope: RootScope,
+struct InterpreterState {
+    root_scope: Rc<RefCell<Scope>>,
     current_scope: Rc<RefCell<Scope>>,
     closures: HashMap<HirId, hir::FunctionDeclaration>,
     objects: HashMap<TlangObjectId, TlangObjectKind>,
+    native_fns: HashMap<TlangObjectId, TlangNativeFn>,
+}
+
+impl Default for InterpreterState {
+    fn default() -> Self {
+        let root_scope = Rc::new(RefCell::new(Scope::default()));
+        let current_scope = root_scope.clone();
+
+        Self {
+            root_scope,
+            current_scope,
+            closures: HashMap::new(),
+            objects: HashMap::new(),
+            native_fns: HashMap::new(),
+        }
+    }
+}
+
+impl Resolver for InterpreterState {
+    fn resolve_path(&self, path: &hir::Path) -> Option<TlangValue> {
+        self.current_scope.borrow().resolve_path(path)
+    }
+
+    fn resolve_fn_decl(&self, id: hir::HirId) -> Option<Rc<hir::FunctionDeclaration>> {
+        self.current_scope.borrow().resolve_fn_decl(id)
+    }
+}
+
+pub struct Interpreter {
+    state: InterpreterState,
 }
 
 impl Resolver for Interpreter {
     fn resolve_path(&self, path: &hir::Path) -> Option<TlangValue> {
-        match self.current_scope.borrow().resolve_path(path) {
-            Some(value) => Some(value),
-            None => self.root_scope.resolve_path(path),
-        }
+        self.state.resolve_path(path)
     }
 
     fn resolve_fn_decl(&self, id: hir::HirId) -> Option<Rc<hir::FunctionDeclaration>> {
-        match self.current_scope.borrow().resolve_fn_decl(id) {
-            Some(decl) => Some(decl),
-            None => self.root_scope.resolve_fn_decl(id),
-        }
+        self.state.resolve_fn_decl(id)
     }
 }
 
@@ -53,16 +79,8 @@ impl Default for Interpreter {
 
 impl Interpreter {
     pub fn new() -> Self {
-        let root_scope = RootScope {
-            scope: Rc::new(RefCell::new(Scope::default())),
-            native_fns: HashMap::new(),
-        };
-
         let mut interpreter = Self {
-            current_scope: root_scope.scope.clone(),
-            root_scope,
-            closures: HashMap::new(),
-            objects: HashMap::new(),
+            state: Default::default(),
         };
 
         interpreter.define_native_fn("log", |args| {
@@ -82,7 +100,9 @@ impl Interpreter {
     pub fn new_object(&mut self, kind: TlangObjectKind) -> TlangValue {
         let obj = TlangValue::new_object();
 
-        self.objects.insert(obj.get_object_id().unwrap(), kind);
+        self.state
+            .objects
+            .insert(obj.get_object_id().unwrap(), kind);
 
         obj
     }
@@ -90,45 +110,43 @@ impl Interpreter {
     pub fn define_native_fn(&mut self, name: &str, f: fn(&[TlangValue]) -> TlangValue) {
         let fn_object = self.new_object(TlangObjectKind::NativeFn);
 
-        self.root_scope
-            .scope
+        self.state
+            .root_scope
             .borrow_mut()
-            .values
-            .insert(name.to_string(), fn_object);
+            .insert_value(name.to_string(), fn_object);
 
-        self.root_scope
+        self.state
             .native_fns
             .insert(fn_object.get_object_id().unwrap(), Box::new(f));
     }
 
     fn resolve_closure_decl(&self, id: HirId) -> Option<&hir::FunctionDeclaration> {
-        self.closures.get(&id)
+        self.state.closures.get(&id)
     }
 
     fn insert_closure_decl(&mut self, id: HirId, decl: hir::FunctionDeclaration) {
-        self.closures.insert(id, decl);
+        self.state.closures.insert(id, decl);
     }
 
     fn get_object(&self, id: TlangObjectId) -> &TlangObjectKind {
-        self.objects.get(&id).unwrap()
+        self.state.objects.get(&id).unwrap()
     }
 
     fn enter_scope(&mut self) {
-        let new_scope = Rc::new(RefCell::new(Scope {
-            parent: Some(self.current_scope.clone()),
-            ..Default::default()
-        }));
-        self.current_scope = new_scope;
+        let new_scope = Rc::new(RefCell::new(Scope::new_child(
+            self.state.current_scope.clone(),
+        )));
+        self.state.current_scope = new_scope;
     }
 
     fn exit_scope(&mut self) {
         let parent_scope = {
-            let current_scope = self.current_scope.borrow();
+            let current_scope = self.state.current_scope.borrow();
             current_scope.parent.clone()
         };
 
         if let Some(parent) = parent_scope {
-            self.current_scope = parent;
+            self.state.current_scope = parent;
         } else {
             panic!("Attempted to exit root scope!");
         }
@@ -150,9 +168,9 @@ impl Interpreter {
     where
         F: FnOnce(&mut Self) -> R,
     {
-        let previous_scope = std::mem::replace(&mut self.current_scope, scope);
+        let previous_scope = std::mem::replace(&mut self.state.current_scope, scope);
         let result = f(self);
-        self.current_scope = previous_scope;
+        self.state.current_scope = previous_scope;
         result
     }
 
@@ -190,6 +208,7 @@ impl Interpreter {
         match self.eval_block_stmts(&block.stmts) {
             StmtResult::None => self.eval_block_expr(block),
             StmtResult::Return => self
+                .state
                 .current_scope
                 .borrow_mut()
                 .return_value
@@ -214,7 +233,7 @@ impl Interpreter {
             }
             hir::StmtKind::Return(box Some(expr)) => {
                 let return_value = self.eval_expr(expr);
-                self.current_scope.borrow_mut().return_value = Some(return_value);
+                self.state.current_scope.borrow_mut().return_value = Some(return_value);
                 return StmtResult::Return;
             }
             hir::StmtKind::Return(_) => return StmtResult::Return,
@@ -258,7 +277,7 @@ impl Interpreter {
 
                 self.new_object(TlangObjectKind::Closure(TlangClosure {
                     id: fn_decl.hir_id,
-                    scope: self.current_scope.clone(),
+                    scope: self.state.current_scope.clone(),
                 }))
             }
             hir::ExprKind::Match(expr, arms) => self.eval_match(expr, arms),
@@ -398,7 +417,8 @@ impl Interpreter {
     }
 
     fn eval_fn_decl(&mut self, decl: &hir::FunctionDeclaration) {
-        self.current_scope
+        self.state
+            .current_scope
             .borrow_mut()
             .fn_decls
             .insert(decl.hir_id, Rc::new(decl.clone()));
@@ -408,7 +428,8 @@ impl Interpreter {
                 let path_name = path.join("::");
                 let fn_object = self.new_object(TlangObjectKind::Fn(decl.hir_id));
 
-                self.current_scope
+                self.state
+                    .current_scope
                     .borrow_mut()
                     .values
                     .insert(path_name, fn_object);
@@ -418,7 +439,8 @@ impl Interpreter {
     }
 
     fn eval_struct_decl(&mut self, decl: &hir::StructDeclaration) {
-        self.current_scope
+        self.state
+            .current_scope
             .borrow_mut()
             .struct_decls
             .insert(decl.hir_id, Rc::new(decl.clone()));
@@ -451,15 +473,15 @@ impl Interpreter {
                         .unwrap_or_else(|| panic!("Function {} not found", path.join("::")))
                         .clone();
 
-                    self.with_scope(self.root_scope.scope.clone(), |this| {
+                    self.with_scope(self.state.root_scope.clone(), |this| {
                         this.eval_fn_call(&fn_decl, &args)
                     })
-                } else if let Some(TlangObjectKind::NativeFn) = self.objects.get(&id) {
-                    let current_scope = self.current_scope.clone();
-                    self.current_scope = self.root_scope.scope.clone();
-                    let native_fn = self.root_scope.native_fns.get(&id).unwrap();
+                } else if let Some(TlangObjectKind::NativeFn) = self.state.objects.get(&id) {
+                    let current_scope = self.state.current_scope.clone();
+                    self.state.current_scope = self.state.root_scope.clone();
+                    let native_fn = self.state.native_fns.get(&id).unwrap();
                     let result = native_fn(&args);
-                    self.current_scope = current_scope;
+                    self.state.current_scope = current_scope;
                     result
                 } else {
                     panic!(
@@ -473,7 +495,7 @@ impl Interpreter {
                 panic!(
                     "Function `{}` not found\nCurrent scope: {:?}",
                     path.join("::"),
-                    self.current_scope.borrow()
+                    self.state.current_scope.borrow()
                 );
             }
             _ => todo!("eval_call: {:?}", call_expr.callee),
@@ -497,6 +519,7 @@ impl Interpreter {
         self.with_new_scope(|interpreter| {
             for (param, arg) in fn_decl.parameters.iter().zip(args.iter()) {
                 interpreter
+                    .state
                     .current_scope
                     .borrow_mut()
                     .values
@@ -510,7 +533,8 @@ impl Interpreter {
         match &pat.kind {
             hir::PatKind::Identifier(_id, ident) => {
                 let value = self.eval_expr(expr);
-                self.current_scope
+                self.state
+                    .current_scope
                     .borrow_mut()
                     .values
                     .insert(ident.to_string(), value);
@@ -577,6 +601,7 @@ impl Interpreter {
             hir::PatKind::List(patterns) => {
                 if let TlangValue::Object(id) = value {
                     let list_values_length = self
+                        .state
                         .objects
                         .get(id)
                         .and_then(|o| o.get_struct())
@@ -597,6 +622,7 @@ impl Interpreter {
                     }
 
                     let field_values = self
+                        .state
                         .objects
                         .get(id)
                         .and_then(|o| o.get_struct())
@@ -626,7 +652,8 @@ impl Interpreter {
                 false
             }
             hir::PatKind::Identifier(_id, ident) => {
-                self.current_scope
+                self.state
+                    .current_scope
                     .borrow_mut()
                     .values
                     .insert(ident.to_string(), *value);
@@ -842,8 +869,8 @@ mod tests {
 
         let log_fn_object_id = interpreter
             .interpreter
+            .state
             .root_scope
-            .scope
             .borrow()
             .values
             .get("log")
@@ -851,7 +878,7 @@ mod tests {
             .get_object_id()
             .unwrap();
 
-        interpreter.interpreter.root_scope.native_fns.insert(
+        interpreter.interpreter.state.native_fns.insert(
             log_fn_object_id,
             Box::new(move |args| {
                 calls_tracker.borrow_mut().push(args.to_vec());
