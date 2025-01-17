@@ -4,6 +4,7 @@ use std::rc::Rc;
 use tlang_hir::hir::HirId;
 
 use crate::scope::Scope;
+use crate::InterpreterState;
 
 #[derive(Debug)]
 pub struct TlangClosure {
@@ -33,7 +34,7 @@ impl TlangObjectId {
     }
 }
 
-pub type TlangNativeFn = Box<dyn Fn(&[TlangValue]) -> TlangValue>;
+pub type TlangNativeFn = Box<dyn Fn(&InterpreterState, &[TlangValue]) -> TlangValue>;
 
 #[derive(Debug)]
 pub enum TlangObjectKind {

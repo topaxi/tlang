@@ -18,7 +18,7 @@ mod resolver;
 mod scope;
 mod value;
 
-struct InterpreterState {
+pub struct InterpreterState {
     root_scope: Rc<RefCell<Scope>>,
     current_scope: Rc<RefCell<Scope>>,
     closures: HashMap<HirId, hir::FunctionDeclaration>,
@@ -78,7 +78,11 @@ impl InterpreterState {
         obj
     }
 
-    pub fn define_native_fn(&mut self, name: &str, f: fn(&[TlangValue]) -> TlangValue) {
+    pub fn define_native_fn(
+        &mut self,
+        name: &str,
+        f: fn(&InterpreterState, &[TlangValue]) -> TlangValue,
+    ) {
         let fn_object = self.new_object(TlangObjectKind::NativeFn);
 
         self.root_scope
@@ -122,7 +126,7 @@ impl Interpreter {
             state: Default::default(),
         };
 
-        interpreter.define_native_fn("log", |args| {
+        interpreter.define_native_fn("log", |_, args| {
             println!(
                 "{}",
                 args.iter()
@@ -140,7 +144,11 @@ impl Interpreter {
         self.state.new_object(kind)
     }
 
-    pub fn define_native_fn(&mut self, name: &str, f: fn(&[TlangValue]) -> TlangValue) {
+    pub fn define_native_fn(
+        &mut self,
+        name: &str,
+        f: fn(&InterpreterState, &[TlangValue]) -> TlangValue,
+    ) {
         self.state.define_native_fn(name, f);
     }
 
@@ -490,11 +498,11 @@ impl Interpreter {
                     self.with_scope(self.state.root_scope.clone(), |this| {
                         this.eval_fn_call(&fn_decl, &args)
                     })
-                } else if let Some(TlangObjectKind::NativeFn) = self.state.objects.get(&id) {
+                } else if let TlangObjectKind::NativeFn = self.get_object(id) {
                     let current_scope = self.state.current_scope.clone();
                     self.state.current_scope = self.state.root_scope.clone();
                     let native_fn = self.state.native_fns.get(&id).unwrap();
-                    let result = native_fn(&args);
+                    let result = native_fn(&self.state, &args);
                     self.state.current_scope = current_scope;
                     result
                 } else {
@@ -894,7 +902,7 @@ mod tests {
 
         interpreter.interpreter.state.native_fns.insert(
             log_fn_object_id,
-            Box::new(move |args| {
+            Box::new(move |_, args| {
                 calls_tracker.borrow_mut().push(args.to_vec());
                 TlangValue::Nil
             }),
