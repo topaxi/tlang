@@ -22,6 +22,10 @@ updates:
         patterns:
           - 'wasm-bindgen'
           - 'web-sys'
+      serde:
+        patterns:
+          - 'serde'
+          - 'serde_*'
   - package-ecosystem: 'npm'
     versioning-strategy: 'increase'
     directory: '/'
