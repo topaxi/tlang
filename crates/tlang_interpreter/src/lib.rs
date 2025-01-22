@@ -131,15 +131,11 @@ impl Interpreter {
         interpreter
     }
 
-    pub fn new_object(&mut self, kind: TlangObjectKind) -> TlangValue {
-        self.state.new_object(kind)
-    }
-
     pub fn define_native_fn<F>(&mut self, name: &str, f: F)
     where
         F: Fn(&mut InterpreterState, &[TlangValue]) -> TlangValue + 'static,
     {
-        let fn_object = self.new_object(TlangObjectKind::NativeFn);
+        let fn_object = self.state.new_object(TlangObjectKind::NativeFn);
 
         self.state
             .root_scope
@@ -295,10 +291,11 @@ impl Interpreter {
                     self.insert_closure_decl(fn_decl.hir_id, *fn_decl.clone());
                 }
 
-                self.new_object(TlangObjectKind::Closure(TlangClosure {
-                    id: fn_decl.hir_id,
-                    scope: self.state.current_scope.clone(),
-                }))
+                self.state
+                    .new_object(TlangObjectKind::Closure(TlangClosure {
+                        id: fn_decl.hir_id,
+                        scope: self.state.current_scope.clone(),
+                    }))
             }
             hir::ExprKind::Match(expr, arms) => self.eval_match(expr, arms),
             _ => todo!("eval_expr: {:?}", expr),
@@ -446,7 +443,7 @@ impl Interpreter {
         match decl.name.kind {
             hir::ExprKind::Path(ref path) => {
                 let path_name = path.join("::");
-                let fn_object = self.new_object(TlangObjectKind::Fn(decl.hir_id));
+                let fn_object = self.state.new_object(TlangObjectKind::Fn(decl.hir_id));
 
                 self.state
                     .current_scope
@@ -589,7 +586,7 @@ impl Interpreter {
             }
         }
 
-        self.new_object(TlangObjectKind::Struct(TlangStruct { field_values }))
+        self.state.new_list(field_values)
     }
 
     fn eval_match(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) -> TlangValue {
@@ -661,10 +658,7 @@ impl Interpreter {
                     for (i, pat) in patterns.iter().enumerate() {
                         if let hir::PatKind::Rest(pat) = &pat.kind {
                             let rest_values = field_values[i..].to_vec();
-                            let rest_object =
-                                self.new_object(TlangObjectKind::Struct(TlangStruct {
-                                    field_values: rest_values,
-                                }));
+                            let rest_object = self.state.new_list(rest_values);
 
                             return self.eval_pat(pat, &rest_object);
                         }
