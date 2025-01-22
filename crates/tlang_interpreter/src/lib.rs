@@ -16,14 +16,13 @@ use self::value::{
 
 mod resolver;
 mod scope;
-mod value;
+pub mod value;
 
 pub struct InterpreterState {
     root_scope: Rc<RefCell<Scope>>,
     current_scope: Rc<RefCell<Scope>>,
     closures: HashMap<HirId, hir::FunctionDeclaration>,
     objects: HashMap<TlangObjectId, TlangObjectKind>,
-    native_fns: HashMap<TlangObjectId, TlangNativeFn>,
 }
 
 impl Default for InterpreterState {
@@ -36,7 +35,6 @@ impl Default for InterpreterState {
             current_scope,
             closures: HashMap::new(),
             objects: HashMap::new(),
-            native_fns: HashMap::new(),
         }
     }
 }
@@ -78,24 +76,16 @@ impl InterpreterState {
         obj
     }
 
-    pub fn define_native_fn(
-        &mut self,
-        name: &str,
-        f: fn(&InterpreterState, &[TlangValue]) -> TlangValue,
-    ) {
-        let fn_object = self.new_object(TlangObjectKind::NativeFn);
-
-        self.root_scope
-            .borrow_mut()
-            .insert_value(name.to_string(), fn_object);
-
-        self.native_fns
-            .insert(fn_object.get_object_id().unwrap(), Box::new(f));
+    pub fn new_list(&mut self, values: Vec<TlangValue>) -> TlangValue {
+        self.new_object(TlangObjectKind::Struct(TlangStruct {
+            field_values: values,
+        }))
     }
 }
 
 pub struct Interpreter {
     state: InterpreterState,
+    native_fns: HashMap<TlangObjectId, TlangNativeFn>,
 }
 
 impl Resolver for Interpreter {
@@ -124,6 +114,7 @@ impl Interpreter {
     pub fn new() -> Self {
         let mut interpreter = Self {
             state: Default::default(),
+            native_fns: HashMap::new(),
         };
 
         interpreter.define_native_fn("log", |_, args| {
@@ -144,12 +135,19 @@ impl Interpreter {
         self.state.new_object(kind)
     }
 
-    pub fn define_native_fn(
-        &mut self,
-        name: &str,
-        f: fn(&InterpreterState, &[TlangValue]) -> TlangValue,
-    ) {
-        self.state.define_native_fn(name, f);
+    pub fn define_native_fn<F>(&mut self, name: &str, f: F)
+    where
+        F: Fn(&mut InterpreterState, &[TlangValue]) -> TlangValue + 'static,
+    {
+        let fn_object = self.new_object(TlangObjectKind::NativeFn);
+
+        self.state
+            .root_scope
+            .borrow_mut()
+            .insert_value(name.to_string(), fn_object);
+
+        self.native_fns
+            .insert(fn_object.get_object_id().unwrap(), Box::new(f));
     }
 
     fn resolve_closure_decl(&self, id: HirId) -> Option<&hir::FunctionDeclaration> {
@@ -501,8 +499,17 @@ impl Interpreter {
                 } else if let TlangObjectKind::NativeFn = self.get_object(id) {
                     let current_scope = self.state.current_scope.clone();
                     self.state.current_scope = self.state.root_scope.clone();
-                    let native_fn = self.state.native_fns.get(&id).unwrap();
-                    let result = native_fn(&self.state, &args);
+
+                    let result = if let Some(native_fn) = self.native_fns.get_mut(&id) {
+                        native_fn(&mut self.state, &args)
+                    } else {
+                        panic!(
+                            "`{:?}` is not a function: {:?}",
+                            path.join("::"),
+                            self.get_object(id)
+                        );
+                    };
+
                     self.state.current_scope = current_scope;
                     result
                 } else {
@@ -900,7 +907,7 @@ mod tests {
             .get_object_id()
             .unwrap();
 
-        interpreter.interpreter.state.native_fns.insert(
+        interpreter.interpreter.native_fns.insert(
             log_fn_object_id,
             Box::new(move |_, args| {
                 calls_tracker.borrow_mut().push(args.to_vec());

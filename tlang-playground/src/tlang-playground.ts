@@ -229,6 +229,10 @@ export class TlangPlayground extends LitElement {
   private runInterpreted() {
     let interpreter = new TlangInterpreter();
 
+    interpreter.define_js_fn('log', (...args: unknown[]) => {
+      this.consoleOutput = [...this.consoleOutput, args];
+    });
+
     interpreter.eval(this.source);
   }
 
@@ -326,12 +330,25 @@ export class TlangPlayground extends LitElement {
     updateDisplayHashparam(this.display);
   }
 
+  private stringify(value: unknown) {
+    function bigintToJSON(n: bigint) {
+      if (n > BigInt(Number.MAX_SAFE_INTEGER)) {
+        return n.toString();
+      } else if (n < BigInt(Number.MIN_SAFE_INTEGER)) {
+        return n.toString();
+      } else {
+        return Number(n);
+      }
+    }
+    return JSON.stringify(value, (_, v) =>
+      typeof v === 'bigint' ? bigintToJSON(v) : v,
+    );
+  }
+
   renderLogMessage(args: string | unknown[]) {
     return html`
       <div class="log-message">
-        ${typeof args === 'string'
-          ? args
-          : args.map((arg) => JSON.stringify(arg)).join(', ')}
+        ${typeof args === 'string' ? args : args.map(this.stringify).join(', ')}
       </div>
     `;
   }

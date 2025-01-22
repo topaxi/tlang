@@ -34,7 +34,7 @@ impl TlangObjectId {
     }
 }
 
-pub type TlangNativeFn = Box<dyn Fn(&InterpreterState, &[TlangValue]) -> TlangValue>;
+pub type TlangNativeFn = Box<dyn FnMut(&mut InterpreterState, &[TlangValue]) -> TlangValue>;
 
 #[derive(Debug)]
 pub enum TlangObjectKind {
