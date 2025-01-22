@@ -593,6 +593,7 @@ version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
  "gloo-utils",
+ "js-sys",
  "ron 0.8.1",
  "serde_json",
  "tlang_ast",

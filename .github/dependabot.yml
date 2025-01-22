@@ -22,6 +22,7 @@ updates:
         patterns:
           - 'wasm-bindgen'
           - 'web-sys'
+          - 'js-sys'
       serde:
         patterns:
           - 'serde'
