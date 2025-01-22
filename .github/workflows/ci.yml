@@ -45,7 +45,7 @@ jobs:
       # keys easily.
       - name: Install wasm-bindgen
         run: |
-          cargo install -f wasm-bindgen-cli --version $(grep -oP 'wasm-bindgen = "\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
+          cargo install -f wasm-bindgen-cli --version $(grep -oP 'wasm-bindgen = "=\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
 
       - name: Install wasm toolchain
         run: |
