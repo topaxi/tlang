@@ -525,6 +525,10 @@ impl Interpreter {
                     );
                 }
             }
+            // If the path resolves to a struct, we create a new object.
+            hir::ExprKind::Path(_path) if false => {
+                todo!("Constructing structs not implemented yet")
+            }
             hir::ExprKind::Path(path) => {
                 panic!(
                     "Function `{}` not found\nCurrent scope: {:?}",
@@ -604,24 +608,20 @@ impl Interpreter {
         for entry in entries {
             field_values.push(self.eval_expr(&entry.1));
 
-            let key = self.eval_expr(&entry.0);
-
-            if let TlangValue::Object(id) = key {
-                if let TlangObjectKind::String(str) = self.get_object(id) {
-                    shape_keys.push(str.to_string());
-                } else {
-                    panic!("Expected string key, got {:?}", key);
-                }
-            } else {
-                panic!("Expected string key, got {:?}", key);
-            }
+            // As we primarily had compilation to JS in mind, paths here should actually be
+            // strings instead. Need to update the parser to emit strings instead of paths,
+            // and paths when using brackets.
+            match &entry.0.kind {
+                hir::ExprKind::Path(path) => shape_keys.push(path.first_ident().to_string()),
+                _ => todo!("eval_dict_expr: {:?}", entry.0),
+            };
         }
 
         let shape = ShapeKey::from_dict_keys(&shape_keys);
 
         if self.state.get_shape(shape).is_none() {
             self.state
-                .define_native_struct("Dict".to_string(), shape_keys, HashMap::new());
+                .define_struct_shape(shape, "Dict".to_string(), shape_keys, HashMap::new());
         }
 
         self.state.new_object(TlangObjectKind::Struct(TlangStruct {

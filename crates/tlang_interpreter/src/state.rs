@@ -82,6 +82,10 @@ impl InterpreterState {
         }))
     }
 
+    pub fn new_string(&mut self, value: String) -> TlangValue {
+        self.new_object(TlangObjectKind::String(value))
+    }
+
     pub fn define_native_struct(
         &mut self,
         name: String,
@@ -89,6 +93,16 @@ impl InterpreterState {
         methods: HashMap<String, TlangStructMethod>,
     ) -> ShapeKey {
         let shape_key = ShapeKey::new_native();
+        self.define_struct_shape(shape_key, name, fields, methods)
+    }
+
+    pub fn define_struct_shape(
+        &mut self,
+        shape_key: ShapeKey,
+        name: String,
+        fields: Vec<String>,
+        methods: HashMap<String, TlangStructMethod>,
+    ) -> ShapeKey {
         let shape = TlangStructShape::new(name, fields, methods);
         self.shapes.insert(shape_key, shape);
         shape_key
