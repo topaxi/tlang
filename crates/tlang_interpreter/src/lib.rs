@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use tlang_ast::node::UnaryOp;
+use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token;
 use tlang_hir::hir::{self, HirId};
 
@@ -12,8 +12,8 @@ use self::resolver::Resolver;
 use self::scope::Scope;
 use self::state::InterpreterState;
 use self::value::{
-    ShapeKey, TlangClosure, TlangNativeFn, TlangObjectId, TlangObjectKind, TlangStructShape,
-    TlangValue,
+    ShapeKey, TlangClosure, TlangNativeFn, TlangObjectId, TlangObjectKind, TlangStruct,
+    TlangStructShape, TlangValue,
 };
 
 mod resolver;
@@ -232,7 +232,9 @@ impl Interpreter {
             hir::ExprKind::Path(path) => self.resolve_path(path).unwrap_or(TlangValue::Nil),
             hir::ExprKind::Literal(value) => self.eval_literal(value),
             hir::ExprKind::List(values) => self.eval_list_expr(values),
+            hir::ExprKind::Dict(entries) => self.eval_dict_expr(entries),
             hir::ExprKind::IndexAccess(lhs, rhs) => self.eval_index_access(lhs, rhs),
+            hir::ExprKind::FieldAccess(lhs, rhs) => self.eval_field_access(lhs, rhs),
             hir::ExprKind::Block(block) => self.eval_block(block),
             hir::ExprKind::Binary(op, lhs, rhs) => self.eval_binary(*op, lhs, rhs),
             hir::ExprKind::Call(call_expr) => self.eval_call(call_expr),
@@ -272,18 +274,29 @@ impl Interpreter {
     }
 
     fn eval_index_access(&mut self, lhs: &hir::Expr, rhs: &hir::Expr) -> TlangValue {
-        let lhs = self.eval_expr(lhs);
-        let rhs = self.eval_expr(rhs);
+        if let TlangValue::Int(index) = self.eval_expr(rhs) {
+            let lhs = self.eval_expr(lhs);
 
-        if let TlangValue::Object(id) = lhs {
-            if let Some(TlangObjectKind::Struct(obj)) = self.state.get_object(id) {
-                if let TlangValue::Int(index) = rhs {
+            if let TlangValue::Object(id) = lhs {
+                if let Some(TlangObjectKind::Struct(obj)) = self.state.get_object(id) {
                     return obj.field_values[index as usize];
                 }
             }
         }
 
-        todo!("eval_index_access: {:?}[{:?}]", lhs, rhs);
+        todo!("eval_index_access: {:?}[{:?}]", lhs, rhs)
+    }
+
+    fn eval_field_access(&mut self, lhs: &hir::Expr, ident: &Ident) -> TlangValue {
+        if let TlangValue::Object(id) = self.eval_expr(lhs) {
+            if let Some(TlangObjectKind::Struct(obj)) = self.state.get_object(id) {
+                if let Some(index) = self.state.get_field_index(obj.shape, ident.as_str()) {
+                    return obj.field_values[index];
+                }
+            }
+        }
+
+        todo!("eval_field_access: {:?}.{:?}", lhs, ident);
     }
 
     fn eval_literal(&mut self, literal: &token::Literal) -> TlangValue {
@@ -445,6 +458,17 @@ impl Interpreter {
             .borrow_mut()
             .struct_decls
             .insert(decl.hir_id, Rc::new(decl.clone()));
+
+        let struct_shape = TlangStructShape::new(
+            decl.name.to_string(),
+            decl.fields
+                .iter()
+                .map(|field| field.name.to_string())
+                .collect(),
+            HashMap::new(),
+        );
+
+        self.state.shapes.insert(decl.hir_id.into(), struct_shape);
     }
 
     fn eval_tail_call(&mut self, call_expr: &hir::CallExpression) -> TlangValue {
@@ -571,6 +595,39 @@ impl Interpreter {
         }
 
         self.state.new_list(field_values)
+    }
+
+    fn eval_dict_expr(&mut self, entries: &[(hir::Expr, hir::Expr)]) -> TlangValue {
+        let mut field_values = Vec::with_capacity(entries.len());
+        let mut shape_keys = Vec::with_capacity(entries.len());
+
+        for entry in entries {
+            field_values.push(self.eval_expr(&entry.1));
+
+            let key = self.eval_expr(&entry.0);
+
+            if let TlangValue::Object(id) = key {
+                if let TlangObjectKind::String(str) = self.get_object(id) {
+                    shape_keys.push(str.to_string());
+                } else {
+                    panic!("Expected string key, got {:?}", key);
+                }
+            } else {
+                panic!("Expected string key, got {:?}", key);
+            }
+        }
+
+        let shape = ShapeKey::from_dict_keys(&shape_keys);
+
+        if self.state.get_shape(shape).is_none() {
+            self.state
+                .define_native_struct("Dict".to_string(), shape_keys, HashMap::new());
+        }
+
+        self.state.new_object(TlangObjectKind::Struct(TlangStruct {
+            shape,
+            field_values,
+        }))
     }
 
     fn eval_match(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) -> TlangValue {
@@ -895,5 +952,18 @@ mod tests {
 
         assert_matches!(interpreter.eval("log(10)"), TlangValue::Nil);
         assert_matches!(calls.borrow()[0][..], [TlangValue::Int(10)]);
+    }
+
+    #[test]
+    fn test_struct_field_access() {
+        let mut interpreter = interpreter(indoc! {"
+            struct Point {
+                x: Int,
+                y: Int,
+            }
+            let point = Point { x: 10, y: 20 };
+        "});
+        assert_matches!(interpreter.eval("point.x"), TlangValue::Int(10));
+        assert_matches!(interpreter.eval("point.y"), TlangValue::Int(20));
     }
 }

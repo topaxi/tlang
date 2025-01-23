@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::hash::DefaultHasher;
 use std::rc::Rc;
 
 use tlang_hir::hir::HirId;
@@ -20,10 +21,14 @@ pub struct TlangStruct {
     pub field_values: Vec<TlangValue>,
 }
 
+// ShapeKeyDict is a hash value generated from each of the keys in the struct.
+type ShapeKeyDict = u64;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum ShapeKeyImpl {
     HirId(HirId),
     Native(usize),
+    Dict(ShapeKeyDict),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -39,6 +44,24 @@ impl ShapeKey {
 
     pub fn new_hir_id(id: HirId) -> Self {
         ShapeKey(ShapeKeyImpl::HirId(id))
+    }
+
+    pub fn from_dict_keys(keys: &[String]) -> Self {
+        let mut hasher = DefaultHasher::new();
+
+        for key in keys.iter() {
+            std::hash::Hash::hash(&key, &mut hasher);
+        }
+
+        let hash = std::hash::Hasher::finish(&hasher);
+
+        ShapeKey(ShapeKeyImpl::Dict(hash))
+    }
+}
+
+impl From<HirId> for ShapeKey {
+    fn from(id: HirId) -> Self {
+        ShapeKey::new_hir_id(id)
     }
 }
 
@@ -95,6 +118,7 @@ pub type TlangNativeFn = Box<dyn FnMut(&mut InterpreterState, &[TlangValue]) -> 
 pub enum TlangObjectKind {
     Fn(HirId),
     NativeFn,
+    String(String),
     Struct(TlangStruct),
     Closure(TlangClosure),
 }
@@ -120,6 +144,13 @@ impl TlangObjectKind {
             _ => None,
         }
     }
+
+    pub(crate) fn get_str(&self) -> Option<&str> {
+        match self {
+            TlangObjectKind::String(s) => Some(s),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -129,6 +160,20 @@ pub enum TlangValue {
     Float(f64),
     Bool(bool),
     Object(TlangObjectId),
+}
+
+impl std::cmp::Eq for TlangValue {}
+
+impl std::hash::Hash for TlangValue {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            TlangValue::Nil => 0.hash(state),
+            TlangValue::Int(i) => i.hash(state),
+            TlangValue::Float(f) => f.to_bits().hash(state), // do we want to support this?
+            TlangValue::Bool(b) => b.hash(state),
+            TlangValue::Object(id) => id.hash(state),
+        }
+    }
 }
 
 impl TlangValue {

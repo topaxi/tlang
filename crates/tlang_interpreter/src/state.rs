@@ -93,4 +93,14 @@ impl InterpreterState {
         self.shapes.insert(shape_key, shape);
         shape_key
     }
+
+    pub fn get_shape(&self, key: ShapeKey) -> Option<&TlangStructShape> {
+        self.shapes.get(&key)
+    }
+
+    pub fn get_field_index(&self, shape: ShapeKey, field: &str) -> Option<usize> {
+        self.shapes
+            .get(&shape)
+            .and_then(|shape| shape.field_map.get(field).copied())
+    }
 }
