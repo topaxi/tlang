@@ -10,78 +10,16 @@ use tlang_hir::hir::{self, HirId};
 
 use self::resolver::Resolver;
 use self::scope::Scope;
+use self::state::InterpreterState;
 use self::value::{
-    TlangClosure, TlangNativeFn, TlangObjectId, TlangObjectKind, TlangStruct, TlangValue,
+    ShapeKey, TlangClosure, TlangNativeFn, TlangObjectId, TlangObjectKind, TlangStructShape,
+    TlangValue,
 };
 
 mod resolver;
 mod scope;
+pub mod state;
 pub mod value;
-
-pub struct InterpreterState {
-    root_scope: Rc<RefCell<Scope>>,
-    current_scope: Rc<RefCell<Scope>>,
-    closures: HashMap<HirId, hir::FunctionDeclaration>,
-    objects: HashMap<TlangObjectId, TlangObjectKind>,
-}
-
-impl Default for InterpreterState {
-    fn default() -> Self {
-        let root_scope = Rc::new(RefCell::new(Scope::default()));
-        let current_scope = root_scope.clone();
-
-        Self {
-            root_scope,
-            current_scope,
-            closures: HashMap::new(),
-            objects: HashMap::new(),
-        }
-    }
-}
-
-impl Resolver for InterpreterState {
-    fn resolve_path(&self, path: &hir::Path) -> Option<TlangValue> {
-        self.current_scope.borrow().resolve_path(path)
-    }
-
-    fn resolve_fn_decl(&self, id: hir::HirId) -> Option<Rc<hir::FunctionDeclaration>> {
-        self.current_scope.borrow().resolve_fn_decl(id)
-    }
-}
-
-impl InterpreterState {
-    fn enter_scope(&mut self) {
-        let child_scope = Scope::new_child(self.current_scope.clone());
-        self.current_scope = Rc::new(RefCell::new(child_scope));
-    }
-
-    fn exit_scope(&mut self) {
-        let parent_scope = {
-            let current_scope = self.current_scope.borrow();
-            current_scope.parent.clone()
-        };
-
-        if let Some(parent) = parent_scope {
-            self.current_scope = parent;
-        } else {
-            panic!("Attempted to exit root scope!");
-        }
-    }
-
-    pub fn new_object(&mut self, kind: TlangObjectKind) -> TlangValue {
-        let obj = TlangValue::new_object();
-
-        self.objects.insert(obj.get_object_id().unwrap(), kind);
-
-        obj
-    }
-
-    pub fn new_list(&mut self, values: Vec<TlangValue>) -> TlangValue {
-        self.new_object(TlangObjectKind::Struct(TlangStruct {
-            field_values: values,
-        }))
-    }
-}
 
 pub struct Interpreter {
     state: InterpreterState,
@@ -112,10 +50,18 @@ impl Default for Interpreter {
 
 impl Interpreter {
     pub fn new() -> Self {
+        let list_shape_key = ShapeKey::new_native();
+        let list_shape = TlangStructShape::new("List".to_string(), vec![], HashMap::new());
+
         let mut interpreter = Self {
-            state: Default::default(),
+            state: InterpreterState::new(list_shape_key),
             native_fns: HashMap::new(),
         };
+
+        interpreter
+            .state
+            .shapes
+            .insert(interpreter.state.list_shape, list_shape);
 
         interpreter.define_native_fn("log", |_, args| {
             println!(
@@ -126,6 +72,28 @@ impl Interpreter {
                     .join(" ")
             );
             TlangValue::Nil
+        });
+
+        interpreter.define_native_fn("len", |state, args| {
+            if let TlangValue::Object(id) = &args[0] {
+                if let Some(TlangObjectKind::Struct(obj)) = state.get_object(*id) {
+                    TlangValue::Int(obj.field_values.len() as i64)
+                } else {
+                    panic!("Expected object, got {:?}", args[0]);
+                }
+            } else {
+                panic!("Expected object, got {:?}", args[0]);
+            }
+        });
+
+        interpreter.define_native_fn("math::floor", |_, args| {
+            if let TlangValue::Float(value) = args[0] {
+                TlangValue::Float(value.floor())
+            } else if let TlangValue::Int(_) = args[0] {
+                args[0]
+            } else {
+                panic!("Expected float, got {:?}", args[0]);
+            }
         });
 
         interpreter
@@ -264,6 +232,7 @@ impl Interpreter {
             hir::ExprKind::Path(path) => self.resolve_path(path).unwrap_or(TlangValue::Nil),
             hir::ExprKind::Literal(value) => self.eval_literal(value),
             hir::ExprKind::List(values) => self.eval_list_expr(values),
+            hir::ExprKind::IndexAccess(lhs, rhs) => self.eval_index_access(lhs, rhs),
             hir::ExprKind::Block(block) => self.eval_block(block),
             hir::ExprKind::Binary(op, lhs, rhs) => self.eval_binary(*op, lhs, rhs),
             hir::ExprKind::Call(call_expr) => self.eval_call(call_expr),
@@ -300,6 +269,21 @@ impl Interpreter {
             hir::ExprKind::Match(expr, arms) => self.eval_match(expr, arms),
             _ => todo!("eval_expr: {:?}", expr),
         }
+    }
+
+    fn eval_index_access(&mut self, lhs: &hir::Expr, rhs: &hir::Expr) -> TlangValue {
+        let lhs = self.eval_expr(lhs);
+        let rhs = self.eval_expr(rhs);
+
+        if let TlangValue::Object(id) = lhs {
+            if let Some(TlangObjectKind::Struct(obj)) = self.state.get_object(id) {
+                if let TlangValue::Int(index) = rhs {
+                    return obj.field_values[index as usize];
+                }
+            }
+        }
+
+        todo!("eval_index_access: {:?}[{:?}]", lhs, rhs);
     }
 
     fn eval_literal(&mut self, literal: &token::Literal) -> TlangValue {

@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use tlang_hir::hir::HirId;
@@ -13,9 +14,63 @@ pub struct TlangClosure {
     pub(crate) scope: Rc<RefCell<Scope>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct TlangStruct {
+    pub shape: ShapeKey,
     pub field_values: Vec<TlangValue>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum ShapeKeyImpl {
+    HirId(HirId),
+    Native(usize),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ShapeKey(ShapeKeyImpl);
+
+impl ShapeKey {
+    pub fn new_native() -> Self {
+        static NEXT_ID: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        ShapeKey(ShapeKeyImpl::Native(
+            NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+        ))
+    }
+
+    pub fn new_hir_id(id: HirId) -> Self {
+        ShapeKey(ShapeKeyImpl::HirId(id))
+    }
+}
+
+pub enum TlangStructMethod {
+    Native(TlangNativeFn),
+    HirId(HirId),
+}
+
+pub struct TlangStructShape {
+    pub name: String,
+    pub field_map: HashMap<String, usize>,
+    pub method_map: HashMap<String, TlangStructMethod>,
+}
+
+impl TlangStructShape {
+    pub fn new(
+        name: String,
+        fields: Vec<String>,
+        methods: HashMap<String, TlangStructMethod>,
+    ) -> Self {
+        let mut field_map = HashMap::new();
+
+        for (i, field) in fields.into_iter().enumerate() {
+            field_map.insert(field, i);
+        }
+
+        Self {
+            name,
+            field_map,
+            method_map: methods,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]

@@ -1,6 +1,6 @@
 use tlang_hir::hir;
+use tlang_interpreter::state::InterpreterState;
 use tlang_interpreter::value::TlangValue;
-use tlang_interpreter::InterpreterState;
 use tlang_parser::error::ParseError;
 use tlang_parser::parser::Parser;
 use wasm_bindgen::prelude::*;
