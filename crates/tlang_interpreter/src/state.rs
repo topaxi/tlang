@@ -28,6 +28,10 @@ impl Resolver for InterpreterState {
     fn resolve_fn_decl(&self, id: hir::HirId) -> Option<Rc<hir::FunctionDeclaration>> {
         self.current_scope.borrow().resolve_fn_decl(id)
     }
+
+    fn resolve_struct_decl(&self, path: &hir::Path) -> Option<Rc<hir::StructDeclaration>> {
+        self.current_scope.borrow().resolve_struct_decl(path)
+    }
 }
 
 impl InterpreterState {

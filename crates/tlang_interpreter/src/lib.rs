@@ -34,6 +34,10 @@ impl Resolver for Interpreter {
     fn resolve_fn_decl(&self, id: hir::HirId) -> Option<Rc<hir::FunctionDeclaration>> {
         self.state.resolve_fn_decl(id)
     }
+
+    fn resolve_struct_decl(&self, path: &hir::Path) -> Option<Rc<hir::StructDeclaration>> {
+        self.state.resolve_struct_decl(path)
+    }
 }
 
 #[derive(Debug)]
@@ -225,6 +229,10 @@ impl Interpreter {
         }
 
         StmtResult::None
+    }
+
+    fn eval_exprs(&mut self, exprs: &[hir::Expr]) -> Vec<TlangValue> {
+        exprs.iter().map(|expr| self.eval_expr(expr)).collect()
     }
 
     fn eval_expr(&mut self, expr: &hir::Expr) -> TlangValue {
@@ -457,7 +465,7 @@ impl Interpreter {
             .current_scope
             .borrow_mut()
             .struct_decls
-            .insert(decl.hir_id, Rc::new(decl.clone()));
+            .insert(decl.name.to_string(), Rc::new(decl.clone()));
 
         let struct_shape = TlangStructShape::new(
             decl.name.to_string(),
@@ -477,15 +485,12 @@ impl Interpreter {
     }
 
     fn eval_call(&mut self, call_expr: &hir::CallExpression) -> TlangValue {
-        let mut args: Vec<TlangValue> = Vec::with_capacity(call_expr.arguments.len());
-        for arg in &call_expr.arguments {
-            args.push(self.eval_expr(arg));
-        }
-
         match &call_expr.callee.kind {
             hir::ExprKind::Path(path)
                 if let Some(TlangValue::Object(id)) = self.resolve_path(path) =>
             {
+                let args = self.eval_exprs(&call_expr.arguments);
+
                 if let Some(closure) = self.get_object(id).get_closure() {
                     let closure_decl = self.resolve_closure_decl(closure.id).unwrap().clone();
 
@@ -526,8 +531,34 @@ impl Interpreter {
                 }
             }
             // If the path resolves to a struct, we create a new object.
-            hir::ExprKind::Path(_path) if false => {
-                todo!("Constructing structs not implemented yet")
+            hir::ExprKind::Path(path) if let Some(struct_decl) = self.resolve_struct_decl(path) => {
+                // Struct calls are always calls with a single argument, which is a dict.
+                let dict = &call_expr.arguments[0];
+                let dict_map: HashMap<String, TlangValue> = match &dict.kind {
+                    hir::ExprKind::Dict(entries) => entries
+                        .iter()
+                        .map(|(key, value)| {
+                            let key = match &key.kind {
+                                hir::ExprKind::Path(path) => path.first_ident().to_string(),
+                                _ => todo!("eval_call: {:?}", key),
+                            };
+                            let value = self.eval_expr(value);
+                            (key, value)
+                        })
+                        .collect(),
+                    _ => todo!("eval_call: {:?}", dict),
+                };
+
+                let field_values = struct_decl
+                    .fields
+                    .iter()
+                    .map(|field| *dict_map.get(&field.name.to_string()).unwrap())
+                    .collect();
+
+                self.state.new_object(TlangObjectKind::Struct(TlangStruct {
+                    shape: struct_decl.hir_id.into(),
+                    field_values,
+                }))
             }
             hir::ExprKind::Path(path) => {
                 panic!(
