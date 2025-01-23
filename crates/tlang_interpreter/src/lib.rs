@@ -13,7 +13,7 @@ use self::scope::Scope;
 use self::state::InterpreterState;
 use self::value::{
     ShapeKey, TlangClosure, TlangNativeFn, TlangObjectId, TlangObjectKind, TlangStruct,
-    TlangStructShape, TlangValue,
+    TlangStructMethod, TlangStructShape, TlangValue,
 };
 
 mod resolver;
@@ -445,7 +445,7 @@ impl Interpreter {
             .fn_decls
             .insert(decl.hir_id, Rc::new(decl.clone()));
 
-        match decl.name.kind {
+        match &decl.name.kind {
             hir::ExprKind::Path(ref path) => {
                 let path_name = path.join("::");
                 let fn_object = self.state.new_object(TlangObjectKind::Fn(decl.hir_id));
@@ -455,6 +455,19 @@ impl Interpreter {
                     .borrow_mut()
                     .values
                     .insert(path_name, fn_object);
+            }
+            hir::ExprKind::FieldAccess(expr, ident) => {
+                let path = match &expr.kind {
+                    hir::ExprKind::Path(path) => path,
+                    _ => todo!("eval_fn_decl: {:?}", expr),
+                };
+                let struct_decl = self.resolve_struct_decl(path).unwrap();
+
+                self.state.set_struct_method(
+                    struct_decl.hir_id.into(),
+                    ident.as_str(),
+                    TlangStructMethod::HirId(decl.hir_id),
+                );
             }
             _ => todo!("eval_fn_decl: {:?}", decl.name),
         }

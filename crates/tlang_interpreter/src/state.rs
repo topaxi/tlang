@@ -121,4 +121,15 @@ impl InterpreterState {
             .get(&shape)
             .and_then(|shape| shape.field_map.get(field).copied())
     }
+
+    pub fn set_struct_method(
+        &mut self,
+        shape: ShapeKey,
+        method_name: &str,
+        method: TlangStructMethod,
+    ) {
+        self.shapes
+            .get_mut(&shape)
+            .and_then(|shape| shape.method_map.insert(method_name.to_string(), method));
+    }
 }
