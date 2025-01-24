@@ -82,11 +82,11 @@ impl TlangStructShape {
         fields: Vec<String>,
         methods: HashMap<String, TlangStructMethod>,
     ) -> Self {
-        let mut field_map = HashMap::new();
-
-        for (i, field) in fields.into_iter().enumerate() {
-            field_map.insert(field, i);
-        }
+        let field_map = fields
+            .into_iter()
+            .enumerate()
+            .map(|(i, f)| (f, i))
+            .collect();
 
         Self {
             name,
