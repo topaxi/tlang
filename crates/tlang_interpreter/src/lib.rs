@@ -579,16 +579,15 @@ impl Interpreter {
 
                 match call_target {
                     TlangValue::Object(_id) => {
-                        let struct_shape_key = self
+                        let struct_shape = self
                             .state
                             .get_object(call_target)
-                            .unwrap()
-                            .get_shape()
+                            .and_then(|o| o.get_shape_key())
+                            .and_then(|key| self.state.get_shape(key))
                             .unwrap();
-                        let struct_shape = self.state.get_shape(struct_shape_key).unwrap();
-                        let method = struct_shape.method_map.get(ident.as_str()).unwrap();
-                        match method {
-                            TlangStructMethod::HirId(id) => {
+
+                        match struct_shape.method_map.get(ident.as_str()) {
+                            Some(TlangStructMethod::HirId(id)) => {
                                 let fn_decl = self.resolve_fn_decl(*id).unwrap().clone();
                                 let mut args = self.eval_exprs(&call_expr.arguments);
                                 args.insert(0, call_target);

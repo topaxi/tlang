@@ -131,7 +131,7 @@ impl TlangObjectKind {
         }
     }
 
-    pub(crate) fn get_shape(&self) -> Option<ShapeKey> {
+    pub(crate) fn get_shape_key(&self) -> Option<ShapeKey> {
         self.get_struct().map(|s| s.shape)
     }
 
