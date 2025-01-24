@@ -67,11 +67,11 @@ impl Interpreter {
             .shapes
             .insert(interpreter.state.list_shape, list_shape);
 
-        interpreter.define_native_fn("log", |_, args| {
+        interpreter.define_native_fn("log", |state, args| {
             println!(
                 "{}",
                 args.iter()
-                    .map(|v| v.to_string())
+                    .map(|v| state.stringify(v))
                     .collect::<Vec<_>>()
                     .join(" ")
             );
@@ -87,6 +87,12 @@ impl Interpreter {
         interpreter.define_native_fn("math::floor", |_, args| match args[0] {
             TlangValue::Float(value) => TlangValue::Float(value.floor()),
             TlangValue::Int(_) => args[0],
+            _ => panic!("Expected float or int, got {:?}", args[0]),
+        });
+
+        interpreter.define_native_fn("math::sqrt", |_, args| match args[0] {
+            TlangValue::Float(value) => TlangValue::Float(value.sqrt()),
+            TlangValue::Int(value) => TlangValue::Float((value as f64).sqrt()),
             _ => panic!("Expected float or int, got {:?}", args[0]),
         });
 
@@ -567,6 +573,34 @@ impl Interpreter {
                     path.join("::"),
                     self.state.current_scope.borrow()
                 );
+            }
+            hir::ExprKind::FieldAccess(expr, ident) => {
+                let call_target = self.eval_expr(expr);
+
+                match call_target {
+                    TlangValue::Object(_id) => {
+                        let struct_shape_key = self
+                            .state
+                            .get_object(call_target)
+                            .unwrap()
+                            .get_shape()
+                            .unwrap();
+                        let struct_shape = self.state.get_shape(struct_shape_key).unwrap();
+                        let method = struct_shape.method_map.get(ident.as_str()).unwrap();
+                        match method {
+                            TlangStructMethod::HirId(id) => {
+                                let fn_decl = self.resolve_fn_decl(*id).unwrap().clone();
+                                let mut args = self.eval_exprs(&call_expr.arguments);
+                                args.insert(0, call_target);
+                                self.with_scope(self.state.root_scope.clone(), |this| {
+                                    this.eval_fn_call(&fn_decl, &args)
+                                })
+                            }
+                            _ => todo!("eval_call: {:?}", call_target),
+                        }
+                    }
+                    _ => todo!("eval_call: {:?}", call_target),
+                }
             }
             _ => todo!("eval_call: {:?}", call_expr.callee),
         }

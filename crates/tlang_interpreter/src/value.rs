@@ -131,6 +131,10 @@ impl TlangObjectKind {
         }
     }
 
+    pub(crate) fn get_shape(&self) -> Option<ShapeKey> {
+        self.get_struct().map(|s| s.shape)
+    }
+
     pub(crate) fn get_closure(&self) -> Option<&TlangClosure> {
         match self {
             TlangObjectKind::Closure(f) => Some(f),

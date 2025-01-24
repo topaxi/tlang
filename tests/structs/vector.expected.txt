@@ -1,0 +1,3 @@
+Vector { x: 4, y: 6 }
+Vector { x: 6, y: 8 }
+5

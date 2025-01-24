@@ -139,4 +139,41 @@ impl InterpreterState {
             .get_mut(&shape)
             .and_then(|shape| shape.method_map.insert(method_name.to_string(), method));
     }
+
+    pub fn stringify(&self, value: &TlangValue) -> String {
+        match value {
+            TlangValue::Object(id) => match self.get_object_by_id(*id) {
+                Some(TlangObjectKind::String(s)) => s.clone(),
+                Some(TlangObjectKind::Struct(s)) => {
+                    let shape = self.get_shape(s.shape).unwrap();
+                    let mut result = String::new();
+
+                    result.push_str(&shape.name);
+                    result.push_str(" { ");
+
+                    let mut fields = shape
+                        .field_map
+                        .clone()
+                        .into_iter()
+                        .collect::<Vec<(String, usize)>>();
+                    fields.sort();
+                    result.push_str(
+                        &fields
+                            .into_iter()
+                            .map(|(field, idx)| {
+                                let value = &s.field_values[idx];
+                                format!("{}: {}", field, self.stringify(value))
+                            })
+                            .collect::<Vec<String>>()
+                            .join(", "),
+                    );
+
+                    result.push_str(" }");
+                    result
+                }
+                _ => format!("{:?}", value),
+            },
+            _ => value.to_string(),
+        }
+    }
 }
