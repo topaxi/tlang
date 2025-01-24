@@ -78,28 +78,16 @@ impl Interpreter {
             TlangValue::Nil
         });
 
-        interpreter.define_native_fn("len", |state, args| {
-            if let TlangValue::Object(id) = &args[0] {
-                if let Some(TlangObjectKind::Struct(obj)) = state.get_object(*id) {
-                    TlangValue::Int(obj.field_values.len() as i64)
-                } else if let Some(TlangObjectKind::String(string)) = state.get_object(*id) {
-                    TlangValue::Int(string.len() as i64)
-                } else {
-                    panic!("Expected struct or string, got {:?}", args[0]);
-                }
-            } else {
-                panic!("Expected object, got {:?}", args[0]);
-            }
+        interpreter.define_native_fn("len", |state, args| match state.get_object(args[0]) {
+            Some(TlangObjectKind::Struct(obj)) => TlangValue::Int(obj.field_values.len() as i64),
+            Some(TlangObjectKind::String(string)) => TlangValue::Int(string.len() as i64),
+            _ => panic!("Expected struct or string, got {:?}", args[0]),
         });
 
-        interpreter.define_native_fn("math::floor", |_, args| {
-            if let TlangValue::Float(value) = args[0] {
-                TlangValue::Float(value.floor())
-            } else if let TlangValue::Int(_) = args[0] {
-                args[0]
-            } else {
-                panic!("Expected float, got {:?}", args[0]);
-            }
+        interpreter.define_native_fn("math::floor", |_, args| match args[0] {
+            TlangValue::Float(value) => TlangValue::Float(value.floor()),
+            TlangValue::Int(_) => args[0],
+            _ => panic!("Expected float or int, got {:?}", args[0]),
         });
 
         interpreter
@@ -287,10 +275,8 @@ impl Interpreter {
         if let TlangValue::Int(index) = self.eval_expr(rhs) {
             let lhs = self.eval_expr(lhs);
 
-            if let TlangValue::Object(id) = lhs {
-                if let Some(TlangObjectKind::Struct(obj)) = self.state.get_object(id) {
-                    return obj.field_values[index as usize];
-                }
+            if let Some(TlangObjectKind::Struct(obj)) = self.state.get_object(lhs) {
+                return obj.field_values[index as usize];
             }
         }
 
@@ -298,11 +284,10 @@ impl Interpreter {
     }
 
     fn eval_field_access(&mut self, lhs: &hir::Expr, ident: &Ident) -> TlangValue {
-        if let TlangValue::Object(id) = self.eval_expr(lhs) {
-            if let Some(TlangObjectKind::Struct(obj)) = self.state.get_object(id) {
-                if let Some(index) = self.state.get_field_index(obj.shape, ident.as_str()) {
-                    return obj.field_values[index];
-                }
+        let value = self.eval_expr(lhs);
+        if let Some(TlangObjectKind::Struct(obj)) = self.state.get_object(value) {
+            if let Some(index) = self.state.get_field_index(obj.shape, ident.as_str()) {
+                return obj.field_values[index];
             }
         }
 

@@ -75,8 +75,15 @@ impl InterpreterState {
         obj
     }
 
-    pub fn get_object(&self, id: TlangObjectId) -> Option<&TlangObjectKind> {
+    #[inline(always)]
+    fn get_object_by_id(&self, id: TlangObjectId) -> Option<&TlangObjectKind> {
         self.objects.get(&id)
+    }
+
+    pub fn get_object(&self, value: TlangValue) -> Option<&TlangObjectKind> {
+        value
+            .get_object_id()
+            .and_then(|id| self.get_object_by_id(id))
     }
 
     pub fn new_list(&mut self, values: Vec<TlangValue>) -> TlangValue {
