@@ -300,7 +300,8 @@ impl Interpreter {
             token::Literal::UnsignedInteger(value) => TlangValue::Int(*value as i64),
             token::Literal::Float(value) => TlangValue::Float(*value),
             token::Literal::Boolean(value) => TlangValue::Bool(*value),
-            _ => todo!("eval_literal: {:?}", literal),
+            token::Literal::String(value) => self.state.new_string(value.to_string()),
+            token::Literal::Char(value) => self.state.new_string(value.to_string()),
         }
     }
 
