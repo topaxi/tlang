@@ -97,18 +97,16 @@ fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
 
     if actual_output.trim() == expected_output.trim() {
         println!(
-            "Test passed for {} (backend: {}) in {:?} (total {:?})",
+            "Test passed for {} in {:?} (total {:?})",
             file_path.display(),
-            backend,
             exec_elapsed,
             elapsed
         );
         Ok(())
     } else {
         println!(
-            "Test failed for {} (backend: {}).\nExpected:\n{}\nActual:\n{}",
+            "Test failed for {}.\nExpected:\n{}\nActual:\n{}",
             file_path.display(),
-            backend,
             expected_output,
             actual_output
         );
