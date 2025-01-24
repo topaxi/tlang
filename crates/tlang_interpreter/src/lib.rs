@@ -82,8 +82,10 @@ impl Interpreter {
             if let TlangValue::Object(id) = &args[0] {
                 if let Some(TlangObjectKind::Struct(obj)) = state.get_object(*id) {
                     TlangValue::Int(obj.field_values.len() as i64)
+                } else if let Some(TlangObjectKind::String(string)) = state.get_object(*id) {
+                    TlangValue::Int(string.len() as i64)
                 } else {
-                    panic!("Expected object, got {:?}", args[0]);
+                    panic!("Expected struct or string, got {:?}", args[0]);
                 }
             } else {
                 panic!("Expected object, got {:?}", args[0]);
