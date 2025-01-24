@@ -14,6 +14,9 @@ import {
   CodemirrorDiagnostic,
 } from './tlang';
 import { MediaController } from './controllers/media-controller';
+import { keyed } from 'lit/directives/keyed.js';
+import { live } from 'lit/directives/live.js';
+import { cache } from 'lit/directives/cache.js';
 
 type CodemirrorSeverity = 'hint' | 'info' | 'warning' | 'error';
 
@@ -46,6 +49,22 @@ function defaultDisplay() {
   return 'output';
 }
 
+function defaultExample() {
+  let params = getHashParams();
+  if (params.has('example')) {
+    return params.get('example')!;
+  }
+  return Object.keys(examples)[0];
+}
+
+function defaultRunner() {
+  let params = getHashParams();
+  if (params.has('runner')) {
+    return params.get('runner') as 'compiler' | 'interpreter';
+  }
+  return 'compiler';
+}
+
 function updateHashParam(key: string, value: string) {
   let params = getHashParams();
   params.set(key, value);
@@ -64,6 +83,10 @@ function updateExampleHashparam(example: string) {
   params.set('example', example);
   params.delete('source');
   window.location.hash = params.toString();
+}
+
+function updateRunnerHashparam(runner: 'compiler' | 'interpreter') {
+  updateHashParam('runner', runner);
 }
 
 async function updateDisplayHashparam(display: string) {
@@ -152,7 +175,7 @@ export class TlangPlayground extends LitElement {
   private desktop = new MediaController(this, '(min-width: 980px)');
 
   @state()
-  selectedExample = Object.keys(examples)[0];
+  selectedExample = defaultExample();
 
   @state()
   source = examples[this.selectedExample];
@@ -176,7 +199,7 @@ export class TlangPlayground extends LitElement {
 
   @state() output = '';
 
-  @state() runner: 'compiler' | 'interpreter' = 'compiler';
+  @state() runner: 'compiler' | 'interpreter' = defaultRunner();
 
   get error() {
     if (this.compiler == null) {
@@ -315,13 +338,15 @@ export class TlangPlayground extends LitElement {
     const target = event.target as HTMLSelectElement;
     this.consoleOutput = [];
     this.codemirror.source = examples[target.value];
-    updateExampleHashparam(target.value);
+    this.selectedExample = target.value;
+    updateExampleHashparam(this.selectedExample);
     this.run();
   }
 
   handleRunnerChange(event: Event) {
     const target = event.target as HTMLSelectElement;
     this.runner = target.value as 'compiler' | 'interpreter';
+    updateRunnerHashparam(this.runner);
   }
 
   handleDisplayChange(event: Event) {
@@ -353,19 +378,50 @@ export class TlangPlayground extends LitElement {
     `;
   }
 
+  renderOutput() {
+    switch (this.display) {
+      case 'ast':
+        return html`<pre class="output-ast">${this.compiler?.ast_string}</pre>`;
+      case 'hir':
+        return html`<pre class="output-ast">${this.compiler?.hir_string}</pre>`;
+      case 'hir pretty':
+        return html`<t-codemirror
+          class="output-code"
+          language="tlang"
+          .source=${this.compiler?.hir_pretty}
+          readonly
+        ></t-codemirror>`;
+      case 'output':
+        return html`<t-codemirror
+          class="output-code"
+          language="javascript"
+          .source=${this.output}
+          readonly
+        ></t-codemirror>`;
+    }
+  }
+
   render() {
     return html`
       <div class="toolbar">
         <button @click=${this.run}>Run</button>
-        <select @change=${this.handleRunnerChange} .value=${this.runner}>
+        <select @change=${this.handleRunnerChange} .value=${live(this.runner)}>
           <option value="compiler">Compiler</option>
           <option value="interpreter">Interpreter</option>
         </select>
         <button @click=${this.share}>Share</button>
-        <select @change=${this.handleExampleSelect}>
-          ${Object.keys(examples).map((key) => html`<option>${key}</option>`)}
+        <select
+          @change=${this.handleExampleSelect}
+          .value=${live(this.selectedExample)}
+        >
+          ${Object.keys(examples).map((key) =>
+            keyed(key, html`<option>${key}</option>`),
+          )}
         </select>
-        <select @change=${this.handleDisplayChange} .value=${this.display}>
+        <select
+          @change=${this.handleDisplayChange}
+          .value=${live(this.display)}
+        >
           <option value="output">code</option>
           <option value="ast">ast</option>
           <option value="hir">hir</option>
@@ -385,33 +441,7 @@ export class TlangPlayground extends LitElement {
           ></t-codemirror>
         </div>
         <t-split slot="second" direction="horizontal" class="output">
-          <div slot="first">
-            ${this.display === 'ast'
-              ? html`<pre class="output-ast">${this.compiler?.ast_string}</pre>`
-              : ''}
-            ${this.display === 'hir'
-              ? html`<pre class="output-ast">${this.compiler?.hir_string}</pre>`
-              : ''}
-            ${this.display === 'hir pretty'
-              ? html`<t-codemirror
-                  class="output-code"
-                  language="tlang"
-                  .source=${this.compiler?.hir_pretty}
-                  readonly
-                ></t-codemirror>`
-              : ''}
-            ${this.display === 'output'
-              ? html`<t-codemirror
-                  class="output-code"
-                  language="javascript"
-                  .source=${this.output}
-                  readonly
-                ></t-codemirror>`
-              : ''}
-            ${this.error
-              ? html`<pre class="output-error">${this.error}</pre>`
-              : ''}
-          </div>
+          <div slot="first">${cache(this.renderOutput())}</div>
           <div slot="second" class="console">
             <div class="console-toolbar">
               <div>Console</div>
