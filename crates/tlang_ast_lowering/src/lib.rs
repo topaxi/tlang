@@ -1086,7 +1086,7 @@ fn get_function_name(expr: &ast::node::Expr) -> String {
     match &expr.kind {
         ast::node::ExprKind::Path(path) => path.join("::"),
         ast::node::ExprKind::FieldExpression(field_expr) => {
-            get_function_name(&field_expr.base) + "." + &field_expr.field.to_string()
+            get_function_name(&field_expr.base) + "." + field_expr.field.as_str()
         }
         _ => unreachable!(),
     }
