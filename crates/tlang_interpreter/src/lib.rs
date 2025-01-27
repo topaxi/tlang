@@ -212,6 +212,9 @@ impl Interpreter {
             hir::StmtKind::StructDeclaration(decl) => {
                 self.eval_struct_decl(decl);
             }
+            hir::StmtKind::EnumDeclaration(decl) => {
+                self.eval_enum_decl(decl);
+            }
             hir::StmtKind::Let(pat, expr, ty) => {
                 self.eval_let_stmt(pat, expr, ty);
             }
@@ -486,6 +489,62 @@ impl Interpreter {
         self.state.shapes.insert(decl.hir_id.into(), struct_shape);
     }
 
+    fn eval_enum_decl(&mut self, decl: &hir::EnumDeclaration) {
+        // Simple enums should be treated as incrementing integers.
+        // Simple enums are enums where all variants are just a name.
+        // The enum variants themselves will just be treated as integers.
+        //
+        // Enums with multiple fields should be treated as structs.
+        // If a variant has no field, it should be treated as a struct with a single field,
+        // and struct with its value with the qualified name shall be put into scope.
+        let is_simple_enum = decl
+            .variants
+            .iter()
+            .all(|variant| variant.parameters.is_empty());
+
+        if is_simple_enum {
+            for (value, variant) in decl.variants.iter().enumerate() {
+                let path = format!("{}::{}", decl.name, variant.name.as_str());
+
+                self.state
+                    .current_scope
+                    .borrow_mut()
+                    .values
+                    .insert(path, TlangValue::Int(value as i64));
+            }
+        } else {
+            for (value, variant) in decl.variants.iter().enumerate() {
+                // Enum variants with no fields should be treated as incrementing numbers.
+                // Enums with multiple fields, should be treated as structs.
+                if variant.parameters.is_empty() {
+                    let path = format!("{}::{}", decl.name, variant.name.as_str());
+
+                    self.state.define_struct_shape(
+                        decl.hir_id.into(),
+                        path.clone(),
+                        vec!["0".to_string()],
+                        HashMap::new(),
+                    );
+
+                    let obj = self.state.new_object(TlangObjectKind::Struct(TlangStruct {
+                        shape: decl.hir_id.into(),
+                        field_values: vec![TlangValue::Int(value as i64)],
+                    }));
+
+                    self.state
+                        .current_scope
+                        .borrow_mut()
+                        .values
+                        .insert(path, obj);
+                } else {
+                    self.eval_struct_decl(&map_enum_variant_decl_to_struct_decl(
+                        variant, &decl.name,
+                    ));
+                }
+            }
+        }
+    }
+
     fn eval_tail_call(&mut self, call_expr: &hir::CallExpression) -> TlangValue {
         // For now, we just call the function normally.
         self.eval_call(call_expr)
@@ -540,20 +599,40 @@ impl Interpreter {
             // If the path resolves to a struct, we create a new object.
             hir::ExprKind::Path(path) if let Some(struct_decl) = self.resolve_struct_decl(path) => {
                 // Struct calls are always calls with a single argument, which is a dict.
-                let dict = &call_expr.arguments[0];
-                let dict_map: HashMap<String, TlangValue> = match &dict.kind {
-                    hir::ExprKind::Dict(entries) => entries
+                // There is a special case for enum variant construction, as they might have
+                // multiple arguments which are not wrapped in a dict but are struct values.
+                // Currently the only way to distinguish this, is by checking whether the struct
+                // definition is a struct with incremental numeric field names, which might cause
+                // problems in case someone defines a struct with numeric fields themselves.
+                let is_enum_variant_without_field_names = struct_decl
+                    .fields
+                    .iter()
+                    .enumerate()
+                    .all(|(i, field)| field.name.as_str() == i.to_string());
+
+                let dict_map: HashMap<String, TlangValue> = if is_enum_variant_without_field_names {
+                    call_expr
+                        .arguments
                         .iter()
-                        .map(|(key, value)| {
-                            let key = match &key.kind {
-                                hir::ExprKind::Path(path) => path.first_ident().to_string(),
-                                _ => todo!("eval_call: {:?}", key),
-                            };
-                            let value = self.eval_expr(value);
-                            (key, value)
-                        })
-                        .collect(),
-                    _ => todo!("eval_call: {:?}", dict),
+                        .enumerate()
+                        .map(|(i, arg)| (i.to_string(), self.eval_expr(arg)))
+                        .collect()
+                } else {
+                    let dict = &call_expr.arguments[0];
+                    match &dict.kind {
+                        hir::ExprKind::Dict(entries) => entries
+                            .iter()
+                            .map(|(key, value)| {
+                                let key = match &key.kind {
+                                    hir::ExprKind::Path(path) => path.first_ident().to_string(),
+                                    _ => todo!("eval_call: {:?}", key),
+                                };
+                                let value = self.eval_expr(value);
+                                (key, value)
+                            })
+                            .collect(),
+                        _ => todo!("eval_call: {:?}", dict),
+                    }
                 };
 
                 let field_values = struct_decl
@@ -795,6 +874,30 @@ impl Interpreter {
     }
 }
 
+fn map_enum_variant_decl_to_struct_decl(
+    variant: &hir::EnumVariant,
+    enum_name: &Ident,
+) -> hir::StructDeclaration {
+    let fields = variant
+        .parameters
+        .iter()
+        .map(|field| hir::StructField {
+            hir_id: field.hir_id,
+            name: field.name.clone(),
+            ty: field.ty.clone(),
+        })
+        .collect();
+
+    hir::StructDeclaration {
+        hir_id: variant.hir_id,
+        name: Ident::new(
+            &format!("{}::{}", enum_name.as_str(), variant.name.as_str()),
+            enum_name.span,
+        ),
+        fields,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1030,5 +1133,58 @@ mod tests {
         "});
         assert_matches!(interpreter.eval("point.x"), TlangValue::Int(10));
         assert_matches!(interpreter.eval("point.y"), TlangValue::Int(20));
+    }
+
+    #[test]
+    fn test_enum_declaration_and_use() {
+        let mut interpreter = interpreter(indoc! {"
+            enum Values {
+                One,
+                Two,
+                Three,
+            }
+        "});
+
+        assert_matches!(interpreter.eval("Values::One"), TlangValue::Int(0));
+        assert_matches!(interpreter.eval("Values::Two"), TlangValue::Int(1));
+        assert_matches!(interpreter.eval("Values::Three"), TlangValue::Int(2));
+    }
+
+    #[test]
+    fn test_tagged_enum_declaration_and_use() {
+        let mut interpreter = interpreter(indoc! {"
+            enum Option {
+                None,
+                Some(Int),
+            }
+            let some = Option::Some(10);
+            let none = Option::None;
+        "});
+
+        assert!(interpreter
+            .interpreter
+            .state
+            .shapes
+            .iter()
+            .any(|shape| shape.1.name == "Option::Some"));
+
+        let some_value = interpreter.eval("some");
+        let none_value = interpreter.eval("none");
+
+        assert_matches!(some_value, TlangValue::Object(_));
+        assert_matches!(none_value, TlangValue::Object(_));
+
+        let some_data = match some_value {
+            TlangValue::Object(id) => interpreter.interpreter.get_object(id).get_struct().unwrap(),
+            val => panic!("Expected struct, got {:?}", val),
+        };
+
+        let none_data = match none_value {
+            TlangValue::Object(id) => interpreter.interpreter.get_object(id).get_struct().unwrap(),
+            val => panic!("Expected struct, got {:?}", val),
+        };
+
+        assert_matches!(some_data.field_values[0], TlangValue::Int(10));
+        assert_matches!(none_data.field_values[0], TlangValue::Int(0));
     }
 }
