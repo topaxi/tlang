@@ -124,7 +124,7 @@ fn test_block_scope() {
     assert_eq!(
         block1_symbols.borrow().get_by_name("b"),
         Some(SymbolInfo {
-            node_id: NodeId::new(6),
+            node_id: NodeId::new(7),
             id: SymbolId::new(2),
             name: "b".to_string(),
             symbol_type: SymbolType::Variable,
@@ -182,7 +182,7 @@ fn test_block_scope() {
     assert_eq!(
         block2_symbols.borrow().get_by_name("b"),
         Some(SymbolInfo {
-            node_id: NodeId::new(6),
+            node_id: NodeId::new(7),
             id: SymbolId::new(2),
             name: "b".to_string(),
             symbol_type: SymbolType::Variable,
@@ -202,7 +202,7 @@ fn test_block_scope() {
     assert_eq!(
         block2_symbols.borrow().get_by_name("c"),
         Some(SymbolInfo {
-            node_id: NodeId::new(10),
+            node_id: NodeId::new(12),
             id: SymbolId::new(3),
             name: "c".to_string(),
             symbol_type: SymbolType::Variable,
