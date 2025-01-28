@@ -23,6 +23,7 @@ tlang_parser = { path = "../tlang_parser" }
 tlang_semantics = { path = "../tlang_semantics" }
 log = { workspace = true }
 env_logger = { workspace = true }
+rand = "0.9"
 
 [dev-dependencies]
 tlang_ast_lowering = { path = "../tlang_ast_lowering" }

@@ -20,6 +20,7 @@ use self::value::{
 mod resolver;
 mod scope;
 pub mod state;
+mod stdlib;
 pub mod value;
 
 pub struct Interpreter {
@@ -68,34 +69,13 @@ impl Interpreter {
             .shapes
             .insert(interpreter.state.list_shape, list_shape);
 
-        interpreter.define_native_fn("log", |state, args| {
-            println!(
-                "{}",
-                args.iter()
-                    .map(|v| state.stringify(v))
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            );
-            TlangValue::Nil
-        });
+        interpreter.define_native_fn("log", stdlib::utils::log);
+        interpreter.define_native_fn("len", stdlib::collections::len);
 
-        interpreter.define_native_fn("len", |state, args| match state.get_object(args[0]) {
-            Some(TlangObjectKind::Struct(obj)) => TlangValue::Int(obj.field_values.len() as i64),
-            Some(TlangObjectKind::String(string)) => TlangValue::Int(string.len() as i64),
-            _ => panic!("Expected struct or string, got {:?}", args[0]),
-        });
-
-        interpreter.define_native_fn("math::floor", |_, args| match args[0] {
-            TlangValue::Float(value) => TlangValue::Float(value.floor()),
-            TlangValue::Int(_) => args[0],
-            _ => panic!("Expected float or int, got {:?}", args[0]),
-        });
-
-        interpreter.define_native_fn("math::sqrt", |_, args| match args[0] {
-            TlangValue::Float(value) => TlangValue::Float(value.sqrt()),
-            TlangValue::Int(value) => TlangValue::Float((value as f64).sqrt()),
-            _ => panic!("Expected float or int, got {:?}", args[0]),
-        });
+        interpreter.define_native_fn("math::floor", stdlib::math::floor);
+        interpreter.define_native_fn("math::sqrt", stdlib::math::sqrt);
+        interpreter.define_native_fn("math::random", stdlib::math::random);
+        interpreter.define_native_fn("math::random_int", stdlib::math::random_int);
 
         interpreter
     }
