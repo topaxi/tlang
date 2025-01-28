@@ -332,10 +332,10 @@ impl Interpreter {
             hir::BinaryOpKind::And => {
                 let lhs = self.eval_expr(lhs);
 
-                if let TlangValue::Bool(true) = lhs {
+                if lhs.is_truthy() {
                     let rhs = self.eval_expr(rhs);
 
-                    if let TlangValue::Bool(true) = rhs {
+                    if rhs.is_truthy() {
                         return TlangValue::Bool(true);
                     }
                 }
@@ -346,7 +346,7 @@ impl Interpreter {
             hir::BinaryOpKind::Or => {
                 let lhs = self.eval_expr(lhs);
 
-                if let TlangValue::Bool(true) = lhs {
+                if lhs.is_truthy() {
                     return TlangValue::Bool(true);
                 }
 
