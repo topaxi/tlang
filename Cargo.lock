@@ -582,6 +582,7 @@ dependencies = [
 name = "tlang_ast_lowering"
 version = "0.1.0"
 dependencies = [
+ "log",
  "pretty_assertions",
  "tlang_ast",
  "tlang_hir",

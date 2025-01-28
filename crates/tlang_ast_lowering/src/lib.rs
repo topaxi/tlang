@@ -2,6 +2,7 @@
 #![feature(if_let_guard)]
 use std::collections::HashMap;
 
+use log::debug;
 use tlang_ast as ast;
 use tlang_ast::node::{
     BinaryOpExpression, BinaryOpKind, EnumPattern, FunctionDeclaration, Ident, LetDeclaration,
@@ -50,11 +51,15 @@ impl LoweringContext {
 
     #[inline(always)]
     pub(crate) fn push_scope(&mut self) {
+        debug!("Entering new scope");
+
         self.scopes.push(Scope::new());
     }
 
     #[inline(always)]
     pub(crate) fn pop_scope(&mut self) {
+        debug!("Leaving scope");
+
         self.scopes.pop();
     }
 
@@ -65,6 +70,8 @@ impl LoweringContext {
 
     #[inline(always)]
     pub(crate) fn create_binding(&mut self, name: &str) {
+        debug!("Creating binding for {}", name);
+
         self.scope().insert(name, name)
     }
 
@@ -142,6 +149,11 @@ impl LoweringContext {
     }
 
     fn lower_module(&mut self, module: &ast::node::Module) -> hir::Module {
+        debug!(
+            "Lowering module with {} statements",
+            module.statements.len()
+        );
+
         self.with_new_scope(|this| hir::Module {
             block: this.lower_block(&module.statements, None, module.span),
             span: module.span,
@@ -154,6 +166,8 @@ impl LoweringContext {
         expr: Option<&ast::node::Expr>,
         span: ast::span::Span,
     ) -> hir::Block {
+        debug!("Lowering block with {} statements", stmts.len());
+
         self.with_new_scope(|this| {
             let stmts = stmts
                 .iter()
@@ -170,6 +184,8 @@ impl LoweringContext {
     }
 
     fn lower_expr(&mut self, node: &ast::node::Expr) -> hir::Expr {
+        debug!("Lowering expression {:?}", node.kind);
+
         let kind = match &node.kind {
             ast::node::ExprKind::BinaryOp(binary_expr) => self.lower_binary_expr(binary_expr),
             ast::node::ExprKind::Block(box ast::node::Block {
@@ -351,6 +367,7 @@ impl LoweringContext {
         }
     }
 
+    #[inline(always)]
     fn expr(&mut self, span: ast::span::Span, kind: hir::ExprKind) -> hir::Expr {
         hir::Expr {
             hir_id: self.unique_id(),
@@ -398,6 +415,8 @@ impl LoweringContext {
     }
 
     fn lower_stmt(&mut self, node: &ast::node::Stmt) -> Vec<hir::Stmt> {
+        debug!("Lowering statement {:?}", node.kind);
+
         match &node.kind {
             ast::node::StmtKind::Expr(expr) => vec![hir::Stmt {
                 hir_id: self.lower_node_id(node.id),
@@ -924,6 +943,8 @@ impl LoweringContext {
     /// Lower a pattern into a HIR pattern. Only use for single patterns, not match arms or
     /// function matching.
     fn lower_pat(&mut self, node: &ast::node::Pattern) -> hir::Pat {
+        debug!("Lowering pattern {:?}", node.kind);
+
         self.lower_pat_with_idents(node, &mut HashMap::new())
     }
 
@@ -999,6 +1020,8 @@ impl LoweringContext {
     }
 
     fn lower_ty(&mut self, node: Option<&ast::node::Ty>) -> hir::Ty {
+        debug!("Lowering type {:?}", node);
+
         if let Some(node) = node {
             hir::Ty {
                 kind: hir::TyKind::Path(self.lower_path(&node.name)),
