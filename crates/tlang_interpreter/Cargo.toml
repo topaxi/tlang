@@ -19,11 +19,13 @@ binary = ["tlang_ast_lowering"]
 tlang_ast = { path = "../tlang_ast" }
 tlang_ast_lowering = { path = "../tlang_ast_lowering", optional = true }
 tlang_hir = { path = "../tlang_hir" }
+tlang_macros = { path = "../tlang_macros" }
 tlang_parser = { path = "../tlang_parser" }
 tlang_semantics = { path = "../tlang_semantics" }
 log = { workspace = true }
 env_logger = { workspace = true }
 rand = "0.9"
+inventory = "0.3"
 
 [dev-dependencies]
 tlang_ast_lowering = { path = "../tlang_ast_lowering" }

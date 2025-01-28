@@ -23,6 +23,13 @@ pub mod state;
 mod stdlib;
 pub mod value;
 
+pub struct NativeFn {
+    pub name: &'static str,
+    pub function: fn(&mut InterpreterState, &[TlangValue]) -> TlangValue,
+}
+
+inventory::collect!(NativeFn);
+
 pub struct Interpreter {
     state: InterpreterState,
     native_fns: HashMap<TlangObjectId, TlangNativeFn>,
@@ -69,13 +76,10 @@ impl Interpreter {
             .shapes
             .insert(interpreter.state.list_shape, list_shape);
 
-        interpreter.define_native_fn("log", stdlib::utils::log);
-        interpreter.define_native_fn("len", stdlib::collections::len);
-
-        interpreter.define_native_fn("math::floor", stdlib::math::floor);
-        interpreter.define_native_fn("math::sqrt", stdlib::math::sqrt);
-        interpreter.define_native_fn("math::random", stdlib::math::random);
-        interpreter.define_native_fn("math::random_int", stdlib::math::random_int);
+        for native_fn in inventory::iter::<NativeFn> {
+            println!("Registering native fn: {}", native_fn.name);
+            interpreter.define_native_fn(native_fn.name, native_fn.function);
+        }
 
         interpreter
     }
