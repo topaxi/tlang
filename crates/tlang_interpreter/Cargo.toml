@@ -21,10 +21,11 @@ tlang_ast_lowering = { path = "../tlang_ast_lowering", optional = true }
 tlang_hir = { path = "../tlang_hir" }
 tlang_parser = { path = "../tlang_parser" }
 tlang_semantics = { path = "../tlang_semantics" }
+log = { workspace = true }
+env_logger = { workspace = true }
 
 [dev-dependencies]
 tlang_ast_lowering = { path = "../tlang_ast_lowering" }
 ctor = { workspace = true }
-env_logger = { workspace = true }
 indoc = { workspace = true }
 pretty_assertions = { workspace = true }

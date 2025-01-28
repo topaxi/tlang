@@ -6,6 +6,8 @@ use tlang_ast_lowering::lower_to_hir;
 use tlang_interpreter::Interpreter;
 
 fn main() {
+    env_logger::init();
+
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
         eprintln!("Usage: {} <file.tlang>", args[0]);

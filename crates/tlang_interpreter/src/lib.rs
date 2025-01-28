@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use log::debug;
 use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token;
 use tlang_hir::hir::{self, HirId};
@@ -236,7 +237,13 @@ impl Interpreter {
 
     fn eval_expr(&mut self, expr: &hir::Expr) -> TlangValue {
         match &expr.kind {
-            hir::ExprKind::Path(path) => self.resolve_path(path).unwrap_or(TlangValue::Nil),
+            hir::ExprKind::Path(path) => self.resolve_path(path).unwrap_or_else(|| {
+                panic!(
+                    "Could not resolve path: {}\nCurrent scope: {:#?}",
+                    path.join("::"),
+                    self.state.current_scope.borrow()
+                )
+            }),
             hir::ExprKind::Literal(value) => self.eval_literal(value),
             hir::ExprKind::List(values) => self.eval_list_expr(values),
             hir::ExprKind::Dict(entries) => self.eval_dict_expr(entries),
@@ -359,6 +366,10 @@ impl Interpreter {
         let lhs = self.eval_expr(lhs);
         let rhs = self.eval_expr(rhs);
 
+        if let TlangValue::Object(_) = lhs {
+            return self.eval_object_binary_op(op, lhs, rhs);
+        }
+
         match op {
             hir::BinaryOpKind::Add => self.eval_arithmetic_op(lhs, rhs, |a, b| a + b),
             hir::BinaryOpKind::Sub => self.eval_arithmetic_op(lhs, rhs, |a, b| a - b),
@@ -411,6 +422,7 @@ impl Interpreter {
             (TlangValue::Int(lhs), TlangValue::Float(rhs)) => {
                 TlangValue::Float(op(lhs as f64, rhs))
             }
+            (TlangValue::Object(_), _) => unreachable!(),
             _ => todo!(
                 "eval_arithmetic_op: incompatible types, {:?} and {:?}",
                 lhs,
@@ -430,7 +442,63 @@ impl Interpreter {
             (TlangValue::Float(lhs), TlangValue::Float(rhs)) => TlangValue::Bool(op(lhs, rhs)),
             (TlangValue::Float(lhs), TlangValue::Int(rhs)) => TlangValue::Bool(op(lhs, rhs as f64)),
             (TlangValue::Int(lhs), TlangValue::Float(rhs)) => TlangValue::Bool(op(lhs as f64, rhs)),
-            _ => todo!("eval_comparison_op: incompatible types"),
+            (TlangValue::Object(_), _) => unreachable!(),
+            _ => todo!("incompatible types, {:?} and {:?}", lhs, rhs),
+        }
+    }
+
+    fn eval_object_binary_op(
+        &mut self,
+        op: hir::BinaryOpKind,
+        lhs: TlangValue,
+        rhs: TlangValue,
+    ) -> TlangValue {
+        match op {
+            hir::BinaryOpKind::Eq | hir::BinaryOpKind::NotEq => {
+                let is_not = matches!(op, hir::BinaryOpKind::NotEq);
+
+                match (lhs, rhs) {
+                    (TlangValue::Object(lhs_id), TlangValue::Object(rhs_id)) => {
+                        if lhs_id == rhs_id {
+                            return TlangValue::Bool(true ^ is_not);
+                        }
+
+                        let lhs = self.get_object(lhs_id);
+                        let rhs = self.get_object(rhs_id);
+
+                        match (lhs, rhs) {
+                            (TlangObjectKind::Struct(lhs), TlangObjectKind::Struct(rhs)) => {
+                                if lhs.shape != rhs.shape {
+                                    return TlangValue::Bool(false ^ is_not);
+                                }
+
+                                // TODO: Implement comparisons between structs of the same shape.
+                                TlangValue::Bool(false ^ is_not)
+                            }
+                            (TlangObjectKind::String(lhs), TlangObjectKind::String(rhs)) => {
+                                TlangValue::Bool((lhs == rhs) ^ is_not)
+                            }
+                            _ => todo!("eval_object_binary_op: {:?}, {:?}, {:?}", op, lhs, rhs),
+                        }
+                    }
+                    _ => todo!("eval_object_binary_op: {:?}, {:?}, {:?}", op, lhs, rhs),
+                }
+            }
+            hir::BinaryOpKind::Add => match (lhs, rhs) {
+                (TlangValue::Object(lhs_id), TlangValue::Object(rhs_id)) => {
+                    let lhs = self.get_object(lhs_id);
+                    let rhs = self.get_object(rhs_id);
+
+                    match (lhs, rhs) {
+                        (TlangObjectKind::String(lhs), TlangObjectKind::String(rhs)) => {
+                            self.state.new_string(lhs.clone() + rhs)
+                        }
+                        _ => todo!("eval_object_binary_op: {:?}, {:?}, {:?}", op, lhs, rhs),
+                    }
+                }
+                _ => todo!("eval_object_binary_op: {:?}, {:?}, {:?}", op, lhs, rhs),
+            },
+            _ => todo!("eval_object_binary_op: {:?}, {:?}, {:?}", op, lhs, rhs),
         }
     }
 
@@ -560,6 +628,8 @@ impl Interpreter {
     }
 
     fn eval_call(&mut self, call_expr: &hir::CallExpression) -> TlangValue {
+        debug!("eval_call: {:?}", call_expr);
+
         match &call_expr.callee.kind {
             hir::ExprKind::Path(path)
                 if let Some(TlangValue::Object(id)) = self.resolve_path(path) =>
@@ -698,6 +768,8 @@ impl Interpreter {
         fn_decl: &hir::FunctionDeclaration,
         args: &[TlangValue],
     ) -> TlangValue {
+        debug!("eval_fn_call: {:?} with args {:?}", fn_decl.name, args);
+
         if fn_decl.parameters.len() != args.len() {
             panic!(
                 "Function `{:?}` expects {} arguments, but got {}",
@@ -816,59 +888,100 @@ impl Interpreter {
         match &pat.kind {
             hir::PatKind::Literal(literal) => {
                 let literal_value = self.eval_literal(literal);
-                *value == literal_value
-            }
-            hir::PatKind::List(patterns) => {
-                if let TlangValue::Object(id) = value {
-                    let list_values_length = self
-                        .state
-                        .objects
-                        .get(id)
-                        .and_then(|o| o.get_struct())
-                        .map(|s| s.field_values.len())
-                        .unwrap_or(0);
 
-                    // Empty list pattern is a special case, it only matches lists with 0 elements.
-                    if patterns.is_empty() && list_values_length >= 1 {
-                        return false;
-                    }
-
-                    // Not enough values in the list to match the pattern.
-                    // Rest patterns are allowed to match 0 values.
-                    let patterns_len =
-                        patterns.len() - patterns.iter().find(|p| p.is_rest()).map_or(0, |_| 1);
-                    if patterns_len > list_values_length {
-                        return false;
-                    }
-
-                    let field_values = self
-                        .state
-                        .objects
-                        .get(id)
-                        .and_then(|o| o.get_struct())
-                        .map(|s| s.field_values.clone())
-                        .unwrap_or_default();
-
-                    for (i, pat) in patterns.iter().enumerate() {
-                        if let hir::PatKind::Rest(pat) = &pat.kind {
-                            let rest_values = field_values[i..].to_vec();
-                            let rest_object = self.state.new_list(rest_values);
-
-                            return self.eval_pat(pat, &rest_object);
-                        }
-
-                        let field_value = field_values[i];
-                        if !self.eval_pat(pat, &field_value) {
-                            return false;
-                        }
-                    }
-
+                if value == &literal_value {
                     return true;
+                }
+
+                if let (TlangValue::Object(lhs), box token::Literal::String(rhs)) =
+                    (value, &literal)
+                {
+                    if let TlangObjectKind::String(lhs) = self.get_object(*lhs) {
+                        return lhs == rhs;
+                    }
                 }
 
                 false
             }
+            // TODO: Instead of having rest patterns within list patterns, we should have a pattern
+            //       specifically for matching against tail values (list, strings, objects)
+            hir::PatKind::List(patterns) => {
+                if let TlangValue::Object(id) = value {
+                    match self.get_object(*id) {
+                        TlangObjectKind::Struct(list_struct) => {
+                            let list_values_length = list_struct.field_values.len();
+
+                            // Empty list pattern is a special case, it only matches lists with 0 elements.
+                            if patterns.is_empty() && list_values_length >= 1 {
+                                return false;
+                            }
+
+                            // Not enough values in the list to match the pattern.
+                            // Rest patterns are allowed to match 0 values.
+                            let patterns_len = patterns.len()
+                                - patterns.iter().find(|p| p.is_rest()).map_or(0, |_| 1);
+                            if patterns_len > list_values_length {
+                                return false;
+                            }
+
+                            let field_values = list_struct.field_values.clone();
+
+                            for (i, pat) in patterns.iter().enumerate() {
+                                if let hir::PatKind::Rest(pat) = &pat.kind {
+                                    let rest_values = field_values[i..].to_vec();
+                                    let rest_object = self.state.new_list(rest_values);
+
+                                    return self.eval_pat(pat, &rest_object);
+                                }
+
+                                let field_value = field_values[i];
+                                if !self.eval_pat(pat, &field_value) {
+                                    return false;
+                                }
+                            }
+
+                            return true;
+                        }
+                        TlangObjectKind::String(str_value) => {
+                            let str_value = str_value.clone();
+                            for (i, pat) in patterns.iter().enumerate() {
+                                if let hir::PatKind::Rest(pat) = &pat.kind {
+                                    let rest_object = if i <= str_value.len() {
+                                        let rest_values = str_value[i..].to_string();
+                                        self.state.new_string(rest_values)
+                                    } else {
+                                        self.state.new_string(String::new())
+                                    };
+
+                                    return self.eval_pat(pat, &rest_object);
+                                }
+
+                                let char_match = if let Some(character) = str_value.chars().nth(i) {
+                                    self.state.new_string(character.to_string())
+                                } else {
+                                    self.state.new_string(String::new())
+                                };
+
+                                if !self.eval_pat(pat, &char_match) {
+                                    return false;
+                                }
+                            }
+
+                            return true;
+                        }
+                        _ => todo!("eval_pat: {:?}", value),
+                    }
+                }
+                false
+            }
             hir::PatKind::Identifier(_id, ident) => {
+                debug!("eval_pat: assigning {:?} to {}", value, ident);
+
+                match value {
+                    TlangValue::Object(id) => debug!("value: {:?}", self.get_object(*id)),
+                    _ => debug!("value: {:?}", value),
+                }
+
                 self.state
                     .current_scope
                     .borrow_mut()
