@@ -222,6 +222,8 @@ impl<'src> Parser<'src> {
     }
 
     fn save_state(&self) -> (Lexer<'src>, Option<Token>, Option<Token>) {
+        debug!("Saving state at {:?}", self.current_token);
+
         (
             self.lexer.clone(),
             self.current_token.clone(),
@@ -230,6 +232,8 @@ impl<'src> Parser<'src> {
     }
 
     fn restore_state(&mut self, state: (Lexer<'src>, Option<Token>, Option<Token>)) {
+        debug!("Restoring state to {:?}", state.1);
+
         self.lexer = state.0;
         self.current_token = state.1;
         self.next_token = state.2;
@@ -266,18 +270,19 @@ impl<'src> Parser<'src> {
         }
 
         let mut span = self.create_span_from_current_token();
-        let mut node = match self.current_token.as_ref().and_then(|token| token.get_keyword()) {
-            Some(Keyword::Let) => self.parse_variable_declaration(),
-            Some(Keyword::Fn)
+        let mut node = match &self.current_token.as_ref().map(|t| &t.kind) {
+            Some(TokenKind::Keyword(Keyword::Let)) => self.parse_variable_declaration(),
+            Some(TokenKind::Keyword(Keyword::Fn))
                 // If the next token is an identifier, we assume a function declaration.
                 // If it's not, we assume a function expression which is handled as a primary expression.
                 if matches!(self.peek_token_kind(), Some(TokenKind::Identifier(_))) =>
             {
                 self.parse_function_declaration()
             }
-            Some(Keyword::Return) => self.parse_return_statement(),
-            Some(Keyword::Enum) => self.parse_enum_declaration(),
-            Some(Keyword::Struct) => self.parse_struct_declaration(),
+            Some(TokenKind::Keyword(Keyword::Return)) => self.parse_return_statement(),
+            Some(TokenKind::Keyword(Keyword::Enum)) => self.parse_enum_declaration(),
+            Some(TokenKind::Keyword(Keyword::Struct)) => self.parse_struct_declaration(),
+            Some(TokenKind::LBrace) => self.parse_block_stmt(),
             _ => node::stmt!(self.unique_id(), Expr(Box::new(self.parse_expression()))),
         };
         node.leading_comments = comments;
@@ -533,6 +538,15 @@ impl<'src> Parser<'src> {
         self.end_span_from_previous_token(&mut span);
 
         Block::new(self.unique_id(), statements, expression).with_span(span)
+    }
+
+    fn parse_block_expr(&mut self) -> Expr {
+        node::expr!(self.unique_id(), Block(Box::new(self.parse_block())))
+    }
+
+    fn parse_block_stmt(&mut self) -> Stmt {
+        println!("Parsing block statement");
+        node::stmt!(self.unique_id(), Expr(Box::new(self.parse_block_expr())))
     }
 
     fn parse_let_expression(&mut self) -> Expr {
@@ -1558,6 +1572,8 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_expression(&mut self) -> Expr {
+        debug!("Parsing expression {:?}", self.current_token);
+
         self.parse_expression_with_precedence(0, Associativity::Left)
     }
 

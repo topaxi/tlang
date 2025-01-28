@@ -913,6 +913,11 @@ mod tests {
     use indoc::indoc;
     use pretty_assertions::assert_matches;
 
+    #[ctor::ctor]
+    fn before_all() {
+        env_logger::init();
+    }
+
     struct TestInterpreter {
         lowering_context: tlang_ast_lowering::LoweringContext,
         interpreter: Interpreter,
