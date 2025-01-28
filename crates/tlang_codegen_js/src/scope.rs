@@ -16,19 +16,9 @@ impl Scope {
         }
     }
 
-    fn safe_js_variable_name(&self, name: &str) -> String {
-        // We might want to special case `this` in codegeneration, currently
-        // we just define `this` when needed.
-        if js::is_keyword(name) && name != js::kw::This {
-            return "$".to_string() + name;
-        }
-
-        name.to_string()
-    }
-
     #[inline(always)]
     fn insert_variable(&mut self, name: &str, js_name: &str) -> String {
-        let js_name = self.safe_js_variable_name(js_name);
+        let js_name = safe_js_variable_name(js_name);
         self.variables.insert(name.to_string(), js_name.clone());
         js_name
     }
@@ -146,6 +136,16 @@ impl Default for Scope {
             ]),
         }
     }
+}
+
+fn safe_js_variable_name(name: &str) -> String {
+    // We might want to special case `this` in codegeneration, currently
+    // we just define `this` when needed.
+    if js::is_keyword(name) && name != js::kw::This {
+        return "$".to_string() + name;
+    }
+
+    name.to_string()
 }
 
 #[cfg(test)]
