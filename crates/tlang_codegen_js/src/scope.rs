@@ -1,3 +1,4 @@
+use crate::js;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -15,15 +16,30 @@ impl Scope {
         }
     }
 
+    fn safe_js_variable_name(&self, name: &str) -> String {
+        // We might want to special case `this` in codegeneration, currently
+        // we just define `this` when needed.
+        if js::is_keyword(name) && name != js::kw::This {
+            return "$".to_string() + name;
+        }
+
+        name.to_string()
+    }
+
+    #[inline(always)]
+    fn insert_variable(&mut self, name: &str, js_name: &str) -> String {
+        let js_name = self.safe_js_variable_name(js_name);
+        self.variables.insert(name.to_string(), js_name.clone());
+        js_name
+    }
+
     pub(crate) fn get_parent(&self) -> Option<&Scope> {
         self.parent.as_deref()
     }
 
     pub(crate) fn declare_local_variable(&mut self, name: &str) -> String {
         if !self.has_local_variable(name) {
-            self.variables.insert(name.to_string(), name.to_string());
-
-            return name.to_string();
+            return self.insert_variable(name, name);
         }
         // If already declared, generate a new name with a suffix (e.g., $a, $b)
         let name_without_suffix = name
@@ -31,8 +47,8 @@ impl Scope {
             .then(|| &name[..name.rfind('$').unwrap()])
             .unwrap_or(name);
         let new_name = self.get_unique_variable_name(&(name_without_suffix.to_string() + "$"));
-        self.variables.insert(new_name.clone(), new_name.clone());
-        self.variables.insert(name.to_string(), new_name.clone());
+        self.insert_variable(&new_name, &new_name);
+        self.insert_variable(name, &new_name);
         new_name
     }
 
@@ -41,7 +57,7 @@ impl Scope {
         //       variables, which makes this a bit harder as we add and define more variables.
         //       Can this be solved in a better way?
         if !self.has_variable_in_scope(name) {
-            self.variables.insert(name.to_string(), name.to_string());
+            self.insert_variable(name, name);
 
             return name.to_string();
         }
@@ -51,13 +67,13 @@ impl Scope {
             .then(|| &name[..name.rfind('$').unwrap()])
             .unwrap_or(name);
         let new_name = self.get_unique_variable_name(&(name_without_suffix.to_string() + "$"));
-        self.variables.insert(new_name.clone(), new_name.clone());
-        self.variables.insert(name.to_string(), new_name.clone());
+        self.insert_variable(&new_name, &new_name);
+        self.insert_variable(name, &new_name);
         new_name
     }
 
     pub(crate) fn declare_variable_alias(&mut self, from: &str, to: &str) {
-        self.variables.insert(from.to_string(), to.to_string());
+        self.insert_variable(from, to);
     }
 
     fn get_unique_variable_name(&self, prefix: &str) -> String {
@@ -129,5 +145,18 @@ impl Default for Scope {
                 ("math::random".to_string(), "Math.random".to_string()),
             ]),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn test_scope() {
+        let mut scope = super::Scope::default();
+        scope.declare_variable("void");
+
+        assert_eq!(scope.resolve_variable("void"), Some("$void".to_string()));
     }
 }

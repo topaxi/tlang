@@ -77,7 +77,9 @@ impl CodegenJS {
     }
 
     pub(crate) fn generate_function_declaration(&mut self, declaration: &hir::FunctionDeclaration) {
-        let name_as_str = fn_identifier_to_string(&declaration.name);
+        let name_as_str = self
+            .current_scope()
+            .declare_local_variable(&fn_identifier_to_string(&declaration.name));
         let is_tail_recursive =
             is_function_body_tail_recursive_block(&name_as_str, &declaration.body);
         self.push_function_context(

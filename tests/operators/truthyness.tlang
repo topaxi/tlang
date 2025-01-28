@@ -1,0 +1,18 @@
+fn map([], _) { [] }
+fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
+
+fn to_bool(v) { !!v }
+fn void() {}
+
+let truthy_values = [true, 1, [1], { a: 1 }] |> map(fn(v) { [v, to_bool(v)] });
+let falsy_values = [void(), false, 0, [], {}] |> map(fn(v) { [v, to_bool(v)] });
+
+log("Truthy values");
+log("============");
+log(truthy_values);
+
+log("");
+
+log("Falsy values");
+log("============");
+log(falsy_values);

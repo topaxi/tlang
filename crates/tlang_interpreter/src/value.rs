@@ -21,6 +21,13 @@ pub struct TlangStruct {
     pub field_values: Vec<TlangValue>,
 }
 
+impl TlangStruct {
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.field_values.is_empty()
+    }
+}
+
 // ShapeKeyDict is a hash value generated from each of the keys in the struct.
 type ShapeKeyDict = u64;
 
@@ -155,6 +162,16 @@ impl TlangObjectKind {
             _ => None,
         }
     }
+
+    fn is_truthy(&self) -> bool {
+        match self {
+            TlangObjectKind::Fn(_) => true,
+            TlangObjectKind::NativeFn => true,
+            TlangObjectKind::String(s) => !s.is_empty(),
+            TlangObjectKind::Struct(s) => !s.is_empty(),
+            TlangObjectKind::Closure(_) => true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -192,13 +209,15 @@ impl TlangValue {
         }
     }
 
-    pub fn is_truthy(&self) -> bool {
+    pub fn is_truthy(&self, state: &InterpreterState) -> bool {
         match self {
             TlangValue::Nil => false,
             TlangValue::Int(i) => *i != 0,
             TlangValue::Float(f) => *f != 0.0,
             TlangValue::Bool(b) => *b,
-            TlangValue::Object(_) => true,
+            TlangValue::Object(id) => state
+                .get_object_by_id(*id)
+                .is_some_and(|kind| kind.is_truthy()),
         }
     }
 }

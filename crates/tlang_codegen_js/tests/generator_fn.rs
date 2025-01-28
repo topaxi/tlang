@@ -341,3 +341,16 @@ fn test_function_reuse_param_name_with_pattern() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_function_name_with_reserved_keyword() {
+    let output = compile!(indoc! {"
+        fn delete() { 1 }
+    "});
+    let expected_output = indoc! {"
+        function $delete() {
+            return 1;
+        }
+    "};
+    assert_eq!(output, expected_output);
+}

@@ -748,13 +748,18 @@ impl<'src> Parser<'src> {
     fn parse_block_or_dict(&mut self) -> Expr {
         let mut span = self.create_span_from_current_token();
         self.consume_token(TokenKind::LBrace);
-        // If the first token is a identifier followed by a colon or comma, we assume a dict.
-        if let Some(TokenKind::Identifier(_)) = self.current_token_kind() {
-            if let Some(TokenKind::Colon | TokenKind::Comma) = self.peek_token_kind() {
-                let elements = self.parse_dict_elements();
-                self.consume_token(TokenKind::RBrace);
-                return node::expr!(self.unique_id(), Dict(elements));
-            }
+        // If immediately closed or the first token is a identifier followed by a colon or comma,
+        // we assume we are parsing a dict.
+        let is_dict = matches!(self.current_token_kind(), Some(TokenKind::RBrace))
+            || (matches!(self.current_token_kind(), Some(TokenKind::Identifier(_)))
+                && matches!(
+                    self.peek_token_kind(),
+                    Some(TokenKind::Colon | TokenKind::Comma)
+                ));
+        if is_dict {
+            let elements = self.parse_dict_elements();
+            self.consume_token(TokenKind::RBrace);
+            return node::expr!(self.unique_id(), Dict(elements));
         }
 
         let (statements, expression) = self.parse_statements(true);

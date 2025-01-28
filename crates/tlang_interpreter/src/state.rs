@@ -76,7 +76,7 @@ impl InterpreterState {
     }
 
     #[inline(always)]
-    fn get_object_by_id(&self, id: TlangObjectId) -> Option<&TlangObjectKind> {
+    pub(crate) fn get_object_by_id(&self, id: TlangObjectId) -> Option<&TlangObjectKind> {
         self.objects.get(&id)
     }
 
@@ -145,11 +145,26 @@ impl InterpreterState {
             TlangValue::Object(id) => match self.get_object_by_id(*id) {
                 Some(TlangObjectKind::String(s)) => s.clone(),
                 Some(TlangObjectKind::Struct(s)) => {
+                    if s.shape == self.list_shape {
+                        let values = s
+                            .field_values
+                            .iter()
+                            .map(|v| self.stringify(v))
+                            .collect::<Vec<String>>()
+                            .join(", ");
+                        return format!("[{}]", values);
+                    }
+
                     let shape = self.get_shape(s.shape).unwrap();
                     let mut result = String::new();
 
                     result.push_str(&shape.name);
                     result.push_str(" { ");
+
+                    if shape.field_map.is_empty() {
+                        result.push('}');
+                        return result;
+                    }
 
                     let mut fields = shape
                         .field_map

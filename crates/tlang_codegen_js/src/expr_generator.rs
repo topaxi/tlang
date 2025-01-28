@@ -211,10 +211,7 @@ impl CodegenJS {
     fn generate_dict_expression(&mut self, kvs: &[(hir::Expr, hir::Expr)]) {
         self.push_str("{\n");
         self.inc_indent();
-        for (i, (key, value)) in kvs.iter().enumerate() {
-            if i > 0 {
-                self.push_str(",\n");
-            }
+        for (key, value) in kvs.iter() {
             self.push_indent();
             self.generate_expr(key, None);
 
@@ -223,8 +220,8 @@ impl CodegenJS {
                 self.push_str(": ");
                 self.generate_expr(value, None);
             }
+            self.push_str(",\n");
         }
-        self.push_str(",\n");
         self.dec_indent();
         self.push_indent();
         self.push_char('}');

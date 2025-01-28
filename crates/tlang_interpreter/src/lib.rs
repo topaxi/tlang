@@ -272,13 +272,13 @@ impl Interpreter {
         consequence: &hir::Block,
         else_clauses: &[hir::ElseClause],
     ) -> TlangValue {
-        if self.eval_expr(condition).is_truthy() {
+        if self.eval_expr(condition).is_truthy(&self.state) {
             return self.eval_block(consequence);
         }
 
         for else_clause in else_clauses {
             if let Some(condition) = &else_clause.condition {
-                if self.eval_expr(condition).is_truthy() {
+                if self.eval_expr(condition).is_truthy(&self.state) {
                     return self.eval_block(&else_clause.consequence);
                 }
             } else {
@@ -332,10 +332,10 @@ impl Interpreter {
             hir::BinaryOpKind::And => {
                 let lhs = self.eval_expr(lhs);
 
-                if lhs.is_truthy() {
+                if lhs.is_truthy(&self.state) {
                     let rhs = self.eval_expr(rhs);
 
-                    if rhs.is_truthy() {
+                    if rhs.is_truthy(&self.state) {
                         return TlangValue::Bool(true);
                     }
                 }
@@ -346,7 +346,7 @@ impl Interpreter {
             hir::BinaryOpKind::Or => {
                 let lhs = self.eval_expr(lhs);
 
-                if lhs.is_truthy() {
+                if lhs.is_truthy(&self.state) {
                     return TlangValue::Bool(true);
                 }
 
@@ -388,8 +388,9 @@ impl Interpreter {
         }
     }
 
-    fn eval_unary(&mut self, op: UnaryOp, _expr: &hir::Expr) -> TlangValue {
+    fn eval_unary(&mut self, op: UnaryOp, expr: &hir::Expr) -> TlangValue {
         match op {
+            UnaryOp::Not => TlangValue::Bool(!self.eval_expr(expr).is_truthy(&self.state)),
             UnaryOp::Rest => unreachable!("Rest operator implemented in eval_list_expr"),
             _ => todo!("eval_unary: {:?}", op),
         }
@@ -799,7 +800,7 @@ impl Interpreter {
         self.with_new_scope(|this| {
             if this.eval_pat(&arm.pat, value) {
                 if let Some(expr) = &arm.guard {
-                    if !this.eval_expr(expr).is_truthy() {
+                    if !this.eval_expr(expr).is_truthy(&this.state) {
                         return None;
                     }
                 }
