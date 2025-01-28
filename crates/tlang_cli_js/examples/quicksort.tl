@@ -1,6 +1,3 @@
-// len(a[]) -> int
-fn len(list) { list.length }
-
 // random_int(int) -> int
 fn random_int(max) { math::random() * max |> math::floor() }
 

@@ -1,6 +1,3 @@
-// len(a[]) -> int
-fn len(list) { list.length }
-
 // binary_search(a[], a) -> int
 fn binary_search(list, target) { binary_search(list, target, 0, len(list) - 1) }
 // binary_search(a[], a, int, int) -> int
