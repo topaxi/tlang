@@ -10,26 +10,9 @@ use tlang_ast::node::{
 use tlang_ast::token::{kw, Literal};
 use tlang_hir::hir::{self, HirId};
 
-#[derive(Debug, Default)]
-struct Scope {
-    bindings: HashMap<String, String>,
-}
+use self::scope::Scope;
 
-impl Scope {
-    fn new() -> Self {
-        Self {
-            bindings: HashMap::new(),
-        }
-    }
-
-    pub fn insert(&mut self, name: &str, binding: &str) {
-        self.bindings.insert(name.to_string(), binding.to_string());
-    }
-
-    pub fn lookup(&self, name: &str) -> Option<&str> {
-        self.bindings.get(name).map(|s| s.as_str())
-    }
-}
+mod scope;
 
 // TODO: Add scopes and variable resolutions. There should be two kinds of bindings, one for a
 // whole block (declarations) and one for variable definitions (from definition forward).
