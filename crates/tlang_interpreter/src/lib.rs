@@ -224,7 +224,7 @@ impl Interpreter {
                 return StmtResult::Return;
             }
             hir::StmtKind::Return(_) => return StmtResult::Return,
-            _ => todo!("eval_stmt: {:?}", stmt),
+            hir::StmtKind::None => unreachable!(),
         }
 
         StmtResult::None
@@ -248,21 +248,7 @@ impl Interpreter {
             hir::ExprKind::TailCall(call_expr) => self.eval_tail_call(call_expr),
             hir::ExprKind::Unary(op, expr) => self.eval_unary(*op, expr),
             hir::ExprKind::IfElse(condition, consequence, else_clauses) => {
-                let condition = self.eval_expr(condition);
-                if let TlangValue::Bool(true) = condition {
-                    self.eval_block(consequence)
-                } else {
-                    for else_clause in else_clauses {
-                        if let Some(condition) = &else_clause.condition {
-                            if let TlangValue::Bool(true) = self.eval_expr(condition) {
-                                return self.eval_block(&else_clause.consequence);
-                            }
-                        } else {
-                            return self.eval_block(&else_clause.consequence);
-                        }
-                    }
-                    TlangValue::Nil
-                }
+                self.eval_if_else(condition, consequence, else_clauses)
             }
             hir::ExprKind::FunctionExpression(fn_decl) => {
                 if self.resolve_closure_decl(fn_decl.hir_id).is_none() {
@@ -278,6 +264,28 @@ impl Interpreter {
             hir::ExprKind::Match(expr, arms) => self.eval_match(expr, arms),
             _ => todo!("eval_expr: {:?}", expr),
         }
+    }
+
+    fn eval_if_else(
+        &mut self,
+        condition: &hir::Expr,
+        consequence: &hir::Block,
+        else_clauses: &[hir::ElseClause],
+    ) -> TlangValue {
+        if self.eval_expr(condition).is_truthy() {
+            return self.eval_block(consequence);
+        }
+
+        for else_clause in else_clauses {
+            if let Some(condition) = &else_clause.condition {
+                if self.eval_expr(condition).is_truthy() {
+                    return self.eval_block(&else_clause.consequence);
+                }
+            } else {
+                return self.eval_block(&else_clause.consequence);
+            }
+        }
+        TlangValue::Nil
     }
 
     fn eval_index_access(&mut self, lhs: &hir::Expr, rhs: &hir::Expr) -> TlangValue {
