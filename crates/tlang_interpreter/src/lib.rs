@@ -25,7 +25,9 @@ pub mod value;
 
 pub struct NativeFn {
     pub name: &'static str,
+    pub binding_name: &'static str,
     pub function: fn(&mut InterpreterState, &[TlangValue]) -> TlangValue,
+    pub module_path: &'static str,
 }
 
 inventory::collect!(NativeFn);
@@ -77,8 +79,14 @@ impl Interpreter {
             .insert(interpreter.state.list_shape, list_shape);
 
         for native_fn in inventory::iter::<NativeFn> {
-            println!("Registering native fn: {}", native_fn.name);
-            interpreter.define_native_fn(native_fn.name, native_fn.function);
+            let fn_name = if native_fn.binding_name.is_empty() {
+                let module_name = native_fn.module_path.split("::").last().unwrap();
+                module_name.to_string() + "::" + native_fn.name
+            } else {
+                native_fn.binding_name.to_string()
+            };
+
+            interpreter.define_native_fn(&fn_name, native_fn.function);
         }
 
         interpreter
