@@ -12,6 +12,7 @@ use tlang_hir::hir::{self, HirId};
 use self::resolver::Resolver;
 use self::scope::Scope;
 use self::state::InterpreterState;
+use self::stdlib::collections::define_list_shape;
 use self::value::{
     ShapeKey, TlangClosure, TlangNativeFn, TlangObjectId, TlangObjectKind, TlangStruct,
     TlangStructMethod, TlangStructShape, TlangValue,
@@ -67,45 +68,13 @@ impl Default for Interpreter {
 impl Interpreter {
     pub fn new() -> Self {
         let list_shape_key = ShapeKey::new_native();
-        let mut list_methods = HashMap::new();
-
-        let slice_method_id = TlangObjectId::new();
-        let slice_method = TlangStructMethod::Native(slice_method_id);
-
-        list_methods.insert("slice".to_string(), slice_method);
-
-        let list_shape = TlangStructShape::new("List".to_string(), vec![], list_methods);
 
         let mut interpreter = Self {
             state: InterpreterState::new(list_shape_key),
             native_fns: HashMap::new(),
         };
 
-        interpreter.insert_native_fn(slice_method_id, |state, args| {
-            let this = state
-                .get_object(args[0])
-                .and_then(|o| o.get_struct())
-                .unwrap();
-
-            let start = args[1].as_usize().unwrap();
-            let end = if args.len() < 3 {
-                this.field_values.len()
-            } else {
-                args[2].as_usize().unwrap_or(this.field_values.len())
-            };
-
-            let field_values = this.field_values[start..end].to_vec();
-
-            state.new_object(TlangObjectKind::Struct(TlangStruct {
-                shape: this.shape,
-                field_values,
-            }))
-        });
-
-        interpreter
-            .state
-            .shapes
-            .insert(interpreter.state.list_shape, list_shape);
+        define_list_shape(&mut interpreter);
 
         for native_fn in inventory::iter::<NativeFn> {
             let fn_name = if native_fn.binding_name.is_empty() {
