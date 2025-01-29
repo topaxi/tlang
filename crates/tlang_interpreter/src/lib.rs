@@ -20,7 +20,8 @@ use self::value::{
 mod resolver;
 mod scope;
 pub mod state;
-mod stdlib;
+#[cfg(feature = "stdlib")]
+pub mod stdlib;
 pub mod value;
 
 pub struct NativeFn {

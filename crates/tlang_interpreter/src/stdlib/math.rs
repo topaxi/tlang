@@ -21,11 +21,13 @@ pub fn sqrt(_: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
     }
 }
 
+#[cfg(not(feature = "wasm"))]
 #[native_fn]
 pub fn random(_: &mut InterpreterState, _: &[TlangValue]) -> TlangValue {
     TlangValue::Float(rand::random())
 }
 
+#[cfg(not(feature = "wasm"))]
 #[native_fn]
 pub fn random_int(_: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
     match &args[0] {
