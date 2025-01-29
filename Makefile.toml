@@ -7,3 +7,6 @@ args = ["clean"]
 
 [tasks.pre-build]
 dependencies = ["clean"]
+
+[tasks.test]
+args = ["nextest", "run"]
