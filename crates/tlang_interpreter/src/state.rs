@@ -17,7 +17,7 @@ pub struct InterpreterState {
     pub(crate) closures: HashMap<HirId, hir::FunctionDeclaration>,
     pub(crate) objects: HashMap<TlangObjectId, TlangObjectKind>,
     pub(crate) shapes: HashMap<ShapeKey, TlangStructShape>,
-    pub(crate) list_shape: ShapeKey,
+    pub list_shape: ShapeKey,
 }
 
 impl Resolver for InterpreterState {

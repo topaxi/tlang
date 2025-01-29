@@ -67,12 +67,40 @@ impl Default for Interpreter {
 impl Interpreter {
     pub fn new() -> Self {
         let list_shape_key = ShapeKey::new_native();
-        let list_shape = TlangStructShape::new("List".to_string(), vec![], HashMap::new());
+        let mut list_methods = HashMap::new();
+
+        let slice_method_id = TlangObjectId::new();
+        let slice_method = TlangStructMethod::Native(slice_method_id);
+
+        list_methods.insert("slice".to_string(), slice_method);
+
+        let list_shape = TlangStructShape::new("List".to_string(), vec![], list_methods);
 
         let mut interpreter = Self {
             state: InterpreterState::new(list_shape_key),
             native_fns: HashMap::new(),
         };
+
+        interpreter.insert_native_fn(slice_method_id, |state, args| {
+            let this = state
+                .get_object(args[0])
+                .and_then(|o| o.get_struct())
+                .unwrap();
+
+            let start = args[1].as_usize().unwrap();
+            let end = if args.len() < 3 {
+                this.field_values.len()
+            } else {
+                args[2].as_usize().unwrap_or(this.field_values.len())
+            };
+
+            let field_values = this.field_values[start..end].to_vec();
+
+            state.new_object(TlangObjectKind::Struct(TlangStruct {
+                shape: this.shape,
+                field_values,
+            }))
+        });
 
         interpreter
             .state
@@ -93,6 +121,14 @@ impl Interpreter {
         interpreter
     }
 
+    #[inline(always)]
+    fn insert_native_fn<F>(&mut self, id: TlangObjectId, f: F)
+    where
+        F: Fn(&mut InterpreterState, &[TlangValue]) -> TlangValue + 'static,
+    {
+        self.native_fns.insert(id, Box::new(f));
+    }
+
     pub fn define_native_fn<F>(&mut self, name: &str, f: F)
     where
         F: Fn(&mut InterpreterState, &[TlangValue]) -> TlangValue + 'static,
@@ -104,8 +140,7 @@ impl Interpreter {
             .borrow_mut()
             .insert_value(name.to_string(), fn_object);
 
-        self.native_fns
-            .insert(fn_object.get_object_id().unwrap(), Box::new(f));
+        self.insert_native_fn(fn_object.get_object_id().unwrap(), f);
     }
 
     fn resolve_closure_decl(&self, id: HirId) -> Option<&hir::FunctionDeclaration> {
@@ -289,15 +324,21 @@ impl Interpreter {
     }
 
     fn eval_index_access(&mut self, lhs: &hir::Expr, rhs: &hir::Expr) -> TlangValue {
-        if let TlangValue::Int(index) = self.eval_expr(rhs) {
-            let lhs = self.eval_expr(lhs);
+        let rhs_value = self.eval_expr(rhs);
 
-            if let Some(TlangObjectKind::Struct(obj)) = self.state.get_object(lhs) {
-                return obj.field_values[index as usize];
-            }
+        let index = match rhs_value {
+            TlangValue::Int(index) => index,
+            TlangValue::Float(index) => index as i64,
+            _ => todo!("eval_index_access: {:?}", rhs_value),
+        };
+
+        let lhs_value = self.eval_expr(lhs);
+
+        if let Some(TlangObjectKind::Struct(obj)) = self.state.get_object(lhs_value) {
+            return obj.field_values[index as usize];
         }
 
-        todo!("eval_index_access: {:?}[{:?}]", lhs, rhs)
+        todo!("eval_index_access: {:?}[{:?}]", lhs, rhs_value)
     }
 
     fn eval_field_access(&mut self, lhs: &hir::Expr, ident: &Ident) -> TlangValue {
@@ -645,21 +686,7 @@ impl Interpreter {
                         this.eval_fn_call(&fn_decl, &args)
                     })
                 } else if let TlangObjectKind::NativeFn = self.get_object(id) {
-                    let current_scope = self.state.current_scope.clone();
-                    self.state.current_scope = self.state.root_scope.clone();
-
-                    let result = if let Some(native_fn) = self.native_fns.get_mut(&id) {
-                        native_fn(&mut self.state, &args)
-                    } else {
-                        panic!(
-                            "`{:?}` is not a function: {:?}",
-                            path.join("::"),
-                            self.get_object(id)
-                        );
-                    };
-
-                    self.state.current_scope = current_scope;
-                    result
+                    self.exec_native_fn(id, &args)
                 } else {
                     panic!(
                         "`{:?}` is not a function: {:?}",
@@ -727,6 +754,8 @@ impl Interpreter {
             }
             hir::ExprKind::FieldAccess(expr, ident) => {
                 let call_target = self.eval_expr(expr);
+                let mut args = self.eval_exprs(&call_expr.arguments);
+                args.insert(0, call_target);
 
                 match call_target {
                     TlangValue::Object(_id) => {
@@ -740,13 +769,19 @@ impl Interpreter {
                         match struct_shape.method_map.get(ident.as_str()) {
                             Some(TlangStructMethod::HirId(id)) => {
                                 let fn_decl = self.resolve_fn_decl(*id).unwrap().clone();
-                                let mut args = self.eval_exprs(&call_expr.arguments);
-                                args.insert(0, call_target);
                                 self.with_scope(self.state.root_scope.clone(), |this| {
                                     this.eval_fn_call(&fn_decl, &args)
                                 })
                             }
-                            _ => todo!("eval_call: {:?}", call_target),
+                            Some(TlangStructMethod::Native(id)) => self.exec_native_fn(*id, &args),
+                            _ => {
+                                panic!(
+                                    "{} does not have a method {:?}, {:?}",
+                                    struct_shape.name,
+                                    ident.as_str(),
+                                    struct_shape.method_map.keys()
+                                );
+                            }
                         }
                     }
                     _ => todo!("eval_call: {:?}", call_target),
@@ -782,6 +817,19 @@ impl Interpreter {
                     .insert(param.name.to_string(), *arg);
             }
             interpreter.eval_block(&fn_decl.body)
+        })
+    }
+
+    fn exec_native_fn(&mut self, id: TlangObjectId, args: &[TlangValue]) -> TlangValue {
+        // Do we need and want to reset the scope for native functions?
+        // It could be somewhat interesting to manipulate the current scope from native functions.
+        self.with_scope(self.state.root_scope.clone(), |this| {
+            let result = if let Some(native_fn) = this.native_fns.get_mut(&id) {
+                native_fn(&mut this.state, args)
+            } else {
+                panic!("Native function not found: {:?}", id);
+            };
+            result
         })
     }
 

@@ -72,8 +72,9 @@ impl From<HirId> for ShapeKey {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum TlangStructMethod {
-    Native(TlangNativeFn),
+    Native(TlangObjectId),
     HirId(HirId),
 }
 
@@ -218,6 +219,14 @@ impl TlangValue {
             TlangValue::Object(id) => state
                 .get_object_by_id(*id)
                 .is_some_and(|kind| kind.is_truthy()),
+        }
+    }
+
+    pub fn as_usize(&self) -> Option<usize> {
+        match self {
+            TlangValue::Int(i) => Some(*i as usize),
+            TlangValue::Float(f) => Some(*f as usize),
+            _ => None,
         }
     }
 }

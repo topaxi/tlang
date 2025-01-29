@@ -133,6 +133,7 @@ impl Default for Scope {
                 ("math::max".to_string(), "Math.max".to_string()),
                 ("math::floor".to_string(), "Math.floor".to_string()),
                 ("math::random".to_string(), "Math.random".to_string()),
+                ("random_int".to_string(), "random_int".to_string()),
             ]),
         }
     }

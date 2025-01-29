@@ -1,6 +1,6 @@
 use tlang_hir::hir;
 use tlang_interpreter::state::InterpreterState;
-use tlang_interpreter::value::TlangValue;
+use tlang_interpreter::value::{TlangObjectKind, TlangValue};
 use tlang_parser::error::ParseError;
 use tlang_parser::parser::Parser;
 use wasm_bindgen::prelude::*;
@@ -94,13 +94,39 @@ impl TlangInterpreter {
     }
 }
 
-fn tlang_value_to_js_value(_state: &InterpreterState, value: TlangValue) -> JsValue {
+fn tlang_value_to_js_value(state: &InterpreterState, value: TlangValue) -> JsValue {
     match value {
         TlangValue::Nil => JsValue::null(),
         TlangValue::Bool(b) => JsValue::from(b),
         TlangValue::Int(i) => JsValue::from(i),
         TlangValue::Float(f) => JsValue::from_f64(f),
-        TlangValue::Object(_id) => todo!(),
+        TlangValue::Object(_) => tlang_object_to_js_value(state, value),
+    }
+}
+
+fn tlang_object_to_js_value(state: &InterpreterState, value: TlangValue) -> JsValue {
+    match state.get_object(value) {
+        Some(TlangObjectKind::String(s)) => JsValue::from(s),
+        Some(TlangObjectKind::Struct(s)) => {
+            if s.shape == state.list_shape {
+                let array = js_sys::Array::new();
+                for value in &s.field_values {
+                    array.push(&tlang_value_to_js_value(state, *value));
+                }
+                return JsValue::from(array);
+            }
+
+            let shape = state.get_shape(s.shape).unwrap();
+            let object = js_sys::Object::new();
+            for (field, idx) in shape.field_map.iter() {
+                let key = JsValue::from(field);
+                let value = &s.field_values[*idx];
+                js_sys::Reflect::set(&object, &key, &tlang_value_to_js_value(state, *value))
+                    .expect("Unable to set property on object");
+            }
+            JsValue::from(object)
+        }
+        _ => JsValue::from("unknown object"),
     }
 }
 

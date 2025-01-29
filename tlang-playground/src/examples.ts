@@ -2,7 +2,7 @@ import { standardLibrarySource } from './tlang';
 
 const cli_examples = Object.fromEntries(
   Object.entries(
-    import.meta.glob('../../crates/tlang_cli_js/examples/*.tl', {
+    import.meta.glob('../../crates/tlang_cli_js/examples/*.tlang', {
       query: '?raw',
       import: 'default',
       eager: true,
