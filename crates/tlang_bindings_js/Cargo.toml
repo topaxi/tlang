@@ -19,7 +19,9 @@ tlang_hir = { path = "../tlang_hir" }
 tlang_hir_pretty = { path = "../tlang_hir_pretty" }
 tlang_parser = { path = "../tlang_parser" }
 tlang_semantics = { path = "../tlang_semantics" }
-tlang_interpreter = { path = "../tlang_interpreter", features = ["wasm"] }
+tlang_interpreter = { path = "../tlang_interpreter", default-features = false, features = [
+  "stdlib",
+] }
 tlang_macros = { path = "../tlang_macros" }
 tlang_codegen_js = { path = "../tlang_codegen_js" }
 inventory = { workspace = true }

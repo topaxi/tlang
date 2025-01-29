@@ -13,10 +13,10 @@ path = "src/main.rs"
 required-features = ["binary"]
 
 [features]
-default = ["stdlib"]
+default = ["stdlib", "rand"]
 binary = ["tlang_ast_lowering"]
-wasm = []
 stdlib = []
+rand = ["dep:rand"]
 
 [dependencies]
 tlang_ast = { path = "../tlang_ast" }
@@ -28,12 +28,10 @@ tlang_semantics = { path = "../tlang_semantics" }
 log = { workspace = true }
 env_logger = { workspace = true }
 inventory = "0.3"
+rand = { version = "0.9", optional = true }
 
 [dev-dependencies]
 tlang_ast_lowering = { path = "../tlang_ast_lowering" }
 ctor = { workspace = true }
 indoc = { workspace = true }
 pretty_assertions = { workspace = true }
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-rand = { version = "0.9" }
