@@ -47,32 +47,20 @@ impl CodegenJS {
     }
 
     fn generate_struct_method_binding(&mut self, declaration: &hir::FunctionDeclaration) {
-        if is_static_method(&declaration.name) {
-            let lhs = match &declaration.name.kind {
-                hir::ExprKind::Path(path) => path.join("."),
-                _ => unreachable!(),
-            };
-
-            self.push_indent();
-            self.push_str(&format!("{} = ", lhs));
-        } else if is_member_method(&declaration.name) {
-            let target_name: String = match &declaration.name.kind {
-                hir::ExprKind::FieldAccess(base, ..) => fn_identifier_to_string(base),
-                _ => unreachable!(),
-            };
-
-            let field_name = match &declaration.name.kind {
-                hir::ExprKind::FieldAccess(_, field) => field.to_string(),
-                _ => unreachable!(),
-            };
-
-            self.push_indent();
-            self.push_str(&target_name);
-            self.push_str("Constructor.prototype.");
-            self.push_str(&field_name);
-            self.push_str(" = ");
-        } else {
-            self.push_indent();
+        match &declaration.name.kind {
+            hir::ExprKind::Path(path) if path.segments.len() > 1 => {
+                self.push_indent();
+                self.push_str(&path.join("."));
+                self.push_str(" = ");
+            }
+            hir::ExprKind::FieldAccess(base, field) => {
+                self.push_indent();
+                self.push_str(&fn_identifier_to_string(base));
+                self.push_str("Constructor.prototype.");
+                self.push_str(field.as_str());
+                self.push_str(" = ");
+            }
+            _ => self.push_indent(),
         }
     }
 
@@ -338,22 +326,10 @@ fn is_function_body_tail_recursive(function_name: &str, node: &hir::Expr) -> boo
     }
 }
 
-fn is_member_method(node: &hir::Expr) -> bool {
-    matches!(&node.kind, hir::ExprKind::FieldAccess(..))
-}
-
-fn is_static_method(node: &hir::Expr) -> bool {
-    if let hir::ExprKind::Path(path) = &node.kind {
-        return path.segments.len() > 1;
-    }
-
-    false
-}
-
 pub(crate) fn fn_identifier_to_string(expr: &hir::Expr) -> String {
     match &expr.kind {
         hir::ExprKind::Path(path) => path.join("__"),
         hir::ExprKind::FieldAccess(_base, field) => field.to_string(),
-        kind => todo!("fn_identifier_to_string: {:?}", kind),
+        _ => unreachable!(),
     }
 }
