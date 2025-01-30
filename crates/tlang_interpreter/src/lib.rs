@@ -803,16 +803,12 @@ impl Interpreter {
     }
 
     fn eval_let_stmt(&mut self, pat: &hir::Pat, expr: &hir::Expr, _ty: &hir::Ty) {
-        match &pat.kind {
-            hir::PatKind::Identifier(_id, ident) => {
-                let value = self.eval_expr(expr);
-                self.state
-                    .current_scope
-                    .borrow_mut()
-                    .values
-                    .insert(ident.to_string(), value);
-            }
-            _ => todo!("eval_let_stmt: {:?}", pat),
+        let value = self.eval_expr(expr);
+
+        if !self.eval_pat(pat, &value) {
+            // We'd probably want to do it more like Rust via a if let statement, and have the
+            // normal let statement be only valid for identifiers.
+            panic!("Pattern did not match value");
         }
     }
 

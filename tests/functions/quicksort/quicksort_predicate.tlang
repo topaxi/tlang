@@ -1,0 +1,33 @@
+// random_int(int) -> int
+fn random_int(max) { math::random() * max |> math::floor() }
+
+// partition(a[], fn(a) -> bool) -> (a[], a[])
+fn partition([], _) { [[], []] }
+fn partition(list, predicate) { partition(list, predicate, [], []) }
+// partition(a[], fn(a) -> bool, a[], a[]) -> (a[], a[])
+fn partition([], _, satisfies, does_not_satisfy) { [satisfies, does_not_satisfy] }
+fn partition([x, ...xs], predicate, satisfies, does_not_satisfy) if predicate(x) {
+  rec partition(xs, predicate, [...satisfies, x], does_not_satisfy)
+}
+fn partition([x, ...xs], predicate, satisfies, does_not_satisfy) {
+  rec partition(xs, predicate, satisfies, [...does_not_satisfy, x])
+}
+
+// quicksort(a[], fn(a, a) -> int) -> a[]
+fn quicksort([], _) { [] }
+fn quicksort(list, predicate) {
+  let pivotIndex = random_int(len(list));
+  let pivot = list[pivotIndex];
+  let list = [...list.slice(0, pivotIndex), ...list.slice(pivotIndex+1)];
+
+  let [smaller, greater] = list |> partition(fn(x) { predicate(x, pivot) < 0 });
+
+  let smaller = smaller |> quicksort(predicate);
+  let greater = greater |> quicksort(predicate);
+
+  [...smaller, pivot, ...greater]
+}
+
+[3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5]
+|> quicksort(fn(a, b) { b - a })
+|> log();
