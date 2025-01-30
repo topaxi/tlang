@@ -714,6 +714,32 @@ impl Interpreter {
                     field_values,
                 }))
             }
+            // The path might resolve to a struct method directly.
+            hir::ExprKind::Path(path)
+                if let Some(struct_decl) = self.resolve_struct_decl(&path.as_init()) =>
+            {
+                let method_name = path.last_ident();
+                let args = self.eval_exprs(&call_expr.arguments);
+                let struct_shape = self.state.get_shape(struct_decl.hir_id.into()).unwrap();
+
+                match struct_shape.method_map.get(method_name.as_str()) {
+                    Some(TlangStructMethod::HirId(id)) => {
+                        let fn_decl = self.resolve_fn_decl(*id).unwrap().clone();
+                        self.with_scope(self.state.root_scope.clone(), |this| {
+                            this.eval_fn_call(&fn_decl, &args)
+                        })
+                    }
+                    Some(TlangStructMethod::Native(id)) => self.exec_native_fn(*id, &args),
+                    _ => {
+                        panic!(
+                            "{} does not have a method {:?}, {:?}",
+                            struct_shape.name,
+                            method_name.as_str(),
+                            struct_shape.method_map.keys()
+                        );
+                    }
+                }
+            }
             hir::ExprKind::Path(path) => {
                 panic!(
                     "Function `{}` not found\nCurrent scope: {:?}",
@@ -767,7 +793,7 @@ impl Interpreter {
     ) -> TlangValue {
         debug!("eval_fn_call: {:?} with args {:?}", fn_decl.name, args);
 
-        if fn_decl.parameters.len() != args.len() {
+        if fn_decl.parameters.len() != args.len() && !fn_decl.variadic {
             panic!(
                 "Function `{:?}` expects {} arguments, but got {}",
                 fn_decl.name,
@@ -776,16 +802,31 @@ impl Interpreter {
             );
         }
 
-        self.with_new_scope(|interpreter| {
-            for (param, arg) in fn_decl.parameters.iter().zip(args.iter()) {
-                interpreter
-                    .state
+        self.with_new_scope(|this| {
+            if !fn_decl.variadic {
+                for (param, arg) in fn_decl.parameters.iter().zip(args.iter()) {
+                    this.state
+                        .current_scope
+                        .borrow_mut()
+                        .values
+                        .insert(param.name.to_string(), *arg);
+                }
+            } else {
+                let arguments = this.state.new_list(args.to_vec());
+                // TODO: This is currently getting lowered into a path of "arguments.list" instead
+                //       of an actual expression.
+                this.state.current_scope.borrow_mut().values.insert(
+                    "arguments.length".to_string(),
+                    TlangValue::Int(args.len() as i64),
+                );
+                this.state
                     .current_scope
                     .borrow_mut()
                     .values
-                    .insert(param.name.to_string(), *arg);
+                    .insert("arguments".to_string(), arguments);
             }
-            interpreter.eval_block(&fn_decl.body)
+
+            this.eval_block(&fn_decl.body)
         })
     }
 

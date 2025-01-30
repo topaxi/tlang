@@ -529,6 +529,26 @@ impl LoweringContext {
                                 })),
                                 span: Default::default(),
                             },
+                            hir::ExprKind::FieldAccess(
+                                box hir::Expr {
+                                    kind: hir::ExprKind::Path(box path),
+                                    ..
+                                },
+                                ident,
+                            ) => hir::Expr {
+                                hir_id: self.unique_id(),
+                                kind: hir::ExprKind::Path(Box::new(hir::Path {
+                                    segments: [
+                                        path.segments.clone(),
+                                        vec![hir::PathSegment {
+                                            ident: ident.clone(),
+                                        }],
+                                    ]
+                                    .concat(),
+                                    span: Default::default(),
+                                })),
+                                span: Default::default(),
+                            },
                             _ => unreachable!(),
                         };
 
@@ -559,15 +579,30 @@ impl LoweringContext {
                                     arguments: (0..arg_len)
                                         .map(|i| hir::Expr {
                                             hir_id: self.unique_id(),
-                                            kind: hir::ExprKind::Path(Box::new(hir::Path {
-                                                segments: vec![hir::PathSegment {
-                                                    ident: Ident::new(
-                                                        &format!("arguments[{}]", i),
-                                                        Default::default(),
-                                                    ),
-                                                }],
-                                                span: Default::default(),
-                                            })),
+                                            kind: hir::ExprKind::IndexAccess(
+                                                Box::new(hir::Expr {
+                                                    hir_id: self.unique_id(),
+                                                    kind: hir::ExprKind::Path(Box::new(
+                                                        hir::Path {
+                                                            segments: vec![hir::PathSegment {
+                                                                ident: Ident::new(
+                                                                    "arguments",
+                                                                    Default::default(),
+                                                                ),
+                                                            }],
+                                                            span: Default::default(),
+                                                        },
+                                                    )),
+                                                    span: Default::default(),
+                                                }),
+                                                Box::new(hir::Expr {
+                                                    hir_id: self.unique_id(),
+                                                    kind: hir::ExprKind::Literal(Box::new(
+                                                        Literal::Integer(i64::try_from(i).unwrap()),
+                                                    )),
+                                                    span: Default::default(),
+                                                }),
+                                            ),
                                             span: Default::default(),
                                         })
                                         .collect(),
@@ -583,6 +618,7 @@ impl LoweringContext {
 
                     let mut dynamic_dispatch_fn =
                         hir::FunctionDeclaration::new_empty_fn(self.unique_id(), fn_name, vec![]);
+                    dynamic_dispatch_fn.variadic = true;
 
                     dynamic_dispatch_fn.body.expr = Some(hir::Expr {
                         hir_id: self.unique_id(),
@@ -899,6 +935,7 @@ impl LoweringContext {
                 hir_id: this.lower_node_id(decl.id),
                 name,
                 parameters,
+                variadic: false,
                 return_type,
                 body,
                 span: decl.span,

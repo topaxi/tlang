@@ -44,6 +44,15 @@ impl Path {
     pub fn last_ident(&self) -> &Ident {
         &self.segments[self.segments.len() - 1].ident
     }
+
+    pub fn as_init(&self) -> Self {
+        let mut segments = self.segments.clone();
+        segments.pop();
+        Path {
+            segments,
+            span: self.span,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -290,6 +299,7 @@ pub struct FunctionDeclaration {
     pub hir_id: HirId,
     pub name: Expr,
     pub parameters: Vec<FunctionParameter>,
+    pub variadic: bool,
     pub return_type: Ty,
     pub body: Block,
     pub span: Span,
@@ -301,6 +311,7 @@ impl FunctionDeclaration {
             hir_id,
             name,
             parameters,
+            variadic: false,
             return_type: Ty {
                 kind: TyKind::Unknown,
                 span: Span::default(),
