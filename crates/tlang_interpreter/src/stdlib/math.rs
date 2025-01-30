@@ -21,6 +21,17 @@ pub fn sqrt(_: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
     }
 }
 
+#[native_fn]
+pub fn max(_: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
+    match (args[0], args[1]) {
+        (TlangValue::Float(f1), TlangValue::Float(f2)) => TlangValue::Float(f1.max(f2)),
+        (TlangValue::Int(i1), TlangValue::Int(i2)) => TlangValue::Int(i1.max(i2)),
+        (TlangValue::Float(f), TlangValue::Int(i)) => TlangValue::Float(f.max(i as f64)),
+        (TlangValue::Int(i), TlangValue::Float(f)) => TlangValue::Float((i as f64).max(f)),
+        (value1, value2) => panic!("Expected float or int, got {:?} and {:?}", value1, value2),
+    }
+}
+
 #[cfg(feature = "rand")]
 #[native_fn]
 pub fn random(_: &mut InterpreterState, _: &[TlangValue]) -> TlangValue {

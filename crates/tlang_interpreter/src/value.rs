@@ -210,6 +210,10 @@ impl TlangValue {
         }
     }
 
+    pub fn is_object(&self) -> bool {
+        matches!(self, TlangValue::Object(_))
+    }
+
     pub fn is_truthy(&self, state: &InterpreterState) -> bool {
         match self {
             TlangValue::Nil => false,

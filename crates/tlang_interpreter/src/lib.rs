@@ -996,8 +996,28 @@ impl Interpreter {
                 true
             }
             hir::PatKind::Wildcard => true,
+            hir::PatKind::Enum(path, kvs) => match self.state.get_object(*value) {
+                Some(TlangObjectKind::Struct(tlang_struct)) => {
+                    let shape = self.state.get_shape(tlang_struct.shape).unwrap();
+                    let path_name = path.join("::");
+
+                    if shape.name != path_name {
+                        return false;
+                    }
+
+                    let field_values = tlang_struct.field_values.clone();
+                    let field_map = shape.field_map.clone();
+                    kvs.iter()
+                        .map(|(k, pat)| (field_map.get(&k.to_string()), pat))
+                        .all(|(field_index, pat)| {
+                            field_index.is_some_and(|field_index| {
+                                self.eval_pat(pat, &field_values[*field_index])
+                            })
+                        })
+                }
+                _ => todo!("eval_pat: Enum({:?}, {:?})", path, kvs),
+            },
             hir::PatKind::Rest(_) => unreachable!("Rest patterns can only appear in list patterns"),
-            _ => todo!("eval_pat: {:?}, {:?}", pat, value),
         }
     }
 }
