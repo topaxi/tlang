@@ -1,0 +1,20 @@
+struct A {}
+
+fn A::new() {
+    A {}
+}
+
+fn A.method(self) {
+    "called with just self"
+}
+fn A.method(self, a) {
+    "called with a single argument"
+}
+
+let a = A::new();
+
+a.method()
+|> log();
+
+a.method(1)
+|> log();

@@ -1,0 +1,2 @@
+called with just self
+called with a single argument
