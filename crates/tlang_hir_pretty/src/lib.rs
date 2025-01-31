@@ -85,6 +85,9 @@ impl HirPretty {
             hir::StmtKind::EnumDeclaration(decl) => self.print_enum_declaration(decl),
             hir::StmtKind::Expr(expr) => self.print_expr(expr),
             hir::StmtKind::FunctionDeclaration(decl) => self.print_function_declaration(decl),
+            hir::StmtKind::DynFunctionDeclaration(decl) => {
+                self.print_dyn_function_declaration(decl)
+            }
             hir::StmtKind::Let(pat, expr, ty) => self.print_variable_declaration(pat, expr, ty),
             hir::StmtKind::Return(expr) => {
                 self.push_str("return");
@@ -326,6 +329,21 @@ impl HirPretty {
         self.print_ty(&decl.return_type);
         self.push_char(' ');
         self.print_block(&decl.body);
+    }
+
+    fn print_dyn_function_declaration(&mut self, decl: &hir::DynFunctionDeclaration) {
+        self.push_str("dyn fn ");
+        self.print_expr(&decl.name);
+        self.inc_indent();
+        for variant in &decl.variants {
+            self.push_newline();
+            self.push_indent();
+            self.push_str("-> ");
+            self.print_expr(&decl.name);
+            self.push_str("$$");
+            self.push_str(&variant.0.to_string());
+        }
+        self.dec_indent();
     }
 
     fn print_variable_declaration(&mut self, pat: &hir::Pat, expr: &hir::Expr, ty: &hir::Ty) {

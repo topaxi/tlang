@@ -46,8 +46,8 @@ impl CodegenJS {
         self.push_char(')');
     }
 
-    fn generate_struct_method_binding(&mut self, declaration: &hir::FunctionDeclaration) {
-        match &declaration.name.kind {
+    fn generate_struct_method_binding(&mut self, name: &hir::Expr) {
+        match &name.kind {
             hir::ExprKind::Path(path) if path.segments.len() > 1 => {
                 self.push_indent();
                 self.push_str(&path.join("."));
@@ -77,7 +77,7 @@ impl CodegenJS {
             is_tail_recursive,
         );
 
-        self.generate_struct_method_binding(declaration);
+        self.generate_struct_method_binding(&declaration.name);
         self.push_str("function ");
         self.push_str(&name_as_str);
         self.push_scope();
@@ -91,6 +91,67 @@ impl CodegenJS {
         self.push_str("}\n");
         self.pop_scope();
         self.pop_function_context();
+    }
+
+    pub(crate) fn generate_dyn_function_declaration(
+        &mut self,
+        declaration: &hir::DynFunctionDeclaration,
+    ) {
+        let is_method = matches!(declaration.name.kind, hir::ExprKind::FieldAccess(_, _));
+        let name_as_str = self
+            .current_scope()
+            .declare_local_variable(&fn_identifier_to_string(&declaration.name));
+
+        self.generate_struct_method_binding(&declaration.name);
+        self.push_str("function ");
+        self.push_str(&name_as_str);
+        self.push_str("() {\n");
+        self.inc_indent();
+
+        for (i, (variant_arg_len, _)) in declaration.variants.iter().enumerate() {
+            if i > 0 {
+                self.push_str(" else ");
+            } else {
+                self.push_indent();
+            }
+
+            self.push_str("if (arguments.length === ");
+            self.push_str(&(variant_arg_len - is_method as usize).to_string());
+            self.push_str(") {\n");
+            self.inc_indent();
+            self.push_indent();
+            self.push_str("return ");
+
+            if is_method {
+                self.push_str("this.");
+            }
+
+            self.push_str(&name_as_str);
+            self.push_str("$$");
+            self.push_str(&variant_arg_len.to_string());
+
+            self.push_char('(');
+            for i in 0..(variant_arg_len - is_method as usize) {
+                if i > 0 {
+                    self.push_str(", ");
+                }
+
+                self.push_str("arguments[");
+                self.push_str(&i.to_string());
+                self.push_char(']');
+            }
+            self.push_str(");\n");
+
+            self.dec_indent();
+            self.push_indent();
+
+            self.push_char('}');
+        }
+
+        self.push_newline();
+        self.dec_indent();
+        self.push_indent();
+        self.push_str("}\n");
     }
 
     pub(crate) fn generate_function_expression(

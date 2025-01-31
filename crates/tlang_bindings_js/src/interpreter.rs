@@ -1,6 +1,6 @@
 use tlang_hir::hir;
 use tlang_interpreter::state::InterpreterState;
-use tlang_interpreter::value::{TlangObjectKind, TlangValue};
+use tlang_interpreter::value::{NativeFnReturn, TlangObjectKind, TlangValue};
 use tlang_parser::error::ParseError;
 use tlang_parser::parser::Parser;
 use wasm_bindgen::prelude::*;
@@ -30,7 +30,7 @@ impl TlangInterpreter {
         self.0.define_native_fn(name, move |state, args| {
             let this = JsValue::null();
 
-            match args.len() {
+            let value = match args.len() {
                 0 => {
                     let result = f.call0(&this);
                     match result {
@@ -76,7 +76,9 @@ impl TlangInterpreter {
                         Err(err) => panic!("Error calling JavaScript function: {:?}", err),
                     }
                 }
-            }
+            };
+
+            NativeFnReturn::Return(value)
         });
     }
 

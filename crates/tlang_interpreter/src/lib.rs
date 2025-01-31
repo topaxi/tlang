@@ -14,8 +14,8 @@ use self::scope::Scope;
 use self::state::InterpreterState;
 use self::stdlib::collections::define_list_shape;
 use self::value::{
-    ShapeKey, TlangClosure, TlangNativeFn, TlangObjectId, TlangObjectKind, TlangStruct,
-    TlangStructMethod, TlangStructShape, TlangValue,
+    NativeFnReturn, ShapeKey, TlangClosure, TlangNativeFn, TlangObjectId, TlangObjectKind,
+    TlangStruct, TlangStructMethod, TlangStructShape, TlangValue,
 };
 
 mod resolver;
@@ -84,7 +84,9 @@ impl Interpreter {
                 native_fn.binding_name.to_string()
             };
 
-            interpreter.define_native_fn(&fn_name, native_fn.function);
+            interpreter.define_native_fn(&fn_name, move |state, args| {
+                NativeFnReturn::Return((native_fn.function)(state, args))
+            });
         }
 
         interpreter
@@ -93,14 +95,14 @@ impl Interpreter {
     #[inline(always)]
     fn insert_native_fn<F>(&mut self, id: TlangObjectId, f: F)
     where
-        F: Fn(&mut InterpreterState, &[TlangValue]) -> TlangValue + 'static,
+        F: Fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn + 'static,
     {
         self.native_fns.insert(id, Box::new(f));
     }
 
     pub fn define_native_fn<F>(&mut self, name: &str, f: F)
     where
-        F: Fn(&mut InterpreterState, &[TlangValue]) -> TlangValue + 'static,
+        F: Fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn + 'static,
     {
         let fn_object = self.state.new_object(TlangObjectKind::NativeFn);
 
@@ -206,6 +208,9 @@ impl Interpreter {
             }
             hir::StmtKind::FunctionDeclaration(decl) => {
                 self.eval_fn_decl(decl);
+            }
+            hir::StmtKind::DynFunctionDeclaration(decl) => {
+                self.eval_dyn_fn_decl(decl);
             }
             hir::StmtKind::StructDeclaration(decl) => {
                 self.eval_struct_decl(decl);
@@ -550,6 +555,63 @@ impl Interpreter {
         }
     }
 
+    fn eval_dyn_fn_decl(&mut self, decl: &hir::DynFunctionDeclaration) {
+        let variants = decl.variants.clone();
+
+        match &decl.name.kind {
+            hir::ExprKind::Path(ref path) => {
+                let path_name = path.join("::");
+
+                self.define_native_fn(&path_name.clone(), move |_state, args| {
+                    let variant = variants.iter().find_map(|(arity, hir_id)| {
+                        if *arity == args.len() {
+                            Some(*hir_id)
+                        } else {
+                            None
+                        }
+                    });
+
+                    if let Some(id) = variant {
+                        NativeFnReturn::DynamicCall(id)
+                    } else {
+                        panic!("Function {} not found", path_name);
+                    }
+                });
+            }
+            hir::ExprKind::FieldAccess(expr, ident) => {
+                let method_name = ident.to_string();
+                let path = match &expr.kind {
+                    hir::ExprKind::Path(path) => path,
+                    _ => todo!("eval_dyn_fn_decl: {:?}", expr),
+                };
+                let struct_decl = self.resolve_struct_decl(path).unwrap();
+                let method_object = self.state.new_object(TlangObjectKind::NativeFn);
+                let object_id = method_object.get_object_id().unwrap();
+                self.insert_native_fn(object_id, move |_state, args| {
+                    let variant = variants.iter().find_map(|(arity, hir_id)| {
+                        if *arity == args.len() {
+                            Some(*hir_id)
+                        } else {
+                            None
+                        }
+                    });
+
+                    if let Some(id) = variant {
+                        NativeFnReturn::DynamicCall(id)
+                    } else {
+                        panic!("Method {} not found", method_name);
+                    }
+                });
+                self.state.set_struct_method(
+                    struct_decl.hir_id.into(),
+                    ident.as_str(),
+                    TlangStructMethod::Native(object_id),
+                );
+            }
+            _ => todo!("eval_dyn_fn_decl: {:?}", decl.name),
+        }
+    }
+
     fn eval_struct_decl(&mut self, decl: &hir::StructDeclaration) {
         self.state
             .current_scope
@@ -833,14 +895,23 @@ impl Interpreter {
     fn exec_native_fn(&mut self, id: TlangObjectId, args: &[TlangValue]) -> TlangValue {
         // Do we need and want to reset the scope for native functions?
         // It could be somewhat interesting to manipulate the current scope from native functions.
-        self.with_scope(self.state.root_scope.clone(), |this| {
+        let r = self.with_scope(self.state.root_scope.clone(), |this| {
             let result = if let Some(native_fn) = this.native_fns.get_mut(&id) {
                 native_fn(&mut this.state, args)
             } else {
                 panic!("Native function not found: {:?}", id);
             };
             result
-        })
+        });
+
+        match r {
+            NativeFnReturn::Return(value) => value,
+            NativeFnReturn::DynamicCall(id) => {
+                let fn_decl = self.resolve_fn_decl(id).unwrap().clone();
+
+                self.eval_fn_call(&fn_decl, args)
+            }
+        }
     }
 
     fn eval_let_stmt(&mut self, pat: &hir::Pat, expr: &hir::Expr, _ty: &hir::Ty) {
@@ -1308,7 +1379,7 @@ mod tests {
             log_fn_object_id,
             Box::new(move |_, args| {
                 calls_tracker.borrow_mut().push(args.to_vec());
-                TlangValue::Nil
+                NativeFnReturn::Return(TlangValue::Nil)
             }),
         );
 

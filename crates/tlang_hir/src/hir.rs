@@ -107,6 +107,7 @@ pub enum StmtKind {
     Expr(Box<Expr>),
     Let(Box<Pat>, Box<Expr>, Box<Ty>),
     FunctionDeclaration(Box<FunctionDeclaration>),
+    DynFunctionDeclaration(Box<DynFunctionDeclaration>),
     Return(Box<Option<Expr>>),
     EnumDeclaration(Box<EnumDeclaration>),
     StructDeclaration(Box<StructDeclaration>),
@@ -324,6 +325,13 @@ impl FunctionDeclaration {
             span: Span::default(),
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DynFunctionDeclaration {
+    pub hir_id: HirId,
+    pub name: Expr,
+    pub variants: Vec<(usize, HirId)>,
 }
 
 #[derive(Debug, Clone, Serialize)]

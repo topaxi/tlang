@@ -13,6 +13,11 @@ pub(crate) struct Scope {
     pub values: HashMap<String, TlangValue>,
     pub return_value: Option<TlangValue>,
     pub fn_decls: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
+    // Maybe we want to store dynamic dispatch functions in a separate map?
+    // Currently we create a native fn to call the respective function, this will limit or make it
+    // more difficult to potentially extend the methods to dispatch (in case another one is
+    // defined later in the same scope).
+    //pub dyn_fn_decls: HashMap<HirId, Vec<(usize, HirId)>>,
     pub struct_decls: HashMap<String, Rc<hir::StructDeclaration>>,
 }
 
