@@ -100,18 +100,29 @@ impl Interpreter {
         self.native_fns.insert(id, Box::new(f));
     }
 
-    pub fn define_native_fn<F>(&mut self, name: &str, f: F)
+    pub fn create_native_fn<F>(&mut self, f: F) -> TlangValue
     where
         F: Fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn + 'static,
     {
         let fn_object = self.state.new_object(TlangObjectKind::NativeFn);
+
+        self.insert_native_fn(fn_object.get_object_id().unwrap(), f);
+
+        fn_object
+    }
+
+    pub fn define_native_fn<F>(&mut self, name: &str, f: F) -> TlangValue
+    where
+        F: Fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn + 'static,
+    {
+        let fn_object = self.create_native_fn(f);
 
         self.state
             .root_scope
             .borrow_mut()
             .insert_value(name.to_string(), fn_object);
 
-        self.insert_native_fn(fn_object.get_object_id().unwrap(), f);
+        fn_object
     }
 
     fn resolve_closure_decl(&self, id: HirId) -> Option<&hir::FunctionDeclaration> {
@@ -555,57 +566,60 @@ impl Interpreter {
         }
     }
 
-    fn eval_dyn_fn_decl(&mut self, decl: &hir::DynFunctionDeclaration) {
+    fn create_dyn_fn_object(&mut self, decl: &hir::DynFunctionDeclaration) -> TlangValue {
+        let name = match &decl.name.kind {
+            hir::ExprKind::Path(path) => path.join("::"),
+            hir::ExprKind::FieldAccess(expr, ident) => {
+                let path = match &expr.kind {
+                    hir::ExprKind::Path(path) => path.join("::"),
+                    _ => todo!("create_dyn_fn_object: {:?}", expr),
+                };
+
+                path + "::" + ident.as_str()
+            }
+            _ => todo!("create_dyn_fn_object: {:?}", decl.name),
+        };
         let variants = decl.variants.clone();
+
+        self.create_native_fn(move |_state, args| {
+            let variant = variants.iter().find_map(|(arity, hir_id)| {
+                if *arity == args.len() {
+                    Some(*hir_id)
+                } else {
+                    None
+                }
+            });
+            if let Some(id) = variant {
+                NativeFnReturn::DynamicCall(id)
+            } else {
+                panic!("Function {} not found", name);
+            }
+        })
+    }
+
+    fn eval_dyn_fn_decl(&mut self, decl: &hir::DynFunctionDeclaration) {
+        let dyn_fn_object = self.create_dyn_fn_object(decl);
 
         match &decl.name.kind {
             hir::ExprKind::Path(ref path) => {
                 let path_name = path.join("::");
 
-                self.define_native_fn(&path_name.clone(), move |_state, args| {
-                    let variant = variants.iter().find_map(|(arity, hir_id)| {
-                        if *arity == args.len() {
-                            Some(*hir_id)
-                        } else {
-                            None
-                        }
-                    });
-
-                    if let Some(id) = variant {
-                        NativeFnReturn::DynamicCall(id)
-                    } else {
-                        panic!("Function {} not found", path_name);
-                    }
-                });
+                self.state
+                    .current_scope
+                    .borrow_mut()
+                    .values
+                    .insert(path_name, dyn_fn_object);
             }
             hir::ExprKind::FieldAccess(expr, ident) => {
-                let method_name = ident.to_string();
                 let path = match &expr.kind {
                     hir::ExprKind::Path(path) => path,
                     _ => todo!("eval_dyn_fn_decl: {:?}", expr),
                 };
                 let struct_decl = self.resolve_struct_decl(path).unwrap();
-                let method_object = self.state.new_object(TlangObjectKind::NativeFn);
-                let object_id = method_object.get_object_id().unwrap();
-                self.insert_native_fn(object_id, move |_state, args| {
-                    let variant = variants.iter().find_map(|(arity, hir_id)| {
-                        if *arity == args.len() {
-                            Some(*hir_id)
-                        } else {
-                            None
-                        }
-                    });
-
-                    if let Some(id) = variant {
-                        NativeFnReturn::DynamicCall(id)
-                    } else {
-                        panic!("Method {} not found", method_name);
-                    }
-                });
                 self.state.set_struct_method(
                     struct_decl.hir_id.into(),
                     ident.as_str(),
-                    TlangStructMethod::Native(object_id),
+                    TlangStructMethod::Native(dyn_fn_object.get_object_id().unwrap()),
                 );
             }
             _ => todo!("eval_dyn_fn_decl: {:?}", decl.name),
