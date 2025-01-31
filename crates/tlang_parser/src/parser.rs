@@ -545,7 +545,6 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_block_stmt(&mut self) -> Stmt {
-        println!("Parsing block statement");
         node::stmt!(self.unique_id(), Expr(Box::new(self.parse_block_expr())))
     }
 
