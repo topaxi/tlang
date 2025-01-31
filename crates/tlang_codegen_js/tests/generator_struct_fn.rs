@@ -45,3 +45,52 @@ fn test_function_definition_on_struct() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[test]
+fn test_variadic_function_definition_on_struct() {
+    let output = compile!(indoc! {"
+        struct Test {
+            field: int,
+        }
+
+        fn Test::new() -> Test {
+            Test {
+                field: 0,
+            }
+        }
+
+        fn Test.value(self) -> int {
+            self.field
+        }
+        fn Test.value(self, value: int) {
+            self.field = value;
+        }
+    "});
+    let expected_output = indoc! {"
+        function TestConstructor(field) {
+            this.field = field;
+        }
+        function Test(props) {
+            return new TestConstructor(props.field);
+        }
+        Test.new = function Test__new() {
+            return Test({
+                field: 0,
+            });
+        }
+        TestConstructor.prototype.value$$1 = function value$$1() {
+            return this.field;
+        }
+        TestConstructor.prototype.value$$2 = function value$$2(value) {
+            this.field = value;
+        }
+        TestConstructor.prototype.value = function value() {
+            if (arguments.length === 0) {
+                return this.value$$1();
+            } else if (arguments.length === 1) {
+                return this.value$$2(arguments[0]);
+            }
+        }
+    "};
+    assert_eq!(output, expected_output);
+}
