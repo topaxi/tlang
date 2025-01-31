@@ -1004,7 +1004,13 @@ impl Interpreter {
         self.with_new_scope(|this| {
             if this.eval_pat(&arm.pat, value) {
                 if let Some(expr) = &arm.guard {
-                    if !this.eval_expr(expr).is_truthy(&this.state) {
+                    if let hir::ExprKind::Let(pat, expr) = &expr.kind {
+                        let value = this.eval_expr(expr);
+
+                        if !this.eval_pat(pat, &value) {
+                            return None;
+                        }
+                    } else if !this.eval_expr(expr).is_truthy(&this.state) {
                         return None;
                     }
                 }
