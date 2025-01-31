@@ -701,44 +701,76 @@ impl Interpreter {
         }
     }
 
+    fn eval_call_object(&mut self, callee: TlangValue, args: Vec<TlangValue>) -> TlangValue {
+        let id = callee.get_object_id().unwrap();
+
+        if let Some(closure) = self.get_object(id).get_closure() {
+            let closure_decl = self.resolve_closure_decl(closure.id).unwrap().clone();
+
+            self.with_scope(closure.scope.clone(), |this| {
+                this.eval_fn_call(&closure_decl, &args)
+            })
+        } else if let Some(id) = self.get_object(id).get_fn_hir_id() {
+            let fn_decl = self
+                .resolve_fn_decl(id)
+                .unwrap_or_else(|| panic!("Function not found"))
+                .clone();
+
+            self.with_scope(self.state.root_scope.clone(), |this| {
+                this.eval_fn_call(&fn_decl, &args)
+            })
+        } else if let TlangObjectKind::NativeFn = self.get_object(id) {
+            self.exec_native_fn(id, &args)
+        } else {
+            panic!("`{:?}` is not a function", self.get_object(id));
+        }
+    }
+
     fn eval_tail_call(&mut self, call_expr: &hir::CallExpression) -> TlangValue {
         // For now, we just call the function normally.
         self.eval_call(call_expr)
     }
 
+    fn eval_partial_call(&mut self, call_expr: &hir::CallExpression) -> TlangValue {
+        let callee = self.eval_expr(&call_expr.callee);
+        let mut applied_args = Vec::with_capacity(call_expr.arguments.len());
+
+        for expr in &call_expr.arguments {
+            if expr.is_wildcard() {
+                applied_args.push(TlangValue::Nil);
+            } else {
+                applied_args.push(self.eval_expr(expr));
+            }
+        }
+
+        self.create_native_fn(move |_, args| {
+            let mut applied_args = applied_args.clone();
+            // For each arg in args, replace a hole (Nil) from the already applied args
+            for arg in args {
+                let index = applied_args
+                    .iter()
+                    .position(|a| *a == TlangValue::Nil)
+                    .unwrap();
+
+                applied_args[index] = *arg;
+            }
+
+            NativeFnReturn::PartialCall(callee, applied_args)
+        })
+    }
+
     fn eval_call(&mut self, call_expr: &hir::CallExpression) -> TlangValue {
         debug!("eval_call: {:?}", call_expr);
 
+        if call_expr.arguments.iter().any(|arg| arg.is_wildcard()) {
+            return self.eval_partial_call(call_expr);
+        }
+
         match &call_expr.callee.kind {
-            hir::ExprKind::Path(path)
-                if let Some(TlangValue::Object(id)) = self.resolve_path(path) =>
-            {
+            hir::ExprKind::Path(path) if let Some(value) = self.resolve_path(path) => {
                 let args = self.eval_exprs(&call_expr.arguments);
 
-                if let Some(closure) = self.get_object(id).get_closure() {
-                    let closure_decl = self.resolve_closure_decl(closure.id).unwrap().clone();
-
-                    self.with_scope(closure.scope.clone(), |this| {
-                        this.eval_fn_call(&closure_decl, &args)
-                    })
-                } else if let Some(id) = self.get_object(id).get_fn_hir_id() {
-                    let fn_decl = self
-                        .resolve_fn_decl(id)
-                        .unwrap_or_else(|| panic!("Function {} not found", path.join("::")))
-                        .clone();
-
-                    self.with_scope(self.state.root_scope.clone(), |this| {
-                        this.eval_fn_call(&fn_decl, &args)
-                    })
-                } else if let TlangObjectKind::NativeFn = self.get_object(id) {
-                    self.exec_native_fn(id, &args)
-                } else {
-                    panic!(
-                        "`{:?}` is not a function: {:?}",
-                        path.join("::"),
-                        self.get_object(id)
-                    );
-                }
+                self.eval_call_object(value, args)
             }
             // If the path resolves to a struct, we create a new object.
             hir::ExprKind::Path(path) if let Some(struct_decl) = self.resolve_struct_decl(path) => {
@@ -921,10 +953,13 @@ impl Interpreter {
         match r {
             NativeFnReturn::Return(value) => value,
             NativeFnReturn::DynamicCall(id) => {
-                let fn_decl = self.resolve_fn_decl(id).unwrap().clone();
-
-                self.eval_fn_call(&fn_decl, args)
+                if let Some(fn_decl) = self.resolve_fn_decl(id) {
+                    self.eval_fn_call(&fn_decl, args)
+                } else {
+                    panic!("Function not found: {:?}", id);
+                }
             }
+            NativeFnReturn::PartialCall(fn_object, args) => self.eval_call_object(fn_object, args),
         }
     }
 
