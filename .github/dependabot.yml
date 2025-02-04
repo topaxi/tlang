@@ -27,6 +27,10 @@ updates:
         patterns:
           - 'serde'
           - 'serde_*'
+      proc_macro:
+        patterns:
+          - 'syn'
+          - 'quote'
   - package-ecosystem: 'npm'
     versioning-strategy: 'increase'
     directory: '/'
