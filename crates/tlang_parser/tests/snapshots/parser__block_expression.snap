@@ -8,7 +8,7 @@ Module(
     Stmt(
       id: NodeId(9),
       kind: Let(LetDeclaration(
-        pattern: Pattern(
+        pattern: Pat(
           id: NodeId(2),
           kind: Identifier(Ident(
             name: "x",

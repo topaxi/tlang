@@ -54,7 +54,7 @@ Module(
           ),
           parameters: [
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(3),
                 kind: Literal(Integer(0)),
                 leading_comments: [],
@@ -191,7 +191,7 @@ Module(
           ),
           parameters: [
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(9),
                 kind: Identifier(Ident(
                   name: "n",

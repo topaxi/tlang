@@ -16,15 +16,15 @@ macro_rules! expr {
 #[macro_export]
 macro_rules! pat {
     ($id:expr, $kind:ident) => {{
-        use tlang_ast::node::{Pattern, PatternKind};
+        use tlang_ast::node::{Pat, PatKind};
 
-        Pattern::new($id, PatternKind::$kind)
+        Pat::new($id, PatKind::$kind)
     }};
 
     ($id:expr, $kind:ident($($arg:expr),* $(,)?)) => {{
-        use tlang_ast::node::{Pattern, PatternKind};
+        use tlang_ast::node::{Pat, PatKind};
 
-        Pattern::new($id, PatternKind::$kind($($arg),*))
+        Pat::new($id, PatKind::$kind($($arg),*))
     }};
 }
 

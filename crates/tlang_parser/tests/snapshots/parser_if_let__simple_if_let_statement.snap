@@ -12,7 +12,7 @@ Module(
         kind: IfElse(IfElseExpression(
           condition: Expr(
             id: NodeId(5),
-            kind: Let(Pattern(
+            kind: Let(Pat(
               id: NodeId(3),
               kind: Identifier(Ident(
                 name: "x",

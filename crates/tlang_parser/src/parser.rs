@@ -2,7 +2,7 @@ use tlang_ast::node::{
     self, Associativity, BinaryOpExpression, BinaryOpKind, Block, CallExpression, ElseClause,
     EnumDeclaration, EnumPattern, EnumVariant, Expr, ExprKind, FieldAccessExpression,
     FunctionDeclaration, FunctionParameter, Ident, IfElseExpression, IndexAccessExpression,
-    LetDeclaration, MatchArm, MatchExpression, Module, OperatorInfo, Path, Pattern, Stmt, StmtKind,
+    LetDeclaration, MatchArm, MatchExpression, Module, OperatorInfo, Pat, Path, Stmt, StmtKind,
     StructDeclaration, StructField, Ty, UnaryOp,
 };
 use tlang_ast::node_id::NodeId;
@@ -630,7 +630,7 @@ impl<'src> Parser<'src> {
         .with_span(span)
     }
 
-    fn parse_identifier_pattern(&mut self) -> Pattern {
+    fn parse_identifier_pattern(&mut self) -> Pat {
         let id = self.unique_id();
         let current_token = self.current_token.as_ref().unwrap();
 
@@ -652,7 +652,7 @@ impl<'src> Parser<'src> {
         node
     }
 
-    fn parse_list_extraction(&mut self) -> Pattern {
+    fn parse_list_extraction(&mut self) -> Pat {
         self.consume_token(TokenKind::LBracket);
 
         let mut elements = Vec::new();
@@ -1203,7 +1203,7 @@ impl<'src> Parser<'src> {
     }
 
     /// Parses an enum extraction, e.g. `Foo(bar, baz)` and `Foo { bar, baz }`
-    fn parse_enum_extraction(&mut self) -> Pattern {
+    fn parse_enum_extraction(&mut self) -> Pat {
         let path = self.parse_path();
         let is_dict_extraction = matches!(self.current_token_kind(), Some(TokenKind::LBrace));
 
@@ -1516,13 +1516,13 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_pattern_literal(&mut self) -> Pattern {
+    fn parse_pattern_literal(&mut self) -> Pat {
         expect_token_matches!(self, "literal", TokenKind::Literal(_));
 
         node::pat!(self.unique_id(), Literal(Box::new(self.parse_literal())))
     }
 
-    fn parse_pattern(&mut self) -> Pattern {
+    fn parse_pattern(&mut self) -> Pat {
         let comments = self.parse_comments();
 
         expect_token_matches!(

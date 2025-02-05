@@ -152,7 +152,7 @@ Module(
     Stmt(
       id: NodeId(13),
       kind: Let(LetDeclaration(
-        pattern: Pattern(
+        pattern: Pat(
           id: NodeId(7),
           kind: Identifier(Ident(
             name: "x",

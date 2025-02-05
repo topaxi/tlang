@@ -8,7 +8,7 @@ Module(
     Stmt(
       id: NodeId(10),
       kind: Let(LetDeclaration(
-        pattern: Pattern(
+        pattern: Pat(
           id: NodeId(2),
           kind: Identifier(Ident(
             name: "x",
@@ -58,7 +58,7 @@ Module(
             arms: [
               MatchArm(
                 id: NodeId(8),
-                pattern: Pattern(
+                pattern: Pat(
                   id: NodeId(6),
                   kind: Enum(EnumPattern(
                     path: Path(
@@ -101,10 +101,10 @@ Module(
                             column: 0,
                           ),
                         ),
-                      ), Pattern(
+                      ), Pat(
                         id: NodeId(5),
                         kind: List([
-                          Pattern(
+                          Pat(
                             id: NodeId(4),
                             kind: Identifier(Ident(
                               name: "bar",

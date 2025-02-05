@@ -53,10 +53,10 @@ Module(
         ),
         parameters: [
           FunctionParameter(
-            pattern: Pattern(
+            pattern: Pat(
               id: NodeId(6),
               kind: List([
-                Pattern(
+                Pat(
                   id: NodeId(3),
                   kind: Wildcard,
                   leading_comments: [],
@@ -72,9 +72,9 @@ Module(
                     ),
                   ),
                 ),
-                Pattern(
+                Pat(
                   id: NodeId(4),
-                  kind: Rest(Pattern(
+                  kind: Rest(Pat(
                     id: NodeId(5),
                     kind: Identifier(Ident(
                       name: "xs",

@@ -55,7 +55,7 @@ Module(
           arms: [
             MatchArm(
               id: NodeId(8),
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(4),
                 kind: List([]),
                 leading_comments: [],
@@ -178,10 +178,10 @@ Module(
             ),
             MatchArm(
               id: NodeId(16),
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(12),
                 kind: List([
-                  Pattern(
+                  Pat(
                     id: NodeId(9),
                     kind: Identifier(Ident(
                       name: "bar",
@@ -209,9 +209,9 @@ Module(
                       ),
                     ),
                   ),
-                  Pattern(
+                  Pat(
                     id: NodeId(10),
-                    kind: Rest(Pattern(
+                    kind: Rest(Pat(
                       id: NodeId(11),
                       kind: Identifier(Ident(
                         name: "baz",
@@ -373,7 +373,7 @@ Module(
             ),
             MatchArm(
               id: NodeId(21),
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(17),
                 kind: Wildcard,
                 leading_comments: [],

@@ -801,9 +801,9 @@ impl LoweringContext {
 
     fn lower_fn_param_pat(&mut self, node: &ast::node::FunctionParameter) -> Ident {
         match &node.pattern.kind {
-            ast::node::PatternKind::Identifier(box ident) => ident.clone(),
-            ast::node::PatternKind::_Self => Ident::new(kw::_Self, node.span),
-            ast::node::PatternKind::Wildcard => Ident::new(kw::Underscore, node.span),
+            ast::node::PatKind::Identifier(box ident) => ident.clone(),
+            ast::node::PatKind::_Self => Ident::new(kw::_Self, node.span),
+            ast::node::PatKind::Wildcard => Ident::new(kw::Underscore, node.span),
             _ => {
                 unimplemented!(
                     "Only identifier patterns are supported for function parameters, found {:?}",
@@ -871,7 +871,7 @@ impl LoweringContext {
 
     /// Lower a pattern into a HIR pattern. Only use for single patterns, not match arms or
     /// function matching.
-    fn lower_pat(&mut self, node: &ast::node::Pattern) -> hir::Pat {
+    fn lower_pat(&mut self, node: &ast::node::Pat) -> hir::Pat {
         debug!("Lowering pattern {:?}", node.kind);
 
         self.lower_pat_with_idents(node, &mut HashMap::new())
@@ -881,19 +881,19 @@ impl LoweringContext {
     // times. As then each of them have to match the same pattern/value.
     fn lower_pat_with_idents(
         &mut self,
-        node: &ast::node::Pattern,
+        node: &ast::node::Pat,
         _idents: &mut HashMap<String, String>,
     ) -> hir::Pat {
         match &node.kind {
-            ast::node::PatternKind::Wildcard => hir::Pat {
+            ast::node::PatKind::Wildcard => hir::Pat {
                 kind: hir::PatKind::Wildcard,
                 span: node.span,
             },
-            ast::node::PatternKind::Literal(box literal) => hir::Pat {
+            ast::node::PatKind::Literal(box literal) => hir::Pat {
                 kind: hir::PatKind::Literal(Box::new(literal.clone())),
                 span: node.span,
             },
-            ast::node::PatternKind::Identifier(box ident) => {
+            ast::node::PatKind::Identifier(box ident) => {
                 self.create_binding(ident.as_str());
                 // TODO: As mentioned above, create_unique_binding was supposed to help with
                 // resolving shadowed variables by giving them unique names. Due to some
@@ -915,15 +915,15 @@ impl LoweringContext {
                     span: node.span,
                 }
             }
-            ast::node::PatternKind::List(patterns) => hir::Pat {
+            ast::node::PatKind::List(patterns) => hir::Pat {
                 kind: hir::PatKind::List(patterns.iter().map(|pat| self.lower_pat(pat)).collect()),
                 span: node.span,
             },
-            ast::node::PatternKind::Rest(pattern) => hir::Pat {
+            ast::node::PatKind::Rest(pattern) => hir::Pat {
                 kind: hir::PatKind::Rest(Box::new(self.lower_pat(pattern))),
                 span: node.span,
             },
-            ast::node::PatternKind::Enum(box EnumPattern { path, elements }) => {
+            ast::node::PatKind::Enum(box EnumPattern { path, elements }) => {
                 let path = self.lower_path(path);
                 let elements = elements
                     .iter()
@@ -935,14 +935,14 @@ impl LoweringContext {
                     span: node.span,
                 }
             }
-            ast::node::PatternKind::_Self => hir::Pat {
+            ast::node::PatKind::_Self => hir::Pat {
                 kind: hir::PatKind::Identifier(
                     self.lower_node_id(node.id),
                     Box::new(Ident::new(kw::_Self, node.span)),
                 ),
                 span: node.span,
             },
-            ast::node::PatternKind::None => {
+            ast::node::PatKind::None => {
                 unreachable!("PatternKind::None should not be encountered, validate AST first")
             }
         }
@@ -1070,8 +1070,8 @@ fn get_param_names(decls: &[FunctionDeclaration]) -> Vec<Option<Ident>> {
             let param_pattern_kind = &d.parameters.get(i).map(|p| &p.pattern.kind);
 
             match &param_pattern_kind {
-                Some(ast::node::PatternKind::Identifier(ident)) => Some(ident.to_string()),
-                Some(ast::node::PatternKind::Enum(enum_pattern)) => {
+                Some(ast::node::PatKind::Identifier(ident)) => Some(ident.to_string()),
+                Some(ast::node::PatKind::Enum(enum_pattern)) => {
                     Some(get_enum_name(&enum_pattern.path).to_lowercase())
                 }
                 _ => None,
@@ -1082,10 +1082,10 @@ fn get_param_names(decls: &[FunctionDeclaration]) -> Vec<Option<Ident>> {
             && decls
                 .iter()
                 .all(|d| match &d.parameters.get(i).map(|p| &p.pattern.kind) {
-                    Some(ast::node::PatternKind::Identifier(ident)) => {
+                    Some(ast::node::PatKind::Identifier(ident)) => {
                         Some(ident.to_string()) == arg_name
                     }
-                    Some(ast::node::PatternKind::Enum(enum_pattern)) => {
+                    Some(ast::node::PatKind::Enum(enum_pattern)) => {
                         Some(get_enum_name(&enum_pattern.path).to_lowercase()) == arg_name
                     }
                     _ => true,

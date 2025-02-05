@@ -198,7 +198,7 @@ Module(
           ),
           parameters: [
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(8),
                 kind: Enum(EnumPattern(
                   path: Path(
@@ -421,7 +421,7 @@ Module(
           ),
           parameters: [
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(17),
                 kind: Enum(EnumPattern(
                   path: Path(
@@ -477,7 +477,7 @@ Module(
                           column: 0,
                         ),
                       ),
-                    ), Pattern(
+                    ), Pat(
                       id: NodeId(16),
                       kind: Identifier(Ident(
                         name: "value",

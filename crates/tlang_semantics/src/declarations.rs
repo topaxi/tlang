@@ -5,8 +5,8 @@ use tlang_ast::span::Span;
 use tlang_ast::token::kw;
 use tlang_ast::{
     node::{
-        Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, LetDeclaration, Module,
-        Pattern, PatternKind, Stmt, StmtKind,
+        Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, LetDeclaration, Module, Pat,
+        PatKind, Stmt, StmtKind,
     },
     symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
 };
@@ -307,9 +307,9 @@ impl DeclarationAnalyzer {
         self.pop_symbol_table();
     }
 
-    fn collect_pattern(&mut self, pattern: &Pattern) {
+    fn collect_pattern(&mut self, pattern: &Pat) {
         match &pattern.kind {
-            PatternKind::Identifier(ident) => {
+            PatKind::Identifier(ident) => {
                 self.declare_symbol(
                     pattern.id,
                     ident.as_str(),
@@ -320,24 +320,24 @@ impl DeclarationAnalyzer {
                     pattern.span,
                 );
             }
-            PatternKind::_Self => {
+            PatKind::_Self => {
                 self.declare_symbol(pattern.id, kw::_Self, SymbolType::Variable, pattern.span);
             }
-            PatternKind::List(patterns) => {
+            PatKind::List(patterns) => {
                 for pattern in patterns {
                     self.collect_pattern(pattern);
                 }
             }
-            PatternKind::Rest(pattern) => {
+            PatKind::Rest(pattern) => {
                 self.collect_pattern(pattern);
             }
-            PatternKind::Enum(enum_pattern) => {
+            PatKind::Enum(enum_pattern) => {
                 for (_ident, pat) in &enum_pattern.elements {
                     self.collect_pattern(pat);
                 }
             }
-            PatternKind::Wildcard => {} // Wildcard discards values, nothing to do here.
-            PatternKind::Literal(_) => {} // Literal patterns don't need to be declared.
+            PatKind::Wildcard => {} // Wildcard discards values, nothing to do here.
+            PatKind::Literal(_) => {} // Literal patterns don't need to be declared.
             _ => {}
         }
     }

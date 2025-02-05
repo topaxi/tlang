@@ -8,7 +8,7 @@ Module(
     Stmt(
       id: NodeId(14),
       kind: Let(LetDeclaration(
-        pattern: Pattern(
+        pattern: Pat(
           id: NodeId(2),
           kind: Identifier(Ident(
             name: "x",
@@ -58,7 +58,7 @@ Module(
             arms: [
               MatchArm(
                 id: NodeId(6),
-                pattern: Pattern(
+                pattern: Pat(
                   id: NodeId(4),
                   kind: Literal(Integer(1)),
                   leading_comments: [],
@@ -94,7 +94,7 @@ Module(
               ),
               MatchArm(
                 id: NodeId(9),
-                pattern: Pattern(
+                pattern: Pat(
                   id: NodeId(7),
                   kind: Literal(Integer(3)),
                   leading_comments: [],
@@ -130,7 +130,7 @@ Module(
               ),
               MatchArm(
                 id: NodeId(12),
-                pattern: Pattern(
+                pattern: Pat(
                   id: NodeId(10),
                   kind: Wildcard,
                   leading_comments: [],

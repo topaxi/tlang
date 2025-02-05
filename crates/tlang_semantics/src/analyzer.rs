@@ -2,8 +2,8 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use tlang_ast::{
     node::{
-        Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, LetDeclaration, Module,
-        Path, Pattern, PatternKind, Stmt, StmtKind, StructDeclaration,
+        Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, LetDeclaration, Module, Pat,
+        PatKind, Path, Stmt, StmtKind, StructDeclaration,
     },
     node_id::NodeId,
     span::Span,
@@ -318,15 +318,15 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn analyze_pat(&mut self, pat: &Pattern) {
+    fn analyze_pat(&mut self, pat: &Pat) {
         match &pat.kind {
-            PatternKind::List(patterns) => {
+            PatKind::List(patterns) => {
                 for pattern in patterns {
                     self.analyze_pat(pattern);
                 }
             }
-            PatternKind::Rest(pattern) => self.analyze_pat(pattern),
-            PatternKind::Enum(enum_pattern) => {
+            PatKind::Rest(pattern) => self.analyze_pat(pattern),
+            PatKind::Enum(enum_pattern) => {
                 self.analyze_path(&enum_pattern.path, pat.span);
 
                 for (_ident, pat) in &enum_pattern.elements {

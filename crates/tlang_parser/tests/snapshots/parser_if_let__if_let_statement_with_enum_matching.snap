@@ -12,7 +12,7 @@ Module(
         kind: IfElse(IfElseExpression(
           condition: Expr(
             id: NodeId(6),
-            kind: Let(Pattern(
+            kind: Let(Pat(
               id: NodeId(4),
               kind: Enum(EnumPattern(
                 path: Path(
@@ -68,7 +68,7 @@ Module(
                         column: 0,
                       ),
                     ),
-                  ), Pattern(
+                  ), Pat(
                     id: NodeId(3),
                     kind: Identifier(Ident(
                       name: "y",

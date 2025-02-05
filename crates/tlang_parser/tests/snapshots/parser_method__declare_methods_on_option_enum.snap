@@ -211,7 +211,7 @@ Module(
           ),
           parameters: [
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(9),
                 kind: Enum(EnumPattern(
                   path: Path(
@@ -267,7 +267,7 @@ Module(
                           column: 0,
                         ),
                       ),
-                    ), Pattern(
+                    ), Pat(
                       id: NodeId(8),
                       kind: Wildcard,
                       leading_comments: [],
@@ -415,7 +415,7 @@ Module(
           ),
           parameters: [
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(15),
                 kind: Enum(EnumPattern(
                   path: Path(
@@ -590,7 +590,7 @@ Module(
           ),
           parameters: [
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(21),
                 kind: Wildcard,
                 leading_comments: [],
@@ -757,7 +757,7 @@ Module(
           ),
           parameters: [
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(32),
                 kind: Enum(EnumPattern(
                   path: Path(
@@ -813,7 +813,7 @@ Module(
                           column: 0,
                         ),
                       ),
-                    ), Pattern(
+                    ), Pat(
                       id: NodeId(31),
                       kind: Wildcard,
                       leading_comments: [],
@@ -978,7 +978,7 @@ Module(
           ),
           parameters: [
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(39),
                 kind: Enum(EnumPattern(
                   path: Path(
@@ -1187,7 +1187,7 @@ Module(
           ),
           parameters: [
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(50),
                 kind: Enum(EnumPattern(
                   path: Path(
@@ -1243,7 +1243,7 @@ Module(
                           column: 0,
                         ),
                       ),
-                    ), Pattern(
+                    ), Pat(
                       id: NodeId(49),
                       kind: Identifier(Ident(
                         name: "x",
@@ -1299,7 +1299,7 @@ Module(
               ),
             ),
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(51),
                 kind: Identifier(Ident(
                   name: "f",
@@ -1622,7 +1622,7 @@ Module(
           ),
           parameters: [
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(62),
                 kind: Enum(EnumPattern(
                   path: Path(
@@ -1693,7 +1693,7 @@ Module(
               ),
             ),
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(63),
                 kind: Wildcard,
                 leading_comments: [],

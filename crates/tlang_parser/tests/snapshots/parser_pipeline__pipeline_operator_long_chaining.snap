@@ -182,7 +182,7 @@ Module(
                                 ),
                                 parameters: [
                                   FunctionParameter(
-                                    pattern: Pattern(
+                                    pattern: Pat(
                                       id: NodeId(9),
                                       kind: Identifier(Ident(
                                         name: "x",
@@ -464,7 +464,7 @@ Module(
                             ),
                             parameters: [
                               FunctionParameter(
-                                pattern: Pattern(
+                                pattern: Pat(
                                   id: NodeId(21),
                                   kind: Identifier(Ident(
                                     name: "x",
@@ -780,7 +780,7 @@ Module(
                         ),
                         parameters: [
                           FunctionParameter(
-                            pattern: Pattern(
+                            pattern: Pat(
                               id: NodeId(35),
                               kind: Identifier(Ident(
                                 name: "acc",
@@ -821,7 +821,7 @@ Module(
                             ),
                           ),
                           FunctionParameter(
-                            pattern: Pattern(
+                            pattern: Pat(
                               id: NodeId(36),
                               kind: Identifier(Ident(
                                 name: "x",

@@ -8,10 +8,10 @@ Module(
     Stmt(
       id: NodeId(12),
       kind: Let(LetDeclaration(
-        pattern: Pattern(
+        pattern: Pat(
           id: NodeId(6),
           kind: List([
-            Pattern(
+            Pat(
               id: NodeId(2),
               kind: Identifier(Ident(
                 name: "x",
@@ -39,7 +39,7 @@ Module(
                 ),
               ),
             ),
-            Pattern(
+            Pat(
               id: NodeId(3),
               kind: Identifier(Ident(
                 name: "y",
@@ -67,9 +67,9 @@ Module(
                 ),
               ),
             ),
-            Pattern(
+            Pat(
               id: NodeId(4),
-              kind: Rest(Pattern(
+              kind: Rest(Pat(
                 id: NodeId(5),
                 kind: Identifier(Ident(
                   name: "z",

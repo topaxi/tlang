@@ -61,13 +61,13 @@ pub enum Associativity {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct FunctionParameter {
-    pub pattern: Pattern,
+    pub pattern: Pat,
     pub type_annotation: Option<Ty>,
     pub span: Span,
 }
 
 impl FunctionParameter {
-    pub fn new(pattern: Pattern) -> Self {
+    pub fn new(pattern: Pat) -> Self {
         FunctionParameter {
             pattern,
             type_annotation: None,
@@ -230,7 +230,7 @@ pub enum ExprKind {
     FieldExpression(Box<FieldAccessExpression>),
     IndexExpression(Box<IndexAccessExpression>),
     // Let expression, only valid within if conditions and guards
-    Let(Box<Pattern>, Box<Expr>),
+    Let(Box<Pat>, Box<Expr>),
     IfElse(Box<IfElseExpression>),
     List(Vec<Expr>),
     Literal(Box<Literal>),
@@ -285,17 +285,17 @@ impl Path {
 }
 
 #[derive(Debug, Default, Clone, Serialize)]
-pub struct Pattern {
+pub struct Pat {
     pub id: NodeId,
-    pub kind: PatternKind,
+    pub kind: PatKind,
     pub leading_comments: Vec<Token>,
     pub trailing_comments: Vec<Token>,
     pub span: Span,
 }
 
-impl Pattern {
-    pub fn new(id: NodeId, kind: PatternKind) -> Self {
-        Pattern {
+impl Pat {
+    pub fn new(id: NodeId, kind: PatKind) -> Self {
+        Pat {
             id,
             kind,
             ..Default::default()
@@ -311,13 +311,13 @@ impl Pattern {
         let mut ids = vec![self.id];
 
         match &self.kind {
-            PatternKind::List(patterns) => {
-                ids.extend(patterns.iter().flat_map(Pattern::get_all_node_ids));
+            PatKind::List(patterns) => {
+                ids.extend(patterns.iter().flat_map(Pat::get_all_node_ids));
             }
-            PatternKind::Rest(pattern) => {
+            PatKind::Rest(pattern) => {
                 ids.extend(pattern.get_all_node_ids());
             }
-            PatternKind::Enum(enum_pattern) => {
+            PatKind::Enum(enum_pattern) => {
                 ids.extend(
                     enum_pattern
                         .elements
@@ -325,35 +325,35 @@ impl Pattern {
                         .flat_map(|(_, pattern)| pattern.get_all_node_ids()),
                 );
             }
-            PatternKind::None
-            | PatternKind::Literal(_)
-            | PatternKind::Identifier(_)
-            | PatternKind::_Self
-            | PatternKind::Wildcard => {}
+            PatKind::None
+            | PatKind::Literal(_)
+            | PatKind::Identifier(_)
+            | PatKind::_Self
+            | PatKind::Wildcard => {}
         }
 
         ids
     }
 
     pub fn is_wildcard(&self) -> bool {
-        matches!(self.kind, PatternKind::Wildcard)
+        matches!(self.kind, PatKind::Wildcard)
     }
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct EnumPattern {
     pub path: Path,
-    pub elements: Vec<(Ident, Pattern)>,
+    pub elements: Vec<(Ident, Pat)>,
 }
 
 #[derive(Debug, Default, Clone, Serialize)]
-pub enum PatternKind {
+pub enum PatKind {
     #[default]
     None,
     Identifier(Box<Ident>),
     Literal(Box<Literal>),
-    List(Vec<Pattern>),
-    Rest(Box<Pattern>),
+    List(Vec<Pat>),
+    Rest(Box<Pat>),
     Enum(Box<EnumPattern>),
     Wildcard,
     // TODO: As mentioned on the Keyword enum, we might want this to just be an Identifier(Pattern)
@@ -414,7 +414,7 @@ pub enum StmtKind {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct LetDeclaration {
-    pub pattern: Pattern,
+    pub pattern: Pat,
     pub expression: Expr,
     pub type_annotation: Option<Ty>,
 }
@@ -464,7 +464,7 @@ impl Ty {
 #[derive(Debug, Clone, Serialize)]
 pub struct MatchArm {
     pub id: NodeId,
-    pub pattern: Pattern,
+    pub pattern: Pat,
     pub guard: Option<Expr>,
     pub expression: Expr,
 }

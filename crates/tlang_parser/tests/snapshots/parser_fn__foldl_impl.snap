@@ -54,7 +54,7 @@ Module(
           ),
           parameters: [
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(3),
                 kind: List([]),
                 leading_comments: [],
@@ -83,7 +83,7 @@ Module(
               ),
             ),
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(4),
                 kind: Identifier(Ident(
                   name: "acc",
@@ -124,7 +124,7 @@ Module(
               ),
             ),
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(5),
                 kind: Wildcard,
                 leading_comments: [],
@@ -270,10 +270,10 @@ Module(
           ),
           parameters: [
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(14),
                 kind: List([
-                  Pattern(
+                  Pat(
                     id: NodeId(11),
                     kind: Identifier(Ident(
                       name: "x",
@@ -301,9 +301,9 @@ Module(
                       ),
                     ),
                   ),
-                  Pattern(
+                  Pat(
                     id: NodeId(12),
-                    kind: Rest(Pattern(
+                    kind: Rest(Pat(
                       id: NodeId(13),
                       kind: Identifier(Ident(
                         name: "xs",
@@ -371,7 +371,7 @@ Module(
               ),
             ),
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(15),
                 kind: Identifier(Ident(
                   name: "acc",
@@ -412,7 +412,7 @@ Module(
               ),
             ),
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(16),
                 kind: Identifier(Ident(
                   name: "f",

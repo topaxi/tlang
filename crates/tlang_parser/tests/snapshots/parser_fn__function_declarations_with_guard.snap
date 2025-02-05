@@ -54,7 +54,7 @@ Module(
           ),
           parameters: [
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(3),
                 kind: List([]),
                 leading_comments: [],
@@ -83,7 +83,7 @@ Module(
               ),
             ),
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(4),
                 kind: Identifier(Ident(
                   name: "f",
@@ -215,10 +215,10 @@ Module(
           ),
           parameters: [
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(13),
                 kind: List([
-                  Pattern(
+                  Pat(
                     id: NodeId(10),
                     kind: Identifier(Ident(
                       name: "x",
@@ -246,9 +246,9 @@ Module(
                       ),
                     ),
                   ),
-                  Pattern(
+                  Pat(
                     id: NodeId(11),
-                    kind: Rest(Pattern(
+                    kind: Rest(Pat(
                       id: NodeId(12),
                       kind: Identifier(Ident(
                         name: "xs",
@@ -316,7 +316,7 @@ Module(
               ),
             ),
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(14),
                 kind: Identifier(Ident(
                   name: "f",
@@ -753,10 +753,10 @@ Module(
           ),
           parameters: [
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(32),
                 kind: List([
-                  Pattern(
+                  Pat(
                     id: NodeId(29),
                     kind: Identifier(Ident(
                       name: "x",
@@ -784,9 +784,9 @@ Module(
                       ),
                     ),
                   ),
-                  Pattern(
+                  Pat(
                     id: NodeId(30),
-                    kind: Rest(Pattern(
+                    kind: Rest(Pat(
                       id: NodeId(31),
                       kind: Identifier(Ident(
                         name: "xs",
@@ -854,7 +854,7 @@ Module(
               ),
             ),
             FunctionParameter(
-              pattern: Pattern(
+              pattern: Pat(
                 id: NodeId(33),
                 kind: Identifier(Ident(
                   name: "f",
