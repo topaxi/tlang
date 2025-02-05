@@ -25,8 +25,8 @@ range(0, height - 1)
 |> map(fn (y) {
     range(0, width - 1)
     |> map(fn (x) {
-        let c_real = ((x + 0.0) / width) * 3.5 - 2.5;
-        let c_imag = ((y + 0.0) / height) * 2.0 - 1.0;
+        let c_real = (x / width) * 3.5 - 2.5;
+        let c_imag = (y / height) * 2.0 - 1.0;
         mandelbrot(c_real, c_imag, max_iter)
     })
 })
