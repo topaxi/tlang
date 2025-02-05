@@ -766,12 +766,12 @@ impl LoweringContext {
                     .map(|ident| {
                         self.expr(
                             span,
-                            hir::ExprKind::Path(Box::new(hir::Path {
-                                segments: vec![hir::PathSegment {
+                            hir::ExprKind::Path(Box::new(hir::Path::new(
+                                vec![hir::PathSegment {
                                     ident: ident.clone(),
                                 }],
                                 span,
-                            })),
+                            ))),
                         )
                     })
                     .collect(),
@@ -781,12 +781,12 @@ impl LoweringContext {
         } else {
             self.expr(
                 ast::span::Span::default(),
-                hir::ExprKind::Path(Box::new(hir::Path {
-                    segments: vec![hir::PathSegment {
+                hir::ExprKind::Path(Box::new(hir::Path::new(
+                    vec![hir::PathSegment {
                         ident: param_names.first().unwrap().clone(),
                     }],
                     span,
-                })),
+                ))),
             )
         };
 
@@ -853,10 +853,7 @@ impl LoweringContext {
             let segment = path.segments.first().unwrap();
             let segment = hir::PathSegment::from_str(self.lookup(segment.as_str()), segment.span);
 
-            return hir::Path {
-                segments: vec![segment],
-                span: path.span,
-            };
+            return hir::Path::new(vec![segment], path.span);
         }
 
         let segments = path
@@ -865,10 +862,7 @@ impl LoweringContext {
             .map(|seg| self.lower_path_segment(seg))
             .collect();
 
-        hir::Path {
-            segments,
-            span: path.span,
-        }
+        hir::Path::new(segments, path.span)
     }
 
     fn lower_path_segment(&mut self, seg: &Ident) -> hir::PathSegment {

@@ -16,9 +16,28 @@ impl HirId {
     }
 }
 
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize)]
+pub enum DefKind {
+    Struct,
+    Enum,
+    Variant,
+    Fn,
+    Field,
+    Closure,
+}
+
+#[derive(Debug, Default, Eq, PartialEq, Clone, Copy, Serialize)]
+pub enum Res {
+    #[default]
+    Unknown,
+    Def(DefKind, HirId),
+    Local(HirId),
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct Path {
     pub segments: Vec<PathSegment>,
+    pub res: Res,
     pub span: Span,
 }
 
@@ -29,6 +48,19 @@ impl PartialEq for Path {
 }
 
 impl Path {
+    pub fn new(segments: Vec<PathSegment>, span: Span) -> Self {
+        Self {
+            segments,
+            res: Res::Unknown,
+            span,
+        }
+    }
+
+    pub fn with_res(mut self, res: Res) -> Self {
+        self.res = res;
+        self
+    }
+
     pub fn join(&self, separator: &str) -> String {
         self.segments
             .iter()
@@ -46,10 +78,9 @@ impl Path {
     }
 
     pub fn as_init(&self) -> Self {
-        let mut segments = self.segments.clone();
-        segments.pop();
         Path {
-            segments,
+            segments: self.segments[0..self.segments.len() - 1].to_vec(),
+            res: Default::default(),
             span: self.span,
         }
     }
