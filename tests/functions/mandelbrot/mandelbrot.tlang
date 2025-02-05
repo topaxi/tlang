@@ -1,0 +1,33 @@
+fn apply_map(f, acc, x) { [...acc, f(x)] }
+fn map(xs, f) { foldl(xs, [], apply_map(f, _, _)) }
+
+fn foldl([], acc, _) { acc }
+fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+
+fn range(start, end) { range(start, end, []) }
+fn range(start, end, acc) if start >= end; { acc }
+fn range(start, end, acc) { range(start + 1, end, [...acc, start]) }
+
+fn mandelbrot(c_real, c_imag, max_iter) { mandelbrot(c_real, c_imag, max_iter, 0, 0, 0) }
+fn mandelbrot(_, _, 0, _, _, _) { 0 }
+fn mandelbrot(_, _, _, z_real, z_imag, iter) if z_real * z_real + z_imag * z_imag > 4 { iter }
+fn mandelbrot(c_real, c_imag, max_iter, z_real, z_imag, iter) {
+    let new_real = z_real * z_real - z_imag * z_imag + c_real;
+    let new_imag = 2 * z_real * z_imag + c_imag;
+    rec mandelbrot(c_real, c_imag, max_iter - 1, new_real, new_imag, iter + 1)
+}
+
+let width = 20;
+let height = 10;
+let max_iter = 50;
+
+range(0, height - 1)
+|> map(fn (y) {
+    range(0, width - 1)
+    |> map(fn (x) {
+        let c_real = ((x + 0.0) / width) * 3.5 - 2.5;
+        let c_imag = ((y + 0.0) / height) * 2.0 - 1.0;
+        mandelbrot(c_real, c_imag, max_iter)
+    })
+})
+|> log();

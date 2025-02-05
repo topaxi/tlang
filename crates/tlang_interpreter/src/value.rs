@@ -205,6 +205,15 @@ impl std::hash::Hash for TlangValue {
     }
 }
 
+enum ArithmeticOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+    Pow,
+}
+
 impl TlangValue {
     pub fn new_object() -> Self {
         TlangValue::Object(TlangObjectId::new())
@@ -240,6 +249,46 @@ impl TlangValue {
             _ => None,
         }
     }
+
+    #[inline(always)]
+    fn apply_arithmetic_op(self, rhs: TlangValue, op: ArithmeticOp) -> TlangValue {
+        match (self, rhs) {
+            (TlangValue::Int(lhs), TlangValue::Int(rhs)) => match op {
+                ArithmeticOp::Add => TlangValue::Int(lhs + rhs),
+                ArithmeticOp::Sub => TlangValue::Int(lhs - rhs),
+                ArithmeticOp::Mul => TlangValue::Int(lhs * rhs),
+                ArithmeticOp::Div => TlangValue::Float(lhs as f64 / rhs as f64),
+                ArithmeticOp::Rem => TlangValue::Int(lhs % rhs),
+                ArithmeticOp::Pow if rhs >= 0 => TlangValue::Int(lhs.pow(rhs as u32)),
+                ArithmeticOp::Pow => TlangValue::Float((lhs as f64).powf(rhs as f64)),
+            },
+            (TlangValue::Float(lhs), TlangValue::Float(rhs)) => match op {
+                ArithmeticOp::Add => TlangValue::Float(lhs + rhs),
+                ArithmeticOp::Sub => TlangValue::Float(lhs - rhs),
+                ArithmeticOp::Mul => TlangValue::Float(lhs * rhs),
+                ArithmeticOp::Div => TlangValue::Float(lhs / rhs),
+                ArithmeticOp::Rem => TlangValue::Float(lhs % rhs),
+                ArithmeticOp::Pow => TlangValue::Float(lhs.powf(rhs)),
+            },
+            (TlangValue::Int(lhs), TlangValue::Float(rhs)) => match op {
+                ArithmeticOp::Add => TlangValue::Float(lhs as f64 + rhs),
+                ArithmeticOp::Sub => TlangValue::Float(lhs as f64 - rhs),
+                ArithmeticOp::Mul => TlangValue::Float(lhs as f64 * rhs),
+                ArithmeticOp::Div => TlangValue::Float(lhs as f64 / rhs),
+                ArithmeticOp::Rem => TlangValue::Float(lhs as f64 % rhs),
+                ArithmeticOp::Pow => TlangValue::Float((lhs as f64).powf(rhs)),
+            },
+            (TlangValue::Float(lhs), TlangValue::Int(rhs)) => match op {
+                ArithmeticOp::Add => TlangValue::Float(lhs + rhs as f64),
+                ArithmeticOp::Sub => TlangValue::Float(lhs - rhs as f64),
+                ArithmeticOp::Mul => TlangValue::Float(lhs * rhs as f64),
+                ArithmeticOp::Div => TlangValue::Float(lhs / rhs as f64),
+                ArithmeticOp::Rem => TlangValue::Float(lhs % rhs as f64),
+                ArithmeticOp::Pow => TlangValue::Float(lhs.powf(rhs as f64)),
+            },
+            _ => panic!("Unsupported operation"),
+        }
+    }
 }
 
 impl std::fmt::Display for TlangValue {
@@ -251,5 +300,40 @@ impl std::fmt::Display for TlangValue {
             TlangValue::Bool(b) => write!(f, "{}", b),
             TlangValue::Object(id) => write!(f, "Object({})", id.0),
         }
+    }
+}
+
+pub trait TlangArithmetic {
+    fn add(self, rhs: Self) -> Self;
+    fn sub(self, rhs: Self) -> Self;
+    fn mul(self, rhs: Self) -> Self;
+    fn div(self, rhs: Self) -> Self;
+    fn rem(self, rhs: Self) -> Self;
+    fn pow(self, rhs: Self) -> Self;
+}
+
+impl TlangArithmetic for TlangValue {
+    fn add(self, rhs: Self) -> Self {
+        self.apply_arithmetic_op(rhs, ArithmeticOp::Add)
+    }
+
+    fn sub(self, rhs: Self) -> Self {
+        self.apply_arithmetic_op(rhs, ArithmeticOp::Sub)
+    }
+
+    fn mul(self, rhs: Self) -> Self {
+        self.apply_arithmetic_op(rhs, ArithmeticOp::Mul)
+    }
+
+    fn div(self, rhs: Self) -> Self {
+        self.apply_arithmetic_op(rhs, ArithmeticOp::Div)
+    }
+
+    fn rem(self, rhs: Self) -> Self {
+        self.apply_arithmetic_op(rhs, ArithmeticOp::Rem)
+    }
+
+    fn pow(self, rhs: Self) -> Self {
+        self.apply_arithmetic_op(rhs, ArithmeticOp::Pow)
     }
 }

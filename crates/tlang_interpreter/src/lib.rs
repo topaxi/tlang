@@ -14,8 +14,8 @@ use self::scope::Scope;
 use self::state::InterpreterState;
 use self::stdlib::collections::define_list_shape;
 use self::value::{
-    NativeFnReturn, ShapeKey, TlangClosure, TlangNativeFn, TlangObjectId, TlangObjectKind,
-    TlangStruct, TlangStructMethod, TlangStructShape, TlangValue,
+    NativeFnReturn, ShapeKey, TlangArithmetic, TlangClosure, TlangNativeFn, TlangObjectId,
+    TlangObjectKind, TlangStruct, TlangStructMethod, TlangStructShape, TlangValue,
 };
 
 mod resolver;
@@ -348,6 +348,14 @@ impl Interpreter {
         }
     }
 
+    fn eval_unary(&mut self, op: UnaryOp, expr: &hir::Expr) -> TlangValue {
+        match op {
+            UnaryOp::Not => TlangValue::Bool(!self.eval_expr(expr).is_truthy(&self.state)),
+            UnaryOp::Rest => unreachable!("Rest operator implemented in eval_list_expr"),
+            _ => todo!("eval_unary: {:?}", op),
+        }
+    }
+
     fn eval_binary(
         &mut self,
         op: hir::BinaryOpKind,
@@ -390,12 +398,12 @@ impl Interpreter {
         }
 
         match op {
-            hir::BinaryOpKind::Add => self.eval_arithmetic_op(lhs, rhs, |a, b| a + b),
-            hir::BinaryOpKind::Sub => self.eval_arithmetic_op(lhs, rhs, |a, b| a - b),
-            hir::BinaryOpKind::Mul => self.eval_arithmetic_op(lhs, rhs, |a, b| a * b),
-            hir::BinaryOpKind::Div => self.eval_arithmetic_op(lhs, rhs, |a, b| a / b),
-            hir::BinaryOpKind::Mod => self.eval_arithmetic_op(lhs, rhs, |a, b| a % b),
-            hir::BinaryOpKind::Exp => self.eval_arithmetic_op(lhs, rhs, |a, b| a.powf(b)),
+            hir::BinaryOpKind::Add => lhs.add(rhs),
+            hir::BinaryOpKind::Sub => lhs.sub(rhs),
+            hir::BinaryOpKind::Mul => lhs.mul(rhs),
+            hir::BinaryOpKind::Div => lhs.div(rhs),
+            hir::BinaryOpKind::Mod => lhs.rem(rhs),
+            hir::BinaryOpKind::Exp => lhs.pow(rhs),
 
             hir::BinaryOpKind::Eq => self.eval_comparison_op(lhs, rhs, |a, b| a == b),
             hir::BinaryOpKind::NotEq => self.eval_comparison_op(lhs, rhs, |a, b| a != b),
@@ -415,38 +423,6 @@ impl Interpreter {
             hir::BinaryOpKind::And | hir::BinaryOpKind::Or => {
                 unreachable!();
             }
-        }
-    }
-
-    fn eval_unary(&mut self, op: UnaryOp, expr: &hir::Expr) -> TlangValue {
-        match op {
-            UnaryOp::Not => TlangValue::Bool(!self.eval_expr(expr).is_truthy(&self.state)),
-            UnaryOp::Rest => unreachable!("Rest operator implemented in eval_list_expr"),
-            _ => todo!("eval_unary: {:?}", op),
-        }
-    }
-
-    fn eval_arithmetic_op<F>(&self, lhs: TlangValue, rhs: TlangValue, op: F) -> TlangValue
-    where
-        F: Fn(f64, f64) -> f64,
-    {
-        match (lhs, rhs) {
-            (TlangValue::Int(lhs), TlangValue::Int(rhs)) => {
-                TlangValue::Int(op(lhs as f64, rhs as f64) as i64)
-            }
-            (TlangValue::Float(lhs), TlangValue::Float(rhs)) => TlangValue::Float(op(lhs, rhs)),
-            (TlangValue::Float(lhs), TlangValue::Int(rhs)) => {
-                TlangValue::Float(op(lhs, rhs as f64))
-            }
-            (TlangValue::Int(lhs), TlangValue::Float(rhs)) => {
-                TlangValue::Float(op(lhs as f64, rhs))
-            }
-            (TlangValue::Object(_), _) => unreachable!(),
-            _ => todo!(
-                "eval_arithmetic_op: incompatible types, {:?} and {:?}",
-                lhs,
-                rhs
-            ),
         }
     }
 
@@ -1150,9 +1126,8 @@ impl Interpreter {
             hir::PatKind::Identifier(_id, ident) => {
                 debug!("eval_pat: assigning {:?} to {}", value, ident);
 
-                match value {
-                    TlangValue::Object(id) => debug!("value: {:?}", self.get_object(*id)),
-                    _ => debug!("value: {:?}", value),
+                if let TlangValue::Object(id) = value {
+                    debug!("eval_pat: value = {:?}", self.get_object(*id))
                 }
 
                 self.state
