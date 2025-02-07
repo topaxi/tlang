@@ -1,35 +1,66 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 
 use tlang_ast::node::Ident;
 use tlang_hir::hir::{self, HirId};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Binding {
     name: String,
     res: hir::Res,
 }
 
 impl Binding {
-    pub(crate) fn new_local(name: String, hir_id: HirId) -> Self {
+    pub(crate) fn new_local(name: String, hir_id: HirId, index: usize) -> Self {
         Self {
             name,
-            res: hir::Res::Local(hir_id),
+            res: hir::Res::Local(hir_id, index),
         }
     }
 
-    pub(crate) fn new_def(name: String, def_kind: hir::DefKind, hir_id: HirId) -> Self {
+    pub(crate) fn new_def(
+        name: String,
+        def_kind: hir::DefKind,
+        hir_id: HirId,
+        index: usize,
+    ) -> Self {
         Self {
             name,
-            res: hir::Res::Def(def_kind, hir_id),
+            res: hir::Res::Def(def_kind, hir_id, index),
         }
     }
 
-    pub(crate) fn new_fn_def(name: String, hir_id: HirId) -> Self {
-        Self::new_def(name, hir::DefKind::Fn, hir_id)
+    pub(crate) fn new_fn_def(name: String, hir_id: HirId, index: usize) -> Self {
+        Self::new_def(name, hir::DefKind::Fn, hir_id, index)
     }
 
-    pub(crate) fn new_struct_def(name: String, hir_id: HirId) -> Self {
-        Self::new_def(name, hir::DefKind::Struct, hir_id)
+    pub(crate) fn new_struct_def(name: String, hir_id: HirId, index: usize) -> Self {
+        Self::new_def(name, hir::DefKind::Struct, hir_id, index)
+    }
+
+    pub(crate) fn new_enum_variant_def(
+        enum_name: &str,
+        variant_name: &str,
+        hir_id: HirId,
+        index: usize,
+    ) -> Self {
+        Self::new_def(
+            enum_name.to_string() + "::" + variant_name,
+            hir::DefKind::Variant,
+            hir_id,
+            index,
+        )
+    }
+
+    pub(crate) fn new_upvar(name: String, scope: usize, index: usize) -> Self {
+        Self {
+            name,
+            res: hir::Res::Upvar(scope, index),
+        }
+    }
+
+    pub(crate) fn name(&self) -> &str {
+        &self.name
     }
 
     pub(crate) fn res(&self) -> hir::Res {
@@ -76,41 +107,80 @@ impl From<&Ident> for Binding {
 #[derive(Debug, Default)]
 pub struct Scope {
     bindings: HashMap<String, Binding>,
+    definitions: HashMap<String, Binding>,
+    upvars: RefCell<HashMap<String, Binding>>,
 }
 
 impl Scope {
     pub(crate) fn new() -> Self {
         Self {
             bindings: HashMap::new(),
+            definitions: HashMap::new(),
+            upvars: HashMap::new().into(),
         }
     }
 
     pub(crate) fn def_local(&mut self, name: &str, hir_id: HirId) {
+        let index = self.bindings.len();
+
         self.bindings.insert(
             name.to_string(),
-            Binding::new_local(name.to_string(), hir_id),
+            Binding::new_local(name.to_string(), hir_id, index),
         );
     }
 
     pub(crate) fn def_fn_local(&mut self, name: &str, hir_id: HirId) {
+        let index = self.bindings.len();
+
         self.bindings.insert(
             name.to_string(),
-            Binding::new_fn_def(name.to_string(), hir_id),
+            Binding::new_fn_def(name.to_string(), hir_id, index),
         );
     }
 
     pub(crate) fn def_struct_local(&mut self, name: &str, hir_id: HirId) {
-        self.bindings.insert(
+        let index = self.definitions.len();
+
+        self.definitions.insert(
             name.to_string(),
-            Binding::new_struct_def(name.to_string(), hir_id),
+            Binding::new_struct_def(name.to_string(), hir_id, index),
         );
     }
 
-    pub(crate) fn lookup_name(&self, name: &str) -> Option<&str> {
-        self.bindings.get(name).map(|s| s.name.as_str())
+    /// Define a local binding for an (untagged) enum variant.
+    pub(crate) fn def_enum_variant_local(
+        &mut self,
+        enum_name: &str,
+        variant_name: &str,
+        hir_id: HirId,
+    ) {
+        let index = self.bindings.len();
+
+        self.bindings.insert(
+            enum_name.to_string() + "::" + variant_name,
+            Binding::new_enum_variant_def(enum_name, variant_name, hir_id, index),
+        );
+    }
+
+    pub(crate) fn def_upvar(&mut self, name: &str, scope: usize, index: usize) -> Binding {
+        let binding = Binding::new_upvar(name.to_string(), scope, index);
+
+        self.upvars
+            .borrow_mut()
+            .insert(name.to_string(), binding.clone());
+
+        binding
     }
 
     pub(crate) fn lookup(&self, name: &str) -> Option<&Binding> {
         self.bindings.get(name)
+    }
+
+    pub(crate) fn locals(&self) -> usize {
+        self.bindings.len()
+    }
+
+    pub(crate) fn upvars(&self) -> usize {
+        self.upvars.borrow().len()
     }
 }

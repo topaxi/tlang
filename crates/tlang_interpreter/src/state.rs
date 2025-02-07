@@ -2,14 +2,15 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use log::debug;
 use slab::Slab;
 use tlang_hir::hir::{self, HirId};
 
 use crate::resolver::Resolver;
-use crate::scope::Scope;
+use crate::scope::{Scope, ScopeStack};
 use crate::value::{
-    ShapeKey, TlangObjectId, TlangObjectKind, TlangStruct, TlangStructMethod, TlangStructShape,
-    TlangValue,
+    ShapeKey, TlangClosure, TlangObjectId, TlangObjectKind, TlangStruct, TlangStructMethod,
+    TlangStructShape, TlangValue,
 };
 
 pub enum CallStackKind {
@@ -24,27 +25,46 @@ pub struct CallStackEntry {
 }
 
 pub struct InterpreterState {
-    pub(crate) root_scope: Rc<RefCell<Scope>>,
-    pub(crate) current_scope: Rc<RefCell<Scope>>,
+    pub(crate) scope_stack: ScopeStack,
     pub(crate) closures: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
     pub(crate) objects: Slab<TlangObjectKind>,
     pub(crate) shapes: HashMap<ShapeKey, TlangStructShape>,
     pub(crate) fn_decls: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
     pub(crate) struct_decls: HashMap<String, Rc<hir::StructDeclaration>>,
     pub(crate) call_stack: Vec<CallStackEntry>,
+    pub(crate) globals: HashMap<String, TlangValue>,
     pub list_shape: ShapeKey,
 }
 
 impl Resolver for InterpreterState {
     fn resolve_path(&self, path: &hir::Path) -> Option<TlangValue> {
-        self.current_scope.borrow().resolve_path(path)
+        let value = self
+            .scope_stack
+            .resolve_path(path)
+            .or_else(|| self.globals.get(&path.join("::")).copied());
+
+        if let Some(value) = value {
+            debug!(
+                "Resolved path: {:?} ({:?}), got: {:?}",
+                path.join("::"),
+                path.res,
+                self.stringify(&value)
+            );
+        } else {
+            debug!(
+                "Resolved path: {:?} ({:?}), got: {:?}",
+                path.join("::"),
+                path.res,
+                value
+            );
+        }
+
+        value
     }
 }
 
 impl InterpreterState {
     pub(crate) fn new(list_shape: ShapeKey) -> Self {
-        let root_scope = Rc::new(RefCell::new(Scope::default()));
-        let current_scope = root_scope.clone();
         let mut call_stack = Vec::with_capacity(1000);
 
         call_stack.push(CallStackEntry {
@@ -53,14 +73,14 @@ impl InterpreterState {
         });
 
         Self {
-            root_scope,
-            current_scope,
+            scope_stack: ScopeStack::default(),
             closures: HashMap::with_capacity(100),
             objects: Slab::with_capacity(1000),
             struct_decls: HashMap::with_capacity(100),
             fn_decls: HashMap::with_capacity(1000),
             shapes: HashMap::with_capacity(100),
             call_stack,
+            globals: HashMap::with_capacity(100),
             list_shape,
         }
     }
@@ -103,26 +123,34 @@ impl InterpreterState {
         self.call_stack.last_mut().unwrap().current_span = span;
     }
 
-    pub(crate) fn enter_scope(&mut self) {
-        let child_scope = Scope::new_child(self.current_scope.clone());
-        self.current_scope = Rc::new(RefCell::new(child_scope));
+    pub(crate) fn enter_scope<T>(&mut self, meta: &T)
+    where
+        T: hir::HirScope,
+    {
+        self.scope_stack.push(meta);
     }
 
     pub(crate) fn exit_scope(&mut self) {
-        let parent_scope = {
-            let current_scope = self.current_scope.borrow();
-            current_scope.parent.clone()
-        };
+        self.scope_stack.pop();
+    }
 
-        if let Some(parent) = parent_scope {
-            self.current_scope = parent;
-        } else {
-            panic!("Attempted to exit root scope!");
-        }
+    pub(crate) fn current_scope(&self) -> Rc<RefCell<Scope>> {
+        self.scope_stack.current_scope()
     }
 
     pub fn new_object(&mut self, kind: TlangObjectKind) -> TlangValue {
         TlangValue::new_object(self.objects.insert(kind))
+    }
+
+    pub fn new_closure(&mut self, decl: &hir::FunctionDeclaration) -> TlangValue {
+        self.closures
+            .entry(decl.hir_id)
+            .or_insert_with(|| decl.clone().into());
+
+        self.new_object(TlangObjectKind::Closure(TlangClosure {
+            id: decl.hir_id,
+            scope_stack: self.scope_stack.clone(),
+        }))
     }
 
     #[inline(always)]
@@ -235,6 +263,11 @@ impl InterpreterState {
 
                     result.push_str(" }");
                     result
+                }
+                Some(TlangObjectKind::Closure(s)) => {
+                    let fn_decl = self.closures.get(&s.id).unwrap();
+
+                    format!("fn {}({:?})", fn_decl.name(), s.id)
                 }
                 _ => format!("{:?}", value),
             },

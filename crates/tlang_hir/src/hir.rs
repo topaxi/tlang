@@ -3,6 +3,14 @@ use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::span::Span;
 use tlang_ast::token::{Literal, Token};
 
+pub trait HirScope {
+    fn locals(&self) -> usize;
+    fn upvars(&self) -> usize;
+
+    fn set_locals(&mut self, locals: usize);
+    fn set_upvars(&mut self, upvars: usize);
+}
+
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Hash, Serialize)]
 pub struct HirId(usize);
 
@@ -13,6 +21,32 @@ impl HirId {
 
     pub fn next(&self) -> Self {
         HirId(self.0 + 1)
+    }
+}
+
+#[derive(Debug, Default, Clone, Serialize)]
+pub struct HirScopeData {
+    // How many slots to allocate for local variables.
+    locals: usize,
+    // How many slots to allocate for variables from parent scopes.
+    upvars: usize,
+}
+
+impl HirScope for HirScopeData {
+    fn locals(&self) -> usize {
+        self.locals
+    }
+
+    fn upvars(&self) -> usize {
+        self.upvars
+    }
+
+    fn set_locals(&mut self, locals: usize) {
+        self.locals = locals;
+    }
+
+    fn set_upvars(&mut self, upvars: usize) {
+        self.upvars = upvars;
     }
 }
 
@@ -30,8 +64,9 @@ pub enum DefKind {
 pub enum Res {
     #[default]
     Unknown,
-    Def(DefKind, HirId),
-    Local(HirId),
+    Def(DefKind, HirId, usize),
+    Local(HirId, usize),
+    Upvar(usize, usize),
 }
 
 impl Res {
@@ -40,17 +75,25 @@ impl Res {
     }
 
     pub fn is_struct_def(&self) -> bool {
-        matches!(self, Res::Def(DefKind::Struct, _))
+        matches!(self, Res::Def(DefKind::Struct, ..))
     }
 
     pub fn hir_id(&self) -> Option<HirId> {
         match self {
-            Res::Def(_, hir_id) | Res::Local(hir_id) => Some(*hir_id),
+            Res::Def(_, hir_id, ..) | Res::Local(hir_id, ..) => Some(*hir_id),
             _ => None,
+        }
+    }
+
+    pub fn slot_index(&self) -> Option<usize> {
+        match self {
+            Res::Def(.., index) | Res::Local(.., index) | Res::Upvar(.., index) => Some(*index),
+            Res::Unknown => None,
         }
     }
 }
 
+/// HIR representation of a path.
 #[derive(Debug, Clone, Serialize)]
 pub struct Path {
     pub segments: Vec<PathSegment>,
@@ -126,16 +169,62 @@ pub struct Module {
     pub span: Span,
 }
 
+impl HirScope for Module {
+    fn locals(&self) -> usize {
+        self.block.scope.locals()
+    }
+
+    fn upvars(&self) -> usize {
+        self.block.scope.upvars()
+    }
+
+    fn set_locals(&mut self, locals: usize) {
+        self.block.scope.set_locals(locals);
+    }
+
+    fn set_upvars(&mut self, upvars: usize) {
+        self.block.scope.set_upvars(upvars);
+    }
+}
+
 #[derive(Debug, Default, Clone, Serialize)]
 pub struct Block {
     pub stmts: Vec<Stmt>,
     pub expr: Option<Expr>,
+    scope: HirScopeData,
     pub span: Span,
 }
 
 impl Block {
+    pub fn new(stmts: Vec<Stmt>, expr: Option<Expr>, span: Span) -> Self {
+        Block {
+            stmts,
+            expr,
+            scope: Default::default(),
+            span,
+        }
+    }
+
     pub fn has_completion(&self) -> bool {
         self.expr.is_some()
+    }
+}
+
+impl HirScope for Block {
+    fn locals(&self) -> usize {
+        self.scope.locals()
+    }
+
+    fn upvars(&self) -> usize {
+        self.scope.upvars()
+    }
+
+    fn set_locals(&mut self, locals: usize) {
+        self.scope.set_locals(locals);
+    }
+
+    fn set_upvars(&mut self, upvars: usize) {
+        self.scope.set_upvars(upvars);
     }
 }
 
@@ -218,6 +307,7 @@ pub struct MatchArm {
     pub pat: Pat,
     pub guard: Option<Expr>,
     pub expr: Expr,
+    pub scope: HirScopeData,
     // TODO: We might want to handle this somehow different, as we pass them on from the AST to
     //       HIR, which feels somewhat unnecessary.
     pub leading_comments: Vec<Token>,
@@ -233,6 +323,24 @@ impl MatchArm {
         }
 
         false
+    }
+}
+
+impl HirScope for MatchArm {
+    fn locals(&self) -> usize {
+        self.scope.locals()
+    }
+
+    fn upvars(&self) -> usize {
+        self.scope.upvars()
+    }
+
+    fn set_locals(&mut self, locals: usize) {
+        self.scope.set_locals(locals);
+    }
+
+    fn set_upvars(&mut self, upvars: usize) {
+        self.scope.set_upvars(upvars);
     }
 }
 
@@ -349,15 +457,8 @@ impl FunctionDeclaration {
             hir_id,
             name,
             parameters,
-            return_type: Ty {
-                kind: TyKind::Unknown,
-                span: Span::default(),
-            },
-            body: Block {
-                stmts: vec![],
-                expr: None,
-                span: Span::default(),
-            },
+            return_type: Ty::default(),
+            body: Block::default(),
             span: Span::default(),
         }
     }
@@ -370,6 +471,42 @@ impl FunctionDeclaration {
             }
             _ => unreachable!(),
         }
+    }
+}
+
+impl HirScope for FunctionDeclaration {
+    fn locals(&self) -> usize {
+        self.body.locals()
+    }
+
+    fn upvars(&self) -> usize {
+        self.body.upvars()
+    }
+
+    fn set_locals(&mut self, locals: usize) {
+        self.body.set_locals(locals);
+    }
+
+    fn set_upvars(&mut self, upvars: usize) {
+        self.body.set_upvars(upvars);
+    }
+}
+
+impl HirScope for std::rc::Rc<FunctionDeclaration> {
+    fn locals(&self) -> usize {
+        self.body.locals()
+    }
+
+    fn upvars(&self) -> usize {
+        self.body.upvars()
+    }
+
+    fn set_locals(&mut self, _locals: usize) {
+        unreachable!()
+    }
+
+    fn set_upvars(&mut self, _upvars: usize) {
+        unreachable!()
     }
 }
 

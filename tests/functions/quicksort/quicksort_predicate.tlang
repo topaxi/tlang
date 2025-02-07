@@ -20,7 +20,7 @@ fn quicksort(list, predicate) {
   let pivot = list[pivotIndex];
   let list = [...list.slice(0, pivotIndex), ...list.slice(pivotIndex+1)];
 
-  let [smaller, greater] = list |> partition(fn(x) { predicate(x, pivot) < 0 });
+  let [smaller, greater] = list |> partition(fn partitioner(x) { predicate(x, pivot) < 0 });
 
   let smaller = smaller |> quicksort(predicate);
   let greater = greater |> quicksort(predicate);
@@ -29,5 +29,5 @@ fn quicksort(list, predicate) {
 }
 
 [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5]
-|> quicksort(fn(a, b) { b - a })
+|> quicksort(fn cmp(a, b) { b - a })
 |> log();

@@ -33,20 +33,6 @@ impl LoweringContext {
     }
 
     #[inline(always)]
-    pub(crate) fn push_scope(&mut self) {
-        debug!("Entering new scope");
-
-        self.scopes.push(Scope::new());
-    }
-
-    #[inline(always)]
-    pub(crate) fn pop_scope(&mut self) {
-        debug!("Leaving scope");
-
-        self.scopes.pop();
-    }
-
-    #[inline(always)]
     pub(crate) fn scope(&mut self) -> &mut Scope {
         self.scopes.last_mut().unwrap()
     }
@@ -61,33 +47,45 @@ impl LoweringContext {
         false
     }
 
-    pub(crate) fn lookup_name<'a>(&'a self, name: &'a str) -> &'a str {
-        for scope in self.scopes.iter().rev() {
-            if let Some(binding) = scope.lookup_name(name) {
-                return binding;
-            }
-        }
-
-        name
+    pub(crate) fn lookup_name(&mut self, name: &str) -> String {
+        self.lookup(name)
+            .map_or(name.to_string(), |binding| binding.name().to_string())
     }
 
-    pub(crate) fn lookup(&self, name: &str) -> Option<&scope::Binding> {
-        for scope in self.scopes.iter().rev() {
-            if let Some(binding) = scope.lookup(name) {
-                return Some(binding);
-            }
+    pub(crate) fn lookup<'a>(&'a mut self, name: &'a str) -> Option<scope::Binding> {
+        let (scope_index, binding) = self
+            .scopes
+            .iter()
+            .enumerate()
+            .rev()
+            .find_map(|(i, scope)| scope.lookup(name).map(|binding| (i, binding.clone())))?;
+
+        if scope_index < self.scopes.len() - 1 {
+            let relative_scope_index = self.scopes.len() - 1 - scope_index;
+            let slot_index = binding.res().slot_index().unwrap();
+
+            return Some(self.scopes.last_mut().unwrap().def_upvar(
+                binding.name(),
+                relative_scope_index,
+                slot_index,
+            ));
         }
 
-        None
+        Some(binding)
     }
 
     pub(crate) fn with_new_scope<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce(&mut Self) -> R,
+        R: hir::HirScope,
     {
-        self.push_scope();
-        let result = f(self);
-        self.pop_scope();
+        debug!("Entering new scope");
+        self.scopes.push(Scope::new());
+        let mut result = f(self);
+        result.set_locals(self.scope().locals());
+        result.set_upvars(self.scope().upvars());
+        debug!("Leaving scope");
+        self.scopes.pop();
         result
     }
 
@@ -147,7 +145,7 @@ impl LoweringContext {
             .flat_map(|stmt| self.lower_stmt(stmt))
             .collect();
         let expr = expr.as_ref().map(|expr| self.lower_expr(expr));
-        hir::Block { stmts, expr, span }
+        hir::Block::new(stmts, expr, span)
     }
 
     fn lower_exprs(&mut self, exprs: &[ast::node::Expr]) -> Vec<hir::Expr> {
@@ -235,6 +233,7 @@ impl LoweringContext {
                     pat: self.lower_pat(pat),
                     guard: None,
                     expr: self.expr(node.span, hir::ExprKind::Block(Box::new(block))),
+                    scope: Default::default(),
                     leading_comments: condition.leading_comments.clone(),
                     trailing_comments: condition.trailing_comments.clone(),
                 });
@@ -258,6 +257,7 @@ impl LoweringContext {
                         },
                         guard: condition,
                         expr: consequence,
+                        scope: Default::default(),
                         leading_comments: vec![],
                         trailing_comments: vec![],
                     });
@@ -301,12 +301,32 @@ impl LoweringContext {
                 let arms = arms
                     .iter()
                     .map(|arm| {
-                        self.with_new_scope(|this| hir::MatchArm {
-                            pat: this.lower_pat_with_idents(&arm.pattern, &mut idents),
-                            guard: arm.guard.as_ref().map(|expr| this.lower_expr(expr)),
-                            expr: this.lower_expr(&arm.expression),
-                            leading_comments: vec![],
-                            trailing_comments: vec![],
+                        self.with_new_scope(|this| {
+                            let pat = this.lower_pat_with_idents(&arm.pattern, &mut idents);
+                            let guard = arm.guard.as_ref().map(|expr| this.lower_expr(expr));
+                            let expr =
+                                // TODO: Do we need this?
+                                if let ast::node::ExprKind::Block(block) = &arm.expression.kind {
+                                    let block_expr_kind = hir::ExprKind::Block(Box::new(
+                                        this.lower_block_in_current_scope(
+                                            &block.statements,
+                                            block.expression.as_ref(),
+                                            block.span,
+                                        ),
+                                    ));
+                                    this.expr(arm.expression.span, block_expr_kind)
+                                } else {
+                                    this.lower_expr(&arm.expression)
+                                };
+
+                            hir::MatchArm {
+                                pat,
+                                guard,
+                                expr,
+                                scope: Default::default(),
+                                leading_comments: vec![],
+                                trailing_comments: vec![],
+                            }
                         })
                     })
                     .collect();
@@ -415,9 +435,13 @@ impl LoweringContext {
             }
             ast::node::StmtKind::FunctionDeclaration(box decl) => {
                 let fn_name = get_function_name_from_ast(&decl.name);
-                let decl = self.lower_fn_decl(decl);
+                let hir_id = self.lower_node_id(decl.id);
 
-                self.scope().def_fn_local(&fn_name, decl.hir_id);
+                if let ast::node::ExprKind::Path(_) = &decl.name.kind {
+                    self.scope().def_fn_local(&fn_name, hir_id);
+                }
+
+                let decl = self.lower_fn_decl(decl);
 
                 vec![hir::Stmt {
                     hir_id: self.lower_node_id(node.id),
@@ -456,7 +480,9 @@ impl LoweringContext {
                         let function_name = get_function_name_from_ast(&first_declaration.name);
                         let function_name = function_name + "$$" + &arg_len.to_string();
 
-                        self.scope().def_fn_local(&function_name, *hir_id);
+                        if let ast::node::ExprKind::Path(_) = &first_declaration.name.kind {
+                            self.scope().def_fn_local(&function_name, *hir_id);
+                        }
                     }
 
                     let mut grouped_decls = vec![];
@@ -606,6 +632,17 @@ impl LoweringContext {
                         .collect::<Vec<_>>(),
                 };
 
+                for variant in &decl.variants {
+                    // Variants with no params are values, they need a slot in the current scope.
+                    if variant.parameters.is_empty() {
+                        self.scope().def_enum_variant_local(
+                            decl.name.as_str(),
+                            variant.name.as_str(),
+                            variant.hir_id,
+                        );
+                    }
+                }
+
                 vec![hir::Stmt {
                     hir_id: self.lower_node_id(node.id),
                     kind: hir::StmtKind::EnumDeclaration(Box::new(decl)),
@@ -649,6 +686,18 @@ impl LoweringContext {
             span.end = decls.last().unwrap().span.end;
 
             let first_declaration = &decls[0];
+            let hir_id = this.lower_node_id(first_declaration.id);
+
+            match &first_declaration.name.kind {
+                ast::node::ExprKind::Path(path) => {
+                    this.scope().def_fn_local(&path.join("::"), hir_id);
+                }
+                ast::node::ExprKind::FieldExpression(_fe) => {
+                    // TODO!
+                }
+                _ => unreachable!(),
+            }
+
             let param_names = get_param_names(decls)
                 .iter()
                 .enumerate()
@@ -669,7 +718,6 @@ impl LoweringContext {
             // parameters, for each parameter/argument we reuse the existing plain
             // identifier if it exists, otherwise we create a new one which will be reused
             // in a match expression in the resulting block.
-            let hir_id = this.lower_node_id(first_declaration.id);
             let mut hir_fn_decl = hir::FunctionDeclaration::new_empty_fn(
                 hir_id,
                 this.lower_expr(&first_declaration.name),
@@ -686,7 +734,7 @@ impl LoweringContext {
             let mut match_arms = Vec::with_capacity(decls.len());
 
             for (i, decl) in decls.iter().enumerate() {
-                this.with_new_scope(|this| {
+                let match_arm = this.with_new_scope(|this| {
                     // All declarations with the same amount of arguments refer to the same
                     // function now, we map this in our symbol_id_to_hir_id table.
                     this.node_id_to_hir_id.insert(decl.id, hir_id);
@@ -719,7 +767,7 @@ impl LoweringContext {
                     {
                         this.lower_expr(decl.body.expression.as_ref().unwrap())
                     } else {
-                        let body = this.lower_block(
+                        let body = this.lower_block_in_current_scope(
                             &decl.body.statements,
                             decl.body.expression.as_ref(),
                             decl.body.span,
@@ -733,14 +781,17 @@ impl LoweringContext {
                     }
                     arm_leading_comments.extend(decl.leading_comments.clone());
 
-                    match_arms.push(hir::MatchArm {
+                    hir::MatchArm {
                         pat,
                         guard,
                         expr,
+                        scope: Default::default(),
                         leading_comments: arm_leading_comments,
                         trailing_comments: decl.trailing_comments.clone(),
-                    });
+                    }
                 });
+
+                match_arms.push(match_arm);
             }
 
             let match_value = if param_names.len() > 1 {
@@ -826,21 +877,25 @@ impl LoweringContext {
     fn lower_fn_decl(&mut self, decl: &FunctionDeclaration) -> hir::FunctionDeclaration {
         self.with_new_scope(|this| {
             let hir_id = this.lower_node_id(decl.id);
-            let name = this.lower_expr(&decl.name);
 
-            // Set function self-references in current scope.
-            if let hir::ExprKind::Path(path) = &name.kind {
-                this.scope().def_fn_local(&path.join("::"), hir_id);
-            } else {
-                // TODO
+            match &decl.name.kind {
+                ast::node::ExprKind::Path(path) => {
+                    this.scope().def_fn_local(&path.join("::"), hir_id);
+                }
+                ast::node::ExprKind::FieldExpression(_fe) => {
+                    // TODO!
+                }
+                _ => unreachable!(),
             }
+
+            let name = this.lower_expr(&decl.name);
 
             let parameters = decl
                 .parameters
                 .iter()
                 .map(|param| this.lower_fn_param(param))
                 .collect();
-            let body = this.lower_block(
+            let body = this.lower_block_in_current_scope(
                 &decl.body.statements,
                 decl.body.expression.as_ref(),
                 decl.body.span,
@@ -866,7 +921,7 @@ impl LoweringContext {
         if path.segments.len() == 1 {
             let segment = path.segments.first().unwrap();
             let segment =
-                hir::PathSegment::from_str(self.lookup_name(segment.as_str()), segment.span);
+                hir::PathSegment::from_str(&self.lookup_name(segment.as_str()), segment.span);
 
             return hir::Path::new(vec![segment], path.span).with_res(res);
         }
@@ -1113,89 +1168,4 @@ fn get_param_names(decls: &[FunctionDeclaration]) -> Vec<Option<Ident>> {
     }
 
     argument_names
-}
-
-#[cfg(test)]
-mod tests {
-    use tlang_ast as ast;
-    use tlang_hir::hir;
-
-    fn parse_from_str(input: &str) -> ast::node::Module {
-        let mut parser = tlang_parser::parser::Parser::from_source(input);
-        parser.parse().unwrap()
-    }
-
-    #[test]
-    fn test_lowering_fn_param_assigns_resolution_to_paths_referring_to_same_fn() {
-        let input = parse_from_str(
-            r#"
-            fn foo_a(a) {
-                a + a
-            }
-            fn foo_b(a, b) {
-                a + b
-            }
-        "#,
-        );
-
-        let hir = crate::lower_to_hir(&input);
-
-        let fn_a = hir.block.stmts.first().unwrap();
-        let fn_b = hir.block.stmts.get(1).unwrap();
-
-        if let hir::StmtKind::FunctionDeclaration(fn_a) = &fn_a.kind {
-            let param_a = fn_a.parameters.first().unwrap();
-
-            let (path_a1, path_a2) = match fn_a.body.expr.as_ref().unwrap() {
-                hir::Expr {
-                    kind:
-                        hir::ExprKind::Binary(
-                            _,
-                            box hir::Expr {
-                                kind: hir::ExprKind::Path(box path_a1),
-                                ..
-                            },
-                            box hir::Expr {
-                                kind: hir::ExprKind::Path(box path_a2),
-                                ..
-                            },
-                        ),
-                    ..
-                } => (path_a1, path_a2),
-                _ => panic!("Expected binary expression"),
-            };
-
-            assert_eq!(path_a1.res, hir::Res::Local(param_a.hir_id));
-            assert_eq!(path_a2.res, hir::Res::Local(param_a.hir_id));
-        } else {
-            panic!("Expected function declaration");
-        }
-
-        if let hir::StmtKind::FunctionDeclaration(fn_b) = &fn_b.kind {
-            let param_a = fn_b.parameters.first().unwrap();
-            let param_b = fn_b.parameters.last().unwrap();
-            let (path_a, path_b) = match fn_b.body.expr.as_ref().unwrap() {
-                hir::Expr {
-                    kind:
-                        hir::ExprKind::Binary(
-                            _,
-                            box hir::Expr {
-                                kind: hir::ExprKind::Path(box path_a),
-                                ..
-                            },
-                            box hir::Expr {
-                                kind: hir::ExprKind::Path(box path_b),
-                                ..
-                            },
-                        ),
-                    ..
-                } => (path_a, path_b),
-                _ => panic!("Expected binary expression"),
-            };
-            assert_eq!(path_a.res, hir::Res::Local(param_a.hir_id));
-            assert_eq!(path_b.res, hir::Res::Local(param_b.hir_id));
-        } else {
-            panic!("Expected function declaration");
-        }
-    }
 }

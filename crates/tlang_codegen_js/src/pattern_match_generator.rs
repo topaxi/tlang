@@ -337,6 +337,7 @@ impl CodegenJS {
                 expr: arm_expr,
                 leading_comments,
                 trailing_comments,
+                ..
             },
         ) in arms.iter().enumerate()
         {

@@ -24,6 +24,7 @@ impl Backend {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pattern = "tests/**/*.tlang";
+    let mut errors: Vec<_> = vec![];
 
     for (i, backend) in Backend::values().enumerate() {
         if i > 0 {
@@ -34,11 +35,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         for entry in glob(pattern).expect("Failed to read glob pattern") {
             let file_path = entry.expect("Failed to read test file path");
-            run_test(&file_path, backend.as_str())?;
+
+            match run_test(&file_path, backend.as_str()) {
+                Ok(()) => {}
+                Err(e) => {
+                    errors.push(e);
+                }
+            }
         }
     }
 
-    Ok(())
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors.join("\n").into())
+    }
 }
 
 fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {

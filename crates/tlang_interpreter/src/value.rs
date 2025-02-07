@@ -1,18 +1,16 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::hash::DefaultHasher;
-use std::rc::Rc;
 
 use tlang_hir::hir::HirId;
 
-use crate::scope::Scope;
+use crate::scope::ScopeStack;
 use crate::InterpreterState;
 
 #[derive(Debug)]
 pub struct TlangClosure {
     pub id: HirId,
-    // Closures hold a reference to the parent scope.
-    pub(crate) scope: Rc<RefCell<Scope>>,
+    // Closures hold a reference to the scope stack at the time of creation.
+    pub(crate) scope_stack: ScopeStack,
 }
 
 #[derive(Debug, PartialEq)]
@@ -136,20 +134,6 @@ impl TlangObjectKind {
         self.get_struct().map(|s| s.shape)
     }
 
-    pub(crate) fn get_closure(&self) -> Option<&TlangClosure> {
-        match self {
-            TlangObjectKind::Closure(f) => Some(f),
-            _ => None,
-        }
-    }
-
-    pub(crate) fn get_fn_hir_id(&self) -> Option<HirId> {
-        match self {
-            TlangObjectKind::Fn(id) => Some(*id),
-            _ => None,
-        }
-    }
-
     fn is_truthy(&self) -> bool {
         match self {
             TlangObjectKind::Fn(_) => true,
@@ -203,6 +187,10 @@ impl TlangValue {
             TlangValue::Object(id) => Some(*id),
             _ => None,
         }
+    }
+
+    pub fn is_nil(&self) -> bool {
+        matches!(self, TlangValue::Nil)
     }
 
     pub fn is_object(&self) -> bool {

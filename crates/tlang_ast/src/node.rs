@@ -243,6 +243,7 @@ pub enum ExprKind {
     Wildcard,
 }
 
+/// AST representation of a path.
 #[derive(Debug, Clone, Serialize)]
 pub struct Path {
     pub segments: Vec<Ident>,
