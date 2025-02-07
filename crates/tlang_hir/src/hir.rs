@@ -34,6 +34,23 @@ pub enum Res {
     Local(HirId),
 }
 
+impl Res {
+    pub fn is_unknown(&self) -> bool {
+        matches!(self, Res::Unknown)
+    }
+
+    pub fn is_struct_def(&self) -> bool {
+        matches!(self, Res::Def(DefKind::Struct, _))
+    }
+
+    pub fn hir_id(&self) -> Option<HirId> {
+        match self {
+            Res::Def(_, hir_id) | Res::Local(hir_id) => Some(*hir_id),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct Path {
     pub segments: Vec<PathSegment>,
@@ -178,18 +195,6 @@ impl Pat {
             _ => false,
         }
     }
-
-    pub fn is_fixed_list(&self) -> bool {
-        match &self.kind {
-            PatKind::List(pats) => {
-                !pats.is_empty()
-                    && pats
-                        .iter()
-                        .all(|pat| pat.is_wildcard() || pat.is_identifier())
-            }
-            _ => false,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -307,20 +312,22 @@ pub enum ExprKind {
     Wildcard, // TODO: This might be better to just be an identifier
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct Ty {
     pub kind: TyKind,
     pub span: Span,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub enum TyKind {
+    #[default]
     Unknown,
     Path(Path),
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct FunctionParameter {
+    pub hir_id: HirId,
     pub name: Ident,
     pub type_annotation: Ty,
     pub span: Span,
@@ -331,7 +338,6 @@ pub struct FunctionDeclaration {
     pub hir_id: HirId,
     pub name: Expr,
     pub parameters: Vec<FunctionParameter>,
-    pub variadic: bool,
     pub return_type: Ty,
     pub body: Block,
     pub span: Span,
@@ -343,7 +349,6 @@ impl FunctionDeclaration {
             hir_id,
             name,
             parameters,
-            variadic: false,
             return_type: Ty {
                 kind: TyKind::Unknown,
                 span: Span::default(),
@@ -354,6 +359,16 @@ impl FunctionDeclaration {
                 span: Span::default(),
             },
             span: Span::default(),
+        }
+    }
+
+    pub fn name(&self) -> String {
+        match &self.name.kind {
+            ExprKind::Path(path) => path.join("::"),
+            ExprKind::FieldAccess(expr, ident) => {
+                format!("{}.{}", expr.path().unwrap().join("::"), ident)
+            }
+            _ => unreachable!(),
         }
     }
 }

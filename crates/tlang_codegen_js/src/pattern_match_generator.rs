@@ -346,7 +346,7 @@ impl CodegenJS {
             if !no_cond_need || need_cond {
                 self.push_str("if (");
                 self.generate_pat_condition(pat, true, &match_value_binding);
-                if !pat.is_wildcard() && guard.is_some() && !pat.is_fixed_list() {
+                if !pat.is_wildcard() && guard.is_some() && !is_fixed_list_pattern(pat) {
                     self.push_str(" && ");
                 }
                 if let Some(guard) = guard {
@@ -450,4 +450,16 @@ fn expr_idents_match_pat_idents(expr: &hir::Expr, pat: &hir::Pat) -> bool {
     }
 
     false
+}
+
+fn is_fixed_list_pattern(pat: &hir::Pat) -> bool {
+    match &pat.kind {
+        hir::PatKind::List(pats) => {
+            !pats.is_empty()
+                && pats
+                    .iter()
+                    .all(|pat| pat.is_wildcard() || pat.is_identifier())
+        }
+        _ => false,
+    }
 }

@@ -1,8 +1,8 @@
-fn apply_map(f, acc, x) { [...acc, f(x)] }
-fn map(xs, f) { foldl(xs, [], apply_map(f, _, _)) }
-
 fn foldl([], acc, _) { acc }
 fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+
+fn apply_map(f, acc, x) { [...acc, f(x)] }
+fn map(xs, f) { foldl(xs, [], apply_map(f, _, _)) }
 
 fn range(start, end) { range(start, end, []) }
 fn range(start, end, acc) if start >= end; { acc }

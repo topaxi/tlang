@@ -9,4 +9,5 @@ tlang_hir = { path = "../tlang_hir" }
 log = { workspace = true }
 
 [dev-dependencies]
+tlang_parser = { path = "../tlang_parser" }
 pretty_assertions = { workspace = true }

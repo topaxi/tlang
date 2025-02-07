@@ -6,6 +6,12 @@ pub struct LineColumn {
     pub column: u32,
 }
 
+impl std::fmt::Display for LineColumn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.line, self.column)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
 pub struct Span {
     pub start: LineColumn,

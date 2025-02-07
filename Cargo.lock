@@ -686,6 +686,7 @@ dependencies = [
  "pretty_assertions",
  "tlang_ast",
  "tlang_hir",
+ "tlang_parser",
 ]
 
 [[package]]

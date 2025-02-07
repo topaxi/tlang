@@ -164,13 +164,6 @@ impl TlangObjectKind {
         }
     }
 
-    pub(crate) fn get_str(&self) -> Option<&str> {
-        match self {
-            TlangObjectKind::String(s) => Some(s),
-            _ => None,
-        }
-    }
-
     fn is_truthy(&self) -> bool {
         match self {
             TlangObjectKind::Fn(_) => true,
@@ -313,26 +306,32 @@ pub trait TlangArithmetic {
 }
 
 impl TlangArithmetic for TlangValue {
+    #[inline(always)]
     fn add(self, rhs: Self) -> Self {
         self.apply_arithmetic_op(rhs, ArithmeticOp::Add)
     }
 
+    #[inline(always)]
     fn sub(self, rhs: Self) -> Self {
         self.apply_arithmetic_op(rhs, ArithmeticOp::Sub)
     }
 
+    #[inline(always)]
     fn mul(self, rhs: Self) -> Self {
         self.apply_arithmetic_op(rhs, ArithmeticOp::Mul)
     }
 
+    #[inline(always)]
     fn div(self, rhs: Self) -> Self {
         self.apply_arithmetic_op(rhs, ArithmeticOp::Div)
     }
 
+    #[inline(always)]
     fn rem(self, rhs: Self) -> Self {
         self.apply_arithmetic_op(rhs, ArithmeticOp::Rem)
     }
 
+    #[inline(always)]
     fn pow(self, rhs: Self) -> Self {
         self.apply_arithmetic_op(rhs, ArithmeticOp::Pow)
     }

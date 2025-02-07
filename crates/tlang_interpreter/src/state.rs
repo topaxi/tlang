@@ -11,12 +11,26 @@ use crate::value::{
     TlangValue,
 };
 
+pub enum CallStackKind {
+    Root,
+    Function(Rc<hir::FunctionDeclaration>),
+    NativeFn(String),
+}
+
+pub struct CallStackEntry {
+    pub kind: CallStackKind,
+    pub current_span: tlang_ast::span::Span,
+}
+
 pub struct InterpreterState {
     pub(crate) root_scope: Rc<RefCell<Scope>>,
     pub(crate) current_scope: Rc<RefCell<Scope>>,
-    pub(crate) closures: HashMap<HirId, hir::FunctionDeclaration>,
+    pub(crate) closures: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
     pub(crate) objects: HashMap<TlangObjectId, TlangObjectKind>,
     pub(crate) shapes: HashMap<ShapeKey, TlangStructShape>,
+    pub(crate) fn_decls: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
+    pub(crate) struct_decls: HashMap<String, Rc<hir::StructDeclaration>>,
+    pub(crate) call_stack: Vec<CallStackEntry>,
     pub list_shape: ShapeKey,
 }
 
@@ -24,29 +38,76 @@ impl Resolver for InterpreterState {
     fn resolve_path(&self, path: &hir::Path) -> Option<TlangValue> {
         self.current_scope.borrow().resolve_path(path)
     }
-
-    fn resolve_fn_decl(&self, id: hir::HirId) -> Option<Rc<hir::FunctionDeclaration>> {
-        self.current_scope.borrow().resolve_fn_decl(id)
-    }
-
-    fn resolve_struct_decl(&self, path: &hir::Path) -> Option<Rc<hir::StructDeclaration>> {
-        self.current_scope.borrow().resolve_struct_decl(path)
-    }
 }
 
 impl InterpreterState {
     pub(crate) fn new(list_shape: ShapeKey) -> Self {
         let root_scope = Rc::new(RefCell::new(Scope::default()));
         let current_scope = root_scope.clone();
+        let mut call_stack = Vec::with_capacity(1000);
+
+        call_stack.push(CallStackEntry {
+            kind: CallStackKind::Root,
+            current_span: tlang_ast::span::Span::default(),
+        });
 
         Self {
             root_scope,
             current_scope,
-            closures: HashMap::new(),
-            objects: HashMap::new(),
-            shapes: HashMap::new(),
+            closures: HashMap::with_capacity(100),
+            objects: HashMap::with_capacity(1000),
+            struct_decls: HashMap::with_capacity(100),
+            fn_decls: HashMap::with_capacity(1000),
+            shapes: HashMap::with_capacity(100),
+            call_stack,
             list_shape,
         }
+    }
+
+    pub(crate) fn get_fn_decl(&self, id: hir::HirId) -> Option<Rc<hir::FunctionDeclaration>> {
+        if let Some(decl) = self.fn_decls.get(&id) {
+            return Some(decl.clone());
+        }
+
+        None
+    }
+
+    pub(crate) fn get_struct_decl(&self, path: &hir::Path) -> Option<Rc<hir::StructDeclaration>> {
+        let path_name = path.join("::");
+
+        if let Some(decl) = self.struct_decls.get(&path_name) {
+            return Some(decl.clone());
+        }
+
+        None
+    }
+
+    pub(crate) fn panic(&self, message: String) -> ! {
+        let mut call_stack = String::new();
+
+        for entry in self.call_stack.iter().rev() {
+            match &entry.kind {
+                CallStackKind::Function(decl) => {
+                    call_stack.push_str(&format!(
+                        "  at function {}:{}\n",
+                        decl.name(),
+                        entry.current_span.start
+                    ));
+                }
+                CallStackKind::NativeFn(name) => {
+                    call_stack.push_str(&format!("  at native function {}:0:0\n", name));
+                }
+                CallStackKind::Root => {
+                    call_stack.push_str(&format!("  at root {}\n", entry.current_span.start));
+                }
+            }
+        }
+
+        panic!("{}\n{}", message, call_stack)
+    }
+
+    pub(crate) fn set_current_span(&mut self, span: tlang_ast::span::Span) {
+        self.call_stack.last_mut().unwrap().current_span = span;
     }
 
     pub(crate) fn enter_scope(&mut self) {

@@ -312,9 +312,17 @@ impl HirPretty {
         self.push_str(")");
     }
 
+    fn print_function_name(&mut self, name: &hir::Expr) {
+        if let hir::ExprKind::Path(path) = &name.kind {
+            self.push_str(&path.join("::"));
+        } else {
+            self.print_expr(name);
+        }
+    }
+
     fn print_function_declaration(&mut self, decl: &hir::FunctionDeclaration) {
         self.push_str("fn ");
-        self.print_expr(&decl.name);
+        self.print_function_name(&decl.name);
         self.push_str("(");
         for (i, param) in decl.parameters.iter().enumerate() {
             if i > 0 {
@@ -333,13 +341,13 @@ impl HirPretty {
 
     fn print_dyn_function_declaration(&mut self, decl: &hir::DynFunctionDeclaration) {
         self.push_str("dyn fn ");
-        self.print_expr(&decl.name);
+        self.print_function_name(&decl.name);
         self.inc_indent();
         for variant in &decl.variants {
             self.push_newline();
             self.push_indent();
             self.push_str("-> ");
-            self.print_expr(&decl.name);
+            self.print_function_name(&decl.name);
             self.push_str("$$");
             self.push_str(&variant.0.to_string());
         }
@@ -404,6 +412,11 @@ impl HirPretty {
 
     fn print_path(&mut self, path: &hir::Path) {
         self.push_str(&path.join("::"));
+
+        // We print unresolved paths with a question mark.
+        if path.res.is_unknown() {
+            self.push_char('?');
+        }
     }
 
     fn print_literal(&mut self, lit: &Literal) {

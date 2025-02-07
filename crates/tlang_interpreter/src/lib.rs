@@ -43,14 +43,6 @@ impl Resolver for Interpreter {
     fn resolve_path(&self, path: &hir::Path) -> Option<TlangValue> {
         self.state.resolve_path(path)
     }
-
-    fn resolve_fn_decl(&self, id: hir::HirId) -> Option<Rc<hir::FunctionDeclaration>> {
-        self.state.resolve_fn_decl(id)
-    }
-
-    fn resolve_struct_decl(&self, path: &hir::Path) -> Option<Rc<hir::StructDeclaration>> {
-        self.state.resolve_struct_decl(path)
-    }
 }
 
 #[derive(Debug)]
@@ -92,6 +84,10 @@ impl Interpreter {
         interpreter
     }
 
+    fn panic(&self, message: String) -> ! {
+        self.state.panic(message)
+    }
+
     #[inline(always)]
     fn insert_native_fn<F>(&mut self, id: TlangObjectId, f: F)
     where
@@ -125,16 +121,25 @@ impl Interpreter {
         fn_object
     }
 
-    fn resolve_closure_decl(&self, id: HirId) -> Option<&hir::FunctionDeclaration> {
-        self.state.closures.get(&id)
+    fn get_closure_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
+        self.state.closures.get(&id).cloned()
     }
 
     fn insert_closure_decl(&mut self, id: HirId, decl: hir::FunctionDeclaration) {
-        self.state.closures.insert(id, decl);
+        self.state.closures.insert(id, Rc::new(decl));
     }
 
     fn get_object(&self, id: TlangObjectId) -> &TlangObjectKind {
         self.state.objects.get(&id).unwrap()
+    }
+
+    #[inline(always)]
+    fn insert_binding(&mut self, hir_id: HirId, value: TlangValue) {
+        self.state
+            .current_scope
+            .borrow_mut()
+            .bindings
+            .insert(hir_id, value);
     }
 
     #[inline(always)]
@@ -155,6 +160,22 @@ impl Interpreter {
         self.enter_scope();
         let result = f(self);
         self.exit_scope();
+        result
+    }
+
+    #[inline(always)]
+    fn with_new_fn_scope<F, R>(&mut self, fn_decl: Rc<hir::FunctionDeclaration>, f: F) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        self.state.call_stack.push(state::CallStackEntry {
+            kind: state::CallStackKind::Function(fn_decl.clone()),
+            current_span: fn_decl.span,
+        });
+        self.enter_scope();
+        let result = f(self);
+        self.exit_scope();
+        self.state.call_stack.pop();
         result
     }
 
@@ -213,6 +234,8 @@ impl Interpreter {
     }
 
     fn eval_stmt(&mut self, stmt: &hir::Stmt) -> StmtResult {
+        self.state.set_current_span(stmt.span);
+
         match &stmt.kind {
             hir::StmtKind::Expr(expr) => {
                 self.eval_expr(expr);
@@ -249,13 +272,16 @@ impl Interpreter {
     }
 
     fn eval_expr(&mut self, expr: &hir::Expr) -> TlangValue {
+        self.state.set_current_span(expr.span);
+
         match &expr.kind {
             hir::ExprKind::Path(path) => self.resolve_path(path).unwrap_or_else(|| {
-                panic!(
-                    "Could not resolve path: {}\nCurrent scope: {:#?}",
+                self.panic(format!(
+                    "Could not resolve path: {} ({:?})\nCurrent scope: {:#?}",
                     path.join("::"),
+                    path.res,
                     self.state.current_scope.borrow()
-                )
+                ))
             }),
             hir::ExprKind::Literal(value) => self.eval_literal(value),
             hir::ExprKind::List(values) => self.eval_list_expr(values),
@@ -271,7 +297,7 @@ impl Interpreter {
                 self.eval_if_else(condition, consequence, else_clauses)
             }
             hir::ExprKind::FunctionExpression(fn_decl) => {
-                if self.resolve_closure_decl(fn_decl.hir_id).is_none() {
+                if self.get_closure_decl(fn_decl.hir_id).is_none() {
                     self.insert_closure_decl(fn_decl.hir_id, *fn_decl.clone());
                 }
 
@@ -509,28 +535,28 @@ impl Interpreter {
 
     fn eval_fn_decl(&mut self, decl: &hir::FunctionDeclaration) {
         self.state
-            .current_scope
-            .borrow_mut()
             .fn_decls
             .insert(decl.hir_id, Rc::new(decl.clone()));
 
         match &decl.name.kind {
             hir::ExprKind::Path(ref path) => {
-                let path_name = path.join("::");
                 let fn_object = self.state.new_object(TlangObjectKind::Fn(decl.hir_id));
 
+                self.insert_binding(decl.hir_id, fn_object);
+
+                // Used for static struct method resolution, for now..
                 self.state
                     .current_scope
                     .borrow_mut()
                     .values
-                    .insert(path_name, fn_object);
+                    .insert(path.join("::"), fn_object);
             }
             hir::ExprKind::FieldAccess(expr, ident) => {
                 let path = match &expr.kind {
                     hir::ExprKind::Path(path) => path,
                     _ => todo!("eval_fn_decl: {:?}", expr),
                 };
-                let struct_decl = self.resolve_struct_decl(path).unwrap();
+                let struct_decl = self.state.get_struct_decl(path).unwrap();
 
                 self.state.set_struct_method(
                     struct_decl.hir_id.into(),
@@ -557,7 +583,7 @@ impl Interpreter {
         };
         let variants = decl.variants.clone();
 
-        self.create_native_fn(move |_state, args| {
+        self.create_native_fn(move |state, args| {
             let variant = variants.iter().find_map(|(arity, hir_id)| {
                 if *arity == args.len() {
                     Some(*hir_id)
@@ -568,7 +594,7 @@ impl Interpreter {
             if let Some(id) = variant {
                 NativeFnReturn::DynamicCall(id)
             } else {
-                panic!("Function {} not found", name);
+                state.panic(format!("Function {} not found", name))
             }
         })
     }
@@ -591,7 +617,7 @@ impl Interpreter {
                     hir::ExprKind::Path(path) => path,
                     _ => todo!("eval_dyn_fn_decl: {:?}", expr),
                 };
-                let struct_decl = self.resolve_struct_decl(path).unwrap();
+                let struct_decl = self.state.get_struct_decl(path).unwrap();
                 self.state.set_struct_method(
                     struct_decl.hir_id.into(),
                     ident.as_str(),
@@ -604,8 +630,6 @@ impl Interpreter {
 
     fn eval_struct_decl(&mut self, decl: &hir::StructDeclaration) {
         self.state
-            .current_scope
-            .borrow_mut()
             .struct_decls
             .insert(decl.name.to_string(), Rc::new(decl.clone()));
 
@@ -681,24 +705,25 @@ impl Interpreter {
         let id = callee.get_object_id().unwrap();
 
         if let Some(closure) = self.get_object(id).get_closure() {
-            let closure_decl = self.resolve_closure_decl(closure.id).unwrap().clone();
+            let closure_decl = self.get_closure_decl(closure.id).unwrap().clone();
 
             self.with_scope(closure.scope.clone(), |this| {
-                this.eval_fn_call(&closure_decl, &args)
+                this.eval_fn_call(closure_decl, &args)
             })
         } else if let Some(id) = self.get_object(id).get_fn_hir_id() {
             let fn_decl = self
-                .resolve_fn_decl(id)
-                .unwrap_or_else(|| panic!("Function not found"))
+                .state
+                .get_fn_decl(id)
+                .unwrap_or_else(|| self.panic("Function not found".to_string()))
                 .clone();
 
             self.with_scope(self.state.root_scope.clone(), |this| {
-                this.eval_fn_call(&fn_decl, &args)
+                this.eval_fn_call(fn_decl.clone(), &args)
             })
         } else if let TlangObjectKind::NativeFn = self.get_object(id) {
             self.exec_native_fn(id, &args)
         } else {
-            panic!("`{:?}` is not a function", self.get_object(id));
+            self.panic(format!("`{:?}` is not a function", self.get_object(id)))
         }
     }
 
@@ -709,15 +734,17 @@ impl Interpreter {
 
     fn eval_partial_call(&mut self, call_expr: &hir::CallExpression) -> TlangValue {
         let callee = self.eval_expr(&call_expr.callee);
-        let mut applied_args = Vec::with_capacity(call_expr.arguments.len());
-
-        for expr in &call_expr.arguments {
-            if expr.is_wildcard() {
-                applied_args.push(TlangValue::Nil);
-            } else {
-                applied_args.push(self.eval_expr(expr));
-            }
-        }
+        let applied_args: Vec<TlangValue> = call_expr
+            .arguments
+            .iter()
+            .map(|expr| {
+                if expr.is_wildcard() {
+                    TlangValue::Nil
+                } else {
+                    self.eval_expr(expr)
+                }
+            })
+            .collect();
 
         self.create_native_fn(move |_, args| {
             let mut applied_args = applied_args.clone();
@@ -749,80 +776,18 @@ impl Interpreter {
                 self.eval_call_object(value, args)
             }
             // If the path resolves to a struct, we create a new object.
-            hir::ExprKind::Path(path) if let Some(struct_decl) = self.resolve_struct_decl(path) => {
-                // Struct calls are always calls with a single argument, which is a dict.
-                // There is a special case for enum variant construction, as they might have
-                // multiple arguments which are not wrapped in a dict but are struct values.
-                // Currently the only way to distinguish this, is by checking whether the struct
-                // definition is a struct with incremental numeric field names, which might cause
-                // problems in case someone defines a struct with numeric fields themselves.
-                let is_enum_variant_without_field_names = struct_decl
-                    .fields
-                    .iter()
-                    .enumerate()
-                    .all(|(i, field)| field.name.as_str() == i.to_string());
-
-                let dict_map: HashMap<String, TlangValue> = if is_enum_variant_without_field_names {
-                    call_expr
-                        .arguments
-                        .iter()
-                        .enumerate()
-                        .map(|(i, arg)| (i.to_string(), self.eval_expr(arg)))
-                        .collect()
-                } else {
-                    let dict = &call_expr.arguments[0];
-                    match &dict.kind {
-                        hir::ExprKind::Dict(entries) => entries
-                            .iter()
-                            .map(|(key, value)| {
-                                let key = match &key.kind {
-                                    hir::ExprKind::Path(path) => path.first_ident().to_string(),
-                                    _ => todo!("eval_call: {:?}", key),
-                                };
-                                let value = self.eval_expr(value);
-                                (key, value)
-                            })
-                            .collect(),
-                        _ => todo!("eval_call: {:?}", dict),
-                    }
-                };
-
-                let field_values = struct_decl
-                    .fields
-                    .iter()
-                    .map(|field| *dict_map.get(&field.name.to_string()).unwrap())
-                    .collect();
-
-                self.state.new_object(TlangObjectKind::Struct(TlangStruct {
-                    shape: struct_decl.hir_id.into(),
-                    field_values,
-                }))
+            hir::ExprKind::Path(path)
+                if let Some(struct_decl) = self.state.get_struct_decl(path) =>
+            {
+                self.eval_struct_ctor(call_expr, &struct_decl)
             }
             // The path might resolve to a struct method directly.
             hir::ExprKind::Path(path)
-                if let Some(struct_decl) = self.resolve_struct_decl(&path.as_init()) =>
+                if let Some(struct_decl) = self.state.get_struct_decl(&path.as_init()) =>
             {
-                let method_name = path.last_ident();
                 let args = self.eval_exprs(&call_expr.arguments);
-                let struct_shape = self.state.get_shape(struct_decl.hir_id.into()).unwrap();
 
-                match struct_shape.method_map.get(method_name.as_str()) {
-                    Some(TlangStructMethod::HirId(id)) => {
-                        let fn_decl = self.resolve_fn_decl(*id).unwrap().clone();
-                        self.with_scope(self.state.root_scope.clone(), |this| {
-                            this.eval_fn_call(&fn_decl, &args)
-                        })
-                    }
-                    Some(TlangStructMethod::Native(id)) => self.exec_native_fn(*id, &args),
-                    _ => {
-                        panic!(
-                            "{} does not have a method {:?}, {:?}",
-                            struct_shape.name,
-                            method_name.as_str(),
-                            struct_shape.method_map.keys()
-                        );
-                    }
-                }
+                self.eval_call_struct_method(struct_decl.hir_id.into(), path.last_ident(), &args)
             }
             hir::ExprKind::Path(path) => {
                 panic!(
@@ -836,34 +801,15 @@ impl Interpreter {
                 let mut args = self.eval_exprs(&call_expr.arguments);
                 args.insert(0, call_target);
 
-                match call_target {
-                    TlangValue::Object(_id) => {
-                        let struct_shape = self
-                            .state
-                            .get_object(call_target)
-                            .and_then(|o| o.get_shape_key())
-                            .and_then(|key| self.state.get_shape(key))
-                            .unwrap();
+                let shape_key = self
+                    .state
+                    .get_object(call_target)
+                    .and_then(|o| o.get_shape_key());
 
-                        match struct_shape.method_map.get(ident.as_str()) {
-                            Some(TlangStructMethod::HirId(id)) => {
-                                let fn_decl = self.resolve_fn_decl(*id).unwrap().clone();
-                                self.with_scope(self.state.root_scope.clone(), |this| {
-                                    this.eval_fn_call(&fn_decl, &args)
-                                })
-                            }
-                            Some(TlangStructMethod::Native(id)) => self.exec_native_fn(*id, &args),
-                            _ => {
-                                panic!(
-                                    "{} does not have a method {:?}, {:?}",
-                                    struct_shape.name,
-                                    ident.as_str(),
-                                    struct_shape.method_map.keys()
-                                );
-                            }
-                        }
-                    }
-                    _ => todo!("eval_call: {:?}", call_target),
+                if let Some(shape_key) = shape_key {
+                    self.eval_call_struct_method(shape_key, ident, &args)
+                } else {
+                    self.panic(format!("Field access on non-struct: {:?}", call_target));
                 }
             }
             _ => todo!("eval_call: {:?}", call_expr.callee),
@@ -872,12 +818,12 @@ impl Interpreter {
 
     fn eval_fn_call(
         &mut self,
-        fn_decl: &hir::FunctionDeclaration,
+        fn_decl: Rc<hir::FunctionDeclaration>,
         args: &[TlangValue],
     ) -> TlangValue {
         debug!("eval_fn_call: {:?} with args {:?}", fn_decl.name, args);
 
-        if fn_decl.parameters.len() != args.len() && !fn_decl.variadic {
+        if fn_decl.parameters.len() != args.len() {
             panic!(
                 "Function `{:?}` expects {} arguments, but got {}",
                 fn_decl.name,
@@ -886,28 +832,9 @@ impl Interpreter {
             );
         }
 
-        self.with_new_scope(|this| {
-            if !fn_decl.variadic {
-                for (param, arg) in fn_decl.parameters.iter().zip(args.iter()) {
-                    this.state
-                        .current_scope
-                        .borrow_mut()
-                        .values
-                        .insert(param.name.to_string(), *arg);
-                }
-            } else {
-                let arguments = this.state.new_list(args.to_vec());
-                // TODO: This is currently getting lowered into a path of "arguments.list" instead
-                //       of an actual expression.
-                this.state.current_scope.borrow_mut().values.insert(
-                    "arguments.length".to_string(),
-                    TlangValue::Int(args.len() as i64),
-                );
-                this.state
-                    .current_scope
-                    .borrow_mut()
-                    .values
-                    .insert("arguments".to_string(), arguments);
+        self.with_new_fn_scope(fn_decl.clone(), |this| {
+            for (param, arg) in fn_decl.parameters.iter().zip(args.iter()) {
+                this.insert_binding(param.hir_id, *arg);
             }
 
             this.eval_block(&fn_decl.body)
@@ -918,24 +845,104 @@ impl Interpreter {
         // Do we need and want to reset the scope for native functions?
         // It could be somewhat interesting to manipulate the current scope from native functions.
         let r = self.with_scope(self.state.root_scope.clone(), |this| {
-            let result = if let Some(native_fn) = this.native_fns.get_mut(&id) {
+            if let Some(native_fn) = this.native_fns.get_mut(&id) {
                 native_fn(&mut this.state, args)
             } else {
-                panic!("Native function not found: {:?}", id);
-            };
-            result
+                panic!("Native function not found: {:?}", id)
+            }
         });
 
         match r {
             NativeFnReturn::Return(value) => value,
             NativeFnReturn::DynamicCall(id) => {
-                if let Some(fn_decl) = self.resolve_fn_decl(id) {
-                    self.eval_fn_call(&fn_decl, args)
+                if let Some(fn_decl) = self.state.get_fn_decl(id) {
+                    self.eval_fn_call(fn_decl.clone(), args)
                 } else {
                     panic!("Function not found: {:?}", id);
                 }
             }
             NativeFnReturn::PartialCall(fn_object, args) => self.eval_call_object(fn_object, args),
+        }
+    }
+
+    fn eval_struct_ctor(
+        &mut self,
+        call_expr: &hir::CallExpression,
+        struct_decl: &hir::StructDeclaration,
+    ) -> TlangValue {
+        // Struct calls are always calls with a single argument, which is a dict.
+        // There is a special case for enum variant construction, as they might have
+        // multiple arguments which are not wrapped in a dict but are struct values.
+        // Currently the only way to distinguish this, is by checking whether the struct
+        // definition is a struct with incremental numeric field names, which might cause
+        // problems in case someone defines a struct with numeric fields themselves.
+        let is_enum_variant_without_field_names = struct_decl
+            .fields
+            .iter()
+            .enumerate()
+            .all(|(i, field)| field.name.as_str() == i.to_string());
+
+        let dict_map: HashMap<String, TlangValue> = if is_enum_variant_without_field_names {
+            call_expr
+                .arguments
+                .iter()
+                .enumerate()
+                .map(|(i, arg)| (i.to_string(), self.eval_expr(arg)))
+                .collect()
+        } else {
+            let dict = &call_expr.arguments[0];
+            match &dict.kind {
+                hir::ExprKind::Dict(entries) => entries
+                    .iter()
+                    .map(|(key, value)| {
+                        let key = match &key.kind {
+                            hir::ExprKind::Path(path) => path.first_ident().to_string(),
+                            _ => todo!("eval_call: {:?}", key),
+                        };
+                        let value = self.eval_expr(value);
+                        (key, value)
+                    })
+                    .collect(),
+                _ => todo!("eval_call: {:?}", dict),
+            }
+        };
+
+        let field_values = struct_decl
+            .fields
+            .iter()
+            .map(|field| *dict_map.get(&field.name.to_string()).unwrap())
+            .collect();
+
+        self.state.new_object(TlangObjectKind::Struct(TlangStruct {
+            shape: struct_decl.hir_id.into(),
+            field_values,
+        }))
+    }
+
+    fn eval_call_struct_method(
+        &mut self,
+        struct_key: ShapeKey,
+        method_name: &Ident,
+        args: &[TlangValue],
+    ) -> TlangValue {
+        let struct_shape = self.state.get_shape(struct_key).unwrap();
+
+        match struct_shape.method_map.get(method_name.as_str()) {
+            Some(TlangStructMethod::HirId(id)) => {
+                let fn_decl = self.state.get_fn_decl(*id).unwrap().clone();
+                self.with_scope(self.state.root_scope.clone(), |this| {
+                    this.eval_fn_call(fn_decl.clone(), args)
+                })
+            }
+            Some(TlangStructMethod::Native(id)) => self.exec_native_fn(*id, args),
+            _ => {
+                panic!(
+                    "{} does not have a method {:?}, {:?}",
+                    struct_shape.name,
+                    method_name.as_str(),
+                    struct_shape.method_map.keys()
+                );
+            }
         }
     }
 
@@ -1034,6 +1041,8 @@ impl Interpreter {
     }
 
     fn eval_pat(&mut self, pat: &hir::Pat, value: &TlangValue) -> bool {
+        self.state.set_current_span(pat.span);
+
         match &pat.kind {
             hir::PatKind::Literal(literal) => {
                 let literal_value = self.eval_literal(literal);
@@ -1123,18 +1132,14 @@ impl Interpreter {
                 }
                 false
             }
-            hir::PatKind::Identifier(_id, ident) => {
+            hir::PatKind::Identifier(id, ident) => {
                 debug!("eval_pat: assigning {:?} to {}", value, ident);
 
                 if let TlangValue::Object(id) = value {
                     debug!("eval_pat: value = {:?}", self.get_object(*id))
                 }
 
-                self.state
-                    .current_scope
-                    .borrow_mut()
-                    .values
-                    .insert(ident.to_string(), *value);
+                self.insert_binding(*id, *value);
                 true
             }
             hir::PatKind::Wildcard => true,
