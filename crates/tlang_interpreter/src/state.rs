@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use slab::Slab;
 use tlang_hir::hir::{self, HirId};
 
 use crate::resolver::Resolver;
@@ -26,7 +27,7 @@ pub struct InterpreterState {
     pub(crate) root_scope: Rc<RefCell<Scope>>,
     pub(crate) current_scope: Rc<RefCell<Scope>>,
     pub(crate) closures: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
-    pub(crate) objects: HashMap<TlangObjectId, TlangObjectKind>,
+    pub(crate) objects: Slab<TlangObjectKind>,
     pub(crate) shapes: HashMap<ShapeKey, TlangStructShape>,
     pub(crate) fn_decls: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
     pub(crate) struct_decls: HashMap<String, Rc<hir::StructDeclaration>>,
@@ -55,7 +56,7 @@ impl InterpreterState {
             root_scope,
             current_scope,
             closures: HashMap::with_capacity(100),
-            objects: HashMap::with_capacity(1000),
+            objects: Slab::with_capacity(1000),
             struct_decls: HashMap::with_capacity(100),
             fn_decls: HashMap::with_capacity(1000),
             shapes: HashMap::with_capacity(100),
@@ -65,21 +66,13 @@ impl InterpreterState {
     }
 
     pub(crate) fn get_fn_decl(&self, id: hir::HirId) -> Option<Rc<hir::FunctionDeclaration>> {
-        if let Some(decl) = self.fn_decls.get(&id) {
-            return Some(decl.clone());
-        }
-
-        None
+        self.fn_decls.get(&id).cloned()
     }
 
     pub(crate) fn get_struct_decl(&self, path: &hir::Path) -> Option<Rc<hir::StructDeclaration>> {
         let path_name = path.join("::");
 
-        if let Some(decl) = self.struct_decls.get(&path_name) {
-            return Some(decl.clone());
-        }
-
-        None
+        self.struct_decls.get(&path_name).cloned()
     }
 
     pub(crate) fn panic(&self, message: String) -> ! {
@@ -129,16 +122,12 @@ impl InterpreterState {
     }
 
     pub fn new_object(&mut self, kind: TlangObjectKind) -> TlangValue {
-        let obj = TlangValue::new_object();
-
-        self.objects.insert(obj.get_object_id().unwrap(), kind);
-
-        obj
+        TlangValue::new_object(self.objects.insert(kind))
     }
 
     #[inline(always)]
     pub(crate) fn get_object_by_id(&self, id: TlangObjectId) -> Option<&TlangObjectKind> {
-        self.objects.get(&id)
+        self.objects.get(id)
     }
 
     pub fn get_object(&self, value: TlangValue) -> Option<&TlangObjectKind> {

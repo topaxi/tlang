@@ -104,21 +104,7 @@ impl TlangStructShape {
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
-pub struct TlangObjectId(u64);
-
-impl Default for TlangObjectId {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl TlangObjectId {
-    pub fn new() -> Self {
-        static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-        TlangObjectId(NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst))
-    }
-}
+pub type TlangObjectId = usize;
 
 pub type TlangNativeFn = Box<dyn FnMut(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn>;
 
@@ -208,8 +194,8 @@ enum ArithmeticOp {
 }
 
 impl TlangValue {
-    pub fn new_object() -> Self {
-        TlangValue::Object(TlangObjectId::new())
+    pub fn new_object(id: TlangObjectId) -> Self {
+        TlangValue::Object(id)
     }
 
     pub fn get_object_id(&self) -> Option<TlangObjectId> {
@@ -291,7 +277,7 @@ impl std::fmt::Display for TlangValue {
             TlangValue::Int(i) => write!(f, "{}", i),
             TlangValue::Float(fl) => write!(f, "{}", fl),
             TlangValue::Bool(b) => write!(f, "{}", b),
-            TlangValue::Object(id) => write!(f, "Object({})", id.0),
+            TlangValue::Object(id) => write!(f, "Object({})", id),
         }
     }
 }

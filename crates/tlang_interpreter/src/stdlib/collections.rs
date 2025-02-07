@@ -4,8 +4,7 @@ use tlang_macros::native_fn;
 
 use crate::state::InterpreterState;
 use crate::value::{
-    NativeFnReturn, TlangObjectId, TlangObjectKind, TlangStruct, TlangStructMethod,
-    TlangStructShape, TlangValue,
+    NativeFnReturn, TlangObjectKind, TlangStruct, TlangStructMethod, TlangStructShape, TlangValue,
 };
 use crate::Interpreter;
 
@@ -19,16 +18,9 @@ pub fn len(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
 }
 
 pub fn define_list_shape(interpreter: &mut Interpreter) {
-    let mut list_methods = HashMap::new();
+    let mut list_methods = HashMap::with_capacity(1);
 
-    let slice_method_id = TlangObjectId::new();
-    let slice_method = TlangStructMethod::Native(slice_method_id);
-
-    list_methods.insert("slice".to_string(), slice_method);
-
-    let list_shape = TlangStructShape::new("List".to_string(), vec![], list_methods);
-
-    interpreter.insert_native_fn(slice_method_id, |state, args| {
+    let method_fn_object = interpreter.create_native_fn(|state, args| {
         let this = state
             .get_object(args[0])
             .and_then(|o| o.get_struct())
@@ -48,6 +40,12 @@ pub fn define_list_shape(interpreter: &mut Interpreter) {
             field_values,
         })))
     });
+
+    let slice_method_id = method_fn_object.get_object_id().unwrap();
+    let slice_method = TlangStructMethod::Native(slice_method_id);
+    list_methods.insert("slice".to_string(), slice_method);
+
+    let list_shape = TlangStructShape::new("List".to_string(), vec![], list_methods);
 
     interpreter
         .state

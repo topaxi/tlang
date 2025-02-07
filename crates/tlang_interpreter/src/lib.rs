@@ -88,21 +88,14 @@ impl Interpreter {
         self.state.panic(message)
     }
 
-    #[inline(always)]
-    fn insert_native_fn<F>(&mut self, id: TlangObjectId, f: F)
-    where
-        F: Fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn + 'static,
-    {
-        self.native_fns.insert(id, Box::new(f));
-    }
-
     pub fn create_native_fn<F>(&mut self, f: F) -> TlangValue
     where
         F: Fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn + 'static,
     {
         let fn_object = self.state.new_object(TlangObjectKind::NativeFn);
 
-        self.insert_native_fn(fn_object.get_object_id().unwrap(), f);
+        self.native_fns
+            .insert(fn_object.get_object_id().unwrap(), Box::new(f));
 
         fn_object
     }
@@ -130,7 +123,7 @@ impl Interpreter {
     }
 
     fn get_object(&self, id: TlangObjectId) -> &TlangObjectKind {
-        self.state.objects.get(&id).unwrap()
+        self.state.objects.get(id).unwrap()
     }
 
     #[inline(always)]

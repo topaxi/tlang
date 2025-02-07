@@ -10,10 +10,10 @@ use crate::value::TlangValue;
 #[derive(Debug, Default)]
 pub(crate) struct Scope {
     pub parent: Option<Rc<RefCell<Scope>>>,
-    // Values in scope, reachable using Path strings
-    pub values: HashMap<String, TlangValue>,
     // Value bindings in user code, this includes references to user defined functions.
     pub bindings: HashMap<HirId, TlangValue>,
+    // Values in scope, reachable using Path strings
+    pub values: HashMap<String, TlangValue>,
     pub return_value: Option<TlangValue>,
 }
 
