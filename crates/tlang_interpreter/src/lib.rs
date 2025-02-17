@@ -663,7 +663,7 @@ impl Interpreter {
 
                     self.state.define_struct_shape(
                         decl.hir_id.into(),
-                        path.clone(),
+                        path,
                         vec!["0".to_string()],
                         HashMap::new(),
                     );
