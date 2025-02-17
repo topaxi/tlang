@@ -43,21 +43,12 @@ impl Resolver for InterpreterState {
             .resolve_path(path)
             .or_else(|| self.globals.get(&path.join("::")).copied());
 
-        if let Some(value) = value {
-            debug!(
-                "Resolved path: {:?} ({:?}), got: {:?}",
-                path.join("::"),
-                path.res,
-                self.stringify(&value)
-            );
-        } else {
-            debug!(
-                "Resolved path: {:?} ({:?}), got: {:?}",
-                path.join("::"),
-                path.res,
-                value
-            );
-        }
+        debug!(
+            "Resolved path: {:?} ({:?}), got: {:?}",
+            path.join("::"),
+            path.res,
+            value.map(|v| self.stringify(&v))
+        );
 
         value
     }
