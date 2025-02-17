@@ -7,6 +7,6 @@ clean:
 	cargo +nightly make clean
 
 test:
-	cargo build --features=binary --bin tlangdi
-	cargo build --bin tlang_cli_js
+	cargo build --release --features=binary --bin tlangdi
+	cargo build --release --bin tlang_cli_js
 	cargo run --release --bin tlang_test_runner
