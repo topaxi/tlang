@@ -21,6 +21,7 @@ pub enum CallStackKind {
 
 pub struct CallStackEntry {
     pub kind: CallStackKind,
+    pub return_value: Option<TlangValue>,
     pub current_span: tlang_ast::span::Span,
 }
 
@@ -31,7 +32,7 @@ pub struct InterpreterState {
     pub(crate) shapes: HashMap<ShapeKey, TlangStructShape>,
     pub(crate) fn_decls: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
     pub(crate) struct_decls: HashMap<String, Rc<hir::StructDeclaration>>,
-    pub(crate) call_stack: Vec<CallStackEntry>,
+    call_stack: Vec<CallStackEntry>,
     pub(crate) globals: HashMap<String, TlangValue>,
     pub list_shape: ShapeKey,
 }
@@ -60,6 +61,7 @@ impl InterpreterState {
 
         call_stack.push(CallStackEntry {
             kind: CallStackKind::Root,
+            return_value: None,
             current_span: tlang_ast::span::Span::default(),
         });
 
@@ -110,8 +112,24 @@ impl InterpreterState {
         panic!("{}\n{}", message, call_stack)
     }
 
+    pub(crate) fn set_return_value(&mut self, value: TlangValue) {
+        self.call_stack.last_mut().unwrap().return_value = Some(value);
+    }
+
     pub(crate) fn set_current_span(&mut self, span: tlang_ast::span::Span) {
         self.call_stack.last_mut().unwrap().current_span = span;
+    }
+
+    pub(crate) fn push_call_stack(&mut self, entry: CallStackEntry) {
+        self.call_stack.push(entry);
+    }
+
+    pub(crate) fn pop_call_stack(&mut self) -> CallStackEntry {
+        self.call_stack.pop().unwrap()
+    }
+
+    pub(crate) fn current_call_frame(&self) -> &CallStackEntry {
+        self.call_stack.last().unwrap()
     }
 
     pub(crate) fn enter_scope<T>(&mut self, meta: &T)

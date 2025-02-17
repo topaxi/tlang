@@ -148,19 +148,22 @@ impl Interpreter {
     }
 
     #[inline(always)]
-    fn with_new_fn_scope<F, R>(&mut self, fn_decl: Rc<hir::FunctionDeclaration>, f: F) -> R
+    fn with_new_fn_scope<F>(&mut self, fn_decl: Rc<hir::FunctionDeclaration>, f: F) -> TlangValue
     where
-        F: FnOnce(&mut Self) -> R,
+        F: FnOnce(&mut Self),
     {
-        self.state.call_stack.push(state::CallStackEntry {
+        self.state.push_call_stack(state::CallStackEntry {
             kind: state::CallStackKind::Function(fn_decl.clone()),
+            return_value: None,
             current_span: fn_decl.span,
         });
         self.enter_scope(&fn_decl.clone());
-        let result = f(self);
+        f(self);
         self.exit_scope();
-        self.state.call_stack.pop();
-        result
+        self.state
+            .pop_call_stack()
+            .return_value
+            .unwrap_or(TlangValue::Nil)
     }
 
     #[inline(always)]
@@ -190,6 +193,10 @@ impl Interpreter {
     #[inline(always)]
     fn eval_block_stmts(&mut self, stmts: &[hir::Stmt]) -> StmtResult {
         for stmt in stmts {
+            if self.state.current_call_frame().return_value.is_some() {
+                return StmtResult::Return;
+            }
+
             match self.eval_stmt(stmt) {
                 StmtResult::Return => return StmtResult::Return,
                 StmtResult::None => {}
@@ -215,13 +222,17 @@ impl Interpreter {
     #[inline(always)]
     fn eval_block_inner(&mut self, block: &hir::Block) -> TlangValue {
         match self.eval_block_stmts(&block.stmts) {
-            StmtResult::None => self.eval_block_expr(block),
+            StmtResult::None => {
+                let result = self.eval_block_expr(block);
+                if self.state.current_call_frame().return_value.is_some() {
+                    return self.state.current_call_frame().return_value.unwrap();
+                }
+                result
+            }
             StmtResult::Return => self
                 .state
-                .current_scope()
-                .borrow_mut()
+                .current_call_frame()
                 .return_value
-                .take()
                 .unwrap_or(TlangValue::Nil),
         }
     }
@@ -250,7 +261,7 @@ impl Interpreter {
             }
             hir::StmtKind::Return(box Some(expr)) => {
                 let return_value = self.eval_expr(expr);
-                self.state.current_scope().borrow_mut().return_value = Some(return_value);
+                self.state.set_return_value(return_value);
                 return StmtResult::Return;
             }
             hir::StmtKind::Return(_) => return StmtResult::Return,
@@ -281,7 +292,13 @@ impl Interpreter {
             hir::ExprKind::Dict(entries) => self.eval_dict_expr(entries),
             hir::ExprKind::IndexAccess(lhs, rhs) => self.eval_index_access(lhs, rhs),
             hir::ExprKind::FieldAccess(lhs, rhs) => self.eval_field_access(lhs, rhs),
-            hir::ExprKind::Block(block) => self.eval_block(block),
+            hir::ExprKind::Block(block) => {
+                let result = self.eval_block(block);
+                if self.state.current_call_frame().return_value.is_some() {
+                    return self.state.current_call_frame().return_value.unwrap();
+                }
+                result
+            }
             hir::ExprKind::Binary(op, lhs, rhs) => self.eval_binary(*op, lhs, rhs),
             hir::ExprKind::Call(call_expr) => self.eval_call(call_expr),
             hir::ExprKind::TailCall(call_expr) => self.eval_tail_call(call_expr),
@@ -833,7 +850,8 @@ impl Interpreter {
                 this.push_value(*arg);
             }
 
-            this.eval_block_inner(&fn_decl.body)
+            let result = this.eval_block_inner(&fn_decl.body);
+            this.state.set_return_value(result);
         })
     }
 
@@ -1312,6 +1330,49 @@ mod tests {
         "});
 
         assert_matches!(interpreter.eval("add(1, 2)"), TlangValue::Int(3));
+    }
+
+    #[test]
+    fn test_early_return() {
+        let mut interpreter = interpreter(indoc! {"
+            fn r(a) {
+                if a == 0; {
+                    return 1;
+                }
+
+                2
+            }
+        "});
+        assert_matches!(interpreter.eval("r(0)"), TlangValue::Int(1));
+        assert_matches!(interpreter.eval("r(1)"), TlangValue::Int(2));
+    }
+
+    #[test]
+    fn test_deeply_nested_early_return() {
+        let mut interpreter = interpreter(indoc! {"
+            fn r(a) {
+                if a > 1; {
+                    if a > 2; {
+                        if a > 3; {
+                            return 4;
+                        }
+
+                        return 3;
+                    }
+
+                    return 2;
+                }
+
+                1
+            }
+        "});
+
+        assert_matches!(interpreter.eval("r(0)"), TlangValue::Int(1));
+        assert_matches!(interpreter.eval("r(1)"), TlangValue::Int(1));
+        assert_matches!(interpreter.eval("r(2)"), TlangValue::Int(2));
+        assert_matches!(interpreter.eval("r(3)"), TlangValue::Int(3));
+        assert_matches!(interpreter.eval("r(4)"), TlangValue::Int(4));
+        assert_matches!(interpreter.eval("r(5)"), TlangValue::Int(4));
     }
 
     #[test]

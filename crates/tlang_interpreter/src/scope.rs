@@ -93,15 +93,12 @@ impl Resolver for ScopeStack {
 pub(crate) struct Scope {
     // Value bindings in user code, this includes references to user defined functions.
     pub locals: Vec<TlangValue>,
-    // The return value of the current function, if we are in a function context.
-    pub return_value: Option<TlangValue>,
 }
 
 impl Scope {
     pub fn new(locals: usize, _upvars: usize) -> Self {
         Self {
             locals: Vec::with_capacity(locals),
-            return_value: None,
         }
     }
 
