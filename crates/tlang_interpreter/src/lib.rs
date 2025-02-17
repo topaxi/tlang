@@ -191,19 +191,16 @@ impl Interpreter {
     }
 
     #[inline(always)]
-    fn eval_block_stmts(&mut self, stmts: &[hir::Stmt]) -> StmtResult {
-        for stmt in stmts {
-            if self.state.current_call_frame().return_value.is_some() {
-                return StmtResult::Return;
-            }
+    fn eval_block_inner(&mut self, block: &hir::Block) -> TlangValue {
+        for stmt in &block.stmts {
+            self.eval_stmt(stmt);
 
-            match self.eval_stmt(stmt) {
-                StmtResult::Return => return StmtResult::Return,
-                StmtResult::None => {}
+            if let Some(value) = self.state.current_call_frame().return_value {
+                return value;
             }
         }
 
-        StmtResult::None
+        self.eval_block_expr(block)
     }
 
     #[inline(always)]
@@ -217,24 +214,6 @@ impl Interpreter {
 
     fn eval_block(&mut self, block: &hir::Block) -> TlangValue {
         self.with_new_scope(block, |this| this.eval_block_inner(block))
-    }
-
-    #[inline(always)]
-    fn eval_block_inner(&mut self, block: &hir::Block) -> TlangValue {
-        match self.eval_block_stmts(&block.stmts) {
-            StmtResult::None => {
-                let result = self.eval_block_expr(block);
-                if self.state.current_call_frame().return_value.is_some() {
-                    return self.state.current_call_frame().return_value.unwrap();
-                }
-                result
-            }
-            StmtResult::Return => self
-                .state
-                .current_call_frame()
-                .return_value
-                .unwrap_or(TlangValue::Nil),
-        }
     }
 
     fn eval_stmt(&mut self, stmt: &hir::Stmt) -> StmtResult {
@@ -292,13 +271,7 @@ impl Interpreter {
             hir::ExprKind::Dict(entries) => self.eval_dict_expr(entries),
             hir::ExprKind::IndexAccess(lhs, rhs) => self.eval_index_access(lhs, rhs),
             hir::ExprKind::FieldAccess(lhs, rhs) => self.eval_field_access(lhs, rhs),
-            hir::ExprKind::Block(block) => {
-                let result = self.eval_block(block);
-                if self.state.current_call_frame().return_value.is_some() {
-                    return self.state.current_call_frame().return_value.unwrap();
-                }
-                result
-            }
+            hir::ExprKind::Block(block) => self.eval_block(block),
             hir::ExprKind::Binary(op, lhs, rhs) => self.eval_binary(*op, lhs, rhs),
             hir::ExprKind::Call(call_expr) => self.eval_call(call_expr),
             hir::ExprKind::TailCall(call_expr) => self.eval_tail_call(call_expr),
