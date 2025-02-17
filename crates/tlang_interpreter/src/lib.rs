@@ -43,12 +43,6 @@ impl Resolver for Interpreter {
     }
 }
 
-#[derive(Debug)]
-enum StmtResult {
-    None,
-    Return,
-}
-
 impl Default for Interpreter {
     fn default() -> Self {
         Interpreter::new()
@@ -216,7 +210,7 @@ impl Interpreter {
         self.with_new_scope(block, |this| this.eval_block_inner(block))
     }
 
-    fn eval_stmt(&mut self, stmt: &hir::Stmt) -> StmtResult {
+    fn eval_stmt(&mut self, stmt: &hir::Stmt) {
         self.state.set_current_span(stmt.span);
 
         match &stmt.kind {
@@ -241,13 +235,10 @@ impl Interpreter {
             hir::StmtKind::Return(box Some(expr)) => {
                 let return_value = self.eval_expr(expr);
                 self.state.set_return_value(return_value);
-                return StmtResult::Return;
             }
-            hir::StmtKind::Return(_) => return StmtResult::Return,
+            hir::StmtKind::Return(_) => {}
             hir::StmtKind::None => unreachable!(),
         }
-
-        StmtResult::None
     }
 
     fn eval_exprs(&mut self, exprs: &[hir::Expr]) -> Vec<TlangValue> {
