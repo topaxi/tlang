@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
+use log::debug;
 use tlang_ast::node::Ident;
 use tlang_hir::hir::{self, HirId};
 
@@ -106,7 +107,7 @@ impl From<&Ident> for Binding {
 
 #[derive(Debug, Default)]
 pub struct Scope {
-    bindings: HashMap<String, Binding>,
+    bindings: Vec<Binding>,
     definitions: HashMap<String, Binding>,
     upvars: RefCell<HashMap<String, Binding>>,
 }
@@ -114,16 +115,26 @@ pub struct Scope {
 impl Scope {
     pub(crate) fn new() -> Self {
         Self {
-            bindings: HashMap::new(),
+            bindings: Vec::new(),
             definitions: HashMap::new(),
             upvars: HashMap::new().into(),
         }
     }
 
+    fn create_binding(&mut self, name: String, binding: Binding) {
+        debug!("Creating binding for {}: {:?}", name, binding);
+
+        self.bindings.push(binding);
+    }
+
+    fn create_upvar(&self, name: String, binding: Binding) {
+        self.upvars.borrow_mut().insert(name, binding);
+    }
+
     pub(crate) fn def_local(&mut self, name: &str, hir_id: HirId) {
         let index = self.bindings.len();
 
-        self.bindings.insert(
+        self.create_binding(
             name.to_string(),
             Binding::new_local(name.to_string(), hir_id, index),
         );
@@ -132,7 +143,7 @@ impl Scope {
     pub(crate) fn def_fn_local(&mut self, name: &str, hir_id: HirId) {
         let index = self.bindings.len();
 
-        self.bindings.insert(
+        self.create_binding(
             name.to_string(),
             Binding::new_fn_def(name.to_string(), hir_id, index),
         );
@@ -156,24 +167,22 @@ impl Scope {
     ) {
         let index = self.bindings.len();
 
-        self.bindings.insert(
+        self.create_binding(
             enum_name.to_string() + "::" + variant_name,
             Binding::new_enum_variant_def(enum_name, variant_name, hir_id, index),
         );
     }
 
-    pub(crate) fn def_upvar(&mut self, name: &str, scope: usize, index: usize) -> Binding {
+    pub(crate) fn def_upvar(&self, name: &str, scope: usize, index: usize) -> Binding {
         let binding = Binding::new_upvar(name.to_string(), scope, index);
 
-        self.upvars
-            .borrow_mut()
-            .insert(name.to_string(), binding.clone());
+        self.create_upvar(name.to_string(), binding.clone());
 
         binding
     }
 
     pub(crate) fn lookup(&self, name: &str) -> Option<&Binding> {
-        self.bindings.get(name)
+        self.bindings.iter().rev().find(|b| b.name() == name)
     }
 
     pub(crate) fn locals(&self) -> usize {

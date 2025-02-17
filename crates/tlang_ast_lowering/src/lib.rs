@@ -174,21 +174,13 @@ impl LoweringContext {
                 hir::ExprKind::TailCall(Box::new(self.lower_call_expr(call_expr)))
             }
             ast::node::ExprKind::UnaryOp(op, expr) => {
-                let expr = self.lower_expr(expr);
-                hir::ExprKind::Unary(*op, Box::new(expr))
+                hir::ExprKind::Unary(*op, Box::new(self.lower_expr(expr)))
             }
-            ast::node::ExprKind::Path(path) => {
-                let path = self.lower_path(path);
-                hir::ExprKind::Path(Box::new(path))
-            }
+            ast::node::ExprKind::Path(path) => hir::ExprKind::Path(Box::new(self.lower_path(path))),
             ast::node::ExprKind::FunctionExpression(decl) => {
-                let decl = self.lower_fn_decl(decl);
-                hir::ExprKind::FunctionExpression(Box::new(decl))
+                hir::ExprKind::FunctionExpression(Box::new(self.lower_fn_decl(decl)))
             }
-            ast::node::ExprKind::List(exprs) => {
-                let exprs = self.lower_exprs(exprs);
-                hir::ExprKind::List(exprs)
-            }
+            ast::node::ExprKind::List(exprs) => hir::ExprKind::List(self.lower_exprs(exprs)),
             ast::node::ExprKind::Dict(entries) => {
                 let entries = entries
                     .iter()
