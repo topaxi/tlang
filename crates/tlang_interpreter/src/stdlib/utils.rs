@@ -8,7 +8,7 @@ pub fn log(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
     println!(
         "{}",
         args.iter()
-            .map(|v| state.stringify(v))
+            .map(|v| state.stringify(*v))
             .collect::<Vec<_>>()
             .join(" ")
     );

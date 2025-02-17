@@ -341,7 +341,7 @@ impl Interpreter {
 
         todo!(
             "eval_field_access: {}.{}",
-            self.state.stringify(&value),
+            self.state.stringify(value),
             ident
         );
     }
@@ -789,9 +789,9 @@ impl Interpreter {
         debug!(
             "eval_fn_call: {} {:?} with args {:?}",
             fn_decl.name(),
-            self.state.stringify(&callee),
+            self.state.stringify(callee),
             args.iter()
-                .map(|a| self.state.stringify(a))
+                .map(|a| self.state.stringify(*a))
                 .collect::<Vec<_>>()
         );
 
@@ -936,7 +936,7 @@ impl Interpreter {
     fn eval_let_stmt(&mut self, pat: &hir::Pat, expr: &hir::Expr, _ty: &hir::Ty) {
         let value = self.eval_expr(expr);
 
-        if !self.eval_pat(pat, &value) {
+        if !self.eval_pat(pat, value) {
             // We'd probably want to do it more like Rust via a if let statement, and have the
             // normal let statement be only valid for identifiers.
             panic!("Pattern did not match value");
@@ -995,10 +995,10 @@ impl Interpreter {
     fn eval_match(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) -> TlangValue {
         let match_value = self.eval_expr(expr);
 
-        debug!("eval_match: {}", self.state.stringify(&match_value));
+        debug!("eval_match: {}", self.state.stringify(match_value));
 
         for arm in arms {
-            if let Some(value) = self.eval_match_arm(arm, &match_value) {
+            if let Some(value) = self.eval_match_arm(arm, match_value) {
                 return value;
             }
         }
@@ -1007,7 +1007,7 @@ impl Interpreter {
     }
 
     /// Evaluates a match arm and returns the value if it matches, otherwise returns None.
-    fn eval_match_arm(&mut self, arm: &hir::MatchArm, value: &TlangValue) -> Option<TlangValue> {
+    fn eval_match_arm(&mut self, arm: &hir::MatchArm, value: TlangValue) -> Option<TlangValue> {
         //debug!("eval_match_arm: {:?} {:?}", arm, value);
 
         self.with_new_scope(arm, |this| {
@@ -1016,7 +1016,7 @@ impl Interpreter {
                     if let hir::ExprKind::Let(pat, expr) = &expr.kind {
                         let value = this.eval_expr(expr);
 
-                        if !this.eval_pat(pat, &value) {
+                        if !this.eval_pat(pat, value) {
                             return None;
                         }
                     } else if !this.eval_expr(expr).is_truthy(&this.state) {
@@ -1036,21 +1036,21 @@ impl Interpreter {
         })
     }
 
-    fn eval_pat(&mut self, pat: &hir::Pat, value: &TlangValue) -> bool {
+    fn eval_pat(&mut self, pat: &hir::Pat, value: TlangValue) -> bool {
         self.state.set_current_span(pat.span);
 
         match &pat.kind {
             hir::PatKind::Literal(literal) => {
                 let literal_value = self.eval_literal(literal);
 
-                if value == &literal_value {
+                if value == literal_value {
                     return true;
                 }
 
                 if let (TlangValue::Object(lhs), box token::Literal::String(rhs)) =
                     (value, &literal)
                 {
-                    if let TlangObjectKind::String(lhs) = self.get_object(*lhs) {
+                    if let TlangObjectKind::String(lhs) = self.get_object(lhs) {
                         return lhs == rhs;
                     }
                 }
@@ -1061,7 +1061,7 @@ impl Interpreter {
             //       specifically for matching against tail values (list, strings, objects)
             hir::PatKind::List(patterns) => {
                 if let TlangValue::Object(id) = value {
-                    match self.get_object(*id) {
+                    match self.get_object(id) {
                         TlangObjectKind::Struct(list_struct) => {
                             let list_values_length = list_struct.field_values.len();
 
@@ -1085,11 +1085,11 @@ impl Interpreter {
                                     let rest_values = field_values[i..].to_vec();
                                     let rest_object = self.state.new_list(rest_values);
 
-                                    return self.eval_pat(pat, &rest_object);
+                                    return self.eval_pat(pat, rest_object);
                                 }
 
                                 let field_value = field_values[i];
-                                if !self.eval_pat(pat, &field_value) {
+                                if !self.eval_pat(pat, field_value) {
                                     return false;
                                 }
                             }
@@ -1107,7 +1107,7 @@ impl Interpreter {
                                         self.state.new_string(String::new())
                                     };
 
-                                    return self.eval_pat(pat, &rest_object);
+                                    return self.eval_pat(pat, rest_object);
                                 }
 
                                 let char_match = if let Some(character) = str_value.chars().nth(i) {
@@ -1116,7 +1116,7 @@ impl Interpreter {
                                     self.state.new_string(String::new())
                                 };
 
-                                if !self.eval_pat(pat, &char_match) {
+                                if !self.eval_pat(pat, char_match) {
                                     return false;
                                 }
                             }
@@ -1131,12 +1131,12 @@ impl Interpreter {
             hir::PatKind::Identifier(_id, ident) => {
                 debug!("eval_pat: {} = {}", ident, self.state.stringify(value));
 
-                self.push_value(*value);
+                self.push_value(value);
 
                 true
             }
             hir::PatKind::Wildcard => true,
-            hir::PatKind::Enum(path, kvs) => match self.state.get_object(*value) {
+            hir::PatKind::Enum(path, kvs) => match self.state.get_object(value) {
                 Some(TlangObjectKind::Struct(tlang_struct)) => {
                     let shape = self.state.get_shape(tlang_struct.shape).unwrap();
                     let path_name = path.join("::");
@@ -1151,7 +1151,7 @@ impl Interpreter {
                         .map(|(k, pat)| (field_map.get(&k.to_string()), pat))
                         .all(|(field_index, pat)| {
                             field_index.is_some_and(|field_index| {
-                                self.eval_pat(pat, &field_values[*field_index])
+                                self.eval_pat(pat, field_values[*field_index])
                             })
                         })
                 }

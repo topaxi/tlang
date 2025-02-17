@@ -48,7 +48,7 @@ impl Resolver for InterpreterState {
             "Resolved path: {:?} ({:?}), got: {:?}",
             path.join("::"),
             path.res,
-            value.map(|v| self.stringify(&v))
+            value.map(|v| self.stringify(v))
         );
 
         value
@@ -227,16 +227,16 @@ impl InterpreterState {
             .and_then(|shape| shape.method_map.insert(method_name.to_string(), method));
     }
 
-    pub fn stringify(&self, value: &TlangValue) -> String {
+    pub fn stringify(&self, value: TlangValue) -> String {
         match value {
-            TlangValue::Object(id) => match self.get_object_by_id(*id) {
+            TlangValue::Object(id) => match self.get_object_by_id(id) {
                 Some(TlangObjectKind::String(s)) => s.clone(),
                 Some(TlangObjectKind::Struct(s)) => {
                     if s.shape == self.list_shape {
                         let values = s
                             .field_values
                             .iter()
-                            .map(|v| self.stringify(v))
+                            .map(|v| self.stringify(*v))
                             .collect::<Vec<String>>()
                             .join(", ");
                         return format!("[{}]", values);
@@ -263,8 +263,7 @@ impl InterpreterState {
                         &fields
                             .into_iter()
                             .map(|(field, idx)| {
-                                let value = &s.field_values[idx];
-                                format!("{}: {}", field, self.stringify(value))
+                                format!("{}: {}", field, self.stringify(s.field_values[idx]))
                             })
                             .collect::<Vec<String>>()
                             .join(", "),

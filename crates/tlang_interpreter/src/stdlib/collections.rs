@@ -24,7 +24,7 @@ pub fn define_list_shape(interpreter: &mut Interpreter) {
     let slice_fn_object = interpreter.create_native_fn(|state, args| {
         debug!(
             "Calling slice on list, args: {:?}",
-            args.iter().map(|a| state.stringify(a)).collect::<Vec<_>>()
+            args.iter().map(|a| state.stringify(*a)).collect::<Vec<_>>()
         );
 
         let this = state

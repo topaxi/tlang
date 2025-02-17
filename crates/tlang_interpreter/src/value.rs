@@ -182,37 +182,37 @@ impl TlangValue {
         TlangValue::Object(id)
     }
 
-    pub fn get_object_id(&self) -> Option<TlangObjectId> {
+    pub fn get_object_id(self) -> Option<TlangObjectId> {
         match self {
-            TlangValue::Object(id) => Some(*id),
+            TlangValue::Object(id) => Some(id),
             _ => None,
         }
     }
 
-    pub fn is_nil(&self) -> bool {
+    pub fn is_nil(self) -> bool {
         matches!(self, TlangValue::Nil)
     }
 
-    pub fn is_object(&self) -> bool {
+    pub fn is_object(self) -> bool {
         matches!(self, TlangValue::Object(_))
     }
 
-    pub fn is_truthy(&self, state: &InterpreterState) -> bool {
+    pub fn is_truthy(self, state: &InterpreterState) -> bool {
         match self {
             TlangValue::Nil => false,
-            TlangValue::Int(i) => *i != 0,
-            TlangValue::Float(f) => *f != 0.0,
-            TlangValue::Bool(b) => *b,
+            TlangValue::Int(i) => i != 0,
+            TlangValue::Float(f) => f != 0.0,
+            TlangValue::Bool(b) => b,
             TlangValue::Object(id) => state
-                .get_object_by_id(*id)
+                .get_object_by_id(id)
                 .is_some_and(|kind| kind.is_truthy()),
         }
     }
 
-    pub fn as_usize(&self) -> Option<usize> {
+    pub fn as_usize(self) -> Option<usize> {
         match self {
-            TlangValue::Int(i) => Some(*i as usize),
-            TlangValue::Float(f) => Some(*f as usize),
+            TlangValue::Int(i) => Some(i as usize),
+            TlangValue::Float(f) => Some(f as usize),
             _ => None,
         }
     }
