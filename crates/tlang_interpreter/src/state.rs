@@ -8,10 +8,8 @@ use tlang_hir::hir::{self, HirId};
 
 use crate::resolver::Resolver;
 use crate::scope::{Scope, ScopeStack};
-use crate::value::{
-    ShapeKey, TlangClosure, TlangObjectId, TlangObjectKind, TlangStruct, TlangStructMethod,
-    TlangStructShape, TlangValue,
-};
+use crate::shape::{ShapeKey, TlangStructMethod, TlangStructShape};
+use crate::value::{TlangClosure, TlangObjectId, TlangObjectKind, TlangStruct, TlangValue};
 
 pub enum CallStackKind {
     Root,

@@ -3,10 +3,9 @@ use std::collections::HashMap;
 use log::debug;
 use tlang_macros::native_fn;
 
+use crate::shape::{TlangStructMethod, TlangStructShape};
 use crate::state::InterpreterState;
-use crate::value::{
-    NativeFnReturn, TlangObjectKind, TlangStruct, TlangStructMethod, TlangStructShape, TlangValue,
-};
+use crate::value::{NativeFnReturn, TlangObjectKind, TlangStruct, TlangValue};
 use crate::Interpreter;
 
 #[native_fn(name = "len")]

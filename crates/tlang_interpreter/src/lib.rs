@@ -9,15 +9,17 @@ use tlang_ast::token;
 use tlang_hir::hir::{self, HirId};
 
 use self::resolver::Resolver;
+use self::shape::{ShapeKey, TlangStructMethod, TlangStructShape};
 use self::state::InterpreterState;
 use self::stdlib::collections::define_list_shape;
 use self::value::{
-    NativeFnReturn, ShapeKey, TlangArithmetic, TlangNativeFn, TlangObjectId, TlangObjectKind,
-    TlangStruct, TlangStructMethod, TlangStructShape, TlangValue,
+    NativeFnReturn, TlangArithmetic, TlangNativeFn, TlangObjectId, TlangObjectKind, TlangStruct,
+    TlangValue,
 };
 
 mod resolver;
 mod scope;
+mod shape;
 pub mod state;
 #[cfg(feature = "stdlib")]
 pub mod stdlib;
