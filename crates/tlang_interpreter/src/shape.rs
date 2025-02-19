@@ -3,7 +3,7 @@ use std::hash::DefaultHasher;
 
 use tlang_hir::hir::HirId;
 
-use crate::value::TlangObjectId;
+use crate::value::{TlangObjectId, TlangValue};
 
 // ShapeKeyDict is a hash value generated from each of the keys in the struct.
 type ShapeKeyDict = u64;
@@ -53,6 +53,16 @@ impl From<HirId> for ShapeKey {
 pub enum TlangStructMethod {
     Native(TlangObjectId),
     HirId(HirId),
+}
+
+impl TlangStructMethod {
+    pub fn from_value(value: TlangValue) -> Self {
+        Self::from_object_id(value.get_object_id().unwrap())
+    }
+
+    pub fn from_object_id(id: TlangObjectId) -> Self {
+        TlangStructMethod::Native(id)
+    }
 }
 
 pub struct TlangStructShape {

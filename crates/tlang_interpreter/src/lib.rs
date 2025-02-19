@@ -724,7 +724,7 @@ impl Interpreter {
                 applied_args[index] = *arg;
             }
 
-            NativeFnReturn::PartialCall(callee, applied_args)
+            NativeFnReturn::PartialCall(Box::new((callee, applied_args)))
         })
     }
 
@@ -846,7 +846,9 @@ impl Interpreter {
                     panic!("Function not found: {:?}", id);
                 }
             }
-            NativeFnReturn::PartialCall(fn_object, args) => self.eval_call_object(fn_object, args),
+            NativeFnReturn::PartialCall(box (fn_object, args)) => {
+                self.eval_call_object(fn_object, args)
+            }
         }
     }
 
