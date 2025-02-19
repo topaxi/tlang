@@ -524,7 +524,7 @@ impl Interpreter {
             .insert(decl.hir_id, Rc::new(decl.clone()));
 
         match &decl.name.kind {
-            hir::ExprKind::Path(ref path) => {
+            hir::ExprKind::Path(path) => {
                 let fn_object = self.state.new_object(TlangObjectKind::Fn(decl.hir_id));
 
                 self.push_value(fn_object);
