@@ -10,7 +10,7 @@ use tlang_hir::hir::{self, HirId};
 
 use self::resolver::Resolver;
 use self::shape::{ShapeKey, TlangStructMethod, TlangStructShape};
-use self::state::InterpreterState;
+use self::state::{InterpreterState, TailCall};
 use self::stdlib::collections::define_list_shape;
 use self::value::{
     NativeFnReturn, TlangArithmetic, TlangNativeFn, TlangObjectId, TlangObjectKind, TlangStruct,
@@ -59,6 +59,7 @@ pub enum EvalResult {
     Void,
     Value(TlangValue),
     Return(TlangValue),
+    TailCall,
 }
 
 impl EvalResult {
@@ -67,6 +68,7 @@ impl EvalResult {
             EvalResult::Value(value) => value,
             EvalResult::Return(value) => value,
             EvalResult::Void => TlangValue::Nil,
+            EvalResult::TailCall => panic!("Tried to unwrap a TailCall"),
         }
     }
 }
@@ -191,11 +193,16 @@ impl Interpreter {
     where
         F: FnOnce(&mut Self) -> R,
     {
-        self.state.push_call_stack(state::CallStackEntry {
-            kind: state::CallStackKind::Function(fn_decl.clone()),
-            current_span: fn_decl.span,
-        });
-        let result = self.with_new_scope(&fn_decl, f);
+        self.state
+            .push_call_stack(state::CallStackEntry::new_call(fn_decl.clone()));
+        self.enter_scope(&fn_decl.clone());
+        self.state
+            .scope_stack
+            .current_scope()
+            .borrow_mut()
+            .is_fn_scope = true;
+        let result = f(self);
+        self.exit_scope();
         self.state.pop_call_stack();
         result
     }
@@ -749,8 +756,81 @@ impl Interpreter {
     }
 
     fn eval_tail_call(&mut self, call_expr: &hir::CallExpression) -> EvalResult {
-        // For now, we just call the function normally.
-        self.eval_call(call_expr)
+        if call_expr.has_wildcard() {
+            self.panic("Tail call with wildcard arguments not allowed".to_string());
+        }
+
+        let callee = eval_value!(self.eval_expr(&call_expr.callee));
+        let args = self.eval_exprs(&call_expr.arguments);
+
+        self.state
+            .current_call_frame_mut()
+            .set_tail_call(TailCall { callee, args });
+
+        EvalResult::TailCall
+    }
+
+    fn tail_call(&mut self) -> EvalResult {
+        loop {
+            let tail_call = self
+                .state
+                .current_call_frame_mut()
+                .tail_call
+                .take()
+                .unwrap();
+
+            debug!("tail_call: {:?}", tail_call);
+
+            let fn_hir_id = if let TlangValue::Object(obj) = tail_call.callee {
+                if let TlangObjectKind::Fn(hir_id) = self.get_object(obj) {
+                    *hir_id
+                } else {
+                    self.panic(format!("`{:?}` is not a function", tail_call.callee));
+                }
+            } else {
+                self.panic(format!("`{:?}` is not a function", tail_call.callee));
+            };
+
+            // Optimized for self referencial tail calls, if we are calling the same function,
+            // we'll reuse the fn declaration stored on the current call frame.
+            let fn_decl = match self.state.current_call_frame().get_fn_decl() {
+                Some(fn_decl) if fn_decl.hir_id == fn_hir_id => fn_decl.clone(),
+                _ => self.state.get_fn_decl(fn_hir_id).unwrap_or_else(|| {
+                    self.panic(format!("Function `{:?}` not found", tail_call.callee));
+                }),
+            };
+
+            // Instead of a recursive call, replace the current function scope
+            self.replace_current_fn_scope(fn_decl.clone(), tail_call.callee, &tail_call.args);
+            match self.eval_block_inner(&fn_decl.body) {
+                EvalResult::TailCall => continue,
+                result => return result,
+            }
+        }
+    }
+
+    fn replace_current_fn_scope(
+        &mut self,
+        fn_decl: Rc<hir::FunctionDeclaration>,
+        callee: TlangValue,
+        args: &[TlangValue],
+    ) {
+        debug!("replace_current_fn_scope: {:?}", fn_decl.name());
+
+        self.state
+            .current_call_frame_mut()
+            .replace_fn_decl(fn_decl.clone());
+        self.state.scope_stack.drop_block_scopes();
+        self.state.scope_stack.clear_current_scope();
+
+        // TODO: Methods currently do not reserve a slot for the fn itself.
+        if fn_decl.name.path().is_some() {
+            self.push_value(callee);
+        }
+
+        for arg in args {
+            self.push_value(*arg);
+        }
     }
 
     fn eval_partial_call(&mut self, call_expr: &hir::CallExpression) -> EvalResult {
@@ -786,9 +866,9 @@ impl Interpreter {
     }
 
     fn eval_call(&mut self, call_expr: &hir::CallExpression) -> EvalResult {
-        //debug!("eval_call: {:?}", call_expr);
+        debug!("eval_call: {:?}", call_expr);
 
-        if call_expr.arguments.iter().any(|arg| arg.is_wildcard()) {
+        if call_expr.has_wildcard() {
             return self.eval_partial_call(call_expr);
         }
 
@@ -875,7 +955,10 @@ impl Interpreter {
                 this.push_value(*arg);
             }
 
-            this.eval_block_inner(&fn_decl.body)
+            match this.eval_block_inner(&fn_decl.body) {
+                EvalResult::TailCall => this.tail_call(),
+                result => result,
+            }
         })
     }
 
@@ -1494,10 +1577,11 @@ mod tests {
             fn fib(n) { fib(n, 0, 1) }
             fn fib(0, a, _) { a }
             fn fib(1, _, b) { b }
-            fn fib(n, a, b) { fib(n - 1, b, a + b) }
+            fn fib(n, a, b) { rec fib(n - 1, b, a + b) }
         "});
 
         assert_matches!(interpreter.eval("fib(10)"), TlangValue::Int(55));
+        assert_matches!(interpreter.eval("fib(50)"), TlangValue::Int(12586269025));
     }
 
     #[test]

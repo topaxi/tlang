@@ -58,7 +58,7 @@ impl CodegenJS {
 
         let completion = block.expr.as_ref().unwrap();
         if completion_tmp_var == "return" {
-            if completion.is_tail_call() {
+            if self.is_self_referencing_tail_call(completion) {
                 self.generate_expr(completion, None);
             } else {
                 self.push_indent();
@@ -134,6 +134,7 @@ impl CodegenJS {
             }
             hir::ExprKind::Block(block) => self.generate_block(block),
             hir::ExprKind::Call(expr) => self.generate_call_expression(expr),
+            hir::ExprKind::TailCall(expr) => self.generate_recursive_call_expression(expr),
             hir::ExprKind::FieldAccess(base, field) => {
                 self.generate_field_access_expression(base, field)
             }
@@ -154,7 +155,6 @@ impl CodegenJS {
                 self.generate_if_else(expr, then_branch, else_branches, parent_op)
             }
             hir::ExprKind::FunctionExpression(decl) => self.generate_function_expression(decl),
-            hir::ExprKind::TailCall(expr) => self.generate_recursive_call_expression(expr),
             hir::ExprKind::Range(_) => todo!("Range expression not implemented yet."),
             hir::ExprKind::Wildcard => {}
         }

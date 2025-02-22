@@ -394,7 +394,11 @@ impl LoweringContext {
         let arguments = self.lower_exprs(&node.arguments);
         let callee = self.lower_callee(&node.callee, node.arguments.len());
 
-        hir::CallExpression { callee, arguments }
+        hir::CallExpression {
+            hir_id: self.unique_id(),
+            callee,
+            arguments,
+        }
     }
 
     fn lower_stmt(&mut self, node: &ast::node::Stmt) -> Vec<hir::Stmt> {
@@ -1052,6 +1056,7 @@ impl LoweringContext {
                         let rhs = self.lower_callee(&node.rhs, 1);
 
                         hir::ExprKind::Call(Box::new(hir::CallExpression {
+                            hir_id: self.unique_id(),
                             callee: rhs,
                             arguments: vec![lhs],
                         }))
@@ -1077,7 +1082,11 @@ impl LoweringContext {
                         };
                         let callee = self.lower_callee(&call_expr.callee, arguments.len());
 
-                        hir::ExprKind::Call(Box::new(hir::CallExpression { callee, arguments }))
+                        hir::ExprKind::Call(Box::new(hir::CallExpression {
+                            hir_id: self.unique_id(),
+                            callee,
+                            arguments,
+                        }))
                     }
                     _ => unreachable!("Validate AST before lowering"),
                 }

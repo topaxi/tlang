@@ -6,7 +6,7 @@ fn map(xs, f) { foldl(xs, [], apply_map(f, _, _)) }
 
 fn range(start, end) { range(start, end, []) }
 fn range(start, end, acc) if start >= end; { acc }
-fn range(start, end, acc) { range(start + 1, end, [...acc, start]) }
+fn range(start, end, acc) { rec range(start + 1, end, [...acc, start]) }
 
 fn mandelbrot(c_real, c_imag, max_iter) { mandelbrot(c_real, c_imag, max_iter, 0, 0, 0) }
 fn mandelbrot(_, _, 0, _, _, _) { 0 }

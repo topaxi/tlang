@@ -353,6 +353,7 @@ pub struct RangeExpression {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct CallExpression {
+    pub hir_id: HirId,
     pub callee: Expr,
     pub arguments: Vec<Expr>,
 }

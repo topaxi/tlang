@@ -19,7 +19,39 @@ pub enum CallStackKind {
 
 pub struct CallStackEntry {
     pub kind: CallStackKind,
+    pub tail_call: Option<TailCall>,
     pub current_span: tlang_ast::span::Span,
+}
+
+impl CallStackEntry {
+    pub fn new_call(fn_decl: Rc<hir::FunctionDeclaration>) -> Self {
+        Self {
+            kind: CallStackKind::Function(fn_decl.clone()),
+            tail_call: None,
+            current_span: fn_decl.span,
+        }
+    }
+
+    pub(crate) fn replace_fn_decl(&mut self, fn_decl: Rc<hir::FunctionDeclaration>) {
+        self.kind = CallStackKind::Function(fn_decl);
+    }
+
+    pub(crate) fn set_tail_call(&mut self, tail_call: TailCall) {
+        self.tail_call = Some(tail_call);
+    }
+
+    pub(crate) fn get_fn_decl(&self) -> Option<Rc<hir::FunctionDeclaration>> {
+        match &self.kind {
+            CallStackKind::Function(fn_decl) => Some(fn_decl.clone()),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct TailCall {
+    pub callee: TlangValue,
+    pub args: Vec<TlangValue>,
 }
 
 pub struct InterpreterState {
@@ -58,6 +90,7 @@ impl InterpreterState {
 
         call_stack.push(CallStackEntry {
             kind: CallStackKind::Root,
+            tail_call: None,
             current_span: tlang_ast::span::Span::default(),
         });
 
@@ -118,6 +151,14 @@ impl InterpreterState {
 
     pub(crate) fn pop_call_stack(&mut self) -> CallStackEntry {
         self.call_stack.pop().unwrap()
+    }
+
+    pub(crate) fn current_call_frame(&mut self) -> &CallStackEntry {
+        self.call_stack.last().unwrap()
+    }
+
+    pub(crate) fn current_call_frame_mut(&mut self) -> &mut CallStackEntry {
+        self.call_stack.last_mut().unwrap()
     }
 
     pub(crate) fn enter_scope<T>(&mut self, meta: &T)

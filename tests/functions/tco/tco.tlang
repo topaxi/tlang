@@ -1,0 +1,10 @@
+fn range(start, end) { range(start, end, []) }
+fn range(start, end, acc) if start >= end; { acc }
+fn range(start, end, acc) { rec range(start + 1, end, [...acc, start]) }
+
+fn foldl([], acc, _) { acc }
+fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+
+range(0, 10000)
+|> foldl(0, fn (acc, x) { acc + x })
+|> log();

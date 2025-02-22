@@ -1,0 +1,8 @@
+fn isEven(0) { true }
+fn isEven(n) { rec isOdd(n - 1) }
+
+fn isOdd(0) { false }
+fn isOdd(n) { rec isEven(n - 1) }
+
+isEven(100) |> log();
+isOdd(100) |> log();

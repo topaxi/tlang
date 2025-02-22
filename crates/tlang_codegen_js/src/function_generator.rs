@@ -2,7 +2,7 @@ use tlang_ast::token::kw;
 use tlang_hir::hir;
 
 use crate::expr_generator::expr_can_render_as_js_expr;
-use crate::generator::{BlockContext, CodegenJS};
+use crate::generator::{BlockContext, CodegenJS, FunctionContext};
 
 impl CodegenJS {
     fn generate_function_param(&mut self, param: &hir::FunctionParameter) {
@@ -270,41 +270,57 @@ impl CodegenJS {
         self.pop_context();
     }
 
+    fn get_self_referencing_tail_call_function_context(
+        &self,
+        expr: &hir::CallExpression,
+    ) -> Option<&FunctionContext> {
+        if let hir::ExprKind::Path(_) = &expr.callee.kind {
+            self.get_function_context().filter(|&function_context| {
+                function_context.is_tail_recursive
+                    && function_context.name == fn_identifier_to_string(&expr.callee)
+            })
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn is_self_referencing_tail_call(&self, expr: &hir::Expr) -> bool {
+        if let hir::ExprKind::TailCall(call_expr) = &expr.kind {
+            self.get_self_referencing_tail_call_function_context(call_expr)
+                .is_some()
+        } else {
+            false
+        }
+    }
+
     pub(crate) fn generate_recursive_call_expression(&mut self, expr: &hir::CallExpression) {
         // If call expression is referencing the current function, all we do is update the arguments,
         // as we are in a while loop.
-        if let hir::ExprKind::Path(_) = &expr.callee.kind {
-            if let Some(function_context) = self.get_function_context() {
-                if function_context.is_tail_recursive
-                        // TODO: Comparing identifier by string might not be the best idea.
-                        && function_context.name == fn_identifier_to_string(&expr.callee)
-                {
-                    let params = function_context.parameter_bindings.clone();
+        if let Some(function_context) = self.get_self_referencing_tail_call_function_context(expr) {
+            let params = function_context.parameter_bindings.clone();
 
-                    let tmp_vars = params
-                        .iter()
-                        .map(|_| self.current_scope().declare_tmp_variable())
-                        .collect::<Vec<_>>();
+            let tmp_vars = params
+                .iter()
+                .map(|_| self.current_scope().declare_tmp_variable())
+                .collect::<Vec<_>>();
 
-                    for (i, arg) in expr.arguments.iter().enumerate() {
-                        self.push_let_declaration_to_expr(&tmp_vars[i], arg);
-                        self.push_str(";\n");
-                    }
-
-                    for (i, arg_name) in params.iter().enumerate() {
-                        self.push_indent();
-                        self.push_str(arg_name);
-                        self.push_str(" = ");
-                        self.push_str(&tmp_vars[i]);
-                        self.push_str(";\n");
-                    }
-
-                    self.push_indent();
-                    self.push_str("continue rec;\n");
-
-                    return;
-                }
+            for (i, arg) in expr.arguments.iter().enumerate() {
+                self.push_let_declaration_to_expr(&tmp_vars[i], arg);
+                self.push_str(";\n");
             }
+
+            for (i, arg_name) in params.iter().enumerate() {
+                self.push_indent();
+                self.push_str(arg_name);
+                self.push_str(" = ");
+                self.push_str(&tmp_vars[i]);
+                self.push_str(";\n");
+            }
+
+            self.push_indent();
+            self.push_str("continue rec;\n");
+
+            return;
         }
 
         // For any other referenced function, we do a normal call expression.
