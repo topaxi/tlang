@@ -34,6 +34,49 @@ pub struct NativeFn {
 
 inventory::collect!(NativeFn);
 
+/// Propagate control flow (`Return`, `TailCall`, etc.), otherwise extract the value.
+macro_rules! eval_value {
+    ($expr:expr) => {
+        match $expr {
+            EvalResult::Value(val) => val,
+            other => return other,
+        }
+    };
+}
+
+/// Propagate control flow if it's not `Value`
+macro_rules! propagate {
+    ($expr:expr) => {
+        match $expr {
+            EvalResult::Value(_) | EvalResult::Void => {}
+            other => return other,
+        }
+    };
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum EvalResult {
+    Void,
+    Value(TlangValue),
+    Return(TlangValue),
+}
+
+impl EvalResult {
+    fn unwrap_value(self) -> TlangValue {
+        match self {
+            EvalResult::Value(value) => value,
+            EvalResult::Return(value) => value,
+            EvalResult::Void => TlangValue::Nil,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum MatchResult {
+    Matched(EvalResult),
+    NotMatched(EvalResult),
+}
+
 pub struct Interpreter {
     state: InterpreterState,
     native_fns: HashMap<TlangObjectId, TlangNativeFn>,
@@ -144,22 +187,17 @@ impl Interpreter {
     }
 
     #[inline(always)]
-    fn with_new_fn_scope<F>(&mut self, fn_decl: Rc<hir::FunctionDeclaration>, f: F) -> TlangValue
+    fn with_new_fn_scope<F, R>(&mut self, fn_decl: Rc<hir::FunctionDeclaration>, f: F) -> R
     where
-        F: FnOnce(&mut Self),
+        F: FnOnce(&mut Self) -> R,
     {
         self.state.push_call_stack(state::CallStackEntry {
             kind: state::CallStackKind::Function(fn_decl.clone()),
-            return_value: None,
             current_span: fn_decl.span,
         });
-        self.enter_scope(&fn_decl.clone());
-        f(self);
-        self.exit_scope();
-        self.state
-            .pop_call_stack()
-            .return_value
-            .unwrap_or(TlangValue::Nil)
+        let result = self.with_new_scope(&fn_decl, f);
+        self.state.pop_call_stack();
+        result
     }
 
     #[inline(always)]
@@ -183,41 +221,35 @@ impl Interpreter {
     }
 
     pub fn eval(&mut self, input: &hir::Module) -> TlangValue {
-        self.eval_block_inner(&input.block)
+        self.eval_block_inner(&input.block).unwrap_value()
     }
 
     #[inline(always)]
-    fn eval_block_inner(&mut self, block: &hir::Block) -> TlangValue {
-        for stmt in &block.stmts {
-            self.eval_stmt(stmt);
-
-            if let Some(value) = self.state.current_call_frame().return_value {
-                return value;
-            }
-        }
+    fn eval_block_inner(&mut self, block: &hir::Block) -> EvalResult {
+        propagate!(self.eval_stmts(&block.stmts));
 
         self.eval_block_expr(block)
     }
 
     #[inline(always)]
-    fn eval_block_expr(&mut self, block: &hir::Block) -> TlangValue {
+    fn eval_block_expr(&mut self, block: &hir::Block) -> EvalResult {
         if let Some(expr) = &block.expr {
             self.eval_expr(expr)
         } else {
-            TlangValue::Nil
+            EvalResult::Void
         }
     }
 
-    fn eval_block(&mut self, block: &hir::Block) -> TlangValue {
+    fn eval_block(&mut self, block: &hir::Block) -> EvalResult {
         self.with_new_scope(block, |this| this.eval_block_inner(block))
     }
 
-    fn eval_stmt(&mut self, stmt: &hir::Stmt) {
+    fn eval_stmt(&mut self, stmt: &hir::Stmt) -> EvalResult {
         self.state.set_current_span(stmt.span);
 
         match &stmt.kind {
             hir::StmtKind::Expr(expr) => {
-                self.eval_expr(expr);
+                return self.eval_expr(expr);
             }
             hir::StmtKind::FunctionDeclaration(decl) => {
                 self.eval_fn_decl(decl);
@@ -231,35 +263,48 @@ impl Interpreter {
             hir::StmtKind::EnumDeclaration(decl) => {
                 self.eval_enum_decl(decl);
             }
-            hir::StmtKind::Let(pat, expr, ty) => {
-                self.eval_let_stmt(pat, expr, ty);
-            }
+            hir::StmtKind::Let(pat, expr, ty) => return self.eval_let_stmt(pat, expr, ty),
             hir::StmtKind::Return(box Some(expr)) => {
-                let return_value = self.eval_expr(expr);
-                self.state.set_return_value(return_value);
+                let value = eval_value!(self.eval_expr(expr));
+                return EvalResult::Return(value);
             }
-            hir::StmtKind::Return(_) => {}
+            hir::StmtKind::Return(_) => return EvalResult::Return(TlangValue::Nil),
             hir::StmtKind::None => unreachable!(),
         }
+
+        EvalResult::Void
+    }
+
+    fn eval_stmts(&mut self, stmts: &[hir::Stmt]) -> EvalResult {
+        for stmt in stmts {
+            propagate!(self.eval_stmt(stmt));
+        }
+
+        EvalResult::Void
     }
 
     fn eval_exprs(&mut self, exprs: &[hir::Expr]) -> Vec<TlangValue> {
-        exprs.iter().map(|expr| self.eval_expr(expr)).collect()
+        exprs
+            .iter()
+            .map(|expr| self.eval_expr(expr).unwrap_value())
+            .collect()
     }
 
-    fn eval_expr(&mut self, expr: &hir::Expr) -> TlangValue {
+    fn eval_expr(&mut self, expr: &hir::Expr) -> EvalResult {
         self.state.set_current_span(expr.span);
 
         match &expr.kind {
-            hir::ExprKind::Path(path) => self.resolve_path(path).unwrap_or_else(|| {
-                self.panic(format!(
-                    "Could not resolve path: {} ({:?})\nCurrent scope: {:#?}",
-                    path.join("::"),
-                    path.res,
-                    self.state.scope_stack
-                ))
-            }),
-            hir::ExprKind::Literal(value) => self.eval_literal(value),
+            hir::ExprKind::Path(path) => {
+                EvalResult::Value(self.resolve_path(path).unwrap_or_else(|| {
+                    self.panic(format!(
+                        "Could not resolve path: {} ({:?})\nCurrent scope: {:#?}",
+                        path.join("::"),
+                        path.res,
+                        self.state.scope_stack
+                    ))
+                }))
+            }
+            hir::ExprKind::Literal(value) => EvalResult::Value(self.eval_literal(value)),
             hir::ExprKind::List(values) => self.eval_list_expr(values),
             hir::ExprKind::Dict(entries) => self.eval_dict_expr(entries),
             hir::ExprKind::IndexAccess(lhs, rhs) => self.eval_index_access(lhs, rhs),
@@ -272,7 +317,9 @@ impl Interpreter {
             hir::ExprKind::IfElse(condition, consequence, else_clauses) => {
                 self.eval_if_else(condition, consequence, else_clauses)
             }
-            hir::ExprKind::FunctionExpression(fn_decl) => self.state.new_closure(fn_decl),
+            hir::ExprKind::FunctionExpression(fn_decl) => {
+                EvalResult::Value(self.state.new_closure(fn_decl))
+            }
             hir::ExprKind::Match(expr, arms) => self.eval_match(expr, arms),
             _ => todo!("eval_expr: {:?}", expr),
         }
@@ -283,25 +330,26 @@ impl Interpreter {
         condition: &hir::Expr,
         consequence: &hir::Block,
         else_clauses: &[hir::ElseClause],
-    ) -> TlangValue {
-        if self.eval_expr(condition).is_truthy(&self.state) {
+    ) -> EvalResult {
+        if eval_value!(self.eval_expr(condition)).is_truthy(&self.state) {
             return self.eval_block(consequence);
         }
 
         for else_clause in else_clauses {
             if let Some(condition) = &else_clause.condition {
-                if self.eval_expr(condition).is_truthy(&self.state) {
+                if eval_value!(self.eval_expr(condition)).is_truthy(&self.state) {
                     return self.eval_block(&else_clause.consequence);
                 }
             } else {
                 return self.eval_block(&else_clause.consequence);
             }
         }
-        TlangValue::Nil
+
+        EvalResult::Void
     }
 
-    fn eval_index_access(&mut self, lhs: &hir::Expr, rhs: &hir::Expr) -> TlangValue {
-        let rhs_value = self.eval_expr(rhs);
+    fn eval_index_access(&mut self, lhs: &hir::Expr, rhs: &hir::Expr) -> EvalResult {
+        let rhs_value = eval_value!(self.eval_expr(rhs));
 
         let index = match rhs_value {
             TlangValue::Int(index) => index,
@@ -309,21 +357,21 @@ impl Interpreter {
             _ => todo!("eval_index_access: {:?}", rhs_value),
         };
 
-        let lhs_value = self.eval_expr(lhs);
+        let lhs_value = eval_value!(self.eval_expr(lhs));
 
         if let Some(TlangObjectKind::Struct(obj)) = self.state.get_object(lhs_value) {
-            return obj.field_values[index as usize];
+            return EvalResult::Value(obj.field_values[index as usize]);
         }
 
         todo!("eval_index_access: {:?}[{:?}]", lhs, rhs_value)
     }
 
-    fn eval_field_access(&mut self, lhs: &hir::Expr, ident: &Ident) -> TlangValue {
-        let value = self.eval_expr(lhs);
+    fn eval_field_access(&mut self, lhs: &hir::Expr, ident: &Ident) -> EvalResult {
+        let value = eval_value!(self.eval_expr(lhs));
 
         if let Some(TlangObjectKind::Struct(obj)) = self.state.get_object(value) {
             if let Some(index) = self.state.get_field_index(obj.shape, ident.as_str()) {
-                return obj.field_values[index];
+                return EvalResult::Value(obj.field_values[index]);
             }
 
             let shape = self.state.get_shape(obj.shape).unwrap();
@@ -359,9 +407,11 @@ impl Interpreter {
         }
     }
 
-    fn eval_unary(&mut self, op: UnaryOp, expr: &hir::Expr) -> TlangValue {
+    fn eval_unary(&mut self, op: UnaryOp, expr: &hir::Expr) -> EvalResult {
         match op {
-            UnaryOp::Not => TlangValue::Bool(!self.eval_expr(expr).is_truthy(&self.state)),
+            UnaryOp::Not => EvalResult::Value(TlangValue::Bool(
+                !eval_value!(self.eval_expr(expr)).is_truthy(&self.state),
+            )),
             UnaryOp::Rest => unreachable!("Rest operator implemented in eval_list_expr"),
             _ => todo!("eval_unary: {:?}", op),
         }
@@ -372,27 +422,27 @@ impl Interpreter {
         op: hir::BinaryOpKind,
         lhs: &hir::Expr,
         rhs: &hir::Expr,
-    ) -> TlangValue {
+    ) -> EvalResult {
         match op {
             hir::BinaryOpKind::And => {
-                let lhs = self.eval_expr(lhs);
+                let lhs = eval_value!(self.eval_expr(lhs));
 
                 if lhs.is_truthy(&self.state) {
-                    let rhs = self.eval_expr(rhs);
+                    let rhs = eval_value!(self.eval_expr(rhs));
 
                     if rhs.is_truthy(&self.state) {
-                        return TlangValue::Bool(true);
+                        return EvalResult::Value(TlangValue::Bool(true));
                     }
                 }
 
-                return TlangValue::Bool(false);
+                return EvalResult::Value(TlangValue::Bool(false));
             }
 
             hir::BinaryOpKind::Or => {
-                let lhs = self.eval_expr(lhs);
+                let lhs = eval_value!(self.eval_expr(lhs));
 
                 if lhs.is_truthy(&self.state) {
-                    return TlangValue::Bool(true);
+                    return EvalResult::Value(TlangValue::Bool(true));
                 }
 
                 return self.eval_expr(rhs);
@@ -401,14 +451,14 @@ impl Interpreter {
             _ => {}
         }
 
-        let lhs = self.eval_expr(lhs);
-        let rhs = self.eval_expr(rhs);
+        let lhs = eval_value!(self.eval_expr(lhs));
+        let rhs = eval_value!(self.eval_expr(rhs));
 
         if let TlangValue::Object(_) = lhs {
             return self.eval_object_binary_op(op, lhs, rhs);
         }
 
-        match op {
+        let value = match op {
             hir::BinaryOpKind::Add => lhs.add(rhs),
             hir::BinaryOpKind::Sub => lhs.sub(rhs),
             hir::BinaryOpKind::Mul => lhs.mul(rhs),
@@ -434,7 +484,9 @@ impl Interpreter {
             hir::BinaryOpKind::And | hir::BinaryOpKind::Or => {
                 unreachable!();
             }
-        }
+        };
+
+        EvalResult::Value(value)
     }
 
     fn eval_comparison_op<F>(&self, lhs: TlangValue, rhs: TlangValue, op: F) -> TlangValue
@@ -458,7 +510,7 @@ impl Interpreter {
         op: hir::BinaryOpKind,
         lhs: TlangValue,
         rhs: TlangValue,
-    ) -> TlangValue {
+    ) -> EvalResult {
         match op {
             hir::BinaryOpKind::Eq | hir::BinaryOpKind::NotEq => {
                 let is_not = matches!(op, hir::BinaryOpKind::NotEq);
@@ -466,7 +518,7 @@ impl Interpreter {
                 match (lhs, rhs) {
                     (TlangValue::Object(lhs_id), TlangValue::Object(rhs_id)) => {
                         if lhs_id == rhs_id {
-                            return TlangValue::Bool(true ^ is_not);
+                            return EvalResult::Value(TlangValue::Bool(true ^ is_not));
                         }
 
                         let lhs = self.get_object(lhs_id);
@@ -475,14 +527,14 @@ impl Interpreter {
                         match (lhs, rhs) {
                             (TlangObjectKind::Struct(lhs), TlangObjectKind::Struct(rhs)) => {
                                 if lhs.shape != rhs.shape {
-                                    return TlangValue::Bool(false ^ is_not);
+                                    return EvalResult::Value(TlangValue::Bool(false ^ is_not));
                                 }
 
                                 // TODO: Implement comparisons between structs of the same shape.
-                                TlangValue::Bool(false ^ is_not)
+                                EvalResult::Value(TlangValue::Bool(false ^ is_not))
                             }
                             (TlangObjectKind::String(lhs), TlangObjectKind::String(rhs)) => {
-                                TlangValue::Bool((lhs == rhs) ^ is_not)
+                                EvalResult::Value(TlangValue::Bool((lhs == rhs) ^ is_not))
                             }
                             _ => todo!("eval_object_binary_op: {:?}, {:?}, {:?}", op, lhs, rhs),
                         }
@@ -497,7 +549,7 @@ impl Interpreter {
 
                     match (lhs, rhs) {
                         (TlangObjectKind::String(lhs), TlangObjectKind::String(rhs)) => {
-                            self.state.new_string(lhs.clone() + rhs)
+                            EvalResult::Value(self.state.new_string(lhs.clone() + rhs))
                         }
                         _ => todo!("eval_object_binary_op: {:?}, {:?}, {:?}", op, lhs, rhs),
                     }
@@ -677,6 +729,7 @@ impl Interpreter {
 
                 self.with_scope(&closure.scope_stack.clone(), |this| {
                     this.eval_fn_call(closure_decl, callee, &args)
+                        .unwrap_value()
                 })
             }
             TlangObjectKind::Fn(hir_id) => {
@@ -686,20 +739,23 @@ impl Interpreter {
                     .unwrap_or_else(|| self.panic("Function not found".to_string()))
                     .clone();
 
-                self.with_root_scope(|this| this.eval_fn_call(fn_decl.clone(), callee, &args))
+                self.with_root_scope(|this| {
+                    this.eval_fn_call(fn_decl.clone(), callee, &args)
+                        .unwrap_value()
+                })
             }
             TlangObjectKind::NativeFn => self.exec_native_fn(id, callee, &args),
             obj => self.panic(format!("`{:?}` is not a function", obj)),
         }
     }
 
-    fn eval_tail_call(&mut self, call_expr: &hir::CallExpression) -> TlangValue {
+    fn eval_tail_call(&mut self, call_expr: &hir::CallExpression) -> EvalResult {
         // For now, we just call the function normally.
         self.eval_call(call_expr)
     }
 
-    fn eval_partial_call(&mut self, call_expr: &hir::CallExpression) -> TlangValue {
-        let callee = self.eval_expr(&call_expr.callee);
+    fn eval_partial_call(&mut self, call_expr: &hir::CallExpression) -> EvalResult {
+        let callee = eval_value!(self.eval_expr(&call_expr.callee));
         let applied_args: Vec<TlangValue> = call_expr
             .arguments
             .iter()
@@ -707,12 +763,12 @@ impl Interpreter {
                 if expr.is_wildcard() {
                     TlangValue::Nil
                 } else {
-                    self.eval_expr(expr)
+                    self.eval_expr(expr).unwrap_value()
                 }
             })
             .collect();
 
-        self.create_native_fn(move |_, args| {
+        let fn_object = self.create_native_fn(move |_, args| {
             let mut applied_args = applied_args.clone();
             // For each arg in args, replace a hole (Nil) from the already applied args
             for arg in args {
@@ -725,17 +781,19 @@ impl Interpreter {
             }
 
             NativeFnReturn::PartialCall(Box::new((callee, applied_args)))
-        })
+        });
+
+        EvalResult::Value(fn_object)
     }
 
-    fn eval_call(&mut self, call_expr: &hir::CallExpression) -> TlangValue {
+    fn eval_call(&mut self, call_expr: &hir::CallExpression) -> EvalResult {
         //debug!("eval_call: {:?}", call_expr);
 
         if call_expr.arguments.iter().any(|arg| arg.is_wildcard()) {
             return self.eval_partial_call(call_expr);
         }
 
-        match &call_expr.callee.kind {
+        let return_value = match &call_expr.callee.kind {
             hir::ExprKind::Path(path) if let Some(value) = self.resolve_path(path) => {
                 let args = self.eval_exprs(&call_expr.arguments);
 
@@ -763,7 +821,7 @@ impl Interpreter {
                 );
             }
             hir::ExprKind::FieldAccess(expr, ident) => {
-                let call_target = self.eval_expr(expr);
+                let call_target = eval_value!(self.eval_expr(expr));
                 let mut args = self.eval_exprs(&call_expr.arguments);
                 args.insert(0, call_target);
 
@@ -779,7 +837,9 @@ impl Interpreter {
                 }
             }
             _ => todo!("eval_call: {:?}", call_expr.callee),
-        }
+        };
+
+        EvalResult::Value(return_value)
     }
 
     fn eval_fn_call(
@@ -787,7 +847,7 @@ impl Interpreter {
         fn_decl: Rc<hir::FunctionDeclaration>,
         callee: TlangValue,
         args: &[TlangValue],
-    ) -> TlangValue {
+    ) -> EvalResult {
         debug!(
             "eval_fn_call: {} {:?} with args {:?}",
             fn_decl.name(),
@@ -816,8 +876,7 @@ impl Interpreter {
                 this.push_value(*arg);
             }
 
-            let result = this.eval_block_inner(&fn_decl.body);
-            this.state.set_return_value(result);
+            this.eval_block_inner(&fn_decl.body)
         })
     }
 
@@ -842,6 +901,7 @@ impl Interpreter {
             NativeFnReturn::DynamicCall(id) => {
                 if let Some(fn_decl) = self.state.get_fn_decl(id) {
                     self.with_root_scope(|this| this.eval_fn_call(fn_decl.clone(), callee, args))
+                        .unwrap_value()
                 } else {
                     panic!("Function not found: {:?}", id);
                 }
@@ -874,11 +934,10 @@ impl Interpreter {
                 .arguments
                 .iter()
                 .enumerate()
-                .map(|(i, arg)| (i.to_string(), self.eval_expr(arg)))
+                .map(|(i, arg)| (i.to_string(), self.eval_expr(arg).unwrap_value()))
                 .collect()
         } else {
-            let dict = &call_expr.arguments[0];
-            match &dict.kind {
+            match &call_expr.arguments[0].kind {
                 hir::ExprKind::Dict(entries) => entries
                     .iter()
                     .map(|(key, value)| {
@@ -886,11 +945,11 @@ impl Interpreter {
                             hir::ExprKind::Path(path) => path.first_ident().to_string(),
                             _ => todo!("eval_call: {:?}", key),
                         };
-                        let value = self.eval_expr(value);
+                        let value = self.eval_expr(value).unwrap_value();
                         (key, value)
                     })
                     .collect(),
-                _ => todo!("eval_call: {:?}", dict),
+                _ => todo!("eval_call: {:?}", call_expr.arguments[0]),
             }
         };
 
@@ -920,6 +979,7 @@ impl Interpreter {
                 self.with_root_scope(|this| {
                     // TODO: Struct methods should have a value to refer to.
                     this.eval_fn_call(fn_decl.clone(), TlangValue::Nil, args)
+                        .unwrap_value()
                 })
             }
             Some(TlangStructMethod::Native(id)) => {
@@ -937,21 +997,23 @@ impl Interpreter {
         }
     }
 
-    fn eval_let_stmt(&mut self, pat: &hir::Pat, expr: &hir::Expr, _ty: &hir::Ty) {
-        let value = self.eval_expr(expr);
+    fn eval_let_stmt(&mut self, pat: &hir::Pat, expr: &hir::Expr, _ty: &hir::Ty) -> EvalResult {
+        let value = eval_value!(self.eval_expr(expr));
 
         if !self.eval_pat(pat, value) {
             // We'd probably want to do it more like Rust via a if let statement, and have the
             // normal let statement be only valid for identifiers.
             panic!("Pattern did not match value");
         }
+
+        EvalResult::Void
     }
 
-    fn eval_list_expr(&mut self, values: &[hir::Expr]) -> TlangValue {
+    fn eval_list_expr(&mut self, values: &[hir::Expr]) -> EvalResult {
         let mut field_values = Vec::with_capacity(values.len());
         for expr in values {
             if let hir::ExprKind::Unary(UnaryOp::Spread, expr) = &expr.kind {
-                let value = self.eval_expr(expr);
+                let value = eval_value!(self.eval_expr(expr));
 
                 if let TlangValue::Object(id) = value {
                     let struct_values = &self.get_object(id).get_struct().unwrap().field_values;
@@ -960,19 +1022,19 @@ impl Interpreter {
                     panic!("Expected list, got {:?}", value);
                 }
             } else {
-                field_values.push(self.eval_expr(expr));
+                field_values.push(eval_value!(self.eval_expr(expr)));
             }
         }
 
-        self.state.new_list(field_values)
+        EvalResult::Value(self.state.new_list(field_values))
     }
 
-    fn eval_dict_expr(&mut self, entries: &[(hir::Expr, hir::Expr)]) -> TlangValue {
-        let mut field_values = Vec::with_capacity(entries.len());
+    fn eval_dict_expr(&mut self, entries: &[(hir::Expr, hir::Expr)]) -> EvalResult {
+        let mut field_values: Vec<TlangValue> = Vec::with_capacity(entries.len());
         let mut shape_keys = Vec::with_capacity(entries.len());
 
         for entry in entries {
-            field_values.push(self.eval_expr(&entry.1));
+            field_values.push(eval_value!(self.eval_expr(&entry.1)));
 
             // As we primarily had compilation to JS in mind, paths here should actually be
             // strings instead. Need to update the parser to emit strings instead of paths,
@@ -990,52 +1052,56 @@ impl Interpreter {
                 .define_struct_shape(shape, "Dict".to_string(), shape_keys, HashMap::new());
         }
 
-        self.state.new_object(TlangObjectKind::Struct(TlangStruct {
+        EvalResult::Value(self.state.new_object(TlangObjectKind::Struct(TlangStruct {
             shape,
             field_values,
-        }))
+        })))
     }
 
-    fn eval_match(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) -> TlangValue {
-        let match_value = self.eval_expr(expr);
+    fn eval_match(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) -> EvalResult {
+        let match_value = eval_value!(self.eval_expr(expr));
 
         debug!("eval_match: {}", self.state.stringify(match_value));
 
         for arm in arms {
-            if let Some(value) = self.eval_match_arm(arm, match_value) {
-                return value;
+            match self.eval_match_arm(arm, match_value) {
+                MatchResult::Matched(value) => return value,
+                MatchResult::NotMatched(eval_result) => propagate!(eval_result),
             }
         }
 
-        TlangValue::Nil
+        EvalResult::Void
     }
 
     /// Evaluates a match arm and returns the value if it matches, otherwise returns None.
-    fn eval_match_arm(&mut self, arm: &hir::MatchArm, value: TlangValue) -> Option<TlangValue> {
+    fn eval_match_arm(&mut self, arm: &hir::MatchArm, value: TlangValue) -> MatchResult {
         //debug!("eval_match_arm: {:?} {:?}", arm, value);
 
         self.with_new_scope(arm, |this| {
-            if this.eval_pat(&arm.pat, value) {
-                if let Some(expr) = &arm.guard {
-                    if let hir::ExprKind::Let(pat, expr) = &expr.kind {
-                        let value = this.eval_expr(expr);
+            if !this.eval_pat(&arm.pat, value) {
+                return MatchResult::NotMatched(EvalResult::Void);
+            }
 
-                        if !this.eval_pat(pat, value) {
-                            return None;
-                        }
-                    } else if !this.eval_expr(expr).is_truthy(&this.state) {
-                        return None;
+            if let Some(expr) = &arm.guard {
+                if let hir::ExprKind::Let(pat, expr) = &expr.kind {
+                    let value = match this.eval_expr(expr) {
+                        EvalResult::Value(value) => value,
+                        other => return MatchResult::NotMatched(other),
+                    };
+
+                    if !this.eval_pat(pat, value) {
+                        return MatchResult::NotMatched(EvalResult::Void);
                     }
+                } else if !this.eval_expr(expr).unwrap_value().is_truthy(&this.state) {
+                    return MatchResult::NotMatched(EvalResult::Void);
                 }
+            }
 
-                if let hir::ExprKind::Block(block) = &arm.expr.kind {
-                    // TODO: Do we need this?
-                    Some(this.eval_block_inner(block))
-                } else {
-                    Some(this.eval_expr(&arm.expr))
-                }
+            if let hir::ExprKind::Block(block) = &arm.expr.kind {
+                // TODO: Do we need this?
+                MatchResult::Matched(this.eval_block_inner(block))
             } else {
-                None
+                MatchResult::Matched(this.eval_expr(&arm.expr))
             }
         })
     }
@@ -1230,7 +1296,7 @@ mod tests {
             let hir = self.lowering_context.lower_module_in_current_scope(&ast);
 
             match &hir.block.stmts[0].kind {
-                hir::StmtKind::Expr(expr) => self.interpreter.eval_expr(expr),
+                hir::StmtKind::Expr(expr) => self.interpreter.eval_expr(expr).unwrap_value(),
                 _ => todo!("eval: {:?}", hir),
             }
         }

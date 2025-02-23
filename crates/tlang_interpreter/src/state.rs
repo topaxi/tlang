@@ -19,7 +19,6 @@ pub enum CallStackKind {
 
 pub struct CallStackEntry {
     pub kind: CallStackKind,
-    pub return_value: Option<TlangValue>,
     pub current_span: tlang_ast::span::Span,
 }
 
@@ -59,7 +58,6 @@ impl InterpreterState {
 
         call_stack.push(CallStackEntry {
             kind: CallStackKind::Root,
-            return_value: None,
             current_span: tlang_ast::span::Span::default(),
         });
 
@@ -110,10 +108,6 @@ impl InterpreterState {
         panic!("{}\n{}", message, call_stack)
     }
 
-    pub(crate) fn set_return_value(&mut self, value: TlangValue) {
-        self.call_stack.last_mut().unwrap().return_value = Some(value);
-    }
-
     pub(crate) fn set_current_span(&mut self, span: tlang_ast::span::Span) {
         self.call_stack.last_mut().unwrap().current_span = span;
     }
@@ -124,10 +118,6 @@ impl InterpreterState {
 
     pub(crate) fn pop_call_stack(&mut self) -> CallStackEntry {
         self.call_stack.pop().unwrap()
-    }
-
-    pub(crate) fn current_call_frame(&self) -> &CallStackEntry {
-        self.call_stack.last().unwrap()
     }
 
     pub(crate) fn enter_scope<T>(&mut self, meta: &T)
