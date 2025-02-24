@@ -265,8 +265,7 @@ impl Interpreter {
             }
             hir::StmtKind::Let(pat, expr, ty) => return self.eval_let_stmt(pat, expr, ty),
             hir::StmtKind::Return(box Some(expr)) => {
-                let value = eval_value!(self.eval_expr(expr));
-                return EvalResult::Return(value);
+                return EvalResult::Return(eval_value!(self.eval_expr(expr)));
             }
             hir::StmtKind::Return(_) => return EvalResult::Return(TlangValue::Nil),
             hir::StmtKind::None => unreachable!(),
