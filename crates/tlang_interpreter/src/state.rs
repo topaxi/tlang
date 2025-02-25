@@ -242,7 +242,7 @@ impl InterpreterState {
     pub fn get_field_index(&self, shape: ShapeKey, field: &str) -> Option<usize> {
         self.shapes
             .get(&shape)
-            .and_then(|shape| shape.field_map.get(field).copied())
+            .and_then(|shape| shape.get_field_index(field))
     }
 
     pub fn set_struct_method(
@@ -277,16 +277,12 @@ impl InterpreterState {
                     result.push_str(&shape.name);
                     result.push_str(" { ");
 
-                    if shape.field_map.is_empty() {
+                    if !shape.has_fields() {
                         result.push('}');
                         return result;
                     }
 
-                    let mut fields = shape
-                        .field_map
-                        .clone()
-                        .into_iter()
-                        .collect::<Vec<(String, usize)>>();
+                    let mut fields = shape.get_fields();
                     fields.sort();
                     result.push_str(
                         &fields

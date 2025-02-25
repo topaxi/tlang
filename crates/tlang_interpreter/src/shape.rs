@@ -88,6 +88,21 @@ impl TlangStructShape {
         }
     }
 
+    pub fn has_fields(&self) -> bool {
+        !self.field_map.is_empty()
+    }
+
+    pub fn get_field_index(&self, name: &str) -> Option<usize> {
+        self.field_map.get(name).copied()
+    }
+
+    pub fn get_fields(&self) -> Vec<(String, usize)> {
+        self.field_map
+            .iter()
+            .map(|(k, v)| (k.clone(), *v))
+            .collect()
+    }
+
     pub fn get_method(&self, name: &str) -> Option<&TlangStructMethod> {
         self.method_map.get(name)
     }
