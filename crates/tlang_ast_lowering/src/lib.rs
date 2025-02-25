@@ -19,7 +19,7 @@ mod scope;
 // See: https://github.com/rust-lang/rust/blob/de7cef75be8fab7a7e1b4d5bb01b51b4bac925c3/compiler/rustc_resolve/src/lib.rs#L408
 pub struct LoweringContext {
     unique_id: HirId,
-    node_id_to_hir_id: std::collections::HashMap<ast::node_id::NodeId, HirId>,
+    node_id_to_hir_id: HashMap<ast::node_id::NodeId, HirId>,
     scopes: Vec<Scope>,
 }
 
@@ -27,7 +27,7 @@ impl LoweringContext {
     pub fn new() -> Self {
         Self {
             unique_id: HirId::new(0),
-            node_id_to_hir_id: std::collections::HashMap::default(),
+            node_id_to_hir_id: HashMap::default(),
             scopes: vec![Scope::default()],
         }
     }
@@ -38,13 +38,10 @@ impl LoweringContext {
     }
 
     fn has_binding(&self, name: &str) -> bool {
-        for scope in self.scopes.iter().rev() {
-            if scope.lookup(name).is_some() {
-                return true;
-            }
-        }
-
-        false
+        self.scopes
+            .iter()
+            .rev()
+            .any(|scope| scope.lookup(name).is_some())
     }
 
     pub(crate) fn lookup_name(&mut self, name: &str) -> String {

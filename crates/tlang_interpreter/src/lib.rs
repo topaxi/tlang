@@ -1055,7 +1055,7 @@ impl Interpreter {
     ) -> TlangValue {
         let struct_shape = self.state.get_shape(struct_key).unwrap();
 
-        match struct_shape.method_map.get(method_name.as_str()) {
+        match struct_shape.get_method(method_name.as_str()) {
             Some(TlangStructMethod::HirId(id)) => {
                 let fn_decl = self.state.get_fn_decl(*id).unwrap().clone();
                 self.with_root_scope(|this| {

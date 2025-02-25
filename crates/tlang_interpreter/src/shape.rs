@@ -5,14 +5,12 @@ use tlang_hir::hir::HirId;
 
 use crate::value::{TlangObjectId, TlangValue};
 
-// ShapeKeyDict is a hash value generated from each of the keys in the struct.
-type ShapeKeyDict = u64;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum ShapeKeyImpl {
     HirId(HirId),
     Native(usize),
-    Dict(ShapeKeyDict),
+    // ShapeKeyImpl::Dict is a hash value generated from each of the keys in the struct.
+    Dict(u64),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -88,5 +86,9 @@ impl TlangStructShape {
             field_map,
             method_map: methods,
         }
+    }
+
+    pub fn get_method(&self, name: &str) -> Option<&TlangStructMethod> {
+        self.method_map.get(name)
     }
 }
