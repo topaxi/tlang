@@ -1,7 +1,7 @@
 macro_rules! advance_until {
     ($parser:ident, $pattern:pat) => {
-        while let Some(ref token) = $parser.current_token {
-            if matches!(&token.kind, $pattern) {
+        while !$parser.at_eof() {
+            if matches!($parser.current_token_kind(), $pattern) {
                 break;
             }
             $parser.advance();
@@ -14,7 +14,7 @@ macro_rules! expect_token_matches {
         use crate::macros::advance_until;
 
         match $parser.current_token_kind() {
-            Some($pattern) $(if $guard)? => (),
+            $pattern $(if $guard)? => (),
             _ => {
                 if !$parser.recoverable() {
                     $parser.panic_unexpected_token(&format!("{:?}", stringify!($pattern)), $parser.current_token.clone());
@@ -32,7 +32,7 @@ macro_rules! expect_token_matches {
         use crate::macros::advance_until;
 
         match $parser.current_token_kind() {
-            Some($pattern) $(if $guard)? => (),
+            $pattern $(if $guard)? => (),
             _ => {
                 if !$parser.recoverable() {
                     $parser.panic_unexpected_token($message, $parser.current_token.clone());

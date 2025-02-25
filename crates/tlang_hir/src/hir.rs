@@ -297,12 +297,6 @@ pub enum PatKind {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct ElseClause {
-    pub condition: Option<Expr>,
-    pub consequence: Block,
-}
-
-#[derive(Debug, Clone, Serialize)]
 pub struct MatchArm {
     pub pat: Pat,
     pub guard: Option<Expr>,
@@ -419,6 +413,12 @@ pub enum ExprKind {
     Match(Box<Expr>, Vec<MatchArm>),
     Range(Box<RangeExpression>),
     Wildcard, // TODO: This might be better to just be an identifier
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ElseClause {
+    pub condition: Option<Expr>,
+    pub consequence: Block,
 }
 
 #[derive(Debug, Default, Clone, Serialize)]

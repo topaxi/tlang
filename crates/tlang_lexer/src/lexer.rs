@@ -86,6 +86,8 @@ impl Lexer<'_> {
         let slice = &self.source[start_position..self.position];
         let token_kind = if slice.contains('.') {
             TokenKind::Literal(Literal::Float(slice.parse().unwrap_or(0.0)))
+        } else if slice.starts_with('-') {
+            TokenKind::Literal(Literal::UnsignedInteger(slice.parse().unwrap_or(0)))
         } else {
             TokenKind::Literal(Literal::Integer(slice.parse().unwrap_or(0)))
         };

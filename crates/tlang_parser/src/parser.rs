@@ -16,9 +16,9 @@ use log::debug;
 
 pub struct Parser<'src> {
     lexer: Lexer<'src>,
-    previous_span: Option<Span>,
-    current_token: Option<Token>,
-    next_token: Option<Token>,
+    previous_span: Span,
+    current_token: Token,
+    next_token: Token,
 
     recoverable: bool,
 
@@ -31,9 +31,9 @@ impl<'src> Parser<'src> {
     pub fn new(lexer: Lexer<'src>) -> Parser<'src> {
         Parser {
             lexer,
-            previous_span: None,
-            current_token: None,
-            next_token: None,
+            previous_span: Span::default(),
+            current_token: Token::default(),
+            next_token: Token::default(),
             unique_id: NodeId::new(0),
             errors: Vec::new(),
             recoverable: false,
@@ -63,8 +63,8 @@ impl<'src> Parser<'src> {
     }
 
     pub fn parse(&mut self) -> Result<Module, ParseError> {
-        self.advance();
-        self.advance();
+        self.current_token = self.lexer.next_token();
+        self.next_token = self.lexer.next_token();
 
         let module = self.parse_module();
 
@@ -76,30 +76,25 @@ impl<'src> Parser<'src> {
     }
 
     fn create_span_from_current_token(&self) -> Span {
-        self.current_token.as_ref().unwrap().span
+        self.current_token.span
     }
 
     fn end_span_from_previous_token(&self, span: &mut Span) {
-        span.end = self.previous_span.unwrap().end
+        span.end = self.previous_span.end
     }
 
     #[inline(never)]
-    fn push_unexpected_token_error(&mut self, expected: &str, actual: Option<Token>) {
-        self.errors.push(ParseIssue {
-            msg: format!(
-                "Expected {}, found {:?}",
-                expected,
-                actual.as_ref().unwrap().kind
-            ),
-            kind: ParseIssueKind::UnexpectedToken(actual.clone().unwrap()),
-            span: actual.as_ref().unwrap().span,
-        });
+    fn push_unexpected_token_error(&mut self, expected: &str, actual: Token) {
+        let span = actual.span;
+        let msg = format!("Expected {}, found {:?}", expected, actual.kind);
+        let kind = ParseIssueKind::UnexpectedToken(actual);
+
+        self.errors.push(ParseIssue { msg, kind, span });
     }
 
     #[inline(never)]
-    fn panic_unexpected_token(&self, expected: &str, actual: Option<Token>) {
-        let token = actual.as_ref().unwrap();
-        let start_span = token.span.start;
+    fn panic_unexpected_token(&self, expected: &str, actual: Token) {
+        let start_span = actual.span.start;
         let source_line = self
             .lexer
             .source()
@@ -110,14 +105,13 @@ impl<'src> Parser<'src> {
 
         panic!(
             "Expected {} on line {}, column {}, found {:?} instead\n{}\n{}",
-            expected, start_span.line, start_span.column, token.kind, source_line, caret
+            expected, start_span.line, start_span.column, actual.kind, source_line, caret
         );
     }
 
     #[inline(never)]
-    fn panic_unexpected_stmt(&self, expected: &str, actual: Option<Stmt>) {
-        let node = actual.as_ref().unwrap();
-        let start_span = node.span.start;
+    fn panic_unexpected_stmt(&self, expected: &str, actual: Stmt) {
+        let start_span = actual.span.start;
         let source_line = self
             .lexer
             .source()
@@ -128,7 +122,7 @@ impl<'src> Parser<'src> {
 
         panic!(
             "Expected {} on line {}, column {}, found {:?} instead\n{}\n{}",
-            expected, start_span.line, start_span.column, node.kind, source_line, caret
+            expected, start_span.line, start_span.column, actual.kind, source_line, caret
         );
     }
 
@@ -181,47 +175,45 @@ impl<'src> Parser<'src> {
     fn parse_identifier(&mut self) -> Ident {
         expect_token_matches!(self, TokenKind::Identifier(_));
 
-        let current_token = self.current_token.as_ref().unwrap();
+        let current_token = self.advance();
         let ident = Ident::new(current_token.get_identifier().unwrap(), current_token.span);
-
-        self.advance();
 
         ident
     }
 
     fn at_eof(&self) -> bool {
-        matches!(self.current_token_kind(), Some(TokenKind::Eof))
+        matches!(self.current_token_kind(), TokenKind::Eof)
     }
 
-    fn advance(&mut self) {
+    fn advance(&mut self) -> Token {
         if self.at_eof() {
             // In error recovery we scan ahead and look for the expected token.
             // If we reach the end of the file, we don't want to continue scanning and
             // break our `while let Some(_) = self.current_token` loop.
-            self.current_token = None;
-            self.next_token = None;
+            let consumed_token = self.current_token.clone();
+            self.next_token = Token::new(TokenKind::Eof, consumed_token.span);
 
-            return;
+            return consumed_token;
         }
 
-        self.previous_span = self.current_token.as_ref().map(|token| token.span);
-        self.current_token = self.next_token.take();
-
-        self.next_token = Some(self.lexer.next_token());
+        let next_token = std::mem::replace(&mut self.next_token, self.lexer.next_token());
+        let consumed_token = std::mem::replace(&mut self.current_token, next_token);
+        self.previous_span = consumed_token.span;
         debug!("Advanced to {:?}", self.current_token);
+        consumed_token
     }
 
     #[inline(always)]
-    fn current_token_kind(&self) -> Option<&TokenKind> {
-        self.current_token.as_ref().map(|token| &token.kind)
+    fn current_token_kind(&self) -> &TokenKind {
+        &self.current_token.kind
     }
 
     #[inline(always)]
-    pub fn peek_token_kind(&self) -> Option<&TokenKind> {
-        self.next_token.as_ref().map(|token| &token.kind)
+    pub fn peek_token_kind(&self) -> &TokenKind {
+        &self.next_token.kind
     }
 
-    fn save_state(&self) -> (Lexer<'src>, Option<Token>, Option<Token>) {
+    fn save_state(&self) -> (Lexer<'src>, Token, Token) {
         debug!("Saving state at {:?}", self.current_token);
 
         (
@@ -231,7 +223,7 @@ impl<'src> Parser<'src> {
         )
     }
 
-    fn restore_state(&mut self, state: (Lexer<'src>, Option<Token>, Option<Token>)) {
+    fn restore_state(&mut self, state: (Lexer<'src>, Token, Token)) {
         debug!("Restoring state to {:?}", state.1);
 
         self.lexer = state.0;
@@ -243,10 +235,9 @@ impl<'src> Parser<'src> {
         let mut comments: Vec<Token> = Vec::new();
         while matches!(
             self.current_token_kind(),
-            Some(TokenKind::SingleLineComment(_) | TokenKind::MultiLineComment(_))
+            TokenKind::SingleLineComment(_) | TokenKind::MultiLineComment(_)
         ) {
-            comments.push(self.current_token.clone().unwrap());
-            self.advance();
+            comments.push(self.advance());
         }
         comments
     }
@@ -255,7 +246,7 @@ impl<'src> Parser<'src> {
         debug!("Parsing statement {:?}", self.current_token);
 
         // Skip stray semicolons.
-        if let Some(TokenKind::Semicolon) = self.current_token_kind() {
+        if matches!(self.current_token_kind(), TokenKind::Semicolon) {
             self.advance();
 
             return (false, None);
@@ -263,26 +254,26 @@ impl<'src> Parser<'src> {
 
         let comments = self.parse_comments();
 
-        if matches!(self.current_token_kind(), Some(TokenKind::Eof)) {
+        if matches!(self.current_token_kind(), TokenKind::Eof) {
             let mut node = node::stmt!(self.unique_id(), None);
             node.leading_comments = comments;
             return (false, Some(node));
         }
 
         let mut span = self.create_span_from_current_token();
-        let mut node = match &self.current_token.as_ref().map(|t| &t.kind) {
-            Some(TokenKind::Keyword(Keyword::Let)) => self.parse_variable_declaration(),
-            Some(TokenKind::Keyword(Keyword::Fn))
+        let mut node = match &self.current_token.kind {
+            TokenKind::Keyword(Keyword::Let) => self.parse_variable_declaration(),
+            TokenKind::Keyword(Keyword::Fn)
                 // If the next token is an identifier, we assume a function declaration.
                 // If it's not, we assume a function expression which is handled as a primary expression.
-                if matches!(self.peek_token_kind(), Some(TokenKind::Identifier(_))) =>
+                if matches!(self.peek_token_kind(), TokenKind::Identifier(_)) =>
             {
                 self.parse_function_declaration()
             }
-            Some(TokenKind::Keyword(Keyword::Return)) => self.parse_return_statement(),
-            Some(TokenKind::Keyword(Keyword::Enum)) => self.parse_enum_declaration(),
-            Some(TokenKind::Keyword(Keyword::Struct)) => self.parse_struct_declaration(),
-            Some(TokenKind::LBrace) => self.parse_block_stmt(),
+            TokenKind::Keyword(Keyword::Return) => self.parse_return_statement(),
+            TokenKind::Keyword(Keyword::Enum) => self.parse_enum_declaration(),
+            TokenKind::Keyword(Keyword::Struct) => self.parse_struct_declaration(),
+            TokenKind::LBrace => self.parse_block_stmt(),
             _ => node::stmt!(self.unique_id(), Expr(Box::new(self.parse_expression()))),
         };
         node.leading_comments = comments;
@@ -309,7 +300,7 @@ impl<'src> Parser<'src> {
     fn parse_return_statement(&mut self) -> Stmt {
         self.consume_keyword_token(Keyword::Return);
 
-        if matches!(self.current_token_kind(), Some(TokenKind::Semicolon)) {
+        if matches!(self.current_token_kind(), TokenKind::Semicolon) {
             return node::stmt!(self.unique_id(), Return(Box::new(None)));
         }
 
@@ -327,7 +318,7 @@ impl<'src> Parser<'src> {
 
     fn parse_path(&mut self) -> Path {
         let mut path = Path::from_ident(self.parse_identifier());
-        while let Some(TokenKind::PathSeparator) = self.current_token_kind() {
+        while matches!(self.current_token_kind(), TokenKind::PathSeparator) {
             self.advance();
             path.push(self.parse_identifier());
         }
@@ -351,9 +342,10 @@ impl<'src> Parser<'src> {
         let name = self.parse_identifier();
         self.consume_token(TokenKind::LBrace);
         let mut fields = Vec::with_capacity(2);
-        while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
+        while !matches!(self.current_token_kind(), TokenKind::RBrace) {
             fields.push(self.parse_struct_field());
-            if let Some(TokenKind::Comma) = self.current_token_kind() {
+
+            if matches!(self.current_token_kind(), TokenKind::Comma) {
                 self.advance();
             }
         }
@@ -381,9 +373,10 @@ impl<'src> Parser<'src> {
         let name = self.parse_identifier();
         self.consume_token(TokenKind::LBrace);
         let mut variants = Vec::with_capacity(2);
-        while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
+        while !matches!(self.current_token_kind(), TokenKind::RBrace) {
             variants.push(self.parse_enum_variant());
-            if let Some(TokenKind::Comma) = self.current_token_kind() {
+
+            if matches!(self.current_token_kind(), TokenKind::Comma) {
                 self.advance();
             }
         }
@@ -401,11 +394,11 @@ impl<'src> Parser<'src> {
         let name = self.parse_identifier();
         log::debug!("Parsing enum variant {}", name);
         let mut node = match self.current_token_kind() {
-            Some(TokenKind::LParen) => {
+            TokenKind::LParen => {
                 self.advance();
                 let mut parameters = Vec::new();
                 let mut index = 0;
-                while !matches!(self.current_token_kind(), Some(TokenKind::RParen)) {
+                while !matches!(self.current_token_kind(), TokenKind::RParen) {
                     let ident = Ident::new(&index.to_string(), Span::default());
                     let ty = self.parse_type_annotation();
                     parameters.push(StructField {
@@ -413,7 +406,7 @@ impl<'src> Parser<'src> {
                         name: ident,
                         ty,
                     });
-                    if let Some(TokenKind::Comma) = self.current_token_kind() {
+                    if matches!(self.current_token_kind(), TokenKind::Comma) {
                         self.advance();
                     }
                     index += 1;
@@ -426,12 +419,12 @@ impl<'src> Parser<'src> {
                     span,
                 }
             }
-            Some(TokenKind::LBrace) => {
+            TokenKind::LBrace => {
                 self.advance();
                 let mut parameters = Vec::new();
-                while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
+                while !matches!(self.current_token_kind(), TokenKind::RBrace) {
                     let ident = self.parse_identifier();
-                    let ty = if matches!(self.current_token_kind(), Some(TokenKind::Colon)) {
+                    let ty = if matches!(self.current_token_kind(), TokenKind::Colon) {
                         self.advance();
                         self.parse_type_annotation()
                     } else {
@@ -448,7 +441,7 @@ impl<'src> Parser<'src> {
                         name: ident,
                         ty,
                     });
-                    if let Some(TokenKind::Comma) = self.current_token_kind() {
+                    if matches!(self.current_token_kind(), TokenKind::Comma) {
                         self.advance();
                     }
                 }
@@ -478,11 +471,11 @@ impl<'src> Parser<'src> {
 
         while !matches!(
             self.current_token_kind(),
-            Some(TokenKind::RBrace | TokenKind::Eof)
+            TokenKind::RBrace | TokenKind::Eof
         ) {
             if let (consume_semicolon, Some(mut statement)) = self.parse_statement() {
                 if may_complete
-                    && matches!(self.current_token_kind(), Some(TokenKind::RBrace))
+                    && matches!(self.current_token_kind(), TokenKind::RBrace)
                     && matches!(
                         statement.kind,
                         StmtKind::Expr(_) | StmtKind::FunctionDeclaration(_)
@@ -498,7 +491,7 @@ impl<'src> Parser<'src> {
                         _ => {
                             self.panic_unexpected_stmt(
                                 "expression statement or function declaration",
-                                Some(statement),
+                                statement,
                             );
                             unreachable!()
                         }
@@ -564,7 +557,7 @@ impl<'src> Parser<'src> {
         let pattern = self.parse_pattern();
 
         let type_annotation = match self.current_token_kind() {
-            Some(TokenKind::Colon) => {
+            TokenKind::Colon => {
                 self.advance();
                 self.parse_optional_type_annotation()
             }
@@ -591,7 +584,7 @@ impl<'src> Parser<'src> {
             "Parsing call expression, current token: {:?}",
             self.current_token
         );
-        let is_dict_call = matches!(self.current_token_kind(), Some(TokenKind::LBrace));
+        let is_dict_call = matches!(self.current_token_kind(), TokenKind::LBrace);
         let mut arguments = Vec::new();
 
         log::debug!("Is dict call: {}", is_dict_call);
@@ -601,14 +594,14 @@ impl<'src> Parser<'src> {
         } else {
             self.consume_token(TokenKind::LParen);
             let mut is_first_argument = true;
-            while !matches!(self.current_token_kind(), Some(TokenKind::RParen)) {
+            while !matches!(self.current_token_kind(), TokenKind::RParen) {
                 if !is_first_argument {
                     self.consume_token(TokenKind::Comma);
                 } else {
                     is_first_argument = false;
                 }
 
-                if matches!(self.current_token_kind(), Some(TokenKind::RParen)) {
+                if matches!(self.current_token_kind(), TokenKind::RParen) {
                     break;
                 }
 
@@ -632,14 +625,15 @@ impl<'src> Parser<'src> {
 
     fn parse_identifier_pattern(&mut self) -> Pat {
         let id = self.unique_id();
-        let current_token = self.current_token.as_ref().unwrap();
 
         // TODO: We only do this because we call `parse_identifier_pattern` within
         // `parse_enum_extraction` and that code there is quite messy.
-        if let TokenKind::Keyword(Keyword::Underscore) = current_token.kind {
-            let wildcard_pattern = node::pat!(id, Wildcard).with_span(current_token.span);
-            self.advance();
-            return wildcard_pattern;
+        if matches!(
+            self.current_token_kind(),
+            TokenKind::Keyword(Keyword::Underscore)
+        ) {
+            let current_token = self.advance();
+            return node::pat!(id, Wildcard).with_span(current_token.span);
         }
 
         let name = self.parse_identifier();
@@ -657,7 +651,7 @@ impl<'src> Parser<'src> {
 
         let mut elements = Vec::new();
         // Only allow literal values, identifiers and and rest params for now.
-        while !matches!(self.current_token_kind(), Some(TokenKind::RBracket)) {
+        while !matches!(self.current_token_kind(), TokenKind::RBracket) {
             expect_token_matches!(
                 self,
                 "identifier, literal, wildcard or rest parameter",
@@ -669,7 +663,7 @@ impl<'src> Parser<'src> {
             );
 
             let element = match self.current_token_kind() {
-                Some(TokenKind::DotDotDot) => {
+                TokenKind::DotDotDot => {
                     self.advance();
                     node::pat!(
                         self.unique_id(),
@@ -682,7 +676,7 @@ impl<'src> Parser<'src> {
             elements.push(element);
 
             // Allow trailing comma.
-            if matches!(self.current_token_kind(), Some(TokenKind::RBracket)) {
+            if matches!(self.current_token_kind(), TokenKind::RBracket) {
                 break;
             }
 
@@ -698,9 +692,9 @@ impl<'src> Parser<'src> {
         self.consume_token(TokenKind::LBracket);
 
         let mut elements = Vec::new();
-        while !matches!(self.current_token_kind(), Some(TokenKind::RBracket)) {
+        while !matches!(self.current_token_kind(), TokenKind::RBracket) {
             let element = match self.current_token_kind() {
-                Some(TokenKind::DotDotDot) => {
+                TokenKind::DotDotDot => {
                     self.advance();
 
                     node::expr!(
@@ -714,7 +708,7 @@ impl<'src> Parser<'src> {
             elements.push(element);
 
             // Allow trailing comma.
-            if matches!(self.current_token_kind(), Some(TokenKind::RBracket)) {
+            if matches!(self.current_token_kind(), TokenKind::RBracket) {
                 break;
             }
 
@@ -728,7 +722,7 @@ impl<'src> Parser<'src> {
 
     fn parse_dict_elements(&mut self) -> Vec<(Expr, Expr)> {
         let mut elements = Vec::new();
-        while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
+        while !matches!(self.current_token_kind(), TokenKind::RBrace) {
             let key = self.parse_expression();
 
             // If key is an single identifier and we follow up with a comma or rbrace, then we are
@@ -737,10 +731,10 @@ impl<'src> Parser<'src> {
                 if path.segments.len() == 1
                     && matches!(
                         self.current_token_kind(),
-                        Some(TokenKind::Comma | TokenKind::RBrace)
+                        TokenKind::Comma | TokenKind::RBrace
                     )
                 {
-                    if matches!(self.current_token_kind(), Some(TokenKind::Comma)) {
+                    if matches!(self.current_token_kind(), TokenKind::Comma) {
                         self.advance();
                     }
                     elements.push((key.clone(), key));
@@ -749,9 +743,8 @@ impl<'src> Parser<'src> {
             }
 
             self.consume_token(TokenKind::Colon);
-            let value = self.parse_expression();
-            elements.push((key, value));
-            if let Some(TokenKind::Comma) = self.current_token_kind() {
+            elements.push((key, self.parse_expression()));
+            if matches!(self.current_token_kind(), TokenKind::Comma) {
                 self.advance();
             }
         }
@@ -763,12 +756,9 @@ impl<'src> Parser<'src> {
         self.consume_token(TokenKind::LBrace);
         // If immediately closed or the first token is a identifier followed by a colon or comma,
         // we assume we are parsing a dict.
-        let is_dict = matches!(self.current_token_kind(), Some(TokenKind::RBrace))
-            || (matches!(self.current_token_kind(), Some(TokenKind::Identifier(_)))
-                && matches!(
-                    self.peek_token_kind(),
-                    Some(TokenKind::Colon | TokenKind::Comma)
-                ));
+        let is_dict = matches!(self.current_token_kind(), TokenKind::RBrace)
+            || (matches!(self.current_token_kind(), TokenKind::Identifier(_))
+                && matches!(self.peek_token_kind(), TokenKind::Colon | TokenKind::Comma));
         if is_dict {
             let elements = self.parse_dict_elements();
             self.consume_token(TokenKind::RBrace);
@@ -793,7 +783,7 @@ impl<'src> Parser<'src> {
         let path = self.parse_path_expression();
         let mut span = path.span;
 
-        let mut expr = if let Some(TokenKind::Dot) = self.current_token_kind() {
+        let mut expr = if matches!(self.current_token_kind(), TokenKind::Dot) {
             self.advance();
             node::expr!(
                 self.unique_id(),
@@ -814,7 +804,7 @@ impl<'src> Parser<'src> {
     fn parse_if_condition(&mut self) -> Expr {
         self.consume_keyword_token(Keyword::If);
 
-        let condition = if let Some(TokenKind::Keyword(Keyword::Let)) = self.current_token_kind() {
+        let condition = if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Let)) {
             self.parse_let_expression()
         } else {
             self.parse_expression()
@@ -825,7 +815,7 @@ impl<'src> Parser<'src> {
         // Semicolon or parenthesis are currently needed to disambiguate call with dictionary and block.
         // E.g. `if let x = foo { .. }` is recognized as `foo({ .. })`
         // vs `if let x = foo; { .. }` which will properly parse.
-        if let Some(TokenKind::Semicolon) = self.current_token_kind() {
+        if matches!(self.current_token_kind(), TokenKind::Semicolon) {
             self.advance();
         }
 
@@ -839,10 +829,10 @@ impl<'src> Parser<'src> {
         let then_branch = self.parse_block();
 
         let mut else_branches = Vec::new();
-        while let Some(TokenKind::Keyword(Keyword::Else)) = self.current_token_kind() {
+        while matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Else)) {
             self.advance();
 
-            let condition = if let Some(TokenKind::Keyword(Keyword::If)) = self.current_token_kind()
+            let condition = if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::If))
             {
                 Some(self.parse_if_condition())
             } else {
@@ -874,7 +864,7 @@ impl<'src> Parser<'src> {
 
     fn parse_unary_expression(&mut self) -> Expr {
         match self.current_token_kind() {
-            Some(TokenKind::Minus) => {
+            TokenKind::Minus => {
                 self.advance();
 
                 node::expr!(
@@ -883,7 +873,7 @@ impl<'src> Parser<'src> {
                 )
             }
 
-            Some(TokenKind::ExclamationMark | TokenKind::Keyword(Keyword::Not)) => {
+            TokenKind::ExclamationMark | TokenKind::Keyword(Keyword::Not) => {
                 self.advance();
 
                 node::expr!(
@@ -924,20 +914,37 @@ impl<'src> Parser<'src> {
 
         let mut span = self.create_span_from_current_token();
         let mut node = match self.current_token_kind() {
-            Some(
-                TokenKind::Minus | TokenKind::ExclamationMark | TokenKind::Keyword(Keyword::Not),
-            ) => self.parse_unary_expression(),
-            Some(TokenKind::LParen) => {
+            TokenKind::Minus | TokenKind::Plus
+                if matches!(
+                    self.peek_token_kind(),
+                    TokenKind::Literal(Literal::Integer(_) | Literal::Float(_))
+                ) =>
+            {
+                let invert = matches!(self.advance().kind, TokenKind::Minus);
+                let lit_token = self.advance();
+                let literal = lit_token.get_literal().unwrap();
+
+                if invert {
+                    node::expr!(self.unique_id(), Literal(Box::new(literal.invert_sign())))
+                } else {
+                    node::expr!(self.unique_id(), Literal(Box::new(literal.clone())))
+                }
+            }
+
+            TokenKind::Minus | TokenKind::ExclamationMark | TokenKind::Keyword(Keyword::Not) => {
+                self.parse_unary_expression()
+            }
+            TokenKind::LParen => {
                 self.advance();
                 let expression = self.parse_expression();
                 self.consume_token(TokenKind::RParen);
                 expression
             }
-            Some(TokenKind::LBrace) => self.parse_block_or_dict(),
-            Some(TokenKind::LBracket) => self.parse_list_expression(),
-            Some(TokenKind::Keyword(Keyword::If)) => self.parse_if_else_expression(),
-            Some(TokenKind::Keyword(Keyword::Fn)) => self.parse_function_expression(),
-            Some(TokenKind::Keyword(Keyword::Rec)) => {
+            TokenKind::LBrace => self.parse_block_or_dict(),
+            TokenKind::LBracket => self.parse_list_expression(),
+            TokenKind::Keyword(Keyword::If) => self.parse_if_else_expression(),
+            TokenKind::Keyword(Keyword::Fn) => self.parse_function_expression(),
+            TokenKind::Keyword(Keyword::Rec) => {
                 self.advance();
                 let expr = self.parse_expression();
                 let call_expr = match expr.kind {
@@ -950,19 +957,18 @@ impl<'src> Parser<'src> {
 
                 node::expr!(self.unique_id(), RecursiveCall(call_expr)).with_span(expr.span)
             }
-            Some(TokenKind::Keyword(Keyword::Match)) => self.parse_match_expression(),
-            Some(TokenKind::Keyword(Keyword::Underscore)) => {
+            TokenKind::Keyword(Keyword::Match) => self.parse_match_expression(),
+            TokenKind::Keyword(Keyword::Underscore) => {
                 self.advance();
                 node::expr!(self.unique_id(), Wildcard)
             }
-            Some(TokenKind::Literal(literal)) => {
-                let literal = literal.clone();
-                self.advance();
+            TokenKind::Literal(_) => {
+                let literal = self.advance().get_literal().unwrap().clone();
                 node::expr!(self.unique_id(), Literal(Box::new(literal)))
             }
             // TODO: Mostly copied from Identifier further below, `self` might be easier to just be
             //       an identifier.
-            Some(TokenKind::Keyword(Keyword::_Self)) => {
+            TokenKind::Keyword(Keyword::_Self) => {
                 let identifier_span = self.create_span_from_current_token();
 
                 self.advance();
@@ -970,7 +976,7 @@ impl<'src> Parser<'src> {
                 let mut path = Path::from_ident(Ident::new(kw::_Self, identifier_span));
                 let mut span = path.span;
 
-                while let Some(TokenKind::PathSeparator) = self.current_token_kind() {
+                while matches!(self.current_token_kind(), TokenKind::PathSeparator) {
                     self.advance();
                     path.push(self.parse_identifier());
                 }
@@ -979,22 +985,25 @@ impl<'src> Parser<'src> {
 
                 let mut expr = node::expr!(self.unique_id(), Path(Box::new(path))).with_span(span);
 
-                if let Some(TokenKind::LParen | TokenKind::LBrace) = self.current_token_kind() {
+                if matches!(
+                    self.current_token_kind(),
+                    TokenKind::LParen | TokenKind::LBrace
+                ) {
                     expr = self.parse_call_expression(expr);
                 }
 
                 expr
             }
-            Some(TokenKind::Identifier(identifier)) => {
-                let identifier = identifier.clone();
+            TokenKind::Identifier(_) => {
                 let identifier_span = self.create_span_from_current_token();
 
-                self.advance();
+                let token = self.advance();
+                let identifier = token.get_identifier().unwrap();
 
-                let mut path = Path::from_ident(Ident::new(&identifier, identifier_span));
+                let mut path = Path::from_ident(Ident::new(identifier, identifier_span));
                 let mut span = path.span;
 
-                while let Some(TokenKind::PathSeparator) = self.current_token_kind() {
+                while matches!(self.current_token_kind(), TokenKind::PathSeparator) {
                     self.advance();
                     path.push(self.parse_identifier());
                 }
@@ -1003,7 +1012,10 @@ impl<'src> Parser<'src> {
 
                 let mut expr = node::expr!(self.unique_id(), Path(Box::new(path))).with_span(span);
 
-                if let Some(TokenKind::LParen | TokenKind::LBrace) = self.current_token_kind() {
+                if matches!(
+                    self.current_token_kind(),
+                    TokenKind::LParen | TokenKind::LBrace
+                ) {
                     expr = self.parse_call_expression(expr);
                 }
 
@@ -1031,14 +1043,14 @@ impl<'src> Parser<'src> {
         // Semicolon or parenthesis are currently needed to disambiguate call with dictionary and block.
         // E.g. `if let x = foo { .. }` is recognized as `foo({ .. })`
         // vs `if let x = foo; { .. }` which will properly parse.
-        if let Some(TokenKind::Semicolon) = self.current_token_kind() {
+        if matches!(self.current_token_kind(), TokenKind::Semicolon) {
             self.advance();
         }
 
         self.consume_token(TokenKind::LBrace);
 
         let mut arms = Vec::new();
-        while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
+        while !matches!(self.current_token_kind(), TokenKind::RBrace) {
             let pattern = self.parse_pattern();
             let guard = self.parse_guard_clause();
             self.consume_token(TokenKind::FatArrow);
@@ -1049,7 +1061,7 @@ impl<'src> Parser<'src> {
                 guard,
                 expression,
             });
-            if let Some(TokenKind::Comma) = self.current_token_kind() {
+            if matches!(self.current_token_kind(), TokenKind::Comma) {
                 self.advance();
             }
         }
@@ -1065,14 +1077,14 @@ impl<'src> Parser<'src> {
     fn parse_parameter_list(&mut self) -> Vec<FunctionParameter> {
         let mut parameters = Vec::new();
 
-        if let Some(TokenKind::LParen) = self.current_token_kind() {
+        if matches!(self.current_token_kind(), TokenKind::LParen) {
             self.consume_token(TokenKind::LParen);
 
             let mut is_first_parameter = true;
-            while !matches!(self.current_token_kind(), Some(TokenKind::RParen)) {
+            while !matches!(self.current_token_kind(), TokenKind::RParen) {
                 if !is_first_parameter {
                     self.consume_token(TokenKind::Comma);
-                    if matches!(self.current_token_kind(), Some(TokenKind::RParen)) {
+                    if matches!(self.current_token_kind(), TokenKind::RParen) {
                         break;
                     }
                 } else {
@@ -1083,7 +1095,7 @@ impl<'src> Parser<'src> {
                 let parameter_pattern = self.parse_pattern();
 
                 let type_annotation = match self.current_token_kind() {
-                    Some(TokenKind::Colon) => {
+                    TokenKind::Colon => {
                         self.advance();
                         self.parse_optional_type_annotation()
                     }
@@ -1118,36 +1130,35 @@ impl<'src> Parser<'src> {
         expect_token_matches!(self, "type annotation", TokenKind::Identifier(_));
 
         match self.current_token_kind() {
-            Some(TokenKind::Identifier(_)) => {
+            TokenKind::Identifier(_) => {
                 let identifier = self.parse_path();
                 let parameters = self.parse_type_annotation_parameters();
 
                 Ty::new(self.unique_id(), identifier).with_parameters(parameters)
             }
-            Some(token) => unreachable!("Expected type annotation, found {:?}", token),
-            None => unreachable!("Expected type annotation"),
+            token => unreachable!("Expected type annotation, found {:?}", token),
         }
     }
 
     fn parse_optional_type_annotation(&mut self) -> Option<Ty> {
-        let token = self.current_token_kind()?;
+        let token = self.current_token_kind();
 
         if !Self::is_type_annotation_token(token) {
             return None;
         }
 
-        self.parse_type_annotation().into()
+        Some(self.parse_type_annotation())
     }
 
     fn parse_type_annotation_parameters(&mut self) -> Vec<Ty> {
         let mut parameters = Vec::new();
 
-        if let Some(TokenKind::LessThan) = self.current_token_kind() {
+        if matches!(self.current_token_kind(), TokenKind::LessThan) {
             self.advance();
-            while !matches!(self.current_token_kind(), Some(TokenKind::GreaterThan)) {
+            while !matches!(self.current_token_kind(), TokenKind::GreaterThan) {
                 let parameter = self.parse_type_annotation();
                 parameters.push(parameter);
-                if let Some(TokenKind::Comma) = self.current_token_kind() {
+                if matches!(self.current_token_kind(), TokenKind::Comma) {
                     self.advance();
                 }
             }
@@ -1158,7 +1169,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_return_type(&mut self) -> Option<Ty> {
-        if let Some(TokenKind::Arrow) = self.current_token_kind() {
+        if matches!(self.current_token_kind(), TokenKind::Arrow) {
             self.advance();
             self.parse_optional_type_annotation()
         } else {
@@ -1169,7 +1180,7 @@ impl<'src> Parser<'src> {
     fn parse_function_expression(&mut self) -> Expr {
         let mut span = self.create_span_from_current_token();
         self.consume_keyword_token(Keyword::Fn);
-        let name = if let Some(TokenKind::Identifier(_)) = self.current_token_kind() {
+        let name = if matches!(self.current_token_kind(), TokenKind::Identifier(_)) {
             self.parse_single_identifier()
         } else {
             node::expr!(
@@ -1205,15 +1216,15 @@ impl<'src> Parser<'src> {
     /// Parses an enum extraction, e.g. `Foo(bar, baz)` and `Foo { bar, baz }`
     fn parse_enum_extraction(&mut self) -> Pat {
         let path = self.parse_path();
-        let is_dict_extraction = matches!(self.current_token_kind(), Some(TokenKind::LBrace));
+        let is_dict_extraction = matches!(self.current_token_kind(), TokenKind::LBrace);
 
         if is_dict_extraction {
             self.consume_token(TokenKind::LBrace);
             let mut elements = Vec::new();
-            while !matches!(self.current_token_kind(), Some(TokenKind::RBrace)) {
+            while !matches!(self.current_token_kind(), TokenKind::RBrace) {
                 let ident = self.parse_identifier();
 
-                if let Some(TokenKind::Colon) = self.current_token_kind() {
+                if matches!(self.current_token_kind(), TokenKind::Colon) {
                     self.advance();
                     let pattern = self.parse_pattern();
                     elements.push((ident, pattern));
@@ -1224,7 +1235,7 @@ impl<'src> Parser<'src> {
                     ));
                 }
 
-                if let Some(TokenKind::Comma) = self.current_token_kind() {
+                if matches!(self.current_token_kind(), TokenKind::Comma) {
                     self.advance();
                 }
             }
@@ -1233,15 +1244,15 @@ impl<'src> Parser<'src> {
                 self.unique_id(),
                 Enum(Box::new(EnumPattern { path, elements }))
             )
-        } else if let Some(TokenKind::LParen) = self.current_token_kind() {
+        } else if matches!(self.current_token_kind(), TokenKind::LParen) {
             self.consume_token(TokenKind::LParen);
             let mut elements = Vec::new();
             let mut index = 0;
-            while !matches!(self.current_token_kind(), Some(TokenKind::RParen)) {
+            while !matches!(self.current_token_kind(), TokenKind::RParen) {
                 let ident = Ident::new(&index.to_string(), Span::default());
                 index += 1;
                 elements.push((ident, self.parse_pattern()));
-                if let Some(TokenKind::Comma) = self.current_token_kind() {
+                if matches!(self.current_token_kind(), TokenKind::Comma) {
                     self.advance();
                 }
             }
@@ -1267,11 +1278,9 @@ impl<'src> Parser<'src> {
 
         while matches!(
             self.current_token_kind(),
-            Some(
-                TokenKind::Keyword(Keyword::Fn)
-                    | TokenKind::SingleLineComment(_)
-                    | TokenKind::MultiLineComment(_)
-            )
+            TokenKind::Keyword(Keyword::Fn)
+                | TokenKind::SingleLineComment(_)
+                | TokenKind::MultiLineComment(_)
         ) {
             // We have to check if it is the same function declaration as the previous one.
             // Parse ahead to get the identifier of the function, which might be an Identifier,
@@ -1286,7 +1295,7 @@ impl<'src> Parser<'src> {
             let comments = self.parse_comments();
             let mut span = self.create_span_from_current_token();
 
-            if let Some(TokenKind::Keyword(Keyword::Fn)) = self.current_token_kind() {
+            if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Fn)) {
                 self.advance();
             } else {
                 // We found a comment, but not a function declaration, stop parsing function
@@ -1295,7 +1304,7 @@ impl<'src> Parser<'src> {
                 break;
             }
 
-            if let Some(TokenKind::Identifier(_)) = self.current_token_kind() {
+            if matches!(self.current_token_kind(), TokenKind::Identifier(_)) {
                 let node = self.parse_function_name();
 
                 if name.is_some()
@@ -1359,38 +1368,36 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_guard_clause(&mut self) -> Option<Expr> {
-        if let Some(TokenKind::Keyword(Keyword::If)) = self.current_token_kind() {
-            self.advance();
-
-            if let Some(TokenKind::Keyword(Keyword::Let)) = self.current_token_kind() {
-                let decl = self.parse_let_expression();
-
-                return Some(decl);
-            }
-
-            // Valid guard clauses are function calls, binary logical expressions and unary logical
-            // expressions.
-            let expression = self.parse_expression();
-
-            match expression.kind {
-                ExprKind::Call { .. } | ExprKind::BinaryOp { .. } | ExprKind::UnaryOp { .. } => (),
-                _ => {
-                    self.panic_unexpected_expr(
-                        "function call, binary logical expression or unary logical expression",
-                        Some(expression.clone()),
-                    );
-                }
-            }
-
-            // Disambiguate between call with dict and block.
-            if let Some(TokenKind::Semicolon) = self.current_token_kind() {
-                self.advance();
-            }
-
-            Some(expression)
-        } else {
-            None
+        if !matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::If)) {
+            return None;
         }
+
+        self.advance();
+
+        if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Let)) {
+            return Some(self.parse_let_expression());
+        }
+
+        // Valid guard clauses are function calls, binary logical expressions and unary logical
+        // expressions.
+        let expression = self.parse_expression();
+
+        match expression.kind {
+            ExprKind::Call { .. } | ExprKind::BinaryOp { .. } | ExprKind::UnaryOp { .. } => (),
+            _ => {
+                self.panic_unexpected_expr(
+                    "function call, binary logical expression or unary logical expression",
+                    Some(expression.clone()),
+                );
+            }
+        }
+
+        // Disambiguate between call with dict and block.
+        if matches!(self.current_token_kind(), TokenKind::Semicolon) {
+            self.advance();
+        }
+
+        Some(expression)
     }
 
     fn is_binary_op(token: &TokenKind) -> bool {
@@ -1507,7 +1514,7 @@ impl<'src> Parser<'src> {
     fn parse_literal(&mut self) -> Literal {
         expect_token_matches!(self, "literal", TokenKind::Literal(_));
         match self.current_token_kind() {
-            Some(TokenKind::Literal(literal)) => {
+            TokenKind::Literal(literal) => {
                 let literal = literal.clone();
                 self.advance();
                 literal
@@ -1539,27 +1546,23 @@ impl<'src> Parser<'src> {
         let mut span = self.create_span_from_current_token();
         let mut node = match self.current_token_kind() {
             // Literal values will be pattern matched
-            Some(TokenKind::Literal(_)) => self.parse_pattern_literal(),
-            Some(TokenKind::Keyword(Keyword::_Self)) => {
+            TokenKind::Literal(_) => self.parse_pattern_literal(),
+            TokenKind::Keyword(Keyword::_Self) => {
                 self.advance();
                 node::pat!(self.unique_id(), _Self)
             }
-            Some(TokenKind::Keyword(Keyword::Underscore)) => {
+            TokenKind::Keyword(Keyword::Underscore) => {
                 self.advance();
                 node::pat!(self.unique_id(), Wildcard)
             }
             // Identifiers can be namespaced identifiers or call expressions, which should be pattern matched.
             // Simple identifiers will be used as is and mapped to a function parameter.
-            Some(TokenKind::Identifier(_)) => {
-                if let Some(TokenKind::PathSeparator) = self.peek_token_kind() {
-                    self.parse_enum_extraction()
-                } else if let Some(TokenKind::LParen | TokenKind::LBrace) = self.peek_token_kind() {
-                    self.parse_enum_extraction()
-                } else {
-                    self.parse_identifier_pattern()
-                }
-            }
-            Some(TokenKind::LBracket) => self.parse_list_extraction(),
+            TokenKind::Identifier(_) => match self.peek_token_kind() {
+                TokenKind::PathSeparator => self.parse_enum_extraction(),
+                TokenKind::LParen | TokenKind::LBrace => self.parse_enum_extraction(),
+                _ => self.parse_identifier_pattern(),
+            },
+            TokenKind::LBracket => self.parse_list_extraction(),
             _ => unreachable!("Expected pattern, found {:?}", self.current_token_kind()),
         };
 
@@ -1590,7 +1593,7 @@ impl<'src> Parser<'src> {
 
         loop {
             match self.current_token_kind() {
-                Some(TokenKind::Dot) => {
+                TokenKind::Dot => {
                     self.advance();
                     lhs.trailing_comments = self.parse_comments();
                     let field_name = self.parse_identifier();
@@ -1602,7 +1605,7 @@ impl<'src> Parser<'src> {
                         }))
                     );
                 }
-                Some(TokenKind::LBracket) => {
+                TokenKind::LBracket => {
                     self.advance();
                     let index = self.parse_expression_with_precedence(0, Associativity::Left);
                     self.consume_token(TokenKind::RBracket);
@@ -1611,10 +1614,10 @@ impl<'src> Parser<'src> {
                         IndexExpression(Box::new(IndexAccessExpression { base: lhs, index }))
                     );
                 }
-                Some(TokenKind::LParen) => {
+                TokenKind::LParen => {
                     lhs = self.parse_call_expression(lhs);
                 }
-                Some(token) if Self::is_binary_op(token) => {
+                token if Self::is_binary_op(token) => {
                     let operator = Self::map_binary_op(token);
                     let operator_info = Self::map_operator_info(&operator);
 

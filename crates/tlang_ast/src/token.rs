@@ -97,11 +97,11 @@ pub enum TokenKind {
     // Unknown token, unexpected character
     Unknown(String),
 
-    // Token for end-of-file
+    // Token for end-of-file, also used as an unitialized sentinel token.
     Eof,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 pub enum Literal {
     Boolean(bool),
     Integer(i64),
@@ -111,10 +111,49 @@ pub enum Literal {
     Char(String),
 }
 
+impl Clone for Literal {
+    fn clone(&self) -> Self {
+        // TODO: Would be great if literal string and char just refer to the string in the
+        //       source. Or we do some kind of interning at some point.
+        match self {
+            Literal::String(value) => Literal::String(value.clone()),
+            Literal::Char(value) => Literal::Char(value.clone()),
+            _ => unsafe { std::ptr::read(self) },
+        }
+    }
+}
+
+impl Literal {
+    pub fn as_unsigned_integer(&self) -> Self {
+        match self {
+            Literal::Integer(value) => Literal::UnsignedInteger(*value as u64),
+            Literal::UnsignedInteger(value) => Literal::UnsignedInteger(*value),
+            _ => panic!("Expected integer or unsigned integer, found {:?}", self),
+        }
+    }
+
+    pub fn invert_sign(&self) -> Self {
+        match self {
+            Literal::Integer(value) => Literal::Integer(-value),
+            Literal::Float(value) => Literal::Float(-value),
+            _ => panic!("Expected integer or float, found {:?}", self),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize)]
 pub struct Token {
     pub kind: TokenKind,
     pub span: Span,
+}
+
+impl Default for Token {
+    fn default() -> Self {
+        Self {
+            kind: TokenKind::Eof,
+            span: Span::default(),
+        }
+    }
 }
 
 impl Token {
@@ -140,6 +179,13 @@ impl Token {
         match &self.kind {
             TokenKind::SingleLineComment(comment) => Some(comment),
             TokenKind::MultiLineComment(comment) => Some(comment),
+            _ => None,
+        }
+    }
+
+    pub fn get_literal(&self) -> Option<&Literal> {
+        match &self.kind {
+            TokenKind::Literal(literal) => Some(literal),
             _ => None,
         }
     }
