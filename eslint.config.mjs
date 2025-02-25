@@ -1,9 +1,9 @@
 import globals from 'globals';
-import pluginJs from '@eslint/js';
+import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
 
-export default [
+export default tseslint.config([
   { files: ['**/*.{js,mjs,cjs,ts}'] },
   {
     ignores: [
@@ -14,8 +14,8 @@ export default [
     ],
   },
   { languageOptions: { globals: globals.browser } },
-  pluginJs.configs.recommended,
-  ...tseslint.configs.recommended,
+  eslint.configs.recommended,
+  tseslint.configs.recommended,
   eslintPluginPrettierRecommended,
   {
     rules: {
@@ -34,4 +34,4 @@ export default [
       ],
     },
   },
-];
+]);
