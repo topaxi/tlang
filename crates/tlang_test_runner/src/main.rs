@@ -72,14 +72,14 @@ fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
         "interpreter" => {
             exec_start = std::time::Instant::now();
 
-            Command::new("./target/debug/tlangdi")
+            Command::new("./target/release/tlangdi")
                 .arg(file_path)
                 .output()
                 .map_err(|e| format!("Failed to execute interpreter: {}", e))?
         }
         "javascript" => {
             #[allow(clippy::zombie_processes)]
-            let tlang_js_compiler_output = Command::new("./target/debug/tlang_cli_js")
+            let tlang_js_compiler_output = Command::new("./target/release/tlang_cli_js")
                 .arg(file_path)
                 .stdout(Stdio::piped())
                 .spawn()
