@@ -410,6 +410,7 @@ impl Interpreter {
             token::Literal::Boolean(value) => TlangValue::Bool(*value),
             token::Literal::String(value) => self.state.new_string(value.to_string()),
             token::Literal::Char(value) => self.state.new_string(value.to_string()),
+            token::Literal::None => unreachable!(),
         }
     }
 

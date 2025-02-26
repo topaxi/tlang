@@ -104,6 +104,7 @@ impl CodegenJS {
             Literal::String(value) | Literal::Char(value) => {
                 self.push_str(&format!("\"{value}\""));
             }
+            Literal::None => unreachable!(),
         }
     }
 

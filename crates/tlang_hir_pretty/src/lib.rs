@@ -427,6 +427,7 @@ impl HirPretty {
             Literal::UnsignedInteger(u) => self.push_str(&u.to_string()),
             Literal::Integer(i) => self.push_str(&i.to_string()),
             Literal::Float(f) => self.push_str(&f.to_string()),
+            Literal::None => unreachable!(),
         }
     }
 }

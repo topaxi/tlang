@@ -109,6 +109,7 @@ pub enum Literal {
     Float(f64),
     String(String),
     Char(String),
+    None,
 }
 
 impl Clone for Literal {
@@ -183,9 +184,9 @@ impl Token {
         }
     }
 
-    pub fn get_literal(&self) -> Option<&Literal> {
-        match &self.kind {
-            TokenKind::Literal(literal) => Some(literal),
+    pub fn take_literal(&mut self) -> Option<Literal> {
+        match &mut self.kind {
+            TokenKind::Literal(literal) => Some(std::mem::replace(literal, Literal::None)),
             _ => None,
         }
     }

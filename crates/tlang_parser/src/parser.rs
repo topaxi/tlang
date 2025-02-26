@@ -921,8 +921,7 @@ impl<'src> Parser<'src> {
                 ) =>
             {
                 let invert = matches!(self.advance().kind, TokenKind::Minus);
-                let lit_token = self.advance();
-                let literal = lit_token.get_literal().unwrap();
+                let literal = self.advance().take_literal().unwrap();
 
                 if invert {
                     node::expr!(self.unique_id(), Literal(Box::new(literal.invert_sign())))
@@ -963,7 +962,7 @@ impl<'src> Parser<'src> {
                 node::expr!(self.unique_id(), Wildcard)
             }
             TokenKind::Literal(_) => {
-                let literal = self.advance().get_literal().unwrap().clone();
+                let literal = self.advance().take_literal().unwrap();
                 node::expr!(self.unique_id(), Literal(Box::new(literal)))
             }
             // TODO: Mostly copied from Identifier further below, `self` might be easier to just be
@@ -1513,12 +1512,9 @@ impl<'src> Parser<'src> {
 
     fn parse_literal(&mut self) -> Literal {
         expect_token_matches!(self, "literal", TokenKind::Literal(_));
+
         match self.current_token_kind() {
-            TokenKind::Literal(literal) => {
-                let literal = literal.clone();
-                self.advance();
-                literal
-            }
+            TokenKind::Literal(_) => self.advance().take_literal().unwrap(),
             _ => unreachable!("Expected literal"),
         }
     }
