@@ -125,16 +125,9 @@ impl Clone for Literal {
 }
 
 impl Literal {
-    pub fn as_unsigned_integer(&self) -> Self {
-        match self {
-            Literal::Integer(value) => Literal::UnsignedInteger(*value as u64),
-            Literal::UnsignedInteger(value) => Literal::UnsignedInteger(*value),
-            _ => panic!("Expected integer or unsigned integer, found {:?}", self),
-        }
-    }
-
     pub fn invert_sign(&self) -> Self {
         match self {
+            Literal::UnsignedInteger(value) => Literal::Integer(-(*value as i64)),
             Literal::Integer(value) => Literal::Integer(-value),
             Literal::Float(value) => Literal::Float(-value),
             _ => panic!("Expected integer or float, found {:?}", self),

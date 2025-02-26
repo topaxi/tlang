@@ -90,7 +90,7 @@ Module(
             statements: [],
             expression: Some(Expr(
               id: NodeId(5),
-              kind: Literal(Integer(0)),
+              kind: Literal(UnsignedInteger(0)),
               leading_comments: [],
               trailing_comments: [],
               span: Span(

@@ -38,7 +38,7 @@ Module(
         ),
         expression: Expr(
           id: NodeId(3),
-          kind: Literal(Integer(2)),
+          kind: Literal(UnsignedInteger(2)),
           leading_comments: [
             Token(
               kind: MultiLineComment(" comment before expr "),
@@ -124,7 +124,7 @@ Module(
                 kind: List([
                   Expr(
                     id: NodeId(6),
-                    kind: Literal(Integer(1)),
+                    kind: Literal(UnsignedInteger(1)),
                     leading_comments: [],
                     trailing_comments: [],
                     span: Span(
@@ -140,7 +140,7 @@ Module(
                   ),
                   Expr(
                     id: NodeId(7),
-                    kind: Literal(Integer(2)),
+                    kind: Literal(UnsignedInteger(2)),
                     leading_comments: [],
                     trailing_comments: [],
                     span: Span(

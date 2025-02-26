@@ -31,7 +31,7 @@ fn test_identifier() {
 fn test_integer() {
     let mut lexer = Lexer::new("123");
 
-    assert_tokens!(lexer, [TokenKind::Literal(Literal::Integer(123))]);
+    assert_tokens!(lexer, [TokenKind::Literal(Literal::UnsignedInteger(123))]);
 }
 
 #[test]
@@ -48,7 +48,7 @@ fn test_typed_integer() {
     assert_tokens!(
         lexer,
         [
-            TokenKind::Literal(Literal::Integer(123)),
+            TokenKind::Literal(Literal::UnsignedInteger(123)),
             TokenKind::Identifier("i64".to_string())
         ]
     );
@@ -187,9 +187,9 @@ fn test_simple_assignment() {
             TokenKind::Keyword(Keyword::Let),
             TokenKind::Identifier("x".to_string()),
             TokenKind::EqualSign,
-            TokenKind::Literal(Literal::Integer(1)),
+            TokenKind::Literal(Literal::UnsignedInteger(1)),
             TokenKind::Plus,
-            TokenKind::Literal(Literal::Integer(2)),
+            TokenKind::Literal(Literal::UnsignedInteger(2)),
             TokenKind::Semicolon,
         ]
     );
@@ -240,7 +240,7 @@ fn test_regression_integer_literal_followed_by_dot() {
             TokenKind::RBracket,
             TokenKind::RParen,
             TokenKind::LBrace,
-            TokenKind::Literal(Literal::Integer(0)),
+            TokenKind::Literal(Literal::UnsignedInteger(0)),
             TokenKind::RBrace,
             TokenKind::Keyword(Keyword::Fn),
             TokenKind::Identifier("sum".to_string()),

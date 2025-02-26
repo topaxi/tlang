@@ -241,7 +241,7 @@ Module(
             arguments: [
               Expr(
                 id: NodeId(9),
-                kind: Literal(Integer(42)),
+                kind: Literal(UnsignedInteger(42)),
                 leading_comments: [],
                 trailing_comments: [],
                 span: Span(

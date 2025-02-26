@@ -41,7 +41,7 @@ Module(
           kind: Match(MatchExpression(
             expression: Expr(
               id: NodeId(3),
-              kind: Literal(Integer(1)),
+              kind: Literal(UnsignedInteger(1)),
               leading_comments: [],
               trailing_comments: [],
               span: Span(
@@ -134,7 +134,7 @@ Module(
                     ),
                     rhs: Expr(
                       id: NodeId(6),
-                      kind: Literal(Integer(1)),
+                      kind: Literal(UnsignedInteger(1)),
                       leading_comments: [],
                       trailing_comments: [],
                       span: Span(
@@ -164,7 +164,7 @@ Module(
                 )),
                 expression: Expr(
                   id: NodeId(8),
-                  kind: Literal(Integer(2)),
+                  kind: Literal(UnsignedInteger(2)),
                   leading_comments: [],
                   trailing_comments: [],
                   span: Span(
@@ -200,7 +200,7 @@ Module(
                 guard: None,
                 expression: Expr(
                   id: NodeId(11),
-                  kind: Literal(Integer(3)),
+                  kind: Literal(UnsignedInteger(3)),
                   leading_comments: [],
                   trailing_comments: [],
                   span: Span(

@@ -38,7 +38,7 @@ Module(
         ),
         expression: Expr(
           id: NodeId(5),
-          kind: Literal(Integer(1)),
+          kind: Literal(UnsignedInteger(1)),
           leading_comments: [],
           trailing_comments: [],
           span: Span(

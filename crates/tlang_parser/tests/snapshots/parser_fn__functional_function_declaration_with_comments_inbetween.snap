@@ -56,7 +56,7 @@ Module(
             FunctionParameter(
               pattern: Pat(
                 id: NodeId(3),
-                kind: Literal(Integer(1)),
+                kind: Literal(UnsignedInteger(1)),
                 leading_comments: [],
                 trailing_comments: [],
                 span: Span(
@@ -90,7 +90,7 @@ Module(
             statements: [],
             expression: Some(Expr(
               id: NodeId(5),
-              kind: Literal(Integer(1)),
+              kind: Literal(UnsignedInteger(1)),
               leading_comments: [],
               trailing_comments: [],
               span: Span(
@@ -268,7 +268,7 @@ Module(
                 ),
                 rhs: Expr(
                   id: NodeId(12),
-                  kind: Literal(Integer(2)),
+                  kind: Literal(UnsignedInteger(2)),
                   leading_comments: [],
                   trailing_comments: [],
                   span: Span(

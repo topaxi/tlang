@@ -101,7 +101,7 @@ Module(
                 arguments: [
                   Expr(
                     id: NodeId(5),
-                    kind: Literal(Integer(1)),
+                    kind: Literal(UnsignedInteger(1)),
                     leading_comments: [],
                     trailing_comments: [],
                     span: Span(
@@ -132,7 +132,7 @@ Module(
             ),
             Expr(
               id: NodeId(7),
-              kind: Literal(Integer(2)),
+              kind: Literal(UnsignedInteger(2)),
               leading_comments: [],
               trailing_comments: [],
               span: Span(

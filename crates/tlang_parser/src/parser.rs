@@ -917,7 +917,8 @@ impl<'src> Parser<'src> {
             TokenKind::Minus | TokenKind::Plus
                 if matches!(
                     self.peek_token_kind(),
-                    TokenKind::Literal(Literal::Integer(_) | Literal::Float(_))
+                    // During lexing, we only emit unsigned integers.
+                    TokenKind::Literal(Literal::UnsignedInteger(_) | Literal::Float(_))
                 ) =>
             {
                 let invert = matches!(self.advance().kind, TokenKind::Minus);
@@ -926,7 +927,7 @@ impl<'src> Parser<'src> {
                 if invert {
                     node::expr!(self.unique_id(), Literal(Box::new(literal.invert_sign())))
                 } else {
-                    node::expr!(self.unique_id(), Literal(Box::new(literal.clone())))
+                    node::expr!(self.unique_id(), Literal(Box::new(literal)))
                 }
             }
 

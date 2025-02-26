@@ -285,7 +285,7 @@ Module(
                     ),
                   ), Expr(
                     id: NodeId(10),
-                    kind: Literal(Integer(42)),
+                    kind: Literal(UnsignedInteger(42)),
                     leading_comments: [],
                     trailing_comments: [],
                     span: Span(

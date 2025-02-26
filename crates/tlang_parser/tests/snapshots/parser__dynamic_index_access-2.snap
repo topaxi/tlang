@@ -86,7 +86,7 @@ Module(
                 ),
                 index: Expr(
                   id: NodeId(4),
-                  kind: Literal(Integer(1)),
+                  kind: Literal(UnsignedInteger(1)),
                   leading_comments: [],
                   trailing_comments: [],
                   span: Span(
@@ -116,7 +116,7 @@ Module(
             ),
             index: Expr(
               id: NodeId(6),
-              kind: Literal(Integer(2)),
+              kind: Literal(UnsignedInteger(2)),
               leading_comments: [],
               trailing_comments: [],
               span: Span(

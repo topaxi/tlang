@@ -1,8 +1,34 @@
+#![feature(box_patterns)]
+
+use pretty_assertions::assert_matches;
+
 mod common;
 
 #[test]
-fn test_unary_minus() {
-    assert_parses!("-1;");
+fn test_unsigned_literal() {
+    let ast = parse!("1;");
+
+    assert_matches!(
+        ast.statements[0].kind,
+        tlang_ast::node::StmtKind::Expr(box tlang_ast::node::Expr {
+            kind:
+                tlang_ast::node::ExprKind::Literal(box tlang_ast::token::Literal::UnsignedInteger(1)),
+            ..
+        })
+    );
+}
+
+#[test]
+fn test_signed_literal() {
+    let ast = parse!("-1;");
+
+    assert_matches!(
+        ast.statements[0].kind,
+        tlang_ast::node::StmtKind::Expr(box tlang_ast::node::Expr {
+            kind: tlang_ast::node::ExprKind::Literal(box tlang_ast::token::Literal::Integer(-1)),
+            ..
+        })
+    );
 }
 
 #[test]
