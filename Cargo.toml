@@ -28,7 +28,6 @@ features = ["max_level_debug", "release_max_level_warn"]
 incremental = false
 
 [profile.release]
-opt-level = 's'
 # Disabling parallel codegen speeds enables to analyze the generated code with focus on smallest file size.
 # This shaved off around 20kb from the final binary size, at the time of writing.
 codegen-units = 1
