@@ -22,6 +22,10 @@ impl TlangStruct {
     pub fn is_empty(&self) -> bool {
         self.field_values.is_empty()
     }
+
+    pub fn len(&self) -> usize {
+        self.field_values.len()
+    }
 }
 
 pub type TlangObjectId = usize;
@@ -48,6 +52,13 @@ impl TlangObjectKind {
     pub(crate) fn get_struct(&self) -> Option<&TlangStruct> {
         match self {
             TlangObjectKind::Struct(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn get_str(&self) -> Option<&str> {
+        match self {
+            TlangObjectKind::String(s) => Some(s),
             _ => None,
         }
     }
