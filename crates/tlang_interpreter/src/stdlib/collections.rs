@@ -11,8 +11,8 @@ use crate::Interpreter;
 #[native_fn(name = "len")]
 pub fn len(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
     match state.get_object(args[0]) {
-        Some(TlangObjectKind::Struct(obj)) => TlangValue::Int(obj.field_values.len() as i64),
-        Some(TlangObjectKind::String(string)) => TlangValue::Int(string.len() as i64),
+        Some(TlangObjectKind::Struct(obj)) => TlangValue::U64(obj.field_values.len() as u64),
+        Some(TlangObjectKind::String(string)) => TlangValue::U64(string.len() as u64),
         _ => panic!("Expected struct or string, got {:?}", args[0]),
     }
 }
@@ -33,11 +33,11 @@ pub fn define_list_shape(interpreter: &mut Interpreter) {
                 .and_then(|o| o.get_struct())
                 .unwrap();
 
-            let start = args[1].as_usize().unwrap();
-            let end = if args.len() < 3 {
+            let start = args[1].as_usize();
+            let end = if args.len() < 3 || args[2].is_nil() {
                 this.field_values.len()
             } else {
-                args[2].as_usize().unwrap_or(this.field_values.len())
+                args[2].as_usize()
             };
 
             let field_values = this.field_values[start..end].to_vec();

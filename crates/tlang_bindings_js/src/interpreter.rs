@@ -1,6 +1,6 @@
 use tlang_hir::hir;
 use tlang_interpreter::state::InterpreterState;
-use tlang_interpreter::value::{NativeFnReturn, TlangObjectKind, TlangValue};
+use tlang_interpreter::value::{NativeFnReturn, TlangObjectKind, TlangPrimitive, TlangValue};
 use tlang_parser::{error::ParseError, Parser};
 use wasm_bindgen::prelude::*;
 
@@ -98,10 +98,14 @@ impl TlangInterpreter {
 fn tlang_value_to_js_value(state: &InterpreterState, value: TlangValue) -> JsValue {
     match value {
         TlangValue::Nil => JsValue::null(),
-        TlangValue::Bool(b) => JsValue::from(b),
-        TlangValue::Int(i) => JsValue::from(i),
-        TlangValue::Float(f) => JsValue::from_f64(f),
         TlangValue::Object(_) => tlang_object_to_js_value(state, value),
+        value => match value.as_primitive() {
+            TlangPrimitive::Nil => JsValue::null(),
+            TlangPrimitive::Bool(value) => JsValue::from(value),
+            TlangPrimitive::Int(value) => JsValue::from(value),
+            TlangPrimitive::UInt(value) => JsValue::from(value),
+            TlangPrimitive::Float(value) => JsValue::from(value),
+        },
     }
 }
 
@@ -135,12 +139,15 @@ fn js_value_to_tlang_value(state: &mut InterpreterState, value: JsValue) -> Tlan
     if value.is_null() || value.is_undefined() {
         return TlangValue::Nil;
     }
+
     if let Some(b) = value.as_bool() {
         return TlangValue::Bool(b);
     }
+
     if let Some(i) = value.as_f64() {
-        return TlangValue::Float(i);
+        return TlangValue::F64(i);
     }
+
     if let Some(array) = value.dyn_ref::<js_sys::Array>() {
         let mut values = Vec::with_capacity(array.length() as usize);
 

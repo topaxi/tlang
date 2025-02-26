@@ -373,17 +373,10 @@ impl Interpreter {
 
     fn eval_index_access(&mut self, lhs: &hir::Expr, rhs: &hir::Expr) -> EvalResult {
         let rhs_value = eval_value!(self.eval_expr(rhs));
-
-        let index = match rhs_value {
-            TlangValue::Int(index) => index,
-            TlangValue::Float(index) => index as i64,
-            _ => todo!("eval_index_access: {:?}", rhs_value),
-        };
-
         let lhs_value = eval_value!(self.eval_expr(lhs));
 
         if let Some(TlangObjectKind::Struct(obj)) = self.get_object(lhs_value) {
-            return EvalResult::Value(obj.field_values[index as usize]);
+            return EvalResult::Value(obj.field_values[rhs_value.as_usize()]);
         }
 
         todo!("eval_index_access: {:?}[{:?}]", lhs, rhs_value)
@@ -421,9 +414,9 @@ impl Interpreter {
 
     fn eval_literal(&mut self, literal: &token::Literal) -> TlangValue {
         match literal {
-            token::Literal::Integer(value) => TlangValue::Int(*value),
-            token::Literal::UnsignedInteger(value) => TlangValue::Int(*value as i64),
-            token::Literal::Float(value) => TlangValue::Float(*value),
+            token::Literal::Integer(value) => TlangValue::I64(*value),
+            token::Literal::UnsignedInteger(value) => TlangValue::U64(*value),
+            token::Literal::Float(value) => TlangValue::F64(*value),
             token::Literal::Boolean(value) => TlangValue::Bool(*value),
             token::Literal::String(value) => self.state.new_string(value.to_string()),
             token::Literal::Char(value) => self.state.new_string(value.to_string()),
@@ -517,16 +510,7 @@ impl Interpreter {
     where
         F: Fn(f64, f64) -> bool,
     {
-        match (lhs, rhs) {
-            (TlangValue::Int(lhs), TlangValue::Int(rhs)) => {
-                TlangValue::Bool(op(lhs as f64, rhs as f64))
-            }
-            (TlangValue::Float(lhs), TlangValue::Float(rhs)) => TlangValue::Bool(op(lhs, rhs)),
-            (TlangValue::Float(lhs), TlangValue::Int(rhs)) => TlangValue::Bool(op(lhs, rhs as f64)),
-            (TlangValue::Int(lhs), TlangValue::Float(rhs)) => TlangValue::Bool(op(lhs as f64, rhs)),
-            (TlangValue::Object(_), _) => unreachable!(),
-            _ => todo!("incompatible types, {:?} and {:?}", lhs, rhs),
-        }
+        TlangValue::Bool(op(lhs.as_f64(), rhs.as_f64()))
     }
 
     fn eval_object_binary_op(
@@ -589,7 +573,7 @@ impl Interpreter {
         F: Fn(i64, i64) -> i64,
     {
         match (lhs, rhs) {
-            (TlangValue::Int(lhs), TlangValue::Int(rhs)) => TlangValue::Int(op(lhs, rhs)),
+            (TlangValue::I64(lhs), TlangValue::I64(rhs)) => TlangValue::I64(op(lhs, rhs)),
             _ => todo!("eval_bitwise_op: incompatible types"),
         }
     }
@@ -711,7 +695,7 @@ impl Interpreter {
 
         if is_simple_enum {
             for (value, _variant) in decl.variants.iter().enumerate() {
-                self.push_value(TlangValue::Int(value as i64));
+                self.push_value(TlangValue::U64(value as u64));
             }
         } else {
             for (value, variant) in decl.variants.iter().enumerate() {
@@ -729,7 +713,7 @@ impl Interpreter {
 
                     let obj = self.state.new_object(TlangObjectKind::Struct(TlangStruct {
                         shape: decl.hir_id.into(),
-                        field_values: vec![TlangValue::Int(value as i64)],
+                        field_values: vec![TlangValue::U64(value as u64)],
                     }));
 
                     self.push_value(obj);
@@ -1418,15 +1402,15 @@ mod tests {
     fn test_basic_arithmetic() {
         let mut interpreter = interpreter("");
         let result = interpreter.eval("1 + 2");
-        assert_matches!(result, TlangValue::Int(3));
+        assert_matches!(result, TlangValue::U64(3));
     }
 
     #[test]
     fn test_addition_of_mixed_ints_and_floats() {
         let mut interpreter = interpreter("");
 
-        assert_matches!(interpreter.eval("1 + 2.0"), TlangValue::Float(3.0));
-        assert_matches!(interpreter.eval("1.0 + 2"), TlangValue::Float(3.0));
+        assert_matches!(interpreter.eval("1 + 2.0"), TlangValue::F64(3.0));
+        assert_matches!(interpreter.eval("1.0 + 2"), TlangValue::F64(3.0));
     }
 
     #[test]
@@ -1462,7 +1446,7 @@ mod tests {
             }
         "});
 
-        assert_matches!(interpreter.eval("add(1, 2)"), TlangValue::Int(3));
+        assert_matches!(interpreter.eval("add(1, 2)"), TlangValue::U64(3));
     }
 
     #[test]
@@ -1476,8 +1460,8 @@ mod tests {
                 2
             }
         "});
-        assert_matches!(interpreter.eval("r(0)"), TlangValue::Int(1));
-        assert_matches!(interpreter.eval("r(1)"), TlangValue::Int(2));
+        assert_matches!(interpreter.eval("r(0)"), TlangValue::U64(1));
+        assert_matches!(interpreter.eval("r(1)"), TlangValue::U64(2));
     }
 
     #[test]
@@ -1500,12 +1484,12 @@ mod tests {
             }
         "});
 
-        assert_matches!(interpreter.eval("r(0)"), TlangValue::Int(1));
-        assert_matches!(interpreter.eval("r(1)"), TlangValue::Int(1));
-        assert_matches!(interpreter.eval("r(2)"), TlangValue::Int(2));
-        assert_matches!(interpreter.eval("r(3)"), TlangValue::Int(3));
-        assert_matches!(interpreter.eval("r(4)"), TlangValue::Int(4));
-        assert_matches!(interpreter.eval("r(5)"), TlangValue::Int(4));
+        assert_matches!(interpreter.eval("r(0)"), TlangValue::U64(1));
+        assert_matches!(interpreter.eval("r(1)"), TlangValue::U64(1));
+        assert_matches!(interpreter.eval("r(2)"), TlangValue::U64(2));
+        assert_matches!(interpreter.eval("r(3)"), TlangValue::U64(3));
+        assert_matches!(interpreter.eval("r(4)"), TlangValue::U64(4));
+        assert_matches!(interpreter.eval("r(5)"), TlangValue::U64(4));
     }
 
     #[test]
@@ -1520,8 +1504,8 @@ mod tests {
             }
         "});
 
-        assert_matches!(interpreter.eval("fib(10)"), TlangValue::Int(55));
-        assert_matches!(interpreter.eval("fib(20)"), TlangValue::Int(6765));
+        assert_matches!(interpreter.eval("fib(10)"), TlangValue::U64(55));
+        assert_matches!(interpreter.eval("fib(20)"), TlangValue::U64(6765));
     }
 
     #[test]
@@ -1536,8 +1520,8 @@ mod tests {
             let add_5 = make_adder(5);
         "});
 
-        assert_matches!(interpreter.eval("add_5(10)"), TlangValue::Int(15));
-        assert_matches!(interpreter.eval("add_5(20)"), TlangValue::Int(25));
+        assert_matches!(interpreter.eval("add_5(10)"), TlangValue::U64(15));
+        assert_matches!(interpreter.eval("add_5(20)"), TlangValue::U64(25));
     }
 
     #[test]
@@ -1552,9 +1536,9 @@ mod tests {
             }
         "});
 
-        assert_matches!(interpreter.eval("match_test(1)"), TlangValue::Int(2));
-        assert_matches!(interpreter.eval("match_test(2)"), TlangValue::Int(3));
-        assert_matches!(interpreter.eval("match_test(3)"), TlangValue::Int(4));
+        assert_matches!(interpreter.eval("match_test(1)"), TlangValue::U64(2));
+        assert_matches!(interpreter.eval("match_test(2)"), TlangValue::U64(3));
+        assert_matches!(interpreter.eval("match_test(3)"), TlangValue::U64(4));
     }
 
     #[test]
@@ -1568,9 +1552,9 @@ mod tests {
                 }
             }
         "});
-        assert_matches!(interpreter.eval("match_test([1, 2])"), TlangValue::Int(2));
-        assert_matches!(interpreter.eval("match_test([2, 3])"), TlangValue::Int(3));
-        assert_matches!(interpreter.eval("match_test([3, 4])"), TlangValue::Int(4));
+        assert_matches!(interpreter.eval("match_test([1, 2])"), TlangValue::U64(2));
+        assert_matches!(interpreter.eval("match_test([2, 3])"), TlangValue::U64(3));
+        assert_matches!(interpreter.eval("match_test([3, 4])"), TlangValue::U64(4));
     }
 
     #[test]
@@ -1583,9 +1567,9 @@ mod tests {
                 }
             }
         "});
-        assert_matches!(interpreter.eval("match_test(1)"), TlangValue::Int(2));
-        assert_matches!(interpreter.eval("match_test(2)"), TlangValue::Int(2));
-        assert_matches!(interpreter.eval("match_test(3)"), TlangValue::Int(3));
+        assert_matches!(interpreter.eval("match_test(1)"), TlangValue::U64(2));
+        assert_matches!(interpreter.eval("match_test(2)"), TlangValue::U64(2));
+        assert_matches!(interpreter.eval("match_test(3)"), TlangValue::U64(3));
     }
 
     #[test]
@@ -1597,8 +1581,8 @@ mod tests {
             fn fib(n, a, b) { rec fib(n - 1, b, a + b) }
         "});
 
-        assert_matches!(interpreter.eval("fib(10)"), TlangValue::Int(55));
-        assert_matches!(interpreter.eval("fib(50)"), TlangValue::Int(12586269025));
+        assert_matches!(interpreter.eval("fib(10)"), TlangValue::U64(55));
+        assert_matches!(interpreter.eval("fib(50)"), TlangValue::U64(12586269025));
     }
 
     #[test]
@@ -1626,7 +1610,7 @@ mod tests {
         );
 
         assert_matches!(interpreter.eval("log(10)"), TlangValue::Nil);
-        assert_matches!(calls.borrow()[0][..], [TlangValue::Int(10)]);
+        assert_matches!(calls.borrow()[0][..], [TlangValue::U64(10)]);
     }
 
     #[test]
@@ -1638,8 +1622,8 @@ mod tests {
             }
             let point = Point { x: 10, y: 20 };
         "});
-        assert_matches!(interpreter.eval("point.x"), TlangValue::Int(10));
-        assert_matches!(interpreter.eval("point.y"), TlangValue::Int(20));
+        assert_matches!(interpreter.eval("point.x"), TlangValue::U64(10));
+        assert_matches!(interpreter.eval("point.y"), TlangValue::U64(20));
     }
 
     #[test]
@@ -1652,9 +1636,9 @@ mod tests {
             }
         "});
 
-        assert_matches!(interpreter.eval("Values::One"), TlangValue::Int(0));
-        assert_matches!(interpreter.eval("Values::Two"), TlangValue::Int(1));
-        assert_matches!(interpreter.eval("Values::Three"), TlangValue::Int(2));
+        assert_matches!(interpreter.eval("Values::One"), TlangValue::U64(0));
+        assert_matches!(interpreter.eval("Values::Two"), TlangValue::U64(1));
+        assert_matches!(interpreter.eval("Values::Three"), TlangValue::U64(2));
     }
 
     #[test]
@@ -1699,7 +1683,7 @@ mod tests {
             val => panic!("Expected struct, got {:?}", val),
         };
 
-        assert_matches!(some_data.field_values[0], TlangValue::Int(10));
-        assert_matches!(none_data.field_values[0], TlangValue::Int(0));
+        assert_matches!(some_data.field_values[0], TlangValue::U64(10));
+        assert_matches!(none_data.field_values[0], TlangValue::U64(0));
     }
 }
