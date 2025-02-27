@@ -162,20 +162,20 @@ impl From<Vec<Diagnostic>> for ParserError {
 }
 
 fn compile_to_ast(source: &str) -> Result<String, ParserError> {
-    let mut parser = tlang_parser::parser::Parser::from_source(source);
+    let mut parser = tlang_parser::Parser::from_source(source);
     let ast = parser.parse()?;
     Ok(ron::ser::to_string_pretty(&ast, ron::ser::PrettyConfig::default()).unwrap())
 }
 
 fn compile_to_hir(source: &str) -> Result<String, ParserError> {
-    let mut parser = tlang_parser::parser::Parser::from_source(source);
+    let mut parser = tlang_parser::Parser::from_source(source);
     let ast = parser.parse()?;
     let hir = lower_to_hir(&ast);
     Ok(ron::ser::to_string_pretty(&hir, ron::ser::PrettyConfig::default()).unwrap())
 }
 
 fn compile(source: &str) -> Result<String, ParserError> {
-    let mut parser = tlang_parser::parser::Parser::from_source(source);
+    let mut parser = tlang_parser::Parser::from_source(source);
     let ast = parser.parse()?;
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());

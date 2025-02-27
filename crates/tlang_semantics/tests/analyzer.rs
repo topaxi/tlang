@@ -6,7 +6,7 @@ use tlang_ast::{
     span::{LineColumn, Span},
     symbols::{SymbolId, SymbolInfo, SymbolType},
 };
-use tlang_parser::parser::Parser;
+use tlang_parser::Parser;
 use tlang_semantics::{
     analyzer::SemanticAnalyzer,
     diagnostic::{Diagnostic, Severity},

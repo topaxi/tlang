@@ -2,7 +2,7 @@ use tlang_ast as ast;
 use tlang_hir::hir;
 
 fn parse_from_str(input: &str) -> ast::node::Module {
-    let mut parser = tlang_parser::parser::Parser::from_source(input);
+    let mut parser = tlang_parser::Parser::from_source(input);
     parser.parse().unwrap()
 }
 

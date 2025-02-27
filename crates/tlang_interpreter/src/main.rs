@@ -29,7 +29,7 @@ fn main() {
         }
     };
 
-    let mut parser = tlang_parser::parser::Parser::from_source(&code);
+    let mut parser = tlang_parser::Parser::from_source(&code);
     let ast = match parser.parse() {
         Ok(ast) => ast,
         Err(err) => {

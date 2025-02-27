@@ -1,8 +1,7 @@
 use tlang_hir::hir;
 use tlang_interpreter::state::InterpreterState;
 use tlang_interpreter::value::{NativeFnReturn, TlangObjectKind, TlangValue};
-use tlang_parser::error::ParseError;
-use tlang_parser::parser::Parser;
+use tlang_parser::{error::ParseError, Parser};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]

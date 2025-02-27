@@ -1382,7 +1382,7 @@ mod tests {
         }
 
         fn eval_root(&mut self, src: &str) -> TlangValue {
-            let mut parser = tlang_parser::parser::Parser::from_source(src);
+            let mut parser = tlang_parser::Parser::from_source(src);
             let ast = parser.parse().unwrap();
             let hir = self.lowering_context.lower_module_in_current_scope(&ast);
             self.interpreter.eval(&hir)
@@ -1390,7 +1390,7 @@ mod tests {
 
         fn eval(&mut self, src: &str) -> TlangValue {
             let block = format!("{{ {} }};", src);
-            let mut parser = tlang_parser::parser::Parser::from_source(&block);
+            let mut parser = tlang_parser::Parser::from_source(&block);
             let ast = parser.parse().unwrap();
             let hir = self.lowering_context.lower_module_in_current_scope(&ast);
 

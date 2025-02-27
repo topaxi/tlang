@@ -1,6 +1,6 @@
 use tlang_ast::symbols::SymbolType;
 use tlang_codegen_js::generator::CodegenJS;
-use tlang_parser::parser::Parser;
+use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
 
 #[ctor::ctor]

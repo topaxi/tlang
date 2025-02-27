@@ -3,7 +3,7 @@ use tlang_ast::node::{self as ast};
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_hir::hir;
 use tlang_hir_pretty::HirPretty;
-use tlang_parser::{error::ParseIssue, parser::Parser};
+use tlang_parser::{error::ParseIssue, Parser};
 use tlang_semantics::{diagnostic::Diagnostic, SemanticAnalyzer};
 use wasm_bindgen::prelude::*;
 
