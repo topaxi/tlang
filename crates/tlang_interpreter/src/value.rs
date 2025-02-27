@@ -233,29 +233,31 @@ impl TlangValue {
 
     #[inline(always)]
     fn apply_arithmetic_op(self, rhs: Self, op: ArithmeticOp) -> Self {
+        use TlangPrimitive::*;
+
         match (self.as_primitive(), rhs.as_primitive()) {
-            (TlangPrimitive::UInt(lhs), TlangPrimitive::UInt(rhs)) => match op {
+            (UInt(lhs), UInt(rhs)) => match op {
                 ArithmeticOp::Add => TlangValue::U64(lhs + rhs),
-                // TODO: Overflowing operation, do we want to support this?
-                ArithmeticOp::Sub if rhs > lhs => TlangValue::I64(unsafe {
-                    std::mem::transmute::<u64, i64>(lhs.wrapping_sub(rhs))
-                }),
-                ArithmeticOp::Sub => TlangValue::U64(lhs - rhs),
+                ArithmeticOp::Sub if lhs >= rhs => TlangValue::U64(lhs - rhs),
+                ArithmeticOp::Sub if lhs as i64 >= 0 => TlangValue::I64(lhs as i64 - rhs as i64),
+                ArithmeticOp::Sub => TlangValue::I64((lhs as i128 - rhs as i128) as i64),
                 ArithmeticOp::Mul => TlangValue::U64(lhs * rhs),
+                ArithmeticOp::Div if lhs % rhs == 0 => TlangValue::U64(lhs / rhs),
                 ArithmeticOp::Div => TlangValue::F64(lhs as f64 / rhs as f64),
                 ArithmeticOp::Rem => TlangValue::U64(lhs % rhs),
                 ArithmeticOp::Pow => TlangValue::U64(lhs.pow(rhs as u32)),
             },
-            (TlangPrimitive::Int(lhs), TlangPrimitive::Int(rhs)) => match op {
+            (Int(lhs), Int(rhs)) => match op {
                 ArithmeticOp::Add => TlangValue::I64(lhs + rhs),
                 ArithmeticOp::Sub => TlangValue::I64(lhs - rhs),
                 ArithmeticOp::Mul => TlangValue::I64(lhs * rhs),
+                ArithmeticOp::Div if lhs % rhs == 0 => TlangValue::I64(lhs / rhs),
                 ArithmeticOp::Div => TlangValue::F64(lhs as f64 / rhs as f64),
                 ArithmeticOp::Rem => TlangValue::I64(lhs % rhs),
                 ArithmeticOp::Pow if rhs >= 0 => TlangValue::I64(lhs.pow(rhs as u32)),
-                ArithmeticOp::Pow => TlangValue::F64((lhs as f64).powf(rhs as f64)),
+                ArithmeticOp::Pow => TlangValue::I64(lhs.pow(rhs as u32)),
             },
-            (TlangPrimitive::Float(lhs), TlangPrimitive::Float(rhs)) => match op {
+            (Float(lhs), Float(rhs)) => match op {
                 ArithmeticOp::Add => TlangValue::F64(lhs + rhs),
                 ArithmeticOp::Sub => TlangValue::F64(lhs - rhs),
                 ArithmeticOp::Mul => TlangValue::F64(lhs * rhs),
@@ -263,7 +265,7 @@ impl TlangValue {
                 ArithmeticOp::Rem => TlangValue::F64(lhs % rhs),
                 ArithmeticOp::Pow => TlangValue::F64(lhs.powf(rhs)),
             },
-            (TlangPrimitive::UInt(lhs), TlangPrimitive::Float(rhs)) => match op {
+            (UInt(lhs), Float(rhs)) => match op {
                 ArithmeticOp::Add => TlangValue::F64(lhs as f64 + rhs),
                 ArithmeticOp::Sub => TlangValue::F64(lhs as f64 - rhs),
                 ArithmeticOp::Mul => TlangValue::F64(lhs as f64 * rhs),
@@ -271,7 +273,7 @@ impl TlangValue {
                 ArithmeticOp::Rem => TlangValue::F64(lhs as f64 % rhs),
                 ArithmeticOp::Pow => TlangValue::F64((lhs as f64).powf(rhs)),
             },
-            (TlangPrimitive::Float(lhs), TlangPrimitive::UInt(rhs)) => match op {
+            (Float(lhs), UInt(rhs)) => match op {
                 ArithmeticOp::Add => TlangValue::F64(lhs + rhs as f64),
                 ArithmeticOp::Sub => TlangValue::F64(lhs - rhs as f64),
                 ArithmeticOp::Mul => TlangValue::F64(lhs * rhs as f64),
@@ -279,7 +281,7 @@ impl TlangValue {
                 ArithmeticOp::Rem => TlangValue::F64(lhs % rhs as f64),
                 ArithmeticOp::Pow => TlangValue::F64(lhs.powf(rhs as f64)),
             },
-            (TlangPrimitive::Int(lhs), TlangPrimitive::Float(rhs)) => match op {
+            (Int(lhs), Float(rhs)) => match op {
                 ArithmeticOp::Add => TlangValue::F64(lhs as f64 + rhs),
                 ArithmeticOp::Sub => TlangValue::F64(lhs as f64 - rhs),
                 ArithmeticOp::Mul => TlangValue::F64(lhs as f64 * rhs),
@@ -287,7 +289,7 @@ impl TlangValue {
                 ArithmeticOp::Rem => TlangValue::F64(lhs as f64 % rhs),
                 ArithmeticOp::Pow => TlangValue::F64((lhs as f64).powf(rhs)),
             },
-            (TlangPrimitive::Float(lhs), TlangPrimitive::Int(rhs)) => match op {
+            (Float(lhs), Int(rhs)) => match op {
                 ArithmeticOp::Add => TlangValue::F64(lhs + rhs as f64),
                 ArithmeticOp::Sub => TlangValue::F64(lhs - rhs as f64),
                 ArithmeticOp::Mul => TlangValue::F64(lhs * rhs as f64),
