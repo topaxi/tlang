@@ -302,6 +302,47 @@ impl TlangValue {
     }
 }
 
+macro_rules! impl_from_tlang_value {
+    ($($t:ty => $variant:ident),* $(,)?) => {
+        $(
+            impl From<$t> for TlangValue {
+                fn from(value: $t) -> Self {
+                    TlangValue::$variant(value as _)
+                }
+            }
+        )*
+    };
+}
+
+impl_from_tlang_value! {
+    i8 => I8,
+    i16 => I16,
+    i32 => I32,
+    i64 => I64,
+
+    u8 => U8,
+    u16 => U16,
+    u32 => U32,
+    u64 => U64,
+
+    f32 => F32,
+    f64 => F64,
+
+    bool => Bool,
+}
+
+#[cfg(target_pointer_width = "32")]
+impl_from_tlang_value! {
+    isize => I32,
+    usize => U32,
+}
+
+#[cfg(target_pointer_width = "64")]
+impl_from_tlang_value! {
+    isize => I64,
+    usize => U64,
+}
+
 impl std::fmt::Display for TlangValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
