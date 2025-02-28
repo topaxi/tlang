@@ -9,14 +9,20 @@
 }
 
 :root {
-  font-family: 'VictorMono NFM', 'Victor Mono', Inconsolata, Consolas, Menlo,
-    Monaco, monospace;
+  --t-background-color: var(--ctp-macchiato-base);
+  --t-foreground-color: var(--ctp-macchiato-text);
+}
+
+:root {
+  font-family:
+    'VictorMono NFM', 'Victor Mono', Inconsolata, Consolas, Menlo, Monaco,
+    monospace;
   line-height: 1.5;
   font-weight: 400;
 
   color-scheme: dark;
-  color: var(--ctp-macchiato-text);
-  background-color: var(--ctp-macchiato-base);
+  color: var(--t-foreground-color);
+  background-color: var(--t-background-color);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;

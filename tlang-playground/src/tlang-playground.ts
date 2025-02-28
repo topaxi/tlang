@@ -3,6 +3,7 @@ import { customElement, query, state } from 'lit/decorators.js';
 import { examples } from './examples';
 
 import './components/t-codemirror';
+import './components/t-console';
 import './components/t-split';
 import { type TCodeMirror } from './components/t-codemirror';
 import { compressSource, decompressSource } from './utils/lz';
@@ -16,7 +17,6 @@ import {
 import { MediaController } from './controllers/media-controller';
 import { keyed } from 'lit/directives/keyed.js';
 import { live } from 'lit/directives/live.js';
-import { cache } from 'lit/directives/cache.js';
 
 type CodemirrorSeverity = 'hint' | 'info' | 'warning' | 'error';
 
@@ -41,12 +41,25 @@ async function defaultSource() {
   return examples[Object.keys(examples)[0]];
 }
 
-function defaultDisplay() {
+type OutputDisplay = 'ast' | 'hir' | 'hir pretty' | 'javascript';
+
+function defaultDisplay(): OutputDisplay {
   let params = getHashParams();
+  let display: OutputDisplay = 'javascript';
+
   if (params.has('display')) {
-    return params.get('display') as 'ast' | 'hir' | 'hir pretty' | 'output';
+    display = params.get('display') as
+      | 'ast'
+      | 'hir'
+      | 'hir pretty'
+      | 'javascript';
   }
-  return 'output';
+
+  if (params.get('runner') === 'interpreter' && display === 'javascript') {
+    return 'hir pretty';
+  }
+
+  return display;
 }
 
 function defaultExample() {
@@ -126,13 +139,24 @@ export class TlangPlayground extends LitElement {
       overflow: hidden;
     }
 
-    .editor,
-    .output {
+    .editor-split::part(first),
+    .output-split::part(first) {
       display: flex;
     }
 
-    .editor > *,
-    .output > * {
+    .editor-container,
+    .output-container {
+      display: flex;
+      flex: 1;
+    }
+
+    .editor-container > t-codemirror,
+    .output-container > t-codemirror {
+      flex: 1;
+    }
+
+    .output-code,
+    .output-ast {
       width: 100%;
       overflow: auto;
     }
@@ -142,33 +166,10 @@ export class TlangPlayground extends LitElement {
       margin: 0;
     }
 
-    .log-message {
-      border-bottom: 1px solid var(--ctp-macchiato-surface0);
-      padding-left: 1ch;
-    }
-
-    .output-error {
-      min-height: 5em;
-    }
-
-    .console {
-      display: flex;
-      flex-direction: column;
-      border-left: 1px solid var(--ctp-macchiato-surface0);
-      flex: 1 0 25px;
-    }
-
-    .console-toolbar {
-      display: flex;
-      gap: 1rem;
-      padding-left: 1ch;
-      padding-top: 1rem;
-      border-bottom: 1px solid var(--ctp-macchiato-surface0);
-    }
-
-    .console-output {
-      overflow: auto;
-      scroll-behavior: smooth;
+    .output-split::part(second) {
+      flex: 0 0 min-content;
+      min-height: 24rem;
+      max-height: calc(50% - 4px);
     }
   `;
 
@@ -184,22 +185,29 @@ export class TlangPlayground extends LitElement {
   consoleOutput: Array<unknown[] | string> = [];
 
   @state()
-  display: 'ast' | 'hir' | 'hir pretty' | 'output' = defaultDisplay();
+  display: OutputDisplay = defaultDisplay();
+
+  get availableDisplayOptions(): OutputDisplay[] {
+    if (this.runner === 'interpreter') {
+      return ['hir pretty', 'hir', 'ast'];
+    } else {
+      return ['javascript', 'hir pretty', 'hir', 'ast'];
+    }
+  }
 
   @state()
   showConsole = true;
-
-  @query('t-codemirror')
-  codemirror!: TCodeMirror;
-
-  @query('.console-output')
-  consoleOutputElement!: HTMLElement;
 
   @state() compiler: TlangCompiler | null = null;
 
   @state() output = '';
 
   @state() runner: 'compiler' | 'interpreter' = defaultRunner();
+
+  // The editor which the user can use to write code, as it's always rendered,
+  // we cache the query selector.
+  @query('.editor', true)
+  codemirror!: TCodeMirror;
 
   get error() {
     if (this.compiler == null) {
@@ -323,9 +331,16 @@ export class TlangPlayground extends LitElement {
   }
 
   protected updated(changedProperties: PropertyValueMap<this>): void {
-    if (changedProperties.has('consoleOutput')) {
-      this.consoleOutputElement.scrollTop =
-        this.consoleOutputElement.scrollHeight;
+    if (changedProperties.has('runner')) {
+      // TODO: This is a hack to update the select value. Lit doesn't seem to
+      //       be super happy about dynamically updated options.
+      let select =
+        this.shadowRoot?.querySelector<HTMLSelectElement>('.toolbar__display');
+
+      if (select) {
+        select.value = this.display;
+        updateDisplayHashparam(this.display);
+      }
     }
   }
 
@@ -346,12 +361,19 @@ export class TlangPlayground extends LitElement {
   handleRunnerChange(event: Event) {
     const target = event.target as HTMLSelectElement;
     this.runner = target.value as 'compiler' | 'interpreter';
+
+    // When using the interpreter, showing the javascript output does not make
+    // sense.
+    if (this.runner === 'interpreter' && this.display === 'javascript') {
+      this.display = 'hir pretty';
+    }
+
     updateRunnerHashparam(this.runner);
   }
 
   handleDisplayChange(event: Event) {
     const target = event.target as HTMLSelectElement;
-    this.display = target.value as 'ast' | 'hir' | 'hir pretty' | 'output';
+    this.display = target.value as OutputDisplay;
     updateDisplayHashparam(this.display);
   }
 
@@ -389,13 +411,15 @@ export class TlangPlayground extends LitElement {
           class="output-code"
           language="tlang"
           .source=${this.compiler?.hir_pretty}
+          with-diagnostics="false"
           readonly
         ></t-codemirror>`;
-      case 'output':
+      case 'javascript':
         return html`<t-codemirror
           class="output-code"
           language="javascript"
           .source=${this.output}
+          with-diagnostics="false"
           readonly
         ></t-codemirror>`;
     }
@@ -404,13 +428,18 @@ export class TlangPlayground extends LitElement {
   render() {
     return html`
       <div class="toolbar">
-        <button @click=${this.run}>Run</button>
-        <select @change=${this.handleRunnerChange} .value=${live(this.runner)}>
+        <button class="toolbar__run" @click=${this.run}>Run</button>
+        <select
+          class="toolbar__runner"
+          @change=${this.handleRunnerChange}
+          .value=${live(this.runner)}
+        >
           <option value="compiler">Compiler</option>
           <option value="interpreter">Interpreter</option>
         </select>
-        <button @click=${this.share}>Share</button>
+        <button class="toolbar__share" @click=${this.share}>Share</button>
         <select
+          class="toolbar__example"
           @change=${this.handleExampleSelect}
           .value=${live(this.selectedExample)}
         >
@@ -419,13 +448,13 @@ export class TlangPlayground extends LitElement {
           )}
         </select>
         <select
+          class="toolbar__display"
           @change=${this.handleDisplayChange}
           .value=${live(this.display)}
         >
-          <option value="output">code</option>
-          <option value="ast">ast</option>
-          <option value="hir">hir</option>
-          <option value="hir pretty">hir pretty</option>
+          ${this.availableDisplayOptions.map((key) =>
+            keyed(key, html`<option>${key}</option>`),
+          )}
         </select>
         <div class="repo-link">
           <a href="https://github.com/topaxi/tlang">Source Code</a>
@@ -435,25 +464,22 @@ export class TlangPlayground extends LitElement {
         class="editor-split"
         direction=${this.desktop.matches ? 'vertical' : 'horizontal'}
       >
-        <div slot="first" class="editor">
+        <div slot="first" class="editor-container">
           <t-codemirror
+            class="editor"
             @source-change=${this.handleSourceChange}
           ></t-codemirror>
         </div>
-        <t-split slot="second" direction="horizontal" class="output">
-          <div slot="first">${cache(this.renderOutput())}</div>
-          <div slot="second" class="console">
-            <div class="console-toolbar">
-              <div>Console</div>
-              <button @click=${() => (this.showConsole = !this.showConsole)}>
-                ${this.showConsole ? 'Hide' : 'Show'}
-              </button>
-              <button @click=${() => (this.consoleOutput = [])}>Clear</button>
-            </div>
-            <div class="console-output" .hidden=${!this.showConsole}>
-              ${this.consoleOutput.map((args) => this.renderLogMessage(args))}
-            </div>
+        <t-split slot="second" direction="horizontal" class="output-split">
+          <div class="output-container" slot="first">
+            ${keyed(this.display, this.renderOutput())}
           </div>
+          <t-console
+            slot="second"
+            .messages=${this.consoleOutput}
+            @clear=${() => (this.consoleOutput = [])}
+          >
+          </t-console>
         </t-split>
       </t-split>
     `;
