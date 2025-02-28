@@ -210,6 +210,18 @@ export class TlangPlayground extends LitElement {
   @query('.editor', true)
   codemirror!: TCodeMirror;
 
+  private tlangConsole = {
+    log: (...args: unknown[]) => {
+      this.logToConsole('log', ...args);
+    },
+    group: (...args: unknown[]) => {
+      this.logToConsole('group', ...args);
+    },
+    groupEnd: (...args: unknown[]) => {
+      this.logToConsole('groupEnd', ...args);
+    },
+  };
+
   get error() {
     if (this.compiler == null) {
       return '';
@@ -234,7 +246,7 @@ export class TlangPlayground extends LitElement {
   }
 
   run() {
-    this.consoleMessages.push(createConsoleMessage('group'));
+    this.logToConsole('group');
 
     try {
       if (this.runner === 'compiler') {
@@ -244,14 +256,16 @@ export class TlangPlayground extends LitElement {
       }
     } catch (error) {
       if (error instanceof Error) {
-        this.consoleMessages.push(createConsoleMessage('error', error.message));
+        this.logToConsole('error', error.message);
       }
     }
 
-    this.consoleMessages = [
-      ...this.consoleMessages,
-      createConsoleMessage('groupEnd'),
-    ];
+    this.logToConsole('groupEnd');
+    this.consoleMessages = this.consoleMessages.slice();
+  }
+
+  private logToConsole(method: ConsoleMessage['type'], ...args: unknown[]) {
+    this.consoleMessages.push(createConsoleMessage(method, ...args));
   }
 
   private runCompiled() {
@@ -260,19 +274,17 @@ export class TlangPlayground extends LitElement {
       `${getStandardLibraryCompiled()}\n{${this.output}};`,
     );
 
-    fn({
-      log: (...args: unknown[]) => {
-        this.consoleMessages.push(createConsoleMessage('log', ...args));
-      },
-    });
+    fn(this.tlangConsole);
   }
 
   private runInterpreted() {
     let interpreter = new TlangInterpreter();
 
-    interpreter.define_js_fn('log', (...args: unknown[]) => {
-      this.consoleMessages.push(createConsoleMessage('log', ...args));
-    });
+    interpreter.define_js_fn('log', this.tlangConsole.log);
+
+    for (let [method, fn] of Object.entries(this.tlangConsole)) {
+      interpreter.define_js_fn(`log::${method}`, fn);
+    }
 
     interpreter.eval(this.source);
   }

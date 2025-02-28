@@ -186,6 +186,13 @@ impl CodegenJS {
     }
 
     fn generate_path_expression(&mut self, path: &hir::Path) {
+        // If we have a full identifier which resolves in the current scope, we use it directly.
+        // We currently do not really have a path resolution mechanism, just a naive lookup.
+        if let Some(identifier) = self.current_scope().resolve_variable(&path.join("::")) {
+            self.push_str(&identifier);
+            return;
+        }
+
         let first_segment = path.segments.first().unwrap();
 
         self.generate_identifier(&first_segment.ident);

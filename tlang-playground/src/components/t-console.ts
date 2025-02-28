@@ -1,5 +1,6 @@
 import { css, html, LitElement, PropertyValueMap } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
+import { repeat } from 'lit/directives/repeat.js';
 
 function stringify(value: unknown) {
   function bigintToJSON(n: bigint) {
@@ -71,8 +72,8 @@ export class ConsoleElement extends LitElement {
       padding-left: 1ch;
     }
 
-    t-console-message[type='groupEnd'][indent='0'] {
-      margin-bottom: 0.5rem;
+    li:not(:first-child) > t-console-message[type='group'][indent='0'] {
+      margin-top: 0.5rem;
     }
   `;
 
@@ -87,6 +88,8 @@ export class ConsoleElement extends LitElement {
 
   @query('.messages-container')
   consoleMessagesContainer!: HTMLElement;
+
+  collapsedGroups = new WeakSet<ConsoleMessage>();
 
   collapse(state = !this.collapsed) {
     this.collapsed = state;
@@ -111,8 +114,24 @@ export class ConsoleElement extends LitElement {
     }
   }
 
+  private collapseMessage(event: CustomEvent<ConsoleMessage>) {
+    let message = event.detail;
+
+    if (this.collapsedGroups.has(message)) {
+      this.collapsedGroups.delete(message);
+    } else {
+      this.collapsedGroups.add(message);
+    }
+
+    this.requestUpdate();
+  }
+
   protected render() {
-    let indent = 0;
+    let groupStack = 0;
+    let collapsedAt = Number.MAX_SAFE_INTEGER;
+
+    let isCollapsed = () => groupStack >= collapsedAt;
+    let resetCollapsedAt = () => (collapsedAt = Number.MAX_SAFE_INTEGER);
 
     return html`
       <div class="toolbar">
@@ -139,29 +158,50 @@ export class ConsoleElement extends LitElement {
           .hidden=${this.collapsed}
           aria-expanded=${String(this.collapsed)}
         >
-          ${this.messages.map((message) => {
-            if (message.type === 'group') {
-              indent += 1;
-            }
+          ${repeat(
+            this.messages,
+            (_item, index) => index,
+            (message) => {
+              if (message.type === 'group') {
+                groupStack++;
 
-            let rendered = html`
-              <li>
-                <t-console-message
-                  type=${message.type}
-                  indent=${indent - 1}
-                  .args=${message.args}
-                  .timestamp=${message.timestamp}
-                  .showTimestamp=${this.showTimestamps}
-                ></t-console-message>
-              </li>
-            `;
+                if (!isCollapsed() && this.collapsedGroups.has(message)) {
+                  collapsedAt = groupStack;
+                }
+              } else if (message.type === 'groupEnd') {
+                groupStack--;
 
-            if (message.type === 'groupEnd') {
-              indent -= 1;
-            }
+                if (!isCollapsed()) {
+                  resetCollapsedAt();
+                }
 
-            return rendered;
-          })}
+                return null;
+              }
+
+              if (
+                isCollapsed() &&
+                !(message.type === 'group' && collapsedAt === groupStack)
+              ) {
+                return null;
+              }
+
+              let rendered = html`
+                <li>
+                  <t-console-message
+                    type=${message.type}
+                    indent=${groupStack - 1}
+                    .message=${message}
+                    .timestamp=${message.timestamp}
+                    .showTimestamp=${this.showTimestamps}
+                    .collapsed=${collapsedAt === groupStack}
+                    @collapse=${this.collapseMessage}
+                  ></t-console-message>
+                </li>
+              `;
+
+              return rendered;
+            },
+          )}
         </ul>
       </div>
     `;
@@ -172,20 +212,46 @@ export class ConsoleElement extends LitElement {
 export class ConsoleMessageElement extends LitElement {
   static styles = css`
     :host {
-      display: block;
+      display: flex;
+      position: relative;
       color: var(--ctp-macchiato-text);
     }
 
     time {
       color: var(--ctp-macchiato-subtext0);
+      margin-right: 8px;
+    }
+
+    button {
+      all: unset;
+      appearance: none;
+      margin-right: 8px;
+    }
+
+    button::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+    }
+
+    .indent {
+      display: block;
+      width: 12px;
+      margin-left: 4px;
+      border-left: 1px solid var(--ctp-macchiato-sapphire);
+      margin-top: -1px;
+      margin-bottom: -1px;
     }
   `;
 
   @property({ type: String })
   type: ConsoleMessage['type'] = 'log';
 
-  @property({ type: Array })
-  args: ConsoleMessage['args'] = [];
+  @property({ type: Object })
+  message!: ConsoleMessage;
 
   @property({ type: Number })
   timestamp = 0;
@@ -194,7 +260,18 @@ export class ConsoleMessageElement extends LitElement {
   indent = 0;
 
   @property({ type: Boolean })
+  collapsed = false;
+
+  @property({ type: Boolean })
   showTimestamp = false;
+
+  private collapse() {
+    this.dispatchEvent(
+      new CustomEvent('collapse', {
+        detail: this.message,
+      }),
+    );
+  }
 
   protected renderConsoleMessageArgs(args: ConsoleMessage['args']) {
     if (args == null || args.length === 0) {
@@ -218,7 +295,21 @@ export class ConsoleMessageElement extends LitElement {
   }
 
   protected render() {
-    let rendered = this.renderConsoleMessageArgs(this.args);
+    let rendered = this.renderConsoleMessageArgs(this.message.args);
+
+    if (this.type === 'group' && this.indent > 0) {
+      rendered = html`<button aria-label="Toggle Group" @click=${this.collapse}>
+          ${this.collapsed ? '' : ''}</button
+        >${rendered}`;
+    }
+
+    for (
+      let indent = this.indent - Number(this.type === 'group');
+      indent > 0;
+      indent--
+    ) {
+      rendered = html`<span class="indent"></span>${rendered}`;
+    }
 
     if (rendered != null && this.showTimestamp) {
       let date = new Date(this.timestamp);

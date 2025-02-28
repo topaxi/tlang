@@ -1,5 +1,6 @@
 use gloo_utils::format::JsValueSerdeExt;
 use tlang_ast::node::{self as ast};
+use tlang_ast::symbols::SymbolType;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_hir::hir;
 use tlang_hir_pretty::HirPretty;
@@ -53,6 +54,11 @@ impl TlangCompiler {
     fn analyze(&mut self) {
         self.analyzer
             .add_builtin_symbols(CodegenJS::get_standard_library_symbols());
+        self.analyzer.add_builtin_symbols(&[
+            ("log::log", SymbolType::Function),
+            ("log::group", SymbolType::Function),
+            ("log::groupEnd", SymbolType::Function),
+        ]);
         let _ = self.analyzer.analyze(&self.ast);
         self.analyzer
             .get_diagnostics()
