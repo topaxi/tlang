@@ -17,6 +17,8 @@ import {
 import { MediaController } from './controllers/media-controller';
 import { keyed } from 'lit/directives/keyed.js';
 import { live } from 'lit/directives/live.js';
+import { ConsoleMessage, createConsoleMessage } from './components/t-console';
+import { repeat } from 'lit/directives/repeat.js';
 
 type CodemirrorSeverity = 'hint' | 'info' | 'warning' | 'error';
 
@@ -168,7 +170,6 @@ export class TlangPlayground extends LitElement {
 
     .output-split::part(second) {
       flex: 0 0 min-content;
-      min-height: 24rem;
       max-height: calc(50% - 4px);
     }
   `;
@@ -182,7 +183,7 @@ export class TlangPlayground extends LitElement {
   source = examples[this.selectedExample];
 
   @state()
-  consoleOutput: Array<unknown[] | string> = [];
+  consoleMessages: ConsoleMessage[] = [];
 
   @state()
   display: OutputDisplay = defaultDisplay();
@@ -233,15 +234,24 @@ export class TlangPlayground extends LitElement {
   }
 
   run() {
-    if (this.consoleOutput.length > 0) {
-      this.consoleOutput.push('---');
+    this.consoleMessages.push(createConsoleMessage('group'));
+
+    try {
+      if (this.runner === 'compiler') {
+        this.runCompiled();
+      } else {
+        this.runInterpreted();
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        this.consoleMessages.push(createConsoleMessage('error', error.message));
+      }
     }
 
-    if (this.runner === 'compiler') {
-      this.runCompiled();
-    } else {
-      this.runInterpreted();
-    }
+    this.consoleMessages = [
+      ...this.consoleMessages,
+      createConsoleMessage('groupEnd'),
+    ];
   }
 
   private runCompiled() {
@@ -252,7 +262,7 @@ export class TlangPlayground extends LitElement {
 
     fn({
       log: (...args: unknown[]) => {
-        this.consoleOutput = [...this.consoleOutput, args];
+        this.consoleMessages.push(createConsoleMessage('log', ...args));
       },
     });
   }
@@ -261,7 +271,7 @@ export class TlangPlayground extends LitElement {
     let interpreter = new TlangInterpreter();
 
     interpreter.define_js_fn('log', (...args: unknown[]) => {
-      this.consoleOutput = [...this.consoleOutput, args];
+      this.consoleMessages.push(createConsoleMessage('log', ...args));
     });
 
     interpreter.eval(this.source);
@@ -326,7 +336,6 @@ export class TlangPlayground extends LitElement {
 
     defaultSource().then((source) => {
       this.codemirror.source = source;
-      this.run();
     });
   }
 
@@ -346,16 +355,13 @@ export class TlangPlayground extends LitElement {
 
   handleSourceChange(event: CustomEvent) {
     this.source = event.detail.source;
-    this.consoleOutput = [];
   }
 
   handleExampleSelect(event: Event) {
     const target = event.target as HTMLSelectElement;
-    this.consoleOutput = [];
     this.codemirror.source = examples[target.value];
     this.selectedExample = target.value;
     updateExampleHashparam(this.selectedExample);
-    this.run();
   }
 
   handleRunnerChange(event: Event) {
@@ -375,29 +381,6 @@ export class TlangPlayground extends LitElement {
     const target = event.target as HTMLSelectElement;
     this.display = target.value as OutputDisplay;
     updateDisplayHashparam(this.display);
-  }
-
-  private stringify(value: unknown) {
-    function bigintToJSON(n: bigint) {
-      if (n > BigInt(Number.MAX_SAFE_INTEGER)) {
-        return n.toString();
-      } else if (n < BigInt(Number.MIN_SAFE_INTEGER)) {
-        return n.toString();
-      } else {
-        return Number(n);
-      }
-    }
-    return JSON.stringify(value, (_, v) =>
-      typeof v === 'bigint' ? bigintToJSON(v) : v,
-    );
-  }
-
-  renderLogMessage(args: string | unknown[]) {
-    return html`
-      <div class="log-message">
-        ${typeof args === 'string' ? args : args.map(this.stringify).join(', ')}
-      </div>
-    `;
   }
 
   renderOutput() {
@@ -443,8 +426,10 @@ export class TlangPlayground extends LitElement {
           @change=${this.handleExampleSelect}
           .value=${live(this.selectedExample)}
         >
-          ${Object.keys(examples).map((key) =>
-            keyed(key, html`<option>${key}</option>`),
+          ${repeat(
+            Object.keys(examples),
+            (key) => key,
+            (key) => html`<option>${key}</option>`,
           )}
         </select>
         <select
@@ -452,8 +437,10 @@ export class TlangPlayground extends LitElement {
           @change=${this.handleDisplayChange}
           .value=${live(this.display)}
         >
-          ${this.availableDisplayOptions.map((key) =>
-            keyed(key, html`<option>${key}</option>`),
+          ${repeat(
+            this.availableDisplayOptions,
+            (key) => key,
+            (key) => html`<option>${key}</option>`,
           )}
         </select>
         <div class="repo-link">
@@ -476,8 +463,8 @@ export class TlangPlayground extends LitElement {
           </div>
           <t-console
             slot="second"
-            .messages=${this.consoleOutput}
-            @clear=${() => (this.consoleOutput = [])}
+            .messages=${this.consoleMessages}
+            @clear=${() => (this.consoleMessages = [])}
           >
           </t-console>
         </t-split>
