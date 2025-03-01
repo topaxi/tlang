@@ -164,6 +164,11 @@ export class TlangPlayground extends LitElement {
       flex: 1;
     }
 
+    .output-tabs > t-tab-panel {
+      display: flex;
+      flex: 1;
+    }
+
     .output-code,
     .output-ast {
       width: 100%;
