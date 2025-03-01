@@ -83,12 +83,12 @@ export class SplitElement extends LitElement implements EventListenerObject {
     this.secondContainer.removeAttribute('style');
   }
 
-  private startResizing() {
+  private startMouseResizing() {
     this.ownerDocument.addEventListener('mousemove', this);
     this.ownerDocument.addEventListener('mouseup', this, { once: true });
   }
 
-  private stopResizing() {
+  private stopMouseResizing() {
     this.ownerDocument.removeEventListener('mousemove', this);
   }
 
@@ -99,7 +99,7 @@ export class SplitElement extends LitElement implements EventListenerObject {
     if (this.direction === 'horizontal') {
       let firstSlotSize = Math.min(
         Math.max(position.clientY - containerRect.top, 0),
-        containerRect.height - handleRect.height,
+        containerRect.height - handleRect.height / 2,
       );
       let secondSlotSize = containerRect.height - firstSlotSize;
 
@@ -107,7 +107,7 @@ export class SplitElement extends LitElement implements EventListenerObject {
     } else {
       let firstSlotSize = Math.min(
         Math.max(position.clientX - containerRect.left, 0),
-        containerRect.width - handleRect.width,
+        containerRect.width - handleRect.width / 2,
       );
       let secondSlotSize = containerRect.width - firstSlotSize;
 
@@ -133,10 +133,57 @@ export class SplitElement extends LitElement implements EventListenerObject {
     this.updateSlotSize(firstSlotSize, secondSlotSize);
   }
 
+  private startTouchResizing(event: TouchEvent) {
+    let [touch] = event.touches;
+
+    // Assuming that while resizing the container itself will not change size.
+    let containerRect = this.getBoundingClientRect();
+    let handleRect = this.handle.getBoundingClientRect();
+
+    let dimension: 'width' | 'height' =
+      this.direction === 'horizontal' ? 'height' : 'width';
+    let direction: 'pageX' | 'pageY' =
+      this.direction === 'horizontal' ? 'pageY' : 'pageX';
+    let offsetDirection: 'x' | 'y' =
+      this.direction === 'horizontal' ? 'y' : 'x';
+
+    let containerSize = containerRect[dimension];
+    let initialFirstSlotSize =
+      this.firstContainer.getBoundingClientRect()[dimension];
+
+    let start = { x: touch[direction], y: touch[direction] };
+    let offset = { x: 0, y: 0 };
+
+    let touchmove = (event: TouchEvent) => {
+      let [touch] = event.touches;
+
+      offset[offsetDirection] = start[offsetDirection] - touch[direction];
+
+      let firstSlotSize = Math.min(
+        containerSize - handleRect[dimension] / 2,
+        initialFirstSlotSize - offset[offsetDirection],
+      );
+      let secondSlotSize = containerSize - firstSlotSize;
+
+      this.updateSlotSize(firstSlotSize, secondSlotSize);
+    };
+
+    let touchend = (_event: TouchEvent) => {
+      this.ownerDocument.removeEventListener('touchmove', touchmove);
+      this.ownerDocument.removeEventListener('touchcancel', touchend);
+      this.ownerDocument.removeEventListener('touchend', touchend);
+    };
+
+    this.ownerDocument.addEventListener('touchmove', touchmove);
+    this.ownerDocument.addEventListener('touchcancel', touchend);
+    this.ownerDocument.addEventListener('touchend', touchend);
+  }
+
   handleEvent(e: Event) {
     let event = e as
       | (MouseEvent & { type: 'dblclick' | `mouse${string}` })
-      | (KeyboardEvent & { type: `key${string}` });
+      | (KeyboardEvent & { type: `key${string}` })
+      | (TouchEvent & { type: `touch${string}` });
 
     switch (event.type) {
       case 'dblclick': {
@@ -145,12 +192,12 @@ export class SplitElement extends LitElement implements EventListenerObject {
       }
       case 'mousedown': {
         if (event.button === 0) {
-          this.startResizing();
+          this.startMouseResizing();
         }
         break;
       }
       case 'mouseup': {
-        this.stopResizing();
+        this.stopMouseResizing();
         break;
       }
       case 'mousemove': {
@@ -173,6 +220,10 @@ export class SplitElement extends LitElement implements EventListenerObject {
             break;
           }
         }
+        break;
+      }
+      case 'touchstart': {
+        this.startTouchResizing(event);
         break;
       }
     }
@@ -208,6 +259,7 @@ export class SplitElement extends LitElement implements EventListenerObject {
         aria-orientation=${this.direction}
         @dblclick=${this}
         @mousedown=${this}
+        @touchstart=${this}
         @keyup=${this}
       />
       <div part="second"><slot name="second"></slot></div>
