@@ -5,6 +5,7 @@ import { examples } from './examples';
 import './components/t-codemirror';
 import './components/t-console';
 import './components/t-split';
+import './components/t-tabs';
 import { type TCodeMirror } from './components/t-codemirror';
 import { compressSource, decompressSource } from './utils/lz';
 import {
@@ -43,7 +44,14 @@ async function defaultSource() {
   return examples[Object.keys(examples)[0]];
 }
 
-type OutputDisplay = 'ast' | 'hir' | 'hir pretty' | 'javascript';
+type OutputDisplay = 'ast' | 'hir' | 'hir_pretty' | 'javascript';
+
+const displayLabels = {
+  ast: 'AST',
+  hir: 'HIR',
+  hir_pretty: 'HIR (Pretty)',
+  javascript: 'JavaScript',
+};
 
 function defaultDisplay(): OutputDisplay {
   let params = getHashParams();
@@ -53,12 +61,12 @@ function defaultDisplay(): OutputDisplay {
     display = params.get('display') as
       | 'ast'
       | 'hir'
-      | 'hir pretty'
+      | 'hir_pretty'
       | 'javascript';
   }
 
   if (params.get('runner') === 'interpreter' && display === 'javascript') {
-    return 'hir pretty';
+    return 'hir_pretty';
   }
 
   return display;
@@ -147,13 +155,12 @@ export class TlangPlayground extends LitElement {
     }
 
     .editor-container,
-    .output-container {
+    .output-tabs {
       display: flex;
       flex: 1;
     }
 
-    .editor-container > t-codemirror,
-    .output-container > t-codemirror {
+    .editor-container > t-codemirror {
       flex: 1;
     }
 
@@ -190,9 +197,9 @@ export class TlangPlayground extends LitElement {
 
   get availableDisplayOptions(): OutputDisplay[] {
     if (this.runner === 'interpreter') {
-      return ['hir pretty', 'hir', 'ast'];
+      return ['hir_pretty', 'hir', 'ast'];
     } else {
-      return ['javascript', 'hir pretty', 'hir', 'ast'];
+      return ['javascript', 'hir_pretty', 'hir', 'ast'];
     }
   }
 
@@ -383,15 +390,15 @@ export class TlangPlayground extends LitElement {
     // When using the interpreter, showing the javascript output does not make
     // sense.
     if (this.runner === 'interpreter' && this.display === 'javascript') {
-      this.display = 'hir pretty';
+      this.display = 'hir_pretty';
     }
 
     updateRunnerHashparam(this.runner);
   }
 
   handleDisplayChange(event: Event) {
-    const target = event.target as HTMLSelectElement;
-    this.display = target.value as OutputDisplay;
+    this.display = (event as CustomEvent<{ id: string }>).detail
+      .id as OutputDisplay;
     updateDisplayHashparam(this.display);
   }
 
@@ -401,7 +408,7 @@ export class TlangPlayground extends LitElement {
         return html`<pre class="output-ast">${this.compiler?.ast_string}</pre>`;
       case 'hir':
         return html`<pre class="output-ast">${this.compiler?.hir_string}</pre>`;
-      case 'hir pretty':
+      case 'hir_pretty':
         return html`<t-codemirror
           class="output-code"
           language="tlang"
@@ -444,17 +451,6 @@ export class TlangPlayground extends LitElement {
             (key) => html`<option>${key}</option>`,
           )}
         </select>
-        <select
-          class="toolbar__display"
-          @change=${this.handleDisplayChange}
-          .value=${live(this.display)}
-        >
-          ${repeat(
-            this.availableDisplayOptions,
-            (key) => key,
-            (key) => html`<option>${key}</option>`,
-          )}
-        </select>
         <div class="repo-link">
           <a href="https://github.com/topaxi/tlang">Source Code</a>
         </div>
@@ -470,9 +466,23 @@ export class TlangPlayground extends LitElement {
           ></t-codemirror>
         </div>
         <t-split slot="second" direction="horizontal" class="output-split">
-          <div class="output-container" slot="first">
-            ${keyed(this.display, this.renderOutput())}
-          </div>
+          <t-tabs
+            class="output-tabs"
+            slot="first"
+            single
+            .selected=${this.display}
+            @t-tab-select=${this.handleDisplayChange}
+          >
+            ${repeat(
+              this.availableDisplayOptions,
+              (display) => display,
+              (display) =>
+                html`<t-tab slot="tab" id=${display}>${displayLabels[display]}</option>`,
+            )}
+            <t-tab-panel>
+              ${keyed(this.display, this.renderOutput())}
+            </t-tab-panel>
+          </t-tabs>
           <t-console
             slot="second"
             .messages=${this.consoleMessages}
