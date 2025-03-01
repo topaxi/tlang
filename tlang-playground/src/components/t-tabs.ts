@@ -73,9 +73,7 @@ export class TabsElement extends LitElement {
 
   protected render(): TemplateResult {
     return html`
-      <div part="tablist" role="tablist">
-        <slot name="tab"></slot>
-      </div>
+      <slot part="tablist" role="tablist" name="tab"></slot>
       <slot></slot>
     `;
   }

@@ -55,7 +55,8 @@ export class SplitElement extends LitElement implements EventListenerObject {
       cursor: col-resize;
     }
 
-    div {
+    slot {
+      display: block;
       flex: 1 0 var(--flex-basis);
       overflow: auto;
     }
@@ -251,7 +252,7 @@ export class SplitElement extends LitElement implements EventListenerObject {
 
   protected render(): TemplateResult {
     return html`
-      <div part="first" id="first"><slot name="first"></slot></div>
+      <slot name="first" part="first" id="first"></slot>
       <hr
         part="handle"
         tabindex="0"
@@ -262,7 +263,7 @@ export class SplitElement extends LitElement implements EventListenerObject {
         @touchstart=${this}
         @keyup=${this}
       />
-      <div part="second"><slot name="second"></slot></div>
+      <slot name="second" part="second"></slot>
     `;
   }
 }
