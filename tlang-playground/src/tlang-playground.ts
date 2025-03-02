@@ -51,18 +51,14 @@ const displayLabels = {
   hir: 'HIR',
   hir_pretty: 'HIR (Pretty)',
   javascript: 'JavaScript',
-};
+} satisfies Record<OutputDisplay, string>;
 
 function defaultDisplay(): OutputDisplay {
   let params = getHashParams();
   let display: OutputDisplay = 'javascript';
 
   if (params.has('display')) {
-    display = params.get('display') as
-      | 'ast'
-      | 'hir'
-      | 'hir_pretty'
-      | 'javascript';
+    display = params.get('display') as OutputDisplay;
   }
 
   if (params.get('runner') === 'interpreter' && display === 'javascript') {
