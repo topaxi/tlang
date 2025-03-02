@@ -12,4 +12,4 @@ test:
 	cargo run --release --bin tlang_test_runner
 
 tlangdi-release-debug:
-	RUSTFLAGS="-C force-frame-pointers=yes" cargo build --release --features=binary --bin tlangdi
+	RUSTFLAGS="-C force-frame-pointers=yes -C opt-level=0" cargo build --release --features=binary --bin tlangdi
