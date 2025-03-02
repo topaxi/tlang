@@ -34,7 +34,9 @@ impl TlangInterpreter {
                     let result = f.call0(&this);
                     match result {
                         Ok(value) => js_value_to_tlang_value(state, value),
-                        Err(err) => panic!("Error calling JavaScript function: {:?}", err),
+                        Err(err) => {
+                            state.panic(format!("Error calling JavaScript function: {:?}", err))
+                        }
                     }
                 }
                 1 => {
@@ -42,7 +44,9 @@ impl TlangInterpreter {
                     let result = f.call1(&this, &arg);
                     match result {
                         Ok(value) => js_value_to_tlang_value(state, value),
-                        Err(err) => panic!("Error calling JavaScript function: {:?}", err),
+                        Err(err) => {
+                            state.panic(format!("Error calling JavaScript function: {:?}", err))
+                        }
                     }
                 }
                 2 => {
@@ -51,7 +55,9 @@ impl TlangInterpreter {
                     let result = f.call2(&this, &arg1, &arg2);
                     match result {
                         Ok(value) => js_value_to_tlang_value(state, value),
-                        Err(err) => panic!("Error calling JavaScript function: {:?}", err),
+                        Err(err) => {
+                            state.panic(format!("Error calling JavaScript function: {:?}", err))
+                        }
                     }
                 }
                 3 => {
@@ -61,7 +67,9 @@ impl TlangInterpreter {
                     let result = f.call3(&this, &arg1, &arg2, &arg3);
                     match result {
                         Ok(value) => js_value_to_tlang_value(state, value),
-                        Err(err) => panic!("Error calling JavaScript function: {:?}", err),
+                        Err(err) => {
+                            state.panic(format!("Error calling JavaScript function: {:?}", err))
+                        }
                     }
                 }
                 _ => {
@@ -72,7 +80,9 @@ impl TlangInterpreter {
                     let result = f.apply(&this, &js_args);
                     match result {
                         Ok(value) => js_value_to_tlang_value(state, value),
-                        Err(err) => panic!("Error calling JavaScript function: {:?}", err),
+                        Err(err) => {
+                            state.panic(format!("Error calling JavaScript function: {:?}", err))
+                        }
                     }
                 }
             };
@@ -113,7 +123,7 @@ fn tlang_object_to_js_value(state: &InterpreterState, value: TlangValue) -> JsVa
     match state.get_object(value) {
         Some(TlangObjectKind::String(s)) => JsValue::from(s),
         Some(TlangObjectKind::Struct(s)) => {
-            if s.shape == state.list_shape {
+            if s.shape == state.builtin_shapes.list {
                 let array = js_sys::Array::new();
                 for value in &s.field_values {
                     array.push(&tlang_value_to_js_value(state, *value));
@@ -123,10 +133,10 @@ fn tlang_object_to_js_value(state: &InterpreterState, value: TlangValue) -> JsVa
 
             let shape = state.get_shape(s.shape).unwrap();
             let object = js_sys::Object::new();
-            for (field, idx) in shape.field_map.iter() {
+            for (field, idx) in &shape.field_map {
                 let key = JsValue::from(field);
-                let value = &s.field_values[*idx];
-                js_sys::Reflect::set(&object, &key, &tlang_value_to_js_value(state, *value))
+                let value = s.field_values[*idx];
+                js_sys::Reflect::set(&object, &key, &tlang_value_to_js_value(state, value))
                     .expect("Unable to set property on object");
             }
             JsValue::from(object)

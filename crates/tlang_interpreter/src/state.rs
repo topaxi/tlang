@@ -150,7 +150,7 @@ impl InterpreterState {
         self.struct_decls.get(&path_name).cloned()
     }
 
-    pub(crate) fn panic(&self, message: String) -> ! {
+    pub fn panic(&self, message: String) -> ! {
         let mut call_stack = String::new();
 
         for entry in self.call_stack.iter().rev() {

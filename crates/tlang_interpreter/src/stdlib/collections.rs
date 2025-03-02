@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use log::debug;
 use tlang_macros::native_fn;
 
 use crate::shape::TlangStructMethod;
@@ -13,7 +12,7 @@ pub fn len(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
     match state.get_object(args[0]) {
         Some(TlangObjectKind::Struct(obj)) => TlangValue::from(obj.field_values.len()),
         Some(TlangObjectKind::String(string)) => TlangValue::from(string.len()),
-        _ => panic!("Expected struct or string, got {:?}", args[0]),
+        _ => state.panic(format!("Expected struct or string, got {:?}", args[0])),
     }
 }
 
