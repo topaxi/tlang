@@ -1115,20 +1115,27 @@ impl Interpreter {
     fn eval_list_expr(&mut self, values: &[hir::Expr]) -> EvalResult {
         let mut field_values = Vec::with_capacity(values.len());
 
-        for expr in values {
+        for (i, expr) in values.iter().enumerate() {
             if let hir::ExprKind::Unary(UnaryOp::Spread, expr) = &expr.kind {
                 let value = eval_value!(self.eval_expr(expr));
 
                 if let TlangValue::Object(id) = value {
                     match self.get_object_by_id(id) {
                         TlangObjectKind::Slice(slice) => {
-                            field_values.extend_from_slice(self.get_slice_values(*slice))
+                            let values = self.get_slice_values(*slice);
+                            field_values.reserve(values.len());
+                            field_values.extend_from_slice(values)
                         }
                         TlangObjectKind::Struct(list_struct) => {
+                            field_values.reserve(list_struct.field_values.len());
                             field_values.extend(&list_struct.field_values)
                         }
                         obj => self.panic(format!("Expected list, got {:?}", obj)),
                     }
+
+                    // In case we used all the capacity due to spreading the values above,
+                    // we once again reserve the remaining capacity.
+                    field_values.reserve(values.len() - i);
                 } else {
                     self.panic(format!("Expected list, got {:?}", value));
                 }
