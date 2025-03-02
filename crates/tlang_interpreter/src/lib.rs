@@ -13,8 +13,8 @@ use self::shape::{ShapeKey, TlangStructMethod, TlangStructShape};
 use self::state::{InterpreterState, TailCall};
 use self::stdlib::collections::define_list_shape;
 use self::value::{
-    NativeFnReturn, TlangArithmetic, TlangNativeFn, TlangObjectId, TlangObjectKind, TlangStruct,
-    TlangValue,
+    NativeFnReturn, TlangArithmetic, TlangNativeFn, TlangObjectId, TlangObjectKind, TlangSlice,
+    TlangStruct, TlangValue,
 };
 
 mod resolver;
@@ -161,7 +161,19 @@ impl Interpreter {
     }
 
     fn get_struct(&self, value: TlangValue) -> Option<&TlangStruct> {
-        self.get_object(value).and_then(|obj| obj.get_struct())
+        self.state.get_struct(value)
+    }
+
+    fn get_slice(&self, value: TlangValue) -> Option<TlangSlice> {
+        self.state.get_slice(value)
+    }
+
+    fn get_slice_value(&self, slice: TlangSlice, index: usize) -> TlangValue {
+        self.state.get_slice_value(slice, index)
+    }
+
+    fn get_slice_values(&self, slice: TlangSlice) -> &[TlangValue] {
+        self.state.get_slice_values(slice)
     }
 
     fn get_shape_of(&self, value: TlangValue) -> Option<&TlangStructShape> {
@@ -378,11 +390,15 @@ impl Interpreter {
         let rhs_value = eval_value!(self.eval_expr(rhs));
         let lhs_value = eval_value!(self.eval_expr(lhs));
 
-        if let Some(TlangObjectKind::Struct(obj)) = self.get_object(lhs_value) {
-            return EvalResult::Value(obj.field_values[rhs_value.as_usize()]);
+        match self.get_object(lhs_value) {
+            Some(TlangObjectKind::Struct(obj)) => {
+                EvalResult::Value(obj.field_values[rhs_value.as_usize()])
+            }
+            Some(TlangObjectKind::Slice(slice)) => {
+                EvalResult::Value(self.get_slice_value(*slice, rhs_value.as_usize()))
+            }
+            _ => todo!("eval_index_access: {:?}[{:?}]", lhs, rhs_value),
         }
-
-        todo!("eval_index_access: {:?}[{:?}]", lhs, rhs_value)
     }
 
     fn eval_field_access(&mut self, lhs: &hir::Expr, ident: &Ident) -> EvalResult {
@@ -1104,9 +1120,15 @@ impl Interpreter {
                 let value = eval_value!(self.eval_expr(expr));
 
                 if let TlangValue::Object(id) = value {
-                    let struct_values =
-                        &self.get_object_by_id(id).get_struct().unwrap().field_values;
-                    field_values.extend(struct_values);
+                    match self.get_object_by_id(id) {
+                        TlangObjectKind::Slice(slice) => {
+                            field_values.extend_from_slice(self.get_slice_values(*slice))
+                        }
+                        TlangObjectKind::Struct(list_struct) => {
+                            field_values.extend(&list_struct.field_values)
+                        }
+                        obj => self.panic(format!("Expected list, got {:?}", obj)),
+                    }
                 } else {
                     self.panic(format!("Expected list, got {:?}", value));
                 }
@@ -1278,12 +1300,49 @@ impl Interpreter {
 
                     if let hir::PatKind::Rest(pat) = &pat.kind {
                         let rest_object =
-                            self.state.new_list(list_struct.field_values[i..].to_vec());
+                            self.state
+                                .new_slice(value, i, list_struct.field_values.len() - i);
 
                         return self.eval_pat(pat, rest_object);
                     }
 
                     if !self.eval_pat(pat, list_struct.field_values[i]) {
+                        return false;
+                    }
+                }
+
+                true
+            }
+            TlangObjectKind::Slice(slice) => {
+                let list_values_length = slice.len();
+
+                // Empty list pattern is a special case, it only matches lists with 0 elements.
+                if patterns.is_empty() && list_values_length >= 1 {
+                    return false;
+                }
+
+                // Not enough values in the list to match the pattern.
+                // Rest patterns are allowed to match 0 values.
+                let patterns_len =
+                    patterns.len() - patterns.iter().find(|p| p.is_rest()).map_or(0, |_| 1);
+                if patterns_len > list_values_length {
+                    return false;
+                }
+
+                for (i, pat) in patterns.iter().enumerate() {
+                    let list_slice = self.get_slice(value).unwrap();
+
+                    if let hir::PatKind::Rest(pat) = &pat.kind {
+                        let rest_object = self.state.new_slice(
+                            list_slice.of(),
+                            list_slice.start() + i,
+                            list_slice.len() - i,
+                        );
+
+                        return self.eval_pat(pat, rest_object);
+                    }
+
+                    if !self.eval_pat(pat, self.get_slice_value(list_slice, i)) {
                         return false;
                     }
                 }
@@ -1352,7 +1411,7 @@ mod tests {
 
     use super::*;
     use indoc::indoc;
-    use pretty_assertions::assert_matches;
+    use pretty_assertions::{assert_eq, assert_matches};
 
     #[ctor::ctor]
     fn before_all() {
@@ -1692,5 +1751,49 @@ mod tests {
 
         assert_matches!(some_data.field_values[0], TlangValue::U64(10));
         assert_matches!(none_data.field_values[0], TlangValue::U64(0));
+    }
+
+    #[test]
+    fn test_rest_is_a_slice() {
+        let mut interpreter = interpreter(indoc! {"
+            fn as_slice([...rest]) { rest }
+            fn as_slice(_) { [] }
+        "});
+        let list = interpreter.eval("as_slice([1, 2, 3])");
+        let list_data = match list {
+            TlangValue::Object(id) => interpreter
+                .interpreter
+                .get_object_by_id(id)
+                .get_slice()
+                .unwrap(),
+            val => panic!("Expected slice, got {:?}", val),
+        };
+        assert_eq!(list_data.start(), 0);
+        assert_eq!(list_data.len(), 3);
+    }
+
+    #[test]
+    fn test_rest_is_a_slice_with_offset() {
+        let mut interpreter = interpreter(indoc! {"
+            fn as_slice([_, _, ...rest]) { rest }
+            fn as_slice(_) { [] }
+
+            fn head([]) { 0 }
+            fn head([head]) { head }
+        "});
+        let list = interpreter.eval("as_slice(as_slice([1, 2, 3, 4, 5]))");
+        let list_data = match list {
+            TlangValue::Object(id) => interpreter
+                .interpreter
+                .get_object_by_id(id)
+                .get_slice()
+                .unwrap(),
+            val => panic!("Expected slice, got {:?}", val),
+        };
+        assert_eq!(list_data.start(), 4);
+        assert_eq!(list_data.len(), 1);
+
+        let head = interpreter.eval("head(as_slice([1, 2, 3, 4, 5]))");
+        assert_eq!(head.as_usize(), 3);
     }
 }

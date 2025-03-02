@@ -28,6 +28,39 @@ impl TlangStruct {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TlangSlice {
+    of: TlangValue,
+    start: usize,
+    len: usize,
+}
+
+impl TlangSlice {
+    pub fn new(of: TlangValue, start: usize, len: usize) -> Self {
+        Self { of, start, len }
+    }
+
+    pub fn of(self) -> TlangValue {
+        self.of
+    }
+
+    pub fn start(self) -> usize {
+        self.start
+    }
+
+    pub fn len(self) -> usize {
+        self.len
+    }
+
+    pub fn range(self) -> std::ops::Range<usize> {
+        self.start..self.start + self.len
+    }
+
+    pub fn is_empty(self) -> bool {
+        self.len == 0
+    }
+}
+
 pub type TlangObjectId = usize;
 
 pub type TlangNativeFn = Box<dyn FnMut(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn>;
@@ -45,6 +78,7 @@ pub enum TlangObjectKind {
     NativeFn,
     String(String),
     Struct(TlangStruct),
+    Slice(TlangSlice),
     Closure(TlangClosure),
 }
 
@@ -52,6 +86,13 @@ impl TlangObjectKind {
     pub(crate) fn get_struct(&self) -> Option<&TlangStruct> {
         match self {
             TlangObjectKind::Struct(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn get_slice(&self) -> Option<TlangSlice> {
+        match self {
+            TlangObjectKind::Slice(s) => Some(*s),
             _ => None,
         }
     }
@@ -73,6 +114,7 @@ impl TlangObjectKind {
             TlangObjectKind::NativeFn => true,
             TlangObjectKind::String(s) => !s.is_empty(),
             TlangObjectKind::Struct(s) => !s.is_empty(),
+            TlangObjectKind::Slice(s) => !s.is_empty(),
             TlangObjectKind::Closure(_) => true,
         }
     }

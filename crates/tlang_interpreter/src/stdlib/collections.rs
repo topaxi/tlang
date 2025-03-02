@@ -4,7 +4,7 @@ use tlang_macros::native_fn;
 
 use crate::shape::TlangStructMethod;
 use crate::state::InterpreterState;
-use crate::value::{NativeFnReturn, TlangObjectKind, TlangStruct, TlangValue};
+use crate::value::{NativeFnReturn, TlangObjectKind, TlangValue};
 use crate::Interpreter;
 
 #[native_fn(name = "len")]
@@ -34,12 +34,7 @@ pub fn define_list_shape(interpreter: &mut Interpreter) {
                 args[2].as_usize()
             };
 
-            let field_values = this.field_values[start..end].to_vec();
-
-            NativeFnReturn::Return(state.new_object(TlangObjectKind::Struct(TlangStruct {
-                shape: this.shape,
-                field_values,
-            })))
+            NativeFnReturn::Return(state.new_slice(args[0], start, end - start))
         })),
     );
 

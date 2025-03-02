@@ -9,7 +9,9 @@ use tlang_hir::hir::{self, HirId};
 use crate::resolver::Resolver;
 use crate::scope::{Scope, ScopeStack};
 use crate::shape::{ShapeKey, TlangStructMethod, TlangStructShape};
-use crate::value::{TlangClosure, TlangObjectId, TlangObjectKind, TlangStruct, TlangValue};
+use crate::value::{
+    TlangClosure, TlangObjectId, TlangObjectKind, TlangSlice, TlangStruct, TlangValue,
+};
 
 pub enum CallStackKind {
     Root,
@@ -235,6 +237,24 @@ impl InterpreterState {
             .and_then(|id| self.get_object_by_id(id))
     }
 
+    pub fn get_struct(&self, value: TlangValue) -> Option<&TlangStruct> {
+        self.get_object(value).and_then(|obj| obj.get_struct())
+    }
+
+    pub fn get_slice(&self, value: TlangValue) -> Option<TlangSlice> {
+        self.get_object(value).and_then(|obj| obj.get_slice())
+    }
+
+    pub fn get_slice_value(&self, slice: TlangSlice, index: usize) -> TlangValue {
+        let list = self.get_struct(slice.of()).unwrap();
+        *list.field_values.get(slice.start() + index).unwrap()
+    }
+
+    pub fn get_slice_values(&self, slice: TlangSlice) -> &[TlangValue] {
+        let list = self.get_struct(slice.of()).unwrap();
+        &list.field_values[slice.range()]
+    }
+
     pub fn new_list(&mut self, values: Vec<TlangValue>) -> TlangValue {
         self.new_object(TlangObjectKind::Struct(TlangStruct {
             shape: self.builtin_shapes.list,
@@ -244,6 +264,10 @@ impl InterpreterState {
 
     pub fn new_string(&mut self, value: String) -> TlangValue {
         self.new_object(TlangObjectKind::String(value))
+    }
+
+    pub fn new_slice(&mut self, of: TlangValue, start: usize, len: usize) -> TlangValue {
+        self.new_object(TlangObjectKind::Slice(TlangSlice::new(of, start, len)))
     }
 
     pub fn define_struct_shape(
@@ -322,6 +346,15 @@ impl InterpreterState {
 
                     result.push_str(" }");
                     result
+                }
+                Some(TlangObjectKind::Slice(s)) => {
+                    let values = self
+                        .get_slice_values(*s)
+                        .iter()
+                        .map(|v| self.stringify(*v))
+                        .collect::<Vec<String>>()
+                        .join(", ");
+                    format!("&[{}]", values)
                 }
                 Some(TlangObjectKind::Closure(s)) => {
                     let fn_decl = self.closures.get(&s.id).unwrap();
