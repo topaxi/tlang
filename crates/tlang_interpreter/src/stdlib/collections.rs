@@ -49,10 +49,9 @@ pub fn define_list_shape(interpreter: &mut Interpreter) {
         })),
     );
 
-    let list_shape = TlangStructShape::new("List".to_string(), vec![], list_methods);
-
     interpreter
         .state
-        .shapes
-        .insert(interpreter.state.list_shape, list_shape);
+        .builtin_shapes
+        .get_list_shape_mut()
+        .set_methods(list_methods);
 }

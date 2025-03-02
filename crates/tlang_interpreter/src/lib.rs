@@ -98,10 +98,8 @@ impl Default for Interpreter {
 
 impl Interpreter {
     pub fn new() -> Self {
-        let list_shape_key = ShapeKey::new_native();
-
         let mut interpreter = Self {
-            state: InterpreterState::new(list_shape_key),
+            state: InterpreterState::new(),
             native_fns: HashMap::new(),
         };
 

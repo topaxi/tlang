@@ -6,26 +6,27 @@ use tlang_hir::hir::HirId;
 use crate::value::{TlangObjectId, TlangValue};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum ShapeKeyImpl {
+pub enum ShapeKey {
     HirId(HirId),
     Native(usize),
     // ShapeKeyImpl::Dict is a hash value generated from each of the keys in the struct.
     Dict(u64),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ShapeKey(ShapeKeyImpl);
-
 impl ShapeKey {
-    pub fn new_native() -> Self {
-        static NEXT_ID: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-        ShapeKey(ShapeKeyImpl::Native(
-            NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst),
-        ))
+    pub fn new_native(index: usize) -> Self {
+        ShapeKey::Native(index)
+    }
+
+    pub fn get_native_index(self) -> usize {
+        match self {
+            ShapeKey::Native(index) => index,
+            _ => panic!("Expected native shape key, got {:?}", self),
+        }
     }
 
     pub fn new_hir_id(id: HirId) -> Self {
-        ShapeKey(ShapeKeyImpl::HirId(id))
+        ShapeKey::HirId(id)
     }
 
     pub fn from_dict_keys(keys: &[String]) -> Self {
@@ -37,7 +38,7 @@ impl ShapeKey {
 
         let hash = std::hash::Hasher::finish(&hasher);
 
-        ShapeKey(ShapeKeyImpl::Dict(hash))
+        ShapeKey::Dict(hash)
     }
 }
 
@@ -105,5 +106,17 @@ impl TlangStructShape {
 
     pub fn get_method(&self, name: &str) -> Option<&TlangStructMethod> {
         self.method_map.get(name)
+    }
+
+    pub fn set_fields(&mut self, fields: Vec<String>) {
+        self.field_map = fields
+            .into_iter()
+            .enumerate()
+            .map(|(i, f)| (f, i))
+            .collect();
+    }
+
+    pub fn set_methods(&mut self, methods: HashMap<String, TlangStructMethod>) {
+        self.method_map = methods;
     }
 }

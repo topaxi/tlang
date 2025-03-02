@@ -48,6 +48,39 @@ impl CallStackEntry {
     }
 }
 
+pub struct BuiltinShapes {
+    pub list: ShapeKey,
+    pub shapes: Slab<TlangStructShape>,
+}
+
+impl Default for BuiltinShapes {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BuiltinShapes {
+    pub fn new() -> Self {
+        let mut shapes = Slab::with_capacity(1);
+
+        let list = ShapeKey::new_native(shapes.insert(TlangStructShape::new(
+            "List".to_string(),
+            vec![],
+            HashMap::new(),
+        )));
+
+        Self { list, shapes }
+    }
+
+    pub fn get_list_shape(&self) -> &TlangStructShape {
+        self.shapes.get(self.list.get_native_index()).unwrap()
+    }
+
+    pub fn get_list_shape_mut(&mut self) -> &mut TlangStructShape {
+        self.shapes.get_mut(self.list.get_native_index()).unwrap()
+    }
+}
+
 #[derive(Debug)]
 pub struct TailCall {
     pub callee: TlangValue,
@@ -63,7 +96,7 @@ pub struct InterpreterState {
     pub(crate) struct_decls: HashMap<String, Rc<hir::StructDeclaration>>,
     call_stack: Vec<CallStackEntry>,
     pub(crate) globals: HashMap<String, TlangValue>,
-    pub list_shape: ShapeKey,
+    pub builtin_shapes: BuiltinShapes,
 }
 
 impl Resolver for InterpreterState {
@@ -85,7 +118,7 @@ impl Resolver for InterpreterState {
 }
 
 impl InterpreterState {
-    pub(crate) fn new(list_shape: ShapeKey) -> Self {
+    pub(crate) fn new() -> Self {
         let mut call_stack = Vec::with_capacity(1000);
 
         call_stack.push(CallStackEntry {
@@ -103,7 +136,7 @@ impl InterpreterState {
             shapes: HashMap::with_capacity(100),
             call_stack,
             globals: HashMap::with_capacity(100),
-            list_shape,
+            builtin_shapes: BuiltinShapes::default(),
         }
     }
 
@@ -204,23 +237,13 @@ impl InterpreterState {
 
     pub fn new_list(&mut self, values: Vec<TlangValue>) -> TlangValue {
         self.new_object(TlangObjectKind::Struct(TlangStruct {
-            shape: self.list_shape,
+            shape: self.builtin_shapes.list,
             field_values: values,
         }))
     }
 
     pub fn new_string(&mut self, value: String) -> TlangValue {
         self.new_object(TlangObjectKind::String(value))
-    }
-
-    pub fn define_native_struct(
-        &mut self,
-        name: String,
-        fields: Vec<String>,
-        methods: HashMap<String, TlangStructMethod>,
-    ) -> ShapeKey {
-        let shape_key = ShapeKey::new_native();
-        self.define_struct_shape(shape_key, name, fields, methods)
     }
 
     pub fn define_struct_shape(
@@ -236,7 +259,10 @@ impl InterpreterState {
     }
 
     pub fn get_shape(&self, key: ShapeKey) -> Option<&TlangStructShape> {
-        self.shapes.get(&key)
+        match key {
+            ShapeKey::Native(idx) => self.builtin_shapes.shapes.get(idx),
+            key => self.shapes.get(&key),
+        }
     }
 
     pub fn get_field_index(&self, shape: ShapeKey, field: &str) -> Option<usize> {
@@ -261,7 +287,7 @@ impl InterpreterState {
             TlangValue::Object(id) => match self.get_object_by_id(id) {
                 Some(TlangObjectKind::String(s)) => s.clone(),
                 Some(TlangObjectKind::Struct(s)) => {
-                    if s.shape == self.list_shape {
+                    if s.shape == self.builtin_shapes.list {
                         let values = s
                             .field_values
                             .iter()
