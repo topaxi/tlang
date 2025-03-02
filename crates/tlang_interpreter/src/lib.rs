@@ -898,11 +898,11 @@ impl Interpreter {
                 self.eval_call_struct_method(struct_decl.hir_id.into(), path.last_ident(), &args)
             }
             hir::ExprKind::Path(path) => {
-                panic!(
+                self.panic(format!(
                     "Function `{}` not found\nCurrent scope: {:?}",
                     path.join("::"),
                     self.state.current_scope().borrow()
-                );
+                ));
             }
             hir::ExprKind::FieldAccess(expr, ident) => {
                 let call_target = eval_value!(self.eval_expr(expr));
@@ -939,12 +939,12 @@ impl Interpreter {
         );
 
         if fn_decl.parameters.len() != args.len() {
-            panic!(
+            self.state.panic(format!(
                 "Function `{:?}` expects {} arguments, but got {}",
                 fn_decl.name(),
                 fn_decl.parameters.len(),
                 args.len()
-            );
+            ));
         }
 
         self.with_new_fn_scope(fn_decl.clone(), |this| {
@@ -976,7 +976,7 @@ impl Interpreter {
             if let Some(native_fn) = this.native_fns.get_mut(&id) {
                 native_fn(&mut this.state, args)
             } else {
-                panic!("Native function not found: {:?}", id)
+                this.panic(format!("Native function not found: {:?}", id))
             }
         });
 
@@ -987,7 +987,7 @@ impl Interpreter {
                     self.with_root_scope(|this| this.eval_fn_call(fn_decl.clone(), callee, args))
                         .unwrap_value()
                 } else {
-                    panic!("Function not found: {:?}", id);
+                    self.panic(format!("Function not found: {:?}", id));
                 }
             }
             NativeFnReturn::PartialCall(box (fn_object, args)) => {
@@ -1071,12 +1071,12 @@ impl Interpreter {
                 self.exec_native_fn(*id, TlangValue::Nil, args)
             }
             _ => {
-                panic!(
+                self.panic(format!(
                     "{} does not have a method {:?}, {:?}",
                     struct_shape.name,
                     method_name.as_str(),
                     struct_shape.method_map.keys()
-                );
+                ));
             }
         }
     }
@@ -1087,7 +1087,7 @@ impl Interpreter {
         if !self.eval_pat(pat, value) {
             // We'd probably want to do it more like Rust via a if let statement, and have the
             // normal let statement be only valid for identifiers.
-            panic!("Pattern did not match value");
+            self.panic(format!("Pattern did not match value"));
         }
 
         EvalResult::Void
@@ -1104,7 +1104,7 @@ impl Interpreter {
                         &self.get_object_by_id(id).get_struct().unwrap().field_values;
                     field_values.extend(struct_values);
                 } else {
-                    panic!("Expected list, got {:?}", value);
+                    self.panic(format!("Expected list, got {:?}", value));
                 }
             } else {
                 field_values.push(eval_value!(self.eval_expr(expr)));
