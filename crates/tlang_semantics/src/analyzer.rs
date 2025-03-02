@@ -246,6 +246,9 @@ impl SemanticAnalyzer {
 
                 self.analyze_expr(&expr.callee);
             }
+            ExprKind::Cast(expr, _) => {
+                self.analyze_expr(expr);
+            }
             ExprKind::IfElse(expr) => {
                 self.analyze_expr(&expr.condition);
                 self.analyze_block(&expr.then_branch);

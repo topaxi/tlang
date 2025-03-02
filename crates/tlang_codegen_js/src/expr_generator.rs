@@ -136,6 +136,9 @@ impl CodegenJS {
             hir::ExprKind::Block(block) => self.generate_block(block),
             hir::ExprKind::Call(expr) => self.generate_call_expression(expr),
             hir::ExprKind::TailCall(expr) => self.generate_recursive_call_expression(expr),
+            hir::ExprKind::Cast(expr, _) => {
+                self.generate_expr(expr, parent_op);
+            }
             hir::ExprKind::FieldAccess(base, field) => {
                 self.generate_field_access_expression(base, field)
             }
@@ -495,6 +498,7 @@ pub(crate) fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
         hir::ExprKind::Call(call_expr) => {
             call_expr.arguments.iter().all(expr_can_render_as_js_expr)
         }
+        hir::ExprKind::Cast(expr, _) => expr_can_render_as_js_expr(expr),
         hir::ExprKind::FieldAccess(base, _) => expr_can_render_as_js_expr(base),
         hir::ExprKind::IndexAccess(base, index) => {
             expr_can_render_as_js_expr(base) && expr_can_render_as_js_expr(index)

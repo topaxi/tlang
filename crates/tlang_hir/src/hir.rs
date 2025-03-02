@@ -398,6 +398,7 @@ pub enum ExprKind {
     Block(Box<Block>),
     Call(Box<CallExpression>),
     TailCall(Box<CallExpression>),
+    Cast(Box<Expr>, Box<Ty>),
     Binary(BinaryOpKind, Box<Expr>, Box<Expr>),
     Unary(UnaryOp, Box<Expr>),
     // Let expression, only valid within if conditions and guards

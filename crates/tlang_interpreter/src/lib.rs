@@ -336,6 +336,7 @@ impl Interpreter {
             hir::ExprKind::Binary(op, lhs, rhs) => self.eval_binary(*op, lhs, rhs),
             hir::ExprKind::Call(call_expr) => self.eval_call(call_expr),
             hir::ExprKind::TailCall(call_expr) => self.eval_tail_call(call_expr),
+            hir::ExprKind::Cast(_expr, _ty) => todo!("eval_expr: Cast"),
             hir::ExprKind::Unary(op, expr) => self.eval_unary(*op, expr),
             hir::ExprKind::IfElse(condition, consequence, else_clauses) => {
                 self.eval_if_else(condition, consequence, else_clauses)
@@ -344,7 +345,11 @@ impl Interpreter {
                 EvalResult::Value(self.state.new_closure(fn_decl))
             }
             hir::ExprKind::Match(expr, arms) => self.eval_match(expr, arms),
-            _ => todo!("eval_expr: {:?}", expr),
+            hir::ExprKind::Range(..) => todo!("eval_expr: Range"),
+            hir::ExprKind::Let(..) => self.panic(
+                "Let expressions are only valid in match guards and if expressions".to_string(),
+            ),
+            hir::ExprKind::Wildcard => self.panic("Wildcard not allowed here".to_string()),
         }
     }
 

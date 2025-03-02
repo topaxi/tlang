@@ -170,6 +170,11 @@ impl LoweringContext {
             ast::node::ExprKind::RecursiveCall(call_expr) => {
                 hir::ExprKind::TailCall(Box::new(self.lower_call_expr(call_expr)))
             }
+            ast::node::ExprKind::Cast(box expr, box ty) => {
+                let expr = self.lower_expr(expr);
+                let ty = self.lower_ty(Some(ty));
+                hir::ExprKind::Cast(Box::new(expr), Box::new(ty))
+            }
             ast::node::ExprKind::UnaryOp(op, expr) => {
                 hir::ExprKind::Unary(*op, Box::new(self.lower_expr(expr)))
             }

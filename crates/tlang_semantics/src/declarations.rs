@@ -205,6 +205,9 @@ impl DeclarationAnalyzer {
                     self.collect_declarations_expr(argument);
                 }
             }
+            ExprKind::Cast(expr, _) => {
+                self.collect_declarations_expr(expr);
+            }
             ExprKind::UnaryOp(_, node) => {
                 self.collect_declarations_expr(node);
             }

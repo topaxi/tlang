@@ -161,6 +161,11 @@ impl HirPretty {
                 self.push_str("rec ");
                 self.print_call_expr(call_expr);
             }
+            hir::ExprKind::Cast(expr, ty) => {
+                self.print_expr(expr);
+                self.push_str(" as ");
+                self.print_ty(ty);
+            }
             hir::ExprKind::Binary(op, lhs, rhs) => {
                 self.print_binary_expr(op, lhs, rhs);
             }
