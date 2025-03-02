@@ -1087,7 +1087,10 @@ impl Interpreter {
         if !self.eval_pat(pat, value) {
             // We'd probably want to do it more like Rust via a if let statement, and have the
             // normal let statement be only valid for identifiers.
-            self.panic(format!("Pattern did not match value"));
+            self.panic(format!(
+                "Pattern did not match value {:?}",
+                self.state.stringify(value)
+            ));
         }
 
         EvalResult::Void
@@ -1095,6 +1098,7 @@ impl Interpreter {
 
     fn eval_list_expr(&mut self, values: &[hir::Expr]) -> EvalResult {
         let mut field_values = Vec::with_capacity(values.len());
+
         for expr in values {
             if let hir::ExprKind::Unary(UnaryOp::Spread, expr) = &expr.kind {
                 let value = eval_value!(self.eval_expr(expr));
