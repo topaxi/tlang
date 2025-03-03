@@ -72,15 +72,17 @@ impl ScopeStack {
             hir::Res::Local(_, index)
             | hir::Res::Def(hir::DefKind::Fn, _, index)
             | hir::Res::Def(hir::DefKind::Variant, _, index) => {
-                self.current_scope().borrow().locals.get(*index).cloned()
+                let value = self.current_scope().borrow().locals.get(*index).cloned();
+                value
             }
             hir::Res::Upvar(relative_scope_index, index) => {
                 let scope_index = self.scopes.len() - 1 - relative_scope_index;
-                self.scopes[scope_index]
+                let value = self.scopes[scope_index]
                     .borrow()
                     .locals
                     .get(*index)
-                    .cloned()
+                    .cloned();
+                value
             }
             _ => None,
         }

@@ -3,7 +3,7 @@ use tlang_ast::token::Literal;
 use tlang_hir::hir;
 
 use crate::binary_operator_generator::{
-    map_operator_info, should_wrap_with_parentheses, JSAssociativity, JSOperatorInfo,
+    JSAssociativity, JSOperatorInfo, map_operator_info, should_wrap_with_parentheses,
 };
 use crate::generator::{BlockContext, CodegenJS};
 

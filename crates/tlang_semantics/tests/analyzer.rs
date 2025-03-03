@@ -31,9 +31,7 @@ macro_rules! analyze {
 }
 
 macro_rules! analyze_diag {
-    ($source:expr) => {{
-        analyze_diag!($source, &vec![])
-    }};
+    ($source:expr) => {{ analyze_diag!($source, &vec![]) }};
 
     ($source:expr, $builtin_symbols:expr) => {{
         let mut parser = Parser::from_source($source);
@@ -270,25 +268,14 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
         used: true,
     };
 
-    // Verify that c is within the scope of the function arguments
-    assert_eq!(
-        analyzer
-            .get_symbol_table(function_declaration.id)
-            .unwrap()
-            .borrow()
-            .get_by_name("c"),
-        Some(c_symbol_info.clone())
-    );
+    let actual_c = analyzer
+        .get_symbol_table(function_declaration.id)
+        .unwrap()
+        .borrow()
+        .get_by_name("c");
 
     // Verify that c is within the scope of the function body
-    assert_eq!(
-        analyzer
-            .get_symbol_table(function_declaration.id)
-            .unwrap()
-            .borrow()
-            .get_by_name("c"),
-        Some(c_symbol_info.clone())
-    );
+    assert_eq!(actual_c, Some(c_symbol_info.clone()));
 }
 
 #[test]

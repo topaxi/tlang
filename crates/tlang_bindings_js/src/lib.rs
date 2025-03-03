@@ -10,7 +10,7 @@ pub mod compiler;
 pub mod interpreter;
 mod stdlib;
 
-extern "C" {
+unsafe extern "C" {
     fn __wasm_call_ctors();
 }
 

@@ -4,8 +4,8 @@ use tlang_ast::symbols::SymbolType;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_hir::hir;
 use tlang_hir_pretty::HirPretty;
-use tlang_parser::{error::ParseIssue, Parser};
-use tlang_semantics::{diagnostic::Diagnostic, SemanticAnalyzer};
+use tlang_parser::{Parser, error::ParseIssue};
+use tlang_semantics::{SemanticAnalyzer, diagnostic::Diagnostic};
 use wasm_bindgen::prelude::*;
 
 use crate::codemirror;

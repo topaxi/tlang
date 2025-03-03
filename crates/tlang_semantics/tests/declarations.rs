@@ -26,12 +26,14 @@ macro_rules! analyze {
 fn test_analyze_variable_declaration() {
     let (analyzer, ast) = analyze!("let a = 1;");
 
+    let symbol_info = analyzer
+        .get_symbol_table(ast.id)
+        .unwrap()
+        .borrow()
+        .get_by_name("a");
+
     assert_eq!(
-        analyzer
-            .get_symbol_table(ast.id)
-            .unwrap()
-            .borrow()
-            .get_by_name("a"),
+        symbol_info,
         Some(SymbolInfo {
             node_id: NodeId::new(2),
             id: SymbolId::new(1),

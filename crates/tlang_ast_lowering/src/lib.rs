@@ -1091,7 +1091,7 @@ impl LoweringContext {
                         }))
                     }
                     _ => unreachable!("Validate AST before lowering"),
-                }
+                };
             }
         };
 

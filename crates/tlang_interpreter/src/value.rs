@@ -1,8 +1,8 @@
 use tlang_hir::hir::HirId;
 
+use crate::InterpreterState;
 use crate::scope::ScopeStack;
 use crate::shape::ShapeKey;
-use crate::InterpreterState;
 
 #[derive(Debug)]
 pub struct TlangClosure {

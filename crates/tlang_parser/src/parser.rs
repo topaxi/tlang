@@ -7,7 +7,7 @@ use tlang_ast::node::{
 };
 use tlang_ast::node_id::NodeId;
 use tlang_ast::span::Span;
-use tlang_ast::token::{kw, Keyword, Literal, Token, TokenKind};
+use tlang_ast::token::{Keyword, Literal, Token, TokenKind, kw};
 use tlang_lexer::Lexer;
 
 use crate::error::{ParseError, ParseIssue, ParseIssueKind};

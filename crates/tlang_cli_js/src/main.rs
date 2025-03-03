@@ -4,11 +4,11 @@ use std::{
     path::Path,
 };
 
-use clap::{arg, command, ArgMatches};
+use clap::{ArgMatches, arg, command};
 use tlang_ast_lowering::lower_to_hir;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_parser::error::ParseIssue;
-use tlang_semantics::{diagnostic::Diagnostic, SemanticAnalyzer};
+use tlang_semantics::{SemanticAnalyzer, diagnostic::Diagnostic};
 
 #[derive(Debug, PartialEq)]
 enum OutputType {

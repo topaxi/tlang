@@ -395,10 +395,12 @@ impl SemanticAnalyzer {
             .get_all_node_ids()
             .iter()
             .filter_map(|id| {
-                self.get_last_symbol_table()
+                let symbol_id = self
+                    .get_last_symbol_table()
                     .borrow()
                     .get_local_by_node_id(*id)
-                    .map(|symbol_info| symbol_info.id)
+                    .map(|symbol_info| symbol_info.id);
+                symbol_id
             })
             .filter_map(|id| self.get_last_symbol_table().borrow_mut().remove(id))
             .collect::<Vec<_>>();

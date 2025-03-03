@@ -62,10 +62,6 @@ pub fn compile_src(source: &str, options: CodegenOptions) -> String {
 
 #[macro_export]
 macro_rules! compile {
-    ($source:expr) => {{
-        $crate::common::compile_src($source, Default::default())
-    }};
-    ($source:expr, $options:expr) => {{
-        $crate::common::compile_src($source, $options.into())
-    }};
+    ($source:expr) => {{ $crate::common::compile_src($source, Default::default()) }};
+    ($source:expr, $options:expr) => {{ $crate::common::compile_src($source, $options.into()) }};
 }

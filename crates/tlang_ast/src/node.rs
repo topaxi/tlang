@@ -2,7 +2,7 @@ use serde::Serialize;
 use std::fmt::Display;
 
 use crate::node_id::NodeId;
-use crate::token::{kw, Token};
+use crate::token::{Token, kw};
 use crate::{
     span::{Span, Spanned},
     token::Literal,

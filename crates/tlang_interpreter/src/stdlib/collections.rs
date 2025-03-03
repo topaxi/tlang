@@ -2,10 +2,10 @@ use std::collections::HashMap;
 
 use tlang_macros::native_fn;
 
+use crate::Interpreter;
 use crate::shape::TlangStructMethod;
 use crate::state::InterpreterState;
 use crate::value::{NativeFnReturn, TlangObjectKind, TlangValue};
-use crate::Interpreter;
 
 #[native_fn(name = "len")]
 pub fn len(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {

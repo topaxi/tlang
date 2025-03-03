@@ -1725,12 +1725,14 @@ mod tests {
             let none = Option::None;
         "});
 
-        assert!(interpreter
-            .interpreter
-            .state
-            .shapes
-            .iter()
-            .any(|shape| shape.1.name == "Option::Some"));
+        assert!(
+            interpreter
+                .interpreter
+                .state
+                .shapes
+                .iter()
+                .any(|shape| shape.1.name == "Option::Some")
+        );
 
         let some_value = interpreter.eval("some");
         assert_matches!(some_value, TlangValue::Object(_));
