@@ -7,6 +7,8 @@ import './components/t-console';
 import './components/t-split';
 import './components/t-tabs';
 import { type TCodeMirror } from './components/t-codemirror';
+import { ConsoleMessage, createConsoleMessage } from './components/t-console';
+import { SplitElement } from './components/t-split';
 import { compressSource, decompressSource } from './utils/lz';
 import {
   compile,
@@ -18,7 +20,6 @@ import {
 import { MediaController } from './controllers/media-controller';
 import { keyed } from 'lit/directives/keyed.js';
 import { live } from 'lit/directives/live.js';
-import { ConsoleMessage, createConsoleMessage } from './components/t-console';
 import { repeat } from 'lit/directives/repeat.js';
 
 type CodemirrorSeverity = 'hint' | 'info' | 'warning' | 'error';
@@ -217,6 +218,9 @@ export class TlangPlayground extends LitElement {
   // we cache the query selector.
   @query('.editor', true)
   codemirror!: TCodeMirror;
+
+  @query('.output-split', true)
+  outputSplit!: SplitElement;
 
   private tlangConsole = {
     log: (...args: unknown[]) => {
@@ -508,6 +512,11 @@ export class TlangPlayground extends LitElement {
           <t-console
             slot="second"
             .messages=${this.consoleMessages}
+            @collapse=${(event: CustomEvent<{ collapsed: boolean }>) => {
+              if (event.detail.collapsed) {
+                this.outputSplit.reset();
+              }
+            }}
             @clear=${() => (this.consoleMessages = [])}
           >
           </t-console>

@@ -99,6 +99,12 @@ export class ConsoleElement extends LitElement {
 
   private handleCollapse(_event: Event) {
     this.collapse();
+
+    this.dispatchEvent(
+      new CustomEvent('collapse', {
+        detail: { collapsed: this.collapsed },
+      }),
+    );
   }
 
   private handleConsoleClear(_event: Event) {
