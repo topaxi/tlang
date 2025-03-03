@@ -14,3 +14,14 @@ pub fn log(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
     );
     TlangValue::Nil
 }
+
+#[native_fn(name = "panic")]
+pub fn panic(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
+    state.panic(format!(
+        "Panic!: {}",
+        args.iter()
+            .map(|v| state.stringify(*v))
+            .collect::<Vec<_>>()
+            .join(" ")
+    ));
+}

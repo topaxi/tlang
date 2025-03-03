@@ -28,7 +28,7 @@ export function createConsoleMessage(
   type: ConsoleMessage['type'],
   ...args: unknown[]
 ): ConsoleMessage {
-  return { type, args: args.map(stringify), timestamp: Date.now() };
+  return { type, args, timestamp: Date.now() };
 }
 
 @customElement('t-console')
@@ -66,13 +66,11 @@ export class ConsoleElement extends LitElement {
       min-height: 24em;
     }
 
-    li:not(:first-child)
-      > t-console-message:not([type='groupEnd'][indent='0']) {
-      border-bottom: 1px solid var(--ctp-macchiato-surface0);
-      padding-left: 1ch;
+    t-console-message[type='group'][indent='0'] {
+      border: none;
     }
 
-    li:not(:first-child) > t-console-message[type='group'][indent='0'] {
+    t-console-message[type='group'][indent='0']:not(:first-child) {
       margin-top: 0.5rem;
     }
   `;
@@ -133,6 +131,8 @@ export class ConsoleElement extends LitElement {
     let isCollapsed = () => groupStack >= collapsedAt;
     let resetCollapsedAt = () => (collapsedAt = Number.MAX_SAFE_INTEGER);
 
+    let hasIcons = this.messages.some((message) => message.type === 'error');
+
     return html`
       <div class="toolbar">
         <div id="title" class="toolbar__title">Console</div>
@@ -152,7 +152,7 @@ export class ConsoleElement extends LitElement {
         <button @click=${this.handleConsoleClear}>Clear</button>
       </div>
       <div class="messages-container">
-        <ul
+        <div
           id="messages"
           class="messages"
           .hidden=${this.collapsed}
@@ -186,17 +186,16 @@ export class ConsoleElement extends LitElement {
               }
 
               let rendered = html`
-                <li>
-                  <t-console-message
-                    type=${message.type}
-                    indent=${groupStack - 1}
-                    .message=${message}
-                    .timestamp=${message.timestamp}
-                    .showTimestamp=${this.showTimestamps}
-                    .collapsed=${collapsedAt === groupStack}
-                    @collapse=${this.collapseMessage}
-                  ></t-console-message>
-                </li>
+                <t-console-message
+                  type=${message.type}
+                  indent=${groupStack - 1}
+                  .message=${message}
+                  .timestamp=${message.timestamp}
+                  .showTimestamp=${this.showTimestamps}
+                  .collapsed=${collapsedAt === groupStack}
+                  .forceIcon=${hasIcons}
+                  @collapse=${this.collapseMessage}
+                ></t-console-message>
               `;
 
               return rendered;
@@ -214,21 +213,42 @@ export class ConsoleMessageElement extends LitElement {
     :host {
       display: flex;
       position: relative;
-      color: var(--ctp-macchiato-text);
+      margin-top: -1px;
+      padding-left: 1ch;
+
+      --console-message-color: var(--ctp-macchiato-text);
+      --console-message-border-color: var(--ctp-macchiato-surface0);
+
+      color: var(--console-message-color);
+      background: var(--console-message-background);
+      border-top: 1px solid var(--console-message-border-color);
+      border-bottom: 1px solid var(--console-message-border-color);
     }
 
-    time {
+    :host([type='error']) {
+      --console-message-color: var(--ctp-macchiato-red);
+
+      --console-message-border-color: hsl(
+        from hsl(var(--ctp-macchiato-red-hsl)) h s calc(l - 40)
+      );
+
+      --console-message-background: hsl(
+        from hsl(var(--ctp-macchiato-red-hsl)) h s calc(l - 60)
+      );
+    }
+
+    [part='timestamp'] {
       color: var(--ctp-macchiato-subtext0);
       margin-right: 8px;
     }
 
-    button {
+    [part='collapse'] {
       all: unset;
       appearance: none;
       margin-right: 8px;
     }
 
-    button::after {
+    [part='collapse']::after {
       content: '';
       position: absolute;
       top: 0;
@@ -237,13 +257,35 @@ export class ConsoleMessageElement extends LitElement {
       left: 0;
     }
 
-    .indent {
+    [part='indent'] {
       display: block;
-      width: 12px;
+      min-width: 12px;
+      max-width: 12px;
       margin-left: 4px;
       border-left: 1px solid var(--ctp-macchiato-sapphire);
       margin-top: -1px;
       margin-bottom: -1px;
+    }
+
+    [part^='icon'] {
+      user-select: none;
+      font-style: normal;
+      margin-right: 1ch;
+    }
+
+    [part^='icon']::before {
+      content: attr(icon, '\\a0');
+    }
+
+    [part='args'] {
+      display: flex;
+      gap: 1ch;
+    }
+
+    [part='stack'] {
+      display: block;
+      padding-left: 2ch;
+      white-space: pre-wrap;
     }
   `;
 
@@ -265,12 +307,26 @@ export class ConsoleMessageElement extends LitElement {
   @property({ type: Boolean })
   showTimestamp = false;
 
+  @property({ type: Boolean })
+  forceIcon = false;
+
   private collapse() {
     this.dispatchEvent(
       new CustomEvent('collapse', {
         detail: this.message,
       }),
     );
+  }
+
+  protected renderMessageIcon() {
+    switch (this.type) {
+      case 'error':
+        return html`<i part="icon icon-${this.type}" icon=""></i>`;
+      default:
+        return this.forceIcon
+          ? html`<i part="icon icon-${this.type} icon-none"></i>`
+          : null;
+    }
   }
 
   protected renderConsoleMessageArgs(args: ConsoleMessage['args']) {
@@ -282,7 +338,32 @@ export class ConsoleMessageElement extends LitElement {
       return args;
     }
 
-    return html`${args.map((arg) => html`<span>${arg}</span>`)}`;
+    return html`${this.renderMessageIcon()}<span part="args">
+        ${args.map(this.renderConsoleMessageArg, this)}
+      </span>`;
+  }
+
+  protected renderConsoleMessageArg(arg: unknown) {
+    switch (typeof arg) {
+      case 'string':
+        return html`<span part="arg">${arg}</span>`;
+      case 'object':
+        if (arg == null) {
+          return html`<span part="arg arg-null">null</span>`;
+        }
+
+        if (arg instanceof Error) {
+          return html`
+            <span part="arg arg-error">
+              ${String(arg)}
+              <span part="stack">${arg.stack}</span>
+            </span>
+          `;
+        }
+        break;
+    }
+
+    return html`<span part="arg">${stringify(arg)}</span>`;
   }
 
   private renderTimestamp(ts: Date) {
@@ -298,7 +379,11 @@ export class ConsoleMessageElement extends LitElement {
     let rendered = this.renderConsoleMessageArgs(this.message.args);
 
     if (this.type === 'group' && this.indent > 0) {
-      rendered = html`<button aria-label="Toggle Group" @click=${this.collapse}>
+      rendered = html`<button
+          part="collapse"
+          aria-label="Toggle Group"
+          @click=${this.collapse}
+        >
           ${this.collapsed ? '' : ''}</button
         >${rendered}`;
     }
@@ -308,14 +393,16 @@ export class ConsoleMessageElement extends LitElement {
       indent > 0;
       indent--
     ) {
-      rendered = html`<span class="indent"></span>${rendered}`;
+      rendered = html`<span part="indent"></span>${rendered}`;
     }
 
     if (rendered != null && this.showTimestamp) {
       let date = new Date(this.timestamp);
 
       rendered = html`
-        <time datetime=${date.toJSON()}>${this.renderTimestamp(date)}</time>
+        <time part="timestamp" datetime=${date.toJSON()}>
+          ${this.renderTimestamp(date)}
+        </time>
         ${rendered}
       `;
     }

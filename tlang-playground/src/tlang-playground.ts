@@ -253,8 +253,15 @@ export class TlangPlayground extends LitElement {
     this.output = this.compiler.output;
   }
 
+  private getConsoleOpenGroups() {
+    return this.consoleMessages.filter((message) => message.type === 'group')
+      .length;
+  }
+
   run() {
     this.logToConsole('group');
+
+    let beforeOpenGroups = this.getConsoleOpenGroups();
 
     try {
       if (this.runner === 'compiler') {
@@ -264,7 +271,12 @@ export class TlangPlayground extends LitElement {
       }
     } catch (error) {
       if (error instanceof Error) {
-        this.logToConsole('error', error.message);
+        this.logToConsole('error', error);
+      }
+
+      let openGroups = this.getConsoleOpenGroups();
+      for (let i = beforeOpenGroups; i < openGroups; i++) {
+        this.logToConsole('groupEnd');
       }
     }
 
@@ -277,12 +289,21 @@ export class TlangPlayground extends LitElement {
   }
 
   private runCompiled() {
+    let bindings = {
+      console: this.tlangConsole,
+      panic: (message: string) => {
+        throw new Error(message);
+      },
+    };
+
+    let bindingsDestructuring = `let {${Object.keys(bindings).join(',')}} = ___js_bindings;`;
+
     let fn = new Function(
-      'console',
-      `${getStandardLibraryCompiled()}\n{${this.output}};`,
+      '___js_bindings',
+      `${bindingsDestructuring}${getStandardLibraryCompiled()}\n{${this.output}};`,
     );
 
-    fn(this.tlangConsole);
+    fn(bindings);
   }
 
   private runInterpreted() {

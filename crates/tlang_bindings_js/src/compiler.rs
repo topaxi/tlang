@@ -4,8 +4,8 @@ use tlang_ast::symbols::SymbolType;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_hir::hir;
 use tlang_hir_pretty::HirPretty;
-use tlang_parser::{Parser, error::ParseIssue};
-use tlang_semantics::{SemanticAnalyzer, diagnostic::Diagnostic};
+use tlang_parser::{error::ParseIssue, Parser};
+use tlang_semantics::{diagnostic::Diagnostic, SemanticAnalyzer};
 use wasm_bindgen::prelude::*;
 
 use crate::codemirror;
@@ -55,6 +55,7 @@ impl TlangCompiler {
         self.analyzer
             .add_builtin_symbols(CodegenJS::get_standard_library_symbols());
         self.analyzer.add_builtin_symbols(&[
+            ("panic", SymbolType::Function),
             ("log::log", SymbolType::Function),
             ("log::group", SymbolType::Function),
             ("log::groupEnd", SymbolType::Function),
