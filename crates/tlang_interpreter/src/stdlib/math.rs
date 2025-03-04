@@ -36,13 +36,13 @@ pub fn max(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
     }
 }
 
-#[cfg(feature = "rand")]
+#[cfg(not(target_family = "wasm"))]
 #[native_fn]
 pub fn random(_: &mut InterpreterState, _: &[TlangValue]) -> TlangValue {
     TlangValue::from(rand::random::<f64>())
 }
 
-#[cfg(feature = "rand")]
+#[cfg(not(target_family = "wasm"))]
 #[native_fn]
 pub fn random_int(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
     match args[0].as_primitive() {

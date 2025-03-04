@@ -121,6 +121,14 @@ impl Interpreter {
         interpreter
     }
 
+    pub fn state(&self) -> &InterpreterState {
+        &self.state
+    }
+
+    pub fn state_mut(&mut self) -> &mut InterpreterState {
+        &mut self.state
+    }
+
     fn panic(&self, message: String) -> ! {
         self.state.panic(message)
     }

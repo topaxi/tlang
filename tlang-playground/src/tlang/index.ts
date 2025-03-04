@@ -1,8 +1,8 @@
 import init, { getStandardLibrarySource, Tlang } from 'tlang_bindings_js';
 
-export { Tlang, type CodemirrorDiagnostic } from 'tlang_bindings_js';
-
 await init();
+
+export { Tlang, type CodemirrorDiagnostic } from 'tlang_bindings_js';
 
 export const standardLibrarySource = getStandardLibrarySource();
 

@@ -84,8 +84,9 @@ impl TlangInterpreter {
         });
     }
 
-    pub(crate) fn eval(&mut self, hir: &hir::Module) {
-        self.0.eval(&hir);
+    pub(crate) fn eval(&mut self, hir: &hir::Module) -> JsValue {
+        let value = self.0.eval(hir);
+        tlang_value_to_js_value(self.0.state(), value)
     }
 }
 

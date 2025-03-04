@@ -1,0 +1,5 @@
+[profile.default]
+default-filter = "not package(tlang_bindings_js)"
+
+[profile.ci]
+fail-fast = false

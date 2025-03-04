@@ -63,7 +63,7 @@ impl Tlang {
     }
 
     #[wasm_bindgen]
-    pub fn eval(&mut self) -> Result<(), JsError> {
+    pub fn eval(&mut self) -> Result<JsValue, JsError> {
         self.lower_to_hir();
 
         let hir = self
@@ -72,7 +72,7 @@ impl Tlang {
             .as_ref()
             .ok_or_else(|| JsError::new("Failed to generate HIR"))?;
 
-        Ok(self.interpreter.eval(&hir))
+        Ok(self.interpreter.eval(hir))
     }
 
     #[wasm_bindgen]
@@ -108,10 +108,8 @@ impl Tlang {
     pub fn analyze(&mut self) {
         let _ = self.parse();
 
-        if let Some(parse_result) = &self.build.parse_result {
-            if let Ok(ast) = parse_result {
-                let _ = self.analyzer.analyze(ast);
-            }
+        if let Some(Ok(ast)) = &self.build.parse_result {
+            let _ = self.analyzer.analyze(ast);
         }
     }
 
