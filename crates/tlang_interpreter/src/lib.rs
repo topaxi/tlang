@@ -44,6 +44,16 @@ macro_rules! eval_value {
     };
 }
 
+/// Propagate control flow (`Return`, `TailCall`, etc.), otherwise extract the value.
+macro_rules! eval_match_value {
+    ($expr:expr) => {
+        match $expr {
+            EvalResult::Value(val) => val,
+            other => return MatchResult::NotMatched(other),
+        }
+    };
+}
+
 /// Propagate control flow if it's not `Value`
 macro_rules! propagate {
     ($expr:expr) => {
@@ -1222,15 +1232,12 @@ impl Interpreter {
 
             if let Some(expr) = &arm.guard {
                 if let hir::ExprKind::Let(pat, expr) = &expr.kind {
-                    let value = match this.eval_expr(expr) {
-                        EvalResult::Value(value) => value,
-                        other => return MatchResult::NotMatched(other),
-                    };
+                    let value = eval_match_value!(this.eval_expr(expr));
 
                     if !this.eval_pat(pat, value) {
                         return MatchResult::NotMatched(EvalResult::Void);
                     }
-                } else if !this.eval_expr(expr).unwrap_value().is_truthy(&this.state) {
+                } else if !eval_match_value!(this.eval_expr(expr)).is_truthy(&this.state) {
                     return MatchResult::NotMatched(EvalResult::Void);
                 }
             }
