@@ -7,7 +7,11 @@ edition.workspace = true
 forced-target = "wasm32-unknown-unknown"
 
 [lib]
-crate-type = ["cdylib"]
+test = false
+crate-type = [
+  "cdylib",
+  "rlib" # wasm-pack test wants rlib type
+]
 
 [dependencies]
 console_error_panic_hook = "0.1"
@@ -19,9 +23,7 @@ tlang_hir = { path = "../tlang_hir" }
 tlang_hir_pretty = { path = "../tlang_hir_pretty" }
 tlang_parser = { path = "../tlang_parser" }
 tlang_semantics = { path = "../tlang_semantics" }
-tlang_interpreter = { path = "../tlang_interpreter", default-features = false, features = [
-  "stdlib",
-] }
+tlang_interpreter = { path = "../tlang_interpreter" }
 tlang_macros = { path = "../tlang_macros" }
 tlang_codegen_js = { path = "../tlang_codegen_js" }
 inventory = { workspace = true }
@@ -31,3 +33,6 @@ serde-wasm-bindgen = "0.6"
 [dependencies.web-sys]
 version = "=0.3.77"
 features = ['Document', 'Element', 'HtmlElement', 'Node', 'Window']
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"

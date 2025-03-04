@@ -32,22 +32,27 @@ jobs:
             # changed. Especially useful while working on playground/non-rust
             # code.
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-3
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-4
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Install rustup-toolchain-install-master
         if: ${{ steps.cache.outputs.cache-hit != 'true' }}
         run: |
           cargo install -f rustup-toolchain-install-master
-          cargo install -f cargo-make
           cargo install -f cargo-nextest
-
-      # We always install wasm-bindgen-cli as it must match the installed
-      # wasm-bindgen package version, and we can't include this in the cache
-      # keys easily.
-      - name: Install wasm-bindgen
-        run: |
           cargo install -f wasm-bindgen-cli --version $(grep -oP 'wasm-bindgen = "=\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
+          cargo install -f wasm-pack
+
+      - name: Install wasm-bindgen-cli
+        run: |
+          REQUIRED_VERSION=$(grep -oP 'wasm-bindgen = "=\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
+          INSTALLED_VERSION=$(wasm-bindgen --version 2>/dev/null | awk '{print $2}')
+
+          if [ "$INSTALLED_VERSION" != "$REQUIRED_VERSION" ]; then
+              cargo install -f wasm-bindgen-cli --version "$REQUIRED_VERSION"
+          else
+              echo "wasm-bindgen-cli is already up to date ($INSTALLED_VERSION)."
+          fi
 
       - name: Install wasm toolchain
         run: |
@@ -58,17 +63,17 @@ jobs:
           rustup show
           rustc -Vv
           cargo -V
-          cargo make -V
 
-      - name: Cargo Make
-        run: cargo make
+      - name: cargo-nextest
+        run: cargo nextest run --profile=ci
 
       - name: Test Runner
-        run: |
-          cargo build --features=binary --bin tlangdi
-          cargo run --bin tlang_test_runner
+        run: make test
         env:
           RUST_BACKTRACE: '1'
+
+      - name: Test JS bindings
+        run: wasm-pack test --node crates/tlang_bindings_js
 
       - name: Install binaryen
         run: |

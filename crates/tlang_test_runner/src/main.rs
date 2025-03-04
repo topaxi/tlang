@@ -75,7 +75,13 @@ fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
             Command::new("./target/release/tlangdi")
                 .arg(file_path)
                 .output()
-                .map_err(|e| format!("Failed to execute interpreter: {}", e))?
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "Failed to execute interpreter for {}: {}",
+                        file_path.display(),
+                        e
+                    )
+                })
         }
         "javascript" => {
             #[allow(clippy::zombie_processes)]
@@ -83,7 +89,13 @@ fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
                 .arg(file_path)
                 .stdout(Stdio::piped())
                 .spawn()
-                .expect("Failed to compile to JavaScript");
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "Failed to compile to JavaScript for {}\n{}",
+                        file_path.display(),
+                        err,
+                    )
+                });
 
             exec_start = std::time::Instant::now();
 
@@ -91,7 +103,13 @@ fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
                 .stdin(tlang_js_compiler_output.stdout.unwrap())
                 .stdout(Stdio::piped())
                 .spawn()
-                .expect("Failed to execute JavaScript");
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "Failed to execute JavaScript for {}\n{}",
+                        file_path.display(),
+                        err
+                    )
+                });
 
             javascript_output.wait_with_output().unwrap()
         }

@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
+    "predev": "wasm-pack build --dev --target web crates/tlang_bindings_js",
     "dev": "npm run dev -w tlang-playground",
-    "prebuild": "RUSTFLAGS=\"-C opt-level=s\" cargo make build-release",
+    "prebuild": "wasm-pack build --target web crates/tlang_bindings_js",
     "build": "npm run build -w tlang-playground",
     "prepreview": "npm run build",
     "preview": "npx serve tlang-playground/dist",

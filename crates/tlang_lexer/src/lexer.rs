@@ -133,7 +133,7 @@ impl Lexer<'_> {
 
         let ch = self.current_char;
 
-        let token = match ch {
+        match ch {
             '+' => {
                 self.advance();
                 self.token(TokenKind::Plus, start)
@@ -371,8 +371,6 @@ impl Lexer<'_> {
                 }
             },
             ch => self.token(TokenKind::Unknown(ch.to_string()), start),
-        };
-
-        token
+        }
     }
 }
