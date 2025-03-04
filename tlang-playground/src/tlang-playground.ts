@@ -11,10 +11,8 @@ import { ConsoleMessage, createConsoleMessage } from './components/t-console';
 import { SplitElement } from './components/t-split';
 import { compressSource, decompressSource } from './utils/lz';
 import {
-  compile,
   getStandardLibraryCompiled,
-  TlangCompiler,
-  TlangInterpreter,
+  Tlang,
   CodemirrorDiagnostic,
 } from './tlang';
 import { MediaController } from './controllers/media-controller';
@@ -113,6 +111,8 @@ async function updateDisplayHashparam(display: string) {
   updateHashParam('display', display);
 }
 
+const emptyTlang = {} as Tlang;
+
 @customElement('tlang-playground')
 export class TlangPlayground extends LitElement {
   static styles = css`
@@ -208,9 +208,7 @@ export class TlangPlayground extends LitElement {
   @state()
   showConsole = true;
 
-  @state() compiler: TlangCompiler | null = null;
-
-  @state() output = '';
+  @state() tlang: Tlang = emptyTlang;
 
   @state() runner: 'compiler' | 'interpreter' = defaultRunner();
 
@@ -234,27 +232,36 @@ export class TlangPlayground extends LitElement {
     },
   };
 
-  get error() {
-    if (this.compiler == null) {
-      return '';
+  private analyze() {
+    try {
+      this.tlang.analyze();
+
+      this.codemirror.diagnostics =
+        this.tlang.codemirrorDiagnostics.map(
+          this.mapCodemirrorDiagnosticToJS,
+        ) ?? [];
+
+      for (let diagnostic of this.tlang.diagnostics) {
+        let method =
+          diagnostic.severity === 'Error'
+            ? ('error' as const)
+            : ('warn' as const);
+
+        let formatted = `${diagnostic.message} at ${diagnostic.span.start.line}:${diagnostic.span.start.column}`;
+
+        this.logToConsole(method, formatted);
+      }
+    } catch {
+      // We only log the first parse error to the console, as it's usually the
+      // most relevant one.
+      for (let parseError of this.tlang.parseErrors.slice(0, 1)) {
+        let formatted = `${Object.keys(parseError.kind)[0]}: ${parseError.msg} at ${parseError.span.start.line}:${parseError.span.start.column}`;
+
+        this.logToConsole('error', formatted);
+      }
     }
 
-    let { diagnostics, parseErrors } = this.compiler;
-
-    let diagnosticsErrors = diagnostics.filter((diagnostic) =>
-      diagnostic.startsWith('ERROR:'),
-    );
-
-    if (parseErrors.length + diagnosticsErrors.length) {
-      return [...parseErrors, ...diagnostics].join('\n');
-    } else {
-      return diagnostics.join('\n');
-    }
-  }
-
-  private compile(source: string) {
-    this.compiler = compile(source);
-    this.output = this.compiler.output;
+    this.flushConsole();
   }
 
   private getConsoleOpenGroups() {
@@ -285,11 +292,15 @@ export class TlangPlayground extends LitElement {
     }
 
     this.logToConsole('groupEnd');
-    this.consoleMessages = this.consoleMessages.slice();
+    this.flushConsole();
   }
 
   private logToConsole(method: ConsoleMessage['type'], ...args: unknown[]) {
     this.consoleMessages.push(createConsoleMessage(method, ...args));
+  }
+
+  private flushConsole() {
+    this.consoleMessages = this.consoleMessages.slice();
   }
 
   private runCompiled() {
@@ -304,22 +315,20 @@ export class TlangPlayground extends LitElement {
 
     let fn = new Function(
       '___js_bindings',
-      `${bindingsDestructuring}${getStandardLibraryCompiled()}\n{${this.output}};`,
+      `${bindingsDestructuring}${getStandardLibraryCompiled()}\n{${this.tlang.js}};`,
     );
 
     fn(bindings);
   }
 
   private runInterpreted() {
-    let interpreter = new TlangInterpreter();
-
-    interpreter.define_js_fn('log', this.tlangConsole.log);
+    this.tlang.define_js_fn('log', this.tlangConsole.log);
 
     for (let [method, fn] of Object.entries(this.tlangConsole)) {
-      interpreter.define_js_fn(`log::${method}`, fn);
+      this.tlang.define_js_fn(`log::${method}`, fn);
     }
 
-    interpreter.eval(this.source);
+    this.tlang.eval();
   }
 
   async share() {
@@ -344,7 +353,7 @@ export class TlangPlayground extends LitElement {
     });
   }
 
-  private mapAndFreeCodemirrorDiagnosticToJS(diagnostic: CodemirrorDiagnostic) {
+  private mapCodemirrorDiagnosticToJS(diagnostic: CodemirrorDiagnostic) {
     return {
       from: diagnostic.from,
       to: diagnostic.to,
@@ -353,20 +362,17 @@ export class TlangPlayground extends LitElement {
     };
   }
 
+  protected createTlang(source: string) {
+    this.tlang = new Tlang(source);
+    this.analyze();
+    this.tlang.compileToJS();
+  }
+
   protected update(changedProperties: PropertyValueMap<this>): void {
     super.update(changedProperties);
 
     if (changedProperties.has('source')) {
-      try {
-        this.compile(this.source);
-
-        this.codemirror.diagnostics =
-          this.compiler?.codemirrorDiagnostics.map(
-            this.mapAndFreeCodemirrorDiagnosticToJS,
-          ) ?? [];
-      } catch (error) {
-        console.error(error);
-      }
+      this.createTlang(this.source);
     }
   }
 
@@ -431,14 +437,14 @@ export class TlangPlayground extends LitElement {
   renderOutput() {
     switch (this.display) {
       case 'ast':
-        return html`<pre class="output-ast">${this.compiler?.ast_string}</pre>`;
+        return html`<pre class="output-ast">${this.tlang.ast_string}</pre>`;
       case 'hir':
-        return html`<pre class="output-ast">${this.compiler?.hir_string}</pre>`;
+        return html`<pre class="output-ast">${this.tlang.hir_string}</pre>`;
       case 'hir_pretty':
         return html`<t-codemirror
           class="output-code"
           language="tlang"
-          .source=${this.compiler?.hir_pretty}
+          .source=${this.tlang.hir_pretty}
           with-diagnostics="false"
           readonly
         ></t-codemirror>`;
@@ -446,7 +452,7 @@ export class TlangPlayground extends LitElement {
         return html`<t-codemirror
           class="output-code"
           language="javascript"
-          .source=${this.output}
+          .source=${this.tlang.js}
           with-diagnostics="false"
           readonly
         ></t-codemirror>`;

@@ -120,7 +120,7 @@ impl SemanticAnalyzer {
         if let Some(suggestion) = did_you_mean {
             self.diagnostics.push(Diagnostic::new(
                 format!(
-                    "Use of undeclared variable `{}`, did you mean the {} `{}`",
+                    "Use of undeclared variable `{}`, did you mean the {} `{}`?",
                     name, suggestion.symbol_type, suggestion.name
                 ),
                 Severity::Error,

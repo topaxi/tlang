@@ -205,7 +205,7 @@ fn test_should_error_on_unused_identifier_in_function_definition() {
     assert_eq!(
         diagnostics[..1],
         vec![Diagnostic::new(
-            "Use of undeclared variable `c`, did you mean the parameter `a`".to_string(),
+            "Use of undeclared variable `c`, did you mean the parameter `a`?".to_string(),
             Severity::Error,
             Span::new(
                 LineColumn {

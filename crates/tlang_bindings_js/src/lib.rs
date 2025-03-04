@@ -6,9 +6,9 @@ use wasm_bindgen::prelude::*;
 pub use tlang_interpreter::NativeFn;
 
 pub mod codemirror;
-pub mod compiler;
 pub mod interpreter;
 mod stdlib;
+pub mod tlang;
 
 unsafe extern "C" {
     fn __wasm_call_ctors();
@@ -17,4 +17,6 @@ unsafe extern "C" {
 #[wasm_bindgen(start)]
 pub fn main() {
     unsafe { __wasm_call_ctors() };
+
+    console_error_panic_hook::set_once();
 }

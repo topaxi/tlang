@@ -231,6 +231,18 @@ export class ConsoleMessageElement extends LitElement {
       border-bottom: 1px solid var(--console-message-border-color);
     }
 
+    :host([type='warn']) {
+      --console-message-color: var(--ctp-macchiato-yellow);
+
+      --console-message-border-color: hsl(
+        from hsl(var(--ctp-macchiato-yellow-hsl)) h s calc(l - 40)
+      );
+
+      --console-message-background: hsl(
+        from hsl(var(--ctp-macchiato-yellow-hsl)) h s calc(l - 60)
+      );
+    }
+
     :host([type='error']) {
       --console-message-color: var(--ctp-macchiato-red);
 
@@ -326,6 +338,8 @@ export class ConsoleMessageElement extends LitElement {
 
   protected renderMessageIcon() {
     switch (this.type) {
+      case 'warn':
+        return html`<i part="icon icon-${this.type}" icon=""></i>`;
       case 'error':
         return html`<i part="icon icon-${this.type}" icon=""></i>`;
       default:

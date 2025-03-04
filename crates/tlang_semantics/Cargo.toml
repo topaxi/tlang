@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 tlang_ast = { path = "../tlang_ast" }
+serde = { workspace = true }
 
 [dev-dependencies]
 tlang_parser = { path = "../tlang_parser" }
