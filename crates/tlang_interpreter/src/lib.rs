@@ -1076,7 +1076,7 @@ impl Interpreter {
         let field_values = struct_decl
             .fields
             .iter()
-            .map(|field| *dict_map.get(&field.name.to_string()).unwrap())
+            .map(|field| dict_map.get(&field.name.to_string()).copied().unwrap())
             .collect();
 
         self.state.new_object(TlangObjectKind::Struct(TlangStruct {
