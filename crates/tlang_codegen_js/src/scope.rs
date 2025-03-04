@@ -32,8 +32,11 @@ impl Scope {
             return self.insert_variable(name, name);
         }
         // If already declared, generate a new name with a suffix (e.g., $a, $b)
-        let name_without_suffix = if name
-            .contains('$') { &name[..name.rfind('$').unwrap()] } else { name };
+        let name_without_suffix = if name.contains('$') {
+            &name[..name.rfind('$').unwrap()]
+        } else {
+            name
+        };
         let new_name = self.get_unique_variable_name(&(name_without_suffix.to_string() + "$"));
         self.insert_variable(&new_name, &new_name);
         self.insert_variable(name, &new_name);
@@ -50,8 +53,11 @@ impl Scope {
             return name.to_string();
         }
         // If already declared, generate a new name with a suffix (e.g., $a, $b)
-        let name_without_suffix = if name
-            .contains('$') { &name[..name.rfind('$').unwrap()] } else { name };
+        let name_without_suffix = if name.contains('$') {
+            &name[..name.rfind('$').unwrap()]
+        } else {
+            name
+        };
         let new_name = self.get_unique_variable_name(&(name_without_suffix.to_string() + "$"));
         self.insert_variable(&new_name, &new_name);
         self.insert_variable(name, &new_name);
