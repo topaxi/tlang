@@ -18,6 +18,12 @@ updates:
     schedule:
       interval: 'weekly'
     groups:
+      testing:
+        patterns:
+          - ctor
+          - indoc
+          - insta
+          - pretty_assertions
       wasm:
         patterns:
           - 'wasm-bindgen'
