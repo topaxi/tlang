@@ -176,9 +176,8 @@ impl<'src> Parser<'src> {
         expect_token_matches!(self, TokenKind::Identifier(_));
 
         let current_token = self.advance();
-        let ident = Ident::new(current_token.get_identifier().unwrap(), current_token.span);
 
-        ident
+        Ident::new(current_token.get_identifier().unwrap(), current_token.span)
     }
 
     fn at_eof(&self) -> bool {
