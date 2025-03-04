@@ -1,7 +1,7 @@
 use crate::{pattern_match_generator::MatchContextStack, scope::Scope};
 use tlang_ast::{
     symbols::SymbolType,
-    token::{kw, Token, TokenKind},
+    token::{Token, TokenKind, kw},
 };
 use tlang_hir::hir;
 

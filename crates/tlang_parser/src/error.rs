@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
+use serde::Serialize;
 use tlang_ast::{span::Span, token::Token};
 
 #[derive(Debug, Clone)]
@@ -34,7 +35,7 @@ impl Display for ParseError {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ParseIssue {
     pub msg: String,
     pub kind: ParseIssueKind,
@@ -53,7 +54,7 @@ impl Display for ParseIssue {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum ParseIssueKind {
     UnexpectedToken(Token),
     UnexpectedEof,

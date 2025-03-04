@@ -25,9 +25,8 @@ tlang_interpreter = { path = "../tlang_interpreter", default-features = false, f
 tlang_macros = { path = "../tlang_macros" }
 tlang_codegen_js = { path = "../tlang_codegen_js" }
 inventory = { workspace = true }
-serde_json = { workspace = true }
 ron = { workspace = true }
-gloo-utils = "0.2.0"
+serde-wasm-bindgen = "0.6"
 
 [dependencies.web-sys]
 version = "=0.3.77"

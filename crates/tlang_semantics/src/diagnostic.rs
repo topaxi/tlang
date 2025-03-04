@@ -1,8 +1,9 @@
 use std::fmt::{Display, Formatter};
 
+use serde::Serialize;
 use tlang_ast::span::Span;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Severity {
     Error,
     Warning,
@@ -17,7 +18,7 @@ impl Display for Severity {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Diagnostic {
     /// The message to display to the user.
     message: String,

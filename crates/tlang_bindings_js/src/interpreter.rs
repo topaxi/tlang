@@ -1,10 +1,8 @@
 use tlang_hir::hir;
 use tlang_interpreter::state::InterpreterState;
 use tlang_interpreter::value::{NativeFnReturn, TlangObjectKind, TlangPrimitive, TlangValue};
-use tlang_parser::{Parser, error::ParseError};
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
 pub struct TlangInterpreter(tlang_interpreter::Interpreter);
 
 impl Default for TlangInterpreter {
@@ -13,18 +11,13 @@ impl Default for TlangInterpreter {
     }
 }
 
-#[wasm_bindgen]
 impl TlangInterpreter {
-    #[wasm_bindgen(constructor)]
-    pub fn new() -> Self {
-        console_error_panic_hook::set_once();
-
+    pub(crate) fn new() -> Self {
         let interpreter = tlang_interpreter::Interpreter::default();
 
         TlangInterpreter(interpreter)
     }
 
-    #[wasm_bindgen]
     pub fn define_js_fn(&mut self, name: &str, f: js_sys::Function) {
         self.0.define_native_fn(name, move |state, args| {
             let this = JsValue::null();
@@ -91,17 +84,8 @@ impl TlangInterpreter {
         });
     }
 
-    #[wasm_bindgen]
-    pub fn eval(&mut self, source: &str) {
-        let hir = self.parse(source).unwrap();
+    pub(crate) fn eval(&mut self, hir: &hir::Module) {
         self.0.eval(&hir);
-    }
-
-    fn parse(&self, source: &str) -> Result<hir::Module, ParseError> {
-        let ast = Parser::from_source(source).parse()?;
-        let hir = tlang_ast_lowering::lower_to_hir(&ast);
-
-        Ok(hir)
     }
 }
 
