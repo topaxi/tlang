@@ -54,6 +54,24 @@ macro_rules! propagate {
     };
 }
 
+/// Evaluate a list of hir:Expr expressions into a vector of values, propagating control flow if necessary.
+macro_rules! eval_exprs {
+    ($this:expr, $exprs:expr) => {{
+        let mut exprs = Vec::with_capacity($exprs.len());
+        for expr in &$exprs {
+            exprs.push(eval_value!($this.eval_expr(expr)));
+        }
+        exprs
+    }};
+    ($this:expr, $exprs:expr, $capacity:expr) => {{
+        let mut exprs = Vec::with_capacity($capacity);
+        for expr in &$exprs {
+            exprs.push(eval_value!($this.eval_expr(expr)));
+        }
+        exprs
+    }};
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum EvalResult {
     Void,
@@ -322,13 +340,6 @@ impl Interpreter {
         }
 
         EvalResult::Void
-    }
-
-    fn eval_exprs(&mut self, exprs: &[hir::Expr]) -> Vec<TlangValue> {
-        exprs
-            .iter()
-            .map(|expr| self.eval_expr(expr).unwrap_value())
-            .collect()
     }
 
     fn eval_expr(&mut self, expr: &hir::Expr) -> EvalResult {
@@ -790,7 +801,7 @@ impl Interpreter {
         }
 
         let callee = eval_value!(self.eval_expr(&call_expr.callee));
-        let args = self.eval_exprs(&call_expr.arguments);
+        let args = eval_exprs!(self, call_expr.arguments);
 
         self.state
             .current_call_frame_mut()
@@ -903,7 +914,7 @@ impl Interpreter {
 
         let return_value = match &call_expr.callee.kind {
             hir::ExprKind::Path(path) if let Some(value) = self.resolve_path(path) => {
-                let args = self.eval_exprs(&call_expr.arguments);
+                let args = eval_exprs!(self, call_expr.arguments);
 
                 self.eval_call_object(value, args)
             }
@@ -917,7 +928,7 @@ impl Interpreter {
             hir::ExprKind::Path(path)
                 if let Some(struct_decl) = self.state.get_struct_decl(&path.as_init()) =>
             {
-                let args = self.eval_exprs(&call_expr.arguments);
+                let args = eval_exprs!(self, call_expr.arguments);
 
                 self.eval_call_struct_method(struct_decl.hir_id.into(), path.last_ident(), &args)
             }
@@ -930,7 +941,8 @@ impl Interpreter {
             }
             hir::ExprKind::FieldAccess(expr, ident) => {
                 let call_target = eval_value!(self.eval_expr(expr));
-                let mut args = self.eval_exprs(&call_expr.arguments);
+                let mut args =
+                    eval_exprs!(self, call_expr.arguments, call_expr.arguments.len() + 1);
                 args.insert(0, call_target);
 
                 let shape_key = self.get_object(call_target).and_then(|o| o.get_shape_key());
