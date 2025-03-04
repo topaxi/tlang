@@ -64,9 +64,7 @@ jobs:
         run: cargo make
 
       - name: Test Runner
-        run: |
-          cargo build --features=binary --bin tlangdi
-          cargo run --bin tlang_test_runner
+        run: make test
         env:
           RUST_BACKTRACE: '1'
 
