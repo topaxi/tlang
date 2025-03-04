@@ -27,7 +27,7 @@ tlang_parser = { path = "../tlang_parser" }
 tlang_semantics = { path = "../tlang_semantics" }
 log = { workspace = true }
 env_logger = { workspace = true }
-inventory = "0.3"
+inventory = { workspace = true }
 slab = "0.4"
 rand = { version = "0.9", optional = true }
 
