@@ -75,7 +75,13 @@ fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
             Command::new("./target/release/tlangdi")
                 .arg(file_path)
                 .output()
-                .map_err(|e| format!("Failed to execute interpreter: {}", e))?
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "Failed to execute interpreter for {}: {}",
+                        file_path.display(),
+                        e
+                    )
+                })
         }
         "javascript" => {
             #[allow(clippy::zombie_processes)]
