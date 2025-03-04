@@ -64,7 +64,9 @@ jobs:
         run: cargo make
 
       - name: Test Runner
-        run: make test
+        run: |
+          ls -ahl ./tests/**
+          make test
         env:
           RUST_BACKTRACE: '1'
 

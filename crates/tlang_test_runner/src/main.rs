@@ -23,7 +23,7 @@ impl Backend {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let pattern = "tests/**/*.tlang";
+    let pattern = "./tests/**/*.tlang";
     let mut errors: Vec<_> = vec![];
 
     for (i, backend) in Backend::values().enumerate() {
