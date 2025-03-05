@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "predev": "wasm-pack build --dev --target web crates/tlang_bindings_js",
+    "assume-unchanged": "git update-index --assume-unchanged crates/tlang_bindings_js/pkg/package.json",
+    "predev": "npm run assume-unchanged && wasm-pack build --dev --target web crates/tlang_bindings_js",
     "dev": "npm run dev -w tlang-playground",
-    "prebuild": "wasm-pack build --target web crates/tlang_bindings_js",
+    "prebuild": "npm run assume-unchanged && wasm-pack build --target web crates/tlang_bindings_js",
     "build": "npm run build -w tlang-playground",
     "prepreview": "npm run build",
     "preview": "npx serve tlang-playground/dist",
