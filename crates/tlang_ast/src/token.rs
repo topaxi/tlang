@@ -33,7 +33,7 @@ define_keywords! {
     With => "with"
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub enum TokenKind {
     // Tokens for binary operators
     Caret,
@@ -86,11 +86,11 @@ pub enum TokenKind {
     Literal(Literal),
 
     // Token for identifiers
-    Identifier(String),
+    Identifier,
 
     // Token for comments
-    SingleLineComment(String),
-    MultiLineComment(String),
+    SingleLineComment,
+    MultiLineComment,
 
     // Keywords
     Keyword(Keyword),
@@ -102,43 +102,21 @@ pub enum TokenKind {
     Eof,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub enum Literal {
     Boolean(bool),
-    Integer(i64),
-    UnsignedInteger(u64),
-    Float(f64),
-    String(String),
-    Char(String),
+    Integer,
+    UnsignedInteger,
+    Float,
+    String,
+    Char,
     None,
-}
-
-impl Clone for Literal {
-    fn clone(&self) -> Self {
-        // TODO: Would be great if literal string and char just refer to the string in the
-        //       source. Or we do some kind of interning at some point.
-        match self {
-            Literal::String(value) => Literal::String(value.clone()),
-            Literal::Char(value) => Literal::Char(value.clone()),
-            _ => unsafe { std::ptr::read(self) },
-        }
-    }
-}
-
-impl Literal {
-    pub fn invert_sign(&self) -> Self {
-        match self {
-            Literal::UnsignedInteger(value) => Literal::Integer(-(*value as i64)),
-            Literal::Integer(value) => Literal::Integer(-value),
-            Literal::Float(value) => Literal::Float(-value),
-            _ => panic!("Expected integer or float, found {:?}", self),
-        }
-    }
 }
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Token {
     pub kind: TokenKind,
+    pub token_span: TokenSpan,
     pub span: Span,
 }
 
@@ -146,6 +124,7 @@ impl Default for Token {
     fn default() -> Self {
         Self {
             kind: TokenKind::Eof,
+            token_span: TokenSpan::default(),
             span: Span::default(),
         }
     }
@@ -156,32 +135,26 @@ impl Token {
         Self { kind, span }
     }
 
-    pub fn get_identifier(&self) -> Option<&String> {
-        match &self.kind {
-            TokenKind::Identifier(identifier) => Some(identifier),
-            _ => None,
-        }
-    }
-
-    pub fn get_keyword(&self) -> Option<&Keyword> {
-        match &self.kind {
+    pub fn as_keyword(&self) -> Option<Keyword> {
+        match self.kind {
             TokenKind::Keyword(keyword) => Some(keyword),
             _ => None,
         }
     }
+}
 
-    pub fn get_comment(&self) -> Option<&String> {
-        match &self.kind {
-            TokenKind::SingleLineComment(comment) => Some(comment),
-            TokenKind::MultiLineComment(comment) => Some(comment),
-            _ => None,
-        }
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
+pub struct TokenSpan {
+    pub start: u32,
+    pub end: u32,
+}
+
+impl TokenSpan {
+    pub fn new(start: u32, end: u32) -> Self {
+        Self { start, end }
     }
 
-    pub fn take_literal(&mut self) -> Option<Literal> {
-        match &mut self.kind {
-            TokenKind::Literal(literal) => Some(std::mem::replace(literal, Literal::None)),
-            _ => None,
-        }
+    pub fn range(&self) -> std::ops::Range<usize> {
+        self.start as usize..self.end as usize
     }
 }
