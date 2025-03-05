@@ -173,17 +173,17 @@ impl Interpreter {
     {
         let fn_object = self.create_native_fn(f);
 
-        self.state.globals.insert(name.to_string(), fn_object);
+        self.state.set_global(name.to_string(), fn_object);
 
         fn_object
     }
 
     fn get_closure_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
-        self.state.closures.get(&id).cloned()
+        self.state.get_closure_decl(id)
     }
 
     fn get_object_by_id(&self, id: TlangObjectId) -> &TlangObjectKind {
-        self.state.objects.get(id).unwrap()
+        self.state.get_object_by_id(id).unwrap()
     }
 
     fn get_object(&self, value: TlangValue) -> Option<&TlangObjectKind> {
@@ -621,9 +621,7 @@ impl Interpreter {
     }
 
     fn eval_fn_decl(&mut self, decl: &hir::FunctionDeclaration) {
-        self.state
-            .fn_decls
-            .insert(decl.hir_id, Rc::new(decl.clone()));
+        self.state.set_fn_decl(decl.hir_id, Rc::new(decl.clone()));
 
         match &decl.name.kind {
             hir::ExprKind::Path(path) => {
@@ -632,7 +630,7 @@ impl Interpreter {
                 self.push_value(fn_object);
 
                 // Used for static struct method resolution, for now..
-                self.state.globals.insert(path.join("::"), fn_object);
+                self.state.set_global(path.join("::"), fn_object);
             }
             hir::ExprKind::FieldAccess(expr, ident) => {
                 let path = match &expr.kind {
@@ -707,8 +705,7 @@ impl Interpreter {
 
     fn eval_struct_decl(&mut self, decl: &hir::StructDeclaration) {
         self.state
-            .struct_decls
-            .insert(decl.name.to_string(), Rc::new(decl.clone()));
+            .set_struct_decl(decl.name.to_string(), Rc::new(decl.clone()));
 
         let struct_shape = TlangStructShape::new(
             decl.name.to_string(),
@@ -719,7 +716,7 @@ impl Interpreter {
             HashMap::new(),
         );
 
-        self.state.shapes.insert(decl.hir_id.into(), struct_shape);
+        self.state.set_shape(decl.hir_id.into(), struct_shape);
     }
 
     fn eval_enum_decl(&mut self, decl: &hir::EnumDeclaration) {

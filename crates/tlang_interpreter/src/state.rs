@@ -91,13 +91,13 @@ pub struct TailCall {
 
 pub struct InterpreterState {
     pub(crate) scope_stack: ScopeStack,
-    pub(crate) closures: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
-    pub(crate) objects: Slab<TlangObjectKind>,
-    pub(crate) shapes: HashMap<ShapeKey, TlangStructShape>,
-    pub(crate) fn_decls: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
-    pub(crate) struct_decls: HashMap<String, Rc<hir::StructDeclaration>>,
+    closures: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
+    objects: Slab<TlangObjectKind>,
+    shapes: HashMap<ShapeKey, TlangStructShape>,
+    fn_decls: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
+    struct_decls: HashMap<String, Rc<hir::StructDeclaration>>,
     call_stack: Vec<CallStackEntry>,
-    pub(crate) globals: HashMap<String, TlangValue>,
+    globals: HashMap<String, TlangValue>,
     pub builtin_shapes: BuiltinShapes,
 }
 
@@ -146,10 +146,18 @@ impl InterpreterState {
         self.fn_decls.get(&id).cloned()
     }
 
+    pub(crate) fn set_fn_decl(&mut self, id: hir::HirId, decl: Rc<hir::FunctionDeclaration>) {
+        self.fn_decls.insert(id, decl);
+    }
+
     pub(crate) fn get_struct_decl(&self, path: &hir::Path) -> Option<Rc<hir::StructDeclaration>> {
         let path_name = path.join("::");
 
         self.struct_decls.get(&path_name).cloned()
+    }
+
+    pub(crate) fn set_struct_decl(&mut self, path_name: String, decl: Rc<hir::StructDeclaration>) {
+        self.struct_decls.insert(path_name, decl);
     }
 
     pub fn panic(&self, message: String) -> ! {
@@ -211,6 +219,10 @@ impl InterpreterState {
         self.scope_stack.current_scope()
     }
 
+    pub fn set_global(&mut self, name: String, value: TlangValue) {
+        self.globals.insert(name, value);
+    }
+
     pub fn new_object(&mut self, kind: TlangObjectKind) -> TlangValue {
         TlangValue::new_object(self.objects.insert(kind))
     }
@@ -224,6 +236,10 @@ impl InterpreterState {
             id: decl.hir_id,
             scope_stack: self.scope_stack.clone(),
         }))
+    }
+
+    pub fn get_closure_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
+        self.closures.get(&id).cloned()
     }
 
     #[inline(always)]
@@ -280,6 +296,10 @@ impl InterpreterState {
         let shape = TlangStructShape::new(name, fields, methods);
         self.shapes.insert(shape_key, shape);
         shape_key
+    }
+
+    pub fn set_shape(&mut self, key: ShapeKey, shape: TlangStructShape) {
+        self.shapes.insert(key, shape);
     }
 
     pub fn get_shape(&self, key: ShapeKey) -> Option<&TlangStructShape> {
