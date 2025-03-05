@@ -351,7 +351,7 @@ impl Lexer<'_> {
                     self.token(TokenKind::Identifier(identifier_string), start)
                 }
             },
-            ch => self.token(TokenKind::Unknown(ch.to_string()), start),
+            _ => self.token(TokenKind::Unknown, start),
         }
     }
 }

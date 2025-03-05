@@ -96,7 +96,7 @@ pub enum TokenKind {
     Keyword(Keyword),
 
     // Unknown token, unexpected character
-    Unknown(String),
+    Unknown,
 
     // Token for end-of-file, also used as an unitialized sentinel token.
     Eof,
