@@ -66,17 +66,11 @@ macro_rules! propagate {
 
 /// Evaluate a list of hir:Expr expressions into a vector of values, propagating control flow if necessary.
 macro_rules! eval_exprs {
-    ($this:expr, $exprs:expr) => {{
-        let mut exprs = Vec::with_capacity($exprs.len());
-        for expr in &$exprs {
-            exprs.push(eval_value!($this.eval_expr(expr)));
-        }
-        exprs
-    }};
-    ($this:expr, $exprs:expr, $capacity:expr) => {{
+    ($this:expr, $eval:expr, $exprs:expr) => {{ eval_exprs!($this, $eval, $exprs, $exprs.len()) }};
+    ($this:expr, $eval:expr, $exprs:expr, $capacity:expr) => {{
         let mut exprs = Vec::with_capacity($capacity);
         for expr in &$exprs {
-            exprs.push(eval_value!($this.eval_expr(expr)));
+            exprs.push(eval_value!($eval($this, expr)));
         }
         exprs
     }};
@@ -811,7 +805,7 @@ impl Interpreter {
         }
 
         let callee = eval_value!(self.eval_expr(&call_expr.callee));
-        let args = eval_exprs!(self, call_expr.arguments);
+        let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
 
         self.state
             .current_call_frame_mut()
@@ -885,17 +879,17 @@ impl Interpreter {
 
     fn eval_partial_call(&mut self, call_expr: &hir::CallExpression) -> EvalResult {
         let callee = eval_value!(self.eval_expr(&call_expr.callee));
-        let applied_args: Vec<TlangValue> = call_expr
-            .arguments
-            .iter()
-            .map(|expr| {
+        let applied_args = eval_exprs!(
+            self,
+            |this: &mut Self, expr: &hir::Expr| {
                 if expr.is_wildcard() {
-                    TlangValue::Nil
+                    EvalResult::Value(TlangValue::Nil)
                 } else {
-                    self.eval_expr(expr).unwrap_value()
+                    this.eval_expr(expr)
                 }
-            })
-            .collect();
+            },
+            call_expr.arguments
+        );
 
         let fn_object = self.create_native_fn(move |_, args| {
             let mut applied_args = applied_args.clone();
@@ -924,7 +918,7 @@ impl Interpreter {
 
         let return_value = match &call_expr.callee.kind {
             hir::ExprKind::Path(path) if let Some(value) = self.resolve_path(path) => {
-                let args = eval_exprs!(self, call_expr.arguments);
+                let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
 
                 self.eval_call_object(value, args)
             }
@@ -932,13 +926,13 @@ impl Interpreter {
             hir::ExprKind::Path(path)
                 if let Some(struct_decl) = self.state.get_struct_decl(path) =>
             {
-                self.eval_struct_ctor(call_expr, &struct_decl)
+                eval_value!(self.eval_struct_ctor(call_expr, &struct_decl))
             }
             // The path might resolve to a struct method directly.
             hir::ExprKind::Path(path)
                 if let Some(struct_decl) = self.state.get_struct_decl(&path.as_init()) =>
             {
-                let args = eval_exprs!(self, call_expr.arguments);
+                let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
 
                 self.eval_call_struct_method(struct_decl.hir_id.into(), path.last_ident(), &args)
             }
@@ -951,8 +945,12 @@ impl Interpreter {
             }
             hir::ExprKind::FieldAccess(expr, ident) => {
                 let call_target = eval_value!(self.eval_expr(expr));
-                let mut args =
-                    eval_exprs!(self, call_expr.arguments, call_expr.arguments.len() + 1);
+                let mut args = eval_exprs!(
+                    self,
+                    Self::eval_expr,
+                    call_expr.arguments,
+                    call_expr.arguments.len() + 1
+                );
                 args.insert(0, call_target);
 
                 let shape_key = self.get_object(call_target).and_then(|o| o.get_shape_key());
@@ -1046,7 +1044,7 @@ impl Interpreter {
         &mut self,
         call_expr: &hir::CallExpression,
         struct_decl: &hir::StructDeclaration,
-    ) -> TlangValue {
+    ) -> EvalResult {
         // Struct calls are always calls with a single argument, which is a dict.
         // There is a special case for enum variant construction, as they might have
         // multiple arguments which are not wrapped in a dict but are struct values.
@@ -1060,11 +1058,11 @@ impl Interpreter {
             .all(|(i, field)| field.name.as_str() == i.to_string());
 
         let dict_map: HashMap<String, TlangValue> = if is_enum_variant_without_field_names {
-            call_expr
-                .arguments
-                .iter()
+            // eval_exprs! will allocate a new Vec, we might want to avoid this.
+            eval_exprs!(self, Self::eval_expr, call_expr.arguments)
+                .into_iter()
                 .enumerate()
-                .map(|(i, arg)| (i.to_string(), self.eval_expr(arg).unwrap_value()))
+                .map(|(i, arg)| (i.to_string(), arg))
                 .collect()
         } else {
             match &call_expr.arguments[0].kind {
@@ -1089,10 +1087,10 @@ impl Interpreter {
             .map(|field| dict_map.get(&field.name.to_string()).copied().unwrap())
             .collect();
 
-        self.state.new_object(TlangObjectKind::Struct(TlangStruct {
+        EvalResult::Value(self.state.new_object(TlangObjectKind::Struct(TlangStruct {
             shape: struct_decl.hir_id.into(),
             field_values,
-        }))
+        })))
     }
 
     fn eval_call_struct_method(
