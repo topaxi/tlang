@@ -1,3 +1,5 @@
+use std::num::NonZero;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 use tlang_ast::node::{Ident, UnaryOp};
@@ -14,15 +16,15 @@ pub trait HirScope {
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-pub struct HirId(usize);
+pub struct HirId(NonZero<usize>);
 
 impl HirId {
     pub fn new(id: usize) -> Self {
-        HirId(id)
+        HirId(NonZero::new(id).expect("HirId must be non-zero"))
     }
 
     pub fn next(&self) -> Self {
-        HirId(self.0 + 1)
+        HirId(self.0.saturating_add(1))
     }
 }
 

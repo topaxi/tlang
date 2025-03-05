@@ -26,7 +26,7 @@ pub struct LoweringContext {
 impl LoweringContext {
     pub fn new() -> Self {
         Self {
-            unique_id: HirId::new(0),
+            unique_id: HirId::new(1),
             node_id_to_hir_id: HashMap::default(),
             scopes: vec![Scope::default()],
         }

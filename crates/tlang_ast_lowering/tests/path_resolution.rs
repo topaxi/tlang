@@ -22,9 +22,9 @@ fn test_fn_param_assigns_resolution_to_paths_referring_to_same_fn() {
     // path 0 is foo_a within the fn declaration
 
     // path 1 is the first `a` in the binary expression, it points to the a fn param (hir 2)
-    assert_eq!(paths[1].res, hir::Res::Local(hir::HirId::new(2), 1));
+    assert_eq!(paths[1].res, hir::Res::Local(hir::HirId::new(3), 1));
     // path 2 is the second `a` in the binary expression, it points to the a fn param (hir 2)
-    assert_eq!(paths[2].res, hir::Res::Local(hir::HirId::new(2), 1));
+    assert_eq!(paths[2].res, hir::Res::Local(hir::HirId::new(3), 1));
 
     // foo_a has one local slot, for a
     match hir.block.stmts[0].kind {
@@ -38,9 +38,9 @@ fn test_fn_param_assigns_resolution_to_paths_referring_to_same_fn() {
     // path 3 is foo_b within the fn declaration
 
     // path 4 is the first `a` in the binary expression, it points to the a fn param (hir 9)
-    assert_eq!(paths[4].res, hir::Res::Local(hir::HirId::new(9), 1));
+    assert_eq!(paths[4].res, hir::Res::Local(hir::HirId::new(10), 1));
     // path 5 is the second `b` in the binary expression, it points to the b fn param (hir 10)
-    assert_eq!(paths[5].res, hir::Res::Local(hir::HirId::new(10), 2));
+    assert_eq!(paths[5].res, hir::Res::Local(hir::HirId::new(11), 2));
 
     // foo_b has two local slots, for a and b
     match hir.block.stmts[1].kind {
@@ -68,10 +68,10 @@ fn test_self_referal_reserves_local_slot() {
     // path 1 is `foo` of the call expression, it points to the fn declaration (hir 2)
     assert_eq!(
         paths[1].res,
-        hir::Res::Def(hir::DefKind::Fn, hir::HirId::new(0), 0)
+        hir::Res::Def(hir::DefKind::Fn, hir::HirId::new(1), 0)
     );
     // path 2 is the `a` in the call expression, it points to the a fn param (hir 3)
-    assert_eq!(paths[2].res, hir::Res::Local(hir::HirId::new(2), 1));
+    assert_eq!(paths[2].res, hir::Res::Local(hir::HirId::new(3), 1));
 
     // foo has two local slots, for a and the fn itself
     match hir.block.stmts[0].kind {
@@ -168,8 +168,8 @@ fn test_shadowing_creates_new_slots() {
     // path 0 is foo within the fn declaration
 
     // path 1 is `a` in the fn declaration, it points to the a fn param (hir 2)
-    assert_eq!(paths[1].res, hir::Res::Local(hir::HirId::new(2), 1));
+    assert_eq!(paths[1].res, hir::Res::Local(hir::HirId::new(3), 1));
     // path 2 is the first `a` in the binary expression, it points to the shadowed a (hir 3)
-    assert_eq!(paths[2].res, hir::Res::Local(hir::HirId::new(6), 2));
-    assert_eq!(paths[3].res, hir::Res::Local(hir::HirId::new(6), 2));
+    assert_eq!(paths[2].res, hir::Res::Local(hir::HirId::new(7), 2));
+    assert_eq!(paths[3].res, hir::Res::Local(hir::HirId::new(7), 2));
 }
