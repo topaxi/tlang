@@ -1,6 +1,8 @@
+#[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, Default, Eq, PartialEq, Clone, Copy, Serialize, Hash)]
+#[derive(Debug, Default, Eq, PartialEq, Clone, Copy, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct NodeId(usize);
 
 impl NodeId {

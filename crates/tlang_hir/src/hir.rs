@@ -1,3 +1,4 @@
+#[cfg(feature = "serde")]
 use serde::Serialize;
 use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::span::Span;
@@ -11,7 +12,8 @@ pub trait HirScope {
     fn set_upvars(&mut self, upvars: usize);
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy, Hash, Serialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct HirId(usize);
 
 impl HirId {
@@ -24,7 +26,8 @@ impl HirId {
     }
 }
 
-#[derive(Debug, Default, Clone, Serialize)]
+#[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct HirScopeData {
     // How many slots to allocate for local variables.
     locals: usize,
@@ -50,7 +53,8 @@ impl HirScope for HirScopeData {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum DefKind {
     Struct,
     Enum,
@@ -60,7 +64,8 @@ pub enum DefKind {
     Closure,
 }
 
-#[derive(Debug, Default, Eq, PartialEq, Clone, Copy, Serialize)]
+#[derive(Debug, Default, Eq, PartialEq, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum Res {
     #[default]
     Unknown,
@@ -94,7 +99,8 @@ impl Res {
 }
 
 /// HIR representation of a path.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Path {
     pub segments: Vec<PathSegment>,
     pub res: Res,
@@ -146,7 +152,8 @@ impl Path {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct PathSegment {
     pub ident: Ident,
 }
@@ -163,7 +170,8 @@ impl PathSegment {
     }
 }
 
-#[derive(Debug, Default, Clone, Serialize)]
+#[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Module {
     pub block: Block,
     pub span: Span,
@@ -187,7 +195,8 @@ impl HirScope for Module {
     }
 }
 
-#[derive(Debug, Default, Clone, Serialize)]
+#[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Block {
     pub stmts: Vec<Stmt>,
     pub expr: Option<Expr>,
@@ -228,7 +237,8 @@ impl HirScope for Block {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Stmt {
     pub hir_id: HirId,
     pub kind: StmtKind,
@@ -239,7 +249,8 @@ pub struct Stmt {
     pub trailing_comments: Vec<Token>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum StmtKind {
     Expr(Box<Expr>),
     Let(Box<Pat>, Box<Expr>, Box<Ty>),
@@ -252,7 +263,8 @@ pub enum StmtKind {
     None,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Pat {
     pub kind: PatKind,
     pub span: Span,
@@ -286,7 +298,8 @@ impl Pat {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum PatKind {
     Wildcard,
     Identifier(HirId, Box<Ident>),
@@ -296,7 +309,8 @@ pub enum PatKind {
     Enum(Box<Path>, Vec<(Ident, Pat)>),
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct MatchArm {
     pub pat: Pat,
     pub guard: Option<Expr>,
@@ -338,14 +352,16 @@ impl HirScope for MatchArm {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct RangeExpression {
     pub start: Expr,
     pub end: Expr,
     pub inclusive: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct CallExpression {
     pub hir_id: HirId,
     pub callee: Expr,
@@ -365,7 +381,8 @@ impl CallExpression {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Expr {
     pub hir_id: HirId,
     pub kind: ExprKind,
@@ -393,7 +410,8 @@ impl Expr {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum ExprKind {
     Block(Box<Block>),
     Call(Box<CallExpression>),
@@ -416,26 +434,30 @@ pub enum ExprKind {
     Wildcard, // TODO: This might be better to just be an identifier
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ElseClause {
     pub condition: Option<Expr>,
     pub consequence: Block,
 }
 
-#[derive(Debug, Default, Clone, Serialize)]
+#[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Ty {
     pub kind: TyKind,
     pub span: Span,
 }
 
-#[derive(Debug, Default, Clone, Serialize)]
+#[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum TyKind {
     #[default]
     Unknown,
     Path(Path),
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct FunctionParameter {
     pub hir_id: HirId,
     pub name: Ident,
@@ -443,7 +465,8 @@ pub struct FunctionParameter {
     pub span: Span,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct FunctionDeclaration {
     pub hir_id: HirId,
     pub name: Expr,
@@ -512,35 +535,40 @@ impl HirScope for std::rc::Rc<FunctionDeclaration> {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct DynFunctionDeclaration {
     pub hir_id: HirId,
     pub name: Expr,
     pub variants: Vec<(usize, HirId)>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct StructDeclaration {
     pub hir_id: HirId,
     pub name: Ident,
     pub fields: Vec<StructField>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct StructField {
     pub hir_id: HirId,
     pub name: Ident,
     pub ty: Ty,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct EnumDeclaration {
     pub hir_id: HirId,
     pub name: Ident,
     pub variants: Vec<EnumVariant>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct EnumVariant {
     pub hir_id: HirId,
     pub name: Ident,
@@ -548,7 +576,8 @@ pub struct EnumVariant {
     pub span: Span,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy, Serialize)]
+#[derive(Debug, PartialEq, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum BinaryOpKind {
     Assign,
     Add,

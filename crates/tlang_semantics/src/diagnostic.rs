@@ -1,9 +1,11 @@
 use std::fmt::{Display, Formatter};
 
+#[cfg(feature = "serde")]
 use serde::Serialize;
 use tlang_ast::span::Span;
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum Severity {
     Error,
     Warning,
@@ -18,7 +20,8 @@ impl Display for Severity {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Diagnostic {
     /// The message to display to the user.
     message: String,

@@ -10,19 +10,19 @@ forced-target = "wasm32-unknown-unknown"
 test = false
 crate-type = [
   "cdylib",
-  "rlib" # wasm-pack test wants rlib type
+  "rlib",   # wasm-pack test wants rlib type
 ]
 
 [dependencies]
 console_error_panic_hook = "0.1"
 wasm-bindgen = "=0.2.100"
 js-sys = "=0.3.77"
-tlang_ast = { path = "../tlang_ast" }
+tlang_ast = { path = "../tlang_ast", features = ["serde"] }
 tlang_ast_lowering = { path = "../tlang_ast_lowering" }
-tlang_hir = { path = "../tlang_hir" }
+tlang_hir = { path = "../tlang_hir", features = ["serde"] }
 tlang_hir_pretty = { path = "../tlang_hir_pretty" }
-tlang_parser = { path = "../tlang_parser" }
-tlang_semantics = { path = "../tlang_semantics" }
+tlang_parser = { path = "../tlang_parser", features = ["serde"] }
+tlang_semantics = { path = "../tlang_semantics", features = ["serde"] }
 tlang_interpreter = { path = "../tlang_interpreter" }
 tlang_macros = { path = "../tlang_macros" }
 tlang_codegen_js = { path = "../tlang_codegen_js" }

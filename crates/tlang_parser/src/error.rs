@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
+#[cfg(feature = "serde")]
 use serde::Serialize;
 use tlang_ast::{span::Span, token::Token};
 
@@ -35,7 +36,8 @@ impl Display for ParseError {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ParseIssue {
     pub msg: String,
     pub kind: ParseIssueKind,
@@ -54,7 +56,8 @@ impl Display for ParseIssue {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum ParseIssueKind {
     UnexpectedToken(Token),
     UnexpectedEof,

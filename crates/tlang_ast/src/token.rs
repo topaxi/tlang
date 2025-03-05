@@ -1,5 +1,6 @@
 use crate::define_keywords;
 use crate::span::Span;
+#[cfg(feature = "serde")]
 use serde::Serialize;
 
 define_keywords! {
@@ -33,7 +34,8 @@ define_keywords! {
     With => "with"
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum TokenKind {
     // Tokens for binary operators
     Caret,
@@ -102,7 +104,8 @@ pub enum TokenKind {
     Eof,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum Literal {
     Boolean(bool),
     Integer(i64),
@@ -136,7 +139,8 @@ impl Literal {
     }
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Token {
     pub kind: TokenKind,
     pub span: Span,

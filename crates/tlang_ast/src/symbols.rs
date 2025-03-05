@@ -1,4 +1,5 @@
 // TODO: Does this module belong in the ast crate?
+#[cfg(feature = "serde")]
 use serde::Serialize;
 use std::cell::RefCell;
 use std::fmt::Display;
@@ -7,7 +8,8 @@ use std::rc::Rc;
 use crate::node_id::NodeId;
 use crate::span::Span;
 
-#[derive(Debug, Default, PartialEq, Copy, Clone, Serialize)]
+#[derive(Debug, Default, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum SymbolType {
     Module,
     #[default]
@@ -33,7 +35,8 @@ impl Display for SymbolType {
     }
 }
 
-#[derive(Debug, Default, Eq, PartialEq, Clone, Copy, Serialize, Hash)]
+#[derive(Debug, Default, Eq, PartialEq, Clone, Copy, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct SymbolId(usize);
 
 impl SymbolId {
@@ -46,7 +49,8 @@ impl SymbolId {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, PartialEq, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct SymbolInfo {
     pub id: SymbolId,
     pub name: String,
@@ -83,9 +87,10 @@ impl SymbolInfo {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Serialize)]
+#[derive(Debug, Default, PartialEq, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct SymbolTable {
-    #[serde(skip_serializing)]
+    #[cfg_attr(feature = "serde", serde(skip_serializing))]
     parent: Option<Rc<RefCell<SymbolTable>>>,
     symbols: Vec<SymbolInfo>,
 }
