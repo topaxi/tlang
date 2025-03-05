@@ -49,6 +49,21 @@ macro_rules! define_keywords {
             $($keyword),*
         }
 
+        impl From<&str> for Keyword {
+            fn from(s: &str) -> Self {
+                match s {
+                    $($str_value => Keyword::$keyword,)*
+                    _ => panic!("Unknown keyword: {}", s),
+                }
+            }
+        }
+
+        pub const KEYWORDS: &[&str] = &[$($str_value),*];
+
+        pub fn is_keyword(s: &str) -> bool {
+            KEYWORDS.contains(&s)
+        }
+
         #[allow(non_upper_case_globals)]
         pub mod kw {
             $(pub const $keyword: &str = $str_value;)*

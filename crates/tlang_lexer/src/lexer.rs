@@ -1,6 +1,6 @@
 use tlang_ast::{
     span::{LineColumn, Span},
-    token::{Keyword, Literal, Token, TokenKind},
+    token::{Keyword, Literal, Token, TokenKind, is_keyword},
 };
 
 #[derive(Debug, Clone)]
@@ -340,31 +340,12 @@ impl Lexer<'_> {
                 }
             }
             ch if Self::is_alphanumeric(ch) => match self.read_identifier() {
-                "let" => self.token(TokenKind::Keyword(Keyword::Let), start),
-                "fn" => self.token(TokenKind::Keyword(Keyword::Fn), start),
-                "rec" => self.token(TokenKind::Keyword(Keyword::Rec), start),
-                "return" => self.token(TokenKind::Keyword(Keyword::Return), start),
-                "if" => self.token(TokenKind::Keyword(Keyword::If), start),
-                "else" => self.token(TokenKind::Keyword(Keyword::Else), start),
-                "match" => self.token(TokenKind::Keyword(Keyword::Match), start),
-                "not" => self.token(TokenKind::Keyword(Keyword::Not), start),
-                "enum" => self.token(TokenKind::Keyword(Keyword::Enum), start),
-                "struct" => self.token(TokenKind::Keyword(Keyword::Struct), start),
                 "true" => self.token(TokenKind::Literal(Literal::Boolean(true)), start),
                 "false" => self.token(TokenKind::Literal(Literal::Boolean(false)), start),
-                "and" => self.token(TokenKind::Keyword(Keyword::And), start),
-                "or" => self.token(TokenKind::Keyword(Keyword::Or), start),
-                "_" => self.token(TokenKind::Keyword(Keyword::Underscore), start),
-                "self" => self.token(TokenKind::Keyword(Keyword::_Self), start),
-                "Self" => self.token(TokenKind::Keyword(Keyword::SelfUpper), start),
-                "as" => self.token(TokenKind::Keyword(Keyword::As), start),
-                "for" => self.token(TokenKind::Keyword(Keyword::For), start),
-                "in" => self.token(TokenKind::Keyword(Keyword::In), start),
-                "loop" => self.token(TokenKind::Keyword(Keyword::Loop), start),
-                "pub" => self.token(TokenKind::Keyword(Keyword::Pub), start),
-                "use" => self.token(TokenKind::Keyword(Keyword::Use), start),
-                "while" => self.token(TokenKind::Keyword(Keyword::While), start),
-                "with" => self.token(TokenKind::Keyword(Keyword::With), start),
+                identifier if is_keyword(identifier) => {
+                    let kw = Keyword::from(identifier);
+                    self.token(TokenKind::Keyword(kw), start)
+                }
                 identifier => {
                     let identifier_string = identifier.to_string();
                     self.token(TokenKind::Identifier(identifier_string), start)
