@@ -151,13 +151,7 @@ export class TlangPlayground extends LitElement {
       display: flex;
     }
 
-    .editor-container,
-    .output-tabs {
-      display: flex;
-      flex: 1;
-    }
-
-    .editor-container > t-codemirror {
+    t-codemirror {
       flex: 1;
     }
 
@@ -491,12 +485,11 @@ export class TlangPlayground extends LitElement {
         class="editor-split"
         direction=${this.desktop.matches ? 'vertical' : 'horizontal'}
       >
-        <div slot="first" class="editor-container">
-          <t-codemirror
-            class="editor"
-            @source-change=${this.handleSourceChange}
-          ></t-codemirror>
-        </div>
+        <t-codemirror
+          slot="first"
+          class="editor"
+          @source-change=${this.handleSourceChange}
+        ></t-codemirror>
         <t-split slot="second" direction="horizontal" class="output-split">
           <t-tabs
             class="output-tabs"
