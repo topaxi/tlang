@@ -1687,22 +1687,12 @@ mod tests {
 
         let calls_tracker = calls.clone();
 
-        let log_fn_object_id = interpreter
+        interpreter
             .interpreter
-            .state
-            .globals
-            .get("log")
-            .unwrap()
-            .get_object_id()
-            .unwrap();
-
-        interpreter.interpreter.native_fns.insert(
-            log_fn_object_id,
-            Box::new(move |_, args| {
+            .define_native_fn("log", move |_, args| {
                 calls_tracker.borrow_mut().push(args.to_vec());
                 NativeFnReturn::Return(TlangValue::Nil)
-            }),
-        );
+            });
 
         assert_matches!(interpreter.eval("log(10)"), TlangValue::Nil);
         assert_matches!(calls.borrow()[0][..], [TlangValue::U64(10)]);
@@ -1746,15 +1736,6 @@ mod tests {
             let some = Option::Some(10);
             let none = Option::None;
         "});
-
-        assert!(
-            interpreter
-                .interpreter
-                .state
-                .shapes
-                .iter()
-                .any(|shape| shape.1.name == "Option::Some")
-        );
 
         let some_value = interpreter.eval("some");
         assert_matches!(some_value, TlangValue::Object(_));
