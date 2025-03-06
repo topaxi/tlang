@@ -158,7 +158,8 @@ export class TlangPlayground extends LitElement {
       display: flex;
     }
 
-    t-codemirror {
+    t-codemirror,
+    .output-tabs {
       flex: 1;
     }
 
