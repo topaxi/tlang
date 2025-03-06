@@ -73,7 +73,7 @@ jobs:
           RUST_BACKTRACE: '1'
 
       - name: Test JS bindings
-        run: wasm-pack test --node crates/tlang_bindings_js
+        run: make test-js-bindings
 
       - name: Install binaryen
         run: |
