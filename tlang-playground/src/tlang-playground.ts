@@ -2,8 +2,10 @@ import { LitElement, PropertyValueMap, css, html } from 'lit';
 import { customElement, query, state } from 'lit/decorators.js';
 import { examples } from './examples';
 
+import './components/t-button';
 import './components/t-codemirror';
 import './components/t-console';
+import './components/t-live';
 import './components/t-split';
 import './components/t-tabs';
 import { type TCodeMirror } from './components/t-codemirror';
@@ -120,7 +122,12 @@ export class TlangPlayground extends LitElement {
       display: flex;
       flex-direction: column;
       width: 100%;
-      height: 100vh;
+      height: 100dvh;
+    }
+
+    main {
+      overflow: hidden;
+      flex: 1;
     }
 
     .toolbar {
@@ -341,7 +348,9 @@ export class TlangPlayground extends LitElement {
       flashnotification.style.borderRadius = '8px';
       flashnotification.style.zIndex = '1000';
 
-      document.body.append(flashnotification);
+      document
+        .querySelector('body > t-live[role="log"]')!
+        .append(flashnotification);
 
       setTimeout(() => flashnotification.remove(), 1000);
     });
@@ -455,72 +464,76 @@ export class TlangPlayground extends LitElement {
 
   render() {
     return html`
-      <div class="toolbar">
-        <button class="toolbar__run" @click=${this.run}>Run</button>
-        <select
-          class="toolbar__runner"
-          @change=${this.handleRunnerChange}
-          .value=${live(this.runner)}
-        >
-          <option value="compiler">Compiler</option>
-          <option value="interpreter">Interpreter</option>
-        </select>
-        <button class="toolbar__share" @click=${this.share}>Share</button>
-        <select
-          class="toolbar__example"
-          @change=${this.handleExampleSelect}
-          .value=${live(this.selectedExample)}
-        >
-          ${repeat(
-            Object.keys(examples),
-            (key) => key,
-            (key) => html`<option>${key}</option>`,
-          )}
-        </select>
-        <div class="repo-link">
-          <a href="https://github.com/topaxi/tlang">Source Code</a>
-        </div>
-      </div>
-      <t-split
-        class="editor-split"
-        direction=${this.desktop.matches ? 'vertical' : 'horizontal'}
-      >
-        <t-codemirror
-          slot="first"
-          class="editor"
-          @source-change=${this.handleSourceChange}
-        ></t-codemirror>
-        <t-split slot="second" direction="horizontal" class="output-split">
-          <t-tabs
-            class="output-tabs"
-            slot="first"
-            single
-            .selected=${this.display}
-            @t-tab-select=${this.handleDisplayChange}
+      <header>
+        <div class="toolbar">
+          <t-button @click=${this.run}>Run</t-button>
+          <select
+            class="toolbar__runner"
+            @change=${this.handleRunnerChange}
+            .value=${live(this.runner)}
+          >
+            <option value="compiler">Compiler</option>
+            <option value="interpreter">Interpreter</option>
+          </select>
+          <t-button @click=${this.share}>Share</t-button>
+          <select
+            class="toolbar__example"
+            @change=${this.handleExampleSelect}
+            .value=${live(this.selectedExample)}
           >
             ${repeat(
-              this.availableDisplayOptions,
-              (display) => display,
-              (display) =>
-                html`<t-tab slot="tab" id=${display}>${displayLabels[display]}</option>`,
+              Object.keys(examples),
+              (key) => key,
+              (key) => html`<option>${key}</option>`,
             )}
-            <t-tab-panel>
-              ${keyed(this.display, this.renderOutput())}
-            </t-tab-panel>
-          </t-tabs>
-          <t-console
-            slot="second"
-            .messages=${this.consoleMessages}
-            @collapse=${(event: CustomEvent<{ collapsed: boolean }>) => {
-              if (event.detail.collapsed) {
-                this.outputSplit.reset();
-              }
-            }}
-            @clear=${() => (this.consoleMessages = [])}
-          >
-          </t-console>
+          </select>
+          <div class="repo-link">
+            <a href="https://github.com/topaxi/tlang">Source Code</a>
+          </div>
+        </div>
+      </header>
+      <main>
+        <t-split
+          class="editor-split"
+          direction=${this.desktop.matches ? 'vertical' : 'horizontal'}
+        >
+          <t-codemirror
+            slot="first"
+            class="editor"
+            @source-change=${this.handleSourceChange}
+          ></t-codemirror>
+          <t-split slot="second" direction="horizontal" class="output-split">
+            <t-tabs
+              class="output-tabs"
+              slot="first"
+              single
+              .selected=${this.display}
+              @t-tab-select=${this.handleDisplayChange}
+            >
+              ${repeat(
+                this.availableDisplayOptions,
+                (display) => display,
+                (display) =>
+                  html`<t-tab slot="tab" id=${display}>${displayLabels[display]}</option>`,
+              )}
+              <t-tab-panel>
+                ${keyed(this.display, this.renderOutput())}
+              </t-tab-panel>
+            </t-tabs>
+            <t-console
+              slot="second"
+              .messages=${this.consoleMessages}
+              @collapse=${(event: CustomEvent<{ collapsed: boolean }>) => {
+                if (event.detail.collapsed) {
+                  this.outputSplit.reset();
+                }
+              }}
+              @clear=${() => (this.consoleMessages = [])}
+            >
+            </t-console>
+          </t-split>
         </t-split>
-      </t-split>
+      </main>
     `;
   }
 }

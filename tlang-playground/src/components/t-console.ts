@@ -1,6 +1,8 @@
 import { css, html, LitElement, PropertyValueMap } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
+import './t-button';
+import './t-toggle-button';
 
 function stringify(value: unknown) {
   function bigintToJSON(n: bigint) {
@@ -52,6 +54,7 @@ export class ConsoleElement extends LitElement {
 
     .toolbar__title {
       margin-right: auto;
+      align-self: center;
     }
 
     .messages-container {
@@ -142,27 +145,33 @@ export class ConsoleElement extends LitElement {
     return html`
       <div class="toolbar">
         <div id="title" class="toolbar__title">Console</div>
-        <button
+        <t-toggle-button
           @click=${this.toggleTimestamps}
-          aria-pressed=${String(this.showTimestamps)}
+          .pressed=${this.showTimestamps}
+          ?hidden=${this.collapsed}
         >
           ${this.showTimestamps ? 'Hide Timestamps' : 'Show Timestamps'}
-        </button>
-        <button
+        </t-toggle-button>
+        <t-toggle-button
           @click=${this.handleCollapse}
-          aria-pressed=${String(this.collapsed)}
-          aria-controls="messages"
+          type="collapsable"
+          .pressed=${this.collapsed}
+          controls="messages"
         >
           ${this.collapsed ? 'Expand Console' : 'Collapse Console'}
-        </button>
-        <button @click=${this.handleConsoleClear}>Clear</button>
+        </t-toggle-button>
+        <t-button
+          @click=${this.handleConsoleClear}
+          ?hidden=${this.collapsed}
+        >
+          Clear
+        </t-button>
       </div>
       <div class="messages-container">
         <div
           id="messages"
           class="messages"
           .hidden=${this.collapsed}
-          aria-expanded=${String(this.collapsed)}
         >
           ${repeat(
             this.messages,
@@ -235,11 +244,11 @@ export class ConsoleMessageElement extends LitElement {
       --console-message-color: var(--ctp-macchiato-yellow);
 
       --console-message-border-color: hsl(
-        from hsl(var(--ctp-macchiato-yellow-hsl)) h s calc(l - 40)
+        from var(--ctp-macchiato-yellow) h s calc(l - 40)
       );
 
       --console-message-background: hsl(
-        from hsl(var(--ctp-macchiato-yellow-hsl)) h s calc(l - 60)
+        from var(--ctp-macchiato-yellow)) h s calc(l - 60)
       );
     }
 
@@ -247,11 +256,11 @@ export class ConsoleMessageElement extends LitElement {
       --console-message-color: var(--ctp-macchiato-red);
 
       --console-message-border-color: hsl(
-        from hsl(var(--ctp-macchiato-red-hsl)) h s calc(l - 40)
+        from var(--ctp-macchiato-red) h s calc(l - 40)
       );
 
       --console-message-background: hsl(
-        from hsl(var(--ctp-macchiato-red-hsl)) h s calc(l - 60)
+        from var(--ctp-macchiato-red) h s calc(l - 60)
       );
     }
 

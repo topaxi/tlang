@@ -252,7 +252,7 @@ export class SplitElement extends LitElement implements EventListenerObject {
 
   protected render(): TemplateResult {
     return html`
-      <slot name="first" part="first" id="first"></slot>
+      <slot name="first" part="first" id="first" role="region"></slot>
       <hr
         part="handle"
         tabindex="0"
@@ -263,7 +263,7 @@ export class SplitElement extends LitElement implements EventListenerObject {
         @touchstart=${this}
         @keyup=${this}
       />
-      <slot name="second" part="second"></slot>
+      <slot name="second" part="second" role="region"></slot>
     `;
   }
 }

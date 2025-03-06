@@ -11,6 +11,8 @@
 :root {
   --t-background-color: var(--ctp-macchiato-base);
   --t-foreground-color: var(--ctp-macchiato-text);
+
+  --t-input-border-color: var(--ctp-macchiato-surface0);
 }
 
 :root {
@@ -35,5 +37,5 @@ body {
   display: flex;
   place-items: center;
   min-width: 320px;
-  min-height: 100vh;
+  min-height: 100dvh;
 }
