@@ -2,6 +2,7 @@ import { LitElement, PropertyValueMap, css, html } from 'lit';
 import { customElement, query, state } from 'lit/decorators.js';
 import { examples } from './examples';
 
+import './components/t-menu';
 import './components/t-button';
 import './components/t-codemirror';
 import './components/t-console';
@@ -468,6 +469,13 @@ export class TlangPlayground extends LitElement {
       <header>
         <div class="toolbar">
           <t-button @click=${this.run} shortcut="ctrl+alt+r">Run</t-button>
+          <t-button popovertarget="menu">Menu</t-button>
+          <t-menu id="menu" popover>
+            <t-menuitem>File</t-menuitem>
+            <t-menuitem>View</t-menuitem>
+            <t-menuitem>Help</t-menuitem>
+            <t-menuitem>About</t-menuitem>
+          </t-menu>
           <select
             class="toolbar__runner"
             @change=${this.handleRunnerChange}

@@ -78,6 +78,9 @@ export class ButtonElement extends LitElement {
   @property({ type: Boolean, attribute: 'aria-disabled', reflect: true })
   disabled = false;
 
+  @property({ type: String, reflect: true })
+  popovertarget: string | null = null;
+
   @property({ type: String })
   shortcut: ShortcutDefinition | '' = '';
 
@@ -106,9 +109,22 @@ export class ButtonElement extends LitElement {
       return;
     }
 
-    let event = e as KeyboardEvent & { type: `key${string}` };
+    let event = e as
+      | (MouseEvent & { type: 'click' })
+      | (KeyboardEvent & { type: `key${string}` });
 
     switch (event.type) {
+      case 'click':
+        if (this.popovertarget) {
+          let target = (this.getRootNode() as HTMLElement).querySelector(
+            `#${this.popovertarget}`,
+          ) as HTMLElement | null;
+
+          if (target) {
+            target.togglePopover();
+          }
+        }
+        break;
       case 'keypress':
         if (event.key == 'Enter' || event.key == ' ') {
           this.dispatchEvent(
@@ -123,6 +139,7 @@ export class ButtonElement extends LitElement {
   }
 
   firstUpdated(): void {
+    this.addEventListener('click', this);
     this.addEventListener('keypress', this);
     this.ownerDocument.addEventListener('keyup', this.handleShortcut);
   }
