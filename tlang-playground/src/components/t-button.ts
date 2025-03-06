@@ -52,12 +52,19 @@ export class ButtonElement extends LitElement {
       }
 
       [part='shortcut'] {
+        display: none;
         font-size: 0.75em;
         margin-left: 0.5em;
         margin-right: -0.25em;
         padding: 0.1em 0.25em;
         border: 1px solid var(--button-border-color);
         background-color: var(--button-background-color);
+      }
+
+      @media (min-width: 980px) {
+        [part='shortcut'] {
+          display: inline;
+        }
       }
     `,
   ];
