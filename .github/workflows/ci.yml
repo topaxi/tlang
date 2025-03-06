@@ -73,7 +73,7 @@ jobs:
           RUST_BACKTRACE: '1'
 
       - name: Test JS bindings
-        run: make test-js-bindings
+        run: make test-bindings-js
 
       - name: Install binaryen
         run: |
