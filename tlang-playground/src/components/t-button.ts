@@ -1,5 +1,11 @@
 import { css, html, LitElement, PropertyValues, TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
+import {
+  eventMatchesShortcut,
+  parseShortcutDefinition,
+  ShortcutDefinition,
+  toAriaKeyshortcuts,
+} from '../utils/shortcuts';
 
 @customElement('t-button')
 export class ButtonElement extends LitElement {
@@ -14,6 +20,8 @@ export class ButtonElement extends LitElement {
           from var(--button-hover-background-color) h s calc(l + 10)
         );
 
+        align-items: center;
+        justify-content: center;
         cursor: default;
         user-select: none;
         border: 1px solid var(--button-border-color);
@@ -21,6 +29,10 @@ export class ButtonElement extends LitElement {
         background-color: var(--button-background-color);
         padding: 0.25em 0.5em;
         font-size: 0.85rem;
+      }
+
+      :host(:not([hidden])) {
+        display: inline-flex;
       }
 
       :host(:hover) {
@@ -38,6 +50,15 @@ export class ButtonElement extends LitElement {
       :host([aria-disabled='true']) {
         cursor: not-allowed;
       }
+
+      [part='shortcut'] {
+        font-size: 0.75em;
+        margin-left: 0.5em;
+        margin-right: -0.25em;
+        padding: 0.1em 0.25em;
+        border: 1px solid var(--button-border-color);
+        background-color: var(--button-background-color);
+      }
     `,
   ];
 
@@ -49,6 +70,24 @@ export class ButtonElement extends LitElement {
 
   @property({ type: Boolean, attribute: 'aria-disabled', reflect: true })
   disabled = false;
+
+  @property({ type: String })
+  shortcut: ShortcutDefinition | '' = '';
+
+  private handleShortcut = (e: KeyboardEvent): void => {
+    if (this.disabled || !this.shortcut) {
+      return;
+    }
+
+    if (eventMatchesShortcut(e, parseShortcutDefinition(this.shortcut))) {
+      this.dispatchEvent(
+        new CustomEvent('click', {
+          bubbles: true,
+          composed: true,
+        }),
+      );
+    }
+  };
 
   /**
    * @private
@@ -76,12 +115,31 @@ export class ButtonElement extends LitElement {
     }
   }
 
-  protected firstUpdated(_changedProperties: PropertyValues): void {
+  firstUpdated(): void {
     this.addEventListener('keypress', this);
+    this.ownerDocument.addEventListener('keyup', this.handleShortcut);
+  }
+
+  protected updated(changedProperties: PropertyValues): void {
+    if (changedProperties.has('shortcut') && this.shortcut) {
+      this.setAttribute(
+        'aria-keyshortcuts',
+        toAriaKeyshortcuts(parseShortcutDefinition(this.shortcut)),
+      );
+    }
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.ownerDocument.removeEventListener('keyup', this.handleShortcut);
   }
 
   protected render(): TemplateResult {
-    return html`<slot></slot>`;
+    let shortcut = this.shortcut
+      ? html`<span aria-hidden="true" part="shortcut">${this.shortcut}</span>`
+      : '';
+
+    return html`<slot></slot>${shortcut}`;
   }
 }
 

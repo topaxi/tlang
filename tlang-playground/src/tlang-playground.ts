@@ -466,7 +466,7 @@ export class TlangPlayground extends LitElement {
     return html`
       <header>
         <div class="toolbar">
-          <t-button @click=${this.run}>Run</t-button>
+          <t-button @click=${this.run} shortcut="ctrl+alt+r">Run</t-button>
           <select
             class="toolbar__runner"
             @change=${this.handleRunnerChange}

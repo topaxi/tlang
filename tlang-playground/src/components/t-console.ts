@@ -157,12 +157,14 @@ export class ConsoleElement extends LitElement {
           type="collapsable"
           .pressed=${this.collapsed}
           controls="messages"
+          shortcut="ctrl+alt+c"
         >
           ${this.collapsed ? 'Expand Console' : 'Collapse Console'}
         </t-toggle-button>
         <t-button
           @click=${this.handleConsoleClear}
           ?hidden=${this.collapsed}
+          shortcut="ctrl+alt+k"
         >
           Clear
         </t-button>
