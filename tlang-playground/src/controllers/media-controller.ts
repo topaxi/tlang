@@ -1,5 +1,5 @@
 import { ReactiveController, ReactiveControllerHost } from 'lit';
-import { EventController } from './host-listener';
+import { EventController } from './event-controller';
 
 export class MediaController
   extends EventController<MediaQueryListEvent, MediaQueryList>

@@ -1,5 +1,5 @@
 import { LitElement } from 'lit';
-import { EventController } from '../controllers/host-listener';
+import { EventController } from '../controllers/event-controller';
 
 export function hostListener(eventName: string): PropertyDecorator;
 export function hostListener(eventNames: string[]): PropertyDecorator;
