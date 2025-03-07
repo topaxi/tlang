@@ -35,7 +35,7 @@ export function createConsoleMessage(
 
 @customElement('t-console')
 export class ConsoleElement extends LitElement {
-  static styles = css`
+  static override styles = css`
     :host {
       display: flex;
       flex-direction: column;
@@ -114,7 +114,7 @@ export class ConsoleElement extends LitElement {
     this.dispatchEvent(new CustomEvent('clear'));
   }
 
-  protected updated(changedProperties: PropertyValueMap<this>): void {
+  protected override updated(changedProperties: PropertyValueMap<this>): void {
     if (changedProperties.has('messages')) {
       this.consoleMessagesContainer.scrollTop =
         this.consoleMessagesContainer.scrollHeight;
@@ -133,7 +133,7 @@ export class ConsoleElement extends LitElement {
     this.requestUpdate();
   }
 
-  protected render() {
+  protected override render() {
     let groupStack = 0;
     let collapsedAt = Number.MAX_SAFE_INTEGER;
 
@@ -226,7 +226,7 @@ export class ConsoleElement extends LitElement {
 
 @customElement('t-console-message')
 export class ConsoleMessageElement extends LitElement {
-  static styles = css`
+  static override styles = css`
     :host {
       display: flex;
       position: relative;
@@ -406,7 +406,7 @@ export class ConsoleMessageElement extends LitElement {
     return `${hours}:${minutes}:${seconds}.${milliseconds}`;
   }
 
-  protected render() {
+  protected override render() {
     let rendered = this.renderConsoleMessageArgs(this.message.args);
 
     if (this.type === 'group' && this.indent > 0) {

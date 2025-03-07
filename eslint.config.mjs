@@ -8,7 +8,7 @@ export default tseslint.config([
   {
     ignores: [
       '**/dist/',
-      '**/wasm/',
+      'crates/tlang_bindings_js/pkg/',
       'packages/codemirror-lang-tlang/src/parser.js',
       'packages/codemirror-lang-tlang/src/parser.terms.js',
     ],

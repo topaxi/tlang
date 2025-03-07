@@ -6,10 +6,12 @@ import {
   ShortcutDefinition,
   toAriaKeyshortcuts,
 } from '../utils/shortcuts';
+import { documentListener } from '../decorators/document-listener';
+import { hostListener } from '../decorators/host-listener';
 
 @customElement('t-button')
 export class ButtonElement extends LitElement {
-  static styles = [
+  static override styles = [
     css`
       :host {
         --button-border-color: var(--t-input-border-color);
@@ -69,8 +71,8 @@ export class ButtonElement extends LitElement {
     `,
   ];
 
-  @property({ reflect: true })
-  role = 'button';
+  @property({ type: String, reflect: true })
+  override role = 'button';
 
   @property({ reflect: true })
   tabindex = 0;
@@ -81,7 +83,8 @@ export class ButtonElement extends LitElement {
   @property({ type: String })
   shortcut: ShortcutDefinition | '' = '';
 
-  private handleShortcut = (e: KeyboardEvent): void => {
+  @documentListener('keyup')
+  protected handleShortcut(e: KeyboardEvent) {
     if (this.disabled || !this.shortcut) {
       return;
     }
@@ -94,12 +97,10 @@ export class ButtonElement extends LitElement {
         }),
       );
     }
-  };
+  }
 
-  /**
-   * @private
-   */
-  handleEvent(e: Event): void {
+  @hostListener('keypress')
+  protected handleEvent(e: Event): void {
     if (this.disabled) {
       e.preventDefault();
       e.stopImmediatePropagation();
@@ -122,12 +123,7 @@ export class ButtonElement extends LitElement {
     }
   }
 
-  firstUpdated(): void {
-    this.addEventListener('keypress', this);
-    this.ownerDocument.addEventListener('keyup', this.handleShortcut);
-  }
-
-  protected updated(changedProperties: PropertyValues<this>): void {
+  protected override updated(changedProperties: PropertyValues<this>): void {
     if (changedProperties.has('shortcut') && this.shortcut) {
       this.setAttribute(
         'aria-keyshortcuts',
@@ -136,12 +132,12 @@ export class ButtonElement extends LitElement {
     }
   }
 
-  disconnectedCallback(): void {
+  override disconnectedCallback(): void {
     super.disconnectedCallback();
     this.ownerDocument.removeEventListener('keyup', this.handleShortcut);
   }
 
-  protected render(): TemplateResult {
+  protected override render(): TemplateResult {
     let shortcut = this.shortcut
       ? html`<span aria-hidden="true" part="shortcut">${this.shortcut}</span>`
       : '';

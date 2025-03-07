@@ -17,10 +17,10 @@ import {
   Tlang,
   CodemirrorDiagnostic,
 } from './tlang';
-import { MediaController } from './controllers/media-controller';
 import { keyed } from 'lit/directives/keyed.js';
 import { live } from 'lit/directives/live.js';
 import { repeat } from 'lit/directives/repeat.js';
+import { mediaQuery } from './decorators/media-query';
 
 type CodemirrorSeverity = 'hint' | 'info' | 'warning' | 'error';
 
@@ -117,7 +117,7 @@ const emptyTlang = {} as Tlang;
 
 @customElement('tlang-playground')
 export class TlangPlayground extends LitElement {
-  static styles = css`
+  static override styles = css`
     :host {
       display: flex;
       flex-direction: column;
@@ -192,7 +192,8 @@ export class TlangPlayground extends LitElement {
     }
   `;
 
-  private desktop = new MediaController(this, '(min-width: 980px)');
+  @mediaQuery('(min-width: 980px)')
+  private desktop!: boolean;
 
   @state()
   selectedExample = defaultExample();
@@ -379,7 +380,7 @@ export class TlangPlayground extends LitElement {
     this.tlang.compileToJS();
   }
 
-  protected update(changedProperties: PropertyValueMap<this>): void {
+  protected override update(changedProperties: PropertyValueMap<this>): void {
     super.update(changedProperties);
 
     if (changedProperties.has('source')) {
@@ -387,7 +388,9 @@ export class TlangPlayground extends LitElement {
     }
   }
 
-  protected firstUpdated(_changedProperties: PropertyValueMap<this>): void {
+  protected override firstUpdated(
+    _changedProperties: PropertyValueMap<this>,
+  ): void {
     let params = new URLSearchParams(window.location.hash.slice(1));
 
     let exampleName = String(params.get('example'));
@@ -401,7 +404,7 @@ export class TlangPlayground extends LitElement {
     });
   }
 
-  protected updated(changedProperties: PropertyValueMap<this>): void {
+  protected override updated(changedProperties: PropertyValueMap<this>): void {
     if (changedProperties.has('runner')) {
       // TODO: This is a hack to update the select value. Lit doesn't seem to
       //       be super happy about dynamically updated options.
@@ -479,7 +482,7 @@ export class TlangPlayground extends LitElement {
     }
   }
 
-  render() {
+  protected override render() {
     return html`
       <header>
         <div class="toolbar">
@@ -512,7 +515,7 @@ export class TlangPlayground extends LitElement {
       <main>
         <t-split
           class="editor-split"
-          direction=${this.desktop.matches ? 'vertical' : 'horizontal'}
+          direction=${this.desktop ? 'vertical' : 'horizontal'}
         >
           <t-codemirror
             slot="first"

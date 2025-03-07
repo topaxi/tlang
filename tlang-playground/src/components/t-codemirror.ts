@@ -11,7 +11,7 @@ export type Language = 'tlang' | 'javascript';
 
 @customElement('t-codemirror')
 export class TCodeMirror extends LitElement {
-  static styles = css`
+  static override styles = css`
     :host {
       display: block;
       min-height: 24em;
@@ -92,7 +92,7 @@ export class TCodeMirror extends LitElement {
     };
   }
 
-  firstUpdated() {
+  protected override firstUpdated() {
     this.view = new EditorView(this.getEditorViewConfig());
     setTimeout(() => {
       // TODO: Figure out why the scroll position is reset to 0 on first update.
@@ -100,7 +100,7 @@ export class TCodeMirror extends LitElement {
     });
   }
 
-  updated(changedProperties: Map<string, unknown>) {
+  protected override updated(changedProperties: Map<string, unknown>) {
     if (this.view) {
       if (changedProperties.has('source')) {
         this.view.dispatch({
@@ -114,7 +114,7 @@ export class TCodeMirror extends LitElement {
     }
   }
 
-  disconnectedCallback(): void {
+  override disconnectedCallback(): void {
     this.view?.destroy();
   }
 }

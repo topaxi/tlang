@@ -6,7 +6,7 @@ export type SplitDirection = 'horizontal' | 'vertical';
 
 @customElement('t-split')
 export class SplitElement extends LitElement implements EventListenerObject {
-  static styles = css`
+  static override styles = css`
     :host {
       --handle-size: 8px;
       --handle-color: var(--ctp-macchiato-surface0);
@@ -250,7 +250,7 @@ export class SplitElement extends LitElement implements EventListenerObject {
     );
   }
 
-  protected render(): TemplateResult {
+  protected override render(): TemplateResult {
     return html`
       <slot name="first" part="first" id="first" role="region"></slot>
       <hr

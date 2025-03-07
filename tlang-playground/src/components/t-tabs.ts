@@ -2,13 +2,13 @@ import { css, html, LitElement, PropertyValues, TemplateResult } from 'lit';
 import {
   customElement,
   property,
-  query,
   queryAssignedElements,
 } from 'lit/decorators.js';
+import { hostListener } from '../decorators/host-listener';
 
 @customElement('t-tabs')
 export class TabsElement extends LitElement {
-  static styles = css`
+  static override styles = css`
     :host {
       --tabs-focus-ring-color: var(--ctp-macchiato-surface0);
 
@@ -48,45 +48,37 @@ export class TabsElement extends LitElement {
   @property({ type: Boolean, reflect: true })
   single = false;
 
-  @query('[role="tablist"]', true)
-  private tablist!: HTMLSlotElement;
-
-  constructor() {
-    super();
-
-    this.addEventListener('t-tab-select', this);
-  }
-
+  @hostListener(['keyup', 't-tab-select'])
   handleEvent(e: Event) {
     let event = e as
       | (KeyboardEvent & { type: `key${string}` })
       | (CustomEvent<{ id: string }> & { type: 't-tab-select' });
 
     switch (event.type) {
-      case 't-tab-select':
+      case 't-tab-select': {
         this.selected = event.detail.id;
         break;
-      case 'keyup':
-        if (event.currentTarget === this.tablist) {
-          if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
-            return;
-          }
+      }
+      case 'keyup': {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+          return;
+        }
 
-          let index = this.tabs.findIndex((tab) => tab.id === this.selected);
-          let direction = event.key === 'ArrowLeft' ? -1 : 1;
+        let index = this.tabs.findIndex((tab) => tab.id === this.selected);
+        let direction = event.key === 'ArrowLeft' ? -1 : 1;
 
-          let next = this.tabs[index + direction];
+        let next = this.tabs[index + direction];
 
-          if (next) {
-            event.preventDefault();
-            next.select();
-          }
+        if (next) {
+          event.preventDefault();
+          next.select();
         }
         break;
+      }
     }
   }
 
-  protected updated(changedProperties: PropertyValues<this>): void {
+  protected override updated(changedProperties: PropertyValues<this>): void {
     if (changedProperties.has('selected')) {
       for (let tab of this.tabs) {
         tab.selected = tab.id === this.selected;
@@ -105,15 +97,9 @@ export class TabsElement extends LitElement {
     }
   }
 
-  protected render(): TemplateResult {
+  protected override render(): TemplateResult {
     return html`
-      <slot
-        part="tablist"
-        role="tablist"
-        name="tab"
-        tabindex="0"
-        @keyup=${this}
-      ></slot>
+      <slot part="tablist" role="tablist" name="tab" tabindex="0"></slot>
       <slot></slot>
     `;
   }
@@ -121,7 +107,7 @@ export class TabsElement extends LitElement {
 
 @customElement('t-tab')
 export class TabElement extends LitElement {
-  static styles = css`
+  static override styles = css`
     :host {
       position: relative;
       border-bottom: 1px solid transparent;
@@ -142,12 +128,12 @@ export class TabElement extends LitElement {
   `;
 
   @property({ type: String, reflect: true })
-  role = 'tab';
+  override role = 'tab';
 
   @property({ type: Boolean })
   selected = false;
 
-  protected updated(changedProperties: PropertyValues<this>): void {
+  protected override updated(changedProperties: PropertyValues<this>): void {
     if (changedProperties.has('selected')) {
       this.setAttribute('aria-selected', String(this.selected));
     }
@@ -163,7 +149,7 @@ export class TabElement extends LitElement {
     );
   }
 
-  protected render(): TemplateResult {
+  protected override render(): TemplateResult {
     return html`
       <button part="button" @click=${this.select} tabindex="-1">
         <slot></slot>
@@ -177,10 +163,10 @@ export class TabPanelElement extends LitElement {
   @property({ type: String, reflect: true })
   name: string | undefined;
 
-  @property({ type: String, attribute: 'role', reflect: true })
-  role = 'tabpanel';
+  @property({ type: String, reflect: true })
+  override role = 'tabpanel';
 
-  protected createRenderRoot() {
+  protected override createRenderRoot() {
     return this;
   }
 }

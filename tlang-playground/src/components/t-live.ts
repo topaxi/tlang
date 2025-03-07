@@ -7,16 +7,18 @@ export type AriaLive = 'off' | 'polite' | 'assertive';
 @customElement('t-live')
 export class LiveElement extends LitElement {
   @property({ type: String, reflect: true })
-  role: string | null = null;
+  override role: string | null = null;
 
   @property({ attribute: 'aria-live', reflect: true })
   live: AriaLive | null = null;
 
-  firstUpdated(_changedProperties: PropertyValues<this>): void {
+  protected override firstUpdated(
+    _changedProperties: PropertyValues<this>,
+  ): void {
     this.live = this.live || this.role == 'alert' ? 'assertive' : 'polite';
   }
 
-  protected render(): TemplateResult {
+  protected override render(): TemplateResult {
     return html`<slot></slot>`;
   }
 }

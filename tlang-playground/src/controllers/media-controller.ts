@@ -1,31 +1,19 @@
 import { ReactiveController, ReactiveControllerHost } from 'lit';
+import { EventController } from './host-listener';
 
-export class MediaController implements ReactiveController {
-  private host: ReactiveControllerHost;
-  private mediaQueryList: MediaQueryList | null = null;
-
+export class MediaController
+  extends EventController<MediaQueryListEvent, MediaQueryList>
+  implements ReactiveController
+{
   get matches(): boolean {
-    return this.mediaQueryList?.matches === true;
+    return this.target?.matches === true;
   }
 
-  constructor(
-    host: ReactiveControllerHost,
-    private query: string,
-  ) {
-    (this.host = host).addController(this);
+  constructor(host: ReactiveControllerHost, query: string) {
+    super(host, window.matchMedia(query), 'change');
   }
 
-  hostConnected(): void {
-    this.mediaQueryList = window.matchMedia(this.query);
-    this.mediaQueryList.addEventListener('change', this);
-  }
-
-  hostDisconnected(): void {
-    this.mediaQueryList?.removeEventListener('change', this);
-    this.mediaQueryList = null;
-  }
-
-  handleEvent(_event: MediaQueryListEvent): void {
+  override handleEvent(_event: MediaQueryListEvent): void {
     this.host.requestUpdate();
   }
 }

@@ -4,7 +4,7 @@ import { ButtonElement } from './t-button';
 
 @customElement('t-toggle-button')
 export class ToggleButtonElement extends ButtonElement {
-  static styles = [
+  static override styles = [
     ...ButtonElement.styles,
     css`
       :host([aria-pressed='true']),
@@ -63,7 +63,7 @@ export class ToggleButtonElement extends ButtonElement {
     this.setAttribute(ariaAttr, ariaValue);
   }
 
-  protected updated(changedProperties: PropertyValues<this>): void {
+  protected override updated(changedProperties: PropertyValues<this>): void {
     if (changedProperties.has('pressed')) {
       this.updatePressed();
       this.setAttribute('aria-controls', this.controlled?.id ?? '');
