@@ -12,21 +12,13 @@ export class ButtonElement extends LitElement {
   static styles = [
     css`
       :host {
-        --button-border-color: var(--t-input-border-color);
-        --button-focus-ring-color: var(--button-border-color);
-        --button-background-color: var(--ctp-macchiato-base);
-        --button-hover-background-color: var(--ctp-macchiato-surface1);
-        --button-active-background-color: hsl(
-          from var(--button-hover-background-color) h s calc(l + 10)
-        );
-
         align-items: center;
         justify-content: center;
         cursor: default;
         user-select: none;
-        border: 1px solid var(--button-border-color);
+        border: 1px solid var(--t-button-border-color);
         border-radius: 3px;
-        background-color: var(--button-background-color);
+        background-color: var(--t-button-background-color);
         padding: 0.25em 0.5em;
         font-size: 0.85rem;
       }
@@ -36,15 +28,15 @@ export class ButtonElement extends LitElement {
       }
 
       :host(:hover) {
-        background-color: var(--button-hover-background-color);
+        background-color: var(--t-button-hover-background-color);
       }
 
       :host(:active) {
-        background-color: var(--button-active-background-color);
+        background-color: var(--t-button-active-background-color);
       }
 
       :host(:focus-visible) {
-        outline: 2px solid var(--button-focus-ring-color);
+        outline: 2px solid var(--t-button-focus-ring-color);
       }
 
       :host([aria-disabled='true']) {
@@ -57,8 +49,8 @@ export class ButtonElement extends LitElement {
         margin-left: 0.5em;
         margin-right: -0.25em;
         padding: 0.1em 0.25em;
-        border: 1px solid var(--button-border-color);
-        background-color: var(--button-background-color);
+        border: 1px solid var(--t-button-border-color);
+        background-color: var(--t-button-background-color);
       }
 
       @media (min-width: 980px) {
@@ -117,12 +109,11 @@ export class ButtonElement extends LitElement {
       case 'click':
         if (this.popovertarget) {
           let target = (this.getRootNode() as HTMLElement).querySelector(
-            `#${this.popovertarget}`,
+            `#${this.popovertarget}[popover]`,
           ) as HTMLElement | null;
 
-          if (target) {
-            target.togglePopover();
-          }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          target?.togglePopover({ source: this } as any);
         }
         break;
       case 'keypress':

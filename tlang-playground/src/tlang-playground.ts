@@ -184,6 +184,18 @@ export class TlangPlayground extends LitElement {
       flex: 0 0 min-content;
       max-height: calc(50% - 4px);
     }
+
+    [popovertarget='menu'] {
+      anchor-name: --menu-anchor;
+    }
+
+    #menu {
+      position: fixed;
+      position-anchor: --menu-anchor;
+      top: calc(anchor(bottom) + 8px);
+      justify-self: anchor-center;
+      z-index: 1;
+    }
   `;
 
   private desktop = new MediaController(this, '(min-width: 980px)');

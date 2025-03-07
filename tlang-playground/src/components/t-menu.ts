@@ -3,7 +3,14 @@ import { customElement, property } from 'lit/decorators.js';
 
 @customElement('t-menu')
 export class MenuElement extends LitElement {
-  static styles = css``;
+  static styles = css`
+    :host {
+      padding: 0;
+      border: 1px solid var(--ctp-macchiato-surface0);
+      background-color: var(--ctp-macchiato-base);
+      scrollbar-width: thin;
+    }
+  `;
 
   @property({ type: String, reflect: true })
   role = 'menu';
@@ -15,7 +22,23 @@ export class MenuElement extends LitElement {
 
 @customElement('t-menuitem')
 export class MenuItemElement extends LitElement {
-  static styles = css``;
+  static styles = css`
+    :host {
+      display: block;
+      padding: 0.25em 0.5em;
+      cursor: default;
+      user-select: none;
+      background-color: var(--t-button-background-color);
+    }
+
+    :host(:hover) {
+      background-color: var(--t-button-hover-background-color);
+    }
+
+    :host(:active) {
+      background-color: var(--t-button-active-background-color);
+    }
+  `;
 
   @property({ type: String, reflect: true })
   role = 'menuitem';
