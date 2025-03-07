@@ -63,7 +63,7 @@ export class ToggleButtonElement extends ButtonElement {
     this.setAttribute(ariaAttr, ariaValue);
   }
 
-  protected updated(changedProperties: PropertyValues): void {
+  protected updated(changedProperties: PropertyValues<this>): void {
     if (changedProperties.has('pressed')) {
       this.updatePressed();
       this.setAttribute('aria-controls', this.controlled?.id ?? '');

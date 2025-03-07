@@ -94,6 +94,10 @@ export class TCodeMirror extends LitElement {
 
   firstUpdated() {
     this.view = new EditorView(this.getEditorViewConfig());
+    setTimeout(() => {
+      // TODO: Figure out why the scroll position is reset to 0 on first update.
+      this.view!.scrollDOM.scrollTop = 0;
+    });
   }
 
   updated(changedProperties: Map<string, unknown>) {

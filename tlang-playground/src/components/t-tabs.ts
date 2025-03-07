@@ -2,6 +2,7 @@ import { css, html, LitElement, PropertyValues, TemplateResult } from 'lit';
 import {
   customElement,
   property,
+  query,
   queryAssignedElements,
 } from 'lit/decorators.js';
 
@@ -9,6 +10,8 @@ import {
 export class TabsElement extends LitElement {
   static styles = css`
     :host {
+      --tabs-focus-ring-color: var(--ctp-macchiato-surface0);
+
       display: flex;
       flex-direction: column;
     }
@@ -16,6 +19,11 @@ export class TabsElement extends LitElement {
     [role='tablist'] {
       display: flex;
       border-bottom: 1px solid var(--ctp-macchiato-surface0);
+    }
+
+    [role='tablist']:focus-visible {
+      outline: 2px solid var(--tabs-focus-ring-color);
+      outline-offset: -2px;
     }
 
     ::slotted([slot='tab'])::after {
@@ -40,19 +48,45 @@ export class TabsElement extends LitElement {
   @property({ type: Boolean, reflect: true })
   single = false;
 
+  @query('[role="tablist"]', true)
+  private tablist!: HTMLSlotElement;
+
   constructor() {
     super();
 
-    this.addEventListener('t-tab-select', this.handleTabSelect);
+    this.addEventListener('t-tab-select', this);
   }
 
-  private handleTabSelect(event: Event) {
-    event.stopPropagation();
+  handleEvent(e: Event) {
+    let event = e as
+      | (KeyboardEvent & { type: `key${string}` })
+      | (CustomEvent<{ id: string }> & { type: 't-tab-select' });
 
-    this.selected = (event as CustomEvent<{ id: string }>).detail.id;
+    switch (event.type) {
+      case 't-tab-select':
+        this.selected = event.detail.id;
+        break;
+      case 'keyup':
+        if (event.currentTarget === this.tablist) {
+          if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+            return;
+          }
+
+          let index = this.tabs.findIndex((tab) => tab.id === this.selected);
+          let direction = event.key === 'ArrowLeft' ? -1 : 1;
+
+          let next = this.tabs[index + direction];
+
+          if (next) {
+            event.preventDefault();
+            next.select();
+          }
+        }
+        break;
+    }
   }
 
-  protected updated(changedProperties: PropertyValues): void {
+  protected updated(changedProperties: PropertyValues<this>): void {
     if (changedProperties.has('selected')) {
       for (let tab of this.tabs) {
         tab.selected = tab.id === this.selected;
@@ -73,7 +107,13 @@ export class TabsElement extends LitElement {
 
   protected render(): TemplateResult {
     return html`
-      <slot part="tablist" role="tablist" name="tab"></slot>
+      <slot
+        part="tablist"
+        role="tablist"
+        name="tab"
+        tabindex="0"
+        @keyup=${this}
+      ></slot>
       <slot></slot>
     `;
   }
@@ -86,7 +126,6 @@ export class TabElement extends LitElement {
       position: relative;
       border-bottom: 1px solid transparent;
       margin-bottom: -1px;
-      padding: 0 1ch;
     }
 
     :host([aria-selected='true']) {
@@ -98,6 +137,7 @@ export class TabElement extends LitElement {
       all: unset;
       appearance: none;
       cursor: pointer;
+      padding: 0 1ch;
     }
   `;
 
@@ -107,7 +147,7 @@ export class TabElement extends LitElement {
   @property({ type: Boolean })
   selected = false;
 
-  protected updated(changedProperties: PropertyValues): void {
+  protected updated(changedProperties: PropertyValues<this>): void {
     if (changedProperties.has('selected')) {
       this.setAttribute('aria-selected', String(this.selected));
     }
@@ -118,14 +158,14 @@ export class TabElement extends LitElement {
       new CustomEvent('t-tab-select', {
         bubbles: true,
         composed: true,
-        detail: { id: this.id },
+        detail: this,
       }),
     );
   }
 
   protected render(): TemplateResult {
     return html`
-      <button part="button" @click=${this.select}>
+      <button part="button" @click=${this.select} tabindex="-1">
         <slot></slot>
       </button>
     `;

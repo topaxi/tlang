@@ -127,7 +127,7 @@ export class ButtonElement extends LitElement {
     this.ownerDocument.addEventListener('keyup', this.handleShortcut);
   }
 
-  protected updated(changedProperties: PropertyValues): void {
+  protected updated(changedProperties: PropertyValues<this>): void {
     if (changedProperties.has('shortcut') && this.shortcut) {
       this.setAttribute(
         'aria-keyshortcuts',

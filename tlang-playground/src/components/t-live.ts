@@ -12,7 +12,7 @@ export class LiveElement extends LitElement {
   @property({ attribute: 'aria-live', reflect: true })
   live: AriaLive | null = null;
 
-  firstUpdated(_changedProperties: PropertyValues): void {
+  firstUpdated(_changedProperties: PropertyValues<this>): void {
     this.live = this.live || this.role == 'alert' ? 'assertive' : 'polite';
   }
 

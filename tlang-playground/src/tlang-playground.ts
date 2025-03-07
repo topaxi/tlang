@@ -163,9 +163,16 @@ export class TlangPlayground extends LitElement {
       flex: 1;
     }
 
+    .output-tabs {
+      max-width: 100%;
+      max-height: 100%;
+    }
+
     .output-tabs > t-tab-panel {
-      display: flex;
       flex: 1;
+      display: flex;
+      max-width: 100%;
+      overflow: hidden;
     }
 
     .output-code,
@@ -432,10 +439,19 @@ export class TlangPlayground extends LitElement {
     updateRunnerHashparam(this.runner);
   }
 
-  handleDisplayChange(event: Event) {
-    this.display = (event as CustomEvent<{ id: string }>).detail
-      .id as OutputDisplay;
+  handleDisplayChange(event: CustomEvent<{ id: string }>) {
+    this.display = event.detail.id as OutputDisplay;
     updateDisplayHashparam(this.display);
+  }
+
+  handleConsoleCollapse(event: CustomEvent<{ collapsed: boolean }>) {
+    if (event.detail.collapsed) {
+      this.outputSplit.reset();
+    }
+  }
+
+  handleConsoleClear() {
+    this.consoleMessages = [];
   }
 
   renderOutput() {
@@ -524,12 +540,8 @@ export class TlangPlayground extends LitElement {
             <t-console
               slot="second"
               .messages=${this.consoleMessages}
-              @collapse=${(event: CustomEvent<{ collapsed: boolean }>) => {
-                if (event.detail.collapsed) {
-                  this.outputSplit.reset();
-                }
-              }}
-              @clear=${() => (this.consoleMessages = [])}
+              @collapse=${this.handleConsoleCollapse}
+              @clear=${this.handleConsoleClear}
             >
             </t-console>
           </t-split>
