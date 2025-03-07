@@ -134,7 +134,6 @@ export class ButtonElement extends LitElement {
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
-    this.ownerDocument.removeEventListener('keyup', this.handleShortcut);
   }
 
   protected override render(): TemplateResult {
