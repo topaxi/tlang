@@ -326,22 +326,31 @@ impl InterpreterState {
             .and_then(|shape| shape.method_map.insert(method_name.to_string(), method));
     }
 
+    fn stringify_struct_as_list(&self, s: &TlangStruct) -> String {
+        let values = s
+            .field_values
+            .iter()
+            .map(|v| self.stringify(*v))
+            .collect::<Vec<String>>()
+            .join(", ");
+        format!("[{}]", values)
+    }
+
     pub fn stringify(&self, value: TlangValue) -> String {
         match value {
             TlangValue::Object(id) => match self.get_object_by_id(id) {
                 Some(TlangObjectKind::String(s)) => s.clone(),
                 Some(TlangObjectKind::Struct(s)) => {
                     if s.shape == self.builtin_shapes.list {
-                        let values = s
-                            .field_values
-                            .iter()
-                            .map(|v| self.stringify(*v))
-                            .collect::<Vec<String>>()
-                            .join(", ");
-                        return format!("[{}]", values);
+                        return self.stringify_struct_as_list(s);
                     }
 
                     let shape = self.get_shape(s.shape).unwrap();
+
+                    if shape.has_fields() && shape.has_consecutive_integer_fields() {
+                        return format!("{} {}", shape.name, self.stringify_struct_as_list(s));
+                    }
+
                     let mut result = String::new();
 
                     result.push_str(&shape.name);

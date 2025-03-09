@@ -93,6 +93,28 @@ impl TlangStructShape {
         !self.field_map.is_empty()
     }
 
+    pub fn has_consecutive_integer_fields(&self) -> bool {
+        let mut fields = self.field_map.keys().map(|k| k.parse::<usize>());
+
+        if fields.any(|f| f.is_err()) {
+            return false;
+        }
+
+        let mut fields = fields.map(|f| f.unwrap()).collect::<Vec<_>>();
+
+        fields.sort();
+
+        for (i, k) in fields.into_iter().enumerate() {
+            if i == k {
+                continue;
+            }
+
+            return false;
+        }
+
+        true
+    }
+
     pub fn get_field_index(&self, name: &str) -> Option<usize> {
         self.field_map.get(name).copied()
     }
