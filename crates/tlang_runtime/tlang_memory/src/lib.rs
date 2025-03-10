@@ -17,3 +17,12 @@ pub mod prelude {
 
     pub use crate::shape::{ShapeKey as TlangShapeKey, TlangStructMethod, TlangStructShape};
 }
+
+pub struct NativeFnDef {
+    pub name: &'static str,
+    pub binding_name: &'static str,
+    pub function: fn(&mut InterpreterState, &[TlangValue]) -> TlangValue,
+    pub module_path: &'static str,
+}
+
+inventory::collect!(NativeFnDef);

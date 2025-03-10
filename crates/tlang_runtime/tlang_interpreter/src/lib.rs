@@ -13,7 +13,8 @@ use tlang_memory::value::NativeFnReturn;
 use tlang_memory::value::TlangArithmetic;
 use tlang_memory::{InterpreterState, Resolver, scope};
 use tlang_memory::{prelude::*, state};
-pub use tlang_stdlib::NativeFn;
+
+pub use tlang_memory::NativeFnDef;
 
 mod macros;
 
@@ -66,7 +67,7 @@ impl Interpreter {
 
         let mut interpreter = Self { state };
 
-        for native_fn in inventory::iter::<NativeFn> {
+        for native_fn in inventory::iter::<NativeFnDef> {
             let fn_name = if native_fn.binding_name.is_empty() {
                 let module_name = native_fn.module_path.split("::").last().unwrap();
                 module_name.to_string() + "::" + native_fn.name
@@ -74,8 +75,10 @@ impl Interpreter {
                 native_fn.binding_name.to_string()
             };
 
+            let fn_ptr = native_fn.function;
+
             interpreter.define_native_fn(&fn_name, move |state, args| {
-                NativeFnReturn::Return((native_fn.function)(state, args))
+                NativeFnReturn::Return(fn_ptr(state, args))
             });
         }
 
