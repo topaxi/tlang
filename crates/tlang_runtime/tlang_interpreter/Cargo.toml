@@ -18,12 +18,12 @@ binary = ["tlang_ast_lowering"]
 stdlib = []
 
 [dependencies]
-tlang_ast = { path = "../tlang_ast" }
-tlang_ast_lowering = { path = "../tlang_ast_lowering", optional = true }
-tlang_hir = { path = "../tlang_hir" }
-tlang_macros = { path = "../tlang_macros" }
-tlang_parser = { path = "../tlang_parser" }
-tlang_semantics = { path = "../tlang_semantics" }
+tlang_ast = { path = "../../tlang_ast" }
+tlang_ast_lowering = { path = "../../tlang_ast_lowering", optional = true }
+tlang_hir = { path = "../../tlang_hir" }
+tlang_macros = { path = "../../tlang_macros" }
+tlang_parser = { path = "../../tlang_parser" }
+tlang_semantics = { path = "../../tlang_semantics" }
 log = { workspace = true }
 env_logger = { workspace = true }
 inventory = { workspace = true }
@@ -33,7 +33,7 @@ slab = "0.4"
 rand = { version = "0.9" }
 
 [dev-dependencies]
-tlang_ast_lowering = { path = "../tlang_ast_lowering" }
+tlang_ast_lowering = { path = "../../tlang_ast_lowering" }
 ctor = { workspace = true }
 indoc = { workspace = true }
 pretty_assertions = { workspace = true }

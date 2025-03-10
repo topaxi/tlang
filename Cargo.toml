@@ -1,5 +1,9 @@
 [workspace]
-members = ["crates/*"]
+members = [
+  "crates/tlang_runtime/tlang_interpreter",
+  "crates/*",
+]
+exclude = ["crates/tlang_runtime"]
 resolver = "2"
 
 [workspace.package]
