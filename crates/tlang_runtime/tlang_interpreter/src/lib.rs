@@ -65,7 +65,7 @@ impl Interpreter {
             state: InterpreterState::default(),
         };
 
-        tlang_stdlib::collections::define_list_shape(&mut interpreter.state);
+        interpreter.init_stdlib();
 
         for native_fn in inventory::iter::<NativeFnDef> {
             let fn_name = if native_fn.binding_name.is_empty() {
@@ -84,6 +84,14 @@ impl Interpreter {
 
         interpreter
     }
+
+    #[cfg(feature = "stdlib")]
+    pub fn init_stdlib(&mut self) {
+        tlang_stdlib::collections::define_list_shape(&mut self.state);
+    }
+
+    #[cfg(not(feature = "stdlib"))]
+    pub fn init_stdlib(&mut self) {}
 
     pub fn state(&self) -> &InterpreterState {
         &self.state
