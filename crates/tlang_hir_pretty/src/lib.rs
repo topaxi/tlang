@@ -265,7 +265,7 @@ impl HirPretty {
                 self.print_expr(guard);
             }
             self.push_str(" => ");
-            self.print_expr(&arm.expr);
+            self.print_block(&arm.block);
             self.push_char(',');
             self.push_newline();
         }

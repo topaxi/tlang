@@ -1229,12 +1229,7 @@ impl Interpreter {
                 }
             }
 
-            if let hir::ExprKind::Block(block) = &arm.expr.kind {
-                // TODO: Do we need this?
-                MatchResult::Matched(this.eval_block_inner(block))
-            } else {
-                MatchResult::Matched(this.eval_expr(&arm.expr))
-            }
+            MatchResult::Matched(this.eval_block_inner(&arm.block))
         })
     }
 

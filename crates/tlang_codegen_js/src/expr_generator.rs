@@ -9,7 +9,7 @@ use crate::generator::{BlockContext, CodegenJS};
 
 impl CodegenJS {
     /// Generates blocks in expression position.
-    fn generate_block_expression(&mut self, block: &hir::Block) {
+    pub(crate) fn generate_block_expression(&mut self, block: &hir::Block) {
         let has_completion_var = self.current_completion_variable().is_some();
         let completion_tmp_var = if block.has_completion() {
             self.current_completion_variable()

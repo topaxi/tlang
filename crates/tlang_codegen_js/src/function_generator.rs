@@ -373,7 +373,7 @@ fn is_function_body_tail_recursive(function_name: &str, node: &hir::Expr) -> boo
         hir::ExprKind::Block(block) => is_function_body_tail_recursive_block(function_name, block),
         hir::ExprKind::Match(_, arms, ..) => arms
             .iter()
-            .any(|arm| is_function_body_tail_recursive(function_name, &arm.expr)),
+            .any(|arm| is_function_body_tail_recursive_block(function_name, &arm.block)),
         hir::ExprKind::IfElse(expr, then_branch, else_branches) => {
             is_function_body_tail_recursive(function_name, expr)
                 || if then_branch.expr.is_some() {
