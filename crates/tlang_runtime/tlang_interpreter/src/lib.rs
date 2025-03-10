@@ -7,33 +7,16 @@ use log::debug;
 use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token;
 use tlang_hir::hir::{self, HirId};
+use tlang_memory::shape::ShapeKey;
+use tlang_memory::state::TailCall;
+use tlang_memory::value::NativeFnReturn;
+use tlang_memory::value::TlangArithmetic;
+use tlang_memory::{InterpreterState, Resolver, scope};
+use tlang_memory::{prelude::*, state};
 
-use self::resolver::Resolver;
-use self::shape::{ShapeKey, TlangStructMethod, TlangStructShape};
-use self::state::{InterpreterState, TailCall};
-use self::stdlib::collections::define_list_shape;
-use self::value::{
-    NativeFnReturn, TlangArithmetic, TlangNativeFn, TlangObjectId, TlangObjectKind, TlangSlice,
-    TlangStruct, TlangValue,
-};
+pub use tlang_memory::NativeFnDef;
 
 mod macros;
-mod resolver;
-mod scope;
-mod shape;
-pub mod state;
-#[cfg(feature = "stdlib")]
-pub mod stdlib;
-pub mod value;
-
-pub struct NativeFn {
-    pub name: &'static str,
-    pub binding_name: &'static str,
-    pub function: fn(&mut InterpreterState, &[TlangValue]) -> TlangValue,
-    pub module_path: &'static str,
-}
-
-inventory::collect!(NativeFn);
 
 #[derive(Debug, Clone, Copy)]
 pub enum EvalResult {
@@ -62,7 +45,6 @@ pub enum MatchResult {
 
 pub struct Interpreter {
     state: InterpreterState,
-    native_fns: HashMap<TlangObjectId, TlangNativeFn>,
 }
 
 impl Resolver for Interpreter {
@@ -80,13 +62,12 @@ impl Default for Interpreter {
 impl Interpreter {
     pub fn new() -> Self {
         let mut interpreter = Self {
-            state: InterpreterState::new(),
-            native_fns: HashMap::new(),
+            state: InterpreterState::default(),
         };
 
-        define_list_shape(&mut interpreter);
+        interpreter.init_stdlib();
 
-        for native_fn in inventory::iter::<NativeFn> {
+        for native_fn in inventory::iter::<NativeFnDef> {
             let fn_name = if native_fn.binding_name.is_empty() {
                 let module_name = native_fn.module_path.split("::").last().unwrap();
                 module_name.to_string() + "::" + native_fn.name
@@ -94,13 +75,23 @@ impl Interpreter {
                 native_fn.binding_name.to_string()
             };
 
+            let fn_ptr = native_fn.function;
+
             interpreter.define_native_fn(&fn_name, move |state, args| {
-                NativeFnReturn::Return((native_fn.function)(state, args))
+                NativeFnReturn::Return(fn_ptr(state, args))
             });
         }
 
         interpreter
     }
+
+    #[cfg(feature = "stdlib")]
+    pub fn init_stdlib(&mut self) {
+        tlang_stdlib::collections::define_list_shape(&mut self.state);
+    }
+
+    #[cfg(not(feature = "stdlib"))]
+    pub fn init_stdlib(&mut self) {}
 
     pub fn state(&self) -> &InterpreterState {
         &self.state
@@ -118,12 +109,7 @@ impl Interpreter {
     where
         F: Fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn + 'static,
     {
-        let fn_object = self.state.new_object(TlangObjectKind::NativeFn);
-
-        self.native_fns
-            .insert(fn_object.get_object_id().unwrap(), Box::new(f));
-
-        fn_object
+        self.state.new_native_fn(f)
     }
 
     pub fn define_native_fn<F>(&mut self, name: &str, f: F) -> TlangValue
@@ -965,11 +951,9 @@ impl Interpreter {
         // Do we need and want to reset the scope for native functions?
         // It could be somewhat interesting to manipulate the current scope from native functions.
         let r = self.with_root_scope(|this| {
-            if let Some(native_fn) = this.native_fns.get_mut(&id) {
-                native_fn(&mut this.state, args)
-            } else {
-                this.panic(format!("Native function not found: {:?}", id))
-            }
+            this.state
+                .call_native_fn(id, args)
+                .unwrap_or_else(|| this.panic(format!("Native function not found: {:?}", id)))
         });
 
         match r {

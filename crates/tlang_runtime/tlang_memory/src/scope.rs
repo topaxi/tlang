@@ -8,7 +8,7 @@ use crate::resolver::Resolver;
 use crate::value::TlangValue;
 
 #[derive(Debug, Clone)]
-pub(crate) struct ScopeStack {
+pub struct ScopeStack {
     scopes: Vec<Rc<RefCell<Scope>>>,
 }
 
@@ -57,7 +57,7 @@ impl ScopeStack {
         Self { scopes }
     }
 
-    pub(crate) fn clear_current_scope(&self) {
+    pub fn clear_current_scope(&self) {
         self.current_scope().borrow_mut().clear();
     }
 
@@ -95,7 +95,7 @@ impl Resolver for ScopeStack {
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct Scope {
+pub struct Scope {
     // Value bindings in user code, this includes references to user defined functions.
     pub locals: Vec<TlangValue>,
 }
