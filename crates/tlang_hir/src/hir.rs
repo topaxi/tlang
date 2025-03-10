@@ -316,8 +316,7 @@ pub enum PatKind {
 pub struct MatchArm {
     pub pat: Pat,
     pub guard: Option<Expr>,
-    pub expr: Expr,
-    pub scope: HirScopeData,
+    pub block: Block,
     // TODO: We might want to handle this somehow different, as we pass them on from the AST to
     //       HIR, which feels somewhat unnecessary.
     pub leading_comments: Vec<Token>,
@@ -338,19 +337,19 @@ impl MatchArm {
 
 impl HirScope for MatchArm {
     fn locals(&self) -> usize {
-        self.scope.locals()
+        self.block.locals()
     }
 
     fn upvars(&self) -> usize {
-        self.scope.upvars()
+        self.block.upvars()
     }
 
     fn set_locals(&mut self, locals: usize) {
-        self.scope.set_locals(locals);
+        self.block.set_locals(locals);
     }
 
     fn set_upvars(&mut self, upvars: usize) {
-        self.scope.set_upvars(upvars);
+        self.block.set_upvars(upvars);
     }
 }
 
@@ -372,7 +371,7 @@ pub struct CallExpression {
 
 impl CallExpression {
     pub fn has_wildcard(&self) -> bool {
-        self.arguments.iter().any(|arg| arg.is_wildcard())
+        self.arguments.iter().any(Expr::is_wildcard)
     }
 
     pub fn wildcard_count(&self) -> usize {

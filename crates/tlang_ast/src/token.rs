@@ -134,7 +134,7 @@ impl Literal {
             Literal::UnsignedInteger(value) => Literal::Integer(-(*value as i64)),
             Literal::Integer(value) => Literal::Integer(-value),
             Literal::Float(value) => Literal::Float(-value),
-            _ => panic!("Expected integer or float, found {:?}", self),
+            _ => panic!("Expected integer or float, found {self:?}"),
         }
     }
 }

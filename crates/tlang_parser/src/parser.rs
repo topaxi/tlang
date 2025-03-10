@@ -71,7 +71,7 @@ impl<'src> Parser<'src> {
         if self.errors.is_empty() {
             Ok(module)
         } else {
-            Err(ParseError::new(self.errors.to_vec()))
+            Err(ParseError::new(self.errors.clone()))
         }
     }
 
@@ -155,7 +155,7 @@ impl<'src> Parser<'src> {
     fn expect_token_not(&mut self, expected: TokenKind) {
         expect_token_matches!(
             self,
-            &format!("not {:?}", expected),
+            &format!("not {expected:?}"),
             _kind if *_kind != expected
         );
     }
@@ -594,10 +594,10 @@ impl<'src> Parser<'src> {
             self.consume_token(TokenKind::LParen);
             let mut is_first_argument = true;
             while !matches!(self.current_token_kind(), TokenKind::RParen) {
-                if !is_first_argument {
-                    self.consume_token(TokenKind::Comma);
-                } else {
+                if is_first_argument {
                     is_first_argument = false;
+                } else {
+                    self.consume_token(TokenKind::Comma);
                 }
 
                 if matches!(self.current_token_kind(), TokenKind::RParen) {
@@ -1081,13 +1081,13 @@ impl<'src> Parser<'src> {
 
             let mut is_first_parameter = true;
             while !matches!(self.current_token_kind(), TokenKind::RParen) {
-                if !is_first_parameter {
+                if is_first_parameter {
+                    is_first_parameter = false;
+                } else {
                     self.consume_token(TokenKind::Comma);
                     if matches!(self.current_token_kind(), TokenKind::RParen) {
                         break;
                     }
-                } else {
-                    is_first_parameter = false;
                 }
 
                 let mut parameter_span = self.create_span_from_current_token();

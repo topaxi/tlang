@@ -215,6 +215,7 @@ impl LoweringContext {
                 then_branch,
                 else_branches,
             }) if let ast::node::ExprKind::Let(pat, expr) = &condition.kind => {
+                let pat = self.lower_pat(pat);
                 let expr = self.lower_expr(expr);
                 let mut arms = Vec::with_capacity(else_branches.len() + 1);
                 let block = self.lower_block(
@@ -224,10 +225,9 @@ impl LoweringContext {
                 );
 
                 arms.push(hir::MatchArm {
-                    pat: self.lower_pat(pat),
+                    pat,
                     guard: None,
-                    expr: self.expr(node.span, hir::ExprKind::Block(Box::new(block))),
-                    scope: Default::default(),
+                    block,
                     leading_comments: condition.leading_comments.clone(),
                     trailing_comments: condition.trailing_comments.clone(),
                 });
@@ -242,7 +242,6 @@ impl LoweringContext {
                         else_branch.consequence.expression.as_ref(),
                         node.span,
                     );
-                    let consequence = self.expr(node.span, hir::ExprKind::Block(Box::new(block)));
 
                     arms.push(hir::MatchArm {
                         pat: hir::Pat {
@@ -250,8 +249,7 @@ impl LoweringContext {
                             span: Default::default(),
                         },
                         guard: condition,
-                        expr: consequence,
-                        scope: Default::default(),
+                        block,
                         leading_comments: vec![],
                         trailing_comments: vec![],
                     });
@@ -298,26 +296,25 @@ impl LoweringContext {
                         self.with_new_scope(|this| {
                             let pat = this.lower_pat_with_idents(&arm.pattern, &mut idents);
                             let guard = arm.guard.as_ref().map(|expr| this.lower_expr(expr));
-                            let expr =
-                                // TODO: Do we need this?
+                            let block =
                                 if let ast::node::ExprKind::Block(block) = &arm.expression.kind {
-                                    let block_expr_kind = hir::ExprKind::Block(Box::new(
-                                        this.lower_block_in_current_scope(
-                                            &block.statements,
-                                            block.expression.as_ref(),
-                                            block.span,
-                                        ),
-                                    ));
-                                    this.expr(arm.expression.span, block_expr_kind)
+                                    this.lower_block_in_current_scope(
+                                        &block.statements,
+                                        block.expression.as_ref(),
+                                        block.span,
+                                    )
                                 } else {
-                                    this.lower_expr(&arm.expression)
+                                    hir::Block::new(
+                                        vec![],
+                                        Some(this.lower_expr(&arm.expression)),
+                                        arm.expression.span,
+                                    )
                                 };
 
                             hir::MatchArm {
                                 pat,
                                 guard,
-                                expr,
-                                scope: Default::default(),
+                                block,
                                 leading_comments: vec![],
                                 trailing_comments: vec![],
                             }
@@ -761,17 +758,11 @@ impl LoweringContext {
 
                     let guard = decl.guard.as_ref().map(|expr| this.lower_expr(expr));
 
-                    let expr = if decl.body.statements.is_empty() && decl.body.expression.is_some()
-                    {
-                        this.lower_expr(decl.body.expression.as_ref().unwrap())
-                    } else {
-                        let body = this.lower_block_in_current_scope(
-                            &decl.body.statements,
-                            decl.body.expression.as_ref(),
-                            decl.body.span,
-                        );
-                        this.expr(body.span, hir::ExprKind::Block(Box::new(body)))
-                    };
+                    let body = this.lower_block_in_current_scope(
+                        &decl.body.statements,
+                        decl.body.expression.as_ref(),
+                        decl.body.span,
+                    );
 
                     let mut arm_leading_comments = vec![];
                     if i == 0 {
@@ -782,8 +773,7 @@ impl LoweringContext {
                     hir::MatchArm {
                         pat,
                         guard,
-                        expr,
-                        scope: Default::default(),
+                        block: body,
                         leading_comments: arm_leading_comments,
                         trailing_comments: decl.trailing_comments.clone(),
                     }

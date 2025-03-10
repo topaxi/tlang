@@ -7,74 +7,16 @@ use log::debug;
 use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token;
 use tlang_hir::hir::{self, HirId};
+use tlang_memory::shape::ShapeKey;
+use tlang_memory::state::TailCall;
+use tlang_memory::value::NativeFnReturn;
+use tlang_memory::value::TlangArithmetic;
+use tlang_memory::{InterpreterState, Resolver, scope};
+use tlang_memory::{prelude::*, state};
 
-use self::resolver::Resolver;
-use self::shape::{ShapeKey, TlangStructMethod, TlangStructShape};
-use self::state::{InterpreterState, TailCall};
-use self::stdlib::collections::define_list_shape;
-use self::value::{
-    NativeFnReturn, TlangArithmetic, TlangNativeFn, TlangObjectId, TlangObjectKind, TlangSlice,
-    TlangStruct, TlangValue,
-};
+pub use tlang_memory::NativeFnDef;
 
-mod resolver;
-mod scope;
-mod shape;
-pub mod state;
-#[cfg(feature = "stdlib")]
-pub mod stdlib;
-pub mod value;
-
-pub struct NativeFn {
-    pub name: &'static str,
-    pub binding_name: &'static str,
-    pub function: fn(&mut InterpreterState, &[TlangValue]) -> TlangValue,
-    pub module_path: &'static str,
-}
-
-inventory::collect!(NativeFn);
-
-/// Propagate control flow (`Return`, `TailCall`, etc.), otherwise extract the value.
-macro_rules! eval_value {
-    ($expr:expr) => {
-        match $expr {
-            EvalResult::Value(val) => val,
-            other => return other,
-        }
-    };
-}
-
-/// Propagate control flow (`Return`, `TailCall`, etc.), otherwise extract the value.
-macro_rules! eval_match_value {
-    ($expr:expr) => {
-        match $expr {
-            EvalResult::Value(val) => val,
-            other => return MatchResult::NotMatched(other),
-        }
-    };
-}
-
-/// Propagate control flow if it's not `Value`
-macro_rules! propagate {
-    ($expr:expr) => {
-        match $expr {
-            EvalResult::Value(_) | EvalResult::Void => {}
-            other => return other,
-        }
-    };
-}
-
-/// Evaluate a list of hir:Expr expressions into a vector of values, propagating control flow if necessary.
-macro_rules! eval_exprs {
-    ($this:expr, $eval:expr, $exprs:expr) => {{ eval_exprs!($this, $eval, $exprs, $exprs.len()) }};
-    ($this:expr, $eval:expr, $exprs:expr, $capacity:expr) => {{
-        let mut exprs = Vec::with_capacity($capacity);
-        for expr in &$exprs {
-            exprs.push(eval_value!($eval($this, expr)));
-        }
-        exprs
-    }};
-}
+mod macros;
 
 #[derive(Debug, Clone, Copy)]
 pub enum EvalResult {
@@ -103,7 +45,6 @@ pub enum MatchResult {
 
 pub struct Interpreter {
     state: InterpreterState,
-    native_fns: HashMap<TlangObjectId, TlangNativeFn>,
 }
 
 impl Resolver for Interpreter {
@@ -121,13 +62,12 @@ impl Default for Interpreter {
 impl Interpreter {
     pub fn new() -> Self {
         let mut interpreter = Self {
-            state: InterpreterState::new(),
-            native_fns: HashMap::new(),
+            state: InterpreterState::default(),
         };
 
-        define_list_shape(&mut interpreter);
+        interpreter.init_stdlib();
 
-        for native_fn in inventory::iter::<NativeFn> {
+        for native_fn in inventory::iter::<NativeFnDef> {
             let fn_name = if native_fn.binding_name.is_empty() {
                 let module_name = native_fn.module_path.split("::").last().unwrap();
                 module_name.to_string() + "::" + native_fn.name
@@ -135,13 +75,23 @@ impl Interpreter {
                 native_fn.binding_name.to_string()
             };
 
+            let fn_ptr = native_fn.function;
+
             interpreter.define_native_fn(&fn_name, move |state, args| {
-                NativeFnReturn::Return((native_fn.function)(state, args))
+                NativeFnReturn::Return(fn_ptr(state, args))
             });
         }
 
         interpreter
     }
+
+    #[cfg(feature = "stdlib")]
+    pub fn init_stdlib(&mut self) {
+        tlang_stdlib::collections::define_list_shape(&mut self.state);
+    }
+
+    #[cfg(not(feature = "stdlib"))]
+    pub fn init_stdlib(&mut self) {}
 
     pub fn state(&self) -> &InterpreterState {
         &self.state
@@ -159,12 +109,7 @@ impl Interpreter {
     where
         F: Fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn + 'static,
     {
-        let fn_object = self.state.new_object(TlangObjectKind::NativeFn);
-
-        self.native_fns
-            .insert(fn_object.get_object_id().unwrap(), Box::new(f));
-
-        fn_object
+        self.state.new_native_fn(f)
     }
 
     pub fn define_native_fn<F>(&mut self, name: &str, f: F) -> TlangValue
@@ -252,14 +197,7 @@ impl Interpreter {
     {
         self.state
             .push_call_stack(state::CallStackEntry::new_call(fn_decl.clone()));
-        self.enter_scope(&fn_decl.clone());
-        self.state
-            .scope_stack
-            .current_scope()
-            .borrow_mut()
-            .is_fn_scope = true;
-        let result = f(self);
-        self.exit_scope();
+        let result = self.with_new_scope(&fn_decl.clone(), f);
         self.state.pop_call_stack();
         result
     }
@@ -270,15 +208,15 @@ impl Interpreter {
         F: FnOnce(&mut Self) -> R,
     {
         let root_scope = self.state.scope_stack.as_root();
-        self.with_scope(&root_scope, f)
+        self.with_scope(root_scope, f)
     }
 
     #[inline(always)]
-    fn with_scope<F, R>(&mut self, scope_stack: &scope::ScopeStack, f: F) -> R
+    fn with_scope<F, R>(&mut self, scope_stack: scope::ScopeStack, f: F) -> R
     where
         F: FnOnce(&mut Self) -> R,
     {
-        let old_scope = std::mem::replace(&mut self.state.scope_stack, scope_stack.clone());
+        let old_scope = std::mem::replace(&mut self.state.scope_stack, scope_stack);
         let result = f(self);
         self.state.scope_stack = old_scope;
         result
@@ -440,11 +378,11 @@ impl Interpreter {
         }
 
         if value.is_nil() {
-            self.panic(format!("Cannot access field `{}` on nil", ident));
+            self.panic(format!("Cannot access field `{ident}` on nil"));
         }
 
         if !value.is_object() {
-            self.panic(format!("Cannot access field `{}` on non-object", ident));
+            self.panic(format!("Cannot access field `{ident}` on non-object"));
         }
 
         todo!(
@@ -675,7 +613,7 @@ impl Interpreter {
             if let Some(id) = variant {
                 NativeFnReturn::DynamicCall(id)
             } else {
-                state.panic(format!("Function {} not found", name))
+                state.panic(format!("Function {name} not found"))
             }
         })
     }
@@ -768,13 +706,13 @@ impl Interpreter {
     fn eval_call_object(&mut self, callee: TlangValue, args: Vec<TlangValue>) -> TlangValue {
         let id = callee
             .get_object_id()
-            .unwrap_or_else(|| self.panic(format!("`{:?}` is not a function", callee)));
+            .unwrap_or_else(|| self.panic(format!("`{callee:?}` is not a function")));
 
         match self.get_object_by_id(id) {
             TlangObjectKind::Closure(closure) => {
                 let closure_decl = self.get_closure_decl(closure.id).unwrap().clone();
 
-                self.with_scope(&closure.scope_stack.clone(), |this| {
+                self.with_scope(closure.scope_stack.clone(), |this| {
                     this.eval_fn_call(closure_decl, callee, &args)
                         .unwrap_value()
                 })
@@ -792,7 +730,7 @@ impl Interpreter {
                 })
             }
             TlangObjectKind::NativeFn => self.exec_native_fn(id, callee, &args),
-            obj => self.panic(format!("`{:?}` is not a function", obj)),
+            obj => self.panic(format!("`{obj:?}` is not a function")),
         }
     }
 
@@ -861,7 +799,6 @@ impl Interpreter {
         self.state
             .current_call_frame_mut()
             .replace_fn_decl(fn_decl.clone());
-        self.state.scope_stack.drop_block_scopes();
         self.state.scope_stack.clear_current_scope();
 
         // TODO: Methods currently do not reserve a slot for the fn itself.
@@ -955,7 +892,7 @@ impl Interpreter {
                 if let Some(shape_key) = shape_key {
                     self.eval_call_struct_method(shape_key, ident, &args)
                 } else {
-                    self.panic(format!("Field access on non-struct: {:?}", call_target));
+                    self.panic(format!("Field access on non-struct: {call_target:?}"));
                 }
             }
             _ => todo!("eval_call: {:?}", call_expr.callee),
@@ -1014,11 +951,9 @@ impl Interpreter {
         // Do we need and want to reset the scope for native functions?
         // It could be somewhat interesting to manipulate the current scope from native functions.
         let r = self.with_root_scope(|this| {
-            if let Some(native_fn) = this.native_fns.get_mut(&id) {
-                native_fn(&mut this.state, args)
-            } else {
-                this.panic(format!("Native function not found: {:?}", id))
-            }
+            this.state
+                .call_native_fn(id, args)
+                .unwrap_or_else(|| this.panic(format!("Native function not found: {id:?}")))
         });
 
         match r {
@@ -1028,7 +963,7 @@ impl Interpreter {
                     self.with_root_scope(|this| this.eval_fn_call(fn_decl.clone(), callee, args))
                         .unwrap_value()
                 } else {
-                    self.panic(format!("Function not found: {:?}", id));
+                    self.panic(format!("Function not found: {id:?}"));
                 }
             }
             NativeFnReturn::PartialCall(box (fn_object, args)) => {
@@ -1155,14 +1090,14 @@ impl Interpreter {
                             field_values.reserve(list_struct.field_values.len());
                             field_values.extend(&list_struct.field_values)
                         }
-                        obj => self.panic(format!("Expected list, got {:?}", obj)),
+                        obj => self.panic(format!("Expected list, got {obj:?}")),
                     }
 
                     // In case we used all the capacity due to spreading the values above,
                     // we once again reserve the remaining capacity.
                     field_values.reserve(values.len() - i);
                 } else {
-                    self.panic(format!("Expected list, got {:?}", value));
+                    self.panic(format!("Expected list, got {value:?}"));
                 }
             } else {
                 field_values.push(eval_value!(self.eval_expr(expr)));
@@ -1237,12 +1172,7 @@ impl Interpreter {
                 }
             }
 
-            if let hir::ExprKind::Block(block) = &arm.expr.kind {
-                // TODO: Do we need this?
-                MatchResult::Matched(this.eval_block_inner(block))
-            } else {
-                MatchResult::Matched(this.eval_expr(&arm.expr))
-            }
+            MatchResult::Matched(this.eval_block_inner(&arm.block))
         })
     }
 
@@ -1468,7 +1398,7 @@ mod tests {
         }
 
         fn eval(&mut self, src: &str) -> TlangValue {
-            let block = format!("{{ {} }};", src);
+            let block = format!("{{ {src} }};");
             let mut parser = tlang_parser::Parser::from_source(&block);
             let ast = parser.parse().unwrap();
             let hir = self.lowering_context.lower_module_in_current_scope(&ast);
@@ -1523,10 +1453,10 @@ mod tests {
             ("false || false", TlangValue::Bool(false)),
         ];
 
-        for (src, expected_value) in tests.iter() {
+        for (src, expected_value) in &tests {
             match (interpreter.eval(src), expected_value) {
                 (TlangValue::Bool(actual), TlangValue::Bool(expected)) => {
-                    assert_eq!(actual, *expected)
+                    assert_eq!(actual, *expected);
                 }
                 _ => panic!("Unexpected value"),
             }
@@ -1749,7 +1679,7 @@ mod tests {
                 .get_object_by_id(id)
                 .get_struct()
                 .unwrap(),
-            val => panic!("Expected struct, got {:?}", val),
+            val => panic!("Expected struct, got {val:?}"),
         };
 
         let none_data = match none_value {
@@ -1758,7 +1688,7 @@ mod tests {
                 .get_object_by_id(id)
                 .get_struct()
                 .unwrap(),
-            val => panic!("Expected struct, got {:?}", val),
+            val => panic!("Expected struct, got {val:?}"),
         };
 
         assert_matches!(some_data.field_values[0], TlangValue::U64(10));
@@ -1778,7 +1708,7 @@ mod tests {
                 .get_object_by_id(id)
                 .get_slice()
                 .unwrap(),
-            val => panic!("Expected slice, got {:?}", val),
+            val => panic!("Expected slice, got {val:?}"),
         };
         assert_eq!(list_data.start(), 0);
         assert_eq!(list_data.len(), 3);
@@ -1800,7 +1730,7 @@ mod tests {
                 .get_object_by_id(id)
                 .get_slice()
                 .unwrap(),
-            val => panic!("Expected slice, got {:?}", val),
+            val => panic!("Expected slice, got {val:?}"),
         };
         assert_eq!(list_data.start(), 4);
         assert_eq!(list_data.len(), 1);

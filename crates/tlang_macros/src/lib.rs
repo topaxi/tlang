@@ -32,7 +32,7 @@ pub fn native_fn(attr: TokenStream, input: TokenStream) -> TokenStream {
         #input_fn
 
         inventory::submit! {
-            crate::NativeFn {
+            crate::NativeFnDef {
                 name: #fn_name_string,
                 binding_name: #binding_name,
                 function: #fn_name_ident,

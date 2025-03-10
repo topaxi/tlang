@@ -3,7 +3,7 @@ extern crate tlang_interpreter;
 
 use wasm_bindgen::prelude::*;
 
-pub use tlang_interpreter::NativeFn;
+pub use tlang_memory::NativeFnDef;
 
 pub mod codemirror;
 pub mod interpreter;

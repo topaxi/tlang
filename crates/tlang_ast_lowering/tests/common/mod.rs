@@ -71,7 +71,7 @@ impl PathCollector {
                     if let Some(guard) = &arm.guard {
                         self.collect_expr(guard);
                     }
-                    self.collect_expr(&arm.expr);
+                    self.collect_block(&arm.block);
                 }
             }
             hir::ExprKind::List(exprs) => {

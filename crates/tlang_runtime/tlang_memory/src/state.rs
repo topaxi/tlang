@@ -10,7 +10,8 @@ use crate::resolver::Resolver;
 use crate::scope::{Scope, ScopeStack};
 use crate::shape::{ShapeKey, TlangStructMethod, TlangStructShape};
 use crate::value::{
-    TlangClosure, TlangObjectId, TlangObjectKind, TlangSlice, TlangStruct, TlangValue,
+    NativeFnReturn, TlangClosure, TlangNativeFn, TlangObjectId, TlangObjectKind, TlangSlice,
+    TlangStruct, TlangValue,
 };
 
 pub enum CallStackKind {
@@ -34,15 +35,15 @@ impl CallStackEntry {
         }
     }
 
-    pub(crate) fn replace_fn_decl(&mut self, fn_decl: Rc<hir::FunctionDeclaration>) {
+    pub fn replace_fn_decl(&mut self, fn_decl: Rc<hir::FunctionDeclaration>) {
         self.kind = CallStackKind::Function(fn_decl);
     }
 
-    pub(crate) fn set_tail_call(&mut self, tail_call: TailCall) {
+    pub fn set_tail_call(&mut self, tail_call: TailCall) {
         self.tail_call = Some(tail_call);
     }
 
-    pub(crate) fn get_fn_decl(&self) -> Option<Rc<hir::FunctionDeclaration>> {
+    pub fn get_fn_decl(&self) -> Option<Rc<hir::FunctionDeclaration>> {
         match &self.kind {
             CallStackKind::Function(fn_decl) => Some(fn_decl.clone()),
             _ => None,
@@ -90,7 +91,7 @@ pub struct TailCall {
 }
 
 pub struct InterpreterState {
-    pub(crate) scope_stack: ScopeStack,
+    pub scope_stack: ScopeStack,
     closures: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
     objects: Slab<TlangObjectKind>,
     shapes: HashMap<ShapeKey, TlangStructShape>,
@@ -99,6 +100,7 @@ pub struct InterpreterState {
     call_stack: Vec<CallStackEntry>,
     globals: HashMap<String, TlangValue>,
     pub builtin_shapes: BuiltinShapes,
+    native_fns: HashMap<TlangObjectId, TlangNativeFn>,
 }
 
 impl Resolver for InterpreterState {
@@ -120,7 +122,7 @@ impl Resolver for InterpreterState {
 }
 
 impl InterpreterState {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         let mut call_stack = Vec::with_capacity(1000);
 
         call_stack.push(CallStackEntry {
@@ -139,24 +141,25 @@ impl InterpreterState {
             call_stack,
             globals: HashMap::with_capacity(100),
             builtin_shapes: BuiltinShapes::default(),
+            native_fns: HashMap::with_capacity(100),
         }
     }
 
-    pub(crate) fn get_fn_decl(&self, id: hir::HirId) -> Option<Rc<hir::FunctionDeclaration>> {
+    pub fn get_fn_decl(&self, id: hir::HirId) -> Option<Rc<hir::FunctionDeclaration>> {
         self.fn_decls.get(&id).cloned()
     }
 
-    pub(crate) fn set_fn_decl(&mut self, id: hir::HirId, decl: Rc<hir::FunctionDeclaration>) {
+    pub fn set_fn_decl(&mut self, id: hir::HirId, decl: Rc<hir::FunctionDeclaration>) {
         self.fn_decls.insert(id, decl);
     }
 
-    pub(crate) fn get_struct_decl(&self, path: &hir::Path) -> Option<Rc<hir::StructDeclaration>> {
+    pub fn get_struct_decl(&self, path: &hir::Path) -> Option<Rc<hir::StructDeclaration>> {
         let path_name = path.join("::");
 
         self.struct_decls.get(&path_name).cloned()
     }
 
-    pub(crate) fn set_struct_decl(&mut self, path_name: String, decl: Rc<hir::StructDeclaration>) {
+    pub fn set_struct_decl(&mut self, path_name: String, decl: Rc<hir::StructDeclaration>) {
         self.struct_decls.insert(path_name, decl);
     }
 
@@ -184,38 +187,38 @@ impl InterpreterState {
         panic!("{}\n{}", message, call_stack)
     }
 
-    pub(crate) fn set_current_span(&mut self, span: tlang_ast::span::Span) {
+    pub fn set_current_span(&mut self, span: tlang_ast::span::Span) {
         self.call_stack.last_mut().unwrap().current_span = span;
     }
 
-    pub(crate) fn push_call_stack(&mut self, entry: CallStackEntry) {
+    pub fn push_call_stack(&mut self, entry: CallStackEntry) {
         self.call_stack.push(entry);
     }
 
-    pub(crate) fn pop_call_stack(&mut self) -> CallStackEntry {
+    pub fn pop_call_stack(&mut self) -> CallStackEntry {
         self.call_stack.pop().unwrap()
     }
 
-    pub(crate) fn current_call_frame(&mut self) -> &CallStackEntry {
+    pub fn current_call_frame(&mut self) -> &CallStackEntry {
         self.call_stack.last().unwrap()
     }
 
-    pub(crate) fn current_call_frame_mut(&mut self) -> &mut CallStackEntry {
+    pub fn current_call_frame_mut(&mut self) -> &mut CallStackEntry {
         self.call_stack.last_mut().unwrap()
     }
 
-    pub(crate) fn enter_scope<T>(&mut self, meta: &T)
+    pub fn enter_scope<T>(&mut self, meta: &T)
     where
         T: hir::HirScope,
     {
         self.scope_stack.push(meta);
     }
 
-    pub(crate) fn exit_scope(&mut self) {
+    pub fn exit_scope(&mut self) {
         self.scope_stack.pop();
     }
 
-    pub(crate) fn current_scope(&self) -> Rc<RefCell<Scope>> {
+    pub fn current_scope(&self) -> Rc<RefCell<Scope>> {
         self.scope_stack.current_scope()
     }
 
@@ -238,12 +241,38 @@ impl InterpreterState {
         }))
     }
 
+    pub fn new_native_fn<F>(&mut self, f: F) -> TlangValue
+    where
+        F: Fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn + 'static,
+    {
+        let fn_object = self.new_object(TlangObjectKind::NativeFn);
+
+        self.native_fns
+            .insert(fn_object.get_object_id().unwrap(), Box::new(f));
+
+        fn_object
+    }
+
+    pub fn call_native_fn(
+        &mut self,
+        fn_id: TlangObjectId,
+        args: &[TlangValue],
+    ) -> Option<NativeFnReturn> {
+        let native_fn_ptr = self.native_fns.get_mut(&fn_id)? as *mut TlangNativeFn;
+
+        // 🙈
+        unsafe {
+            let native_fn = &mut *native_fn_ptr;
+            Some(native_fn(self, args))
+        }
+    }
+
     pub fn get_closure_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
         self.closures.get(&id).cloned()
     }
 
     #[inline(always)]
-    pub(crate) fn get_object_by_id(&self, id: TlangObjectId) -> Option<&TlangObjectKind> {
+    pub fn get_object_by_id(&self, id: TlangObjectId) -> Option<&TlangObjectKind> {
         self.objects.get(id)
     }
 
@@ -394,5 +423,11 @@ impl InterpreterState {
             },
             _ => value.to_string(),
         }
+    }
+}
+
+impl Default for InterpreterState {
+    fn default() -> Self {
+        Self::new()
     }
 }

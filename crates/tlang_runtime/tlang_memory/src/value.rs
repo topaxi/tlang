@@ -1,14 +1,14 @@
 use tlang_hir::hir::HirId;
 
-use crate::InterpreterState;
 use crate::scope::ScopeStack;
 use crate::shape::ShapeKey;
+use crate::{InterpreterState, impl_from_tlang_value};
 
 #[derive(Debug)]
 pub struct TlangClosure {
     pub id: HirId,
     // Closures hold a reference to the scope stack at the time of creation.
-    pub(crate) scope_stack: ScopeStack,
+    pub scope_stack: ScopeStack,
 }
 
 #[derive(Debug, PartialEq)]
@@ -83,28 +83,28 @@ pub enum TlangObjectKind {
 }
 
 impl TlangObjectKind {
-    pub(crate) fn get_struct(&self) -> Option<&TlangStruct> {
+    pub fn get_struct(&self) -> Option<&TlangStruct> {
         match self {
             TlangObjectKind::Struct(s) => Some(s),
             _ => None,
         }
     }
 
-    pub(crate) fn get_slice(&self) -> Option<TlangSlice> {
+    pub fn get_slice(&self) -> Option<TlangSlice> {
         match self {
             TlangObjectKind::Slice(s) => Some(*s),
             _ => None,
         }
     }
 
-    pub(crate) fn get_str(&self) -> Option<&str> {
+    pub fn get_str(&self) -> Option<&str> {
         match self {
             TlangObjectKind::String(s) => Some(s),
             _ => None,
         }
     }
 
-    pub(crate) fn get_shape_key(&self) -> Option<ShapeKey> {
+    pub fn get_shape_key(&self) -> Option<ShapeKey> {
         self.get_struct().map(|s| s.shape)
     }
 
@@ -342,18 +342,6 @@ impl TlangValue {
             (lhs, rhs) => panic!("Unsupported operation: {:?} {:?} {:?}", lhs, op, rhs),
         }
     }
-}
-
-macro_rules! impl_from_tlang_value {
-    ($($t:ty => $variant:ident),* $(,)?) => {
-        $(
-            impl From<$t> for TlangValue {
-                fn from(value: $t) -> Self {
-                    TlangValue::$variant(value as _)
-                }
-            }
-        )*
-    };
 }
 
 impl_from_tlang_value! {

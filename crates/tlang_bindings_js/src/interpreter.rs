@@ -1,6 +1,6 @@
 use tlang_hir::hir;
-use tlang_interpreter::state::InterpreterState;
-use tlang_interpreter::value::{NativeFnReturn, TlangObjectKind, TlangPrimitive, TlangValue};
+use tlang_memory::value::NativeFnReturn;
+use tlang_memory::{InterpreterState, prelude::*};
 use wasm_bindgen::prelude::*;
 
 pub struct TlangInterpreter(tlang_interpreter::Interpreter);
@@ -28,7 +28,7 @@ impl TlangInterpreter {
                     match result {
                         Ok(value) => js_value_to_tlang_value(state, value),
                         Err(err) => {
-                            state.panic(format!("Error calling JavaScript function: {:?}", err))
+                            state.panic(format!("Error calling JavaScript function: {err:?}"))
                         }
                     }
                 }
@@ -38,7 +38,7 @@ impl TlangInterpreter {
                     match result {
                         Ok(value) => js_value_to_tlang_value(state, value),
                         Err(err) => {
-                            state.panic(format!("Error calling JavaScript function: {:?}", err))
+                            state.panic(format!("Error calling JavaScript function: {err:?}"))
                         }
                     }
                 }
@@ -49,7 +49,7 @@ impl TlangInterpreter {
                     match result {
                         Ok(value) => js_value_to_tlang_value(state, value),
                         Err(err) => {
-                            state.panic(format!("Error calling JavaScript function: {:?}", err))
+                            state.panic(format!("Error calling JavaScript function: {err:?}"))
                         }
                     }
                 }
@@ -61,7 +61,7 @@ impl TlangInterpreter {
                     match result {
                         Ok(value) => js_value_to_tlang_value(state, value),
                         Err(err) => {
-                            state.panic(format!("Error calling JavaScript function: {:?}", err))
+                            state.panic(format!("Error calling JavaScript function: {err:?}"))
                         }
                     }
                 }
@@ -74,7 +74,7 @@ impl TlangInterpreter {
                     match result {
                         Ok(value) => js_value_to_tlang_value(state, value),
                         Err(err) => {
-                            state.panic(format!("Error calling JavaScript function: {:?}", err))
+                            state.panic(format!("Error calling JavaScript function: {err:?}"))
                         }
                     }
                 }
