@@ -252,14 +252,7 @@ impl Interpreter {
     {
         self.state
             .push_call_stack(state::CallStackEntry::new_call(fn_decl.clone()));
-        self.enter_scope(&fn_decl.clone());
-        self.state
-            .scope_stack
-            .current_scope()
-            .borrow_mut()
-            .is_fn_scope = true;
-        let result = f(self);
-        self.exit_scope();
+        let result = self.with_new_scope(&fn_decl.clone(), f);
         self.state.pop_call_stack();
         result
     }
@@ -861,7 +854,6 @@ impl Interpreter {
         self.state
             .current_call_frame_mut()
             .replace_fn_decl(fn_decl.clone());
-        self.state.scope_stack.drop_block_scopes();
         self.state.scope_stack.clear_current_scope();
 
         // TODO: Methods currently do not reserve a slot for the fn itself.
