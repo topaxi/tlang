@@ -1,9 +1,10 @@
 import globals from 'globals';
+import { defineConfig } from 'eslint/config';
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
 
-export default tseslint.config([
+export default defineConfig([
   { files: ['**/*.{js,mjs,cjs,ts}'] },
   {
     ignores: [
