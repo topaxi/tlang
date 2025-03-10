@@ -1,6 +1,5 @@
-use tlang_interpreter::state::InterpreterState;
-use tlang_interpreter::value::TlangValue;
 use tlang_macros::native_fn;
+use tlang_memory::{InterpreterState, prelude::*};
 
 #[native_fn]
 pub fn random(_: &mut InterpreterState, _: &[TlangValue]) -> TlangValue {

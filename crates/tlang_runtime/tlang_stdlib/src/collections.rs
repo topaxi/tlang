@@ -1,11 +1,8 @@
 use std::collections::HashMap;
 
 use tlang_macros::native_fn;
-
-use crate::Interpreter;
-use crate::shape::TlangStructMethod;
-use crate::state::InterpreterState;
-use crate::value::{NativeFnReturn, TlangObjectKind, TlangValue};
+use tlang_memory::value::NativeFnReturn;
+use tlang_memory::{InterpreterState, prelude::*};
 
 #[native_fn(name = "len")]
 pub fn len(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
@@ -16,12 +13,12 @@ pub fn len(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
     }
 }
 
-pub fn define_list_shape(interpreter: &mut Interpreter) {
-    let mut list_methods = HashMap::with_capacity(1);
+pub fn define_list_shape(state: &mut InterpreterState) {
+    let mut method_map = HashMap::with_capacity(1);
 
-    list_methods.insert(
+    method_map.insert(
         "slice".to_string(),
-        TlangStructMethod::from_value(interpreter.create_native_fn(|state, args| {
+        TlangStructMethod::from_value(state.new_native_fn(|state, args| {
             let this = state
                 .get_object(args[0])
                 .and_then(|o| o.get_struct())
@@ -38,9 +35,8 @@ pub fn define_list_shape(interpreter: &mut Interpreter) {
         })),
     );
 
-    interpreter
-        .state
+    state
         .builtin_shapes
         .get_list_shape_mut()
-        .set_methods(list_methods);
+        .set_methods(method_map);
 }

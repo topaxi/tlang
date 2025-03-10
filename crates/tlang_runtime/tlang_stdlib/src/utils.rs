@@ -1,7 +1,5 @@
 use tlang_macros::native_fn;
-
-use crate::state::InterpreterState;
-use crate::value::TlangValue;
+use tlang_memory::{InterpreterState, prelude::*};
 
 #[native_fn(name = "log")]
 pub fn log(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
