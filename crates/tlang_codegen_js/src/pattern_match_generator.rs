@@ -44,31 +44,28 @@ enum MatchContext {
 }
 
 fn match_args_have_completions(arms: &[hir::MatchArm]) -> bool {
-    arms.iter().any(|arm| match &arm.expr.kind {
-        hir::ExprKind::Block(block) => block.has_completion(),
-        _ => true,
-    })
+    arms.iter().any(|arm| arm.block.has_completion())
 }
 
 impl CodegenJS {
-    fn generate_match_arm_expression(&mut self, expression: &hir::Expr) {
+    fn generate_match_arm_block(&mut self, block: &hir::Block) {
         self.flush_statement_buffer();
-        if let hir::ExprKind::Block(_) = &expression.kind {
-            self.generate_expr(expression, None);
+        if !block.stmts.is_empty() {
+            self.generate_block_expression(block);
         } else if self.current_completion_variable() == Some("return") {
-            if expression.is_tail_call() {
-                self.generate_expr(expression, None);
-            } else {
+            if block.expr.as_ref().is_some_and(|expr| expr.is_tail_call()) {
+                self.generate_block_expression(block);
+            } else if let Some(expr) = &block.expr {
                 self.push_indent();
                 self.push_str("return ");
-                self.generate_expr(expression, None);
+                self.generate_expr(expr, None);
                 self.push_str(";\n");
             }
-        } else {
+        } else if let Some(expr) = &block.expr {
             self.push_indent();
             self.push_current_completion_variable();
             self.push_str(" = ");
-            self.generate_expr(expression, None);
+            self.generate_expr(expr, None);
             self.push_str(";\n");
         }
     }
@@ -334,7 +331,7 @@ impl CodegenJS {
             hir::MatchArm {
                 pat,
                 guard,
-                expr: arm_expr,
+                block,
                 leading_comments,
                 trailing_comments,
                 ..
@@ -359,9 +356,7 @@ impl CodegenJS {
             self.push_str("{\n");
             self.inc_indent();
             self.generate_comments(leading_comments);
-            self.push_context(BlockContext::Expression);
-            self.generate_match_arm_expression(arm_expr);
-            self.pop_context();
+            self.generate_match_arm_block(block);
             self.generate_comments(trailing_comments);
             self.dec_indent();
             self.push_indent();
