@@ -258,13 +258,13 @@ impl InterpreterState {
         fn_id: TlangObjectId,
         args: &[TlangValue],
     ) -> Option<NativeFnReturn> {
-        let mut native_fn = self.native_fns.remove(&fn_id)?;
+        let native_fn_ptr = self.native_fns.get_mut(&fn_id)? as *mut TlangNativeFn;
 
-        let result = native_fn(self, args);
-
-        self.native_fns.insert(fn_id, native_fn);
-
-        Some(result)
+        // 🙈
+        unsafe {
+            let native_fn = &mut *native_fn_ptr;
+            Some(native_fn(self, args))
+        }
     }
 
     pub fn get_closure_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {

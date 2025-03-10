@@ -61,11 +61,11 @@ impl Default for Interpreter {
 
 impl Interpreter {
     pub fn new() -> Self {
-        let mut state = InterpreterState::default();
+        let mut interpreter = Self {
+            state: InterpreterState::default(),
+        };
 
-        tlang_stdlib::collections::define_list_shape(&mut state);
-
-        let mut interpreter = Self { state };
+        tlang_stdlib::collections::define_list_shape(&mut interpreter.state);
 
         for native_fn in inventory::iter::<NativeFnDef> {
             let fn_name = if native_fn.binding_name.is_empty() {
