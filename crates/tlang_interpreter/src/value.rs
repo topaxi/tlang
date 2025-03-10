@@ -1,8 +1,8 @@
 use tlang_hir::hir::HirId;
 
-use crate::InterpreterState;
 use crate::scope::ScopeStack;
 use crate::shape::ShapeKey;
+use crate::{InterpreterState, impl_from_tlang_value};
 
 #[derive(Debug)]
 pub struct TlangClosure {
@@ -342,18 +342,6 @@ impl TlangValue {
             (lhs, rhs) => panic!("Unsupported operation: {:?} {:?} {:?}", lhs, op, rhs),
         }
     }
-}
-
-macro_rules! impl_from_tlang_value {
-    ($($t:ty => $variant:ident),* $(,)?) => {
-        $(
-            impl From<$t> for TlangValue {
-                fn from(value: $t) -> Self {
-                    TlangValue::$variant(value as _)
-                }
-            }
-        )*
-    };
 }
 
 impl_from_tlang_value! {
