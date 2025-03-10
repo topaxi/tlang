@@ -427,8 +427,8 @@ impl HirPretty {
     fn print_literal(&mut self, lit: &Literal) {
         match lit {
             Literal::Boolean(bool) => self.push_str(&bool.to_string()),
-            Literal::String(s) => self.push_str(&format!("{:?}", s)),
-            Literal::Char(c) => self.push_str(&format!("{:?}", c)),
+            Literal::String(s) => self.push_str(&format!("{s:?}")),
+            Literal::Char(c) => self.push_str(&format!("{c:?}")),
             Literal::UnsignedInteger(u) => self.push_str(&u.to_string()),
             Literal::Integer(i) => self.push_str(&i.to_string()),
             Literal::Float(f) => self.push_str(&f.to_string()),

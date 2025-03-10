@@ -101,7 +101,7 @@ fn main() {
         let mut source = String::new();
         if let Err(why) = file.read_to_string(&mut source) {
             panic!("couldn't read {}: {}", path.display(), why)
-        };
+        }
 
         let output = match args.output_type {
             OutputType::Ast => compile_to_ast(&source),
@@ -137,7 +137,7 @@ fn main() {
         };
         if let Err(why) = output_file.write_all(output.as_bytes()) {
             panic!("couldn't write to {output_file_name}: {why}")
-        };
+        }
     }
 }
 

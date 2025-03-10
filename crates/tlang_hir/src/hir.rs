@@ -371,7 +371,7 @@ pub struct CallExpression {
 
 impl CallExpression {
     pub fn has_wildcard(&self) -> bool {
-        self.arguments.iter().any(|arg| arg.is_wildcard())
+        self.arguments.iter().any(Expr::is_wildcard)
     }
 
     pub fn wildcard_count(&self) -> usize {

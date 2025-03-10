@@ -378,11 +378,11 @@ impl Interpreter {
         }
 
         if value.is_nil() {
-            self.panic(format!("Cannot access field `{}` on nil", ident));
+            self.panic(format!("Cannot access field `{ident}` on nil"));
         }
 
         if !value.is_object() {
-            self.panic(format!("Cannot access field `{}` on non-object", ident));
+            self.panic(format!("Cannot access field `{ident}` on non-object"));
         }
 
         todo!(
@@ -613,7 +613,7 @@ impl Interpreter {
             if let Some(id) = variant {
                 NativeFnReturn::DynamicCall(id)
             } else {
-                state.panic(format!("Function {} not found", name))
+                state.panic(format!("Function {name} not found"))
             }
         })
     }
@@ -706,7 +706,7 @@ impl Interpreter {
     fn eval_call_object(&mut self, callee: TlangValue, args: Vec<TlangValue>) -> TlangValue {
         let id = callee
             .get_object_id()
-            .unwrap_or_else(|| self.panic(format!("`{:?}` is not a function", callee)));
+            .unwrap_or_else(|| self.panic(format!("`{callee:?}` is not a function")));
 
         match self.get_object_by_id(id) {
             TlangObjectKind::Closure(closure) => {
@@ -730,7 +730,7 @@ impl Interpreter {
                 })
             }
             TlangObjectKind::NativeFn => self.exec_native_fn(id, callee, &args),
-            obj => self.panic(format!("`{:?}` is not a function", obj)),
+            obj => self.panic(format!("`{obj:?}` is not a function")),
         }
     }
 
@@ -892,7 +892,7 @@ impl Interpreter {
                 if let Some(shape_key) = shape_key {
                     self.eval_call_struct_method(shape_key, ident, &args)
                 } else {
-                    self.panic(format!("Field access on non-struct: {:?}", call_target));
+                    self.panic(format!("Field access on non-struct: {call_target:?}"));
                 }
             }
             _ => todo!("eval_call: {:?}", call_expr.callee),
@@ -953,7 +953,7 @@ impl Interpreter {
         let r = self.with_root_scope(|this| {
             this.state
                 .call_native_fn(id, args)
-                .unwrap_or_else(|| this.panic(format!("Native function not found: {:?}", id)))
+                .unwrap_or_else(|| this.panic(format!("Native function not found: {id:?}")))
         });
 
         match r {
@@ -963,7 +963,7 @@ impl Interpreter {
                     self.with_root_scope(|this| this.eval_fn_call(fn_decl.clone(), callee, args))
                         .unwrap_value()
                 } else {
-                    self.panic(format!("Function not found: {:?}", id));
+                    self.panic(format!("Function not found: {id:?}"));
                 }
             }
             NativeFnReturn::PartialCall(box (fn_object, args)) => {
@@ -1090,14 +1090,14 @@ impl Interpreter {
                             field_values.reserve(list_struct.field_values.len());
                             field_values.extend(&list_struct.field_values)
                         }
-                        obj => self.panic(format!("Expected list, got {:?}", obj)),
+                        obj => self.panic(format!("Expected list, got {obj:?}")),
                     }
 
                     // In case we used all the capacity due to spreading the values above,
                     // we once again reserve the remaining capacity.
                     field_values.reserve(values.len() - i);
                 } else {
-                    self.panic(format!("Expected list, got {:?}", value));
+                    self.panic(format!("Expected list, got {value:?}"));
                 }
             } else {
                 field_values.push(eval_value!(self.eval_expr(expr)));
@@ -1398,7 +1398,7 @@ mod tests {
         }
 
         fn eval(&mut self, src: &str) -> TlangValue {
-            let block = format!("{{ {} }};", src);
+            let block = format!("{{ {src} }};");
             let mut parser = tlang_parser::Parser::from_source(&block);
             let ast = parser.parse().unwrap();
             let hir = self.lowering_context.lower_module_in_current_scope(&ast);
@@ -1453,10 +1453,10 @@ mod tests {
             ("false || false", TlangValue::Bool(false)),
         ];
 
-        for (src, expected_value) in tests.iter() {
+        for (src, expected_value) in &tests {
             match (interpreter.eval(src), expected_value) {
                 (TlangValue::Bool(actual), TlangValue::Bool(expected)) => {
-                    assert_eq!(actual, *expected)
+                    assert_eq!(actual, *expected);
                 }
                 _ => panic!("Unexpected value"),
             }
@@ -1679,7 +1679,7 @@ mod tests {
                 .get_object_by_id(id)
                 .get_struct()
                 .unwrap(),
-            val => panic!("Expected struct, got {:?}", val),
+            val => panic!("Expected struct, got {val:?}"),
         };
 
         let none_data = match none_value {
@@ -1688,7 +1688,7 @@ mod tests {
                 .get_object_by_id(id)
                 .get_struct()
                 .unwrap(),
-            val => panic!("Expected struct, got {:?}", val),
+            val => panic!("Expected struct, got {val:?}"),
         };
 
         assert_matches!(some_data.field_values[0], TlangValue::U64(10));
@@ -1708,7 +1708,7 @@ mod tests {
                 .get_object_by_id(id)
                 .get_slice()
                 .unwrap(),
-            val => panic!("Expected slice, got {:?}", val),
+            val => panic!("Expected slice, got {val:?}"),
         };
         assert_eq!(list_data.start(), 0);
         assert_eq!(list_data.len(), 3);
@@ -1730,7 +1730,7 @@ mod tests {
                 .get_object_by_id(id)
                 .get_slice()
                 .unwrap(),
-            val => panic!("Expected slice, got {:?}", val),
+            val => panic!("Expected slice, got {val:?}"),
         };
         assert_eq!(list_data.start(), 4);
         assert_eq!(list_data.len(), 1);

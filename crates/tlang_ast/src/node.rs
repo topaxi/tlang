@@ -297,7 +297,7 @@ impl Path {
     pub fn join(&self, separator: &str) -> String {
         self.segments
             .iter()
-            .map(|segment| segment.as_str())
+            .map(Ident::as_str)
             .collect::<Vec<_>>()
             .join(separator)
     }
