@@ -57,12 +57,6 @@ impl ScopeStack {
         Self { scopes }
     }
 
-    pub(crate) fn drop_block_scopes(&mut self) {
-        while !self.current_scope().borrow().is_fn_scope {
-            self.pop();
-        }
-    }
-
     pub(crate) fn clear_current_scope(&self) {
         self.current_scope().borrow_mut().clear();
     }
@@ -104,15 +98,12 @@ impl Resolver for ScopeStack {
 pub(crate) struct Scope {
     // Value bindings in user code, this includes references to user defined functions.
     pub locals: Vec<TlangValue>,
-    // Whether this scope is function or block scope.
-    pub is_fn_scope: bool,
 }
 
 impl Scope {
     pub fn new(locals: usize, _upvars: usize) -> Self {
         Self {
             locals: Vec::with_capacity(locals),
-            is_fn_scope: false,
         }
     }
 

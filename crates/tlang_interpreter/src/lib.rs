@@ -252,14 +252,7 @@ impl Interpreter {
     {
         self.state
             .push_call_stack(state::CallStackEntry::new_call(fn_decl.clone()));
-        self.enter_scope(&fn_decl.clone());
-        self.state
-            .scope_stack
-            .current_scope()
-            .borrow_mut()
-            .is_fn_scope = true;
-        let result = f(self);
-        self.exit_scope();
+        let result = self.with_new_scope(&fn_decl.clone(), f);
         self.state.pop_call_stack();
         result
     }
@@ -270,15 +263,15 @@ impl Interpreter {
         F: FnOnce(&mut Self) -> R,
     {
         let root_scope = self.state.scope_stack.as_root();
-        self.with_scope(&root_scope, f)
+        self.with_scope(root_scope, f)
     }
 
     #[inline(always)]
-    fn with_scope<F, R>(&mut self, scope_stack: &scope::ScopeStack, f: F) -> R
+    fn with_scope<F, R>(&mut self, scope_stack: scope::ScopeStack, f: F) -> R
     where
         F: FnOnce(&mut Self) -> R,
     {
-        let old_scope = std::mem::replace(&mut self.state.scope_stack, scope_stack.clone());
+        let old_scope = std::mem::replace(&mut self.state.scope_stack, scope_stack);
         let result = f(self);
         self.state.scope_stack = old_scope;
         result
@@ -774,7 +767,7 @@ impl Interpreter {
             TlangObjectKind::Closure(closure) => {
                 let closure_decl = self.get_closure_decl(closure.id).unwrap().clone();
 
-                self.with_scope(&closure.scope_stack.clone(), |this| {
+                self.with_scope(closure.scope_stack.clone(), |this| {
                     this.eval_fn_call(closure_decl, callee, &args)
                         .unwrap_value()
                 })
@@ -861,7 +854,6 @@ impl Interpreter {
         self.state
             .current_call_frame_mut()
             .replace_fn_decl(fn_decl.clone());
-        self.state.scope_stack.drop_block_scopes();
         self.state.scope_stack.clear_current_scope();
 
         // TODO: Methods currently do not reserve a slot for the fn itself.
@@ -1237,12 +1229,7 @@ impl Interpreter {
                 }
             }
 
-            if let hir::ExprKind::Block(block) = &arm.expr.kind {
-                // TODO: Do we need this?
-                MatchResult::Matched(this.eval_block_inner(block))
-            } else {
-                MatchResult::Matched(this.eval_expr(&arm.expr))
-            }
+            MatchResult::Matched(this.eval_block_inner(&arm.block))
         })
     }
 
