@@ -1,3 +1,5 @@
+#![feature(allocator_api)]
+mod arena;
 mod macros;
 pub mod resolver;
 pub mod scope;
