@@ -1,7 +1,6 @@
 name: Build, Test and Deploy
 
 on:
-  push:
   pull_request:
   merge_group:
 concurrency:
