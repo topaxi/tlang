@@ -85,7 +85,7 @@ export class EventController<
 
   handleEvent(event: E): void {
     if (this.listener !== this) {
-      this.listener.handleEvent(event);
+      return this.listener.handleEvent(event);
     }
 
     throw new Error(`${this.constructor.name}.handleEvent() not implemented`);
