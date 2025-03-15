@@ -1,13 +1,32 @@
 import { ReactiveController, ReactiveControllerHost } from 'lit';
 
+export interface EventListenerOptions {
+  capture?: boolean;
+  once?: boolean;
+  passive?: boolean;
+  signal?: AbortSignal;
+}
+
 interface EventTarget<E = Event> {
   addEventListener(
     eventName: string,
     listener: EventListenerOrEventListenerObject<E>,
+    options?: unknown,
+  ): void;
+  addEventListener(
+    eventName: string,
+    listener: EventListenerOrEventListenerObject<E>,
+    options: EventListenerOptions,
   ): void;
   removeEventListener(
     eventName: string,
     listener: EventListenerOrEventListenerObject<E>,
+    options?: unknown,
+  ): void;
+  removeEventListener(
+    eventName: string,
+    listener: EventListenerOrEventListenerObject<E>,
+    options: EventListenerOptions,
   ): void;
 }
 
@@ -44,24 +63,28 @@ export class EventController<
     target: Target,
     eventName: string,
     listener?: Listener | null,
+    options?: EventListenerOptions,
   );
   constructor(
     host: ReactiveControllerHost,
     target: Target,
     eventNames: string[],
     listener?: Listener | null,
+    options?: EventListenerOptions,
   );
   constructor(
     host: ReactiveControllerHost,
     target: Target,
     eventNames: string | string[],
     listener?: Listener | null,
+    options?: EventListenerOptions,
   );
   constructor(
     host: ReactiveControllerHost,
     protected target: Target,
     eventNames: string | string[],
     listener?: Listener | null,
+    protected options?: EventListenerOptions,
   ) {
     this.eventNames = Array.isArray(eventNames) ? eventNames : [eventNames];
     this.listener =
@@ -73,13 +96,13 @@ export class EventController<
 
   hostConnected(): void {
     for (let eventName of this.eventNames) {
-      this.target.addEventListener(eventName, this);
+      this.target.addEventListener(eventName, this, this.options);
     }
   }
 
   hostDisconnected(): void {
     for (let eventName of this.eventNames) {
-      this.target.removeEventListener(eventName, this);
+      this.target.removeEventListener(eventName, this, this.options);
     }
   }
 

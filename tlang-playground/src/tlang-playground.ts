@@ -6,11 +6,16 @@ import './components/t-button';
 import './components/t-codemirror';
 import './components/t-console';
 import './components/t-live';
+import './components/t-shortcuts';
 import './components/t-split';
 import './components/t-tabs';
 import { type TCodeMirror } from './components/t-codemirror';
-import { ConsoleMessage, createConsoleMessage } from './components/t-console';
-import { SplitElement } from './components/t-split';
+import {
+  ConsoleElement,
+  ConsoleMessage,
+  createConsoleMessage,
+} from './components/t-console';
+import { SplitElement, SplitEvent } from './components/t-split';
 import { compressSource, decompressSource } from './utils/lz';
 import {
   getStandardLibraryCompiled,
@@ -56,10 +61,14 @@ const displayLabels = {
 
 function defaultDisplay(): OutputDisplay {
   let params = getHashParams();
-  let display: OutputDisplay = 'javascript';
+  let display: OutputDisplay = 'hir_pretty';
 
   if (params.has('display')) {
     display = params.get('display') as OutputDisplay;
+  }
+
+  if (params.get('runner') === 'compiler') {
+    return 'javascript';
   }
 
   if (params.get('runner') === 'interpreter' && display === 'javascript') {
@@ -82,7 +91,7 @@ function defaultRunner() {
   if (params.has('runner')) {
     return params.get('runner') as 'compiler' | 'interpreter';
   }
-  return 'compiler';
+  return 'interpreter';
 }
 
 function updateHashParam(key: string, value: string) {
@@ -119,6 +128,10 @@ const emptyTlang = {} as Tlang;
 export class TlangPlayground extends LitElement {
   static override styles = css`
     :host {
+      display: contents;
+    }
+
+    t-shortcuts {
       display: flex;
       flex-direction: column;
       width: 100%;
@@ -218,7 +231,10 @@ export class TlangPlayground extends LitElement {
   @state()
   showConsole = true;
 
-  @state() tlang: Tlang = emptyTlang;
+  /**
+   * No need to be a state, as it is derived on `source` change.
+   */
+  private tlang: Tlang = emptyTlang;
 
   @state() runner: 'compiler' | 'interpreter' = defaultRunner();
 
@@ -229,6 +245,9 @@ export class TlangPlayground extends LitElement {
 
   @query('.output-split', true)
   outputSplit!: SplitElement;
+
+  @query('t-console', true)
+  consoleElement!: ConsoleElement;
 
   private tlangConsole = {
     log: (...args: unknown[]) => {
@@ -448,13 +467,35 @@ export class TlangPlayground extends LitElement {
   }
 
   handleConsoleCollapse(event: CustomEvent<{ collapsed: boolean }>) {
+    this.outputSplit.disabled = event.detail.collapsed ? 'resize-only' : false;
+
     if (event.detail.collapsed) {
       this.outputSplit.reset();
+    } else {
+      this.outputSplit.restore();
     }
   }
 
-  handleConsoleClear() {
+  handleOutputSplitToggle(event: SplitEvent) {
+    if (this.outputSplit.isTouched) {
+      // Default behavior, reset the split.
+      return;
+    }
+
+    event.preventDefault();
+
+    this.outputSplit.restoreOrReset();
+    this.consoleElement.collapse();
+  }
+
+  handleConsoleClear(event: Event) {
+    event.preventDefault();
+
     this.consoleMessages = [];
+  }
+
+  showKeyboardShortcuts() {
+    this.shadowRoot!.querySelector('t-shortcuts')!.showShortcutsReference();
   }
 
   renderOutput() {
@@ -464,92 +505,112 @@ export class TlangPlayground extends LitElement {
       case 'hir':
         return html`<pre class="output-ast">${this.tlang.hir_string}</pre>`;
       case 'hir_pretty':
-        return html`<t-codemirror
-          class="output-code"
-          language="tlang"
-          .source=${this.tlang.hir_pretty}
-          with-diagnostics="false"
-          readonly
-        ></t-codemirror>`;
+        return html`
+          <t-codemirror
+            class="output-code"
+            language="tlang"
+            .source=${this.tlang.hir_pretty}
+            with-diagnostics="false"
+            readonly
+          ></t-codemirror>
+        `;
       case 'javascript':
-        return html`<t-codemirror
-          class="output-code"
-          language="javascript"
-          .source=${this.tlang.js}
-          with-diagnostics="false"
-          readonly
-        ></t-codemirror>`;
+        return html`
+          <t-codemirror
+            class="output-code"
+            language="javascript"
+            .source=${this.tlang.js}
+            with-diagnostics="false"
+            readonly
+          ></t-codemirror>
+        `;
     }
   }
 
   protected override render() {
     return html`
-      <header>
-        <div class="toolbar">
-          <t-button @click=${this.run} shortcut="ctrl+alt+r">Run</t-button>
-          <select
-            class="toolbar__runner"
-            @change=${this.handleRunnerChange}
-            .value=${live(this.runner)}
-          >
-            <option value="compiler">Compiler</option>
-            <option value="interpreter">Interpreter</option>
-          </select>
-          <t-button @click=${this.share}>Share</t-button>
-          <select
-            class="toolbar__example"
-            @change=${this.handleExampleSelect}
-            .value=${live(this.selectedExample)}
-          >
-            ${repeat(
-              Object.keys(examples),
-              (key) => key,
-              (key) => html`<option>${key}</option>`,
-            )}
-          </select>
-          <div class="repo-link">
-            <a href="https://github.com/topaxi/tlang">Source Code</a>
-          </div>
-        </div>
-      </header>
-      <main>
-        <t-split
-          class="editor-split"
-          direction=${this.desktop ? 'vertical' : 'horizontal'}
-        >
-          <t-codemirror
-            slot="first"
-            class="editor"
-            @source-change=${this.handleSourceChange}
-          ></t-codemirror>
-          <t-split slot="second" direction="horizontal" class="output-split">
-            <t-tabs
-              class="output-tabs"
-              slot="first"
-              single
-              .selected=${this.display}
-              @t-tab-select=${this.handleDisplayChange}
+      <t-shortcuts>
+        <header>
+          <div class="toolbar">
+            <t-button
+              @click=${this.run}
+              shortcut="ctrl+enter"
+              shortcut-description="Run Code"
+            >
+              Run
+            </t-button>
+            <select
+              class="toolbar__runner"
+              @change=${this.handleRunnerChange}
+              .value=${live(this.runner)}
+            >
+              <option value="interpreter">Interpreter</option>
+              <option value="compiler">Compiler (JS)</option>
+            </select>
+            <t-button @click=${this.share}>Share</t-button>
+            <select
+              class="toolbar__example"
+              @change=${this.handleExampleSelect}
+              .value=${live(this.selectedExample)}
             >
               ${repeat(
-                this.availableDisplayOptions,
-                (display) => display,
-                (display) =>
-                  html`<t-tab slot="tab" id=${display}>${displayLabels[display]}</option>`,
+                Object.keys(examples),
+                (key) => key,
+                (key) => html`<option>${key}</option>`,
               )}
-              <t-tab-panel>
-                ${keyed(this.display, this.renderOutput())}
-              </t-tab-panel>
-            </t-tabs>
-            <t-console
+            </select>
+            <t-button @click=${this.showKeyboardShortcuts} aria-label="Help">
+              ?
+            </t-button>
+            <div class="repo-link">
+              <a href="https://github.com/topaxi/tlang">Source Code</a>
+            </div>
+          </div>
+        </header>
+        <main>
+          <t-split
+            class="editor-split"
+            direction=${this.desktop ? 'vertical' : 'horizontal'}
+          >
+            <t-codemirror
+              slot="first"
+              class="editor"
+              @source-change=${this.handleSourceChange}
+            ></t-codemirror>
+            <t-split
               slot="second"
-              .messages=${this.consoleMessages}
-              @collapse=${this.handleConsoleCollapse}
-              @clear=${this.handleConsoleClear}
+              direction="horizontal"
+              class="output-split"
+              @t-split-toggle=${this.handleOutputSplitToggle}
             >
-            </t-console>
+              <t-tabs
+                class="output-tabs"
+                slot="first"
+                single
+                .selected=${this.display}
+                @t-tab-select=${this.handleDisplayChange}
+              >
+                ${repeat(
+                  this.availableDisplayOptions,
+                  (display) => display,
+                  (display) =>
+                    html`<t-tab slot="tab" id=${display}>${displayLabels[display]}</option>`,
+                )}
+                <t-tab-panel>
+                  ${keyed(this.display, this.renderOutput())}
+                </t-tab-panel>
+              </t-tabs>
+              <t-console
+                slot="second"
+                .messages=${this.consoleMessages}
+                @collapse=${this.handleConsoleCollapse}
+                @clear=${this.handleConsoleClear}
+              >
+              </t-console>
+            </t-split>
           </t-split>
-        </t-split>
-      </main>
+        </main>
+      </t-shortcuts>
     `;
   }
 }

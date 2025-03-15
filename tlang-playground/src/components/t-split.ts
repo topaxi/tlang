@@ -4,6 +4,19 @@ import { throttleAnimationFrame } from '../utils/debounce';
 
 export type SplitDirection = 'horizontal' | 'vertical';
 
+export class SplitEvent extends CustomEvent<void> {
+  override type!: 't-split-reset' | 't-split-toggle' | 't-split-set';
+
+  constructor(type: SplitEvent['type'], eventInit?: CustomEventInit<void>) {
+    super(type, {
+      bubbles: true,
+      composed: true,
+      cancelable: true,
+      ...eventInit,
+    });
+  }
+}
+
 @customElement('t-split')
 export class SplitElement extends LitElement implements EventListenerObject {
   static override styles = css`
@@ -65,6 +78,9 @@ export class SplitElement extends LitElement implements EventListenerObject {
   @property()
   direction: SplitDirection = 'horizontal';
 
+  @property({ reflect: true })
+  disabled: boolean | 'resize-only' = false;
+
   @query('[part="handle"]', true)
   private handle!: HTMLHRElement;
 
@@ -74,14 +90,67 @@ export class SplitElement extends LitElement implements EventListenerObject {
   @query('[part="second"]', true)
   private secondContainer!: HTMLDivElement;
 
-  constructor() {
-    super();
-    this.updateSlotSize = throttleAnimationFrame(this.updateSlotSize);
+  private _touched = false;
+
+  get isTouched(): boolean {
+    return this._touched;
   }
 
+  private beforeResetState: {
+    firstContainer: string;
+    secondContainer: string;
+    touched: boolean;
+  } | null = null;
+
   reset(): void {
-    this.firstContainer.removeAttribute('style');
-    this.secondContainer.removeAttribute('style');
+    let event = new SplitEvent('t-split-reset');
+
+    if (this.dispatchEvent(event)) {
+      this.beforeResetState = {
+        firstContainer: this.firstContainer.style.cssText,
+        secondContainer: this.secondContainer.style.cssText,
+        touched: this._touched,
+      };
+      this.firstContainer.removeAttribute('style');
+      this.secondContainer.removeAttribute('style');
+      this._touched = false;
+    }
+  }
+
+  toggle(): void {
+    let event = new SplitEvent('t-split-toggle');
+
+    if (!this.dispatchEvent(event)) {
+      return;
+    }
+
+    if (this.isTouched) {
+      this.reset();
+    } else {
+      let event = new SplitEvent('t-split-set');
+
+      if (this.dispatchEvent(event)) {
+        this.resizeByPercentage(100);
+      }
+    }
+  }
+
+  restore(): void {
+    if (this.beforeResetState == null) {
+      return;
+    }
+
+    this.firstContainer.style.cssText = this.beforeResetState.firstContainer;
+    this.secondContainer.style.cssText = this.beforeResetState.secondContainer;
+    this._touched = this.beforeResetState.touched;
+  }
+
+  restoreOrReset(): void {
+    if (this.beforeResetState == null) {
+      this.reset();
+    } else {
+      this.restore();
+    }
   }
 
   private startMouseResizing() {
@@ -118,6 +187,8 @@ export class SplitElement extends LitElement implements EventListenerObject {
 
   private resizeByPercentage(percentage: number) {
     let containerRect = this.getBoundingClientRect();
+    let handleRect = this.handle.getBoundingClientRect();
+
     let dimension: 'width' | 'height' =
       this.direction === 'horizontal' ? 'height' : 'width';
     let containerSize = containerRect[dimension];
@@ -126,7 +197,7 @@ export class SplitElement extends LitElement implements EventListenerObject {
       this.firstContainer.getBoundingClientRect()[dimension];
 
     let firstSlotSize = Math.min(
-      containerSize,
+      containerSize - handleRect[dimension] / 2,
       currentFirstSlotSize + containerSize * percentage,
     );
     let secondSlotSize = containerSize - firstSlotSize;
@@ -181,16 +252,24 @@ export class SplitElement extends LitElement implements EventListenerObject {
   }
 
   handleEvent(e: Event) {
+    if (this.disabled === true) {
+      return;
+    }
+
     let event = e as
       | (MouseEvent & { type: 'dblclick' | `mouse${string}` })
       | (KeyboardEvent & { type: `key${string}` })
       | (TouchEvent & { type: `touch${string}` });
 
+    if (event.type === 'dblclick') {
+      return this.toggle();
+    }
+
+    if (this.disabled === 'resize-only') {
+      return;
+    }
+
     switch (event.type) {
-      case 'dblclick': {
-        this.reset();
-        break;
-      }
       case 'mousedown': {
         if (event.button === 0) {
           this.startMouseResizing();
@@ -230,7 +309,14 @@ export class SplitElement extends LitElement implements EventListenerObject {
     }
   }
 
+  static {
+    this.prototype.updateSlotSize = throttleAnimationFrame(
+      this.prototype.updateSlotSize,
+    );
+  }
+
   private updateSlotSize(firstSlotSize: number, secondSlotSize: number): void {
+    this._touched = true;
     this.setSlotSize(this.firstContainer, firstSlotSize);
     this.setSlotSize(this.secondContainer, secondSlotSize);
   }

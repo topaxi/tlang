@@ -1,11 +1,13 @@
-import { EditorView, basicSetup } from 'codemirror';
-import { EditorState } from '@codemirror/state';
+import { basicSetup } from 'codemirror';
+import { EditorView, keymap } from '@codemirror/view';
+import { EditorState, Prec } from '@codemirror/state';
 import { Diagnostic, linter, lintGutter } from '@codemirror/lint';
 import { catppuccin } from 'codemirror-theme-catppuccin';
 import { tlangLanguageSupport } from 'codemirror-lang-tlang';
 import { javascript } from '@codemirror/lang-javascript';
 import { LitElement, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
+import { hostListener } from '../decorators/host-listener';
 
 export type Language = 'tlang' | 'javascript';
 
@@ -48,6 +50,15 @@ export class TCodeMirror extends LitElement {
   @property({ type: Array })
   diagnostics: Diagnostic[] = [];
 
+  @hostListener('keyup')
+  handleKeyUp(event: KeyboardEvent) {
+    // ? will show the shortcuts popover, but within the editor we do not
+    // want that but instead want to insert a question mark.
+    if (event.key === '?') {
+      event.stopPropagation();
+    }
+  }
+
   private dispatchSourceChangeEvent(source: string) {
     this.dispatchEvent(
       new CustomEvent('source-change', { detail: { source } }),
@@ -55,7 +66,12 @@ export class TCodeMirror extends LitElement {
   }
 
   private getEditorExtensions() {
-    let extensions = [basicSetup, catppuccin('macchiato')];
+    let extensions = [
+      basicSetup,
+      catppuccin('macchiato'),
+      // We currently use Ctrl+Enter to run the code.
+      Prec.highest(keymap.of([{ key: 'Ctrl-Enter', run: () => true }])),
+    ];
 
     switch (this.language) {
       case 'tlang':

@@ -10,7 +10,7 @@ export class ToggleButtonElement extends ButtonElement {
       :host([aria-pressed='true']),
       :host([type='expandable'][aria-expanded='true']),
       :host([type='collapsable'][aria-expanded='false']) {
-        background-color: var(--button-active-background-color);
+        background-color: var(--t-button-active-background-color);
       }
     `,
   ];
@@ -25,34 +25,15 @@ export class ToggleButtonElement extends ButtonElement {
   type: 'pressable' | 'expandable' | 'collapsable' = 'pressable';
 
   @property()
-  controls = '';
+  get controls(): string | null {
+    return this.getAttribute('aria-controls');
+  }
+  set controls(value: string | null) {
+    this.setAttribute('aria-controls', value ?? '');
+  }
 
   @property({ type: Boolean })
   pressed = false;
-
-  private get host(): Element {
-    let rootNode = this.getRootNode();
-
-    if (rootNode instanceof ShadowRoot) {
-      return rootNode.host;
-    }
-
-    return rootNode as Element;
-  }
-
-  private get controlled() {
-    if (!this.controls) {
-      return null;
-    }
-
-    let controlled = this.host.querySelector(this.controls);
-
-    if (controlled?.checkVisibility()) {
-      return controlled;
-    }
-
-    return null;
-  }
 
   private updatePressed() {
     let ariaAttr = this.type === 'pressable' ? 'aria-pressed' : 'aria-expanded';
@@ -64,9 +45,10 @@ export class ToggleButtonElement extends ButtonElement {
   }
 
   protected override updated(changedProperties: PropertyValues<this>): void {
+    super.updated(changedProperties);
+
     if (changedProperties.has('pressed')) {
       this.updatePressed();
-      this.setAttribute('aria-controls', this.controlled?.id ?? '');
     }
   }
 }

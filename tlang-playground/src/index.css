@@ -13,6 +13,14 @@
   --t-foreground-color: var(--ctp-macchiato-text);
 
   --t-input-border-color: var(--ctp-macchiato-surface0);
+
+  --t-button-border-color: var(--t-input-border-color);
+  --t-button-focus-ring-color: var(--t-button-border-color);
+  --t-button-background-color: var(--ctp-macchiato-base);
+  --t-button-hover-background-color: var(--ctp-macchiato-surface1);
+  --t-button-active-background-color: hsl(from var(--t-button-hover-background-color) h s calc(l + 10));
+
+  --t-border-radius: 3px;
 }
 
 :root {

@@ -1,36 +1,40 @@
 import { css, html, LitElement, PropertyValues, TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import {
-  eventMatchesShortcut,
+  eventMatchesMacShortcutDefinition,
+  eventMatchesShortcutDefinition,
+  parseMacShortcutDefinition,
   parseShortcutDefinition,
   ShortcutDefinition,
   toAriaKeyshortcuts,
 } from '../utils/shortcuts';
 import { documentListener } from '../decorators/document-listener';
 import { hostListener } from '../decorators/host-listener';
+import { consume } from '@lit/context';
+import { shortcutsContext, ShortcutsContextValue } from '../contexts/shortcuts';
+import { isMac } from '../utils/platform-detection';
+import './t-shortcuts';
+import {
+  pickShortcutEventDetail,
+  ShortcutCategory,
+  ShortcutEvent,
+} from './t-shortcuts';
 
 @customElement('t-button')
 export class ButtonElement extends LitElement {
   static override styles = [
     css`
       :host {
-        --button-border-color: var(--t-input-border-color);
-        --button-focus-ring-color: var(--button-border-color);
-        --button-background-color: var(--ctp-macchiato-base);
-        --button-hover-background-color: var(--ctp-macchiato-surface1);
-        --button-active-background-color: hsl(
-          from var(--button-hover-background-color) h s calc(l + 10)
-        );
-
         align-items: center;
         justify-content: center;
         cursor: default;
         user-select: none;
-        border: 1px solid var(--button-border-color);
-        border-radius: 3px;
-        background-color: var(--button-background-color);
+        border: 1px solid var(--t-button-border-color);
+        border-radius: var(--t-border-radius);
+        background-color: var(--t-button-background-color);
         padding: 0.25em 0.5em;
         font-size: 0.85rem;
+        min-width: 1.5em;
       }
 
       :host(:not([hidden])) {
@@ -38,15 +42,15 @@ export class ButtonElement extends LitElement {
       }
 
       :host(:hover) {
-        background-color: var(--button-hover-background-color);
+        background-color: var(--t-button-hover-background-color);
       }
 
       :host(:active) {
-        background-color: var(--button-active-background-color);
+        background-color: var(--t-button-active-background-color);
       }
 
       :host(:focus-visible) {
-        outline: 2px solid var(--button-focus-ring-color);
+        outline: 2px solid var(--t-button-focus-ring-color);
       }
 
       :host([aria-disabled='true']) {
@@ -55,18 +59,17 @@ export class ButtonElement extends LitElement {
 
       [part='shortcut'] {
         display: none;
-        font-size: 0.75em;
-        margin-left: 0.5em;
-        margin-right: -0.25em;
-        padding: 0.1em 0.25em;
-        border: 1px solid var(--button-border-color);
-        background-color: var(--button-background-color);
       }
 
       @media (min-width: 980px) {
         [part='shortcut'] {
           display: inline;
         }
+      }
+
+      ::part(kbd) {
+        margin-left: 0.5em;
+        margin-right: -0.25em;
       }
     `,
   ];
@@ -80,8 +83,28 @@ export class ButtonElement extends LitElement {
   @property({ type: Boolean, attribute: 'aria-disabled', reflect: true })
   disabled = false;
 
+  @property({ type: String, reflect: true })
+  popovertarget: string | null = null;
+
   @property({ type: String })
   shortcut: ShortcutDefinition | '' = '';
+
+  @property({ type: String, attribute: 'shortcut-mac' })
+  shortcutMac: ShortcutDefinition | '' = '';
+
+  @property({ type: String, attribute: 'shortcut-description' })
+  shortcutDescription: string = '';
+
+  @property({ type: String, attribute: 'shortcut-category' })
+  shortcutCategory: ShortcutCategory = 'global';
+
+  @property({ type: Number, attribute: 'shortcut-priority' })
+  shortcutPriority = 0;
+
+  @consume({ context: shortcutsContext, subscribe: true })
+  private shortcutsContext!: ShortcutsContextValue;
+
+  private popoverOpen = false;
 
   @documentListener('keyup')
   protected handleShortcut(e: KeyboardEvent) {
@@ -89,7 +112,11 @@ export class ButtonElement extends LitElement {
       return;
     }
 
-    if (eventMatchesShortcut(e, parseShortcutDefinition(this.shortcut))) {
+    if (
+      eventMatchesShortcutDefinition(e, this.shortcut) ||
+      (this.shortcutMac &&
+        eventMatchesMacShortcutDefinition(e, this.shortcutMac))
+    ) {
       this.dispatchEvent(
         new CustomEvent('click', {
           bubbles: true,
@@ -99,7 +126,53 @@ export class ButtonElement extends LitElement {
     }
   }
 
-  @hostListener('keypress')
+  private getPopoverTarget(): HTMLElement | null {
+    if (!this.popovertarget) {
+      return null;
+    }
+
+    let target = (this.getRootNode() as HTMLElement).querySelector(
+      `#${this.popovertarget}[popover]`,
+    ) as HTMLElement | null;
+
+    if (target == null) {
+      throw new Error(
+        `No popover target found with id "${this.popovertarget}"`,
+      );
+    }
+
+    return target;
+  }
+
+  private _togglePopover(force?: boolean): void {
+    let target = this.getPopoverTarget();
+
+    if (target == null) {
+      return;
+    }
+
+    if (!this.popoverOpen) {
+      target.addEventListener(
+        'toggle',
+        (event) => {
+          this.popoverOpen = (event as ToggleEvent).newState === 'open';
+
+          target.addEventListener(
+            'toggle',
+            (event) => {
+              this.popoverOpen = (event as ToggleEvent).newState === 'open';
+            },
+            { once: true },
+          );
+        },
+        { once: true },
+      );
+    }
+
+    target.togglePopover(force);
+  }
+
+  @hostListener(['click', 'keypress'])
   protected handleEvent(e: Event): void {
     if (this.disabled) {
       e.preventDefault();
@@ -107,41 +180,97 @@ export class ButtonElement extends LitElement {
       return;
     }
 
-    let event = e as KeyboardEvent & { type: `key${string}` };
+    let event = e as
+      | (MouseEvent & { type: 'click' })
+      | (KeyboardEvent & { type: `key${string}` });
 
     switch (event.type) {
-      case 'keypress':
+      case 'click': {
+        let target = this.getPopoverTarget();
+
+        if (target == null || (target.popover === 'auto' && this.popoverOpen)) {
+          // Clicking outside the popover will close it already,
+          // so we don't need to do anything
+          return;
+        }
+
+        this._togglePopover();
+        break;
+      }
+      case 'keypress': {
         if (event.key == 'Enter' || event.key == ' ') {
-          this.dispatchEvent(
-            new CustomEvent('click', {
-              bubbles: true,
-              composed: true,
-            }),
-          );
+          let syntheticClick = new CustomEvent('click', {
+            cancelable: true,
+            bubbles: true,
+            composed: true,
+          });
+
+          if (this.dispatchEvent(syntheticClick)) {
+            this._togglePopover(!this.popoverOpen);
+          }
         }
         break;
+      }
     }
   }
 
   protected override updated(changedProperties: PropertyValues<this>): void {
-    if (changedProperties.has('shortcut') && this.shortcut) {
-      this.setAttribute(
-        'aria-keyshortcuts',
-        toAriaKeyshortcuts(parseShortcutDefinition(this.shortcut)),
-      );
+    if (changedProperties.has('shortcut')) {
+      if (!this.shortcut) {
+        this.removeAttribute('aria-keyshortcuts');
+        this.dispatchEvent(ShortcutEvent.unregister(this));
+      } else {
+        this.setAttribute(
+          'aria-keyshortcuts',
+          toAriaKeyshortcuts(
+            isMac() && this.shortcutMac
+              ? parseMacShortcutDefinition(this.shortcutMac)
+              : parseShortcutDefinition(this.shortcut),
+          ),
+        );
+
+        let shortcutDescription =
+          this.shortcutDescription ||
+          this.ariaLabel ||
+          this.title ||
+          this.textContent ||
+          '';
+
+        this.dispatchEvent(
+          ShortcutEvent.register({
+            ...pickShortcutEventDetail(this),
+            shortcutDescription,
+          }),
+        );
+      }
     }
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
+
+    if (this.shortcut) {
+      this.dispatchEvent(ShortcutEvent.unregister(this));
+    }
   }
 
   protected override render(): TemplateResult {
-    let shortcut = this.shortcut
-      ? html`<span aria-hidden="true" part="shortcut">${this.shortcut}</span>`
-      : '';
+    let shortcut =
+      this.shortcut && this.shortcutsContext.showHints
+        ? html`
+            <t-shortcut-hint
+              aria-hidden="true"
+              part="shortcut"
+              exportparts="kbd"
+              .shortcut=${this.shortcut}
+              .shortcutMac=${this.shortcutMac}
+            ></t-shortcut-hint>
+          `
+        : '';
 
-    return html`<slot></slot>${shortcut}`;
+    return html`
+      <slot aria-hidden=${Boolean(this.ariaLabel)}></slot>${shortcut}
+    `;
   }
 }
 

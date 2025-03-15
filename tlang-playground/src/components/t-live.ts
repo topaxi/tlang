@@ -15,7 +15,9 @@ export class LiveElement extends LitElement {
   protected override firstUpdated(
     _changedProperties: PropertyValues<this>,
   ): void {
-    this.live = this.live || this.role == 'alert' ? 'assertive' : 'polite';
+    setTimeout(() => {
+      this.live = this.live || this.role == 'alert' ? 'assertive' : 'polite';
+    });
   }
 
   protected override render(): TemplateResult {

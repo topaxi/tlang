@@ -1,10 +1,20 @@
 import { LitElement } from 'lit';
-import { EventController } from '../controllers/event-controller';
+import {
+  EventController,
+  EventListenerOptions,
+} from '../controllers/event-controller';
 
-export function documentListener(eventName: string): PropertyDecorator;
-export function documentListener(eventNames: string[]): PropertyDecorator;
+export function documentListener(
+  eventName: string,
+  options?: EventListenerOptions,
+): PropertyDecorator;
+export function documentListener(
+  eventNames: string[],
+  options?: EventListenerOptions,
+): PropertyDecorator;
 export function documentListener(
   eventNames: string | string[],
+  options?: EventListenerOptions,
 ): PropertyDecorator {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return function (target: any, propertyKey) {
@@ -18,6 +28,7 @@ export function documentListener(
         eventNames,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (this as any)[propertyKey],
+        options,
       );
     };
   };
