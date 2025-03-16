@@ -171,9 +171,10 @@ export class ConsoleMessageElement extends LitElement {
       return args;
     }
 
-    return html`${this.renderMessageIcon()}<span part="args">
-        ${args.map(this.renderConsoleMessageArg, this)}
-      </span>`;
+    return html`
+      ${this.renderMessageIcon()}
+      <span part="args">${args.map(this.renderConsoleMessageArg, this)}</span>
+    `;
   }
 
   protected renderConsoleMessageArg(arg: unknown) {

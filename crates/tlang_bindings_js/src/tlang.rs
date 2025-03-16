@@ -36,11 +36,6 @@ impl Tlang {
         let mut analyzer = SemanticAnalyzer::default();
 
         analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());
-        analyzer.add_builtin_symbols(&[
-            ("log::log", tlang_ast::symbols::SymbolType::Function),
-            ("log::group", tlang_ast::symbols::SymbolType::Function),
-            ("log::groupEnd", tlang_ast::symbols::SymbolType::Function),
-        ]);
 
         Self {
             source: source.to_string(),
@@ -77,7 +72,9 @@ impl Tlang {
 
     #[wasm_bindgen]
     pub fn define_js_fn(&mut self, name: &str, f: js_sys::Function) {
-        self.interpreter.define_js_fn(name, f)
+        self.interpreter.define_js_fn(name, f);
+        self.analyzer
+            .add_builtin_symbols(&[(name, tlang_ast::symbols::SymbolType::Function)]);
     }
 
     fn parse(&mut self) -> Result<&ast::Module, &ParseError> {

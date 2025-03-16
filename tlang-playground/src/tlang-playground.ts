@@ -253,6 +253,12 @@ export class TlangPlayground extends LitElement {
     log: (...args: unknown[]) => {
       this.logToConsole('log', ...args);
     },
+    warn: (...args: unknown[]) => {
+      this.logToConsole('warn', ...args);
+    },
+    error: (...args: unknown[]) => {
+      this.logToConsole('error', ...args);
+    },
     group: (...args: unknown[]) => {
       this.logToConsole('group', ...args);
     },
@@ -351,12 +357,6 @@ export class TlangPlayground extends LitElement {
   }
 
   private runInterpreted() {
-    this.tlang.define_js_fn('log', this.tlangConsole.log);
-
-    for (let [method, fn] of Object.entries(this.tlangConsole)) {
-      this.tlang.define_js_fn(`log::${method}`, fn);
-    }
-
     this.tlang.eval();
   }
 
@@ -395,6 +395,13 @@ export class TlangPlayground extends LitElement {
 
   protected createTlang(source: string) {
     this.tlang = new Tlang(source);
+
+    this.tlang.define_js_fn('log', this.tlangConsole.log);
+
+    for (let [method, fn] of Object.entries(this.tlangConsole)) {
+      this.tlang.define_js_fn(`log::${method}`, fn);
+    }
+
     this.analyze();
     this.tlang.compileToJS();
   }
