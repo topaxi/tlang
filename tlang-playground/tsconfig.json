@@ -25,8 +25,11 @@
     "noFallthroughCasesInSwitch": true,
     "plugins": [
       {
-        "name": "ts-lit-plugin",
-        "strict": true
+        "name": "@jackolope/ts-lit-plugin",
+        "strict": true,
+        "rules": {
+          "no-noncallable-event-binding": "off"
+        }
       }
     ]
   },
