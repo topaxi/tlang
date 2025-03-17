@@ -1,11 +1,12 @@
 import { css, PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { ButtonElement } from './t-button';
+import { styles } from '../utils/css';
 
 @customElement('t-toggle-button')
 export class ToggleButtonElement extends ButtonElement {
-  static override styles = [
-    ...ButtonElement.styles,
+  static override styles = styles(
+    super.styles,
     css`
       :host([aria-pressed='true']),
       :host([type='expandable'][aria-expanded='true']),
@@ -13,7 +14,7 @@ export class ToggleButtonElement extends ButtonElement {
         background-color: var(--t-button-active-background-color);
       }
     `,
-  ];
+  );
 
   /**
    * What type of toggle button is this?

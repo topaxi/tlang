@@ -12,6 +12,7 @@ import {
   queryAssignedElements,
 } from 'lit/decorators.js';
 import { hostListener } from '../decorators/host-listener';
+import { ButtonElement } from './t-button';
 
 @customElement('t-menu')
 export class MenuElement extends LitElement {
@@ -25,9 +26,9 @@ export class MenuElement extends LitElement {
   `;
 
   @queryAssignedElements({
-    selector: 't-menuitem,t-menuitem-radio,t-menuitem-checkbox',
+    selector: 't-menuitem,t-menuitem-link,t-menuitem-radio,t-menuitem-checkbox',
   })
-  protected menuItems!: MenuItemElement[];
+  protected menuItems!: MenuItemButtonElement[];
 
   @property({ type: String, reflect: true })
   override role = 'menu';
@@ -63,7 +64,7 @@ export class MenuElement extends LitElement {
 }
 
 @customElement('t-menuitem')
-export class MenuItemElement extends LitElement {
+export class MenuItemButtonElement extends ButtonElement {
   static override styles: CSSResultGroup = css`
     :host {
       display: block;
@@ -83,34 +84,31 @@ export class MenuItemElement extends LitElement {
     }
   `;
 
-  protected internals = this.attachInternals();
-
   override tabIndex = -1;
 
-  @property({ type: String, reflect: true })
   override role = 'menuitem';
-
-  @hostListener('keypress')
-  protected handleKeyPress(event: KeyboardEvent) {
-    if (event.key === 'Enter' || event.key === ' ') {
-      this.dispatchEvent(
-        new CustomEvent('click', {
-          bubbles: true,
-          composed: true,
-        }),
-      );
-    }
-  }
 
   protected override render(): TemplateResult {
     return html`<slot></slot>`;
   }
 }
 
-@customElement('t-menuitem-radio')
-export class MenuItemRadioElement extends MenuItemElement {
-  static override styles = MenuItemElement.styles;
+@customElement('t-menuitem-link')
+export class MenuItemLinkElement extends LitElement {
+  static override styles: CSSResultGroup = MenuItemButtonElement.styles;
 
+  override tabIndex = -1;
+
+  @property()
+  href: string | undefined;
+
+  protected override render(): TemplateResult {
+    return html`<a role="menuitem" href=${this.href}><slot></slot></a>`;
+  }
+}
+
+@customElement('t-menuitem-radio')
+export class MenuItemRadioElement extends MenuItemButtonElement {
   override role = 'menuitemradio';
 
   protected override render(): TemplateResult {
@@ -119,9 +117,9 @@ export class MenuItemRadioElement extends MenuItemElement {
 }
 
 @customElement('t-menuitem-checkbox')
-export class MenuItemCheckboxElement extends MenuItemElement {
+export class MenuItemCheckboxElement extends MenuItemButtonElement {
   static override styles = [
-    MenuItemElement.styles,
+    super.styles,
     css`
       ::part(icon)::before {
         content: '\\00a0';
@@ -178,7 +176,7 @@ export class MenuItemSeparatorElement extends LitElement {
 declare global {
   interface HTMLElementTagNameMap {
     't-menu': MenuElement;
-    't-menuitem': MenuItemElement;
+    't-menuitem': MenuItemButtonElement;
     't-menuitemradio': MenuItemRadioElement;
     't-menuitemcheckbox': MenuItemCheckboxElement;
   }

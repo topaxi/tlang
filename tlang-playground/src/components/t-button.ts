@@ -1,4 +1,11 @@
-import { css, html, LitElement, PropertyValues, TemplateResult } from 'lit';
+import {
+  css,
+  CSSResultGroup,
+  html,
+  LitElement,
+  PropertyValues,
+  TemplateResult,
+} from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import {
   eventMatchesMacShortcutDefinition,
@@ -22,7 +29,7 @@ import {
 
 @customElement('t-button')
 export class ButtonElement extends LitElement {
-  static override styles = [
+  static override styles: CSSResultGroup = [
     css`
       :host {
         align-items: center;
@@ -73,6 +80,8 @@ export class ButtonElement extends LitElement {
       }
     `,
   ];
+
+  protected internals = this.attachInternals();
 
   @property({ type: String, reflect: true })
   override role = 'button';

@@ -112,6 +112,7 @@ export class TabElement extends LitElement {
       position: relative;
       border-bottom: 1px solid transparent;
       margin-bottom: -1px;
+      user-select: none;
     }
 
     :host([aria-selected='true']) {
