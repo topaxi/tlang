@@ -145,7 +145,7 @@ export class ConsoleElement extends LitElement {
           .pressed=${this.collapsed}
           controls="messages"
           shortcut="ctrl+alt+c"
-          shostcut-mac="cmd+alt+c"
+          shortcut-mac="cmd+alt+c"
           shortcut-category="console"
           shortcut-description="Toggle Console"
           title=${this.collapsed ? 'Expand Console' : 'Collapse Console'}
@@ -182,11 +182,7 @@ export class ConsoleElement extends LitElement {
         </t-menu>
       </div>
       <div class="messages-container">
-        <div
-          id="messages"
-          class="messages"
-          .hidden=${this.collapsed}
-        >
+        <div id="messages" class="messages" .hidden=${this.collapsed}>
           ${repeat(
             this.messages,
             (_item, index) => index,
@@ -230,7 +226,7 @@ export class ConsoleElement extends LitElement {
               return rendered;
             },
           )}
-        </ul>
+        </div>
       </div>
     `;
   }

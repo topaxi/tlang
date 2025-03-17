@@ -77,8 +77,7 @@ export class ButtonElement extends LitElement {
   @property({ type: String, reflect: true })
   override role = 'button';
 
-  @property({ reflect: true })
-  tabindex = 0;
+  override tabIndex = 0;
 
   @property({ type: Boolean, attribute: 'aria-disabled', reflect: true })
   disabled = false;

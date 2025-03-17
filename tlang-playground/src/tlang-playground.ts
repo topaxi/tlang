@@ -600,8 +600,11 @@ export class TlangPlayground extends LitElement {
                 ${repeat(
                   this.availableDisplayOptions,
                   (display) => display,
-                  (display) =>
-                    html`<t-tab slot="tab" id=${display}>${displayLabels[display]}</option>`,
+                  (display) => html`
+                    <t-tab slot="tab" id=${display}>
+                      ${displayLabels[display]}
+                    </t-tab>
+                  `,
                 )}
                 <t-tab-panel>
                   ${keyed(this.display, this.renderOutput())}

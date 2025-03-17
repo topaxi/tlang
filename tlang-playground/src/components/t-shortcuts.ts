@@ -289,7 +289,7 @@ class ShortcutDescriptionElement extends LitElement {
     }
   `;
 
-  @property()
+  @property({ type: Object })
   shortcutDetail!: ShortcutEventDetail;
 
   protected override render(): unknown {
