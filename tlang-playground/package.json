@@ -26,7 +26,7 @@
   },
   "devDependencies": {
     "ts-lit-plugin": "^2.0.2",
-    "vite": "^6.2.1",
+    "vite": "^6.2.2",
     "vite-plugin-wasm": "^3.4.1"
   }
 }
