@@ -305,6 +305,10 @@ export class TlangPlayground extends LitElement {
   }
 
   run() {
+    if (!this.consoleElement.persist) {
+      this.clearConsole();
+    }
+
     this.logToConsole('group');
 
     let beforeOpenGroups = this.getConsoleOpenGroups();
@@ -497,6 +501,10 @@ export class TlangPlayground extends LitElement {
   handleConsoleClear(event: Event) {
     event.preventDefault();
 
+    this.clearConsole();
+  }
+
+  private clearConsole() {
     this.consoleMessages = [];
   }
 
