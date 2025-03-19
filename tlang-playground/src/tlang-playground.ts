@@ -122,7 +122,7 @@ async function updateDisplayHashparam(display: string) {
   updateHashParam('display', display);
 }
 
-const emptyTlang = {} as Tlang;
+const emptyTlang = new Tlang('');
 
 @customElement('tlang-playground')
 export class TlangPlayground extends LitElement {
@@ -272,11 +272,11 @@ export class TlangPlayground extends LitElement {
       this.tlang.analyze();
 
       this.codemirror.diagnostics =
-        this.tlang.codemirrorDiagnostics.map(
-          this.mapCodemirrorDiagnosticToJS,
-        ) ?? [];
+        this.tlang
+          .getCodemirrorDiagnostics()
+          .map(this.mapCodemirrorDiagnosticToJS) ?? [];
 
-      for (let diagnostic of this.tlang.diagnostics) {
+      for (let diagnostic of this.tlang.getDiagnostics()) {
         let method =
           diagnostic.severity === 'Error'
             ? ('error' as const)
@@ -289,7 +289,7 @@ export class TlangPlayground extends LitElement {
     } catch {
       // We only log the first parse error to the console, as it's usually the
       // most relevant one.
-      for (let parseError of this.tlang.parseErrors.slice(0, 1)) {
+      for (let parseError of this.tlang.getParseErrors().slice(0, 1)) {
         let formatted = `${Object.keys(parseError.kind)[0]}: ${parseError.msg} at ${parseError.span.start.line}:${parseError.span.start.column}`;
 
         this.logToConsole('error', formatted);
@@ -350,7 +350,7 @@ export class TlangPlayground extends LitElement {
 
     let fn = new Function(
       '___js_bindings',
-      `${bindingsDestructuring}${getStandardLibraryCompiled()}\n{${this.tlang.js}};`,
+      `${bindingsDestructuring}${getStandardLibraryCompiled()}\n{${this.tlang.getJavaScript()}};`,
     );
 
     fn(bindings);
@@ -396,14 +396,13 @@ export class TlangPlayground extends LitElement {
   protected createTlang(source: string) {
     this.tlang = new Tlang(source);
 
-    this.tlang.define_js_fn('log', this.tlangConsole.log);
+    this.tlang.defineFunction('log', this.tlangConsole.log);
 
     for (let [method, fn] of Object.entries(this.tlangConsole)) {
-      this.tlang.define_js_fn(`log::${method}`, fn);
+      this.tlang.defineFunction(`log::${method}`, fn);
     }
 
     this.analyze();
-    this.tlang.compileToJS();
   }
 
   protected override update(changedProperties: PropertyValueMap<this>): void {
@@ -508,15 +507,15 @@ export class TlangPlayground extends LitElement {
   renderOutput() {
     switch (this.display) {
       case 'ast':
-        return html`<pre class="output-ast">${this.tlang.ast_string}</pre>`;
+        return html`<pre class="output-ast">${this.tlang.getASTString()}</pre>`;
       case 'hir':
-        return html`<pre class="output-ast">${this.tlang.hir_string}</pre>`;
+        return html`<pre class="output-ast">${this.tlang.getHIRString()}</pre>`;
       case 'hir_pretty':
         return html`
           <t-codemirror
             class="output-code"
             language="tlang"
-            .source=${this.tlang.hir_pretty}
+            .source=${this.tlang.getHIRPretty()}
             with-diagnostics="false"
             readonly
           ></t-codemirror>
@@ -526,7 +525,7 @@ export class TlangPlayground extends LitElement {
           <t-codemirror
             class="output-code"
             language="javascript"
-            .source=${this.tlang.js}
+            .source=${this.tlang.getJavaScript()}
             with-diagnostics="false"
             readonly
           ></t-codemirror>

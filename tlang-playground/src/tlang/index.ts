@@ -16,7 +16,7 @@ export function getStandardLibraryCompiled(): string {
   const compiler = new Tlang(standardLibrarySource);
 
   compiler.compileToJS();
-  const output = compiler.js;
+  const output = compiler.getJavaScript();
 
   compiler.free();
 

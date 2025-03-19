@@ -70,7 +70,7 @@ impl Tlang {
         Ok(self.interpreter.eval(hir))
     }
 
-    #[wasm_bindgen]
+    #[wasm_bindgen(js_name = "defineFunction")]
     pub fn define_js_fn(&mut self, name: &str, f: js_sys::Function) {
         self.interpreter.define_js_fn(name, f);
         self.analyzer
@@ -96,7 +96,7 @@ impl Tlang {
         }
     }
 
-    #[wasm_bindgen(getter, js_name = "parseErrors")]
+    #[wasm_bindgen(js_name = "getParseErrors")]
     pub fn parse_errors(&mut self) -> Result<JsValue, serde_wasm_bindgen::Error> {
         serde_wasm_bindgen::to_value(self.parse_issues())
     }
@@ -135,7 +135,7 @@ impl Tlang {
         Ok(())
     }
 
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(js_name = "getHIRString")]
     pub fn hir_string(&mut self) -> String {
         self.lower_to_hir();
 
@@ -146,7 +146,7 @@ impl Tlang {
         }
     }
 
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(js_name = "getHIRPretty")]
     pub fn hir_pretty(&mut self) -> String {
         self.lower_to_hir();
 
@@ -157,7 +157,7 @@ impl Tlang {
         }
     }
 
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(js_name = "getASTString")]
     pub fn ast_string(&mut self) -> String {
         let _ = self.parse();
 
@@ -168,18 +168,18 @@ impl Tlang {
         }
     }
 
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(js_name = "getJavaScript")]
     pub fn js(&mut self) -> String {
         let _ = self.compile_to_js();
         self.js.get_output().to_string()
     }
 
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(js_name = "getDiagnostics")]
     pub fn diagnostics(&mut self) -> Result<JsValue, serde_wasm_bindgen::Error> {
         serde_wasm_bindgen::to_value(self.analyzer.get_diagnostics())
     }
 
-    #[wasm_bindgen(getter, js_name = "codemirrorDiagnostics")]
+    #[wasm_bindgen(js_name = "getCodemirrorDiagnostics")]
     pub fn codemirror_diagnostics(&mut self) -> Vec<codemirror::CodemirrorDiagnostic> {
         let source = self.source.clone();
         let diagnostics = self
