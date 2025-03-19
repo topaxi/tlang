@@ -2,33 +2,73 @@ use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token::Literal;
 use tlang_hir::hir;
 
-pub struct HirPretty {
-    output: String,
-    indent_level: usize,
+pub struct HirPrettyOptions {
+    pub tab_indent: bool,
+    pub indent_size: usize,
+    pub mark_unresolved: bool,
 }
 
-impl Default for HirPretty {
+impl Default for HirPrettyOptions {
     fn default() -> Self {
-        Self::new()
+        Self {
+            indent_size: 4,
+            tab_indent: false,
+            mark_unresolved: true,
+        }
     }
 }
 
-impl HirPretty {
-    fn new() -> Self {
+struct HirPrettyResolvedOptions {
+    indent_string: String,
+    mark_unresolved: bool,
+}
+
+impl Default for HirPrettyResolvedOptions {
+    fn default() -> Self {
+        Self::from(HirPrettyOptions::default())
+    }
+}
+
+impl From<HirPrettyOptions> for HirPrettyResolvedOptions {
+    fn from(options: HirPrettyOptions) -> Self {
         Self {
-            output: String::new(),
-            indent_level: 0,
+            indent_string: if options.tab_indent {
+                "\t".to_string()
+            } else {
+                " ".repeat(options.indent_size)
+            },
+            mark_unresolved: options.mark_unresolved,
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct HirPretty {
+    output: String,
+    indent_level: usize,
+    options: HirPrettyResolvedOptions,
+}
+
+impl HirPretty {
+    pub fn new(options: HirPrettyOptions) -> Self {
+        Self {
+            options: HirPrettyResolvedOptions::from(options),
+            ..Default::default()
         }
     }
 
     pub fn pretty_print(hir: &hir::Module) -> String {
-        let mut pretty_printer = HirPretty::new();
+        let mut pretty_printer = HirPretty::default();
         pretty_printer.print_module(hir);
         pretty_printer.output
     }
 
     fn push_str(&mut self, string: &str) {
         self.output.push_str(string);
+    }
+
+    fn push_string(&mut self, string: String) {
+        self.push_str(&string);
     }
 
     fn push_char(&mut self, ch: char) {
@@ -45,7 +85,7 @@ impl HirPretty {
 
     fn push_indent(&mut self) {
         for _ in 0..self.indent_level {
-            self.push_str("    ");
+            self.output.push_str(&self.options.indent_string);
         }
     }
 
@@ -319,7 +359,7 @@ impl HirPretty {
 
     fn print_function_name(&mut self, name: &hir::Expr) {
         if let hir::ExprKind::Path(path) = &name.kind {
-            self.push_str(&path.join("::"));
+            self.push_string(path.join("::"));
         } else {
             self.print_expr(name);
         }
@@ -354,7 +394,7 @@ impl HirPretty {
             self.push_str("-> ");
             self.print_function_name(&decl.name);
             self.push_str("$$");
-            self.push_str(&variant.0.to_string());
+            self.push_string(variant.0.to_string());
         }
         self.dec_indent();
     }
@@ -416,22 +456,22 @@ impl HirPretty {
     }
 
     fn print_path(&mut self, path: &hir::Path) {
-        self.push_str(&path.join("::"));
+        self.push_string(path.join("::"));
 
         // We print unresolved paths with a question mark.
-        if path.res.is_unknown() {
+        if self.options.mark_unresolved && path.res.is_unknown() {
             self.push_char('?');
         }
     }
 
     fn print_literal(&mut self, lit: &Literal) {
         match lit {
-            Literal::Boolean(bool) => self.push_str(&bool.to_string()),
-            Literal::String(s) => self.push_str(&format!("{s:?}")),
-            Literal::Char(c) => self.push_str(&format!("{c:?}")),
-            Literal::UnsignedInteger(u) => self.push_str(&u.to_string()),
-            Literal::Integer(i) => self.push_str(&i.to_string()),
-            Literal::Float(f) => self.push_str(&f.to_string()),
+            Literal::Boolean(bool) => self.push_string(bool.to_string()),
+            Literal::String(s) => self.push_string(format!("{s:?}")),
+            Literal::Char(c) => self.push_string(format!("{c:?}")),
+            Literal::UnsignedInteger(u) => self.push_string(u.to_string()),
+            Literal::Integer(i) => self.push_string(i.to_string()),
+            Literal::Float(f) => self.push_string(f.to_string()),
             Literal::None => unreachable!(),
         }
     }
