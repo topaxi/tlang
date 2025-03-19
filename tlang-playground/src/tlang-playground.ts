@@ -15,6 +15,7 @@ import {
   ConsoleMessage,
   createConsoleMessage,
 } from './components/t-console';
+import { FlashElement } from './components/t-flash';
 import { SplitElement, SplitEvent } from './components/t-split';
 import { compressSource, decompressSource } from './utils/lz';
 import {
@@ -367,25 +368,19 @@ export class TlangPlayground extends LitElement {
   async share() {
     await updateSourceHashparam(this.source);
 
-    navigator.clipboard.writeText(String(window.location)).then(() => {
-      let flashnotification = document.createElement('div');
+    try {
+      await navigator.clipboard.writeText(String(window.location));
 
+      let flashnotification = new FlashElement();
+
+      flashnotification.autoDismiss = 1000;
       flashnotification.textContent = 'URL copied to clipboard';
-      flashnotification.style.position = 'fixed';
-      flashnotification.style.left = '50%';
-      flashnotification.style.top = '50%';
-      flashnotification.style.transform = 'translate(-50%, -50%)';
-      flashnotification.style.padding = '1rem';
-      flashnotification.style.background = 'var(--ctp-macchiato-surface0)';
-      flashnotification.style.borderRadius = '8px';
-      flashnotification.style.zIndex = '1000';
+    } catch {
+      let flashnotification = new FlashElement({ severity: 'error' });
 
-      document
-        .querySelector('body > t-live[role="log"]')!
-        .append(flashnotification);
-
-      setTimeout(() => flashnotification.remove(), 1000);
-    });
+      flashnotification.autoDismiss = 2000;
+      flashnotification.textContent = 'Failed to copy URL to clipboard';
+    }
   }
 
   private mapCodemirrorDiagnosticToJS(diagnostic: CodemirrorDiagnostic) {
