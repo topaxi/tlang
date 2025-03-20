@@ -86,7 +86,7 @@ impl CodegenJS {
         format!("{}\n{}", notice, stdlib_js_src)
     }
 
-    pub fn get_standard_library_symbols() -> &'static [(&'static str, SymbolType); 28] {
+    pub fn get_standard_library_symbols() -> &'static [(&'static str, SymbolType); 29] {
         &[
             ("Option", SymbolType::Enum),
             ("Result", SymbolType::Enum),
@@ -101,6 +101,7 @@ impl CodegenJS {
             ("len", SymbolType::Function),
             ("log", SymbolType::Function),
             ("math", SymbolType::Module),
+            ("math::pi", SymbolType::Variable),
             ("math::max", SymbolType::Function),
             ("math::min", SymbolType::Function),
             ("math::floor", SymbolType::Function),

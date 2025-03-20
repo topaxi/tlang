@@ -16,15 +16,12 @@ fn test_enums() {
         }
     "});
     let expected_output = indoc! {"
-        const Option = {
-            Some(x) {
-                return {
-                    tag: \"Some\",
-                    [0]: x,
-                };
-            },
-            None: { tag: \"None\" },
-        };
+        class Option {
+            tag = '';
+            [0];
+            static Some = (x) => Object.assign(new this, { tag: \"Some\", [0]: x });
+            static None = Object.assign(new this, { tag: \"None\" });
+        }
         function main() {
             let x = Option.Some(42);
         }
@@ -52,16 +49,13 @@ fn test_enums_with_fields() {
         }
     "});
     let expected_output = indoc! {"
-        const Node = {
-            BinaryOperation({ operator, left, right }) {
-                return {
-                    tag: \"BinaryOperation\",
-                    operator,
-                    left,
-                    right,
-                };
-            },
-        };
+        class Node {
+            tag = '';
+            operator;
+            left;
+            right;
+            static BinaryOperation = ({ operator, left, right }) => Object.assign(new this, { tag: \"BinaryOperation\", operator, left, right });
+        }
         function main() {
             let x = Node.BinaryOperation({
                 operator: \"+\",
@@ -92,21 +86,14 @@ fn test_enums_tree_implementation() {
         }
     "});
     let expected_output = indoc! {"
-        const Tree = {
-            Leaf(x) {
-                return {
-                    tag: \"Leaf\",
-                    [0]: x,
-                };
-            },
-            Node({ left, right }) {
-                return {
-                    tag: \"Node\",
-                    left,
-                    right,
-                };
-            },
-        };
+        class Tree {
+            tag = '';
+            [0];
+            left;
+            right;
+            static Leaf = (x) => Object.assign(new this, { tag: \"Leaf\", [0]: x });
+            static Node = ({ left, right }) => Object.assign(new this, { tag: \"Node\", left, right });
+        }
         function main() {
             let x = Tree.Node({
                 left: Tree.Leaf(1),
@@ -142,21 +129,14 @@ fn test_maximum_depth_tree() {
         }
     "});
     let expected_output = indoc! {"
-        const Tree = {
-            Leaf(x) {
-                return {
-                    tag: \"Leaf\",
-                    [0]: x,
-                };
-            },
-            Node({ left, right }) {
-                return {
-                    tag: \"Node\",
-                    left,
-                    right,
-                };
-            },
-        };
+        class Tree {
+            tag = '';
+            [0];
+            left;
+            right;
+            static Leaf = (x) => Object.assign(new this, { tag: \"Leaf\", [0]: x });
+            static Node = ({ left, right }) => Object.assign(new this, { tag: \"Node\", left, right });
+        }
         function maximum_depth(tree) {
             let left,right;if (tree.tag === \"Leaf\") {
                 return 1;
@@ -189,21 +169,13 @@ fn test_maximum_depth_tree_positional() {
         fn maximum_depth(Tree::Node(left, right)) { 1 + math::max(maximum_depth(left), maximum_depth(right)) }
     "});
     let expected_output = indoc! {"
-        const Tree = {
-            Leaf(x) {
-                return {
-                    tag: \"Leaf\",
-                    [0]: x,
-                };
-            },
-            Node(left, right) {
-                return {
-                    tag: \"Node\",
-                    [0]: left,
-                    [1]: right,
-                };
-            },
-        };
+        class Tree {
+            tag = '';
+            [0];
+            [1];
+            static Leaf = (x) => Object.assign(new this, { tag: \"Leaf\", [0]: x });
+            static Node = (left, right) => Object.assign(new this, { tag: \"Node\", [0]: left, [1]: right });
+        }
         function maximum_depth(tree) {
             let left,right;if (tree.tag === \"Leaf\") {
                 return 1;

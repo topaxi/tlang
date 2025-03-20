@@ -174,21 +174,13 @@ fn test_codegen_pattern_match_positional_enum() {
         };
     "});
     let expected_output = indoc! {"
-        const Expr = {
-            Value(int) {
-                return {
-                    tag: \"Value\",
-                    [0]: int,
-                };
-            },
-            Add(lhs, rhs) {
-                return {
-                    tag: \"Add\",
-                    [0]: lhs,
-                    [1]: rhs,
-                };
-            },
-        };
+        class Expr {
+            tag = '';
+            [0];
+            [1];
+            static Value = (int) => Object.assign(new this, { tag: \"Value\", [0]: int });
+            static Add = (lhs, rhs) => Object.assign(new this, { tag: \"Add\", [0]: lhs, [1]: rhs });
+        }
         let expr = Expr.Value(42);
         let $tmp$0,x,y;if (expr.tag === \"Value\" && (x = expr[0], true)) {
             $tmp$0 = x;

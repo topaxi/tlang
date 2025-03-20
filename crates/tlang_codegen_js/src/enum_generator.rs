@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use tlang_ast::node::Ident;
 use tlang_hir::hir;
 
@@ -6,14 +8,36 @@ use crate::generator::CodegenJS;
 impl CodegenJS {
     pub(crate) fn generate_enum_declaration(&mut self, decl: &hir::EnumDeclaration) {
         self.push_indent();
-        self.push_str(&format!("const {} = {{\n", decl.name));
+        self.push_str(&format!("class {} {{\n", decl.name));
         self.inc_indent();
+        self.push_indent();
+        self.push_str("tag = '';\n");
+
+        let mut seen = HashSet::new();
+        let field_names = decl
+            .variants
+            .iter()
+            .flat_map(|variant| variant.parameters.iter())
+            .map(|field| field.name.as_str())
+            .filter(|name| seen.insert(name.to_string()))
+            .collect::<Vec<_>>();
+
+        for field_name in field_names {
+            self.push_indent();
+            if field_name.chars().all(char::is_numeric) {
+                self.push_str(&format!("[{}];\n", field_name));
+            } else {
+                self.push_str(&format!("{};\n", field_name));
+            }
+        }
+
         for variant in &decl.variants {
             self.generate_enum_variant(&variant.name, &variant.parameters);
         }
+
         self.dec_indent();
         self.push_indent();
-        self.push_str("};\n");
+        self.push_str("}\n");
     }
 
     fn is_numeric(str: &str) -> bool {
@@ -48,11 +72,13 @@ impl CodegenJS {
         };
 
         if parameters.is_empty() {
-            self.push_str(&format!("{name}: {{ tag: \"{name}\" }},\n"));
+            self.push_str(&format!(
+                "static {name} = Object.assign(new this, {{ tag: \"{name}\" }});\n"
+            ));
             return;
         }
 
-        self.push_str(&format!("{name}("));
+        self.push_str(&format!("static {name} = ("));
         if named_fields {
             self.push_str("{ ");
         }
@@ -65,16 +91,11 @@ impl CodegenJS {
         if named_fields {
             self.push_str(" }");
         }
-        self.push_str(") {\n");
-        self.inc_indent();
-        self.push_indent();
-        self.push_str("return {\n");
-        self.inc_indent();
-        self.push_indent();
-        self.push_str(&format!("tag: \"{name}\",\n"));
+        self.push_str(&format!(") => Object.assign(new this, {{ tag: \"{name}\""));
 
         for (i, param) in parameters.iter().enumerate() {
-            self.push_indent();
+            self.push_str(", ");
+
             let parameter_name = parameter_names[i].as_str();
             let param_field_name = param.name.as_str();
 
@@ -87,15 +108,9 @@ impl CodegenJS {
             }
 
             self.push_str(parameter_name);
-            self.push_str(",\n");
         }
 
-        self.dec_indent();
-        self.push_indent();
-        self.push_str("};\n");
-        self.dec_indent();
-        self.push_indent();
-        self.push_str("},\n");
+        self.push_str(" });\n");
         self.pop_scope();
     }
 }

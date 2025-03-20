@@ -1,0 +1,30 @@
+enum Shape {
+    Circle(f32),
+    Rectangle(f32, f32),
+    Square(f32),
+}
+
+// Shape.area(self) -> f32
+fn Shape.area(Shape::Circle(radius)) { math::pi * radius ** 2 }
+fn Shape.area(Shape::Rectangle(width, height)) { width * height }
+fn Shape.area(Shape::Square(side)) { side ** 2 }
+
+// Shape.perimeter(self) -> f32
+fn Shape.perimeter(Shape::Circle(radius)) { 2 * math::pi * radius }
+fn Shape.perimeter(Shape::Rectangle(width, height)) { 2 * (width + height) }
+fn Shape.perimeter(Shape::Square(side)) { 4 * side }
+
+// Example usage
+let s1 = Shape::Circle(5.0);
+let s2 = Shape::Rectangle(3.0, 4.0);
+let s3 = Shape::Square(2.0);
+
+// Compute and log areas
+s1.area() |> log();
+s2.area() |> log();
+s3.area() |> log();
+
+// Compute and log perimeters
+s1.perimeter() |> log();
+s2.perimeter() |> log();
+s3.perimeter() |> log();

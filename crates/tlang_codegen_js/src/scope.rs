@@ -134,6 +134,7 @@ impl Default for Scope {
                 ("log::group".to_string(), "console.group".to_string()),
                 ("log::groupEnd".to_string(), "console.groupEnd".to_string()),
                 ("math".to_string(), "Math".to_string()),
+                ("math::pi".to_string(), "Math.PI".to_string()),
                 ("math::min".to_string(), "Math.min".to_string()),
                 ("math::max".to_string(), "Math.max".to_string()),
                 ("math::floor".to_string(), "Math.floor".to_string()),
