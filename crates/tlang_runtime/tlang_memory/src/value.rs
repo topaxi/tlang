@@ -98,6 +98,13 @@ impl TlangObjectKind {
         }
     }
 
+    pub fn get_enum(&self) -> Option<&TlangEnum> {
+        match self {
+            TlangObjectKind::Enum(e) => Some(e),
+            _ => None,
+        }
+    }
+
     pub fn get_slice(&self) -> Option<TlangSlice> {
         match self {
             TlangObjectKind::Slice(s) => Some(*s),

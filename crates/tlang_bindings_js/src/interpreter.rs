@@ -116,7 +116,10 @@ fn tlang_object_to_js_value(state: &InterpreterState, value: TlangValue) -> JsVa
                 return JsValue::from(array);
             }
 
-            let shape = state.get_shape(s.shape).unwrap();
+            let shape = state
+                .get_shape(s.shape)
+                .and_then(|s| s.get_struct_shape())
+                .unwrap();
             let object = js_sys::Object::new();
             for (field, idx) in &shape.field_map {
                 let key = JsValue::from(field);

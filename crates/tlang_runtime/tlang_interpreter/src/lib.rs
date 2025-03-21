@@ -7,7 +7,7 @@ use log::debug;
 use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token;
 use tlang_hir::hir::{self, HirId};
-use tlang_memory::shape::ShapeKey;
+use tlang_memory::shape::{ShapeKey, TlangShape};
 use tlang_memory::state::TailCall;
 use tlang_memory::value::NativeFnReturn;
 use tlang_memory::value::TlangArithmetic;
@@ -151,7 +151,7 @@ impl Interpreter {
         self.state.get_slice_values(slice)
     }
 
-    fn get_shape_of(&self, value: TlangValue) -> Option<&TlangStructShape> {
+    fn get_shape_of(&self, value: TlangValue) -> Option<&TlangShape> {
         self.get_struct(value)
             .and_then(|obj| self.state.get_shape(obj.shape))
     }
@@ -366,11 +366,16 @@ impl Interpreter {
         let value = eval_value!(self.eval_expr(lhs));
 
         if let Some(TlangObjectKind::Struct(obj)) = self.get_object(value) {
-            if let Some(index) = self.state.get_field_index(obj.shape, ident.as_str()) {
+            if let Some(index) = self.state.get_struct_field_index(obj.shape, ident.as_str()) {
                 return EvalResult::Value(obj.field_values[index]);
             }
 
-            let shape = self.state.get_shape(obj.shape).unwrap();
+            let shape = self
+                .state
+                .get_shape(obj.shape)
+                .and_then(|shape| shape.get_struct_shape())
+                .unwrap();
+
             self.panic(format!(
                 "Could not find field `{}` on {}",
                 ident, shape.name
@@ -645,7 +650,7 @@ impl Interpreter {
         self.state
             .set_struct_decl(decl.name.to_string(), Rc::new(decl.clone()));
 
-        let struct_shape = TlangStructShape::new(
+        let struct_shape = TlangShape::new_struct_shape(
             decl.name.to_string(),
             decl.fields
                 .iter()
@@ -1031,7 +1036,11 @@ impl Interpreter {
         method_name: &Ident,
         args: &[TlangValue],
     ) -> TlangValue {
-        let struct_shape = self.state.get_shape(struct_key).unwrap();
+        let struct_shape = self
+            .state
+            .get_shape(struct_key)
+            .and_then(|shape| shape.get_struct_shape())
+            .unwrap();
 
         match struct_shape.get_method(method_name.as_str()) {
             Some(TlangStructMethod::HirId(id)) => {
@@ -1208,7 +1217,10 @@ impl Interpreter {
             hir::PatKind::Wildcard => true,
             hir::PatKind::Enum(path, kvs) => match self.get_object(value) {
                 Some(TlangObjectKind::Struct(_)) => {
-                    let shape = self.get_shape_of(value).unwrap();
+                    let shape = self
+                        .get_shape_of(value)
+                        .and_then(|shape| shape.get_struct_shape())
+                        .unwrap();
                     let path_name = path.join("::");
 
                     if shape.name != path_name {
@@ -1217,6 +1229,7 @@ impl Interpreter {
 
                     kvs.iter().all(|(k, pat)| {
                         self.get_shape_of(value)
+                            .and_then(|shape| shape.get_struct_shape())
                             .and_then(|shape| shape.get_field_index(&k.to_string()))
                             .is_some_and(|field_index| {
                                 let tlang_struct = self.get_struct(value).unwrap();

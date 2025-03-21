@@ -48,19 +48,50 @@ impl From<HirId> for ShapeKey {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum TlangStructMethod {
-    Native(TlangObjectId),
-    HirId(HirId),
+pub enum TlangShape {
+    Struct(TlangStructShape),
+    Enum(TlangEnumShape),
 }
 
-impl TlangStructMethod {
-    pub fn from_value(value: TlangValue) -> Self {
-        Self::from_object_id(value.get_object_id().unwrap())
+impl TlangShape {
+    pub fn new_struct_shape(
+        name: String,
+        fields: Vec<String>,
+        methods: HashMap<String, TlangStructMethod>,
+    ) -> Self {
+        TlangShape::Struct(TlangStructShape::new(name, fields, methods))
     }
 
-    pub fn from_object_id(id: TlangObjectId) -> Self {
-        TlangStructMethod::Native(id)
+    pub fn new_enum_shape(name: String, variants: Vec<TlangEnumVariant>) -> Self {
+        TlangShape::Enum(TlangEnumShape { name, variants })
+    }
+
+    pub fn get_struct_shape(&self) -> Option<&TlangStructShape> {
+        match self {
+            TlangShape::Struct(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    pub fn get_struct_shape_mut(&mut self) -> Option<&mut TlangStructShape> {
+        match self {
+            TlangShape::Struct(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    pub fn get_enum_shape(&self) -> Option<&TlangEnumShape> {
+        match self {
+            TlangShape::Enum(e) => Some(e),
+            _ => None,
+        }
+    }
+
+    pub fn get_enum_shape_mut(&mut self) -> Option<&mut TlangEnumShape> {
+        match self {
+            TlangShape::Enum(e) => Some(e),
+            _ => None,
+        }
     }
 }
 
@@ -140,6 +171,22 @@ impl TlangStructShape {
 
     pub fn set_methods(&mut self, methods: HashMap<String, TlangStructMethod>) {
         self.method_map = methods;
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum TlangStructMethod {
+    Native(TlangObjectId),
+    HirId(HirId),
+}
+
+impl TlangStructMethod {
+    pub fn from_value(value: TlangValue) -> Self {
+        Self::from_object_id(value.get_object_id().unwrap())
+    }
+
+    pub fn from_object_id(id: TlangObjectId) -> Self {
+        TlangStructMethod::Native(id)
     }
 }
 
