@@ -39,6 +39,10 @@ impl Binding {
         Self::new_def(name, hir::DefKind::Struct, hir_id, index)
     }
 
+    pub(crate) fn new_enum_def(name: String, hir_id: HirId, index: usize) -> Self {
+        Self::new_def(name, hir::DefKind::Enum, hir_id, index)
+    }
+
     pub(crate) fn new_enum_variant_def(
         enum_name: &str,
         variant_name: &str,
@@ -155,6 +159,15 @@ impl Scope {
         self.definitions.insert(
             name.to_string(),
             Binding::new_struct_def(name.to_string(), hir_id, index),
+        );
+    }
+
+    pub(crate) fn def_enum_local(&mut self, name: &str, hir_id: HirId) {
+        let index = self.definitions.len();
+
+        self.definitions.insert(
+            name.to_string(),
+            Binding::new_enum_def(name.to_string(), hir_id, index),
         );
     }
 

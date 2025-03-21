@@ -627,6 +627,8 @@ impl LoweringContext {
                         .collect::<Vec<_>>(),
                 };
 
+                self.scope().def_enum_local(decl.name.as_str(), decl.hir_id);
+
                 for variant in &decl.variants {
                     // Variants with no params are values, they need a slot in the current scope.
                     if variant.parameters.is_empty() {
