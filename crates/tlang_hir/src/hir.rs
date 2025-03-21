@@ -77,12 +77,35 @@ pub enum Res {
 }
 
 impl Res {
+    pub fn is_value(&self) -> bool {
+        matches!(
+            self,
+            Res::Local(..)
+                | Res::Upvar(..)
+                | Res::Def(DefKind::Fn, ..)
+                | Res::Def(DefKind::Closure, ..)
+                | Res::Unknown
+        )
+    }
+
     pub fn is_unknown(&self) -> bool {
         matches!(self, Res::Unknown)
     }
 
+    pub fn is_def(&self) -> bool {
+        matches!(self, Res::Def(..))
+    }
+
     pub fn is_struct_def(&self) -> bool {
         matches!(self, Res::Def(DefKind::Struct, ..))
+    }
+
+    pub fn is_enum_def(&self) -> bool {
+        matches!(self, Res::Def(DefKind::Enum, ..))
+    }
+
+    pub fn is_enum_variant_def(&self) -> bool {
+        matches!(self, Res::Def(DefKind::Variant, ..))
     }
 
     pub fn hir_id(&self) -> Option<HirId> {

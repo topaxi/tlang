@@ -61,13 +61,9 @@ impl ScopeStack {
         self.current_scope().borrow_mut().clear();
     }
 
-    fn resolve(&self, res: &hir::Res) -> Option<TlangValue> {
+    fn resolve_value(&self, res: &hir::Res) -> Option<TlangValue> {
         match res {
-            hir::Res::Local(_, index)
-            | hir::Res::Def(hir::DefKind::Fn, _, index)
-            | hir::Res::Def(hir::DefKind::Variant, _, index) => {
-                self.current_scope().borrow().locals.get(*index).cloned()
-            }
+            hir::Res::Local(_, index) => self.current_scope().borrow().locals.get(*index).cloned(),
             hir::Res::Upvar(relative_scope_index, index) => {
                 let scope_index = self.scopes.len() - 1 - relative_scope_index;
 
@@ -80,6 +76,10 @@ impl ScopeStack {
             _ => None,
         }
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = Rc<RefCell<Scope>>> {
+        self.scopes.iter().cloned()
+    }
 }
 
 impl Default for ScopeStack {
@@ -89,8 +89,8 @@ impl Default for ScopeStack {
 }
 
 impl Resolver for ScopeStack {
-    fn resolve_path(&self, path: &hir::Path) -> Option<TlangValue> {
-        self.resolve(&path.res)
+    fn resolve_value(&self, path: &hir::Path) -> Option<TlangValue> {
+        self.resolve_value(&path.res)
     }
 }
 

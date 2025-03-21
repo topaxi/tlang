@@ -28,6 +28,13 @@ impl TlangStruct {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub struct TlangEnum {
+    pub shape: ShapeKey,
+    pub variant: usize,
+    pub field_values: Vec<TlangValue>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TlangSlice {
     of: TlangValue,
@@ -78,6 +85,7 @@ pub enum TlangObjectKind {
     NativeFn,
     String(String),
     Struct(TlangStruct),
+    Enum(TlangEnum),
     Slice(TlangSlice),
     Closure(TlangClosure),
 }
@@ -86,6 +94,13 @@ impl TlangObjectKind {
     pub fn get_struct(&self) -> Option<&TlangStruct> {
         match self {
             TlangObjectKind::Struct(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    pub fn get_enum(&self) -> Option<&TlangEnum> {
+        match self {
+            TlangObjectKind::Enum(e) => Some(e),
             _ => None,
         }
     }
@@ -105,7 +120,11 @@ impl TlangObjectKind {
     }
 
     pub fn get_shape_key(&self) -> Option<ShapeKey> {
-        self.get_struct().map(|s| s.shape)
+        match self {
+            TlangObjectKind::Struct(s) => Some(s.shape),
+            TlangObjectKind::Enum(e) => Some(e.shape),
+            _ => None,
+        }
     }
 
     fn is_truthy(&self) -> bool {
@@ -116,6 +135,7 @@ impl TlangObjectKind {
             TlangObjectKind::Struct(s) => !s.is_empty(),
             TlangObjectKind::Slice(s) => !s.is_empty(),
             TlangObjectKind::Closure(_) => true,
+            TlangObjectKind::Enum(_) => todo!(),
         }
     }
 }

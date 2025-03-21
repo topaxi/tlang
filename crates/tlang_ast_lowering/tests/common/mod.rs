@@ -42,6 +42,7 @@ impl PathCollector {
                 self.collect_expr(&fn_decl.name);
                 self.collect_block(&fn_decl.body);
             }
+            hir::StmtKind::StructDeclaration(_struct_decl) => {}
             hir::StmtKind::EnumDeclaration(_enum_decl) => {}
             hir::StmtKind::DynFunctionDeclaration(..) => {}
             hir::StmtKind::Let(_pat, expr, ..) => {
@@ -68,6 +69,7 @@ impl PathCollector {
             hir::ExprKind::Match(expr, arms) => {
                 self.collect_expr(expr);
                 for arm in arms {
+                    self.collect_pat(&arm.pat);
                     if let Some(guard) = &arm.guard {
                         self.collect_expr(guard);
                     }
@@ -80,7 +82,33 @@ impl PathCollector {
                 }
             }
             hir::ExprKind::Literal(..) => {}
+            hir::ExprKind::FieldAccess(expr, _) => self.collect_expr(expr),
+            hir::ExprKind::Dict(entries) => {
+                for (key, value) in entries {
+                    self.collect_expr(key);
+                    self.collect_expr(value);
+                }
+            }
             expr => todo!("{:?}", expr),
+        }
+    }
+
+    fn collect_pat(&mut self, node: &hir::Pat) {
+        match &node.kind {
+            hir::PatKind::List(patterns) => {
+                for pat in patterns {
+                    self.collect_pat(pat);
+                }
+            }
+            hir::PatKind::Enum(path, kvs) => {
+                self.paths.push(*path.clone());
+
+                for (_, v) in kvs {
+                    self.collect_pat(v);
+                }
+            }
+            hir::PatKind::Identifier(..) | hir::PatKind::Literal(..) => {}
+            pat => todo!("{:?}", pat),
         }
     }
 }

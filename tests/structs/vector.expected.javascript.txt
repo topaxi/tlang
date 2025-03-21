@@ -1,3 +1,0 @@
-VectorConstructor { x: 4, y: 6 }
-VectorConstructor { x: 6, y: 8 }
-5

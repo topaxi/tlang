@@ -1,14 +1,16 @@
-use tlang_ast::token::kw;
 use tlang_hir::hir;
 
 use crate::expr_generator::expr_can_render_as_js_expr;
 use crate::generator::{BlockContext, CodegenJS, FunctionContext};
 
 impl CodegenJS {
-    fn generate_function_param(&mut self, param: &hir::FunctionParameter) {
-        if param.name.is_self() {
+    fn generate_function_param(&mut self, param: &hir::FunctionParameter, is_self: bool) {
+        if is_self {
+            let var_name = self
+                .current_scope()
+                .declare_local_variable(param.name.as_str());
             self.current_scope()
-                .declare_variable_alias(kw::_Self, "this");
+                .declare_variable_alias(&var_name, "this");
         } else if param.name.is_wildcard() {
             // nothing to do
         } else {
@@ -16,24 +18,26 @@ impl CodegenJS {
                 .current_scope()
                 .declare_local_variable(param.name.as_str());
             self.push_str(&var_name);
-            self.current_scope()
-                .declare_variable_alias(param.name.as_str(), &var_name);
         }
     }
 
-    fn generate_function_parameter_list(&mut self, parameters: &[hir::FunctionParameter]) {
+    fn generate_function_parameter_list(
+        &mut self,
+        parameters: &[hir::FunctionParameter],
+        is_method: bool,
+    ) {
         self.push_char('(');
 
         let mut iter = parameters.iter();
 
         if let Some(param) = iter.next() {
-            self.generate_function_param(param);
+            self.generate_function_param(param, is_method);
 
             // If the first param was the self param, we didn't render anything and we need to skip
             // the comma being rendered in the loop ahead.
-            if param.name.is_self() {
+            if is_method {
                 if let Some(param) = iter.next() {
-                    self.generate_function_param(param)
+                    self.generate_function_param(param, false)
                 }
             }
         }
@@ -56,7 +60,7 @@ impl CodegenJS {
             hir::ExprKind::FieldAccess(base, field) => {
                 self.push_indent();
                 self.push_str(&fn_identifier_to_string(base));
-                self.push_str("Constructor.prototype.");
+                self.push_str(".prototype.");
                 self.push_str(field.as_str());
                 self.push_str(" = ");
             }
@@ -77,11 +81,13 @@ impl CodegenJS {
             is_tail_recursive,
         );
 
+        let is_method = matches!(declaration.name.kind, hir::ExprKind::FieldAccess(_, _));
+
         self.generate_struct_method_binding(&declaration.name);
         self.push_str("function ");
         self.push_str(&name_as_str);
         self.push_scope();
-        self.generate_function_parameter_list(&declaration.parameters);
+        self.generate_function_parameter_list(&declaration.parameters, is_method);
         self.push_str(" {\n");
         self.flush_statement_buffer();
         self.inc_indent();
@@ -174,7 +180,7 @@ impl CodegenJS {
         );
 
         if generate_arrow {
-            self.generate_function_parameter_list(&declaration.parameters);
+            self.generate_function_parameter_list(&declaration.parameters, false);
             self.push_str(" =>");
         } else {
             self.push_str("function");
@@ -184,7 +190,7 @@ impl CodegenJS {
                 self.push_str(&name_as_str);
             }
 
-            self.generate_function_parameter_list(&declaration.parameters);
+            self.generate_function_parameter_list(&declaration.parameters, false);
         }
 
         if generate_arrow

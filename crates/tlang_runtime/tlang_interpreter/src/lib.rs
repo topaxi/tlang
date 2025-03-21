@@ -6,11 +6,11 @@ use std::rc::Rc;
 use log::debug;
 use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token;
-use tlang_hir::hir::{self, HirId};
-use tlang_memory::shape::ShapeKey;
+use tlang_hir::hir::{self, DefKind, HirId, Res};
+use tlang_memory::shape::{ShapeKey, TlangEnumVariant, TlangShape};
 use tlang_memory::state::TailCall;
-use tlang_memory::value::NativeFnReturn;
 use tlang_memory::value::TlangArithmetic;
+use tlang_memory::value::{NativeFnReturn, TlangEnum};
 use tlang_memory::{InterpreterState, Resolver, scope};
 use tlang_memory::{prelude::*, state};
 
@@ -48,8 +48,8 @@ pub struct Interpreter {
 }
 
 impl Resolver for Interpreter {
-    fn resolve_path(&self, path: &hir::Path) -> Option<TlangValue> {
-        self.state.resolve_path(path)
+    fn resolve_value(&self, path: &hir::Path) -> Option<TlangValue> {
+        self.state.resolve_value(path)
     }
 }
 
@@ -81,6 +81,11 @@ impl Interpreter {
                 NativeFnReturn::Return(fn_ptr(state, args))
             });
         }
+
+        interpreter.state.set_global(
+            "math::pi".to_string(),
+            TlangValue::F64(std::f64::consts::PI),
+        );
 
         interpreter
     }
@@ -139,6 +144,10 @@ impl Interpreter {
         self.state.get_struct(value)
     }
 
+    fn get_enum(&self, value: TlangValue) -> Option<&TlangEnum> {
+        self.state.get_enum(value)
+    }
+
     fn get_slice(&self, value: TlangValue) -> Option<TlangSlice> {
         self.state.get_slice(value)
     }
@@ -151,9 +160,15 @@ impl Interpreter {
         self.state.get_slice_values(slice)
     }
 
-    fn get_shape_of(&self, value: TlangValue) -> Option<&TlangStructShape> {
-        self.get_struct(value)
-            .and_then(|obj| self.state.get_shape(obj.shape))
+    fn get_shape_of(&self, value: TlangValue) -> Option<&TlangShape> {
+        match self.get_object(value)? {
+            TlangObjectKind::Struct(s) => self.state.get_shape(s.shape),
+            TlangObjectKind::Enum(e) => self.state.get_shape(e.shape),
+            _ => self.panic(format!(
+                "Cannot get shape of non-struct object: {:?}",
+                value
+            )),
+        }
     }
 
     fn get_str(&self, value: TlangValue) -> Option<&str> {
@@ -289,12 +304,12 @@ impl Interpreter {
 
         match &expr.kind {
             hir::ExprKind::Path(path) => {
-                EvalResult::Value(self.resolve_path(path).unwrap_or_else(|| {
+                EvalResult::Value(self.resolve_value(path).unwrap_or_else(|| {
                     self.panic(format!(
-                        "Could not resolve path: {} ({:?})\nCurrent scope: {:#?}",
+                        "Could not resolve path: {} ({:?})\nCurrent scope: {}",
                         path.join("::"),
                         path.res,
-                        self.state.scope_stack
+                        self.state.debug_stringify_scope_stack()
                     ))
                 }))
             }
@@ -366,11 +381,16 @@ impl Interpreter {
         let value = eval_value!(self.eval_expr(lhs));
 
         if let Some(TlangObjectKind::Struct(obj)) = self.get_object(value) {
-            if let Some(index) = self.state.get_field_index(obj.shape, ident.as_str()) {
+            if let Some(index) = self.state.get_struct_field_index(obj.shape, ident.as_str()) {
                 return EvalResult::Value(obj.field_values[index]);
             }
 
-            let shape = self.state.get_shape(obj.shape).unwrap();
+            let shape = self
+                .state
+                .get_shape(obj.shape)
+                .and_then(|shape| shape.get_struct_shape())
+                .unwrap();
+
             self.panic(format!(
                 "Could not find field `{}` on {}",
                 ident, shape.name
@@ -427,10 +447,18 @@ impl Interpreter {
                 if lhs.is_truthy(&self.state) {
                     let rhs = eval_value!(self.eval_expr(rhs));
 
+                    debug!(
+                        "eval_binary: {:?} && {:?}",
+                        self.state.stringify(lhs),
+                        self.state.stringify(rhs)
+                    );
+
                     if rhs.is_truthy(&self.state) {
                         return EvalResult::Value(TlangValue::Bool(true));
                     }
                 }
+
+                debug!("eval_binary: {:?} && ...", self.state.stringify(lhs));
 
                 return EvalResult::Value(TlangValue::Bool(false));
             }
@@ -439,6 +467,8 @@ impl Interpreter {
                 let lhs = eval_value!(self.eval_expr(lhs));
 
                 if lhs.is_truthy(&self.state) {
+                    debug!("eval_binary: {:?} || ...", self.state.stringify(lhs));
+
                     return EvalResult::Value(TlangValue::Bool(true));
                 }
 
@@ -450,6 +480,13 @@ impl Interpreter {
 
         let lhs = eval_value!(self.eval_expr(lhs));
         let rhs = eval_value!(self.eval_expr(rhs));
+
+        debug!(
+            "eval_binary: {:?} {:?} {:?}",
+            self.state.stringify(lhs),
+            op,
+            self.state.stringify(rhs)
+        );
 
         if let TlangValue::Object(_) = lhs {
             return self.eval_object_binary_op(op, lhs, rhs);
@@ -561,12 +598,12 @@ impl Interpreter {
     fn eval_fn_decl(&mut self, decl: &hir::FunctionDeclaration) {
         self.state.set_fn_decl(decl.hir_id, Rc::new(decl.clone()));
 
+        let fn_object = self.state.new_object(TlangObjectKind::Fn(decl.hir_id));
+
+        self.push_value(fn_object);
+
         match &decl.name.kind {
             hir::ExprKind::Path(path) => {
-                let fn_object = self.state.new_object(TlangObjectKind::Fn(decl.hir_id));
-
-                self.push_value(fn_object);
-
                 // Used for static struct method resolution, for now..
                 self.state.set_global(path.join("::"), fn_object);
             }
@@ -575,13 +612,38 @@ impl Interpreter {
                     hir::ExprKind::Path(path) => path,
                     _ => todo!("eval_fn_decl: {:?}", expr),
                 };
-                let struct_decl = self.state.get_struct_decl(path).unwrap();
 
-                self.state.set_struct_method(
-                    struct_decl.hir_id.into(),
-                    ident.as_str(),
-                    TlangStructMethod::HirId(decl.hir_id),
-                );
+                // Used for static struct method resolution, for now..
+                self.state
+                    .set_global(path.join("::") + ident.as_str(), fn_object);
+
+                match &path.res {
+                    Res::Def(DefKind::Struct, ..) => {
+                        let struct_decl = self.state.get_struct_decl(path).unwrap();
+
+                        self.state.set_struct_method(
+                            struct_decl.hir_id.into(),
+                            ident.as_str(),
+                            TlangStructMethod::HirId(decl.hir_id),
+                        );
+                    }
+                    Res::Def(DefKind::Enum, ..) => {
+                        let enum_decl = self.state.get_enum_decl(path).unwrap();
+
+                        self.state.set_enum_method(
+                            enum_decl.hir_id.into(),
+                            ident.as_str(),
+                            TlangStructMethod::HirId(decl.hir_id),
+                        );
+                    }
+                    Res::Unknown => {
+                        self.panic(format!(
+                            "Could not define method {ident} on unresolved path: {:?}",
+                            path
+                        ));
+                    }
+                    _ => todo!("eval_fn_decl: {:?}", path),
+                }
             }
             _ => todo!("eval_fn_decl: {:?}", decl.name),
         }
@@ -645,7 +707,7 @@ impl Interpreter {
         self.state
             .set_struct_decl(decl.name.to_string(), Rc::new(decl.clone()));
 
-        let struct_shape = TlangStructShape::new(
+        let struct_shape = TlangShape::new_struct_shape(
             decl.name.to_string(),
             decl.fields
                 .iter()
@@ -658,6 +720,9 @@ impl Interpreter {
     }
 
     fn eval_enum_decl(&mut self, decl: &hir::EnumDeclaration) {
+        self.state
+            .set_enum_decl(decl.name.to_string(), Rc::new(decl.clone()));
+
         // Simple enums should be treated as incrementing integers.
         // Simple enums are enums where all variants are just a name.
         // The enum variants themselves will just be treated as integers.
@@ -669,37 +734,34 @@ impl Interpreter {
             .variants
             .iter()
             .all(|variant| variant.parameters.is_empty());
+        // TODO: AND has no functions attached to it.
 
         if is_simple_enum {
             for (value, _variant) in decl.variants.iter().enumerate() {
                 self.push_value(TlangValue::U64(value as u64));
             }
         } else {
-            for (value, variant) in decl.variants.iter().enumerate() {
-                // Enum variants with no fields should be treated as incrementing numbers.
-                // Enums with multiple fields, should be treated as structs.
-                if variant.parameters.is_empty() {
-                    let path = format!("{}::{}", decl.name, variant.name.as_str());
+            let variant_shapes = decl
+                .variants
+                .iter()
+                .map(|variant| {
+                    let variant_name = variant.name.to_string();
+                    TlangEnumVariant::new(
+                        variant_name,
+                        variant
+                            .parameters
+                            .iter()
+                            .enumerate()
+                            .map(|(i, param)| (param.name.to_string(), i))
+                            .collect(),
+                    )
+                })
+                .collect();
 
-                    self.state.define_struct_shape(
-                        decl.hir_id.into(),
-                        path,
-                        vec!["0".to_string()],
-                        HashMap::new(),
-                    );
+            let enum_shape =
+                TlangShape::new_enum_shape(decl.name.to_string(), variant_shapes, HashMap::new());
 
-                    let obj = self.state.new_object(TlangObjectKind::Struct(TlangStruct {
-                        shape: decl.hir_id.into(),
-                        field_values: vec![TlangValue::U64(value as u64)],
-                    }));
-
-                    self.push_value(obj);
-                } else {
-                    self.eval_struct_decl(&map_enum_variant_decl_to_struct_decl(
-                        variant, &decl.name,
-                    ));
-                }
-            }
+            self.state.set_shape(decl.hir_id.into(), enum_shape);
         }
     }
 
@@ -844,22 +906,26 @@ impl Interpreter {
     }
 
     fn eval_call(&mut self, call_expr: &hir::CallExpression) -> EvalResult {
-        debug!("eval_call: {:?}", call_expr);
-
         if call_expr.has_wildcard() {
             return self.eval_partial_call(call_expr);
         }
 
         let return_value = match &call_expr.callee.kind {
-            hir::ExprKind::Path(path) if let Some(value) = self.resolve_path(path) => {
+            hir::ExprKind::Path(path) if let Some(value) = self.resolve_value(path) => {
                 let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
 
                 self.eval_call_object(value, args)
             }
             // If the path resolves to a struct, we create a new object.
-            hir::ExprKind::Path(path)
-                if let Some(struct_decl) = self.state.get_struct_decl(path) =>
-            {
+            hir::ExprKind::Path(path) if path.res.is_struct_def() => {
+                let Some(struct_decl) = self.state.get_struct_decl(path) else {
+                    self.panic(format!(
+                        "Struct `{}` not found\nCurrent scope: {:?}",
+                        path.join("::"),
+                        self.state.current_scope().borrow()
+                    ));
+                };
+
                 eval_value!(self.eval_struct_ctor(call_expr, &struct_decl))
             }
             // The path might resolve to a struct method directly.
@@ -868,7 +934,19 @@ impl Interpreter {
             {
                 let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
 
-                self.eval_call_struct_method(struct_decl.hir_id.into(), path.last_ident(), &args)
+                self.eval_call_method(struct_decl.hir_id.into(), path.last_ident(), &args)
+            }
+            // If the path resolves to an enum, we create a new object.
+            hir::ExprKind::Path(path) if path.res.is_enum_variant_def() => {
+                let Some(enum_decl) = self.state.get_enum_decl(&path.as_init()) else {
+                    self.panic(format!(
+                        "Enum variant `{}` not found\nCurrent scope: {:?}",
+                        path.join("::"),
+                        self.state.current_scope().borrow()
+                    ));
+                };
+
+                eval_value!(self.eval_enum_ctor(call_expr, &enum_decl, path.last_ident()))
             }
             hir::ExprKind::Path(path) => {
                 self.panic(format!(
@@ -890,9 +968,14 @@ impl Interpreter {
                 let shape_key = self.get_object(call_target).and_then(|o| o.get_shape_key());
 
                 if let Some(shape_key) = shape_key {
-                    self.eval_call_struct_method(shape_key, ident, &args)
+                    self.eval_call_method(shape_key, ident, &args)
                 } else {
-                    self.panic(format!("Field access on non-struct: {call_target:?}"));
+                    self.panic(format!(
+                        "Field access on non-struct: {:?},\nExpr: {:?}, Current scope: {}",
+                        self.state.stringify(call_target),
+                        expr,
+                        self.state.debug_stringify_scope_stack()
+                    ));
                 }
             }
             _ => todo!("eval_call: {:?}", call_expr.callee),
@@ -926,10 +1009,7 @@ impl Interpreter {
         }
 
         self.with_new_fn_scope(fn_decl.clone(), |this| {
-            // TODO: Methods currently do not reserve a slot for the fn itself.
-            if fn_decl.name.path().is_some() {
-                this.push_value(callee);
-            }
+            this.push_value(callee);
 
             for arg in args {
                 this.push_value(*arg);
@@ -977,14 +1057,59 @@ impl Interpreter {
         call_expr: &hir::CallExpression,
         struct_decl: &hir::StructDeclaration,
     ) -> EvalResult {
+        // Structs are always instantiated with a single argument, which is a dict.
+        let dict_map: HashMap<String, TlangValue> = match &call_expr.arguments[0].kind {
+            hir::ExprKind::Dict(entries) => entries
+                .iter()
+                .map(|(key, value)| {
+                    let key = match &key.kind {
+                        hir::ExprKind::Path(path) => path.first_ident().to_string(),
+                        _ => todo!("eval_call: {:?}", key),
+                    };
+                    let value = self.eval_expr(value).unwrap_value();
+                    (key, value)
+                })
+                .collect(),
+            _ => todo!("eval_call: {:?}", call_expr.arguments[0]),
+        };
+
+        let field_values = struct_decl
+            .fields
+            .iter()
+            .map(|field| dict_map.get(&field.name.to_string()).copied().unwrap())
+            .collect();
+
+        EvalResult::Value(self.state.new_object(TlangObjectKind::Struct(TlangStruct {
+            shape: struct_decl.hir_id.into(),
+            field_values,
+        })))
+    }
+
+    fn eval_enum_ctor(
+        &mut self,
+        call_expr: &hir::CallExpression,
+        enum_decl: &hir::EnumDeclaration,
+        variant_name: &Ident,
+    ) -> EvalResult {
         // Struct calls are always calls with a single argument, which is a dict.
         // There is a special case for enum variant construction, as they might have
         // multiple arguments which are not wrapped in a dict but are struct values.
         // Currently the only way to distinguish this, is by checking whether the struct
         // definition is a struct with incremental numeric field names, which might cause
         // problems in case someone defines a struct with numeric fields themselves.
-        let is_enum_variant_without_field_names = struct_decl
-            .fields
+        let enum_variant_decl = enum_decl
+            .variants
+            .iter()
+            .find(|variant| variant.name == *variant_name)
+            .unwrap_or_else(|| {
+                self.panic(format!(
+                    "Enum variant `{}` not found in enum `{}`",
+                    variant_name, enum_decl.name
+                ))
+            });
+
+        let is_enum_variant_without_field_names = enum_variant_decl
+            .parameters
             .iter()
             .enumerate()
             .all(|(i, field)| field.name.as_str() == i.to_string());
@@ -1013,27 +1138,34 @@ impl Interpreter {
             }
         };
 
-        let field_values = struct_decl
-            .fields
+        let field_values = enum_variant_decl
+            .parameters
             .iter()
             .map(|field| dict_map.get(&field.name.to_string()).copied().unwrap())
             .collect();
 
-        EvalResult::Value(self.state.new_object(TlangObjectKind::Struct(TlangStruct {
-            shape: struct_decl.hir_id.into(),
-            field_values,
-        })))
+        EvalResult::Value(
+            self.state.new_object(TlangObjectKind::Enum(TlangEnum {
+                shape: enum_decl.hir_id.into(),
+                variant: enum_decl
+                    .variants
+                    .iter()
+                    .position(|v| v.name == *variant_name)
+                    .unwrap(),
+                field_values,
+            })),
+        )
     }
 
-    fn eval_call_struct_method(
+    fn eval_call_method(
         &mut self,
-        struct_key: ShapeKey,
+        shape_key: ShapeKey,
         method_name: &Ident,
         args: &[TlangValue],
     ) -> TlangValue {
-        let struct_shape = self.state.get_shape(struct_key).unwrap();
+        let shape = self.state.get_shape(shape_key).unwrap();
 
-        match struct_shape.get_method(method_name.as_str()) {
+        match shape.get_method(method_name.as_str()) {
             Some(TlangStructMethod::HirId(id)) => {
                 let fn_decl = self.state.get_fn_decl(*id).unwrap().clone();
                 self.with_root_scope(|this| {
@@ -1049,9 +1181,9 @@ impl Interpreter {
             _ => {
                 self.panic(format!(
                     "{} does not have a method {:?}, {:?}",
-                    struct_shape.name,
+                    shape.name(),
                     method_name.as_str(),
-                    struct_shape.method_map.keys()
+                    shape.get_method_names(),
                 ));
             }
         }
@@ -1153,7 +1285,7 @@ impl Interpreter {
 
     /// Evaluates a match arm and returns the value if it matches, otherwise returns None.
     fn eval_match_arm(&mut self, arm: &hir::MatchArm, value: TlangValue) -> MatchResult {
-        //debug!("eval_match_arm: {:?} {:?}", arm, value);
+        debug!("eval_match_arm: {:?} {}", arm, self.state.stringify(value));
 
         self.with_new_scope(arm, |this| {
             if !this.eval_pat(&arm.pat, value) {
@@ -1207,24 +1339,61 @@ impl Interpreter {
             }
             hir::PatKind::Wildcard => true,
             hir::PatKind::Enum(path, kvs) => match self.get_object(value) {
-                Some(TlangObjectKind::Struct(_)) => {
-                    let shape = self.get_shape_of(value).unwrap();
-                    let path_name = path.join("::");
+                Some(TlangObjectKind::Enum(_)) => {
+                    let variant_index = self.get_enum(value).unwrap().variant;
+                    let shape = self
+                        .get_shape_of(value)
+                        .unwrap_or_else(|| {
+                            self.panic(format!(
+                                "Enum shape not found for value {:?}",
+                                self.state.stringify(value)
+                            ))
+                        })
+                        .get_enum_shape()
+                        .unwrap_or_else(|| {
+                            self.panic(format!(
+                                "Value has a shape, but not an enum shape {:?}",
+                                self.state.stringify(value)
+                            ))
+                        });
+                    let path_name = path.as_init().join("::");
 
                     if shape.name != path_name {
+                        debug!("eval_pat: Not matched as {} != {}", shape.name, path_name);
+
+                        return false;
+                    }
+
+                    let variant_name = path.last_ident().as_str();
+                    let variant_shape = &shape.variants[variant_index];
+
+                    if variant_shape.name != variant_name {
+                        debug!(
+                            "eval_pat: Not matched as {} != {}",
+                            shape.variants[variant_index].name, variant_name
+                        );
+
                         return false;
                     }
 
                     kvs.iter().all(|(k, pat)| {
                         self.get_shape_of(value)
-                            .and_then(|shape| shape.get_field_index(&k.to_string()))
+                            .and_then(|shape| shape.get_enum_shape())
+                            .map(|shape| &shape.variants[variant_index])
+                            .and_then(|variant| variant.get_field_index(&k.to_string()))
                             .is_some_and(|field_index| {
-                                let tlang_struct = self.get_struct(value).unwrap();
-                                self.eval_pat(pat, tlang_struct.field_values[field_index])
+                                let tlang_enum = self.get_enum(value).unwrap();
+                                self.eval_pat(pat, tlang_enum.field_values[field_index])
                             })
                     })
                 }
-                _ => todo!("eval_pat: Enum({:?}, {:?})", path, kvs),
+                _ => todo!(
+                    "eval_pat: Enum({:?}, {:?}) for value {}\nCurrent scope: {}",
+                    path,
+                    kvs,
+                    self.state.stringify(value),
+                    self.state.debug_stringify_scope_stack()
+                ),
             },
             hir::PatKind::Rest(_) => unreachable!("Rest patterns can only appear in list patterns"),
         }
@@ -1337,30 +1506,6 @@ impl Interpreter {
             }
             _ => todo!("eval_pat: {:?}", value),
         }
-    }
-}
-
-fn map_enum_variant_decl_to_struct_decl(
-    variant: &hir::EnumVariant,
-    enum_name: &Ident,
-) -> hir::StructDeclaration {
-    let fields = variant
-        .parameters
-        .iter()
-        .map(|field| hir::StructField {
-            hir_id: field.hir_id,
-            name: field.name.clone(),
-            ty: field.ty.clone(),
-        })
-        .collect();
-
-    hir::StructDeclaration {
-        hir_id: variant.hir_id,
-        name: Ident::new(
-            &format!("{}::{}", enum_name.as_str(), variant.name.as_str()),
-            enum_name.span,
-        ),
-        fields,
     }
 }
 

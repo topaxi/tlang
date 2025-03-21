@@ -1,7 +1,7 @@
 mod common;
 
 use pretty_assertions::{assert_eq, assert_matches};
-use tlang_hir::hir::{self, HirScope};
+use tlang_hir::hir::{self, DefKind, HirScope};
 
 use self::common::{collect_paths, hir_from_str};
 
@@ -172,4 +172,110 @@ fn test_shadowing_creates_new_slots() {
     // path 2 is the first `a` in the binary expression, it points to the shadowed a (hir 3)
     assert_eq!(paths[2].res, hir::Res::Local(hir::HirId::new(7), 2));
     assert_eq!(paths[3].res, hir::Res::Local(hir::HirId::new(7), 2));
+}
+
+#[test]
+fn test_struct_res() {
+    let hir = hir_from_str(
+        r#"
+            struct Foo {
+                a: i32,
+                b: i32,
+            }
+
+            fn Foo.new() {
+                Foo { a: 1, b: 2 }
+            }
+
+            fn foo() {
+                Foo.new()
+            }
+        "#,
+    );
+
+    let paths = collect_paths(&hir);
+
+    assert_eq!(
+        paths[0].res,
+        hir::Res::Def(DefKind::Struct, hir::HirId::new(1), 0)
+    );
+
+    assert_eq!(
+        paths[1].res,
+        hir::Res::Def(DefKind::Struct, hir::HirId::new(1), 0)
+    );
+
+    assert_eq!(
+        paths[5].res,
+        hir::Res::Def(DefKind::Struct, hir::HirId::new(1), 0),
+        "path {}",
+        paths[5].join(""),
+    );
+}
+
+#[test]
+#[ignore]
+fn test_simple_enum_res() {
+    let hir = hir_from_str(
+        r#"
+            enum Foo {
+                Bar,
+                Baz,
+            }
+
+            fn Foo.qux(Foo::Bar) { "bar" }
+            fn Foo.qux(Foo::Baz) { "baz" }
+
+            fn foo() {
+                Foo::Bar.qux()
+            }
+        "#,
+    );
+
+    let paths = collect_paths(&hir);
+
+    assert_eq!(
+        paths[0].res,
+        hir::Res::Def(DefKind::Enum, hir::HirId::new(1), 0)
+    );
+
+    assert_eq!(
+        paths[3].res,
+        hir::Res::Def(DefKind::Variant, hir::HirId::new(1), 0),
+        "path {}",
+        paths[3].join("::")
+    );
+}
+
+#[test]
+fn test_enum_res() {
+    let hir = hir_from_str(
+        r#"
+            enum Foo {
+                Bar(u32),
+                Baz(u32),
+            }
+
+            fn Foo.qux(Foo::Bar(x)) { x }
+            fn Foo.qux(Foo::Baz(x)) { x }
+
+            fn foo() {
+                Foo::Bar(1).qux()
+            }
+        "#,
+    );
+
+    let paths = collect_paths(&hir);
+
+    assert_eq!(
+        paths[0].res,
+        hir::Res::Def(DefKind::Enum, hir::HirId::new(1), 0)
+    );
+
+    assert_eq!(
+        paths[1].res,
+        hir::Res::Def(DefKind::Variant, hir::HirId::new(1), 0),
+        "path {}",
+        paths[1].join("::")
+    );
 }

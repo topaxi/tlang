@@ -55,7 +55,17 @@ impl LoweringContext {
             .iter()
             .enumerate()
             .rev()
-            .find_map(|(i, scope)| scope.lookup(name).map(|binding| (i, binding.clone())))?;
+            .find_map(|(i, scope)| scope.lookup(name).map(|binding| (i, binding.clone())))
+            .or_else(|| {
+                Some((
+                    usize::MAX,
+                    self.scopes
+                        .iter()
+                        .rev()
+                        .find_map(|scope| scope.lookup_definition(name))?
+                        .clone(),
+                ))
+            })?;
 
         if scope_index < self.scopes.len() - 1 {
             let relative_scope_index = self.scopes.len() - 1 - scope_index;
@@ -429,12 +439,9 @@ impl LoweringContext {
                 }]
             }
             ast::node::StmtKind::FunctionDeclaration(box decl) => {
-                let fn_name = get_function_name_from_ast(&decl.name);
                 let hir_id = self.lower_node_id(decl.id);
 
-                if let ast::node::ExprKind::Path(_) = &decl.name.kind {
-                    self.scope().def_fn_local(&fn_name, hir_id);
-                }
+                self.def_fn_local(&decl.name, hir_id, None);
 
                 let decl = self.lower_fn_decl(decl);
 
@@ -472,12 +479,7 @@ impl LoweringContext {
                     fn_variant_ids.dedup_by_key(|(arg_len, _)| *arg_len);
 
                     for (arg_len, hir_id) in &fn_variant_ids {
-                        let function_name = get_function_name_from_ast(&first_declaration.name);
-                        let function_name = function_name + "$$" + &arg_len.to_string();
-
-                        if let ast::node::ExprKind::Path(_) = &first_declaration.name.kind {
-                            self.scope().def_fn_local(&function_name, *hir_id);
-                        }
+                        self.def_fn_local(&first_declaration.name, *hir_id, Some(*arg_len));
                     }
 
                     let mut grouped_decls = vec![];
@@ -554,10 +556,9 @@ impl LoweringContext {
                     let mut leading_comments = node.leading_comments.clone();
                     leading_comments.extend(decls.iter().flat_map(|d| d.leading_comments.clone()));
 
-                    let fn_name = get_function_name_from_ast(&first_declaration.name);
                     let hir_id = self.lower_node_id(first_declaration.id);
 
-                    self.scope().def_fn_local(&fn_name, hir_id);
+                    self.def_fn_local(&first_declaration.name, hir_id, None);
 
                     let hir_fn_decl = self.lower_fn_decl_matching(
                         decls,
@@ -627,10 +628,18 @@ impl LoweringContext {
                         .collect::<Vec<_>>(),
                 };
 
+                self.scope().def_enum_local(decl.name.as_str(), decl.hir_id);
+
                 for variant in &decl.variants {
                     // Variants with no params are values, they need a slot in the current scope.
                     if variant.parameters.is_empty() {
-                        self.scope().def_enum_variant_local(
+                        self.scope().def_untagged_enum_variant_local(
+                            decl.name.as_str(),
+                            variant.name.as_str(),
+                            variant.hir_id,
+                        );
+                    } else {
+                        self.scope().def_tagged_enum_variant_local(
                             decl.name.as_str(),
                             variant.name.as_str(),
                             variant.hir_id,
@@ -683,15 +692,7 @@ impl LoweringContext {
             let first_declaration = &decls[0];
             let hir_id = this.lower_node_id(first_declaration.id);
 
-            match &first_declaration.name.kind {
-                ast::node::ExprKind::Path(path) => {
-                    this.scope().def_fn_local(&path.join("::"), hir_id);
-                }
-                ast::node::ExprKind::FieldExpression(_fe) => {
-                    // TODO!
-                }
-                _ => unreachable!(),
-            }
+            this.def_fn_local(&first_declaration.name, hir_id, None);
 
             let param_names = get_param_names(decls)
                 .iter()
@@ -862,19 +863,31 @@ impl LoweringContext {
         self.create_fn_param(hir_id, name, ty, node.span)
     }
 
+    fn def_fn_local(&mut self, name_expr: &ast::node::Expr, hir_id: HirId, arity: Option<usize>) {
+        let mut fn_name = match &name_expr.kind {
+            ast::node::ExprKind::Path(path) => path.join("::"),
+            ast::node::ExprKind::FieldExpression(fe) => {
+                let ast::node::ExprKind::Path(path) = &fe.base.kind else {
+                    unreachable!("FieldExpression base should be a path");
+                };
+
+                path.join("::") + fe.field.as_str()
+            }
+            _ => unreachable!(),
+        };
+
+        if let Some(arity) = arity {
+            fn_name += &format!("$${}", arity);
+        }
+
+        self.scope().def_fn_local(fn_name.as_str(), hir_id);
+    }
+
     fn lower_fn_decl(&mut self, decl: &FunctionDeclaration) -> hir::FunctionDeclaration {
         self.with_new_scope(|this| {
             let hir_id = this.lower_node_id(decl.id);
 
-            match &decl.name.kind {
-                ast::node::ExprKind::Path(path) => {
-                    this.scope().def_fn_local(&path.join("::"), hir_id);
-                }
-                ast::node::ExprKind::FieldExpression(_fe) => {
-                    // TODO!
-                }
-                _ => unreachable!(),
-            }
+            this.def_fn_local(&decl.name, hir_id, None);
 
             let name = this.lower_expr(&decl.name);
 
@@ -1100,16 +1113,6 @@ impl Default for LoweringContext {
 
 fn get_enum_name(path: &ast::node::Path) -> String {
     path.segments[path.segments.len() - 2].to_string()
-}
-
-fn get_function_name_from_ast(expr: &ast::node::Expr) -> String {
-    match &expr.kind {
-        ast::node::ExprKind::Path(path) => path.join("::"),
-        ast::node::ExprKind::FieldExpression(field_expr) => {
-            get_function_name_from_ast(&field_expr.base) + "." + field_expr.field.as_str()
-        }
-        _ => unreachable!(),
-    }
 }
 
 pub fn lower_to_hir(tlang_ast: &ast::node::Module) -> hir::Module {

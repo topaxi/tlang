@@ -223,8 +223,13 @@ impl CodegenJS {
 
         match &expr.kind {
             hir::ExprKind::Path(path) => {
+                let match_context_identifier = self
+                    .current_scope()
+                    .resolve_variable(path.first_ident().as_str())
+                    .expect("Match expression identifier not found");
+
                 self.match_context_stack
-                    .push(MatchContext::Identifier(path.first_ident().to_string()));
+                    .push(MatchContext::Identifier(match_context_identifier));
             }
             hir::ExprKind::List(exprs)
                 if !exprs.is_empty() && exprs.iter().all(|expr| expr.is_path()) =>

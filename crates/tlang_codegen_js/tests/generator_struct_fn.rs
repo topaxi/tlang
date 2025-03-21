@@ -25,21 +25,20 @@ fn test_function_definition_on_struct() {
         }
     "});
     let expected_output = indoc! {"
-        function TestConstructor(field) {
-            this.field = field;
-        }
-        function Test(props) {
-            return new TestConstructor(props.field);
+        function Test() {
+            if (new.target == null) return Object.assign(new Test, arguments[0]);
+
+            this.field = undefined;
         }
         Test.new = function Test__new() {
             return Test({
                 field: 0,
             });
         }
-        TestConstructor.prototype.get_field = function get_field() {
+        Test.prototype.get_field = function get_field() {
             return this.field;
         }
-        TestConstructor.prototype.set_field = function set_field(field) {
+        Test.prototype.set_field = function set_field(field) {
             this.field = field;
         }
     "};
@@ -67,24 +66,23 @@ fn test_variadic_function_definition_on_struct() {
         }
     "});
     let expected_output = indoc! {"
-        function TestConstructor(field) {
-            this.field = field;
-        }
-        function Test(props) {
-            return new TestConstructor(props.field);
+        function Test() {
+            if (new.target == null) return Object.assign(new Test, arguments[0]);
+
+            this.field = undefined;
         }
         Test.new = function Test__new() {
             return Test({
                 field: 0,
             });
         }
-        TestConstructor.prototype.value$$1 = function value$$1() {
+        Test.prototype.value$$1 = function value$$1() {
             return this.field;
         }
-        TestConstructor.prototype.value$$2 = function value$$2(value) {
+        Test.prototype.value$$2 = function value$$2(value) {
             this.field = value;
         }
-        TestConstructor.prototype.value = function value() {
+        Test.prototype.value = function value() {
             if (arguments.length === 0) {
                 return this.value$$1();
             } else if (arguments.length === 1) {

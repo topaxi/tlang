@@ -8,10 +8,10 @@ use tlang_hir::hir::{self, HirId};
 
 use crate::resolver::Resolver;
 use crate::scope::{Scope, ScopeStack};
-use crate::shape::{ShapeKey, TlangStructMethod, TlangStructShape};
+use crate::shape::{ShapeKey, TlangShape, TlangStructMethod, TlangStructShape};
 use crate::value::{
-    NativeFnReturn, TlangClosure, TlangNativeFn, TlangObjectId, TlangObjectKind, TlangSlice,
-    TlangStruct, TlangValue,
+    NativeFnReturn, TlangClosure, TlangEnum, TlangNativeFn, TlangObjectId, TlangObjectKind,
+    TlangSlice, TlangStruct, TlangValue,
 };
 
 pub enum CallStackKind {
@@ -53,7 +53,7 @@ impl CallStackEntry {
 
 pub struct BuiltinShapes {
     pub list: ShapeKey,
-    pub shapes: Slab<TlangStructShape>,
+    pub shapes: Slab<TlangShape>,
 }
 
 impl Default for BuiltinShapes {
@@ -66,7 +66,7 @@ impl BuiltinShapes {
     pub fn new() -> Self {
         let mut shapes = Slab::with_capacity(1);
 
-        let list = ShapeKey::new_native(shapes.insert(TlangStructShape::new(
+        let list = ShapeKey::new_native(shapes.insert(TlangShape::new_struct_shape(
             "List".to_string(),
             vec![],
             HashMap::new(),
@@ -76,11 +76,17 @@ impl BuiltinShapes {
     }
 
     pub fn get_list_shape(&self) -> &TlangStructShape {
-        self.shapes.get(self.list.get_native_index()).unwrap()
+        self.shapes
+            .get(self.list.get_native_index())
+            .and_then(|s| s.get_struct_shape())
+            .unwrap()
     }
 
     pub fn get_list_shape_mut(&mut self) -> &mut TlangStructShape {
-        self.shapes.get_mut(self.list.get_native_index()).unwrap()
+        self.shapes
+            .get_mut(self.list.get_native_index())
+            .and_then(|s| s.get_struct_shape_mut())
+            .unwrap()
     }
 }
 
@@ -94,9 +100,10 @@ pub struct InterpreterState {
     pub scope_stack: ScopeStack,
     closures: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
     objects: Slab<TlangObjectKind>,
-    shapes: HashMap<ShapeKey, TlangStructShape>,
+    shapes: HashMap<ShapeKey, TlangShape>,
     fn_decls: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
     struct_decls: HashMap<String, Rc<hir::StructDeclaration>>,
+    enum_decls: HashMap<String, Rc<hir::EnumDeclaration>>,
     call_stack: Vec<CallStackEntry>,
     globals: HashMap<String, TlangValue>,
     pub builtin_shapes: BuiltinShapes,
@@ -104,10 +111,14 @@ pub struct InterpreterState {
 }
 
 impl Resolver for InterpreterState {
-    fn resolve_path(&self, path: &hir::Path) -> Option<TlangValue> {
+    fn resolve_value(&self, path: &hir::Path) -> Option<TlangValue> {
+        if !path.res.is_value() {
+            return None;
+        }
+
         let value = self
             .scope_stack
-            .resolve_path(path)
+            .resolve_value(path)
             .or_else(|| self.globals.get(&path.join("::")).copied());
 
         debug!(
@@ -136,6 +147,7 @@ impl InterpreterState {
             closures: HashMap::with_capacity(100),
             objects: Slab::with_capacity(1000),
             struct_decls: HashMap::with_capacity(100),
+            enum_decls: HashMap::with_capacity(100),
             fn_decls: HashMap::with_capacity(1000),
             shapes: HashMap::with_capacity(100),
             call_stack,
@@ -161,6 +173,16 @@ impl InterpreterState {
 
     pub fn set_struct_decl(&mut self, path_name: String, decl: Rc<hir::StructDeclaration>) {
         self.struct_decls.insert(path_name, decl);
+    }
+
+    pub fn get_enum_decl(&self, path: &hir::Path) -> Option<Rc<hir::EnumDeclaration>> {
+        let path_name = path.join("::");
+
+        self.enum_decls.get(&path_name).cloned()
+    }
+
+    pub fn set_enum_decl(&mut self, path_name: String, decl: Rc<hir::EnumDeclaration>) {
+        self.enum_decls.insert(path_name, decl);
     }
 
     pub fn panic(&self, message: String) -> ! {
@@ -286,6 +308,10 @@ impl InterpreterState {
         self.get_object(value).and_then(|obj| obj.get_struct())
     }
 
+    pub fn get_enum(&self, value: TlangValue) -> Option<&TlangEnum> {
+        self.get_object(value).and_then(|obj| obj.get_enum())
+    }
+
     pub fn get_slice(&self, value: TlangValue) -> Option<TlangSlice> {
         self.get_object(value).and_then(|obj| obj.get_slice())
     }
@@ -322,25 +348,26 @@ impl InterpreterState {
         fields: Vec<String>,
         methods: HashMap<String, TlangStructMethod>,
     ) -> ShapeKey {
-        let shape = TlangStructShape::new(name, fields, methods);
-        self.shapes.insert(shape_key, shape);
+        let shape = TlangShape::new_struct_shape(name, fields, methods);
+        self.set_shape(shape_key, shape);
         shape_key
     }
 
-    pub fn set_shape(&mut self, key: ShapeKey, shape: TlangStructShape) {
+    pub fn set_shape(&mut self, key: ShapeKey, shape: TlangShape) {
         self.shapes.insert(key, shape);
     }
 
-    pub fn get_shape(&self, key: ShapeKey) -> Option<&TlangStructShape> {
+    pub fn get_shape(&self, key: ShapeKey) -> Option<&TlangShape> {
         match key {
             ShapeKey::Native(idx) => self.builtin_shapes.shapes.get(idx),
             key => self.shapes.get(&key),
         }
     }
 
-    pub fn get_field_index(&self, shape: ShapeKey, field: &str) -> Option<usize> {
+    pub fn get_struct_field_index(&self, shape: ShapeKey, field: &str) -> Option<usize> {
         self.shapes
             .get(&shape)
+            .and_then(|s| s.get_struct_shape())
             .and_then(|shape| shape.get_field_index(field))
     }
 
@@ -352,7 +379,35 @@ impl InterpreterState {
     ) {
         self.shapes
             .get_mut(&shape)
+            .and_then(|s| s.get_struct_shape_mut())
             .and_then(|shape| shape.method_map.insert(method_name.to_string(), method));
+    }
+
+    pub fn set_enum_method(
+        &mut self,
+        shape: ShapeKey,
+        method_name: &str,
+        method: TlangStructMethod,
+    ) {
+        self.shapes
+            .get_mut(&shape)
+            .and_then(|s| s.get_enum_shape_mut())
+            .and_then(|shape| shape.method_map.insert(method_name.to_string(), method));
+    }
+
+    pub fn debug_stringify_scope_stack(&self) -> String {
+        let mut out = "[\n".to_string();
+        for scope in self.scope_stack.iter() {
+            out.push_str("  {\n");
+            for entry in scope.borrow().locals.iter() {
+                out.push_str("    ");
+                out.push_str(self.stringify(*entry).as_str());
+                out.push_str(",\n");
+            }
+            out.push_str("  },\n");
+        }
+        out.push_str("]\n");
+        out
     }
 
     fn stringify_struct_as_list(&self, s: &TlangStruct) -> String {
@@ -368,13 +423,17 @@ impl InterpreterState {
     pub fn stringify(&self, value: TlangValue) -> String {
         match value {
             TlangValue::Object(id) => match self.get_object_by_id(id) {
+                None => value.to_string(),
                 Some(TlangObjectKind::String(s)) => s.clone(),
                 Some(TlangObjectKind::Struct(s)) => {
                     if s.shape == self.builtin_shapes.list {
                         return self.stringify_struct_as_list(s);
                     }
 
-                    let shape = self.get_shape(s.shape).unwrap();
+                    let shape = self
+                        .get_shape(s.shape)
+                        .and_then(|s| s.get_struct_shape())
+                        .unwrap();
 
                     if shape.has_fields() && shape.has_consecutive_integer_fields() {
                         return format!("{} {}", shape.name, self.stringify_struct_as_list(s));
@@ -405,6 +464,34 @@ impl InterpreterState {
                     result.push_str(" }");
                     result
                 }
+                Some(TlangObjectKind::Enum(e)) => {
+                    let shape = self
+                        .get_shape(e.shape)
+                        .and_then(|s| s.get_enum_shape())
+                        .unwrap();
+                    let variant = &shape.variants[e.variant];
+                    let mut result = String::new();
+                    result.push_str(&shape.name);
+                    result.push_str("::");
+                    result.push_str(&variant.name);
+
+                    if variant.field_map.is_empty() {
+                        return result;
+                    }
+
+                    result.push('(');
+                    for (i, (field, idx)) in variant.field_map.iter().enumerate() {
+                        if i > 0 {
+                            result.push_str(", ");
+                        }
+                        result.push_str(field);
+                        result.push(':');
+                        result.push(' ');
+                        result.push_str(&self.stringify(e.field_values[*idx]));
+                    }
+                    result.push(')');
+                    result
+                }
                 Some(TlangObjectKind::Slice(s)) => {
                     let values = self
                         .get_slice_values(*s)
@@ -419,7 +506,12 @@ impl InterpreterState {
 
                     format!("fn {}({:?})", fn_decl.name(), s.id)
                 }
-                _ => format!("{:?}", value),
+                Some(TlangObjectKind::Fn(id)) => {
+                    let fn_decl = self.fn_decls.get(id).unwrap();
+
+                    format!("fn {}({:?})", fn_decl.name(), id)
+                }
+                Some(TlangObjectKind::NativeFn) => "fn(native)".to_string(),
             },
             _ => value.to_string(),
         }
