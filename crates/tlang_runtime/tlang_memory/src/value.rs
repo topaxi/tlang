@@ -28,6 +28,13 @@ impl TlangStruct {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub struct TlangEnum {
+    pub shape: ShapeKey,
+    pub variant: usize,
+    pub field_values: Vec<TlangValue>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TlangSlice {
     of: TlangValue,
@@ -78,6 +85,7 @@ pub enum TlangObjectKind {
     NativeFn,
     String(String),
     Struct(TlangStruct),
+    Enum(TlangEnum),
     Slice(TlangSlice),
     Closure(TlangClosure),
 }
@@ -116,6 +124,7 @@ impl TlangObjectKind {
             TlangObjectKind::Struct(s) => !s.is_empty(),
             TlangObjectKind::Slice(s) => !s.is_empty(),
             TlangObjectKind::Closure(_) => true,
+            TlangObjectKind::Enum(_) => todo!(),
         }
     }
 }

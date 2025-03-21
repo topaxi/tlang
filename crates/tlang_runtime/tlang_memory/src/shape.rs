@@ -142,3 +142,16 @@ impl TlangStructShape {
         self.method_map = methods;
     }
 }
+
+#[derive(Debug)]
+pub struct TlangEnumVariant {
+    pub name: String,
+    /// Field names to positions, empty for positional variants.
+    pub field_map: HashMap<String, usize>,
+}
+
+#[derive(Debug)]
+pub struct TlangEnumShape {
+    pub name: String,
+    pub variants: Vec<TlangEnumVariant>,
+}
