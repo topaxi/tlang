@@ -171,8 +171,22 @@ impl Scope {
         );
     }
 
+    pub(crate) fn def_tagged_enum_variant_local(
+        &mut self,
+        enum_name: &str,
+        variant_name: &str,
+        hir_id: HirId,
+    ) {
+        let index = self.definitions.len();
+
+        self.definitions.insert(
+            enum_name.to_string() + "::" + variant_name,
+            Binding::new_enum_variant_def(enum_name, variant_name, hir_id, index),
+        );
+    }
+
     /// Define a local binding for an (untagged) enum variant.
-    pub(crate) fn def_enum_variant_local(
+    pub(crate) fn def_untagged_enum_variant_local(
         &mut self,
         enum_name: &str,
         variant_name: &str,

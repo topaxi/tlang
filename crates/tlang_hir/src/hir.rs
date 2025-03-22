@@ -85,6 +85,14 @@ impl Res {
         matches!(self, Res::Def(DefKind::Struct, ..))
     }
 
+    pub fn is_enum_def(&self) -> bool {
+        matches!(self, Res::Def(DefKind::Enum, ..))
+    }
+
+    pub fn is_enum_variant_def(&self) -> bool {
+        matches!(self, Res::Def(DefKind::Variant, ..))
+    }
+
     pub fn hir_id(&self) -> Option<HirId> {
         match self {
             Res::Def(_, hir_id, ..) | Res::Local(hir_id, ..) => Some(*hir_id),

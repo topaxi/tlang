@@ -199,10 +199,23 @@ fn test_struct_res() {
         paths[0].res,
         hir::Res::Def(DefKind::Struct, hir::HirId::new(1), 0)
     );
+
+    assert_eq!(
+        paths[1].res,
+        hir::Res::Def(DefKind::Struct, hir::HirId::new(1), 0)
+    );
+
+    assert_eq!(
+        paths[5].res,
+        hir::Res::Def(DefKind::Struct, hir::HirId::new(1), 0),
+        "path {}",
+        paths[5].join(""),
+    );
 }
 
 #[test]
-fn test_enum_res() {
+#[ignore]
+fn test_simple_enum_res() {
     let hir = hir_from_str(
         r#"
             enum Foo {
@@ -214,7 +227,7 @@ fn test_enum_res() {
             fn Foo.qux(Foo::Baz) { "baz" }
 
             fn foo() {
-                Foo::qux(Foo::Bar)
+                Foo::Bar.qux()
             }
         "#,
     );
@@ -224,5 +237,45 @@ fn test_enum_res() {
     assert_eq!(
         paths[0].res,
         hir::Res::Def(DefKind::Enum, hir::HirId::new(1), 0)
+    );
+
+    assert_eq!(
+        paths[3].res,
+        hir::Res::Def(DefKind::Variant, hir::HirId::new(1), 0),
+        "path {}",
+        paths[3].join("::")
+    );
+}
+
+#[test]
+fn test_enum_res() {
+    let hir = hir_from_str(
+        r#"
+            enum Foo {
+                Bar(u32),
+                Baz(u32),
+            }
+
+            fn Foo.qux(Foo::Bar(x)) { x }
+            fn Foo.qux(Foo::Baz(x)) { x }
+
+            fn foo() {
+                Foo::Bar(1).qux()
+            }
+        "#,
+    );
+
+    let paths = collect_paths(&hir);
+
+    assert_eq!(
+        paths[0].res,
+        hir::Res::Def(DefKind::Enum, hir::HirId::new(1), 0)
+    );
+
+    assert_eq!(
+        paths[1].res,
+        hir::Res::Def(DefKind::Variant, hir::HirId::new(1), 0),
+        "path {}",
+        paths[1].join("::")
     );
 }

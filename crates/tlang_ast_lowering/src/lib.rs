@@ -643,7 +643,13 @@ impl LoweringContext {
                 for variant in &decl.variants {
                     // Variants with no params are values, they need a slot in the current scope.
                     if variant.parameters.is_empty() {
-                        self.scope().def_enum_variant_local(
+                        self.scope().def_untagged_enum_variant_local(
+                            decl.name.as_str(),
+                            variant.name.as_str(),
+                            variant.hir_id,
+                        );
+                    } else {
+                        self.scope().def_tagged_enum_variant_local(
                             decl.name.as_str(),
                             variant.name.as_str(),
                             variant.hir_id,

@@ -883,9 +883,15 @@ impl Interpreter {
                 self.eval_call_object(value, args)
             }
             // If the path resolves to a struct, we create a new object.
-            hir::ExprKind::Path(path)
-                if let Some(struct_decl) = self.state.get_struct_decl(path) =>
-            {
+            hir::ExprKind::Path(path) if path.res.is_struct_def() => {
+                let Some(struct_decl) = self.state.get_struct_decl(path) else {
+                    self.panic(format!(
+                        "Struct `{}` not found\nCurrent scope: {:?}",
+                        path.join("::"),
+                        self.state.current_scope().borrow()
+                    ));
+                };
+
                 eval_value!(self.eval_struct_ctor(call_expr, &struct_decl))
             }
             // The path might resolve to a struct method directly.
@@ -896,7 +902,27 @@ impl Interpreter {
 
                 self.eval_call_method(struct_decl.hir_id.into(), path.last_ident(), &args)
             }
-            hir::ExprKind::Path(path) if let Some(enum_decl) = self.state.get_enum_decl(path) => {
+            // If the path resolves to an enum, we create a new object.
+            hir::ExprKind::Path(path) if path.res.is_enum_def() => {
+                let Some(enum_decl) = self.state.get_enum_decl(path) else {
+                    self.panic(format!(
+                        "Enum `{}` not found\nCurrent scope: {:?}",
+                        path.join("::"),
+                        self.state.current_scope().borrow()
+                    ));
+                };
+
+                eval_value!(self.eval_enum_ctor(call_expr, &enum_decl))
+            }
+            hir::ExprKind::Path(path) if path.res.is_enum_variant_def() => {
+                let Some(enum_decl) = self.state.get_enum_decl(&path.as_init()) else {
+                    self.panic(format!(
+                        "Enum variant `{}` not found\nCurrent scope: {:?}",
+                        path.join("::"),
+                        self.state.current_scope().borrow()
+                    ));
+                };
+
                 let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
 
                 self.eval_call_method(enum_decl.hir_id.into(), path.last_ident(), &args)
@@ -1054,6 +1080,14 @@ impl Interpreter {
             shape: struct_decl.hir_id.into(),
             field_values,
         })))
+    }
+
+    fn eval_enum_ctor(
+        &mut self,
+        call_expr: &hir::CallExpression,
+        enum_decl: &hir::EnumDeclaration,
+    ) -> EvalResult {
+        todo!()
     }
 
     fn eval_call_method(
