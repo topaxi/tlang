@@ -198,6 +198,10 @@ impl Scope {
         self.bindings.iter().rev().find(|b| b.name() == name)
     }
 
+    pub(crate) fn lookup_definition(&self, name: &str) -> Option<&Binding> {
+        self.definitions.get(name)
+    }
+
     pub(crate) fn locals(&self) -> usize {
         self.bindings.len()
     }

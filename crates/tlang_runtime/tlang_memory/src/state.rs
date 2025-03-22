@@ -103,6 +103,7 @@ pub struct InterpreterState {
     shapes: HashMap<ShapeKey, TlangShape>,
     fn_decls: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
     struct_decls: HashMap<String, Rc<hir::StructDeclaration>>,
+    enum_decls: HashMap<String, Rc<hir::EnumDeclaration>>,
     call_stack: Vec<CallStackEntry>,
     globals: HashMap<String, TlangValue>,
     pub builtin_shapes: BuiltinShapes,
@@ -142,6 +143,7 @@ impl InterpreterState {
             closures: HashMap::with_capacity(100),
             objects: Slab::with_capacity(1000),
             struct_decls: HashMap::with_capacity(100),
+            enum_decls: HashMap::with_capacity(100),
             fn_decls: HashMap::with_capacity(1000),
             shapes: HashMap::with_capacity(100),
             call_stack,
@@ -167,6 +169,16 @@ impl InterpreterState {
 
     pub fn set_struct_decl(&mut self, path_name: String, decl: Rc<hir::StructDeclaration>) {
         self.struct_decls.insert(path_name, decl);
+    }
+
+    pub fn get_enum_decl(&self, path: &hir::Path) -> Option<Rc<hir::EnumDeclaration>> {
+        let path_name = path.join("::");
+
+        self.enum_decls.get(&path_name).cloned()
+    }
+
+    pub fn set_enum_decl(&mut self, path_name: String, decl: Rc<hir::EnumDeclaration>) {
+        self.enum_decls.insert(path_name, decl);
     }
 
     pub fn panic(&self, message: String) -> ! {
@@ -364,6 +376,18 @@ impl InterpreterState {
         self.shapes
             .get_mut(&shape)
             .and_then(|s| s.get_struct_shape_mut())
+            .and_then(|shape| shape.method_map.insert(method_name.to_string(), method));
+    }
+
+    pub fn set_enum_method(
+        &mut self,
+        shape: ShapeKey,
+        method_name: &str,
+        method: TlangStructMethod,
+    ) {
+        self.shapes
+            .get_mut(&shape)
+            .and_then(|s| s.get_enum_shape_mut())
             .and_then(|shape| shape.method_map.insert(method_name.to_string(), method));
     }
 

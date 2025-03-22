@@ -42,6 +42,7 @@ impl PathCollector {
                 self.collect_expr(&fn_decl.name);
                 self.collect_block(&fn_decl.body);
             }
+            hir::StmtKind::StructDeclaration(_struct_decl) => {}
             hir::StmtKind::EnumDeclaration(_enum_decl) => {}
             hir::StmtKind::DynFunctionDeclaration(..) => {}
             hir::StmtKind::Let(_pat, expr, ..) => {
@@ -80,6 +81,13 @@ impl PathCollector {
                 }
             }
             hir::ExprKind::Literal(..) => {}
+            hir::ExprKind::FieldAccess(expr, _) => self.collect_expr(expr),
+            hir::ExprKind::Dict(entries) => {
+                for (key, value) in entries {
+                    self.collect_expr(key);
+                    self.collect_expr(value);
+                }
+            }
             expr => todo!("{:?}", expr),
         }
     }

@@ -6,7 +6,7 @@ use std::rc::Rc;
 use log::debug;
 use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token;
-use tlang_hir::hir::{self, HirId};
+use tlang_hir::hir::{self, DefKind, HirId, Res};
 use tlang_memory::shape::{ShapeKey, TlangShape};
 use tlang_memory::state::TailCall;
 use tlang_memory::value::NativeFnReturn;
@@ -580,13 +580,34 @@ impl Interpreter {
                     hir::ExprKind::Path(path) => path,
                     _ => todo!("eval_fn_decl: {:?}", expr),
                 };
-                let struct_decl = self.state.get_struct_decl(path).unwrap();
 
-                self.state.set_struct_method(
-                    struct_decl.hir_id.into(),
-                    ident.as_str(),
-                    TlangStructMethod::HirId(decl.hir_id),
-                );
+                match &path.res {
+                    Res::Def(DefKind::Struct, ..) => {
+                        let struct_decl = self.state.get_struct_decl(path).unwrap();
+
+                        self.state.set_struct_method(
+                            struct_decl.hir_id.into(),
+                            ident.as_str(),
+                            TlangStructMethod::HirId(decl.hir_id),
+                        );
+                    }
+                    Res::Def(DefKind::Enum, ..) => {
+                        let enum_decl = self.state.get_enum_decl(path).unwrap();
+
+                        self.state.set_enum_method(
+                            enum_decl.hir_id.into(),
+                            ident.as_str(),
+                            TlangStructMethod::HirId(decl.hir_id),
+                        );
+                    }
+                    Res::Unknown => {
+                        self.panic(format!(
+                            "Could not define method {ident} on unresolved path: {:?}",
+                            path
+                        ));
+                    }
+                    _ => todo!("eval_fn_decl: {:?}", path),
+                }
             }
             _ => todo!("eval_fn_decl: {:?}", decl.name),
         }
@@ -663,6 +684,9 @@ impl Interpreter {
     }
 
     fn eval_enum_decl(&mut self, decl: &hir::EnumDeclaration) {
+        self.state
+            .set_enum_decl(decl.name.to_string(), Rc::new(decl.clone()));
+
         // Simple enums should be treated as incrementing integers.
         // Simple enums are enums where all variants are just a name.
         // The enum variants themselves will just be treated as integers.

@@ -62,8 +62,16 @@ impl TlangShape {
         TlangShape::Struct(TlangStructShape::new(name, fields, methods))
     }
 
-    pub fn new_enum_shape(name: String, variants: Vec<TlangEnumVariant>) -> Self {
-        TlangShape::Enum(TlangEnumShape { name, variants })
+    pub fn new_enum_shape(
+        name: String,
+        variants: Vec<TlangEnumVariant>,
+        methods: HashMap<String, TlangStructMethod>,
+    ) -> Self {
+        TlangShape::Enum(TlangEnumShape {
+            name,
+            variants,
+            method_map: methods,
+        })
     }
 
     pub fn get_struct_shape(&self) -> Option<&TlangStructShape> {
@@ -201,4 +209,5 @@ pub struct TlangEnumVariant {
 pub struct TlangEnumShape {
     pub name: String,
     pub variants: Vec<TlangEnumVariant>,
+    pub method_map: HashMap<String, TlangStructMethod>,
 }

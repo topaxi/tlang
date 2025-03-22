@@ -61,7 +61,7 @@ impl ScopeStack {
         self.current_scope().borrow_mut().clear();
     }
 
-    fn resolve(&self, res: &hir::Res) -> Option<TlangValue> {
+    fn resolve_value(&self, res: &hir::Res) -> Option<TlangValue> {
         match res {
             hir::Res::Local(_, index)
             | hir::Res::Def(hir::DefKind::Fn, _, index)
@@ -90,7 +90,7 @@ impl Default for ScopeStack {
 
 impl Resolver for ScopeStack {
     fn resolve_path(&self, path: &hir::Path) -> Option<TlangValue> {
-        self.resolve(&path.res)
+        self.resolve_value(&path.res)
     }
 }
 

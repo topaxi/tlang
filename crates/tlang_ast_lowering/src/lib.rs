@@ -1,6 +1,7 @@
 #![feature(box_patterns)]
 #![feature(if_let_guard)]
 use std::collections::HashMap;
+use std::usize;
 
 use log::debug;
 use tlang_ast as ast;
@@ -55,7 +56,17 @@ impl LoweringContext {
             .iter()
             .enumerate()
             .rev()
-            .find_map(|(i, scope)| scope.lookup(name).map(|binding| (i, binding.clone())))?;
+            .find_map(|(i, scope)| scope.lookup(name).map(|binding| (i, binding.clone())))
+            .or_else(|| {
+                Some((
+                    usize::MAX,
+                    self.scopes
+                        .iter()
+                        .rev()
+                        .find_map(|scope| scope.lookup_definition(name))?
+                        .clone(),
+                ))
+            })?;
 
         if scope_index < self.scopes.len() - 1 {
             let relative_scope_index = self.scopes.len() - 1 - scope_index;
