@@ -101,6 +101,27 @@ impl TlangShape {
             _ => None,
         }
     }
+
+    pub fn name(&self) -> &str {
+        match self {
+            TlangShape::Struct(s) => &s.name,
+            TlangShape::Enum(e) => &e.name,
+        }
+    }
+
+    pub fn get_method(&self, name: &str) -> Option<&TlangStructMethod> {
+        match self {
+            TlangShape::Struct(s) => s.get_method(name),
+            TlangShape::Enum(e) => e.get_method(name),
+        }
+    }
+
+    pub fn get_method_names(&self) -> Vec<String> {
+        match self {
+            TlangShape::Struct(s) => s.method_map.keys().cloned().collect(),
+            TlangShape::Enum(e) => e.method_map.keys().cloned().collect(),
+        }
+    }
 }
 
 pub struct TlangStructShape {
@@ -205,9 +226,33 @@ pub struct TlangEnumVariant {
     pub field_map: HashMap<String, usize>,
 }
 
+impl TlangEnumVariant {
+    pub fn new(name: String, field_map: HashMap<String, usize>) -> Self {
+        Self { name, field_map }
+    }
+}
+
 #[derive(Debug)]
 pub struct TlangEnumShape {
     pub name: String,
     pub variants: Vec<TlangEnumVariant>,
     pub method_map: HashMap<String, TlangStructMethod>,
+}
+
+impl TlangEnumShape {
+    pub fn new(
+        name: String,
+        variants: Vec<TlangEnumVariant>,
+        methods: HashMap<String, TlangStructMethod>,
+    ) -> Self {
+        Self {
+            name,
+            variants,
+            method_map: methods,
+        }
+    }
+
+    pub fn get_method(&self, name: &str) -> Option<&TlangStructMethod> {
+        self.method_map.get(name)
+    }
 }

@@ -7,7 +7,7 @@ use log::debug;
 use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token;
 use tlang_hir::hir::{self, DefKind, HirId, Res};
-use tlang_memory::shape::{ShapeKey, TlangShape};
+use tlang_memory::shape::{ShapeKey, TlangEnumVariant, TlangShape};
 use tlang_memory::state::TailCall;
 use tlang_memory::value::NativeFnReturn;
 use tlang_memory::value::TlangArithmetic;
@@ -698,37 +698,34 @@ impl Interpreter {
             .variants
             .iter()
             .all(|variant| variant.parameters.is_empty());
+        // TODO: AND has no functions attached to it.
 
         if is_simple_enum {
             for (value, _variant) in decl.variants.iter().enumerate() {
                 self.push_value(TlangValue::U64(value as u64));
             }
         } else {
-            for (value, variant) in decl.variants.iter().enumerate() {
-                // Enum variants with no fields should be treated as incrementing numbers.
-                // Enums with multiple fields, should be treated as structs.
-                if variant.parameters.is_empty() {
-                    let path = format!("{}::{}", decl.name, variant.name.as_str());
+            let variant_shapes = decl
+                .variants
+                .iter()
+                .map(|variant| {
+                    let variant_name = variant.name.to_string();
+                    TlangEnumVariant::new(
+                        variant_name,
+                        variant
+                            .parameters
+                            .iter()
+                            .enumerate()
+                            .map(|(i, param)| (param.name.to_string(), i))
+                            .collect(),
+                    )
+                })
+                .collect();
 
-                    self.state.define_struct_shape(
-                        decl.hir_id.into(),
-                        path,
-                        vec!["0".to_string()],
-                        HashMap::new(),
-                    );
+            let enum_shape =
+                TlangShape::new_enum_shape(decl.name.to_string(), variant_shapes, HashMap::new());
 
-                    let obj = self.state.new_object(TlangObjectKind::Struct(TlangStruct {
-                        shape: decl.hir_id.into(),
-                        field_values: vec![TlangValue::U64(value as u64)],
-                    }));
-
-                    self.push_value(obj);
-                } else {
-                    self.eval_struct_decl(&map_enum_variant_decl_to_struct_decl(
-                        variant, &decl.name,
-                    ));
-                }
-            }
+            self.state.set_shape(decl.hir_id.into(), enum_shape);
         }
     }
 
@@ -897,7 +894,12 @@ impl Interpreter {
             {
                 let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
 
-                self.eval_call_struct_method(struct_decl.hir_id.into(), path.last_ident(), &args)
+                self.eval_call_method(struct_decl.hir_id.into(), path.last_ident(), &args)
+            }
+            hir::ExprKind::Path(path) if let Some(enum_decl) = self.state.get_enum_decl(path) => {
+                let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
+
+                self.eval_call_method(enum_decl.hir_id.into(), path.last_ident(), &args)
             }
             hir::ExprKind::Path(path) => {
                 self.panic(format!(
@@ -919,7 +921,7 @@ impl Interpreter {
                 let shape_key = self.get_object(call_target).and_then(|o| o.get_shape_key());
 
                 if let Some(shape_key) = shape_key {
-                    self.eval_call_struct_method(shape_key, ident, &args)
+                    self.eval_call_method(shape_key, ident, &args)
                 } else {
                     self.panic(format!("Field access on non-struct: {call_target:?}"));
                 }
@@ -1054,19 +1056,15 @@ impl Interpreter {
         })))
     }
 
-    fn eval_call_struct_method(
+    fn eval_call_method(
         &mut self,
-        struct_key: ShapeKey,
+        shape_key: ShapeKey,
         method_name: &Ident,
         args: &[TlangValue],
     ) -> TlangValue {
-        let struct_shape = self
-            .state
-            .get_shape(struct_key)
-            .and_then(|shape| shape.get_struct_shape())
-            .unwrap();
+        let shape = self.state.get_shape(shape_key).unwrap();
 
-        match struct_shape.get_method(method_name.as_str()) {
+        match shape.get_method(method_name.as_str()) {
             Some(TlangStructMethod::HirId(id)) => {
                 let fn_decl = self.state.get_fn_decl(*id).unwrap().clone();
                 self.with_root_scope(|this| {
@@ -1082,9 +1080,9 @@ impl Interpreter {
             _ => {
                 self.panic(format!(
                     "{} does not have a method {:?}, {:?}",
-                    struct_shape.name,
+                    shape.name(),
                     method_name.as_str(),
-                    struct_shape.method_map.keys()
+                    shape.get_method_names(),
                 ));
             }
         }
@@ -1374,30 +1372,6 @@ impl Interpreter {
             }
             _ => todo!("eval_pat: {:?}", value),
         }
-    }
-}
-
-fn map_enum_variant_decl_to_struct_decl(
-    variant: &hir::EnumVariant,
-    enum_name: &Ident,
-) -> hir::StructDeclaration {
-    let fields = variant
-        .parameters
-        .iter()
-        .map(|field| hir::StructField {
-            hir_id: field.hir_id,
-            name: field.name.clone(),
-            ty: field.ty.clone(),
-        })
-        .collect();
-
-    hir::StructDeclaration {
-        hir_id: variant.hir_id,
-        name: Ident::new(
-            &format!("{}::{}", enum_name.as_str(), variant.name.as_str()),
-            enum_name.span,
-        ),
-        fields,
     }
 }
 
