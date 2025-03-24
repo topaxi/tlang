@@ -519,7 +519,6 @@ export class TlangPlayground extends LitElement {
             class="output-code"
             language="tlang"
             .source=${this.tlang.getHIRPretty()}
-            with-diagnostics="false"
             readonly
           ></t-codemirror>
         `;
@@ -529,7 +528,6 @@ export class TlangPlayground extends LitElement {
             class="output-code"
             language="javascript"
             .source=${this.tlang.getJavaScript()}
-            with-diagnostics="false"
             readonly
           ></t-codemirror>
         `;
@@ -584,6 +582,7 @@ export class TlangPlayground extends LitElement {
             <t-codemirror
               slot="first"
               class="editor"
+              with-diagnostics
               @source-change=${this.handleSourceChange}
             ></t-codemirror>
             <t-split

@@ -98,7 +98,7 @@ export class ButtonElement extends LitElement {
   shortcut: ShortcutDefinition | '' = '';
 
   @property({ type: String, attribute: 'shortcut-mac' })
-  shortcutMac: ShortcutDefinition | '' = '';
+  shortcutMac: ShortcutDefinition | undefined;
 
   @property({ type: String, attribute: 'shortcut-description' })
   shortcutDescription: string = '';
