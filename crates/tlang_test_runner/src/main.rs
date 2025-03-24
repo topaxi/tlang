@@ -102,6 +102,7 @@ fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
             let javascript_output = Command::new("node")
                 .stdin(tlang_js_compiler_output.stdout.unwrap())
                 .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
                 .spawn()
                 .unwrap_or_else(|err| {
                     panic!(
@@ -118,11 +119,11 @@ fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
     let elapsed = start.elapsed();
     let exec_elapsed = exec_start.elapsed();
 
-    let actual_output = if output.status.success() {
-        String::from_utf8_lossy(&output.stdout)
-    } else {
+    let actual_output = format!(
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
-    };
+    );
 
     if actual_output.trim() == expected_output.trim() {
         println!(

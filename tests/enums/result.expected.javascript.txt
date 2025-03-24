@@ -1,0 +1,23 @@
+true
+false
+false
+true
+10
+
+[stdin]:201
+function panic(msg) { throw new Error(msg); }
+                      ^
+
+Error: Called unwrap on Err
+    at panic ([stdin]:201:29)
+    at Result.unwrap$0 [as unwrap] ([stdin]:53:16)
+    at [stdin]:210:17
+    at runScriptInThisContext (node:internal/vm:209:10)
+    at node:internal/process/execution:459:12
+    at [stdin]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:457:60)
+    at evalFunction (node:internal/process/execution:285:30)
+    at evalTypeScript (node:internal/process/execution:297:3)
+    at node:internal/main/eval_stdin:51:5
+
+Node.js v23.6.1

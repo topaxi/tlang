@@ -3,10 +3,28 @@ enum Option {
   None,
 }
 
+fn Option.is_some(Option::Some(_)) { true }
+fn Option.is_some(_) { false }
+
+fn Option.is_none(Option::None) { true }
+fn Option.is_none(_) { false }
+
+fn Option.unwrap(Option::Some(x)) { x }
+fn Option.unwrap(_) { panic("Called unwrap on None") }
+
 enum Result {
   Ok(value),
   Err(error),
 }
+
+fn Result.is_ok(Result::Ok(_)) { true }
+fn Result.is_ok(_) { false }
+
+fn Result.is_err(Result::Err(_)) { true }
+fn Result.is_err(_) { false }
+
+fn Result.unwrap(Result::Ok(x)) { x }
+fn Result.unwrap(_) { panic("Called unwrap on Err") }
 
 // len(a[]) -> int
 fn len(list) { list.length }

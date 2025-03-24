@@ -1,0 +1,11 @@
+let ok = Result::Ok(10);
+let err = Result::Err(5);
+
+ok.is_ok() |> log();
+ok.is_err() |> log();
+
+err.is_ok() |> log();
+err.is_err() |> log();
+
+ok.unwrap() |> log();
+err.unwrap() |> log(); // This should panic

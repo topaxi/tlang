@@ -147,7 +147,7 @@ fn test_codegen_pattern_match_enum_bindings() {
         };
     "});
     let expected_output = indoc! {"
-        let $tmp$0,$tmp$1 = Option.Some(42),x;if ($tmp$1.tag === \"Some\" && (x = $tmp$1[0], true)) {
+        let $tmp$0,$tmp$1 = Option.Some(42),x;if ($tmp$1.tag === Option.Some && (x = $tmp$1[0], true)) {
             $tmp$0 = x;
         } else {
             $tmp$0 = 0;
@@ -175,16 +175,16 @@ fn test_codegen_pattern_match_positional_enum() {
     "});
     let expected_output = indoc! {"
         class Expr {
-            tag = '';
+            tag = this;
             [0];
             [1];
-            static Value = (int) => Object.assign(new this, { tag: \"Value\", [0]: int });
-            static Add = (lhs, rhs) => Object.assign(new this, { tag: \"Add\", [0]: lhs, [1]: rhs });
+            static Value = (int) => Object.assign(new this, { tag: this.Value, [0]: int });
+            static Add = (lhs, rhs) => Object.assign(new this, { tag: this.Add, [0]: lhs, [1]: rhs });
         }
         let expr = Expr.Value(42);
-        let $tmp$0,x,y;if (expr.tag === \"Value\" && (x = expr[0], true)) {
+        let $tmp$0,x,y;if (expr.tag === Expr.Value && (x = expr[0], true)) {
             $tmp$0 = x;
-        } else if (expr.tag === \"Add\" && (x = expr[0], true) && (y = expr[1], true)) {
+        } else if (expr.tag === Expr.Add && (x = expr[0], true) && (y = expr[1], true)) {
             $tmp$0 = x + y;
         } else {
             $tmp$0 = 0;
@@ -207,11 +207,11 @@ fn test_codegen_pattern_match_nested_enum() {
     "});
     let expected_output = indoc! {"
         let x = 42;
-        let $tmp$0,$tmp$1 = Option.Some(Option.Some(42)),x$0;if ($tmp$1.tag === \"Some\" && $tmp$1[0].tag === \"Some\" && (x$0 = $tmp$1[0][0], true)) {
+        let $tmp$0,$tmp$1 = Option.Some(Option.Some(42)),x$0;if ($tmp$1.tag === Option.Some && $tmp$1[0].tag === Option.Some && (x$0 = $tmp$1[0][0], true)) {
             $tmp$0 = x$0;
-        } else if ($tmp$1.tag === \"Some\" && $tmp$1[0].tag === \"None\") {
+        } else if ($tmp$1.tag === Option.Some && $tmp$1[0].tag === Option.None) {
             $tmp$0 = 0;
-        } else if ($tmp$1.tag === \"None\") {
+        } else if ($tmp$1.tag === Option.None) {
             $tmp$0 = 0;
         }
         let y = $tmp$0;
@@ -247,7 +247,7 @@ fn test_codegen_pattern_match_let_guards() {
         };
     "});
     let expected_output = indoc! {"
-        let $tmp$0,$tmp$1 = Option.Some(42),$tmp$2,n,y;if ((n = $tmp$1, true) && ($tmp$2 = n * 2, true) && $tmp$2.tag === \"Some\" && (y = $tmp$2[0], true)) {
+        let $tmp$0,$tmp$1 = Option.Some(42),$tmp$2,n,y;if ((n = $tmp$1, true) && ($tmp$2 = n * 2, true) && $tmp$2.tag === Option.Some && (y = $tmp$2[0], true)) {
             $tmp$0 = y;
         } else {
             $tmp$0 = 0;

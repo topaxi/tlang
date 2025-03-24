@@ -112,12 +112,13 @@ impl CodegenJS {
                 self.push_str(", true)");
             }
             hir::PatKind::Enum(path, patterns) => {
-                let enum_variant_name = path.segments.last().unwrap();
-
                 self.push_str(parent_js_expr);
-                self.push_str(".tag === \"");
-                self.push_str(enum_variant_name.ident.as_str());
-                self.push_str("\"");
+                self.push_str(".tag === ");
+                let resolved = self
+                    .current_scope()
+                    .resolve_variable(path.join("::").as_str())
+                    .unwrap_or_else(|| path.join("."));
+                self.push_str(&resolved);
 
                 for (ident, pattern) in patterns.iter().filter(|(_, pat)| !pat.is_wildcard()) {
                     self.push_str(" && ");

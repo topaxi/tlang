@@ -18,21 +18,18 @@ pub fn define_list_shape(state: &mut InterpreterState) {
 
     method_map.insert(
         "slice".to_string(),
-        TlangStructMethod::from_value(state.new_native_fn(|state, args| {
-            let this = state
-                .get_object(args[0])
-                .and_then(|o| o.get_struct())
-                .unwrap();
+        state.new_native_method(|state, this, args| {
+            let list = state.get_struct(this).unwrap();
 
-            let start = args[1].as_usize();
-            let end = if args.len() < 3 || args[2].is_nil() {
-                this.field_values.len()
+            let start = args[0].as_usize();
+            let end = if args.len() < 2 || args[1].is_nil() {
+                list.field_values.len()
             } else {
-                args[2].as_usize()
+                args[1].as_usize()
             };
 
-            NativeFnReturn::Return(state.new_slice(args[0], start, end - start))
-        })),
+            NativeFnReturn::Return(state.new_slice(this, start, end - start))
+        }),
     );
 
     state

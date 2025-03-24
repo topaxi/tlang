@@ -11,7 +11,7 @@ impl CodegenJS {
         self.push_str(&format!("class {} {{\n", decl.name));
         self.inc_indent();
         self.push_indent();
-        self.push_str("tag = '';\n");
+        self.push_str("tag = this;\n");
 
         let mut seen = HashSet::new();
         let field_names = decl
@@ -72,9 +72,8 @@ impl CodegenJS {
         };
 
         if parameters.is_empty() {
-            self.push_str(&format!(
-                "static {name} = Object.assign(new this, {{ tag: \"{name}\" }});\n"
-            ));
+            self.push_str(&format!("static {name} = new this;\n"));
+            self.pop_scope();
             return;
         }
 
@@ -91,7 +90,7 @@ impl CodegenJS {
         if named_fields {
             self.push_str(" }");
         }
-        self.push_str(&format!(") => Object.assign(new this, {{ tag: \"{name}\""));
+        self.push_str(&format!(") => Object.assign(new this, {{ tag: this.{name}"));
 
         for (i, param) in parameters.iter().enumerate() {
             self.push_str(", ");

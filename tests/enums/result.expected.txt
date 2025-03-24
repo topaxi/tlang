@@ -1,0 +1,12 @@
+true
+false
+false
+true
+10
+
+
+thread 'main' panicked at crates/tlang_runtime/tlang_memory/src/state.rs:276:9:
+Called unwrap on Err
+  at root 10:1
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

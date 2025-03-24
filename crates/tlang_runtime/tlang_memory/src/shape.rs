@@ -210,12 +210,14 @@ pub enum TlangStructMethod {
 }
 
 impl TlangStructMethod {
-    pub fn from_value(value: TlangValue) -> Self {
-        Self::from_object_id(value.get_object_id().unwrap())
-    }
-
     pub fn from_object_id(id: TlangObjectId) -> Self {
         TlangStructMethod::Native(id)
+    }
+}
+
+impl From<TlangValue> for TlangStructMethod {
+    fn from(value: TlangValue) -> Self {
+        Self::from_object_id(value.get_object_id().unwrap())
     }
 }
 
@@ -258,5 +260,9 @@ impl TlangEnumShape {
 
     pub fn get_method(&self, name: &str) -> Option<&TlangStructMethod> {
         self.method_map.get(name)
+    }
+
+    pub fn set_methods(&mut self, methods: HashMap<String, TlangStructMethod>) {
+        self.method_map = methods;
     }
 }

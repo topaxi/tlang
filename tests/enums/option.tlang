@@ -1,0 +1,11 @@
+let some_x = Option::Some(10);
+let none_x = Option::None;
+
+some_x.is_some() |> log();
+some_x.is_none() |> log();
+
+none_x.is_some() |> log();
+none_x.is_none() |> log();
+
+some_x.unwrap() |> log();
+none_x.unwrap() |> log(); // This should panic

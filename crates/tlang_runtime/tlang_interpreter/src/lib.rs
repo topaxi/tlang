@@ -92,6 +92,8 @@ impl Interpreter {
 
     #[cfg(feature = "stdlib")]
     pub fn init_stdlib(&mut self) {
+        tlang_stdlib::option::define_option_shape(&mut self.state);
+        tlang_stdlib::result::define_result_shape(&mut self.state);
         tlang_stdlib::collections::define_list_shape(&mut self.state);
     }
 
@@ -915,7 +917,7 @@ impl Interpreter {
                 applied_args[index] = *arg;
             }
 
-            NativeFnReturn::PartialCall(Box::new((callee, applied_args)))
+            NativeFnReturn::CallObject(Box::new((callee, applied_args)))
         });
 
         EvalResult::Value(fn_object)
@@ -962,6 +964,12 @@ impl Interpreter {
                     ));
                 };
 
+                eval_value!(self.eval_enum_ctor(call_expr, &enum_decl, path.last_ident()))
+            }
+            // The path might resolve to an enum variant directly.
+            hir::ExprKind::Path(path)
+                if let Some(enum_decl) = self.state.get_enum_decl(&path.as_init()) =>
+            {
                 eval_value!(self.eval_enum_ctor(call_expr, &enum_decl, path.last_ident()))
             }
             hir::ExprKind::Path(path) => {
@@ -1062,7 +1070,7 @@ impl Interpreter {
                     self.panic(format!("Function not found: {id:?}"));
                 }
             }
-            NativeFnReturn::PartialCall(box (fn_object, args)) => {
+            NativeFnReturn::CallObject(box (fn_object, args)) => {
                 self.eval_call_object(fn_object, args)
             }
         }

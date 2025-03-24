@@ -76,7 +76,11 @@ fn get_args() -> Args {
 }
 
 fn compile_standard_library() -> Result<String, ParserError> {
-    compile(&CodegenJS::get_standard_library_source())
+    let mut js = compile(&CodegenJS::get_standard_library_source())?;
+
+    js.push_str("\nfunction panic(msg) { throw new Error(msg); }\n");
+
+    Ok(js)
 }
 
 // Main entry point for the CLI, which compiles tlang to javascript.

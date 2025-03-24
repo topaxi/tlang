@@ -8,7 +8,9 @@ use tlang_hir::hir::{self, HirId};
 
 use crate::resolver::Resolver;
 use crate::scope::{Scope, ScopeStack};
-use crate::shape::{ShapeKey, TlangShape, TlangStructMethod, TlangStructShape};
+use crate::shape::{
+    ShapeKey, TlangEnumShape, TlangEnumVariant, TlangShape, TlangStructMethod, TlangStructShape,
+};
 use crate::value::{
     NativeFnReturn, TlangClosure, TlangEnum, TlangNativeFn, TlangObjectId, TlangObjectKind,
     TlangSlice, TlangStruct, TlangValue,
@@ -53,6 +55,8 @@ impl CallStackEntry {
 
 pub struct BuiltinShapes {
     pub list: ShapeKey,
+    pub option: ShapeKey,
+    pub result: ShapeKey,
     pub shapes: Slab<TlangShape>,
 }
 
@@ -64,7 +68,37 @@ impl Default for BuiltinShapes {
 
 impl BuiltinShapes {
     pub fn new() -> Self {
-        let mut shapes = Slab::with_capacity(1);
+        let mut shapes = Slab::with_capacity(3);
+
+        let option = ShapeKey::new_native(shapes.insert(TlangShape::new_enum_shape(
+            "Option".to_string(),
+            vec![
+                TlangEnumVariant {
+                    name: "Some".to_string(),
+                    field_map: HashMap::new(),
+                },
+                TlangEnumVariant {
+                    name: "None".to_string(),
+                    field_map: HashMap::new(),
+                },
+            ],
+            HashMap::new(),
+        )));
+
+        let result = ShapeKey::new_native(shapes.insert(TlangShape::new_enum_shape(
+            "Result".to_string(),
+            vec![
+                TlangEnumVariant {
+                    name: "Ok".to_string(),
+                    field_map: HashMap::new(),
+                },
+                TlangEnumVariant {
+                    name: "Err".to_string(),
+                    field_map: HashMap::new(),
+                },
+            ],
+            HashMap::new(),
+        )));
 
         let list = ShapeKey::new_native(shapes.insert(TlangShape::new_struct_shape(
             "List".to_string(),
@@ -72,7 +106,12 @@ impl BuiltinShapes {
             HashMap::new(),
         )));
 
-        Self { list, shapes }
+        Self {
+            option,
+            result,
+            list,
+            shapes,
+        }
     }
 
     pub fn get_list_shape(&self) -> &TlangStructShape {
@@ -86,6 +125,34 @@ impl BuiltinShapes {
         self.shapes
             .get_mut(self.list.get_native_index())
             .and_then(|s| s.get_struct_shape_mut())
+            .unwrap()
+    }
+
+    pub fn get_option_shape(&self) -> &TlangEnumShape {
+        self.shapes
+            .get(self.option.get_native_index())
+            .and_then(|s| s.get_enum_shape())
+            .unwrap()
+    }
+
+    pub fn get_option_shape_mut(&mut self) -> &mut TlangEnumShape {
+        self.shapes
+            .get_mut(self.option.get_native_index())
+            .and_then(|s| s.get_enum_shape_mut())
+            .unwrap()
+    }
+
+    pub fn get_result_shape(&self) -> &TlangEnumShape {
+        self.shapes
+            .get(self.result.get_native_index())
+            .and_then(|s| s.get_enum_shape())
+            .unwrap()
+    }
+
+    pub fn get_result_shape_mut(&mut self) -> &mut TlangEnumShape {
+        self.shapes
+            .get_mut(self.result.get_native_index())
+            .and_then(|s| s.get_enum_shape_mut())
             .unwrap()
     }
 }
@@ -252,6 +319,19 @@ impl InterpreterState {
         TlangValue::new_object(self.objects.insert(kind))
     }
 
+    pub fn new_enum(
+        &mut self,
+        shape: ShapeKey,
+        variant: usize,
+        values: Vec<TlangValue>,
+    ) -> TlangValue {
+        self.new_object(TlangObjectKind::Enum(TlangEnum {
+            shape,
+            variant,
+            field_values: values,
+        }))
+    }
+
     pub fn new_closure(&mut self, decl: &hir::FunctionDeclaration) -> TlangValue {
         self.closures
             .entry(decl.hir_id)
@@ -273,6 +353,15 @@ impl InterpreterState {
             .insert(fn_object.get_object_id().unwrap(), Box::new(f));
 
         fn_object
+    }
+
+    pub fn new_native_method<F>(&mut self, f: F) -> TlangStructMethod
+    where
+        F: Fn(&mut InterpreterState, TlangValue, &[TlangValue]) -> NativeFnReturn + 'static,
+    {
+        TlangStructMethod::from(
+            self.new_native_fn(move |state, args| f(state, args[0], &args[1..])),
+        )
     }
 
     pub fn call_native_fn(
