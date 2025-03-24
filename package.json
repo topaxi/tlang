@@ -31,5 +31,8 @@
     "stylelint-config-standard": "^37.0.0",
     "typescript": "5.8.2",
     "typescript-eslint": "8.27.0"
+  },
+  "volta": {
+    "node": "23.6.1"
   }
 }
