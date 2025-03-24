@@ -52,7 +52,7 @@ export class ConsoleMessageElement extends LitElement {
       );
 
       --console-message-background: hsl(
-        from var(--ctp-macchiato-yellow)) h s calc(l - 60)
+        from var(--ctp-macchiato-yellow) h s calc(l - 60)
       );
     }
 

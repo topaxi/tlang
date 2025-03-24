@@ -13,15 +13,29 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          codemirror: [
-            'codemirror',
-            '@codemirror/state',
-            '@codemirror/lint',
-            'codemirror-theme-catppuccin',
-          ],
-          'codemirror-javascript': ['@codemirror/lang-javascript'],
-          'codemirror-tlang': ['codemirror-lang-tlang'],
+        manualChunks(id, _meta) {
+          let codemirrorShared = [
+            'node_modules/codemirror',
+            'node_modules/@codemirror/state',
+            'node_modules/@codemirror/lint',
+            'node_modules/codemirror-theme-catppuccin',
+          ];
+
+          if (id.endsWith('.tlang?raw')) {
+            return 'examples';
+          }
+
+          if (codemirrorShared.some((path) => id.includes(path))) {
+            return 'codemirror';
+          }
+
+          if (id.includes('@codemirror/lang-javascript')) {
+            return 'codemirror-javascript';
+          }
+
+          if (id.includes('codemirror-lang-tlang')) {
+            return 'codemirror-tlang';
+          }
         },
       },
     },
