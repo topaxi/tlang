@@ -61,17 +61,21 @@ impl ScopeStack {
         self.current_scope().borrow_mut().clear();
     }
 
+    fn get_local(&self, index: usize) -> Option<TlangValue> {
+        self.current_scope().borrow().locals.get(index).cloned()
+    }
+
+    fn get_upvar(&self, scope_index: usize, index: usize) -> Option<TlangValue> {
+        self.scopes[scope_index].borrow().locals.get(index).cloned()
+    }
+
     fn resolve_value(&self, res: &hir::Res) -> Option<TlangValue> {
         match res {
-            hir::Res::Local(_, index) => self.current_scope().borrow().locals.get(*index).cloned(),
+            hir::Res::Local(_, index) => self.get_local(*index),
             hir::Res::Upvar(relative_scope_index, index) => {
                 let scope_index = self.scopes.len() - 1 - relative_scope_index;
 
-                self.scopes[scope_index]
-                    .borrow()
-                    .locals
-                    .get(*index)
-                    .cloned()
+                self.get_upvar(scope_index, *index)
             }
             _ => None,
         }
