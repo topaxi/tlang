@@ -93,6 +93,10 @@ jobs:
       - name: Lint playground
         run: npm run lint
 
+      - name: lit-analyzer
+        run: npx lit-analyzer src
+        working-directory: ./tlang-playground
+
       - name: TypeCheck playground
         run: npm run typecheck
 
