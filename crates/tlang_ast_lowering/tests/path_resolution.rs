@@ -267,15 +267,32 @@ fn test_enum_res() {
 
     let paths = collect_paths(&hir);
 
+    println!(
+        "paths: {:#?}",
+        paths.iter().map(|p| p.join("::")).collect::<Vec<_>>()
+    );
+
     assert_eq!(
         paths[0].res,
         hir::Res::Def(DefKind::Enum, hir::HirId::new(1), 0)
     );
 
+    // Path 1 is `foo` as pattern matched functions move their arguments into a match expression
+    // within their body.
+
     assert_eq!(
-        paths[1].res,
-        hir::Res::Def(DefKind::Variant, hir::HirId::new(1), 0),
+        paths[2].res,
+        hir::Res::Def(DefKind::Variant, hir::HirId::new(2), 1),
         "path {}",
-        paths[1].join("::")
+        paths[2].join("::")
+    );
+
+    // Path 3 is `x`
+
+    assert_eq!(
+        paths[4].res,
+        hir::Res::Def(DefKind::Variant, hir::HirId::new(4), 2),
+        "path {}",
+        paths[4].join("::")
     );
 }

@@ -738,7 +738,7 @@ impl Interpreter {
 
         if is_simple_enum {
             for (value, _variant) in decl.variants.iter().enumerate() {
-                self.push_value(TlangValue::U64(value as u64));
+                self.push_value(TlangValue::from(value));
             }
         } else {
             let variant_shapes = decl
@@ -756,12 +756,28 @@ impl Interpreter {
                             .collect(),
                     )
                 })
-                .collect();
+                .collect::<Vec<_>>();
+
+            let shape_key = decl.hir_id.into();
+
+            for (variant_index, _) in variant_shapes
+                .iter()
+                .enumerate()
+                .filter(|(_, v)| v.field_map.is_empty())
+            {
+                let enum_value = self.state.new_object(TlangObjectKind::Enum(TlangEnum {
+                    shape: shape_key,
+                    variant: variant_index,
+                    field_values: vec![],
+                }));
+
+                self.push_value(enum_value);
+            }
 
             let enum_shape =
                 TlangShape::new_enum_shape(decl.name.to_string(), variant_shapes, HashMap::new());
 
-            self.state.set_shape(decl.hir_id.into(), enum_shape);
+            self.state.set_shape(shape_key, enum_shape);
         }
     }
 
@@ -1822,7 +1838,7 @@ mod tests {
             TlangValue::Object(id) => interpreter
                 .interpreter
                 .get_object_by_id(id)
-                .get_struct()
+                .get_enum()
                 .unwrap(),
             val => panic!("Expected struct, got {val:?}"),
         };
@@ -1831,13 +1847,16 @@ mod tests {
             TlangValue::Object(id) => interpreter
                 .interpreter
                 .get_object_by_id(id)
-                .get_struct()
+                .get_enum()
                 .unwrap(),
             val => panic!("Expected struct, got {val:?}"),
         };
 
+        assert_eq!(none_data.variant, 0);
+        assert_eq!(some_data.variant, 1);
+
+        assert!(none_data.field_values.is_empty());
         assert_matches!(some_data.field_values[0], TlangValue::U64(10));
-        assert_matches!(none_data.field_values[0], TlangValue::U64(0));
     }
 
     #[test]

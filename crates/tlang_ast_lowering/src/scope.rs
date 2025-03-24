@@ -192,12 +192,7 @@ impl Scope {
         variant_name: &str,
         hir_id: HirId,
     ) {
-        let index = self.bindings.len();
-
-        self.create_binding(
-            enum_name.to_string() + "::" + variant_name,
-            Binding::new_enum_variant_def(enum_name, variant_name, hir_id, index),
-        );
+        self.def_local(&(enum_name.to_string() + "::" + variant_name), hir_id);
     }
 
     pub(crate) fn def_upvar(&self, name: &str, scope: usize, index: usize) -> Binding {
