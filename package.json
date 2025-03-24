@@ -2,6 +2,7 @@
   "name": "@tlang/repo",
   "version": "1.0.0",
   "description": "",
+  "type": "module",
   "scripts": {
     "assume-unchanged": "git update-index --assume-unchanged crates/tlang_bindings_js/pkg/package.json",
     "predev": "npm run assume-unchanged && wasm-pack build --dev --target web crates/tlang_bindings_js",
@@ -10,7 +11,8 @@
     "build": "npm run build -w tlang-playground",
     "prepreview": "npm run build",
     "preview": "npx serve tlang-playground/dist",
-    "lint": "eslint",
+    "lint": "eslint && stylelint \"**/*.css\" \"**/components/**/*.ts\"",
+    "lint:fix": "eslint --fix && stylelint \"**/*.css\" \"**/components/**/*.ts\" --fix",
     "typecheck": "tsc --noEmit"
   },
   "workspaces": [
@@ -23,7 +25,10 @@
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-prettier": "^5.2.3",
     "globals": "16.0.0",
+    "postcss-lit": "^1.2.0",
     "prettier": "^3.5.3",
+    "stylelint": "^16.16.0",
+    "stylelint-config-standard": "^37.0.0",
     "typescript": "5.8.2",
     "typescript-eslint": "8.26.1"
   }

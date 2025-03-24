@@ -1,4 +1,4 @@
-@import '@catppuccin/palette/css/catppuccin.css';
+@import url('@catppuccin/palette/css/catppuccin.css');
 
 @font-face {
   font-family: 'Victor Mono';
@@ -18,12 +18,12 @@
   --t-button-focus-ring-color: var(--t-button-border-color);
   --t-button-background-color: var(--ctp-macchiato-base);
   --t-button-hover-background-color: var(--ctp-macchiato-surface1);
-  --t-button-active-background-color: hsl(from var(--t-button-hover-background-color) h s calc(l + 10));
+  --t-button-active-background-color: hsl(
+    from var(--t-button-hover-background-color) h s calc(l + 10)
+  );
 
   --t-border-radius: 3px;
-}
 
-:root {
   font-family:
     'VictorMono NFM', 'Victor Mono', Inconsolata, Consolas, Menlo, Monaco,
     monospace;
@@ -35,7 +35,7 @@
   background-color: var(--t-background-color);
 
   font-synthesis: none;
-  text-rendering: optimizeLegibility;
+  text-rendering: optimizelegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

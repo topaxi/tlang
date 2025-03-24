@@ -52,6 +52,9 @@ updates:
           - 'typescript-eslint'
           - '@typescript-eslint/*'
           - 'prettier'
+          - 'postcss-lit'
+          - 'stylelint'
+          - 'stylelint-config-standard'
       lit:
         patterns:
           - 'lit'

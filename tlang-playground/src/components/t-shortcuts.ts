@@ -99,11 +99,11 @@ export class ShortcutsElement extends LitElement {
       border-radius: var(--t-border-radius);
       outline: none;
       padding: 0;
-      box-shadow: 4px 4px 16px rgba(0, 0, 0, 0.33);
+      box-shadow: 4px 4px 16px rgb(0 0 0 / 33%);
     }
 
     dialog::backdrop {
-      background: rgba(0, 0, 0, 0.5);
+      background: rgb(0 0 0 / 50%);
     }
 
     header {

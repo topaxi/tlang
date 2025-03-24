@@ -68,7 +68,7 @@ export class ButtonElement extends LitElement {
         display: none;
       }
 
-      @media (min-width: 980px) {
+      @media (width >= 980px) {
         [part='shortcut'] {
           display: inline;
         }

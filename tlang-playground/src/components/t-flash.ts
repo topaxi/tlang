@@ -15,7 +15,7 @@ export class FlashElement extends LitElement {
       background-color: var(--t-background-color);
       border: 1px solid var(--ctp-macchiato-surface0);
       border-radius: var(--t-border-radius);
-      box-shadow: 4px 4px 16px rgba(0, 0, 0, 0.33);
+      box-shadow: 4px 4px 16px rgb(0 0 0 / 33%);
       margin: 0;
     }
 
