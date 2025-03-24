@@ -100,7 +100,7 @@ export class MenuItemLinkElement extends LitElement {
   override tabIndex = -1;
 
   @property()
-  href: string | undefined;
+  href!: string;
 
   protected override render(): TemplateResult {
     return html`<a role="menuitem" href=${this.href}><slot></slot></a>`;

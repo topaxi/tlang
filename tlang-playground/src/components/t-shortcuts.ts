@@ -1,6 +1,7 @@
 import { provide } from '@lit/context';
 import { LitElement, html, css } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
+import { ifDefined } from 'lit/directives/if-defined.js';
 import {
   type ShortcutsContextValue,
   shortcutsContext,
@@ -299,7 +300,9 @@ class ShortcutDescriptionElement extends LitElement {
         part="hint"
         exportparts="kbd"
         shortcut=${this.shortcutDetail.shortcut}
-        shortcut-mac=${this.shortcutDetail.shortcutMac}
+        shortcut-mac=${ifDefined(
+          this.shortcutDetail.shortcutMac as ShortcutDefinition,
+        )}
       ></t-shortcut-hint>
     `;
   }

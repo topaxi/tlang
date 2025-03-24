@@ -40,12 +40,8 @@ export class TCodeMirror extends LitElement {
   @property()
   language: Language = 'tlang';
 
-  @property({
-    attribute: 'with-diagnostics',
-    type: Boolean,
-    converter: (value) => value != null && value !== 'false',
-  })
-  withDiagnostics = true;
+  @property({ type: Boolean, attribute: 'with-diagnostics' })
+  withDiagnostics = false;
 
   @property({ type: Array })
   diagnostics: Diagnostic[] = [];
