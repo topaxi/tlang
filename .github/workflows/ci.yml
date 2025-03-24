@@ -69,6 +69,12 @@ jobs:
       - name: cargo-nextest
         run: cargo nextest run --profile=ci
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '23.6.1'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
       - name: Test Runner
         run: make test
         env:
@@ -81,12 +87,6 @@ jobs:
         run: |
           wget https://github.com/WebAssembly/binaryen/releases/download/version_119/binaryen-version_119-x86_64-linux.tar.gz
           tar xvzf binaryen-version_119-x86_64-linux.tar.gz
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '23.6.1'
-          cache: 'npm'
-          cache-dependency-path: package-lock.json
 
       - name: Install playground dependencies
         run: npm ci
