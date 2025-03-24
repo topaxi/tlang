@@ -77,8 +77,6 @@ jobs:
 
       - name: Test Runner
         run: make test
-        env:
-          RUST_BACKTRACE: '1'
 
       - name: Test JS bindings
         run: make test-bindings-js

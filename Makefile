@@ -9,7 +9,7 @@ clean:
 test:
 	cargo build --release --features=binary --bin tlangdi
 	cargo build --release --bin tlang_cli_js
-	cargo run --release --bin tlang_test_runner
+	RUST_BACKTRACE=1 cargo run --release --bin tlang_test_runner
 
 test-debug:
 	RUSTFLAGS="-C force-frame-pointers=yes -C opt-level=0" cargo build --release --features=binary --bin tlangdi
