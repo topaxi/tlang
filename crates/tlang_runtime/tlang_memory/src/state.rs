@@ -57,7 +57,8 @@ pub struct BuiltinShapes {
     pub list: ShapeKey,
     pub option: ShapeKey,
     pub result: ShapeKey,
-    pub shapes: Slab<TlangShape>,
+
+    store: Slab<TlangShape>,
 }
 
 impl Default for BuiltinShapes {
@@ -68,9 +69,22 @@ impl Default for BuiltinShapes {
 
 impl BuiltinShapes {
     pub fn new() -> Self {
-        let mut shapes = Slab::with_capacity(3);
+        let mut store = Slab::with_capacity(3);
 
-        let option = ShapeKey::new_native(shapes.insert(TlangShape::new_enum_shape(
+        let option = Self::create_option_shape(&mut store);
+        let result = Self::create_result_shape(&mut store);
+        let list = Self::create_list_shape(&mut store);
+
+        Self {
+            option,
+            result,
+            list,
+            store,
+        }
+    }
+
+    fn create_option_shape(store: &mut Slab<TlangShape>) -> ShapeKey {
+        ShapeKey::new_native(store.insert(TlangShape::new_enum_shape(
             "Option".to_string(),
             vec![
                 TlangEnumVariant {
@@ -83,9 +97,11 @@ impl BuiltinShapes {
                 },
             ],
             HashMap::new(),
-        )));
+        )))
+    }
 
-        let result = ShapeKey::new_native(shapes.insert(TlangShape::new_enum_shape(
+    fn create_result_shape(store: &mut Slab<TlangShape>) -> ShapeKey {
+        ShapeKey::new_native(store.insert(TlangShape::new_enum_shape(
             "Result".to_string(),
             vec![
                 TlangEnumVariant {
@@ -98,59 +114,54 @@ impl BuiltinShapes {
                 },
             ],
             HashMap::new(),
-        )));
+        )))
+    }
 
-        let list = ShapeKey::new_native(shapes.insert(TlangShape::new_struct_shape(
+    fn create_list_shape(store: &mut Slab<TlangShape>) -> ShapeKey {
+        ShapeKey::new_native(store.insert(TlangShape::new_struct_shape(
             "List".to_string(),
             vec![],
             HashMap::new(),
-        )));
-
-        Self {
-            option,
-            result,
-            list,
-            shapes,
-        }
+        )))
     }
 
     pub fn get_list_shape(&self) -> &TlangStructShape {
-        self.shapes
+        self.store
             .get(self.list.get_native_index())
             .and_then(|s| s.get_struct_shape())
             .unwrap()
     }
 
     pub fn get_list_shape_mut(&mut self) -> &mut TlangStructShape {
-        self.shapes
+        self.store
             .get_mut(self.list.get_native_index())
             .and_then(|s| s.get_struct_shape_mut())
             .unwrap()
     }
 
     pub fn get_option_shape(&self) -> &TlangEnumShape {
-        self.shapes
+        self.store
             .get(self.option.get_native_index())
             .and_then(|s| s.get_enum_shape())
             .unwrap()
     }
 
     pub fn get_option_shape_mut(&mut self) -> &mut TlangEnumShape {
-        self.shapes
+        self.store
             .get_mut(self.option.get_native_index())
             .and_then(|s| s.get_enum_shape_mut())
             .unwrap()
     }
 
     pub fn get_result_shape(&self) -> &TlangEnumShape {
-        self.shapes
+        self.store
             .get(self.result.get_native_index())
             .and_then(|s| s.get_enum_shape())
             .unwrap()
     }
 
     pub fn get_result_shape_mut(&mut self) -> &mut TlangEnumShape {
-        self.shapes
+        self.store
             .get_mut(self.result.get_native_index())
             .and_then(|s| s.get_enum_shape_mut())
             .unwrap()
@@ -448,7 +459,7 @@ impl InterpreterState {
 
     pub fn get_shape(&self, key: ShapeKey) -> Option<&TlangShape> {
         match key {
-            ShapeKey::Native(idx) => self.builtin_shapes.shapes.get(idx),
+            ShapeKey::Native(idx) => self.builtin_shapes.store.get(idx),
             key => self.shapes.get(&key),
         }
     }
