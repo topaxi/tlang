@@ -931,10 +931,8 @@ impl Interpreter {
         let return_value = match &call_expr.callee.kind {
             hir::ExprKind::Path(path) if let Some(value) = self.resolve_value(path) => {
                 let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
-
                 self.eval_call_object(value, args)
             }
-            // If the path resolves to a struct, we create a new object.
             hir::ExprKind::Path(path) if path.res.is_struct_def() => {
                 let Some(struct_decl) = self.state.get_struct_decl(path) else {
                     self.panic(format!(
@@ -946,15 +944,6 @@ impl Interpreter {
 
                 eval_value!(self.eval_struct_ctor(call_expr, &struct_decl))
             }
-            // The path might resolve to a struct method directly.
-            hir::ExprKind::Path(path)
-                if let Some(struct_decl) = self.state.get_struct_decl(&path.as_init()) =>
-            {
-                let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
-
-                self.eval_call_method(struct_decl.hir_id.into(), path.last_ident(), &args)
-            }
-            // If the path resolves to an enum, we create a new object.
             hir::ExprKind::Path(path) if path.res.is_enum_variant_def() => {
                 let Some(enum_decl) = self.state.get_enum_decl(&path.as_init()) else {
                     self.panic(format!(
@@ -966,7 +955,12 @@ impl Interpreter {
 
                 eval_value!(self.eval_enum_ctor(call_expr, &enum_decl, path.last_ident()))
             }
-            // The path might resolve to an enum variant directly.
+            hir::ExprKind::Path(path)
+                if let Some(struct_decl) = self.state.get_struct_decl(&path.as_init()) =>
+            {
+                let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
+                self.eval_call_method(struct_decl.hir_id.into(), path.last_ident(), &args)
+            }
             hir::ExprKind::Path(path)
                 if let Some(enum_decl) = self.state.get_enum_decl(&path.as_init()) =>
             {
