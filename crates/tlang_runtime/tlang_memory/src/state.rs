@@ -348,11 +348,25 @@ impl InterpreterState {
         variant: usize,
         values: Vec<TlangValue>,
     ) -> TlangValue {
-        self.new_object(TlangObjectKind::Enum(TlangEnum {
-            shape,
-            variant,
-            field_values: values,
-        }))
+        let enum_data = TlangEnum::new(shape, variant, values);
+        self.new_object(TlangObjectKind::Enum(enum_data))
+    }
+
+    pub fn new_enum_with_capacity(
+        &mut self,
+        shape: ShapeKey,
+        variant: usize,
+        capacity: usize,
+    ) -> (TlangValue, &mut Vec<TlangValue>) {
+        let enum_data = TlangEnum::with_capacity(shape, variant, capacity, &self.arena);
+        let obj_id = self.arena.insert(TlangObjectKind::Enum(enum_data));
+        let obj = self.arena.get_mut(obj_id).unwrap();
+        
+        if let TlangObjectKind::Enum(enum_data) = obj {
+            (TlangValue::Object(obj_id), &mut enum_data.field_values)
+        } else {
+            panic!("Expected enum object");
+        }
     }
 
     pub fn new_closure(&mut self, decl: &hir::FunctionDeclaration) -> TlangValue {
@@ -439,10 +453,20 @@ impl InterpreterState {
     }
 
     pub fn new_list(&mut self, values: Vec<TlangValue>) -> TlangValue {
-        self.new_object(TlangObjectKind::Struct(TlangStruct {
-            shape: self.builtin_shapes.list,
-            field_values: values,
-        }))
+        let list_struct = TlangStruct::new(self.builtin_shapes.list, values);
+        self.new_object(TlangObjectKind::Struct(list_struct))
+    }
+
+    pub fn new_list_with_capacity(&mut self, capacity: usize) -> (TlangValue, &mut Vec<TlangValue>) {
+        let list_struct = TlangStruct::with_capacity(self.builtin_shapes.list, capacity, &self.arena);
+        let obj_id = self.arena.insert(TlangObjectKind::Struct(list_struct));
+        let obj = self.arena.get_mut(obj_id).unwrap();
+        
+        if let TlangObjectKind::Struct(list_struct) = obj {
+            (TlangValue::Object(obj_id), &mut list_struct.field_values)
+        } else {
+            panic!("Expected struct object");
+        }
     }
 
     pub fn new_string(&mut self, value: String) -> TlangValue {

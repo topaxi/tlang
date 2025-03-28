@@ -1,5 +1,6 @@
 use tlang_hir::hir::HirId;
 
+use crate::allocator::Arena;
 use crate::scope::ScopeStack;
 use crate::shape::ShapeKey;
 use crate::{InterpreterState, impl_from_tlang_value};
@@ -26,6 +27,30 @@ impl TlangStruct {
     pub fn len(&self) -> usize {
         self.field_values.len()
     }
+    
+    // Create a new TlangStruct with arena-allocated field_values
+    pub fn new(shape: ShapeKey, values: Vec<TlangValue>) -> Self {
+        Self {
+            shape,
+            field_values: values,
+        }
+    }
+    
+    // Create a new empty TlangStruct with arena-allocated field_values
+    pub fn new_empty(shape: ShapeKey, _arena: &Arena) -> Self {
+        Self {
+            shape,
+            field_values: Vec::new(),
+        }
+    }
+    
+    // Create a TlangStruct with capacity and arena allocation
+    pub fn with_capacity(shape: ShapeKey, capacity: usize, _arena: &Arena) -> Self {
+        Self {
+            shape,
+            field_values: Vec::with_capacity(capacity),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -33,6 +58,35 @@ pub struct TlangEnum {
     pub shape: ShapeKey,
     pub variant: usize,
     pub field_values: Vec<TlangValue>,
+}
+
+impl TlangEnum {
+    // Create a new TlangEnum with arena-allocated field_values
+    pub fn new(shape: ShapeKey, variant: usize, values: Vec<TlangValue>) -> Self {
+        Self {
+            shape,
+            variant,
+            field_values: values,
+        }
+    }
+    
+    // Create a new empty TlangEnum with arena-allocated field_values
+    pub fn new_empty(shape: ShapeKey, variant: usize, _arena: &Arena) -> Self {
+        Self {
+            shape,
+            variant,
+            field_values: Vec::new(),
+        }
+    }
+    
+    // Create a TlangEnum with capacity and arena allocation
+    pub fn with_capacity(shape: ShapeKey, variant: usize, capacity: usize, _arena: &Arena) -> Self {
+        Self {
+            shape,
+            variant,
+            field_values: Vec::with_capacity(capacity),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
