@@ -1,7 +1,7 @@
 #![feature(allocator_api)]
 
-mod macros;
 pub mod allocator;
+mod macros;
 pub mod resolver;
 pub mod scope;
 pub mod shape;

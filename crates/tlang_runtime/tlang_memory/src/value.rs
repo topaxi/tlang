@@ -28,7 +28,7 @@ impl TlangStruct {
     pub fn len(&self) -> usize {
         self.field_values.len()
     }
-    
+
     // Create a new TlangStruct with regular field_values
     pub fn new(shape: ShapeKey, values: Vec<TlangValue, Global>) -> Self {
         Self {
@@ -36,7 +36,7 @@ impl TlangStruct {
             field_values: values,
         }
     }
-    
+
     // Create a new empty TlangStruct with arena-allocated field_values
     pub fn new_empty(shape: ShapeKey, arena: &Arena) -> Self {
         let values: Vec<TlangValue, Global> = arena.new_vec().into_iter().collect();
@@ -45,10 +45,11 @@ impl TlangStruct {
             field_values: values,
         }
     }
-    
+
     // Create a TlangStruct with capacity and arena allocation
     pub fn with_capacity(shape: ShapeKey, capacity: usize, arena: &Arena) -> Self {
-        let values: Vec<TlangValue, Global> = arena.new_vec_with_capacity(capacity).into_iter().collect();
+        let values: Vec<TlangValue, Global> =
+            arena.new_vec_with_capacity(capacity).into_iter().collect();
         Self {
             shape,
             field_values: values,
@@ -72,7 +73,7 @@ impl TlangEnum {
             field_values: values,
         }
     }
-    
+
     // Create a new empty TlangEnum with arena-allocated field_values
     pub fn new_empty(shape: ShapeKey, variant: usize, arena: &Arena) -> Self {
         let values: Vec<TlangValue, Global> = arena.new_vec().into_iter().collect();
@@ -82,10 +83,11 @@ impl TlangEnum {
             field_values: values,
         }
     }
-    
+
     // Create a TlangEnum with capacity and arena allocation
     pub fn with_capacity(shape: ShapeKey, variant: usize, capacity: usize, arena: &Arena) -> Self {
-        let values: Vec<TlangValue, Global> = arena.new_vec_with_capacity(capacity).into_iter().collect();
+        let values: Vec<TlangValue, Global> =
+            arena.new_vec_with_capacity(capacity).into_iter().collect();
         Self {
             shape,
             variant,

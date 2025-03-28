@@ -1,7 +1,7 @@
+use std::alloc::Global;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::alloc::Global;
 
 use log::debug;
 use slab::Slab;
@@ -339,12 +339,12 @@ impl InterpreterState {
             TlangObjectKind::Struct(_) => ObjectTag::Struct,
             TlangObjectKind::Enum(_) => ObjectTag::Enum,
             TlangObjectKind::String(_) => ObjectTag::String,
-            TlangObjectKind::Slice(_) => ObjectTag::Slice, 
+            TlangObjectKind::Slice(_) => ObjectTag::Slice,
             TlangObjectKind::Closure(_) => ObjectTag::Closure,
             TlangObjectKind::Fn(_) => ObjectTag::Function,
             TlangObjectKind::NativeFn => ObjectTag::NativeFunction,
         };
-        
+
         let id = self.arena.insert(kind);
         TlangValue::Object(id)
     }
@@ -368,7 +368,7 @@ impl InterpreterState {
         let enum_data = TlangEnum::with_capacity(shape, variant, capacity, &self.arena);
         let obj_id = self.arena.insert(TlangObjectKind::Enum(enum_data));
         let obj = self.arena.get_mut(obj_id).unwrap();
-        
+
         if let TlangObjectKind::Enum(enum_data) = obj {
             (TlangValue::Object(obj_id), &mut enum_data.field_values)
         } else {
@@ -464,11 +464,15 @@ impl InterpreterState {
         self.new_object(TlangObjectKind::Struct(list_struct))
     }
 
-    pub fn new_list_with_capacity(&mut self, capacity: usize) -> (TlangValue, &mut Vec<TlangValue, Global>) {
-        let list_struct = TlangStruct::with_capacity(self.builtin_shapes.list, capacity, &self.arena);
+    pub fn new_list_with_capacity(
+        &mut self,
+        capacity: usize,
+    ) -> (TlangValue, &mut Vec<TlangValue, Global>) {
+        let list_struct =
+            TlangStruct::with_capacity(self.builtin_shapes.list, capacity, &self.arena);
         let obj_id = self.arena.insert(TlangObjectKind::Struct(list_struct));
         let obj = self.arena.get_mut(obj_id).unwrap();
-        
+
         if let TlangObjectKind::Struct(list_struct) = obj {
             (TlangValue::Object(obj_id), &mut list_struct.field_values)
         } else {
@@ -658,6 +662,59 @@ impl InterpreterState {
             },
             _ => value.to_string(),
         }
+    }
+
+    pub fn new_struct_with_capacity(
+        &mut self,
+        shape: ShapeKey,
+        capacity: usize,
+    ) -> (TlangValue, &mut Vec<TlangValue, Global>) {
+        let struct_data = TlangStruct::with_capacity(shape, capacity, &self.arena);
+        let obj_id = self.arena.insert(TlangObjectKind::Struct(struct_data));
+        let obj = self.arena.get_mut(obj_id).unwrap();
+
+        if let TlangObjectKind::Struct(struct_data) = obj {
+            (TlangValue::Object(obj_id), &mut struct_data.field_values)
+        } else {
+            panic!("Expected struct object");
+        }
+    }
+
+    pub fn update_struct_shape(&mut self, value: TlangValue, new_shape: ShapeKey) {
+        if let TlangValue::Object(id) = value {
+            if let Some(TlangObjectKind::Struct(struct_data)) = self.arena.get_mut(id) {
+                struct_data.shape = new_shape;
+            }
+        }
+    }
+
+    // Get slice values and copy them into a new Vec
+    pub fn copy_slice_values(&self, slice: TlangSlice) -> Vec<TlangValue, Global> {
+        let list = self.get_struct(slice.of()).unwrap();
+        let values = &list.field_values[slice.range()];
+        let mut result = Vec::with_capacity(values.len());
+        result.extend_from_slice(values);
+        result
+    }
+
+    // Get struct field values and copy them into a new Vec
+    pub fn copy_list_values(&self, list_value: TlangValue) -> Vec<TlangValue, Global> {
+        let list_struct = self.get_struct(list_value).unwrap();
+        let mut result = Vec::with_capacity(list_struct.field_values.len());
+        result.extend(&list_struct.field_values);
+        result
+    }
+
+    // Append values from a slice to a list
+    pub fn append_slice_to_list(&self, slice: TlangSlice, dest: &mut Vec<TlangValue, Global>) {
+        let list = self.get_struct(slice.of()).unwrap();
+        dest.extend_from_slice(&list.field_values[slice.range()]);
+    }
+
+    // Append values from a list to another list
+    pub fn append_list_to_list(&self, list_value: TlangValue, dest: &mut Vec<TlangValue, Global>) {
+        let list_struct = self.get_struct(list_value).unwrap();
+        dest.extend(&list_struct.field_values);
     }
 }
 

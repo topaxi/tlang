@@ -1,6 +1,6 @@
+use std::alloc::Global;
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::alloc::Global;
 
 use log::debug;
 use tlang_hir::hir::{self, HirScope};

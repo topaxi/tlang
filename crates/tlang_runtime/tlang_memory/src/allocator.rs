@@ -2,8 +2,8 @@ use std::alloc::{self, AllocError, Allocator, GlobalAlloc, Layout};
 use std::cell::UnsafeCell;
 use std::marker::PhantomData;
 use std::ptr::{self, NonNull};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 // Size of each allocation block in bytes
 const BLOCK_SIZE: usize = 1024 * 1024; // 1MB blocks
@@ -104,16 +104,12 @@ static GLOBAL_ARENA: OnceLock<Arena> = OnceLock::new();
 unsafe impl GlobalAlloc for GlobalArenaAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         // Use the system allocator
-        unsafe {
-            alloc::System.alloc(layout)
-        }
+        unsafe { alloc::System.alloc(layout) }
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         // Use the system allocator
-        unsafe {
-            alloc::System.dealloc(ptr, layout)
-        }
+        unsafe { alloc::System.dealloc(ptr, layout) }
     }
 }
 
@@ -121,17 +117,19 @@ unsafe impl GlobalAlloc for Arena {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let size = layout.size();
         let align = layout.align();
-        
+
         // Find a suitable block or allocate a new one
         let blocks = unsafe { &mut *self.blocks.get() };
-        
+
         let block_ptr = if let Some(block) = blocks.last() {
             let offset = block.offset.load(Ordering::Acquire);
             let aligned_offset = (offset + align - 1) & !(align - 1); // Align the offset
-            
+
             if aligned_offset + size <= block.size {
                 // Use existing block
-                let _actual_offset = block.offset.fetch_add(size + (aligned_offset - offset), Ordering::AcqRel);
+                let _actual_offset = block
+                    .offset
+                    .fetch_add(size + (aligned_offset - offset), Ordering::AcqRel);
                 unsafe { block.ptr.as_ptr().add(aligned_offset) }
             } else {
                 // Need a new block
@@ -151,7 +149,7 @@ unsafe impl GlobalAlloc for Arena {
             blocks.push(new_block);
             ptr
         };
-        
+
         block_ptr
     }
 
@@ -167,7 +165,7 @@ unsafe impl Allocator for Arena {
         if ptr.is_null() {
             return Err(AllocError);
         }
-        
+
         let ptr = NonNull::new(ptr).unwrap();
         Ok(NonNull::slice_from_raw_parts(ptr, layout.size()))
     }
@@ -190,7 +188,7 @@ impl Arena {
             total_freed: AtomicUsize::new(0),
         }
     }
-    
+
     // Get the global arena instance
     pub fn global() -> &'static Arena {
         GLOBAL_ARENA.get_or_init(|| Arena::new())
@@ -212,14 +210,12 @@ impl Arena {
                 if header.size >= size {
                     // Remove from free list
                     *free_list = header.next;
-                    
+
                     // Update statistics
                     self.total_freed.fetch_sub(1, Ordering::SeqCst);
-                    
+
                     // Return pointer to the object
-                    return NonNull::new_unchecked(
-                        free.as_ptr().add(1) as *mut T
-                    );
+                    return NonNull::new_unchecked(free.as_ptr().add(1) as *mut T);
                 }
             }
         }
@@ -243,21 +239,22 @@ impl Arena {
         // Initialize header
         unsafe {
             let header = ptr as *mut ObjectHeader;
-            ptr::write(header, ObjectHeader {
-                size,
-                tag,
-                next: None,
-                marked: false,
-            });
+            ptr::write(
+                header,
+                ObjectHeader {
+                    size,
+                    tag,
+                    next: None,
+                    marked: false,
+                },
+            );
         }
 
         // Update statistics
         self.total_allocated.fetch_add(1, Ordering::SeqCst);
 
         // Return pointer to the object
-        unsafe {
-            NonNull::new_unchecked(ptr.add(std::mem::size_of::<ObjectHeader>()) as *mut T)
-        }
+        unsafe { NonNull::new_unchecked(ptr.add(std::mem::size_of::<ObjectHeader>()) as *mut T) }
     }
 
     fn allocate_new_block(&self) -> &mut Block {
@@ -269,15 +266,16 @@ impl Arena {
 
     pub fn deallocate<T>(&self, ptr: NonNull<T>) {
         unsafe {
-            let header_ptr = (ptr.as_ptr() as *mut u8).sub(std::mem::size_of::<ObjectHeader>()) as *mut ObjectHeader;
+            let header_ptr = (ptr.as_ptr() as *mut u8).sub(std::mem::size_of::<ObjectHeader>())
+                as *mut ObjectHeader;
             let header = &mut *header_ptr;
-            
+
             // Add to free list
             let tag_index = header.tag as usize;
             let free_list = &mut *self.free_lists[tag_index].get();
             header.next = *free_list;
             *free_list = Some(NonNull::new_unchecked(header_ptr));
-            
+
             // Update statistics
             self.total_freed.fetch_add(1, Ordering::SeqCst);
         }
@@ -286,28 +284,31 @@ impl Arena {
     pub fn get_stats(&self) -> (usize, usize) {
         (
             self.total_allocated.load(Ordering::Acquire),
-            self.total_freed.load(Ordering::Acquire)
+            self.total_freed.load(Ordering::Acquire),
         )
     }
 
     // For garbage collection
     pub fn mark_object<T>(&self, ptr: NonNull<T>) {
         unsafe {
-            let header_ptr = (ptr.as_ptr() as *mut u8).sub(std::mem::size_of::<ObjectHeader>()) as *mut ObjectHeader;
+            let header_ptr = (ptr.as_ptr() as *mut u8).sub(std::mem::size_of::<ObjectHeader>())
+                as *mut ObjectHeader;
             (*header_ptr).marked = true;
         }
     }
 
     pub fn is_marked<T>(&self, ptr: NonNull<T>) -> bool {
         unsafe {
-            let header_ptr = (ptr.as_ptr() as *mut u8).sub(std::mem::size_of::<ObjectHeader>()) as *mut ObjectHeader;
+            let header_ptr = (ptr.as_ptr() as *mut u8).sub(std::mem::size_of::<ObjectHeader>())
+                as *mut ObjectHeader;
             (*header_ptr).marked
         }
     }
 
     pub fn get_object_tag<T>(&self, ptr: NonNull<T>) -> ObjectTag {
         unsafe {
-            let header_ptr = (ptr.as_ptr() as *mut u8).sub(std::mem::size_of::<ObjectHeader>()) as *mut ObjectHeader;
+            let header_ptr = (ptr.as_ptr() as *mut u8).sub(std::mem::size_of::<ObjectHeader>())
+                as *mut ObjectHeader;
             (*header_ptr).tag
         }
     }
@@ -334,12 +335,12 @@ impl Arena {
             Some(&mut *ptr)
         }
     }
-    
+
     // Allocate a Vec using this arena
     pub fn new_vec<T>(&self) -> Vec<T, &Arena> {
         Vec::new_in(self)
     }
-    
+
     // Create a Vec with the given capacity using this arena
     pub fn new_vec_with_capacity<T>(&self, capacity: usize) -> Vec<T, &Arena> {
         Vec::with_capacity_in(capacity, self)
@@ -392,4 +393,4 @@ impl<T> std::ops::DerefMut for ArenaBox<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { &mut *self.ptr.as_ptr() }
     }
-} 
+}

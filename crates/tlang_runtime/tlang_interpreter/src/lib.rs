@@ -1,9 +1,9 @@
 #![feature(allocator_api)]
 #![feature(if_let_guard)]
 #![feature(box_patterns)]
+use std::alloc::Global;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::alloc::Global;
 
 use log::debug;
 use tlang_ast::node::{Ident, UnaryOp};
@@ -39,8 +39,7 @@ impl EvalResult {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum MatchResult {
+enum MatchResult {
     Matched(EvalResult),
     NotMatched(EvalResult),
 }
@@ -785,7 +784,11 @@ impl Interpreter {
         }
     }
 
-    fn eval_call_object(&mut self, callee: TlangValue, args: Vec<TlangValue, Global>) -> TlangValue {
+    fn eval_call_object(
+        &mut self,
+        callee: TlangValue,
+        args: Vec<TlangValue, Global>,
+    ) -> TlangValue {
         let id = callee
             .get_object_id()
             .unwrap_or_else(|| self.panic(format!("`{callee:?}` is not a function")));
@@ -1099,16 +1102,17 @@ impl Interpreter {
             _ => todo!("eval_call: {:?}", call_expr.arguments[0]),
         };
 
-        let field_values = struct_decl
-            .fields
-            .iter()
-            .map(|field| dict_map.get(&field.name.to_string()).copied().unwrap())
-            .collect();
+        // Create a struct with the capacity to hold all field values using the arena allocator
+        let (struct_obj, field_values) = self
+            .state
+            .new_struct_with_capacity(struct_decl.hir_id.into(), struct_decl.fields.len());
 
-        EvalResult::Value(self.state.new_object(TlangObjectKind::Struct(TlangStruct {
-            shape: struct_decl.hir_id.into(),
-            field_values,
-        })))
+        // Fill the field values from the dictionary
+        for field in &struct_decl.fields {
+            field_values.push(dict_map.get(&field.name.to_string()).copied().unwrap());
+        }
+
+        EvalResult::Value(struct_obj)
     }
 
     fn eval_enum_ctor(
@@ -1164,23 +1168,26 @@ impl Interpreter {
             }
         };
 
-        let field_values = enum_variant_decl
-            .parameters
+        // Find the variant index
+        let variant_idx = enum_decl
+            .variants
             .iter()
-            .map(|field| dict_map.get(&field.name.to_string()).copied().unwrap())
-            .collect();
+            .position(|v| v.name == *variant_name)
+            .unwrap();
 
-        EvalResult::Value(
-            self.state.new_object(TlangObjectKind::Enum(TlangEnum {
-                shape: enum_decl.hir_id.into(),
-                variant: enum_decl
-                    .variants
-                    .iter()
-                    .position(|v| v.name == *variant_name)
-                    .unwrap(),
-                field_values,
-            })),
-        )
+        // Create an enum with arena-allocated field values
+        let (enum_obj, field_values_vec) = self.state.new_enum_with_capacity(
+            enum_decl.hir_id.into(),
+            variant_idx,
+            enum_variant_decl.parameters.len(),
+        );
+
+        // Fill the field values from the dictionary
+        for field in &enum_variant_decl.parameters {
+            field_values_vec.push(dict_map.get(&field.name.to_string()).copied().unwrap());
+        }
+
+        EvalResult::Value(enum_obj)
     }
 
     fn eval_call_method(
@@ -1231,9 +1238,10 @@ impl Interpreter {
     }
 
     fn eval_list_expr(&mut self, values: &[hir::Expr]) -> EvalResult {
-        let mut field_values = Vec::with_capacity(values.len());
+        // Evaluate all expressions and collect values
+        let mut all_values = Vec::with_capacity(values.len() * 2); // Estimate for potential spreads
 
-        for (i, expr) in values.iter().enumerate() {
+        for expr in values {
             if let hir::ExprKind::Unary(UnaryOp::Spread, expr) = &expr.kind {
                 let value = eval_value!(self.eval_expr(expr));
 
@@ -1241,57 +1249,70 @@ impl Interpreter {
                     match self.get_object_by_id(id) {
                         TlangObjectKind::Slice(slice) => {
                             let values = self.get_slice_values(*slice);
-                            field_values.reserve(values.len());
-                            field_values.extend_from_slice(values)
+                            all_values.extend_from_slice(values);
                         }
                         TlangObjectKind::Struct(list_struct) => {
-                            field_values.reserve(list_struct.field_values.len());
-                            field_values.extend(&list_struct.field_values)
+                            all_values.extend(&list_struct.field_values);
                         }
                         obj => self.panic(format!("Expected list, got {obj:?}")),
                     }
-
-                    // In case we used all the capacity due to spreading the values above,
-                    // we once again reserve the remaining capacity.
-                    field_values.reserve(values.len() - i);
                 } else {
                     self.panic(format!("Expected list, got {value:?}"));
                 }
             } else {
-                field_values.push(eval_value!(self.eval_expr(expr)));
+                all_values.push(eval_value!(self.eval_expr(expr)));
             }
         }
 
-        EvalResult::Value(self.state.new_list(field_values))
+        // Now create a new list with arena allocation and the collected values
+        let (list_obj, field_values) = self.state.new_list_with_capacity(all_values.len());
+
+        // Copy all values into the new list
+        field_values.extend_from_slice(&all_values);
+
+        EvalResult::Value(list_obj)
     }
 
     fn eval_dict_expr(&mut self, entries: &[(hir::Expr, hir::Expr)]) -> EvalResult {
-        let mut field_values: Vec<TlangValue, Global> = Vec::with_capacity(entries.len());
-        let mut shape_keys = Vec::with_capacity(entries.len());
+        // First, evaluate all expressions and collect the results
+        let mut key_values = Vec::with_capacity(entries.len());
 
         for entry in entries {
-            field_values.push(eval_value!(self.eval_expr(&entry.1)));
+            let value = eval_value!(self.eval_expr(&entry.1));
 
-            // As we primarily had compilation to JS in mind, paths here should actually be
-            // strings instead. Need to update the parser to emit strings instead of paths,
-            // and paths when using brackets.
-            match &entry.0.kind {
-                hir::ExprKind::Path(path) => shape_keys.push(path.first_ident().to_string()),
+            let key = match &entry.0.kind {
+                hir::ExprKind::Path(path) => path.first_ident().to_string(),
                 _ => todo!("eval_dict_expr: {:?}", entry.0),
             };
+
+            key_values.push((key, value));
         }
 
-        let shape = ShapeKey::from_dict_keys(&shape_keys);
+        // Collect all key names for the shape
+        let shape_keys: Vec<String> = key_values.iter().map(|(k, _)| k.clone()).collect();
+        let final_shape = ShapeKey::from_dict_keys(&shape_keys);
 
-        if self.state.get_shape(shape).is_none() {
-            self.state
-                .define_struct_shape(shape, "Dict".to_string(), shape_keys, HashMap::new());
+        // Create the struct with arena-allocated field values
+        let (dict_obj, field_values) = self
+            .state
+            .new_struct_with_capacity(final_shape, entries.len());
+
+        // Fill field values
+        for (_, value) in &key_values {
+            field_values.push(*value);
         }
 
-        EvalResult::Value(self.state.new_object(TlangObjectKind::Struct(TlangStruct {
-            shape,
-            field_values,
-        })))
+        // Ensure the shape is defined
+        if self.state.get_shape(final_shape).is_none() {
+            self.state.define_struct_shape(
+                final_shape,
+                "Dict".to_string(),
+                shape_keys,
+                HashMap::new(),
+            );
+        }
+
+        EvalResult::Value(dict_obj)
     }
 
     fn eval_match(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) -> EvalResult {
