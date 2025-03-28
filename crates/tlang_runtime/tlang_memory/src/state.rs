@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::alloc::Global;
 
 use log::debug;
 use slab::Slab;
@@ -172,7 +173,13 @@ impl BuiltinShapes {
 #[derive(Debug)]
 pub struct TailCall {
     pub callee: TlangValue,
-    pub args: Vec<TlangValue>,
+    pub args: Vec<TlangValue, Global>,
+}
+
+pub struct StackFrame {
+    pub scope: usize,
+    pub fn_id: Option<HirId>,
+    pub args: Vec<TlangValue, Global>,
 }
 
 pub struct InterpreterState {
@@ -346,7 +353,7 @@ impl InterpreterState {
         &mut self,
         shape: ShapeKey,
         variant: usize,
-        values: Vec<TlangValue>,
+        values: Vec<TlangValue, Global>,
     ) -> TlangValue {
         let enum_data = TlangEnum::new(shape, variant, values);
         self.new_object(TlangObjectKind::Enum(enum_data))
@@ -357,7 +364,7 @@ impl InterpreterState {
         shape: ShapeKey,
         variant: usize,
         capacity: usize,
-    ) -> (TlangValue, &mut Vec<TlangValue>) {
+    ) -> (TlangValue, &mut Vec<TlangValue, Global>) {
         let enum_data = TlangEnum::with_capacity(shape, variant, capacity, &self.arena);
         let obj_id = self.arena.insert(TlangObjectKind::Enum(enum_data));
         let obj = self.arena.get_mut(obj_id).unwrap();
@@ -452,12 +459,12 @@ impl InterpreterState {
         &list.field_values[slice.range()]
     }
 
-    pub fn new_list(&mut self, values: Vec<TlangValue>) -> TlangValue {
+    pub fn new_list(&mut self, values: Vec<TlangValue, Global>) -> TlangValue {
         let list_struct = TlangStruct::new(self.builtin_shapes.list, values);
         self.new_object(TlangObjectKind::Struct(list_struct))
     }
 
-    pub fn new_list_with_capacity(&mut self, capacity: usize) -> (TlangValue, &mut Vec<TlangValue>) {
+    pub fn new_list_with_capacity(&mut self, capacity: usize) -> (TlangValue, &mut Vec<TlangValue, Global>) {
         let list_struct = TlangStruct::with_capacity(self.builtin_shapes.list, capacity, &self.arena);
         let obj_id = self.arena.insert(TlangObjectKind::Struct(list_struct));
         let obj = self.arena.get_mut(obj_id).unwrap();

@@ -1,7 +1,9 @@
+#![feature(allocator_api)]
 #![feature(if_let_guard)]
 #![feature(box_patterns)]
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::alloc::Global;
 
 use log::debug;
 use tlang_ast::node::{Ident, UnaryOp};
@@ -783,7 +785,7 @@ impl Interpreter {
         }
     }
 
-    fn eval_call_object(&mut self, callee: TlangValue, args: Vec<TlangValue>) -> TlangValue {
+    fn eval_call_object(&mut self, callee: TlangValue, args: Vec<TlangValue, Global>) -> TlangValue {
         let id = callee
             .get_object_id()
             .unwrap_or_else(|| self.panic(format!("`{callee:?}` is not a function")));
@@ -1264,7 +1266,7 @@ impl Interpreter {
     }
 
     fn eval_dict_expr(&mut self, entries: &[(hir::Expr, hir::Expr)]) -> EvalResult {
-        let mut field_values: Vec<TlangValue> = Vec::with_capacity(entries.len());
+        let mut field_values: Vec<TlangValue, Global> = Vec::with_capacity(entries.len());
         let mut shape_keys = Vec::with_capacity(entries.len());
 
         for entry in entries {

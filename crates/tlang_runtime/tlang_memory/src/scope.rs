@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::alloc::Global;
 
 use log::debug;
 use tlang_hir::hir::{self, HirScope};
@@ -101,7 +102,7 @@ impl Resolver for ScopeStack {
 #[derive(Debug, Default)]
 pub struct Scope {
     // Value bindings in user code, this includes references to user defined functions.
-    pub locals: Vec<TlangValue>,
+    pub locals: Vec<TlangValue, Global>,
 }
 
 impl Scope {
