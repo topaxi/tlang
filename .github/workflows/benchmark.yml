@@ -1,0 +1,152 @@
+name: Benchmark PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    # Only run on changes to these paths
+    paths:
+      - 'crates/tlang_runtime/**'
+      - 'crates/tlang_memory/**'
+      - 'crates/tlang_ast/**'
+      - 'crates/tlang_hir/**'
+      - 'crates/tlang_parser/**'
+      - 'crates/tlang_ast_lowering/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/benchmark.yml'
+
+jobs:
+  benchmark:
+    name: Run benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+          
+      - name: Install cargo tools
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-nextest
+          
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build project for benchmarking on PR branch
+        run: cargo build --release -p tlang_interpreter
+        
+      - name: Run benchmarks on PR branch
+        run: cd crates/tlang_runtime/tlang_interpreter && cargo bench | tee pr_benchmark.txt
+          
+      - name: Checkout main
+        run: git checkout main
+        
+      - name: Build project for benchmarking on main branch
+        run: cargo build --release -p tlang_interpreter
+        
+      - name: Run benchmarks on main
+        run: cd crates/tlang_runtime/tlang_interpreter && cargo bench | tee main_benchmark.txt
+          
+      - name: Generate benchmark report
+        id: bench-report
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Parse Criterion benchmark results from text output
+            function parseBenchmarkOutput(filePath) {
+              const content = fs.readFileSync(filePath, 'utf8');
+              const lines = content.split('\n');
+              
+              const results = {};
+              let currentGroup = null;
+              
+              for (const line of lines) {
+                // Match benchmark group name
+                const groupMatch = line.match(/^([a-zA-Z0-9 ]+)\/([a-zA-Z0-9_() ]+)$/);
+                if (groupMatch) {
+                  const groupName = groupMatch[1].trim();
+                  const benchName = groupMatch[2].trim();
+                  
+                  if (!results[groupName]) {
+                    results[groupName] = {};
+                  }
+                  
+                  if (!results[groupName][benchName]) {
+                    results[groupName][benchName] = {};
+                  }
+                  
+                  currentGroup = [groupName, benchName];
+                  continue;
+                }
+                
+                // Match time
+                const timeMatch = line.match(/time:\s+\[([\d.]+)\s\ws\s([\d.]+)\s\ws\s([\d.]+)\s\ws\]/);
+                if (timeMatch && currentGroup) {
+                  const [groupName, benchName] = currentGroup;
+                  const median = parseFloat(timeMatch[2]) * 1e9; // convert to ns
+                  
+                  results[groupName][benchName] = { median };
+                }
+              }
+              
+              return results;
+            }
+            
+            // Parse the results from both branches
+            const prResults = parseBenchmarkOutput('crates/tlang_runtime/tlang_interpreter/pr_benchmark.txt');
+            const mainResults = parseBenchmarkOutput('crates/tlang_runtime/tlang_interpreter/main_benchmark.txt');
+            
+            // Generate markdown report
+            let report = '## Benchmark Results\n\n';
+            
+            for (const [group, benchmarks] of Object.entries(prResults)) {
+              if (!mainResults[group]) continue;
+              
+              report += `### ${group}\n\n`;
+              report += '| Benchmark | PR (ns) | Main (ns) | Difference | Change |\n';
+              report += '|-----------|---------|-----------|------------|--------|\n';
+              
+              for (const [benchmark, prResult] of Object.entries(benchmarks)) {
+                if (!mainResults[group][benchmark]) continue;
+                
+                const prMedian = prResult.median;
+                const mainMedian = mainResults[group][benchmark].median;
+                const diff = prMedian - mainMedian;
+                const percentChange = ((diff / mainMedian) * 100).toFixed(2);
+                const isImprovement = diff < 0;
+                
+                const emoji = isImprovement ? '🟢' : (Math.abs(percentChange) < 1 ? '⚪' : '🔴');
+                
+                report += `| ${benchmark} | ${prMedian.toFixed(2)} | ${mainMedian.toFixed(2)} | ${diff.toFixed(2)} | ${emoji} ${percentChange}% |\n`;
+              }
+              
+              report += '\n';
+            }
+            
+            report += '\n🟢 Improvement | ⚪ Neutral (< 1%) | 🔴 Regression\n';
+            
+            // Set output for the next step
+            core.setOutput('report', report);
+            
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const report = `${{ steps.bench-report.outputs.report }}`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: report
+            }); 
