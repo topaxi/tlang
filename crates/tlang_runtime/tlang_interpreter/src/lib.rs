@@ -1002,7 +1002,11 @@ impl Interpreter {
                     ));
                 }
             }
-            _ => todo!("eval_call: {:?}", call_expr.callee),
+            _ => {
+                let callee = eval_value!(self.eval_expr(&call_expr.callee));
+                let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
+                self.eval_call_object(callee, args)
+            }
         };
 
         EvalResult::Value(return_value)
@@ -1909,5 +1913,16 @@ mod tests {
 
         let head = interpreter.eval("head(as_slice([1, 2, 3, 4, 5]))");
         assert_eq!(head.as_usize(), 3);
+    }
+
+    #[test]
+    fn test_nested_function_call() {
+        let mut interpreter = interpreter(indoc! {"
+            fn foo() {
+                fn bar() { 1 }
+            }
+        "});
+
+        assert_matches!(interpreter.eval("foo()()"), TlangValue::U64(1));
     }
 }
