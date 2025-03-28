@@ -65,9 +65,9 @@ fn fibonacci_benchmark(c: &mut Criterion) {
 
     // Tail-recursive implementation
     let tail_recursive_fib = r#"
-        fn fib(n) { fib_tail(n, 0, 1) }
-        fn fib_tail(0, a, _) { a }
-        fn fib_tail(n, a, b) { rec fib_tail(n - 1, b, a + b) }
+        fn fib(n) { fib(n, 0, 1) }
+        fn fib(0, a, _) { a }
+        fn fib(n, a, b) { rec fib(n - 1, b, a + b) }
     "#;
 
     // Run benchmarks for n=10
@@ -147,10 +147,7 @@ fn list_benchmark(c: &mut Criterion) {
             map_helper(list, f, [])
         }
 
-        fn map_helper([], f, acc) {
-            acc
-        }
-
+        fn map_helper([], f, acc) { acc }
         fn map_helper([x, ...xs], f, acc) {
             rec map_helper(xs, f, [...acc, f(x)])
         }
