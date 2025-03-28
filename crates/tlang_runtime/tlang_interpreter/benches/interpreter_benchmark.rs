@@ -215,11 +215,60 @@ fn struct_benchmark(c: &mut Criterion) {
     group.finish();
 }
 
+// Benchmark for function calls with small argument lists
+fn small_arg_call_benchmark(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Small Argument Function Calls");
+
+    let test_code = r#"
+        fn call0() { 42 }
+        fn call1(a) { a }
+        fn call2(a, b) { a + b }
+        fn call3(a, b, c) { a + b + c }
+        fn call4(a, b, c, d) { a + b + c + d }
+        fn call5(a, b, c, d, e) { a + b + c + d + e }
+        fn call6(a, b, c, d, e, f) { a + b + c + d + e + f }
+        fn nested_call(a, b) { call1(a) + call1(b) }
+    "#;
+
+    group.bench_function("call0_no_args", |b| {
+        let mut interp = interpreter(test_code);
+        b.iter(|| interp.eval("call0()"));
+    });
+
+    group.bench_function("call1_one_arg", |b| {
+        let mut interp = interpreter(test_code);
+        b.iter(|| interp.eval("call1(1)"));
+    });
+
+    group.bench_function("call2_two_args", |b| {
+        let mut interp = interpreter(test_code);
+        b.iter(|| interp.eval("call2(1, 2)"));
+    });
+
+    group.bench_function("call4_four_args", |b| {
+        let mut interp = interpreter(test_code);
+        b.iter(|| interp.eval("call4(1, 2, 3, 4)"));
+    });
+
+    group.bench_function("call6_six_args", |b| {
+        let mut interp = interpreter(test_code);
+        b.iter(|| interp.eval("call6(1, 2, 3, 4, 5, 6)"));
+    });
+
+    group.bench_function("nested_calls", |b| {
+        let mut interp = interpreter(test_code);
+        b.iter(|| interp.eval("nested_call(10, 20)"));
+    });
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     fibonacci_benchmark,
     closure_benchmark,
     list_benchmark,
-    struct_benchmark
+    struct_benchmark,
+    small_arg_call_benchmark
 );
 criterion_main!(benches);

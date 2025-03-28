@@ -36,7 +36,7 @@ macro_rules! propagate {
 macro_rules! eval_exprs {
     ($this:expr, $eval:expr, $exprs:expr) => {{ eval_exprs!($this, $eval, $exprs, $exprs.len()) }};
     ($this:expr, $eval:expr, $exprs:expr, $capacity:expr) => {{
-        let mut exprs = Vec::with_capacity($capacity);
+        let mut exprs = SmallVec::<[TlangValue; 8]>::with_capacity($capacity);
         for expr in &$exprs {
             exprs.push(eval_value!($eval($this, expr)));
         }

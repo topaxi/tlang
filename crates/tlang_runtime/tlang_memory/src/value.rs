@@ -1,3 +1,4 @@
+use smallvec::SmallVec;
 use tlang_hir::hir::HirId;
 
 use crate::scope::ScopeStack;
@@ -76,7 +77,7 @@ pub type TlangNativeFn = Box<dyn FnMut(&mut InterpreterState, &[TlangValue]) -> 
 pub enum NativeFnReturn {
     Return(TlangValue),
     DynamicCall(HirId),
-    CallObject(Box<(TlangValue, Vec<TlangValue>)>),
+    CallObject(Box<(TlangValue, SmallVec<[TlangValue; 8]>)>),
 }
 
 #[derive(Debug)]

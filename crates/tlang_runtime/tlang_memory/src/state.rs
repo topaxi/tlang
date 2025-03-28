@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use log::debug;
 use slab::Slab;
+use smallvec::SmallVec;
 use tlang_hir::hir::{self, HirId};
 
 use crate::resolver::Resolver;
@@ -171,7 +172,7 @@ impl BuiltinShapes {
 #[derive(Debug)]
 pub struct TailCall {
     pub callee: TlangValue,
-    pub args: Vec<TlangValue>,
+    pub args: SmallVec<[TlangValue; 8]>,
 }
 
 pub struct InterpreterState {

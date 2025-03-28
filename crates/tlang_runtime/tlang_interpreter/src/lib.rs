@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use log::debug;
+use smallvec::SmallVec;
 use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token;
 use tlang_hir::hir::{self, DefKind, HirId, Res};
@@ -783,7 +784,7 @@ impl Interpreter {
         }
     }
 
-    fn eval_call_object(&mut self, callee: TlangValue, args: Vec<TlangValue>) -> TlangValue {
+    fn eval_call_object(&mut self, callee: TlangValue, args: &[TlangValue]) -> TlangValue {
         let id = callee
             .get_object_id()
             .unwrap_or_else(|| self.panic(format!("`{callee:?}` is not a function")));
@@ -840,14 +841,12 @@ impl Interpreter {
 
             debug!("tail_call: {:?}", tail_call);
 
-            let fn_hir_id = if let TlangValue::Object(obj) = tail_call.callee {
-                if let TlangObjectKind::Fn(hir_id) = self.get_object_by_id(obj) {
-                    *hir_id
-                } else {
-                    self.panic(format!("`{:?}` is not a function", tail_call.callee));
-                }
-            } else {
-                self.panic(format!("`{:?}` is not a function", tail_call.callee));
+            let fn_hir_id = match tail_call.callee {
+                TlangValue::Object(obj) => match self.get_object_by_id(obj) {
+                    TlangObjectKind::Fn(hir_id) => *hir_id,
+                    _ => self.panic(format!("`{:?}` is not a function", tail_call.callee)),
+                },
+                _ => self.panic(format!("`{:?}` is not a function", tail_call.callee)),
             };
 
             // Optimized for self referencial tail calls, if we are calling the same function,
@@ -931,7 +930,7 @@ impl Interpreter {
         let return_value = match &call_expr.callee.kind {
             hir::ExprKind::Path(path) if let Some(value) = self.resolve_value(path) => {
                 let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
-                self.eval_call_object(value, args)
+                self.eval_call_object(value, &args)
             }
             hir::ExprKind::Path(path) if path.res.is_struct_def() => {
                 let Some(struct_decl) = self.state.get_struct_decl(path) else {
@@ -999,7 +998,7 @@ impl Interpreter {
             _ => {
                 let callee = eval_value!(self.eval_expr(&call_expr.callee));
                 let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
-                self.eval_call_object(callee, args)
+                self.eval_call_object(callee, &args)
             }
         };
 
@@ -1069,7 +1068,7 @@ impl Interpreter {
                 }
             }
             NativeFnReturn::CallObject(box (fn_object, args)) => {
-                self.eval_call_object(fn_object, args)
+                self.eval_call_object(fn_object, &args)
             }
         }
     }

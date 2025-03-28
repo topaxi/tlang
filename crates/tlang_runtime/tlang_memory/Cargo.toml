@@ -13,3 +13,4 @@ tlang_hir = { path = "../../tlang_hir" }
 inventory = { workspace = true }
 log = { workspace = true }
 slab = "0.4"
+smallvec = "1.11"
