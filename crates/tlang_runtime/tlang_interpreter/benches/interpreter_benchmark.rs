@@ -4,7 +4,6 @@ use tlang_interpreter::Interpreter;
 use tlang_memory::prelude::TlangValue;
 use tlang_parser::Parser;
 
-// Similar to the TestInterpreter in lib.rs, this helps us run code strings
 struct BenchInterpreter {
     lowering_context: LoweringContext,
     interpreter: Interpreter,
@@ -18,7 +17,6 @@ impl BenchInterpreter {
         }
     }
 
-    // Evaluate a complete module
     fn eval_root(&mut self, src: &str) -> TlangValue {
         let mut parser = Parser::from_source(src);
         let ast = parser.parse().unwrap();
@@ -26,15 +24,12 @@ impl BenchInterpreter {
         self.interpreter.eval(&hir)
     }
 
-    // Evaluate a single expression by wrapping it in a module
     fn eval(&mut self, src: &str) -> TlangValue {
-        // We'll wrap the expression in a module to avoid using eval_expr directly
         let module_src = format!("{src};");
         self.eval_root(&module_src)
     }
 }
 
-// Creates an interpreter with initial code loaded
 fn interpreter(initial_source: &str) -> BenchInterpreter {
     let mut interpreter = BenchInterpreter::new();
     interpreter.eval_root(initial_source);
@@ -45,7 +40,6 @@ fn interpreter(initial_source: &str) -> BenchInterpreter {
 fn fibonacci_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("Fibonacci Implementation");
 
-    // Naive recursive implementation
     let recursive_fib = r#"
         fn fib(n) {
             if n <= 1 {
@@ -56,14 +50,12 @@ fn fibonacci_benchmark(c: &mut Criterion) {
         }
     "#;
 
-    // Pattern-matching implementation
     let pattern_fib = r#"
         fn fib(0) { 0 }
         fn fib(1) { 1 }
         fn fib(n) { fib(n - 1) + fib(n - 2) }
     "#;
 
-    // Tail-recursive implementation
     let tail_recursive_fib = r#"
         fn fib(n) { fib(n, 0, 1) }
         fn fib(0, a, _) { a }
@@ -98,32 +90,22 @@ fn closure_benchmark(c: &mut Criterion) {
             return fn(y) { x + y };
         }
 
-        // Create a specific adder for benchmarking
         let add5 = make_adder(5);
     "#;
 
     group.bench_function("closure_creation_and_call", |b| {
         let mut interp = interpreter(adder_code);
-        b.iter(|| {
-            // Create and call the closure in separate steps to avoid the unimplemented path
-            interp.eval_root("let temp_adder = make_adder(5);");
-            interp.eval("temp_adder(10)")
-        });
+        b.iter(|| { interp.eval("make_adder(5)(10)") });
     });
 
     group.bench_function("reused_closure", |b| {
         let mut interp = interpreter(adder_code);
-        // Create the closure once
         interp.eval_root("let add5 = make_adder(5);");
-        b.iter(|| {
-            // Reuse the same closure on each iteration
-            interp.eval("add5(10)")
-        });
+        b.iter(|| { interp.eval("add5(10)") });
     });
 
     group.bench_function("closure_create_and_store", |b| {
         b.iter(|| {
-            // Create a new interpreter and define a closure on each iteration
             let mut interp = BenchInterpreter::new();
             interp.eval_root(
                 "fn make_adder(x) { return fn(y) { x + y }; } let adder = make_adder(5);",
