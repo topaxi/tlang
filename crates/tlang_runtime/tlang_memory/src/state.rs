@@ -6,6 +6,7 @@ use log::debug;
 use slab::Slab;
 use tlang_hir::hir::{self, HirId};
 
+use crate::allocator::{Arena, ObjectTag};
 use crate::resolver::Resolver;
 use crate::scope::{Scope, ScopeStack};
 use crate::shape::{
@@ -177,7 +178,6 @@ pub struct TailCall {
 pub struct InterpreterState {
     pub scope_stack: ScopeStack,
     closures: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
-    objects: Slab<TlangObjectKind>,
     shapes: HashMap<ShapeKey, TlangShape>,
     fn_decls: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
     struct_decls: HashMap<String, Rc<hir::StructDeclaration>>,
@@ -186,6 +186,7 @@ pub struct InterpreterState {
     globals: HashMap<String, TlangValue>,
     pub builtin_shapes: BuiltinShapes,
     native_fns: HashMap<TlangObjectId, TlangNativeFn>,
+    arena: Arena,
 }
 
 impl Resolver for InterpreterState {
@@ -223,15 +224,15 @@ impl InterpreterState {
         Self {
             scope_stack: ScopeStack::default(),
             closures: HashMap::with_capacity(100),
-            objects: Slab::with_capacity(1000),
+            shapes: HashMap::with_capacity(100),
+            fn_decls: HashMap::with_capacity(1000),
             struct_decls: HashMap::with_capacity(100),
             enum_decls: HashMap::with_capacity(100),
-            fn_decls: HashMap::with_capacity(1000),
-            shapes: HashMap::with_capacity(100),
             call_stack,
             globals: HashMap::with_capacity(100),
             builtin_shapes: BuiltinShapes::default(),
             native_fns: HashMap::with_capacity(100),
+            arena: Arena::new(),
         }
     }
 
@@ -327,7 +328,18 @@ impl InterpreterState {
     }
 
     pub fn new_object(&mut self, kind: TlangObjectKind) -> TlangValue {
-        TlangValue::new_object(self.objects.insert(kind))
+        let _tag = match &kind {
+            TlangObjectKind::Struct(_) => ObjectTag::Struct,
+            TlangObjectKind::Enum(_) => ObjectTag::Enum,
+            TlangObjectKind::String(_) => ObjectTag::String,
+            TlangObjectKind::Slice(_) => ObjectTag::Slice, 
+            TlangObjectKind::Closure(_) => ObjectTag::Closure,
+            TlangObjectKind::Fn(_) => ObjectTag::Function,
+            TlangObjectKind::NativeFn => ObjectTag::NativeFunction,
+        };
+        
+        let id = self.arena.insert(kind);
+        TlangValue::Object(id)
     }
 
     pub fn new_enum(
@@ -395,7 +407,7 @@ impl InterpreterState {
 
     #[inline(always)]
     pub fn get_object_by_id(&self, id: TlangObjectId) -> Option<&TlangObjectKind> {
-        self.objects.get(id)
+        self.arena.get(id)
     }
 
     pub fn get_object(&self, value: TlangValue) -> Option<&TlangObjectKind> {

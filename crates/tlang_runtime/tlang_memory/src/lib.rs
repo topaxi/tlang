@@ -1,4 +1,5 @@
 mod macros;
+pub mod allocator;
 pub mod resolver;
 pub mod scope;
 pub mod shape;
