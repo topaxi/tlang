@@ -227,9 +227,19 @@ fn small_arg_call_benchmark(c: &mut Criterion) {
         b.iter(|| interp.eval("call2(1, 2)"));
     });
 
+    group.bench_function("call3_three_args", |b| {
+        let mut interp = interpreter(test_code);
+        b.iter(|| interp.eval("call3(1, 2, 3)"));
+    });
+
     group.bench_function("call4_four_args", |b| {
         let mut interp = interpreter(test_code);
         b.iter(|| interp.eval("call4(1, 2, 3, 4)"));
+    });
+
+    group.bench_function("call5_five_args", |b| {
+        let mut interp = interpreter(test_code);
+        b.iter(|| interp.eval("call5(1, 2, 3, 4, 5)"));
     });
 
     group.bench_function("call6_six_args", |b| {
