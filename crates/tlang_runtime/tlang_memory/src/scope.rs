@@ -62,11 +62,11 @@ impl ScopeStack {
     }
 
     fn get_local(&self, index: usize) -> Option<TlangValue> {
-        self.current_scope().borrow().locals.get(index).cloned()
+        self.current_scope().borrow().locals.get(index).copied()
     }
 
     fn get_upvar(&self, scope_index: usize, index: usize) -> Option<TlangValue> {
-        self.scopes[scope_index].borrow().locals.get(index).cloned()
+        self.scopes[scope_index].borrow().locals.get(index).copied()
     }
 
     fn resolve_value(&self, res: &hir::Res) -> Option<TlangValue> {
