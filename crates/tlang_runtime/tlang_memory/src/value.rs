@@ -77,7 +77,7 @@ pub type TlangNativeFn = Box<dyn FnMut(&mut InterpreterState, &[TlangValue]) -> 
 pub enum NativeFnReturn {
     Return(TlangValue),
     DynamicCall(HirId),
-    CallObject(Box<(TlangValue, SmallVec<[TlangValue; 8]>)>),
+    CallObject(Box<(TlangValue, SmallVec<[TlangValue; 4]>)>),
 }
 
 #[derive(Debug)]

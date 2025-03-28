@@ -172,7 +172,7 @@ impl BuiltinShapes {
 #[derive(Debug)]
 pub struct TailCall {
     pub callee: TlangValue,
-    pub args: SmallVec<[TlangValue; 8]>,
+    pub args: SmallVec<[TlangValue; 4]>,
 }
 
 pub struct InterpreterState {
