@@ -97,7 +97,7 @@ fn closure_benchmark(c: &mut Criterion) {
         fn make_adder(x) {
             return fn(y) { x + y };
         }
-        
+
         // Create a specific adder for benchmarking
         let add5 = make_adder(5);
     "#;
@@ -142,15 +142,15 @@ fn list_benchmark(c: &mut Criterion) {
         fn reverse(list) { reverse(list, []) }
         fn reverse([], acc) { acc }
         fn reverse([x, ...xs], acc) { rec reverse(xs, [x, ...acc]) }
-        
+
         fn map(list, f) {
             map_helper(list, f, [])
         }
-        
+
         fn map_helper([], f, acc) {
             acc
         }
-        
+
         fn map_helper([x, ...xs], f, acc) {
             rec map_helper(xs, f, [...acc, f(x)])
         }
@@ -186,11 +186,11 @@ fn struct_benchmark(c: &mut Criterion) {
             x: Int,
             y: Int,
         }
-        
-        fn make_point(x, y) {
+
+        fn Point::new(x, y) {
             Point { x: x, y: y }
         }
-        
+
         fn distance(p1, p2) {
             let dx = p1.x - p2.x;
             let dy = p1.y - p2.y;
@@ -200,18 +200,18 @@ fn struct_benchmark(c: &mut Criterion) {
 
     group.bench_function("struct_creation", |b| {
         let mut interp = interpreter(struct_code);
-        b.iter(|| interp.eval("make_point(10, 20)"));
+        b.iter(|| interp.eval("Point::new(10, 20)"));
     });
 
     group.bench_function("struct_field_access", |b| {
         let mut interp = interpreter(struct_code);
-        interp.eval_root("let p = make_point(10, 20);");
+        interp.eval_root("let p = Point::new(10, 20);");
         b.iter(|| interp.eval("p.x + p.y"));
     });
 
     group.bench_function("struct_method", |b| {
         let mut interp = interpreter(struct_code);
-        interp.eval_root("let p1 = make_point(0, 0); let p2 = make_point(3, 4);");
+        interp.eval_root("let p1 = Point::new(0, 0); let p2 = Point::new(3, 4);");
         b.iter(|| interp.eval("distance(p1, p2)"));
     });
 
