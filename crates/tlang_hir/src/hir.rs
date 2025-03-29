@@ -348,13 +348,7 @@ pub struct MatchArm {
 
 impl MatchArm {
     pub fn has_let_guard(&self) -> bool {
-        if let Some(guard) = &self.guard {
-            if let ExprKind::Let(..) = &guard.kind {
-                return true;
-            }
-        }
-
-        false
+        self.guard.as_ref().is_some_and(|guard| guard.is_let())
     }
 }
 
@@ -424,6 +418,10 @@ impl Expr {
 
     pub fn is_tail_call(&self) -> bool {
         matches!(self.kind, ExprKind::TailCall(_))
+    }
+
+    pub fn is_let(&self) -> bool {
+        matches!(self.kind, ExprKind::Let(..))
     }
 
     pub fn path(&self) -> Option<&Path> {

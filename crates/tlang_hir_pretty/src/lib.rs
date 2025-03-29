@@ -1,11 +1,12 @@
 use tlang_ast::node::{Ident, UnaryOp};
-use tlang_ast::token::Literal;
+use tlang_ast::token::{Literal, Token, TokenKind};
 use tlang_hir::hir;
 
 pub struct HirPrettyOptions {
     pub tab_indent: bool,
     pub indent_size: usize,
     pub mark_unresolved: bool,
+    pub comments: bool,
 }
 
 impl Default for HirPrettyOptions {
@@ -14,6 +15,7 @@ impl Default for HirPrettyOptions {
             indent_size: 4,
             tab_indent: false,
             mark_unresolved: true,
+            comments: true,
         }
     }
 }
@@ -21,6 +23,7 @@ impl Default for HirPrettyOptions {
 struct HirPrettyResolvedOptions {
     indent_string: String,
     mark_unresolved: bool,
+    comments: bool,
 }
 
 impl Default for HirPrettyResolvedOptions {
@@ -38,6 +41,7 @@ impl From<HirPrettyOptions> for HirPrettyResolvedOptions {
                 " ".repeat(options.indent_size)
             },
             mark_unresolved: options.mark_unresolved,
+            comments: options.comments,
         }
     }
 }
@@ -112,6 +116,32 @@ impl HirPretty {
         self.push_char('}');
     }
 
+    fn print_comment(&mut self, comment: &Token) {
+        if self.options.comments {
+            match &comment.kind {
+                TokenKind::SingleLineComment(comment) => {
+                    self.push_indent();
+                    self.push_str("// ");
+                    self.push_str(comment.as_str());
+                }
+                TokenKind::MultiLineComment(comment) => {
+                    self.push_indent();
+                    self.push_str("/* ");
+                    self.push_str(comment.as_str());
+                    self.push_str(" */");
+                }
+                _ => unreachable!(),
+            }
+        }
+    }
+
+    fn print_comments(&mut self, comments: &[Token]) {
+        for comment in comments {
+            self.print_comment(comment);
+            self.push_newline();
+        }
+    }
+
     fn print_stmts(&mut self, stmts: &[hir::Stmt]) {
         for stmt in stmts {
             self.print_stmt(stmt);
@@ -120,6 +150,7 @@ impl HirPretty {
 
     fn print_stmt(&mut self, stmt: &hir::Stmt) {
         self.push_indent();
+        self.print_comments(&stmt.leading_comments);
 
         match &stmt.kind {
             hir::StmtKind::EnumDeclaration(decl) => self.print_enum_declaration(decl),
@@ -143,6 +174,7 @@ impl HirPretty {
 
         self.push_char(';');
         self.push_newline();
+        self.print_comments(&stmt.trailing_comments);
     }
 
     fn print_struct_field(&mut self, field: &hir::StructField) {
@@ -298,20 +330,26 @@ impl HirPretty {
         self.push_newline();
         self.inc_indent();
         for arm in arms {
-            self.push_indent();
-            self.print_pat(&arm.pat);
-            if let Some(guard) = &arm.guard {
-                self.push_str(" if ");
-                self.print_expr(guard);
-            }
-            self.push_str(" => ");
-            self.print_block(&arm.block);
-            self.push_char(',');
-            self.push_newline();
+            self.print_match_arm(arm);
         }
         self.dec_indent();
         self.push_indent();
         self.push_char('}');
+    }
+
+    fn print_match_arm(&mut self, arm: &hir::MatchArm) {
+        self.print_comments(&arm.leading_comments);
+        self.push_indent();
+        self.print_pat(&arm.pat);
+        if let Some(guard) = &arm.guard {
+            self.push_str(" if ");
+            self.print_expr(guard);
+        }
+        self.push_str(" => ");
+        self.print_block(&arm.block);
+        self.push_char(',');
+        self.push_newline();
+        self.print_comments(&arm.leading_comments);
     }
 
     fn print_binary_expr(&mut self, op: &hir::BinaryOpKind, lhs: &hir::Expr, rhs: &hir::Expr) {
