@@ -52,18 +52,17 @@ async function defaultSource() {
   return examples[Object.keys(examples)[0]];
 }
 
-type OutputDisplay = 'ast' | 'hir' | 'hir_pretty' | 'javascript';
+type OutputDisplay = 'ast' | 'hir' | 'hir' | 'javascript';
 
 const displayLabels = {
   ast: 'AST',
   hir: 'HIR',
-  hir_pretty: 'HIR (Pretty)',
   javascript: 'JavaScript',
 } satisfies Record<OutputDisplay, string>;
 
 function defaultDisplay(): OutputDisplay {
   let params = getHashParams();
-  let display: OutputDisplay = 'hir_pretty';
+  let display: OutputDisplay = 'hir';
 
   if (params.has('display')) {
     display = params.get('display') as OutputDisplay;
@@ -74,7 +73,7 @@ function defaultDisplay(): OutputDisplay {
   }
 
   if (params.get('runner') === 'interpreter' && display === 'javascript') {
-    return 'hir_pretty';
+    return 'hir';
   }
 
   return display;
@@ -225,9 +224,9 @@ export class TlangPlayground extends LitElement {
 
   get availableDisplayOptions(): OutputDisplay[] {
     if (this.runner === 'interpreter') {
-      return ['hir_pretty', 'hir', 'ast'];
+      return ['hir', 'ast'];
     } else {
-      return ['javascript', 'hir_pretty', 'hir', 'ast'];
+      return ['javascript', 'hir', 'ast'];
     }
   }
 
@@ -462,7 +461,7 @@ export class TlangPlayground extends LitElement {
     // When using the interpreter, showing the javascript output does not make
     // sense.
     if (this.runner === 'interpreter' && this.display === 'javascript') {
-      this.display = 'hir_pretty';
+      this.display = 'hir';
     }
 
     updateRunnerHashparam(this.runner);
@@ -514,10 +513,6 @@ export class TlangPlayground extends LitElement {
       case 'ast':
         return html`<pre class="output-ast">${this.tlang.getASTString()}</pre>`;
       case 'hir':
-        return html`
-          <pre class="output-ast">${this.tlang.getHIRString()}</pre>
-        `;
-      case 'hir_pretty':
         return html`<t-hir-pretty .tlang=${this.tlang}></t-hir-pretty>`;
       case 'javascript':
         return html`

@@ -62,6 +62,8 @@ export class ButtonElement extends LitElement {
 
       :host([aria-disabled='true']) {
         cursor: not-allowed;
+        background-color: var(--t-button-background-color);
+        opacity: 0.5;
       }
 
       [part='shortcut'] {
@@ -88,7 +90,7 @@ export class ButtonElement extends LitElement {
 
   override tabIndex = 0;
 
-  @property({ type: Boolean, attribute: 'aria-disabled', reflect: true })
+  @property()
   disabled = false;
 
   @property({ type: String, reflect: true })
@@ -251,6 +253,16 @@ export class ButtonElement extends LitElement {
           }),
         );
       }
+    }
+
+    if (changedProperties.has('disabled')) {
+      if (!this.disabled) {
+        this.removeAttribute('aria-disabled');
+      } else {
+        this.setAttribute('aria-disabled', 'true');
+      }
+
+      this.internals.ariaDisabled = String(Boolean(this.disabled));
     }
   }
 

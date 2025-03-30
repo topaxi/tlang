@@ -82,6 +82,12 @@ export class MenuItemButtonElement extends ButtonElement {
     :host(:active) {
       background-color: var(--t-button-active-background-color);
     }
+
+    :host([aria-disabled='true']) {
+      cursor: not-allowed;
+      background-color: var(--t-button-background-color);
+      opacity: 0.5;
+    }
   `;
 
   override tabIndex = -1;
