@@ -20,6 +20,11 @@ export class HirPrettyElement extends LitElement {
       right: 0;
       z-index: 1;
     }
+
+    pre {
+      font-family: inherit;
+      margin: 0;
+    }
   `;
 
   @property()
