@@ -27,7 +27,7 @@ export class HirPrettyElement extends LitElement {
     }
   `;
 
-  @property()
+  @property({ attribute: false })
   tlang: Tlang | null = null;
 
   @state()

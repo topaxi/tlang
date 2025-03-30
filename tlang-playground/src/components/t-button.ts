@@ -90,7 +90,7 @@ export class ButtonElement extends LitElement {
 
   override tabIndex = 0;
 
-  @property()
+  @property({ type: Boolean })
   disabled = false;
 
   @property({ type: String, reflect: true })
