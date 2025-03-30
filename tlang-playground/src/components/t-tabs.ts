@@ -34,6 +34,10 @@ export class TabsElement extends LitElement {
       bottom: 0;
       border-right: 1px solid var(--ctp-macchiato-surface0);
     }
+
+    ::slotted(t-tab-panel) {
+      position: relative;
+    }
   `;
 
   @queryAssignedElements({ slot: 'tab', selector: 't-tab' })

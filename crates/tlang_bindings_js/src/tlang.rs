@@ -1,7 +1,8 @@
+use serde::Deserialize;
 use tlang_ast::node::{self as ast};
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_hir::hir;
-use tlang_hir_pretty::HirPretty;
+use tlang_hir_pretty::{HirPretty, HirPrettyOptions};
 use tlang_parser::Parser;
 use tlang_parser::error::{ParseError, ParseIssue};
 use tlang_semantics::SemanticAnalyzer;
@@ -12,6 +13,39 @@ use crate::codemirror;
 #[wasm_bindgen(js_name = "getStandardLibrarySource")]
 pub fn get_standard_library_source() -> String {
     CodegenJS::get_standard_library_source()
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct JsHirPrettyOptions {
+    pub tab_indent: Option<bool>,
+    pub indent_size: Option<usize>,
+    pub mark_unresolved: Option<bool>,
+    pub comments: Option<bool>,
+}
+
+impl JsHirPrettyOptions {
+    fn into_hir_pretty_options(self) -> HirPrettyOptions {
+        let mut options = HirPrettyOptions::default();
+
+        if let Some(tab_indent) = self.tab_indent {
+            options.tab_indent = tab_indent;
+        }
+
+        if let Some(indent_size) = self.indent_size {
+            options.indent_size = indent_size;
+        }
+
+        if let Some(mark_unresolved) = self.mark_unresolved {
+            options.mark_unresolved = mark_unresolved;
+        }
+
+        if let Some(comments) = self.comments {
+            options.comments = comments;
+        }
+
+        options
+    }
 }
 
 #[derive(Default)]
@@ -147,13 +181,23 @@ impl Tlang {
     }
 
     #[wasm_bindgen(js_name = "getHIRPretty")]
-    pub fn hir_pretty(&mut self) -> String {
+    pub fn hir_pretty(&mut self, options: JsValue) -> Result<String, serde_wasm_bindgen::Error> {
         self.lower_to_hir();
 
         if let Some(hir) = self.build.hir.as_ref() {
-            HirPretty::pretty_print(hir)
+            if options.is_undefined() {
+                return Ok(HirPretty::pretty_print(hir));
+            }
+
+            let options: JsHirPrettyOptions = serde_wasm_bindgen::from_value(options)?;
+            let options = options.into_hir_pretty_options();
+            let mut pretty_pinter = HirPretty::new(options);
+
+            pretty_pinter.print_module(hir);
+
+            Ok(pretty_pinter.output().to_string())
         } else {
-            String::new()
+            Ok(String::new())
         }
     }
 

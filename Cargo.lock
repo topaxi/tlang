@@ -1019,6 +1019,7 @@ dependencies = [
  "inventory",
  "js-sys",
  "ron 0.8.1",
+ "serde",
  "serde-wasm-bindgen",
  "tlang_ast",
  "tlang_ast_lowering",

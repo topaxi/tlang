@@ -5,6 +5,7 @@ import { examples } from './examples';
 import './components/t-button';
 import './components/t-codemirror';
 import './components/t-console';
+import './components/t-hir-pretty';
 import './components/t-live';
 import './components/t-shortcuts';
 import './components/t-split';
@@ -189,6 +190,7 @@ export class TlangPlayground extends LitElement {
       overflow: hidden;
     }
 
+    ::part(output),
     .output-code,
     .output-ast {
       width: 100%;
@@ -512,16 +514,11 @@ export class TlangPlayground extends LitElement {
       case 'ast':
         return html`<pre class="output-ast">${this.tlang.getASTString()}</pre>`;
       case 'hir':
-        return html`<pre class="output-ast">${this.tlang.getHIRString()}</pre>`;
-      case 'hir_pretty':
         return html`
-          <t-codemirror
-            class="output-code"
-            language="tlang"
-            .source=${this.tlang.getHIRPretty()}
-            readonly
-          ></t-codemirror>
+          <pre class="output-ast">${this.tlang.getHIRString()}</pre>
         `;
+      case 'hir_pretty':
+        return html`<t-hir-pretty .tlang=${this.tlang}></t-hir-pretty>`;
       case 'javascript':
         return html`
           <t-codemirror

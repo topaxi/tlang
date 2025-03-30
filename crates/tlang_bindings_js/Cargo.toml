@@ -29,6 +29,7 @@ tlang_macros = { path = "../tlang_macros" }
 tlang_codegen_js = { path = "../tlang_codegen_js" }
 inventory = { workspace = true }
 ron = { workspace = true }
+serde = { workspace = true }
 serde-wasm-bindgen = "0.6"
 
 [dependencies.web-sys]

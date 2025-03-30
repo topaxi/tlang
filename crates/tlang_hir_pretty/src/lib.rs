@@ -97,7 +97,11 @@ impl HirPretty {
         self.push_char('\n');
     }
 
-    fn print_module(&mut self, module: &hir::Module) {
+    pub fn output(&self) -> &str {
+        &self.output
+    }
+
+    pub fn print_module(&mut self, module: &hir::Module) {
         self.print_stmts(&module.block.stmts);
     }
 
@@ -117,25 +121,31 @@ impl HirPretty {
     }
 
     fn print_comment(&mut self, comment: &Token) {
-        if self.options.comments {
-            match &comment.kind {
-                TokenKind::SingleLineComment(comment) => {
-                    self.push_indent();
-                    self.push_str("// ");
-                    self.push_str(comment.as_str());
-                }
-                TokenKind::MultiLineComment(comment) => {
-                    self.push_indent();
-                    self.push_str("/* ");
-                    self.push_str(comment.as_str());
-                    self.push_str(" */");
-                }
-                _ => unreachable!(),
+        if !self.options.comments {
+            return;
+        }
+
+        match &comment.kind {
+            TokenKind::SingleLineComment(comment) => {
+                self.push_indent();
+                self.push_str("// ");
+                self.push_str(comment.as_str());
             }
+            TokenKind::MultiLineComment(comment) => {
+                self.push_indent();
+                self.push_str("/* ");
+                self.push_str(comment.as_str());
+                self.push_str(" */");
+            }
+            _ => unreachable!(),
         }
     }
 
     fn print_comments(&mut self, comments: &[Token]) {
+        if !self.options.comments {
+            return;
+        }
+
         for comment in comments {
             self.print_comment(comment);
             self.push_newline();
