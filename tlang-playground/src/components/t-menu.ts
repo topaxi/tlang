@@ -113,12 +113,61 @@ export class MenuItemLinkElement extends LitElement {
   }
 }
 
-@customElement('t-menuitem-radio')
-export class MenuItemRadioElement extends MenuItemButtonElement {
-  override role = 'menuitemradio';
+@customElement('t-menuitem-group')
+export class MenuItemGroupElement extends LitElement {
+  static override styles: CSSResultGroup = css`
+    :host {
+      display: block;
+      padding: 0.25em 0.5em;
+      cursor: default;
+      user-select: none;
+      background-color: var(--t-button-background-color);
+    }
+  `;
+
+  override role = 'group';
 
   protected override render(): TemplateResult {
     return html`<slot></slot>`;
+  }
+}
+
+@customElement('t-menuitem-radio')
+export class MenuItemRadioElement extends MenuItemButtonElement {
+  static override styles = [
+    super.styles,
+    css`
+      ::part(icon)::before {
+        content: '';
+      }
+
+      :host(:state(checked))::part(icon)::before {
+        content: '';
+      }
+    `,
+  ];
+
+  override role = 'menuitemradio';
+
+  @property({ type: Boolean, reflect: true })
+  get checked(): boolean {
+    return this.internals.states.has('checked');
+  }
+  set checked(value: boolean) {
+    if (value) {
+      this.internals.states.add('checked');
+      this.internals.ariaChecked = 'true';
+    } else {
+      this.internals.states.delete('checked');
+      this.internals.ariaChecked = 'false';
+    }
+  }
+
+  protected override render(): TemplateResult {
+    return html`
+      <slot name="radio" part="radio"><i part="icon"></i></slot>
+      <slot></slot>
+    `;
   }
 }
 
@@ -146,8 +195,10 @@ export class MenuItemCheckboxElement extends MenuItemButtonElement {
   set checked(value: boolean) {
     if (value) {
       this.internals.states.add('checked');
+      this.internals.ariaChecked = 'true';
     } else {
       this.internals.states.delete('checked');
+      this.internals.ariaChecked = 'false';
     }
   }
 
@@ -183,7 +234,9 @@ declare global {
   interface HTMLElementTagNameMap {
     't-menu': MenuElement;
     't-menuitem': MenuItemButtonElement;
-    't-menuitemradio': MenuItemRadioElement;
-    't-menuitemcheckbox': MenuItemCheckboxElement;
+    't-menuitem-link': MenuItemLinkElement;
+    't-menuitem-group': MenuItemGroupElement;
+    't-menuitem-radio': MenuItemRadioElement;
+    't-menuitem-checkbox': MenuItemCheckboxElement;
   }
 }

@@ -25,6 +25,23 @@ export class HirPrettyElement extends LitElement {
       font-family: inherit;
       margin: 0;
     }
+
+    .indent-size {
+      display: flex;
+      align-items: center;
+    }
+
+    .indent-size::before {
+      content: '\\00a0\\00a0';
+    }
+
+    .indent-size > label {
+      margin-right: 0.25em;
+    }
+
+    .indent-size:has([aria-disabled='true']) > label {
+      opacity: 0.5;
+    }
   `;
 
   @property({ attribute: false })
@@ -42,9 +59,16 @@ export class HirPrettyElement extends LitElement {
   };
 
   private toggleHirPrettyOption(option: keyof typeof this.hirPrettyOptions) {
+    this.setHirPrettyOption(option, !this.hirPrettyOptions[option]);
+  }
+
+  private setHirPrettyOption<T extends keyof typeof this.hirPrettyOptions>(
+    option: T,
+    value: (typeof this.hirPrettyOptions)[T],
+  ) {
     this.hirPrettyOptions = {
       ...this.hirPrettyOptions,
-      [option]: !this.hirPrettyOptions[option],
+      [option]: value,
     };
   }
 
@@ -78,6 +102,33 @@ export class HirPrettyElement extends LitElement {
         >
           Tab indent
         </t-menuitem-checkbox>
+        <t-menuitem-group class="indent-size">
+          <label id="indent-size__label">Indent size</label>
+          <t-menuitem-radio
+            aria-labelledby="indent-size__label"
+            .disabled=${this.hirPrettyOptions.tabIndent || !this.pretty}
+            @click=${() => this.setHirPrettyOption('indentSize', 2)}
+            .checked=${this.hirPrettyOptions.indentSize === 2}
+          >
+            2
+          </t-menuitem-radio>
+          <t-menuitem-radio
+            aria-labelledby="indent-size__label"
+            .disabled=${this.hirPrettyOptions.tabIndent || !this.pretty}
+            @click=${() => this.setHirPrettyOption('indentSize', 4)}
+            .checked=${this.hirPrettyOptions.indentSize === 4}
+          >
+            4
+          </t-menuitem-radio>
+          <t-menuitem-radio
+            aria-labelledby="indent-size__label"
+            .disabled=${this.hirPrettyOptions.tabIndent || !this.pretty}
+            @click=${() => this.setHirPrettyOption('indentSize', 8)}
+            .checked=${this.hirPrettyOptions.indentSize === 8}
+          >
+            8
+          </t-menuitem-radio>
+        </t-menuitem-group>
         <t-menuitem-checkbox
           @change=${() => (this.pretty = !this.pretty)}
           .checked=${this.pretty}
