@@ -44,7 +44,7 @@ impl SymbolId {
         SymbolId(id)
     }
 
-    pub fn next(&self) -> Self {
+    pub fn next(self) -> Self {
         SymbolId(self.0 + 1)
     }
 }

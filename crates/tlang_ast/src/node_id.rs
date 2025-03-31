@@ -10,7 +10,7 @@ impl NodeId {
         NodeId(id)
     }
 
-    pub fn next(&self) -> Self {
+    pub fn next(self) -> Self {
         NodeId(self.0 + 1)
     }
 }

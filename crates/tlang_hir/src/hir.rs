@@ -23,7 +23,7 @@ impl HirId {
         HirId(NonZero::new(id).expect("HirId must be non-zero"))
     }
 
-    pub fn next(&self) -> Self {
+    pub fn next(self) -> Self {
         HirId(self.0.saturating_add(1))
     }
 }
@@ -77,7 +77,7 @@ pub enum Res {
 }
 
 impl Res {
-    pub fn is_value(&self) -> bool {
+    pub fn is_value(self) -> bool {
         matches!(
             self,
             Res::Local(..)
@@ -88,36 +88,36 @@ impl Res {
         )
     }
 
-    pub fn is_unknown(&self) -> bool {
+    pub fn is_unknown(self) -> bool {
         matches!(self, Res::Unknown)
     }
 
-    pub fn is_def(&self) -> bool {
+    pub fn is_def(self) -> bool {
         matches!(self, Res::Def(..))
     }
 
-    pub fn is_struct_def(&self) -> bool {
+    pub fn is_struct_def(self) -> bool {
         matches!(self, Res::Def(DefKind::Struct, ..))
     }
 
-    pub fn is_enum_def(&self) -> bool {
+    pub fn is_enum_def(self) -> bool {
         matches!(self, Res::Def(DefKind::Enum, ..))
     }
 
-    pub fn is_enum_variant_def(&self) -> bool {
+    pub fn is_enum_variant_def(self) -> bool {
         matches!(self, Res::Def(DefKind::Variant, ..))
     }
 
-    pub fn hir_id(&self) -> Option<HirId> {
+    pub fn hir_id(self) -> Option<HirId> {
         match self {
-            Res::Def(_, hir_id, ..) | Res::Local(hir_id, ..) => Some(*hir_id),
+            Res::Def(_, hir_id, ..) | Res::Local(hir_id, ..) => Some(hir_id),
             _ => None,
         }
     }
 
-    pub fn slot_index(&self) -> Option<usize> {
+    pub fn slot_index(self) -> Option<usize> {
         match self {
-            Res::Def(.., index) | Res::Local(.., index) | Res::Upvar(.., index) => Some(*index),
+            Res::Def(.., index) | Res::Local(.., index) | Res::Upvar(.., index) => Some(index),
             Res::Unknown => None,
         }
     }
@@ -348,7 +348,7 @@ pub struct MatchArm {
 
 impl MatchArm {
     pub fn has_let_guard(&self) -> bool {
-        self.guard.as_ref().is_some_and(|guard| guard.is_let())
+        self.guard.as_ref().is_some_and(Expr::is_let)
     }
 }
 
