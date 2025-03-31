@@ -30,37 +30,37 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt, clippy
-          
+
       - name: Install cargo tools
         uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-nextest
-          
+
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
       - name: Build project for benchmarking on PR branch
         run: cargo build --release -p tlang_interpreter
-        
+
       - name: Run benchmarks on PR branch
         run: cd crates/tlang_runtime/tlang_interpreter && cargo bench | tee pr_benchmark.txt
-          
+
       - name: Checkout main
         run: git checkout main
-        
+
       - name: Build project for benchmarking on main branch
         run: cargo build --release -p tlang_interpreter
-        
+
       - name: Run benchmarks on main
         run: cd crates/tlang_runtime/tlang_interpreter && cargo bench | tee main_benchmark.txt
-          
+
       - name: Generate benchmark report
         id: bench-report
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            
+
             // Parse Criterion benchmark results from text output
             function parseBenchmarkOutput(filePath) {
               const content = fs.readFileSync(filePath, 'utf8');
@@ -100,14 +100,14 @@ jobs:
               
               return results;
             }
-            
+
             // Parse the results from both branches
             const prResults = parseBenchmarkOutput('crates/tlang_runtime/tlang_interpreter/pr_benchmark.txt');
             const mainResults = parseBenchmarkOutput('crates/tlang_runtime/tlang_interpreter/main_benchmark.txt');
-            
+
             // Generate markdown report
             let report = '## Benchmark Results\n\n';
-            
+
             for (const [group, benchmarks] of Object.entries(prResults)) {
               if (!mainResults[group]) continue;
               
@@ -119,7 +119,7 @@ jobs:
                 if (!mainResults[group][benchmark]) continue;
                 
                 const prMedian = prResult.median;
-                const mainMedian = mainResults[group][benchmark].median;
+                const mainMedian = mainResults[group][benchmark].median ?? 0;
                 const diff = prMedian - mainMedian;
                 const percentChange = ((diff / mainMedian) * 100).toFixed(2);
                 const isImprovement = diff < 0;
@@ -131,22 +131,22 @@ jobs:
               
               report += '\n';
             }
-            
+
             report += '\n🟢 Improvement | ⚪ Neutral (< 1%) | 🔴 Regression\n';
-            
+
             // Set output for the next step
             core.setOutput('report', report);
-            
+
       - name: Comment on PR
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const report = `${{ steps.bench-report.outputs.report }}`;
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: report
-            }); 
+            });
