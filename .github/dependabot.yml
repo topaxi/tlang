@@ -53,6 +53,7 @@ updates:
           - '@typescript-eslint/*'
           - 'prettier'
           - 'postcss-lit'
+          - '@jackolope/ts-lit-plugin'
           - 'stylelint'
           - 'stylelint-config-standard'
       lit:
