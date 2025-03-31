@@ -794,7 +794,7 @@ impl Interpreter {
                 let closure_decl = self.get_closure_decl(closure.id).unwrap().clone();
 
                 self.with_scope(closure.scope_stack.clone(), |this| {
-                    this.eval_fn_call(closure_decl, callee, &args)
+                    this.eval_fn_call(closure_decl, callee, args)
                         .unwrap_value()
                 })
             }
@@ -806,11 +806,11 @@ impl Interpreter {
                     .clone();
 
                 self.with_root_scope(|this| {
-                    this.eval_fn_call(fn_decl.clone(), callee, &args)
+                    this.eval_fn_call(fn_decl.clone(), callee, args)
                         .unwrap_value()
                 })
             }
-            TlangObjectKind::NativeFn => self.exec_native_fn(id, callee, &args),
+            TlangObjectKind::NativeFn => self.exec_native_fn(id, callee, args),
             obj => self.panic(format!("`{obj:?}` is not a function")),
         }
     }
