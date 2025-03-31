@@ -794,8 +794,7 @@ impl Interpreter {
                 let closure_decl = self.get_closure_decl(closure.id).unwrap().clone();
 
                 self.with_scope(closure.scope_stack.clone(), |this| {
-                    this.eval_fn_call(closure_decl, callee, args)
-                        .unwrap_value()
+                    this.eval_fn_call(closure_decl, callee, args).unwrap_value()
                 })
             }
             TlangObjectKind::Fn(hir_id) => {
