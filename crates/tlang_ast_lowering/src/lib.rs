@@ -225,75 +225,9 @@ impl LoweringContext {
                 then_branch,
                 else_branches,
             }) if let ast::node::ExprKind::Let(pat, expr) = &condition.kind => {
-                let pat = self.lower_pat(pat);
-                let expr = self.lower_expr(expr);
-                let mut arms = Vec::with_capacity(else_branches.len() + 1);
-                let block = self.lower_block(
-                    &then_branch.statements,
-                    then_branch.expression.as_ref(),
-                    node.span,
-                );
-
-                arms.push(hir::MatchArm {
-                    pat,
-                    guard: None,
-                    block,
-                    leading_comments: condition.leading_comments.clone(),
-                    trailing_comments: condition.trailing_comments.clone(),
-                });
-
-                for else_branch in else_branches {
-                    let condition = else_branch
-                        .condition
-                        .as_ref()
-                        .map(|expr| self.lower_expr(expr));
-                    let block = self.lower_block(
-                        &else_branch.consequence.statements,
-                        else_branch.consequence.expression.as_ref(),
-                        node.span,
-                    );
-
-                    arms.push(hir::MatchArm {
-                        pat: hir::Pat {
-                            kind: hir::PatKind::Wildcard,
-                            span: Default::default(),
-                        },
-                        guard: condition,
-                        block,
-                        leading_comments: vec![],
-                        trailing_comments: vec![],
-                    });
-                }
-
-                hir::ExprKind::Match(Box::new(expr), arms)
+                self.lower_if_let_else(condition, then_branch, else_branches, pat, expr)
             }
-            ast::node::ExprKind::IfElse(box ast::node::IfElseExpression {
-                condition,
-                then_branch,
-                else_branches,
-            }) => {
-                let condition = self.lower_expr(condition);
-
-                let consequence = self.lower_block(
-                    &then_branch.statements,
-                    then_branch.expression.as_ref(),
-                    then_branch.span,
-                );
-
-                let else_branches = else_branches
-                    .iter()
-                    .map(|clause| hir::ElseClause {
-                        condition: clause.condition.as_ref().map(|expr| self.lower_expr(expr)),
-                        consequence: self.lower_block(
-                            &clause.consequence.statements,
-                            clause.consequence.expression.as_ref(),
-                            clause.consequence.span,
-                        ),
-                    })
-                    .collect();
-
-                hir::ExprKind::IfElse(Box::new(condition), Box::new(consequence), else_branches)
-            }
+            ast::node::ExprKind::IfElse(if_else_expr) => self.lower_if_else(if_else_expr),
             ast::node::ExprKind::Literal(box literal) => {
                 hir::ExprKind::Literal(Box::new(literal.clone()))
             }
@@ -366,6 +300,87 @@ impl LoweringContext {
             kind,
             span,
         }
+    }
+
+    fn lower_if_else(&mut self, if_else_expr: &ast::node::IfElseExpression) -> hir::ExprKind {
+        let ast::node::IfElseExpression {
+            condition,
+            then_branch,
+            else_branches,
+        } = if_else_expr;
+
+        let condition = self.lower_expr(condition);
+
+        let consequence = self.lower_block(
+            &then_branch.statements,
+            then_branch.expression.as_ref(),
+            then_branch.span,
+        );
+
+        let else_branches = else_branches
+            .iter()
+            .map(|clause| hir::ElseClause {
+                condition: clause.condition.as_ref().map(|expr| self.lower_expr(expr)),
+                consequence: self.lower_block(
+                    &clause.consequence.statements,
+                    clause.consequence.expression.as_ref(),
+                    clause.consequence.span,
+                ),
+            })
+            .collect();
+
+        hir::ExprKind::IfElse(Box::new(condition), Box::new(consequence), else_branches)
+    }
+
+    fn lower_if_let_else(
+        &mut self,
+        condition: &ast::node::Expr,
+        then_branch: &ast::node::Block,
+        else_branches: &[ast::node::ElseClause],
+        pat: &ast::node::Pat,
+        expr: &ast::node::Expr,
+    ) -> hir::ExprKind {
+        let pat = self.lower_pat(pat);
+        let expr = self.lower_expr(expr);
+        let mut arms = Vec::with_capacity(else_branches.len() + 1);
+        let block = self.lower_block(
+            &then_branch.statements,
+            then_branch.expression.as_ref(),
+            then_branch.span,
+        );
+
+        arms.push(hir::MatchArm {
+            pat,
+            guard: None,
+            block,
+            leading_comments: condition.leading_comments.clone(),
+            trailing_comments: condition.trailing_comments.clone(),
+        });
+
+        for else_branch in else_branches {
+            let guard = else_branch
+                .condition
+                .as_ref()
+                .map(|expr| self.lower_expr(expr));
+            let block = self.lower_block(
+                &else_branch.consequence.statements,
+                else_branch.consequence.expression.as_ref(),
+                else_branch.consequence.span,
+            );
+
+            arms.push(hir::MatchArm {
+                pat: hir::Pat {
+                    kind: hir::PatKind::Wildcard,
+                    span: Default::default(),
+                },
+                guard,
+                block,
+                leading_comments: vec![],
+                trailing_comments: vec![],
+            });
+        }
+
+        hir::ExprKind::Match(Box::new(expr), arms)
     }
 
     fn lower_callee(&mut self, callee: &ast::node::Expr, arg_len: usize) -> hir::Expr {
