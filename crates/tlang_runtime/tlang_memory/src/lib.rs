@@ -7,12 +7,12 @@ pub mod value;
 
 pub use resolver::Resolver;
 pub use state::InterpreterState;
-pub use value::{TlangObjectKind, TlangValue};
+pub use value::{TlangValue, object::TlangObjectKind};
 
 pub mod prelude {
     pub use crate::value::{
-        TlangNativeFn, TlangObjectId, TlangObjectKind, TlangPrimitive, TlangSlice, TlangStruct,
-        TlangValue,
+        TlangPrimitive, TlangValue,
+        object::{TlangNativeFn, TlangObjectId, TlangObjectKind, TlangSlice, TlangStruct},
     };
 
     pub use crate::shape::{

@@ -1,5 +1,5 @@
 use tlang_hir::hir;
-use tlang_memory::value::NativeFnReturn;
+use tlang_memory::value::object::NativeFnReturn;
 use tlang_memory::{InterpreterState, prelude::*};
 use wasm_bindgen::prelude::*;
 

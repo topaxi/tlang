@@ -11,7 +11,7 @@ use tlang_hir::hir::{self, DefKind, HirId, Res};
 use tlang_memory::shape::{ShapeKey, Shaped, TlangEnumVariant, TlangShape};
 use tlang_memory::state::TailCall;
 use tlang_memory::value::TlangArithmetic;
-use tlang_memory::value::{NativeFnReturn, TlangEnum};
+use tlang_memory::value::object::{NativeFnReturn, TlangEnum};
 use tlang_memory::{InterpreterState, Resolver, scope};
 use tlang_memory::{prelude::*, state};
 
