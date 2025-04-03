@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use log::debug;
 use tlang_ast as ast;
 use tlang_ast::node::{FunctionDeclaration, Ident, LetDeclaration};
-use tlang_ast::token::kw;
-use tlang_hir::hir::{self, HirId};
+use tlang_hir::hir;
 
 use crate::LoweringContext;
 
