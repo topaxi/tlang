@@ -62,11 +62,11 @@ impl ScopeStack {
     }
 
     fn get_local(&self, index: usize) -> Option<TlangValue> {
-        self.current_scope().borrow().locals.get(index).copied()
+        self.current_scope().borrow().get(index)
     }
 
     fn get_upvar(&self, scope_index: usize, index: usize) -> Option<TlangValue> {
-        self.scopes[scope_index].borrow().locals.get(index).copied()
+        self.scopes[scope_index].borrow().get(index)
     }
 
     fn resolve_value(&self, res: &hir::Res) -> Option<TlangValue> {
@@ -101,7 +101,7 @@ impl Resolver for ScopeStack {
 #[derive(Debug, Default)]
 pub struct Scope {
     // Value bindings in user code, this includes references to user defined functions.
-    pub locals: Vec<TlangValue>,
+    locals: Vec<TlangValue>,
 }
 
 impl Scope {
@@ -113,6 +113,14 @@ impl Scope {
 
     pub fn push_value(&mut self, value: TlangValue) {
         self.locals.push(value);
+    }
+
+    pub fn get(&self, index: usize) -> Option<TlangValue> {
+        self.locals.get(index).copied()
+    }
+
+    pub fn get_locals(&self) -> &[TlangValue] {
+        &self.locals
     }
 
     pub(crate) fn clear(&mut self) {

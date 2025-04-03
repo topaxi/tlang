@@ -500,7 +500,7 @@ impl InterpreterState {
         let mut out = "[\n".to_string();
         for scope in self.scope_stack.iter() {
             out.push_str("  {\n");
-            for entry in scope.borrow().locals.iter() {
+            for entry in scope.borrow().get_locals().iter() {
                 out.push_str("    ");
                 out.push_str(self.stringify(*entry).as_str());
                 out.push_str(",\n");
