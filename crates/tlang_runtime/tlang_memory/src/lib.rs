@@ -15,7 +15,9 @@ pub mod prelude {
         TlangValue,
     };
 
-    pub use crate::shape::{ShapeKey as TlangShapeKey, TlangStructMethod, TlangStructShape};
+    pub use crate::shape::{
+        ShapeKey as TlangShapeKey, Shaped as TlangShaped, TlangStructMethod, TlangStructShape,
+    };
 }
 
 pub struct NativeFnDef {

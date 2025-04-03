@@ -108,22 +108,22 @@ fn tlang_object_to_js_value(state: &InterpreterState, value: TlangValue) -> JsVa
     match state.get_object(value) {
         Some(TlangObjectKind::String(s)) => JsValue::from(s),
         Some(TlangObjectKind::Struct(s)) => {
-            if s.shape == state.builtin_shapes.list {
+            if s.shape() == state.builtin_shapes.list {
                 let array = js_sys::Array::new();
-                for value in &s.field_values {
+                for value in s.values() {
                     array.push(&tlang_value_to_js_value(state, *value));
                 }
                 return JsValue::from(array);
             }
 
             let shape = state
-                .get_shape(s.shape)
+                .get_shape(s)
                 .and_then(|s| s.get_struct_shape())
                 .unwrap();
             let object = js_sys::Object::new();
             for (field, idx) in &shape.field_map {
                 let key = JsValue::from(field);
-                let value = s.field_values[*idx];
+                let value = s[*idx];
                 js_sys::Reflect::set(&object, &key, &tlang_value_to_js_value(state, value))
                     .expect("Unable to set property on object");
             }

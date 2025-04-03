@@ -7,7 +7,7 @@ use tlang_memory::{InterpreterState, prelude::*};
 #[native_fn(name = "len")]
 pub fn len(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
     match state.get_object(args[0]) {
-        Some(TlangObjectKind::Struct(obj)) => TlangValue::from(obj.field_values.len()),
+        Some(TlangObjectKind::Struct(obj)) => TlangValue::from(obj.len()),
         Some(TlangObjectKind::String(string)) => TlangValue::from(string.len()),
         _ => state.panic(format!("Expected struct or string, got {:?}", args[0])),
     }
@@ -23,7 +23,7 @@ pub fn define_list_shape(state: &mut InterpreterState) {
 
             let start = args[0].as_usize();
             let end = if args.len() < 2 || args[1].is_nil() {
-                list.field_values.len()
+                list.len()
             } else {
                 args[1].as_usize()
             };

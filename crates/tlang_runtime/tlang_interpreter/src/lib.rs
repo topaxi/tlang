@@ -8,7 +8,7 @@ use smallvec::SmallVec;
 use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token;
 use tlang_hir::hir::{self, DefKind, HirId, Res};
-use tlang_memory::shape::{ShapeKey, TlangEnumVariant, TlangShape};
+use tlang_memory::shape::{ShapeKey, Shaped, TlangEnumVariant, TlangShape};
 use tlang_memory::state::TailCall;
 use tlang_memory::value::TlangArithmetic;
 use tlang_memory::value::{NativeFnReturn, TlangEnum};
@@ -164,9 +164,8 @@ impl Interpreter {
     }
 
     fn get_shape_of(&self, value: TlangValue) -> Option<&TlangShape> {
-        match self.get_object(value)? {
-            TlangObjectKind::Struct(s) => self.state.get_shape(s.shape),
-            TlangObjectKind::Enum(e) => self.state.get_shape(e.shape),
+        match self.get_object(value)?.shape() {
+            Some(s) => self.state.get_shape_by_key(s),
             _ => self.panic(format!(
                 "Cannot get shape of non-struct object: {:?}",
                 value
@@ -370,9 +369,7 @@ impl Interpreter {
         let lhs_value = eval_value!(self.eval_expr(lhs));
 
         match self.get_object(lhs_value) {
-            Some(TlangObjectKind::Struct(obj)) => {
-                EvalResult::Value(obj.field_values[rhs_value.as_usize()])
-            }
+            Some(TlangObjectKind::Struct(obj)) => EvalResult::Value(obj[rhs_value.as_usize()]),
             Some(TlangObjectKind::Slice(slice)) => {
                 EvalResult::Value(self.get_slice_value(*slice, rhs_value.as_usize()))
             }
@@ -384,13 +381,16 @@ impl Interpreter {
         let value = eval_value!(self.eval_expr(lhs));
 
         if let Some(TlangObjectKind::Struct(obj)) = self.get_object(value) {
-            if let Some(index) = self.state.get_struct_field_index(obj.shape, ident.as_str()) {
-                return EvalResult::Value(obj.field_values[index]);
+            if let Some(index) = self
+                .state
+                .get_struct_field_index(obj.shape(), ident.as_str())
+            {
+                return EvalResult::Value(obj[index]);
             }
 
             let shape = self
                 .state
-                .get_shape(obj.shape)
+                .get_shape(obj)
                 .and_then(|shape| shape.get_struct_shape())
                 .unwrap();
 
@@ -554,7 +554,7 @@ impl Interpreter {
 
                         match (lhs, rhs) {
                             (TlangObjectKind::Struct(lhs), TlangObjectKind::Struct(rhs)) => {
-                                if lhs.shape != rhs.shape {
+                                if lhs.shape() != rhs.shape() {
                                     return EvalResult::Value(TlangValue::Bool(false ^ is_not));
                                 }
 
@@ -768,11 +768,11 @@ impl Interpreter {
                 .enumerate()
                 .filter(|(_, v)| v.field_map.is_empty())
             {
-                let enum_value = self.state.new_object(TlangObjectKind::Enum(TlangEnum {
-                    shape: shape_key,
-                    variant: variant_index,
-                    field_values: vec![],
-                }));
+                let enum_value = self.state.new_object(TlangObjectKind::Enum(TlangEnum::new(
+                    shape_key,
+                    variant_index,
+                    vec![],
+                )));
 
                 self.push_value(enum_value);
             }
@@ -957,7 +957,7 @@ impl Interpreter {
                 if let Some(struct_decl) = self.state.get_struct_decl(&path.as_init()) =>
             {
                 let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
-                self.eval_call_method(struct_decl.hir_id.into(), path.last_ident(), &args)
+                self.call_shape_method(struct_decl.hir_id.into(), path.last_ident(), &args)
             }
             hir::ExprKind::Path(path)
                 if let Some(enum_decl) = self.state.get_enum_decl(&path.as_init()) =>
@@ -981,10 +981,10 @@ impl Interpreter {
                 );
                 args.insert(0, call_target);
 
-                let shape_key = self.get_object(call_target).and_then(|o| o.get_shape_key());
+                let shape_key = self.get_object(call_target).and_then(|o| o.shape());
 
                 if let Some(shape_key) = shape_key {
-                    self.eval_call_method(shape_key, ident, &args)
+                    self.call_shape_method(shape_key, ident, &args)
                 } else {
                     self.panic(format!(
                         "Field access on non-struct: {:?},\nExpr: {:?}, Current scope: {}",
@@ -1096,13 +1096,16 @@ impl Interpreter {
         let field_values = struct_decl
             .fields
             .iter()
-            .map(|field| dict_map.get(&field.name.to_string()).copied().unwrap())
+            .map(|field| dict_map.get(field.name.as_str()).copied().unwrap())
             .collect();
 
-        EvalResult::Value(self.state.new_object(TlangObjectKind::Struct(TlangStruct {
-            shape: struct_decl.hir_id.into(),
-            field_values,
-        })))
+        EvalResult::Value(
+            self.state
+                .new_object(TlangObjectKind::Struct(TlangStruct::new(
+                    struct_decl.hir_id.into(),
+                    field_values,
+                ))),
+        )
     }
 
     fn eval_enum_ctor(
@@ -1165,25 +1168,25 @@ impl Interpreter {
             .collect();
 
         EvalResult::Value(
-            self.state.new_object(TlangObjectKind::Enum(TlangEnum {
-                shape: enum_decl.hir_id.into(),
-                variant: enum_decl
+            self.state.new_object(TlangObjectKind::Enum(TlangEnum::new(
+                enum_decl.hir_id.into(),
+                enum_decl
                     .variants
                     .iter()
                     .position(|v| v.name == *variant_name)
                     .unwrap(),
                 field_values,
-            })),
+            ))),
         )
     }
 
-    fn eval_call_method(
+    fn call_shape_method(
         &mut self,
         shape_key: ShapeKey,
         method_name: &Ident,
         args: &[TlangValue],
     ) -> TlangValue {
-        let shape = self.state.get_shape(shape_key).unwrap();
+        let shape = self.state.get_shape_by_key(shape_key).unwrap();
 
         match shape.get_method(method_name.as_str()) {
             Some(TlangStructMethod::HirId(id)) => {
@@ -1239,8 +1242,8 @@ impl Interpreter {
                             field_values.extend_from_slice(values)
                         }
                         TlangObjectKind::Struct(list_struct) => {
-                            field_values.reserve(list_struct.field_values.len());
-                            field_values.extend(&list_struct.field_values)
+                            field_values.reserve(list_struct.len());
+                            field_values.extend(list_struct.values())
                         }
                         obj => self.panic(format!("Expected list, got {obj:?}")),
                     }
@@ -1277,15 +1280,18 @@ impl Interpreter {
 
         let shape = ShapeKey::from_dict_keys(&shape_keys);
 
-        if self.state.get_shape(shape).is_none() {
+        if !self.state.has_shape(shape) {
             self.state
                 .define_struct_shape(shape, "Dict".to_string(), shape_keys, HashMap::new());
         }
 
-        EvalResult::Value(self.state.new_object(TlangObjectKind::Struct(TlangStruct {
-            shape,
-            field_values,
-        })))
+        EvalResult::Value(
+            self.state
+                .new_object(TlangObjectKind::Struct(TlangStruct::new(
+                    shape,
+                    field_values,
+                ))),
+        )
     }
 
     fn eval_match(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) -> EvalResult {
@@ -1447,14 +1453,12 @@ impl Interpreter {
                     let list_struct = self.get_struct(value).unwrap();
 
                     if let hir::PatKind::Rest(pat) = &pat.kind {
-                        let rest_object =
-                            self.state
-                                .new_slice(value, i, list_struct.field_values.len() - i);
+                        let rest_object = self.state.new_slice(value, i, list_struct.len() - i);
 
                         return self.eval_pat(pat, rest_object);
                     }
 
-                    if !self.eval_pat(pat, list_struct.field_values[i]) {
+                    if !self.eval_pat(pat, list_struct[i]) {
                         return false;
                     }
                 }

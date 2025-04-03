@@ -1,8 +1,10 @@
+use std::ops::Index;
+
 use smallvec::SmallVec;
 use tlang_hir::hir::HirId;
 
 use crate::scope::ScopeStack;
-use crate::shape::ShapeKey;
+use crate::shape::{ShapeKey, Shaped};
 use crate::{InterpreterState, impl_from_tlang_value};
 
 #[derive(Debug)]
@@ -14,26 +16,68 @@ pub struct TlangClosure {
 
 #[derive(Debug, PartialEq)]
 pub struct TlangStruct {
-    pub shape: ShapeKey,
-    pub field_values: Vec<TlangValue>,
+    shape: ShapeKey,
+    values: Vec<TlangValue>,
 }
 
 impl TlangStruct {
-    #[inline(always)]
-    pub fn is_empty(&self) -> bool {
-        self.field_values.is_empty()
+    pub fn new(shape: ShapeKey, values: Vec<TlangValue>) -> Self {
+        Self { shape, values }
     }
 
-    pub fn len(&self) -> usize {
-        self.field_values.len()
+    pub fn values(&self) -> &[TlangValue] {
+        &self.values
+    }
+
+    pub fn get(&self, index: usize) -> Option<TlangValue> {
+        self.values.get(index).copied()
+    }
+
+    #[inline(always)]
+    pub const fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+
+    pub const fn len(&self) -> usize {
+        self.values.len()
+    }
+}
+
+impl Shaped for &TlangStruct {
+    fn shape(&self) -> ShapeKey {
+        self.shape
+    }
+}
+
+impl Index<usize> for TlangStruct {
+    type Output = TlangValue;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.values[index]
     }
 }
 
 #[derive(Debug, PartialEq)]
 pub struct TlangEnum {
-    pub shape: ShapeKey,
+    shape: ShapeKey,
     pub variant: usize,
     pub field_values: Vec<TlangValue>,
+}
+
+impl TlangEnum {
+    pub fn new(shape: ShapeKey, variant: usize, values: Vec<TlangValue>) -> Self {
+        Self {
+            shape,
+            variant,
+            field_values: values,
+        }
+    }
+}
+
+impl Shaped for &TlangEnum {
+    fn shape(&self) -> ShapeKey {
+        self.shape
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -120,10 +164,10 @@ impl TlangObjectKind {
         }
     }
 
-    pub fn get_shape_key(&self) -> Option<ShapeKey> {
+    pub fn shape(&self) -> Option<ShapeKey> {
         match self {
-            TlangObjectKind::Struct(s) => Some(s.shape),
-            TlangObjectKind::Enum(e) => Some(e.shape),
+            TlangObjectKind::Struct(s) => Some(s.shape()),
+            TlangObjectKind::Enum(e) => Some(e.shape()),
             _ => None,
         }
     }

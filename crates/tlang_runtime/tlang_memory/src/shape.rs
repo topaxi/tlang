@@ -5,6 +5,10 @@ use tlang_hir::hir::HirId;
 
 use crate::value::{TlangObjectId, TlangValue};
 
+pub trait Shaped {
+    fn shape(&self) -> ShapeKey;
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ShapeKey {
     HirId(HirId),
