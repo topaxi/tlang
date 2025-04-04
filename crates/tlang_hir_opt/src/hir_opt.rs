@@ -22,12 +22,9 @@ impl HirOptimizer {
         let mut changed = true;
         while changed {
             iteration += 1;
-            println!("Optimization iteration {}", iteration);
             changed = false;
-            for (i, pass) in self.passes.iter_mut().enumerate() {
-                println!("Running pass {}", i);
+            for pass in self.passes.iter_mut() {
                 if pass.optimize_module(module) {
-                    println!("Pass {} made changes", i);
                     changed = true;
                     break;
                 }
