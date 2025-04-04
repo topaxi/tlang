@@ -25,10 +25,8 @@ impl ConstantFolder {
     }
 
     pub fn optimize_module(&mut self, module: &mut Module) -> bool {
-        println!("ConstantFolder: Starting optimization");
         self.changed = false;
         self.visit_module(module);
-        println!("ConstantFolder: Finished optimization, changed: {}", self.changed);
         self.changed
     }
 
@@ -77,7 +75,6 @@ impl<'hir> Visitor<'hir> for ConstantFolder {
                     if let PatKind::Identifier(hir_id, _) = pat.kind {
                         // Only mark as changed if we haven't seen this constant before
                         if self.constants.get(&hir_id) != Some(&lit) {
-                            println!("ConstantFolder: Found new constant {:?} for hir_id {:?}", lit, hir_id);
                             self.constants.insert(hir_id, lit.clone());
                             self.changed = true;
                         }
@@ -102,7 +99,6 @@ impl<'hir> Visitor<'hir> for ConstantFolder {
         if let Some(lit) = self.try_eval_expr(expr) {
             // Only mark as changed if we haven't folded this expression before
             if self.folded_exprs.get(&expr.hir_id) != Some(&lit) {
-                println!("ConstantFolder: Folded new expression {:?} to {:?}", expr.hir_id, lit);
                 expr.kind = ExprKind::Literal(Box::new(lit.clone()));
                 self.folded_exprs.insert(expr.hir_id, lit);
                 self.changed = true;
