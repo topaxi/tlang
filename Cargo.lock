@@ -1114,6 +1114,7 @@ dependencies = [
  "tlang_ast",
  "tlang_ast_lowering",
  "tlang_hir",
+ "tlang_hir_opt",
  "tlang_macros",
  "tlang_memory",
  "tlang_parser",

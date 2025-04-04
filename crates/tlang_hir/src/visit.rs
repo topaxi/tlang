@@ -175,6 +175,9 @@ pub fn walk_pat<'hir, V: Visitor<'hir>>(visitor: &mut V, pat: &'hir mut hir::Pat
                 visitor.visit_pat(pat);
             }
         }
+        hir::PatKind::Rest(pat) => {
+            visitor.visit_pat(pat);
+        }
         hir::PatKind::Enum(path, fields) => {
             visitor.visit_path(path);
 
@@ -184,7 +187,6 @@ pub fn walk_pat<'hir, V: Visitor<'hir>>(visitor: &mut V, pat: &'hir mut hir::Pat
             }
         }
         hir::PatKind::Literal(literal) => visitor.visit_literal(literal),
-        hir::PatKind::Wildcard => {}
-        other => todo!("{:?}", other),
+        hir::PatKind::Wildcard => {},
     }
 }
