@@ -7,7 +7,7 @@ use self::common::{collect_paths, hir_from_str};
 
 #[test]
 fn test_fn_param_assigns_resolution_to_paths_referring_to_same_fn() {
-    let hir = hir_from_str(
+    let mut hir = hir_from_str(
         r#"
             fn foo_a(a) {
                 a + a
@@ -17,7 +17,7 @@ fn test_fn_param_assigns_resolution_to_paths_referring_to_same_fn() {
             }
         "#,
     );
-    let paths = collect_paths(&hir);
+    let paths = collect_paths(&mut hir);
 
     // path 0 is foo_a within the fn declaration
 
@@ -54,14 +54,14 @@ fn test_fn_param_assigns_resolution_to_paths_referring_to_same_fn() {
 
 #[test]
 fn test_self_referal_reserves_local_slot() {
-    let hir = hir_from_str(
+    let mut hir = hir_from_str(
         r#"
             fn foo(a) {
                 foo(a)
             }
         "#,
     );
-    let paths = collect_paths(&hir);
+    let paths = collect_paths(&mut hir);
 
     // path 0 is foo within the fn declaration
 
@@ -85,7 +85,7 @@ fn test_self_referal_reserves_local_slot() {
 
 #[test]
 fn test_enum_variant_res() {
-    let hir = hir_from_str(
+    let mut hir = hir_from_str(
         r#"
             enum Foo {
                 Bar,
@@ -97,7 +97,7 @@ fn test_enum_variant_res() {
             }
         "#,
     );
-    let paths = collect_paths(&hir);
+    let paths = collect_paths(&mut hir);
 
     assert_eq!(paths[1].res, hir::Res::Upvar(1, 1));
 
@@ -112,14 +112,14 @@ fn test_enum_variant_res() {
 
 #[test]
 fn test_variadic_fn_res() {
-    let hir = hir_from_str(
+    let mut hir = hir_from_str(
         r#"
             fn fac(n) { fac(n, 1) }
             fn fac(0, acc) { acc }
             fn fac(n, acc) { rec fac(n - 1, n * acc) }
         "#,
     );
-    let paths = collect_paths(&hir);
+    let paths = collect_paths(&mut hir);
 
     assert_matches!(paths[1].res, hir::Res::Upvar(1, 1));
     assert_matches!(paths[2].res, hir::Res::Local(_, 1));
@@ -155,7 +155,7 @@ fn test_variadic_fn_res() {
 
 #[test]
 fn test_shadowing_creates_new_slots() {
-    let hir = hir_from_str(
+    let mut hir = hir_from_str(
         r#"
             fn foo(a) {
                 let a = a + 1;
@@ -163,7 +163,7 @@ fn test_shadowing_creates_new_slots() {
             }
         "#,
     );
-    let paths = collect_paths(&hir);
+    let paths = collect_paths(&mut hir);
 
     // path 0 is foo within the fn declaration
 
@@ -176,7 +176,7 @@ fn test_shadowing_creates_new_slots() {
 
 #[test]
 fn test_struct_res() {
-    let hir = hir_from_str(
+    let mut hir = hir_from_str(
         r#"
             struct Foo {
                 a: i32,
@@ -193,7 +193,7 @@ fn test_struct_res() {
         "#,
     );
 
-    let paths = collect_paths(&hir);
+    let paths = collect_paths(&mut hir);
 
     assert_eq!(
         paths[0].res,
@@ -216,7 +216,7 @@ fn test_struct_res() {
 #[test]
 #[ignore]
 fn test_simple_enum_res() {
-    let hir = hir_from_str(
+    let mut hir = hir_from_str(
         r#"
             enum Foo {
                 Bar,
@@ -232,7 +232,7 @@ fn test_simple_enum_res() {
         "#,
     );
 
-    let paths = collect_paths(&hir);
+    let paths = collect_paths(&mut hir);
 
     assert_eq!(
         paths[0].res,
@@ -249,7 +249,7 @@ fn test_simple_enum_res() {
 
 #[test]
 fn test_enum_res() {
-    let hir = hir_from_str(
+    let mut hir = hir_from_str(
         r#"
             enum Foo {
                 Bar(u32),
@@ -265,7 +265,7 @@ fn test_enum_res() {
         "#,
     );
 
-    let paths = collect_paths(&hir);
+    let paths = collect_paths(&mut hir);
 
     assert_eq!(
         paths[0].res,

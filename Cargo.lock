@@ -1078,6 +1078,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "tlang_hir_opt"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "insta",
+ "serde",
+ "tlang_ast",
+ "tlang_ast_lowering",
+ "tlang_hir",
+ "tlang_hir_pretty",
+ "tlang_parser",
+]
+
+[[package]]
 name = "tlang_hir_pretty"
 version = "0.1.0"
 dependencies = [
