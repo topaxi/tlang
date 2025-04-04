@@ -17,6 +17,10 @@ pub trait Visitor<'hir>: Sized {
         walk_expr(self, expr);
     }
 
+    fn visit_pat(&mut self, pat: &'hir hir::Pat) {
+        walk_pat(self, pat);
+    }
+
     fn visit_ident(&mut self, _ident: &'hir tlang_ast::node::Ident) {}
     fn visit_path(&mut self, _path: &'hir hir::Path) {}
     fn visit_ty(&mut self, _ty: &'hir hir::Ty) {}
@@ -39,7 +43,17 @@ pub fn walk_block<'hir, V: Visitor<'hir>>(visitor: &mut V, block: &'hir hir::Blo
 
 pub fn walk_stmt<'hir, V: Visitor<'hir>>(visitor: &mut V, stmt: &'hir hir::Stmt) {
     match &stmt.kind {
+        hir::StmtKind::Let(pat, expr, ty) => {
+            visitor.visit_expr(expr);
+            visitor.visit_pat(pat);
+            visitor.visit_ty(ty);
+        }
         hir::StmtKind::Expr(expr) => visitor.visit_expr(expr),
+        hir::StmtKind::Return(expr) => {
+            if let Some(expr) = expr.as_ref() {
+                visitor.visit_expr(expr);
+            }
+        }
         hir::StmtKind::FunctionDeclaration(decl) => {
             visitor.visit_expr(&decl.name);
 
@@ -66,17 +80,49 @@ pub fn walk_stmt<'hir, V: Visitor<'hir>>(visitor: &mut V, stmt: &'hir hir::Stmt)
                 }
             }
         }
+        hir::StmtKind::DynFunctionDeclaration(_decl) => {}
         hir::StmtKind::None => {}
-        _ => todo!("{:?}", stmt),
     }
 }
 
 pub fn walk_expr<'hir, V: Visitor<'hir>>(visitor: &mut V, expr: &'hir hir::Expr) {
     match &expr.kind {
         hir::ExprKind::Path(path) => visitor.visit_path(path),
+        hir::ExprKind::Unary(_, expr) => visitor.visit_expr(expr),
+        hir::ExprKind::Let(pat, expr) => {
+            visitor.visit_expr(expr);
+            visitor.visit_pat(pat);
+        }
         hir::ExprKind::Binary(_, lhs, rhs) => {
             visitor.visit_expr(lhs);
             visitor.visit_expr(rhs);
+        }
+        hir::ExprKind::IfElse(condition, consequence, else_branches) => {
+            visitor.visit_expr(condition);
+            visitor.visit_block(consequence);
+
+            for hir::ElseClause {
+                condition,
+                consequence,
+            } in else_branches
+            {
+                if let Some(expr) = condition {
+                    visitor.visit_expr(expr);
+                }
+
+                visitor.visit_block(consequence);
+            }
+        }
+        hir::ExprKind::Block(block) => visitor.visit_block(block),
+        hir::ExprKind::FunctionExpression(decl) => {
+            visitor.visit_expr(&decl.name);
+
+            for param in &decl.parameters {
+                visitor.visit_ident(&param.name);
+                visitor.visit_ty(&param.type_annotation);
+            }
+
+            visitor.visit_block(&decl.body);
         }
         hir::ExprKind::Call(call_expr) | hir::ExprKind::TailCall(call_expr) => {
             visitor.visit_expr(&call_expr.callee);
@@ -89,8 +135,56 @@ pub fn walk_expr<'hir, V: Visitor<'hir>>(visitor: &mut V, expr: &'hir hir::Expr)
             visitor.visit_expr(base);
             visitor.visit_ident(ident);
         }
+        hir::ExprKind::IndexAccess(base, expr) => {
+            visitor.visit_expr(expr);
+            visitor.visit_expr(base);
+        }
+        hir::ExprKind::Match(expr, arms) => {
+            visitor.visit_expr(expr);
+            for arm in arms {
+                visitor.visit_pat(&arm.pat);
+                visitor.visit_block(&arm.block);
+            }
+        }
+        hir::ExprKind::Dict(pairs) => {
+            for (key, value) in pairs {
+                visitor.visit_expr(key);
+                visitor.visit_expr(value);
+            }
+        }
+        hir::ExprKind::List(exprs) => {
+            for value in exprs {
+                visitor.visit_expr(value);
+            }
+        }
         hir::ExprKind::Literal(literal) => visitor.visit_literal(literal),
+        hir::ExprKind::Cast(expr, ty) => {
+            visitor.visit_expr(expr);
+            visitor.visit_ty(ty);
+        }
         hir::ExprKind::Wildcard => {}
-        _ => todo!("{:?}", expr),
+        hir::ExprKind::Range(..) => todo!(),
+    }
+}
+
+pub fn walk_pat<'hir, V: Visitor<'hir>>(visitor: &mut V, pat: &'hir hir::Pat) {
+    match &pat.kind {
+        hir::PatKind::Identifier(_, ident) => visitor.visit_ident(ident),
+        hir::PatKind::List(pats) => {
+            for pat in pats {
+                visitor.visit_pat(pat);
+            }
+        }
+        hir::PatKind::Enum(path, fields) => {
+            visitor.visit_path(path);
+
+            for (ident, pat) in fields {
+                visitor.visit_ident(ident);
+                visitor.visit_pat(pat);
+            }
+        }
+        hir::PatKind::Literal(literal) => visitor.visit_literal(literal),
+        hir::PatKind::Wildcard => {}
+        _ => todo!("{:?}", pat),
     }
 }
