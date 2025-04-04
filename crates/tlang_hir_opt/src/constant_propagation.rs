@@ -10,12 +10,14 @@ use crate::hir_opt::HirPass;
 
 pub struct ConstantPropagator {
     constants: HashMap<HirId, Literal>,
+    changed: bool,
 }
 
 impl ConstantPropagator {
     pub fn new() -> Self {
         Self {
             constants: HashMap::new(),
+            changed: false,
         }
     }
 }
@@ -30,6 +32,7 @@ impl<'hir> Visitor<'hir> for ConstantPropagator {
                 // If the expression is a literal, store it for propagation
                 if let ExprKind::Literal(lit) = &expr.kind {
                     if let PatKind::Identifier(hir_id, _) = pat.kind {
+                        println!("ConstantPropagator: Found constant {:?} for hir_id {:?}", lit, hir_id);
                         self.constants.insert(hir_id, *lit.clone());
                     }
                 }
@@ -49,7 +52,9 @@ impl<'hir> Visitor<'hir> for ConstantPropagator {
         if let ExprKind::Path(path) = &expr.kind {
             if let Some(hir_id) = path.res.hir_id() {
                 if let Some(lit) = self.constants.get(&hir_id).cloned() {
+                    println!("ConstantPropagator: Propagating constant {:?} for hir_id {:?}", lit, hir_id);
                     expr.kind = ExprKind::Literal(Box::new(lit));
+                    self.changed = true;
                 }
             }
         }
@@ -57,7 +62,11 @@ impl<'hir> Visitor<'hir> for ConstantPropagator {
 }
 
 impl HirPass for ConstantPropagator {
-    fn optimize_module(&mut self, module: &mut Module) {
+    fn optimize_module(&mut self, module: &mut Module) -> bool {
+        println!("ConstantPropagator: Starting optimization");
+        self.changed = false;
         self.visit_module(module);
+        println!("ConstantPropagator: Finished optimization, changed: {}", self.changed);
+        self.changed
     }
 } 

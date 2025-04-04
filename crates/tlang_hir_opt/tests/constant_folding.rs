@@ -12,8 +12,10 @@ fn simple_binary_constant_folding() {
         "#,
     );
     assert_snapshot!(common::pretty_print(&hir), @r###"
-    let x: unknown = 3;
-    println(x);
+    fn main() -> unknown {
+        let x: unknown = 3;
+        println(3);
+    };
     "###);
 }
 
@@ -26,8 +28,10 @@ fn multiplication_constant_folding() {
         "#,
     );
     assert_snapshot!(common::pretty_print(&hir), @r###"
-    let x: unknown = 6;
-    println(x);
+    fn main() -> unknown {
+        let x: unknown = 6;
+        println(6);
+    };
     "###);
 }
 
@@ -42,10 +46,12 @@ fn chained_operations() {
         "#,
     );
     assert_snapshot!(common::pretty_print(&hir), @r###"
-    let x: unknown = 3;
-    let y: unknown = (x * 3);
-    let z: unknown = (y - 4);
-    println(z);
+    fn main() -> unknown {
+        let x: unknown = 3;
+        let y: unknown = 9;
+        let z: unknown = 5;
+        println(5);
+    };
     "###);
 }
 
@@ -58,8 +64,10 @@ fn mixed_operations() {
         "#,
     );
     assert_snapshot!(common::pretty_print(&hir), @r###"
-    let x: unknown = 9;
-    println(x);
+    fn main() -> unknown {
+        let x: unknown = 9;
+        println(9);
+    };
     "###);
 }
 
@@ -75,10 +83,12 @@ fn chained_constant_folding() {
         "#,
     );
     assert_snapshot!(common::pretty_print(&hir), @r###"
-    let x: unknown = 3;
-    let y: unknown = (x * 3);
-    let z: unknown = (y - 4);
-    let w: unknown = (z + 5);
-    println(w);
+    fn main() -> unknown {
+        let x: unknown = 3;
+        let y: unknown = 9;
+        let z: unknown = 5;
+        let w: unknown = 10;
+        println(10);
+    };
     "###);
 }
