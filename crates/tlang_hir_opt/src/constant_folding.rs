@@ -10,18 +10,26 @@ use crate::hir_opt::HirPass;
 pub struct ConstantFolder {
     // Map from HirId to its constant value
     constants: HashMap<HirId, Literal>,
+    // Track which expressions we've already folded
+    folded_exprs: HashMap<HirId, Literal>,
+    changed: bool,
 }
 
 impl ConstantFolder {
     pub fn new() -> Self {
         Self {
             constants: HashMap::new(),
+            folded_exprs: HashMap::new(),
+            changed: false,
         }
     }
 
-    pub fn optimize_module(&mut self, module: &mut Module) {
-        println!("Starting module optimization");
+    pub fn optimize_module(&mut self, module: &mut Module) -> bool {
+        println!("ConstantFolder: Starting optimization");
+        self.changed = false;
         self.visit_module(module);
+        println!("ConstantFolder: Finished optimization, changed: {}", self.changed);
+        self.changed
     }
 
     fn try_eval_binary_op(&self, op: BinaryOpKind, lhs: &Literal, rhs: &Literal) -> Option<Literal> {
@@ -40,6 +48,11 @@ impl ConstantFolder {
     }
 
     fn try_eval_expr(&self, expr: &Expr) -> Option<Literal> {
+        // If we've already folded this expression, return None to avoid re-folding
+        if let Some(lit) = self.folded_exprs.get(&expr.hir_id) {
+            return Some(lit.clone());
+        }
+
         match &expr.kind {
             ExprKind::Binary(op, lhs, rhs) => {
                 let lhs_val = self.try_eval_expr(lhs)?;
@@ -54,26 +67,27 @@ impl ConstantFolder {
 
 impl<'hir> Visitor<'hir> for ConstantFolder {
     fn visit_stmt(&mut self, stmt: &'hir mut Stmt) {
-        println!("Visiting statement: {:?}", stmt.kind);
         match &mut stmt.kind {
             StmtKind::Let(pat, expr, _) => {
-                println!("Found let statement");
                 // First visit the expression to fold any constants in it
                 self.visit_expr(expr);
 
                 // If the expression is now a constant, store it for future use
                 if let Some(lit) = self.try_eval_expr(expr) {
-                    println!("  Evaluated expression to: {:?}", lit);
                     if let PatKind::Identifier(hir_id, _) = pat.kind {
-                        println!("  Storing constant for hir_id: {:?}", hir_id);
-                        self.constants.insert(hir_id, lit.clone());
-                        // Replace the expression with the constant
-                        expr.kind = ExprKind::Literal(Box::new(lit));
+                        // Only mark as changed if we haven't seen this constant before
+                        if self.constants.get(&hir_id) != Some(&lit) {
+                            println!("ConstantFolder: Found new constant {:?} for hir_id {:?}", lit, hir_id);
+                            self.constants.insert(hir_id, lit.clone());
+                            self.changed = true;
+                        }
+                        // Replace the expression with the constant and track that we've folded it
+                        expr.kind = ExprKind::Literal(Box::new(lit.clone()));
+                        self.folded_exprs.insert(expr.hir_id, lit);
                     }
                 }
             }
             StmtKind::Expr(expr) => {
-                println!("Found expression statement");
                 self.visit_expr(expr);
             }
             _ => visit::walk_stmt(self, stmt),
@@ -86,14 +100,22 @@ impl<'hir> Visitor<'hir> for ConstantFolder {
 
         // Try to evaluate the expression
         if let Some(lit) = self.try_eval_expr(expr) {
-            expr.kind = ExprKind::Literal(Box::new(lit));
+            // Only mark as changed if we haven't folded this expression before
+            if self.folded_exprs.get(&expr.hir_id) != Some(&lit) {
+                println!("ConstantFolder: Folded new expression {:?} to {:?}", expr.hir_id, lit);
+                expr.kind = ExprKind::Literal(Box::new(lit.clone()));
+                self.folded_exprs.insert(expr.hir_id, lit);
+                self.changed = true;
+            }
         }
     }
 }
 
 impl HirPass for ConstantFolder {
-    fn optimize_module(&mut self, module: &mut Module) {
+    fn optimize_module(&mut self, module: &mut Module) -> bool {
+        self.changed = false;
         self.visit_module(module);
+        self.changed
     }
 }
 
