@@ -30,6 +30,12 @@ pub struct DeadCodeEliminator {
     preserve_root: bool,
 }
 
+impl Default for DeadCodeEliminator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DeadCodeEliminator {
     pub fn new() -> Self {
         Self {

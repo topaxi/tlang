@@ -1,11 +1,23 @@
 use tlang_hir::hir::Module;
 
+use crate::{ConstantFolder, ConstantPropagator, DeadCodeEliminator};
+
 pub trait HirPass {
     fn optimize_module(&mut self, module: &mut Module) -> bool;
 }
 
 pub struct HirOptimizer {
     passes: Vec<Box<dyn HirPass>>,
+}
+
+impl Default for HirOptimizer {
+    fn default() -> Self {
+        let mut optimizer = Self::new();
+        optimizer.add_pass(Box::new(ConstantFolder::default()));
+        optimizer.add_pass(Box::new(ConstantPropagator::default()));
+        optimizer.add_pass(Box::new(DeadCodeEliminator::default()));
+        optimizer
+    }
 }
 
 impl HirOptimizer {

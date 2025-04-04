@@ -15,6 +15,12 @@ pub struct ConstantFolder {
     changed: bool,
 }
 
+impl Default for ConstantFolder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConstantFolder {
     pub fn new() -> Self {
         Self {
