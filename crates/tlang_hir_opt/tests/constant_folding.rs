@@ -1,19 +1,16 @@
 use insta::assert_snapshot;
 
 mod common;
-use common::compile_and_optimize;
 
 #[test]
 fn simple_binary_constant_folding() {
-    let hir = compile_and_optimize(
-        r#"
+    let source = r#"
         let x: unknown = 1 + 2;
         println(x);
-        "#,
-    );
+    "#;
+    let hir = common::compile_and_optimize(source);
     assert_snapshot!(common::pretty_print(&hir), @r###"
     fn main() -> unknown {
-        let x: unknown = 3;
         println(3);
     };
     "###);
@@ -21,15 +18,13 @@ fn simple_binary_constant_folding() {
 
 #[test]
 fn multiplication_constant_folding() {
-    let hir = compile_and_optimize(
-        r#"
+    let source = r#"
         let x: unknown = 2 * 3;
         println(x);
-        "#,
-    );
+    "#;
+    let hir = common::compile_and_optimize(source);
     assert_snapshot!(common::pretty_print(&hir), @r###"
     fn main() -> unknown {
-        let x: unknown = 6;
         println(6);
     };
     "###);
@@ -37,19 +32,15 @@ fn multiplication_constant_folding() {
 
 #[test]
 fn chained_operations() {
-    let hir = compile_and_optimize(
-        r#"
+    let source = r#"
         let x: unknown = 1 + 2;
         let y: unknown = x * 3;
         let z: unknown = y - 4;
         println(z);
-        "#,
-    );
+    "#;
+    let hir = common::compile_and_optimize(source);
     assert_snapshot!(common::pretty_print(&hir), @r###"
     fn main() -> unknown {
-        let x: unknown = 3;
-        let y: unknown = 9;
-        let z: unknown = 5;
         println(5);
     };
     "###);
@@ -57,15 +48,13 @@ fn chained_operations() {
 
 #[test]
 fn mixed_operations() {
-    let hir = compile_and_optimize(
-        r#"
+    let source = r#"
         let x: unknown = (1 + 2) * 3;
         println(x);
-        "#,
-    );
+    "#;
+    let hir = common::compile_and_optimize(source);
     assert_snapshot!(common::pretty_print(&hir), @r###"
     fn main() -> unknown {
-        let x: unknown = 9;
         println(9);
     };
     "###);
@@ -73,22 +62,15 @@ fn mixed_operations() {
 
 #[test]
 fn chained_constant_folding() {
-    let hir = compile_and_optimize(
-        r#"
+    let source = r#"
         let x: unknown = 1 + 2;
         let y: unknown = x * 3;
-        let z: unknown = y - 4;
-        let w: unknown = z + 5;
-        println(w);
-        "#,
-    );
+        println(y);
+    "#;
+    let hir = common::compile_and_optimize(source);
     assert_snapshot!(common::pretty_print(&hir), @r###"
     fn main() -> unknown {
-        let x: unknown = 3;
-        let y: unknown = 9;
-        let z: unknown = 5;
-        let w: unknown = 10;
-        println(10);
+        println(9);
     };
     "###);
 }

@@ -34,4 +34,4 @@ impl HirOptimizer {
             }
         }
     }
-} 
+}

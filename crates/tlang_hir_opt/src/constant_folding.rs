@@ -30,7 +30,12 @@ impl ConstantFolder {
         self.changed
     }
 
-    fn try_eval_binary_op(&self, op: BinaryOpKind, lhs: &Literal, rhs: &Literal) -> Option<Literal> {
+    fn try_eval_binary_op(
+        &self,
+        op: BinaryOpKind,
+        lhs: &Literal,
+        rhs: &Literal,
+    ) -> Option<Literal> {
         match (op, lhs, rhs) {
             (BinaryOpKind::Add, Literal::UnsignedInteger(l), Literal::UnsignedInteger(r)) => {
                 Some(Literal::UnsignedInteger(l + r))
@@ -114,5 +119,3 @@ impl HirPass for ConstantFolder {
         self.changed
     }
 }
-
-
