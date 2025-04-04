@@ -1,6 +1,7 @@
 use tlang_ast_lowering::lower_to_hir;
 use tlang_hir::hir;
 use tlang_parser::Parser;
+use tlang_hir_pretty::HirPrettyOptions;
 
 pub fn compile_to_hir(source: &str) -> hir::Module {
     let ast = Parser::from_source(source).parse().unwrap();
@@ -12,4 +13,15 @@ pub fn compile_and_optimize(source: &str) -> hir::Module {
     let mut folder = tlang_hir_opt::constant_folding::ConstantFolder::new();
     folder.optimize_module(&mut module);
     module
+}
+
+pub fn pretty_print(module: &hir::Module) -> String {
+    let options = HirPrettyOptions {
+        mark_unresolved: false,
+        ..Default::default()
+    };
+    let mut prettier = tlang_hir_pretty::HirPretty::new(options);
+    let mut output = String::from("fn main() -> unknown {\n");
+    prettier.print_module(module);
+    prettier.output().to_string()
 }
