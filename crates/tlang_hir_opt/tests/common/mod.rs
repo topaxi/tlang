@@ -1,9 +1,11 @@
 use tlang_ast_lowering::lower_to_hir;
 use tlang_hir::hir;
-use tlang_parser::Parser;
+use tlang_hir_opt::{
+    DeadCodeEliminator, constant_folding::ConstantFolder, constant_propagation::ConstantPropagator,
+    hir_opt::HirOptimizer,
+};
 use tlang_hir_pretty::HirPrettyOptions;
-use tlang_hir_opt::hir_opt::HirOptimizer;
-use tlang_hir_opt::{constant_folding::ConstantFolder, constant_propagation::ConstantPropagator};
+use tlang_parser::Parser;
 
 pub fn compile_to_hir(source: &str) -> hir::Module {
     let ast = Parser::from_source(source).parse().unwrap();
@@ -15,6 +17,7 @@ pub fn compile_and_optimize(source: &str) -> hir::Module {
     let mut optimizer = HirOptimizer::new();
     optimizer.add_pass(Box::new(ConstantFolder::new()));
     optimizer.add_pass(Box::new(ConstantPropagator::new()));
+    optimizer.add_pass(Box::new(DeadCodeEliminator::new()));
     optimizer.optimize_module(&mut module);
     module
 }

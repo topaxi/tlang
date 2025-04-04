@@ -65,4 +65,4 @@ impl HirPass for ConstantPropagator {
         self.visit_module(module);
         self.changed
     }
-} 
+}
