@@ -3,6 +3,7 @@ use std::fs;
 use std::process;
 
 use tlang_ast_lowering::lower_to_hir;
+use tlang_hir_opt::HirOptimizer;
 use tlang_interpreter::Interpreter;
 
 fn main() {
@@ -37,7 +38,11 @@ fn main() {
             process::exit(1);
         }
     };
-    let hir = lower_to_hir(&ast);
+    let mut hir = lower_to_hir(&ast);
+
+    let mut optimizer = HirOptimizer::default();
+    optimizer.optimize_module(&mut hir);
+
     let mut interp = Interpreter::default();
     interp.eval(&hir);
 }

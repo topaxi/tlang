@@ -6,3 +6,5 @@ tsconfig.tsbuildinfo
 # Profiling files
 /perf.data*
 /*.perf
+
+*.pending-snap

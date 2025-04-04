@@ -227,8 +227,22 @@ pub fn walk_fn_decl<'ast, V: Visitor<'ast>>(
 pub fn walk_expr<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'ast node::Expr) {
     match &expression.kind {
         node::ExprKind::None => {}
-        node::ExprKind::Block(block) => {
+        node::ExprKind::Block(block) | node::ExprKind::Loop(block) => {
             visitor.visit_block(&block.statements, &block.expression);
+        }
+        node::ExprKind::Break(Some(expr)) => {
+            visitor.visit_expr(expr);
+        }
+        node::ExprKind::Break(_) => {}
+        node::ExprKind::ForLoop(for_loop) => {
+            if let Some((pat, expr)) = &for_loop.acc {
+                visitor.visit_pat(pat);
+                visitor.visit_expr(expr);
+            }
+
+            visitor.visit_pat(&for_loop.pat);
+            visitor.visit_expr(&for_loop.iter);
+            visitor.visit_block(&for_loop.block.statements, &for_loop.block.expression);
         }
         node::ExprKind::BinaryOp(binary_op_expression) => {
             visitor.visit_expr(&binary_op_expression.lhs);
@@ -297,6 +311,7 @@ pub fn walk_expr<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'ast node
             visitor.visit_expr(&range_expr.end);
         }
         node::ExprKind::Wildcard => {}
+        node::ExprKind::Continue => {}
         node::ExprKind::Cast(..) => todo!(),
     }
 }

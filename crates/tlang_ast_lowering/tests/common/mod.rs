@@ -1,6 +1,5 @@
 use tlang_ast as ast;
-use tlang_hir::hir;
-use tlang_hir::visit::Visitor;
+use tlang_hir::{Visitor, hir};
 
 fn parse_from_str(input: &str) -> ast::node::Module {
     let mut parser = tlang_parser::Parser::from_source(input);
@@ -22,19 +21,19 @@ impl PathCollector {
         Self { paths: Vec::new() }
     }
 
-    fn collect(&mut self, module: &hir::Module) {
+    fn collect(&mut self, module: &mut hir::Module) {
         self.visit_module(module);
     }
 }
 
 impl<'hir> Visitor<'hir> for PathCollector {
-    fn visit_path(&mut self, path: &'hir hir::Path) {
+    fn visit_path(&mut self, path: &'hir mut hir::Path) {
         self.paths.push(path.clone());
     }
 }
 
 #[allow(dead_code)]
-pub fn collect_paths(node: &hir::Module) -> Vec<hir::Path> {
+pub fn collect_paths(node: &mut hir::Module) -> Vec<hir::Path> {
     let mut collector = PathCollector::new();
     collector.collect(node);
     collector.paths

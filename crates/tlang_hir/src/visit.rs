@@ -1,48 +1,48 @@
 use crate::hir;
 
 pub trait Visitor<'hir>: Sized {
-    fn visit_module(&mut self, module: &'hir hir::Module) {
+    fn visit_module(&mut self, module: &'hir mut hir::Module) {
         walk_module(self, module);
     }
 
-    fn visit_block(&mut self, block: &'hir hir::Block) {
+    fn visit_block(&mut self, block: &'hir mut hir::Block) {
         walk_block(self, block);
     }
 
-    fn visit_stmt(&mut self, stmt: &'hir hir::Stmt) {
+    fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt) {
         walk_stmt(self, stmt);
     }
 
-    fn visit_expr(&mut self, expr: &'hir hir::Expr) {
+    fn visit_expr(&mut self, expr: &'hir mut hir::Expr) {
         walk_expr(self, expr);
     }
 
-    fn visit_pat(&mut self, pat: &'hir hir::Pat) {
+    fn visit_pat(&mut self, pat: &'hir mut hir::Pat) {
         walk_pat(self, pat);
     }
 
-    fn visit_ident(&mut self, _ident: &'hir tlang_ast::node::Ident) {}
-    fn visit_path(&mut self, _path: &'hir hir::Path) {}
-    fn visit_ty(&mut self, _ty: &'hir hir::Ty) {}
-    fn visit_literal(&mut self, _literal: &'hir tlang_ast::token::Literal) {}
+    fn visit_ident(&mut self, _ident: &'hir mut tlang_ast::node::Ident) {}
+    fn visit_path(&mut self, _path: &'hir mut hir::Path) {}
+    fn visit_ty(&mut self, _ty: &'hir mut hir::Ty) {}
+    fn visit_literal(&mut self, _literal: &'hir mut tlang_ast::token::Literal) {}
 }
 
-pub fn walk_module<'hir, V: Visitor<'hir>>(visitor: &mut V, module: &'hir hir::Module) {
-    walk_block(visitor, &module.block);
+pub fn walk_module<'hir, V: Visitor<'hir>>(visitor: &mut V, module: &'hir mut hir::Module) {
+    walk_block(visitor, &mut module.block);
 }
 
-pub fn walk_block<'hir, V: Visitor<'hir>>(visitor: &mut V, block: &'hir hir::Block) {
-    for statement in &block.stmts {
+pub fn walk_block<'hir, V: Visitor<'hir>>(visitor: &mut V, block: &'hir mut hir::Block) {
+    for statement in &mut block.stmts {
         visitor.visit_stmt(statement);
     }
 
-    if let Some(expr) = &block.expr {
+    if let Some(expr) = &mut block.expr {
         visitor.visit_expr(expr);
     }
 }
 
-pub fn walk_stmt<'hir, V: Visitor<'hir>>(visitor: &mut V, stmt: &'hir hir::Stmt) {
-    match &stmt.kind {
+pub fn walk_stmt<'hir, V: Visitor<'hir>>(visitor: &mut V, stmt: &'hir mut hir::Stmt) {
+    match &mut stmt.kind {
         hir::StmtKind::Let(pat, expr, ty) => {
             visitor.visit_expr(expr);
             visitor.visit_pat(pat);
@@ -50,33 +50,33 @@ pub fn walk_stmt<'hir, V: Visitor<'hir>>(visitor: &mut V, stmt: &'hir hir::Stmt)
         }
         hir::StmtKind::Expr(expr) => visitor.visit_expr(expr),
         hir::StmtKind::Return(expr) => {
-            if let Some(expr) = expr.as_ref() {
+            if let Some(expr) = expr.as_mut() {
                 visitor.visit_expr(expr);
             }
         }
         hir::StmtKind::FunctionDeclaration(decl) => {
-            visitor.visit_expr(&decl.name);
+            visitor.visit_expr(&mut decl.name);
 
-            for param in &decl.parameters {
-                visitor.visit_ident(&param.name);
-                visitor.visit_ty(&param.type_annotation);
+            for param in &mut decl.parameters {
+                visitor.visit_ident(&mut param.name);
+                visitor.visit_ty(&mut param.type_annotation);
             }
 
-            visitor.visit_block(&decl.body);
+            visitor.visit_block(&mut decl.body);
         }
         hir::StmtKind::StructDeclaration(decl) => {
-            for field in &decl.fields {
-                visitor.visit_ident(&field.name);
-                visitor.visit_ty(&field.ty);
+            for field in &mut decl.fields {
+                visitor.visit_ident(&mut field.name);
+                visitor.visit_ty(&mut field.ty);
             }
         }
         hir::StmtKind::EnumDeclaration(decl) => {
-            for variant in &decl.variants {
-                visitor.visit_ident(&variant.name);
+            for variant in &mut decl.variants {
+                visitor.visit_ident(&mut variant.name);
 
-                for field in &variant.parameters {
-                    visitor.visit_ident(&field.name);
-                    visitor.visit_ty(&field.ty);
+                for field in &mut variant.parameters {
+                    visitor.visit_ident(&mut field.name);
+                    visitor.visit_ty(&mut field.ty);
                 }
             }
         }
@@ -85,8 +85,8 @@ pub fn walk_stmt<'hir, V: Visitor<'hir>>(visitor: &mut V, stmt: &'hir hir::Stmt)
     }
 }
 
-pub fn walk_expr<'hir, V: Visitor<'hir>>(visitor: &mut V, expr: &'hir hir::Expr) {
-    match &expr.kind {
+pub fn walk_expr<'hir, V: Visitor<'hir>>(visitor: &mut V, expr: &'hir mut hir::Expr) {
+    match &mut expr.kind {
         hir::ExprKind::Path(path) => visitor.visit_path(path),
         hir::ExprKind::Unary(_, expr) => visitor.visit_expr(expr),
         hir::ExprKind::Let(pat, expr) => {
@@ -113,21 +113,25 @@ pub fn walk_expr<'hir, V: Visitor<'hir>>(visitor: &mut V, expr: &'hir hir::Expr)
                 visitor.visit_block(consequence);
             }
         }
-        hir::ExprKind::Block(block) => visitor.visit_block(block),
+        hir::ExprKind::Block(block) | hir::ExprKind::Loop(block) => visitor.visit_block(block),
+        hir::ExprKind::Break(Some(expr)) => {
+            visitor.visit_expr(expr);
+        }
+        hir::ExprKind::Break(_) => {}
         hir::ExprKind::FunctionExpression(decl) => {
-            visitor.visit_expr(&decl.name);
+            visitor.visit_expr(&mut decl.name);
 
-            for param in &decl.parameters {
-                visitor.visit_ident(&param.name);
-                visitor.visit_ty(&param.type_annotation);
+            for param in &mut decl.parameters {
+                visitor.visit_ident(&mut param.name);
+                visitor.visit_ty(&mut param.type_annotation);
             }
 
-            visitor.visit_block(&decl.body);
+            visitor.visit_block(&mut decl.body);
         }
         hir::ExprKind::Call(call_expr) | hir::ExprKind::TailCall(call_expr) => {
-            visitor.visit_expr(&call_expr.callee);
+            visitor.visit_expr(&mut call_expr.callee);
 
-            for arg in &call_expr.arguments {
+            for arg in &mut call_expr.arguments {
                 visitor.visit_expr(arg);
             }
         }
@@ -141,9 +145,15 @@ pub fn walk_expr<'hir, V: Visitor<'hir>>(visitor: &mut V, expr: &'hir hir::Expr)
         }
         hir::ExprKind::Match(expr, arms) => {
             visitor.visit_expr(expr);
+
             for arm in arms {
-                visitor.visit_pat(&arm.pat);
-                visitor.visit_block(&arm.block);
+                visitor.visit_pat(&mut arm.pat);
+
+                if let Some(guard) = &mut arm.guard {
+                    visitor.visit_expr(guard);
+                }
+
+                visitor.visit_block(&mut arm.block);
             }
         }
         hir::ExprKind::Dict(pairs) => {
@@ -163,17 +173,21 @@ pub fn walk_expr<'hir, V: Visitor<'hir>>(visitor: &mut V, expr: &'hir hir::Expr)
             visitor.visit_ty(ty);
         }
         hir::ExprKind::Wildcard => {}
+        hir::ExprKind::Continue => {}
         hir::ExprKind::Range(..) => todo!(),
     }
 }
 
-pub fn walk_pat<'hir, V: Visitor<'hir>>(visitor: &mut V, pat: &'hir hir::Pat) {
-    match &pat.kind {
+pub fn walk_pat<'hir, V: Visitor<'hir>>(visitor: &mut V, pat: &'hir mut hir::Pat) {
+    match &mut pat.kind {
         hir::PatKind::Identifier(_, ident) => visitor.visit_ident(ident),
         hir::PatKind::List(pats) => {
             for pat in pats {
                 visitor.visit_pat(pat);
             }
+        }
+        hir::PatKind::Rest(pat) => {
+            visitor.visit_pat(pat);
         }
         hir::PatKind::Enum(path, fields) => {
             visitor.visit_path(path);
@@ -185,6 +199,5 @@ pub fn walk_pat<'hir, V: Visitor<'hir>>(visitor: &mut V, pat: &'hir hir::Pat) {
         }
         hir::PatKind::Literal(literal) => visitor.visit_literal(literal),
         hir::PatKind::Wildcard => {}
-        _ => todo!("{:?}", pat),
     }
 }

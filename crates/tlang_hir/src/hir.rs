@@ -268,6 +268,24 @@ impl HirScope for Block {
     }
 }
 
+impl HirScope for &mut Block {
+    fn locals(&self) -> usize {
+        self.scope.locals()
+    }
+
+    fn upvars(&self) -> usize {
+        self.scope.upvars()
+    }
+
+    fn set_locals(&mut self, locals: usize) {
+        self.scope.set_locals(locals);
+    }
+
+    fn set_upvars(&mut self, upvars: usize) {
+        self.scope.set_upvars(upvars);
+    }
+}
+
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Stmt {
