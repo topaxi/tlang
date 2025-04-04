@@ -1,5 +1,9 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use tlang_ast_lowering::LoweringContext;
+use tlang_hir_opt::{
+    constant_folding::ConstantFolder, constant_propagation::ConstantPropagator,
+    dead_code_elimination::DeadCodeEliminator, hir_opt::HirOptimizer,
+};
 use tlang_interpreter::Interpreter;
 use tlang_memory::prelude::TlangValue;
 use tlang_parser::Parser;
@@ -7,20 +11,28 @@ use tlang_parser::Parser;
 struct BenchInterpreter {
     lowering_context: LoweringContext,
     interpreter: Interpreter,
+    optimizer: HirOptimizer,
 }
 
 impl BenchInterpreter {
     fn new() -> Self {
+        let mut optimizer = HirOptimizer::new();
+        optimizer.add_pass(Box::new(ConstantFolder::new()));
+        optimizer.add_pass(Box::new(ConstantPropagator::new()));
+        optimizer.add_pass(Box::new(DeadCodeEliminator::new().with_preserve_root(true)));
+
         BenchInterpreter {
             lowering_context: LoweringContext::default(),
             interpreter: Interpreter::new(),
+            optimizer,
         }
     }
 
     fn eval_root(&mut self, src: &str) -> TlangValue {
         let mut parser = Parser::from_source(src);
         let ast = parser.parse().unwrap();
-        let hir = self.lowering_context.lower_module_in_current_scope(&ast);
+        let mut hir = self.lowering_context.lower_module_in_current_scope(&ast);
+        self.optimizer.optimize_module(&mut hir);
         self.interpreter.eval(&hir)
     }
 
@@ -511,6 +523,93 @@ fn tree_traversal_benchmark(c: &mut Criterion) {
     group.finish();
 }
 
+// Benchmark for constant folding and propagation
+fn constant_optimization_benchmark(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Constant Optimization");
+
+    // Test with complex constant expressions
+    let complex_constants = r#"
+        let a = 1 + 2 * 3 - 4 / 2;
+        let b = (a + 5) * 2;
+        let c = b - a * 3;
+        let d = c + 10;
+        let e = d * 2 - b;
+        let f = e / 5 + a;
+        let g = f * 3 - c;
+        let h = g + d - e;
+        let i = h * 2 / f;
+        let j = i + g - h;
+        j
+    "#;
+
+    // Test with chained constant operations
+    let chained_constants = r#"
+        let x = 1;
+        let y = x + 2;
+        let z = y * 3;
+        let a = z - 4;
+        let b = a / 5;
+        let c = b + 6;
+        let d = c * 7;
+        let e = d - 8;
+        let f = e / 9;
+        f
+    "#;
+
+    // Test with dead code elimination
+    let dead_code = r#"
+        let unused1 = 1 + 2;
+        let unused2 = 3 * 4;
+        let unused3 = 5 - 6;
+        let result = 42;
+        let unused4 = result * 2;
+        result
+    "#;
+
+    group.bench_function("complex_constants", |b| {
+        let mut interp = BenchInterpreter::new();
+        b.iter(|| interp.eval(complex_constants));
+    });
+
+    group.bench_function("chained_constants", |b| {
+        let mut interp = BenchInterpreter::new();
+        b.iter(|| interp.eval(chained_constants));
+    });
+
+    group.bench_function("dead_code", |b| {
+        let mut interp = BenchInterpreter::new();
+        b.iter(|| interp.eval(dead_code));
+    });
+
+    group.finish();
+}
+
+// Benchmark for mixed constant and variable operations
+fn mixed_operations_benchmark(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Mixed Operations");
+
+    let mixed_code = r#"
+        fn calculate(x) {
+            let a = x + 1;
+            let b = a * 2;
+            let c = b - 3;
+            let d = c / 4;
+            let e = d + 5;
+            let f = e * 6;
+            let g = f - 7;
+            let h = g / 8;
+            h
+        }
+    "#;
+
+    group.bench_function("mixed_operations", |b| {
+        let mut interp = interpreter(mixed_code);
+        b.iter(|| interp.eval("calculate(10)"));
+    });
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     fibonacci_benchmark,
@@ -521,5 +620,7 @@ criterion_group!(
     binary_search_benchmark,
     quicksort_benchmark,
     tree_traversal_benchmark,
+    constant_optimization_benchmark,
+    mixed_operations_benchmark,
 );
 criterion_main!(benches);

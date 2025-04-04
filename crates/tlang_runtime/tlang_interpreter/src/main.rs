@@ -3,6 +3,10 @@ use std::fs;
 use std::process;
 
 use tlang_ast_lowering::lower_to_hir;
+use tlang_hir_opt::{
+    constant_folding::ConstantFolder, constant_propagation::ConstantPropagator,
+    dead_code_elimination::DeadCodeEliminator, hir_opt::HirOptimizer,
+};
 use tlang_interpreter::Interpreter;
 
 fn main() {
@@ -37,7 +41,15 @@ fn main() {
             process::exit(1);
         }
     };
-    let hir = lower_to_hir(&ast);
+    let mut hir = lower_to_hir(&ast);
+
+    // Apply HIR optimizations
+    let mut optimizer = HirOptimizer::new();
+    optimizer.add_pass(Box::new(ConstantFolder::new()));
+    optimizer.add_pass(Box::new(ConstantPropagator::new()));
+    optimizer.add_pass(Box::new(DeadCodeEliminator::new()));
+    optimizer.optimize_module(&mut hir);
+
     let mut interp = Interpreter::default();
     interp.eval(&hir);
 }
