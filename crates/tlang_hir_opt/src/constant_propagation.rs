@@ -13,6 +13,12 @@ pub struct ConstantPropagator {
     changed: bool,
 }
 
+impl Default for ConstantPropagator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConstantPropagator {
     pub fn new() -> Self {
         Self {
