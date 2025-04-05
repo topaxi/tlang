@@ -12,3 +12,9 @@ tlang_ast = { path = "../tlang_ast" }
 insta = { workspace = true }
 serde = { workspace = true }
 anyhow = { workspace = true }
+log = { workspace = true }
+
+[dev-dependencies]
+tlang_parser = { path = "../tlang_parser" }
+tlang_ast_lowering = { path = "../tlang_ast_lowering" }
+env_logger = { workspace = true }

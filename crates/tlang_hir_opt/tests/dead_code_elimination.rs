@@ -7,6 +7,8 @@ use tlang_hir_opt::{
     dead_code_elimination::DeadCodeEliminator,
     HirPass,
 };
+use log::debug;
+use env_logger;
 
 mod common;
 
@@ -35,7 +37,7 @@ impl<'hir> Visitor<'hir> for PathCollector {
         for stmt in &mut block.stmts {
             if let StmtKind::Let(pat, _, _) = &mut stmt.kind {
                 if let PatKind::Identifier(hir_id, ref ident) = pat.kind {
-                    println!("Found let binding: {} with hir_id: {:?}", ident.as_str(), hir_id);
+                    debug!("Found let binding: {} with hir_id: {:?}", ident.as_str(), hir_id);
                     self.paths.insert((hir_id, None));
                 }
             }
@@ -53,7 +55,7 @@ impl<'hir> Visitor<'hir> for PathCollector {
     fn visit_expr(&mut self, expr: &'hir mut Expr) {
         if let ExprKind::Path(path) = &expr.kind {
             if let Some(hir_id) = path.res.hir_id() {
-                println!("Found path usage: {} with hir_id: {:?} and res: {:?}", path.segments[0].ident.as_str(), hir_id, path.res);
+                debug!("Found path usage: {} with hir_id: {:?} and res: {:?}", path.segments[0].ident.as_str(), hir_id, path.res);
                 self.paths.insert((hir_id, path.res.slot_index()));
             }
         }
@@ -89,6 +91,8 @@ impl<'hir> Visitor<'hir> for PathCollector {
 
 #[test]
 fn test_simple_dead_code_removal() {
+    let _ = env_logger::builder().is_test(true).try_init();
+
     let source = r#"
         let x = 1;
         let y = 2;
@@ -100,9 +104,9 @@ fn test_simple_dead_code_removal() {
 
     // Collect initial paths
     let initial_paths = PathCollector::collect(&mut module);
-    println!("\nInitial paths:");
+    debug!("\nInitial paths:");
     for (hir_id, slot) in &initial_paths {
-        println!("  hir_id: {:?} and slot: {:?}", hir_id, slot);
+        debug!("  hir_id: {:?} and slot: {:?}", hir_id, slot);
     }
 
     // Run dead code elimination
@@ -111,9 +115,9 @@ fn test_simple_dead_code_removal() {
 
     // Collect final paths
     let final_paths = PathCollector::collect(&mut module);
-    println!("\nFinal paths:");
+    debug!("\nFinal paths:");
     for (hir_id, slot) in &final_paths {
-        println!("  hir_id: {:?} and slot: {:?}", hir_id, slot);
+        debug!("  hir_id: {:?} and slot: {:?}", hir_id, slot);
     }
 
     // Verify that only 'y' remains
@@ -123,6 +127,8 @@ fn test_simple_dead_code_removal() {
 
 #[test]
 fn test_simple_slot_reassignment() {
+    let _ = env_logger::builder().is_test(true).try_init();
+
     let source = r#"
         let x = 1;
         let y = 2;
@@ -154,6 +160,8 @@ fn test_simple_slot_reassignment() {
 
 #[test]
 fn test_nested_scope_slot_reassignment() {
+    let _ = env_logger::builder().is_test(true).try_init();
+
     let source = r#"
         let x = 1;
         let y = 2;
