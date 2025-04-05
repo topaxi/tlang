@@ -187,6 +187,6 @@ pub fn walk_pat<'hir, V: Visitor<'hir>>(visitor: &mut V, pat: &'hir mut hir::Pat
             }
         }
         hir::PatKind::Literal(literal) => visitor.visit_literal(literal),
-        hir::PatKind::Wildcard => {},
+        hir::PatKind::Wildcard => {}
     }
 }

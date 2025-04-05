@@ -2,10 +2,8 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use tlang_ast_lowering::LoweringContext;
 use tlang_hir::hir::Module;
 use tlang_hir_opt::{
-    constant_folding::ConstantFolder,
-    constant_propagation::ConstantPropagator,
-    dead_code_elimination::DeadCodeEliminator,
-    hir_opt::HirOptimizer,
+    constant_folding::ConstantFolder, constant_propagation::ConstantPropagator,
+    dead_code_elimination::DeadCodeEliminator, hir_opt::HirOptimizer,
 };
 use tlang_interpreter::Interpreter;
 use tlang_memory::prelude::TlangValue;
