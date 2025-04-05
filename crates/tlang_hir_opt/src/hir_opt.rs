@@ -1,6 +1,6 @@
 use tlang_hir::hir::Module;
 
-use crate::{ConstantFolder, ConstantPropagator};
+use crate::{ConstantFolder, ConstantPropagator, DeadCodeEliminator};
 
 pub trait HirPass {
     fn optimize_module(&mut self, module: &mut Module) -> bool;
@@ -15,9 +15,7 @@ impl Default for HirOptimizer {
         let mut optimizer = Self::new();
         optimizer.add_pass(Box::new(ConstantFolder::default()));
         optimizer.add_pass(Box::new(ConstantPropagator::default()));
-        // TODO: Removing unused variable declarations messes up the slots from the lowering
-        //       process. We should probably do this after lowering and dead code elimination.
-        //optimizer.add_pass(Box::new(DeadCodeEliminator::default()));
+        optimizer.add_pass(Box::new(DeadCodeEliminator::default()));
         optimizer
     }
 }
