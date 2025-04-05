@@ -1,8 +1,9 @@
 use std::collections::{HashMap, HashSet};
 use tlang_hir::{
     hir::{Block, Expr, ExprKind, HirId, Module, Path, PatKind, Res, Stmt, StmtKind},
-    visit::{Visitor, walk_expr},
+    visit::Visitor,
 };
+use log::debug;
 
 use crate::hir_opt::HirPass;
 
@@ -47,7 +48,7 @@ impl UsedVarsCollector {
     fn collect(module: &mut Module) -> HashSet<HirId> {
         let mut collector = Self::new();
         collector.visit_module(module);
-        println!("\nCollected used variables: {:?}", collector.used_vars);
+        debug!("Collected used variables: {:?}", collector.used_vars);
         collector.used_vars
     }
 
@@ -76,7 +77,7 @@ impl UsedVarsCollector {
         // First collect any path references
         if let ExprKind::Path(path) = &expr.kind {
             if let Some(hir_id) = path.res.hir_id() {
-                println!("Found used variable: {:?} from path: {}", hir_id, path.segments[0].ident);
+                debug!("Found used variable: {:?} from path: {}", hir_id, path.segments[0].ident);
                 self.used_vars.insert(hir_id);
             }
         }
@@ -279,25 +280,25 @@ impl<'hir> Visitor<'hir> for DeadCodeEliminator {
                     // Keep let bindings for used variables
                     if let PatKind::Identifier(hir_id, _) = pat.kind {
                         if !self.used_vars.contains(&hir_id) {
-                            println!("Found unused variable: {:?}", hir_id);
+                            debug!("Found unused variable: {:?}", hir_id);
                             // Keep the statement only if it has side effects
                             match &expr.kind {
                                 ExprKind::Call(_) => {
-                                    println!("  Converting to expression statement due to side effects");
+                                    debug!("  Converting to expression statement due to side effects");
                                     // Convert to expression statement
                                     block.stmts[i].kind = StmtKind::Expr(expr.clone());
                                     self.changed = true;
                                     i += 1;
                                 }
                                 _ => {
-                                    println!("  Removing unused variable");
+                                    debug!("  Removing unused variable");
                                     // Remove the statement
                                     block.stmts.remove(i);
                                     self.changed = true;
                                 }
                             }
                         } else {
-                            println!("Keeping used variable: {:?}", hir_id);
+                            debug!("Keeping used variable: {:?}", hir_id);
                             i += 1;
                         }
                     } else {
