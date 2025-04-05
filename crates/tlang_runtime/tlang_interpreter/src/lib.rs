@@ -618,10 +618,10 @@ impl Interpreter {
                             return EvalResult::Value(TlangValue::Bool(true ^ is_not));
                         }
 
-                        let lhs = self.get_object_by_id(lhs_id);
-                        let rhs = self.get_object_by_id(rhs_id);
+                        let obj_lhs = self.get_object_by_id(lhs_id);
+                        let obj_rhs = self.get_object_by_id(rhs_id);
 
-                        match (lhs, rhs) {
+                        match (obj_lhs, obj_rhs) {
                             (TlangObjectKind::Struct(lhs), TlangObjectKind::Struct(rhs)) => {
                                 if lhs.shape() != rhs.shape() {
                                     return EvalResult::Value(TlangValue::Bool(false ^ is_not));
@@ -633,10 +633,20 @@ impl Interpreter {
                             (TlangObjectKind::String(lhs), TlangObjectKind::String(rhs)) => {
                                 EvalResult::Value(TlangValue::Bool((lhs == rhs) ^ is_not))
                             }
-                            _ => todo!("eval_object_binary_op: {:?}, {:?}, {:?}", op, lhs, rhs),
+                            _ => todo!(
+                                "eval_object_binary_op: {:?}, {:?}, {:?}",
+                                op,
+                                self.state.stringify(lhs),
+                                self.state.stringify(rhs)
+                            ),
                         }
                     }
-                    _ => todo!("eval_object_binary_op: {:?}, {:?}, {:?}", op, lhs, rhs),
+                    _ => todo!(
+                        "eval_object_binary_op: {:?}, {:?}, {:?}",
+                        op,
+                        self.state.stringify(lhs),
+                        self.state.stringify(rhs)
+                    ),
                 }
             }
             hir::BinaryOpKind::Add => match (lhs, rhs) {

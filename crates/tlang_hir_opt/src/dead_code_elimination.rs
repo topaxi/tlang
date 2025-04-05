@@ -1,9 +1,9 @@
+use log::debug;
 use std::collections::{HashMap, HashSet};
 use tlang_hir::{
-    hir::{Block, Expr, ExprKind, HirId, Module, Path, PatKind, Res, Stmt, StmtKind},
-    visit::Visitor,
+    hir::{Block, Expr, ExprKind, HirId, Module, PatKind, Path, Res, Stmt, StmtKind},
+    visit::{self, Visitor},
 };
-use log::debug;
 
 use crate::hir_opt::HirPass;
 
@@ -51,68 +51,22 @@ impl UsedVarsCollector {
         debug!("Collected used variables: {:?}", collector.used_vars);
         collector.used_vars
     }
+}
 
-    fn visit_block(&mut self, block: &Block) {
-        for stmt in &block.stmts {
-            self.visit_stmt(stmt);
-        }
-        if let Some(expr) = &block.expr {
-            self.visit_expr(expr);
-        }
-    }
-
-    fn visit_stmt(&mut self, stmt: &Stmt) {
-        match &stmt.kind {
-            StmtKind::Let(_, expr, _) => {
-                self.visit_expr(expr);
-            }
-            StmtKind::Expr(expr) => {
-                self.visit_expr(expr);
-            }
-            _ => {}
-        }
-    }
-
-    fn visit_expr(&mut self, expr: &Expr) {
-        // First collect any path references
+impl<'hir> Visitor<'hir> for UsedVarsCollector {
+    fn visit_expr(&mut self, expr: &'hir mut Expr) {
         if let ExprKind::Path(path) = &expr.kind {
             if let Some(hir_id) = path.res.hir_id() {
-                debug!("Found used variable: {:?} from path: {}", hir_id, path.segments[0].ident);
+                debug!(
+                    "Found used variable: {:?} from path: {}",
+                    hir_id, path.segments[0].ident
+                );
                 self.used_vars.insert(hir_id);
             }
         }
 
-        // Then visit all child expressions
-        match &expr.kind {
-            ExprKind::Block(block) => {
-                self.visit_block(block);
-            }
-            ExprKind::Call(call) => {
-                self.visit_expr(&call.callee);
-                for arg in &call.arguments {
-                    self.visit_expr(arg);
-                }
-            }
-            ExprKind::Binary(_, lhs, rhs) => {
-                self.visit_expr(lhs);
-                self.visit_expr(rhs);
-            }
-            ExprKind::IfElse(cond, then_block, else_clauses) => {
-                self.visit_expr(cond);
-                self.visit_block(then_block);
-                for else_clause in else_clauses {
-                    if let Some(cond) = &else_clause.condition {
-                        self.visit_expr(cond);
-                    }
-                    self.visit_block(&else_clause.consequence);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    fn visit_module(&mut self, module: &Module) {
-        self.visit_block(&module.block);
+        // Use the default implementation to visit all child expressions
+        visit::walk_expr(self, expr);
     }
 }
 
@@ -203,6 +157,15 @@ impl SlotUpdater {
 }
 
 impl<'hir> Visitor<'hir> for SlotUpdater {
+    fn visit_expr(&mut self, expr: &'hir mut Expr) {
+        if let ExprKind::Path(path) = &mut expr.kind {
+            self.update_path(path);
+        }
+
+        // Use the default implementation to visit all child expressions
+        visit::walk_expr(self, expr);
+    }
+
     fn visit_block(&mut self, block: &'hir mut Block) {
         self.enter_scope();
 
@@ -220,47 +183,9 @@ impl<'hir> Visitor<'hir> for SlotUpdater {
         }
 
         // Second pass: update path resolutions
-        for stmt in &mut block.stmts {
-            self.visit_stmt(stmt);
-        }
-        if let Some(expr) = &mut block.expr {
-            self.visit_expr(expr);
-        }
+        visit::walk_block(self, block);
 
         self.exit_scope();
-    }
-
-    fn visit_expr(&mut self, expr: &'hir mut Expr) {
-        if let ExprKind::Path(path) = &mut expr.kind {
-            self.update_path(path);
-        }
-
-        match &mut expr.kind {
-            ExprKind::Block(block) => {
-                self.visit_block(block);
-            }
-            ExprKind::Call(call) => {
-                self.visit_expr(&mut call.callee);
-                for arg in &mut call.arguments {
-                    self.visit_expr(arg);
-                }
-            }
-            ExprKind::Binary(_, lhs, rhs) => {
-                self.visit_expr(lhs);
-                self.visit_expr(rhs);
-            }
-            ExprKind::IfElse(cond, then_block, else_clauses) => {
-                self.visit_expr(cond);
-                self.visit_block(then_block);
-                for else_clause in else_clauses {
-                    if let Some(cond) = &mut else_clause.condition {
-                        self.visit_expr(cond);
-                    }
-                    self.visit_block(&mut else_clause.consequence);
-                }
-            }
-            _ => {}
-        }
     }
 }
 
@@ -284,7 +209,9 @@ impl<'hir> Visitor<'hir> for DeadCodeEliminator {
                             // Keep the statement only if it has side effects
                             match &expr.kind {
                                 ExprKind::Call(_) => {
-                                    debug!("  Converting to expression statement due to side effects");
+                                    debug!(
+                                        "  Converting to expression statement due to side effects"
+                                    );
                                     // Convert to expression statement
                                     block.stmts[i].kind = StmtKind::Expr(expr.clone());
                                     self.changed = true;

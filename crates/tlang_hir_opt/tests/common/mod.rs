@@ -1,11 +1,12 @@
 use tlang_ast_lowering::lower_to_hir;
 use tlang_hir::hir;
+use tlang_hir::hir::Module;
 use tlang_hir_opt::{
-    constant_folding::ConstantFolder, constant_propagation::ConstantPropagator, hir_opt::HirOptimizer, DeadCodeEliminator, HirPass
+    DeadCodeEliminator, HirPass, constant_folding::ConstantFolder,
+    constant_propagation::ConstantPropagator, hir_opt::HirOptimizer,
 };
 use tlang_hir_pretty::HirPrettyOptions;
 use tlang_parser::Parser;
-use tlang_hir::hir::Module;
 
 pub fn compile(source: &str) -> Module {
     let ast = Parser::from_source(source).parse().unwrap();
@@ -21,14 +22,20 @@ pub fn optimize(module: &mut hir::Module, passes: Vec<Box<dyn HirPass>>) {
 }
 
 pub fn compile_and_optimize(source: &str) -> hir::Module {
-    compile_and_optimize_with_passes(source, vec![
-        Box::new(ConstantFolder::default()),
-        Box::new(ConstantPropagator::default()),
-        Box::new(DeadCodeEliminator::default()),
-    ])
+    compile_and_optimize_with_passes(
+        source,
+        vec![
+            Box::new(ConstantFolder::default()),
+            Box::new(ConstantPropagator::default()),
+            Box::new(DeadCodeEliminator::default()),
+        ],
+    )
 }
 
-pub fn compile_and_optimize_with_passes(source: &str, passes: Vec<Box<dyn HirPass>>) -> hir::Module {
+pub fn compile_and_optimize_with_passes(
+    source: &str,
+    passes: Vec<Box<dyn HirPass>>,
+) -> hir::Module {
     let mut module = compile(source);
     optimize(&mut module, passes);
     module
