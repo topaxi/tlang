@@ -1,28 +1,10 @@
 use std::collections::HashSet;
 use tlang_hir::{
-    hir::{Expr, ExprKind, HirId, Module, PatKind, Stmt, StmtKind},
-    visit::Visitor,
+    hir::{Block, Expr, ExprKind, HirId, Module, PatKind, Stmt, StmtKind},
+    visit::{Visitor, walk_expr},
 };
 
 use crate::hir_opt::HirPass;
-
-trait UsageVisitor {
-    fn visit_module(&mut self, module: &Module);
-    fn visit_stmt(&mut self, stmt: &Stmt);
-    fn visit_expr(&mut self, expr: &Expr);
-}
-
-impl<T: UsageVisitor> UsageVisitor for &mut T {
-    fn visit_module(&mut self, module: &Module) {
-        (**self).visit_module(module)
-    }
-    fn visit_stmt(&mut self, stmt: &Stmt) {
-        (**self).visit_stmt(stmt)
-    }
-    fn visit_expr(&mut self, expr: &Expr) {
-        (**self).visit_expr(expr)
-    }
-}
 
 pub struct DeadCodeEliminator {
     used_vars: HashSet<HirId>,
@@ -55,10 +37,26 @@ struct UsedVarsCollector {
     used_vars: HashSet<HirId>,
 }
 
-impl UsageVisitor for UsedVarsCollector {
-    fn visit_module(&mut self, module: &Module) {
-        for stmt in &module.block.stmts {
+impl UsedVarsCollector {
+    fn new() -> Self {
+        Self {
+            used_vars: HashSet::new(),
+        }
+    }
+
+    fn collect(module: &mut Module) -> HashSet<HirId> {
+        let mut collector = Self::new();
+        collector.visit_module(module);
+        println!("\nCollected used variables: {:?}", collector.used_vars);
+        collector.used_vars
+    }
+
+    fn visit_block(&mut self, block: &Block) {
+        for stmt in &block.stmts {
             self.visit_stmt(stmt);
+        }
+        if let Some(expr) = &block.expr {
+            self.visit_expr(expr);
         }
     }
 
@@ -75,16 +73,18 @@ impl UsageVisitor for UsedVarsCollector {
     }
 
     fn visit_expr(&mut self, expr: &Expr) {
+        // First collect any path references
         if let ExprKind::Path(path) = &expr.kind {
             if let Some(hir_id) = path.res.hir_id() {
+                println!("Found used variable: {:?} from path: {}", hir_id, path.segments[0].ident);
                 self.used_vars.insert(hir_id);
             }
         }
 
+        // Then visit all child expressions
         match &expr.kind {
-            ExprKind::Binary(_, lhs, rhs) => {
-                self.visit_expr(lhs);
-                self.visit_expr(rhs);
+            ExprKind::Block(block) => {
+                self.visit_block(block);
             }
             ExprKind::Call(call) => {
                 self.visit_expr(&call.callee);
@@ -92,68 +92,95 @@ impl UsageVisitor for UsedVarsCollector {
                     self.visit_expr(arg);
                 }
             }
+            ExprKind::Binary(_, lhs, rhs) => {
+                self.visit_expr(lhs);
+                self.visit_expr(rhs);
+            }
+            ExprKind::IfElse(cond, then_block, else_clauses) => {
+                self.visit_expr(cond);
+                self.visit_block(then_block);
+                for else_clause in else_clauses {
+                    if let Some(cond) = &else_clause.condition {
+                        self.visit_expr(cond);
+                    }
+                    self.visit_block(&else_clause.consequence);
+                }
+            }
             _ => {}
         }
+    }
+
+    fn visit_module(&mut self, module: &Module) {
+        self.visit_block(&module.block);
     }
 }
 
 impl<'hir> Visitor<'hir> for DeadCodeEliminator {
     fn visit_module(&mut self, module: &'hir mut Module) {
-        if self.preserve_root {
-            // If preserving root, just visit children without eliminating
-            for stmt in &mut module.block.stmts {
-                self.visit_stmt(stmt);
-            }
-        } else {
-            // Otherwise proceed with dead code elimination
-            module.block.stmts.retain_mut(|stmt| {
-                match &stmt.kind {
-                    StmtKind::Let(pat, expr, _) => {
-                        // Keep let bindings for used variables
-                        if let PatKind::Identifier(hir_id, _) = pat.kind {
-                            if !self.used_vars.contains(&hir_id) {
-                                // Keep the statement only if it has side effects
-                                match &expr.kind {
-                                    ExprKind::Call(_) => {
-                                        // Convert to expression statement
-                                        stmt.kind = StmtKind::Expr(expr.clone());
-                                        self.changed = true;
-                                        true
-                                    }
-                                    _ => {
-                                        // Remove the statement
-                                        self.changed = true;
-                                        false
-                                    }
+        if !self.preserve_root {
+            self.visit_block(&mut module.block);
+        }
+    }
+
+    fn visit_block(&mut self, block: &'hir mut Block) {
+        // Process block and remove unused statements
+        let mut i = 0;
+        while i < block.stmts.len() {
+            match &block.stmts[i].kind {
+                StmtKind::Let(pat, expr, _) => {
+                    // Keep let bindings for used variables
+                    if let PatKind::Identifier(hir_id, _) = pat.kind {
+                        if !self.used_vars.contains(&hir_id) {
+                            println!("Found unused variable: {:?}", hir_id);
+                            // Keep the statement only if it has side effects
+                            match &expr.kind {
+                                ExprKind::Call(_) => {
+                                    println!("  Converting to expression statement due to side effects");
+                                    // Convert to expression statement
+                                    block.stmts[i].kind = StmtKind::Expr(expr.clone());
+                                    self.changed = true;
+                                    i += 1;
                                 }
-                            } else {
-                                true
+                                _ => {
+                                    println!("  Removing unused variable");
+                                    // Remove the statement
+                                    block.stmts.remove(i);
+                                    self.changed = true;
+                                }
                             }
                         } else {
-                            true
+                            println!("Keeping used variable: {:?}", hir_id);
+                            i += 1;
                         }
+                    } else {
+                        i += 1;
                     }
-                    _ => true,
                 }
-            });
+                _ => {
+                    i += 1;
+                }
+            }
+        }
+
+        // Visit children after eliminating dead code
+        for stmt in &mut block.stmts {
+            self.visit_stmt(stmt);
+        }
+        if let Some(expr) = &mut block.expr {
+            self.visit_expr(expr);
         }
     }
 }
 
 impl HirPass for DeadCodeEliminator {
     fn optimize_module(&mut self, module: &mut Module) -> bool {
+        // First collect all used variables
+        self.used_vars = UsedVarsCollector::collect(module);
         self.changed = false;
-        self.used_vars.clear();
 
-        // Collect used variables
-        let mut collector = UsedVarsCollector {
-            used_vars: HashSet::new(),
-        };
-        collector.visit_module(module);
-        self.used_vars = collector.used_vars;
-
-        // Apply dead code elimination
+        // Then eliminate dead code
         self.visit_module(module);
+
         self.changed
     }
 }
