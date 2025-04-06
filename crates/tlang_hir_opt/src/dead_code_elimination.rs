@@ -152,14 +152,20 @@ impl SlotUpdater {
 
             // Try to find the variable in the current scope first
             let mut found = false;
-            for scope in self.scopes.iter().rev() {
+            for (depth, scope) in self.scopes.iter().rev().enumerate() {
                 if let Some(&slot) = scope.local_slots.get(&hir_id) {
-                    path.res = Res::Local(hir_id, slot);
+                    if depth == 0 {
+                        path.res = Res::Local(hir_id, slot);
+                    } else {
+                        // Variable found in an outer scope, it's an upvar
+                        path.res = Res::Upvar(depth - 1, slot);
+                    }
                     found = true;
                     break;
                 }
                 if let Some(&slot) = scope.upvar_slots.get(&hir_id) {
-                    path.res = Res::Upvar(0, slot); // TODO: Calculate correct depth
+                    // For upvars from parent scopes, we need to add the current depth
+                    path.res = Res::Upvar(depth, slot);
                     found = true;
                     break;
                 }
