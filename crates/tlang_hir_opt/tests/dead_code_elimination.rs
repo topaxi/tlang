@@ -1,4 +1,3 @@
-use env_logger;
 use insta::assert_snapshot;
 use log::debug;
 use std::collections::HashSet;
