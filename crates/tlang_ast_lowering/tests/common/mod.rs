@@ -1,6 +1,5 @@
 use tlang_ast as ast;
-use tlang_hir::hir;
-use tlang_hir::visit::Visitor;
+use tlang_hir::{Visitor, hir};
 
 fn parse_from_str(input: &str) -> ast::node::Module {
     let mut parser = tlang_parser::Parser::from_source(input);
