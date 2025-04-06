@@ -1,7 +1,7 @@
-use log::debug;
+use log::{debug, trace};
 use std::collections::{HashMap, HashSet};
 use tlang_hir::{
-    hir::{Block, Expr, ExprKind, HirId, Module, PatKind, Path, Res, Stmt, StmtKind},
+    hir::{Block, Expr, ExprKind, HirId, Module, Pat, PatKind, Path, Res, StmtKind},
     visit::{self, Visitor},
 };
 
@@ -34,8 +34,8 @@ impl DeadCodeEliminator {
     }
 }
 
-struct UsedVarsCollector {
-    used_vars: HashSet<HirId>,
+pub struct UsedVarsCollector {
+    pub used_vars: HashSet<HirId>,
 }
 
 impl UsedVarsCollector {
@@ -55,18 +55,38 @@ impl UsedVarsCollector {
 
 impl<'hir> Visitor<'hir> for UsedVarsCollector {
     fn visit_expr(&mut self, expr: &'hir mut Expr) {
-        if let ExprKind::Path(path) = &expr.kind {
-            if let Some(hir_id) = path.res.hir_id() {
-                debug!(
-                    "Found used variable: {:?} from path: {}",
-                    hir_id, path.segments[0].ident
-                );
-                self.used_vars.insert(hir_id);
+        trace!("Visiting expression: {:?}", expr.kind);
+        match &mut expr.kind {
+            ExprKind::Match(scrutinee, arms) => {
+                trace!("Processing match expression with {} arms", arms.len());
+                self.visit_expr(scrutinee);
+                for (i, arm) in arms.iter_mut().enumerate() {
+                    trace!("Processing match arm {}", i);
+                    self.visit_pat(&mut arm.pat);
+                    if let Some(guard) = &mut arm.guard {
+                        trace!("Processing guard expression");
+                        self.visit_expr(guard);
+                    }
+                    self.visit_block(&mut arm.block);
+                }
+            }
+            _ => {
+                visit::walk_expr(self, expr);
             }
         }
+    }
 
-        // Use the default implementation to visit all child expressions
-        visit::walk_expr(self, expr);
+    fn visit_pat(&mut self, pat: &'hir mut Pat) {
+        trace!("Visiting pattern: {:?}", pat.kind);
+        match &pat.kind {
+            PatKind::Identifier(hir_id, _) => {
+                trace!("Found identifier pattern with HirId: {:?}", hir_id);
+                self.used_vars.insert(*hir_id);
+            }
+            _ => {
+                visit::walk_pat(self, pat);
+            }
+        }
     }
 }
 
