@@ -47,14 +47,6 @@ pub fn pretty_print(module: &hir::Module) -> String {
         ..Default::default()
     };
     let mut prettier = tlang_hir_pretty::HirPretty::new(options);
-    let mut output = String::from("fn main() -> unknown {\n");
     prettier.print_module(module);
-    let inner = prettier.output().trim_end();
-    if !inner.is_empty() {
-        output.push_str("    ");
-        output.push_str(&inner.replace("\n", "\n    "));
-        output.push('\n');
-    }
-    output.push_str("};\n");
-    output
+    prettier.output().to_string()
 }

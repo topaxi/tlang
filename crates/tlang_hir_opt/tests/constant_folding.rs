@@ -10,9 +10,8 @@ fn simple_binary_constant_folding() {
     "#;
     let hir = common::compile_and_optimize(source);
     assert_snapshot!(common::pretty_print(&hir), @r###"
-    fn main() -> unknown {
-        println(3);
-    };
+    let x: unknown = 3;
+    println(3);
     "###);
 }
 
@@ -24,9 +23,8 @@ fn multiplication_constant_folding() {
     "#;
     let hir = common::compile_and_optimize(source);
     assert_snapshot!(common::pretty_print(&hir), @r###"
-    fn main() -> unknown {
-        println(6);
-    };
+    let x: unknown = 6;
+    println(6);
     "###);
 }
 
@@ -40,9 +38,10 @@ fn chained_operations() {
     "#;
     let hir = common::compile_and_optimize(source);
     assert_snapshot!(common::pretty_print(&hir), @r###"
-    fn main() -> unknown {
-        println(5);
-    };
+    let x: unknown = 3;
+    let y: unknown = 9;
+    let z: unknown = 5;
+    println(5);
     "###);
 }
 
@@ -54,9 +53,8 @@ fn mixed_operations() {
     "#;
     let hir = common::compile_and_optimize(source);
     assert_snapshot!(common::pretty_print(&hir), @r###"
-    fn main() -> unknown {
-        println(9);
-    };
+    let x: unknown = 9;
+    println(9);
     "###);
 }
 
@@ -69,8 +67,8 @@ fn chained_constant_folding() {
     "#;
     let hir = common::compile_and_optimize(source);
     assert_snapshot!(common::pretty_print(&hir), @r###"
-    fn main() -> unknown {
-        println(9);
-    };
+    let x: unknown = 3;
+    let y: unknown = 9;
+    println(9);
     "###);
 }
