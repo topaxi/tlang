@@ -651,19 +651,34 @@ impl Interpreter {
             }
             hir::BinaryOpKind::Add => match (lhs, rhs) {
                 (TlangValue::Object(lhs_id), TlangValue::Object(rhs_id)) => {
-                    let lhs = self.get_object_by_id(lhs_id);
-                    let rhs = self.get_object_by_id(rhs_id);
+                    let obj_lhs = self.get_object_by_id(lhs_id);
+                    let obj_rhs = self.get_object_by_id(rhs_id);
 
-                    match (lhs, rhs) {
+                    match (obj_lhs, obj_rhs) {
                         (TlangObjectKind::String(lhs), TlangObjectKind::String(rhs)) => {
                             EvalResult::Value(self.state.new_string(lhs.clone() + rhs))
                         }
-                        _ => todo!("eval_object_binary_op: {:?}, {:?}, {:?}", op, lhs, rhs),
+                        _ => todo!(
+                            "eval_object_binary_op: {:?}, {:?}, {:?}",
+                            op,
+                            self.state.stringify(lhs),
+                            self.state.stringify(rhs)
+                        ),
                     }
                 }
-                _ => todo!("eval_object_binary_op: {:?}, {:?}, {:?}", op, lhs, rhs),
+                _ => todo!(
+                    "eval_object_binary_op: {:?}, {:?}, {:?}",
+                    op,
+                    self.state.stringify(lhs),
+                    self.state.stringify(rhs)
+                ),
             },
-            _ => todo!("eval_object_binary_op: {:?}, {:?}, {:?}", op, lhs, rhs),
+            _ => todo!(
+                "eval_object_binary_op: {:?}, {:?}, {:?}",
+                op,
+                self.state.stringify(lhs),
+                self.state.stringify(rhs)
+            ),
         }
     }
 
