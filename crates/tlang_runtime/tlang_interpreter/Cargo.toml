@@ -29,7 +29,7 @@ tlang_stdlib = { path = "../tlang_stdlib", optional = true }
 log = { workspace = true }
 env_logger = { workspace = true }
 inventory = { workspace = true }
-smallvec = "1.11"
+smallvec = "1.15"
 
 [dev-dependencies]
 tlang_ast_lowering = { path = "../../tlang_ast_lowering" }
