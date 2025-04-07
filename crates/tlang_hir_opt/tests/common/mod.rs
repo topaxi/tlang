@@ -22,7 +22,7 @@ pub fn optimize(module: &mut hir::Module, passes: Vec<Box<dyn HirPass>>) {
 }
 
 pub fn compile_and_optimize(source: &str) -> hir::Module {
-    compile_and_optimize_with_passes(
+    compile_with_passes(
         source,
         vec![
             Box::new(ConstantFolder::default()),
@@ -32,10 +32,7 @@ pub fn compile_and_optimize(source: &str) -> hir::Module {
     )
 }
 
-pub fn compile_and_optimize_with_passes(
-    source: &str,
-    passes: Vec<Box<dyn HirPass>>,
-) -> hir::Module {
+pub fn compile_with_passes(source: &str, passes: Vec<Box<dyn HirPass>>) -> hir::Module {
     let mut module = compile(source);
     optimize(&mut module, passes);
     module
