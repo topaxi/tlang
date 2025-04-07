@@ -141,8 +141,14 @@ pub fn walk_expr<'hir, V: Visitor<'hir>>(visitor: &mut V, expr: &'hir mut hir::E
         }
         hir::ExprKind::Match(expr, arms) => {
             visitor.visit_expr(expr);
+
             for arm in arms {
                 visitor.visit_pat(&mut arm.pat);
+
+                if let Some(guard) = &mut arm.guard {
+                    visitor.visit_expr(guard);
+                }
+
                 visitor.visit_block(&mut arm.block);
             }
         }

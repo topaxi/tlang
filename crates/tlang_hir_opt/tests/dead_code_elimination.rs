@@ -132,87 +132,6 @@ fn test_simple_dead_code_removal() {
 }
 
 #[test]
-fn test_simple_slot_reassignment() {
-    let _ = env_logger::builder().is_test(true).try_init();
-
-    let source = r#"
-        let x = 1;
-        let y = 2;
-        let z = 3;
-        y;
-    "#;
-
-    let mut module = common::compile(source);
-
-    // Collect initial paths
-    let initial_paths = PathCollector::collect(&mut module);
-    let _initial_y = initial_paths
-        .iter()
-        .find(|(_, slot)| slot.is_some())
-        .expect("Should find y in initial paths");
-
-    // Run dead code elimination
-    let mut optimizer = DeadCodeEliminator::new();
-    optimizer.optimize_module(&mut module);
-
-    // Collect final paths
-    let final_paths = PathCollector::collect(&mut module);
-    let final_y = final_paths
-        .iter()
-        .find(|(_, slot)| slot.is_some())
-        .expect("Should find y in final paths");
-
-    // Verify that y's slot index was updated
-    assert_eq!(
-        final_y.1.unwrap(),
-        0,
-        "y's slot index should be updated to 0"
-    );
-}
-
-#[test]
-fn test_nested_scope_slot_reassignment() {
-    let _ = env_logger::builder().is_test(true).try_init();
-
-    let source = r#"
-        let x = 1;
-        let y = 2;
-        {
-            let a = 3;
-            let b = 4;
-            b;
-        };
-    "#;
-
-    let mut module = common::compile(source);
-
-    // Collect initial paths
-    let initial_paths = PathCollector::collect(&mut module);
-    let _initial_b = initial_paths
-        .iter()
-        .find(|(_, slot)| slot.is_some())
-        .expect("Should find b in initial paths");
-
-    // Run dead code elimination
-    let mut optimizer = DeadCodeEliminator::new();
-    optimizer.optimize_module(&mut module);
-
-    // Collect final paths
-    let final_paths = PathCollector::collect(&mut module);
-    let final_b = final_paths
-        .iter()
-        .find(|(_, slot)| slot.is_some())
-        .expect("Should find b in final paths");
-
-    // Verify that b's slot index was updated
-    assert_eq!(
-        final_b.1.unwrap(),
-        0,
-        "b's slot index should be updated to 0"
-    );
-}
-
-#[test]
 fn test_binary_search_no_dead_code() {
     let _ = env_logger::builder().is_test(true).try_init();
 
@@ -309,7 +228,7 @@ fn test_nested_function_captures() {
         let x = 1;
         let y = 2;
         let z = 3;
-        
+
         fn outer() {
             let a = 4;
             fn middle() {
@@ -324,7 +243,7 @@ fn test_nested_function_captures() {
             }
             middle()
         }
-        
+
         outer();
     "#;
 

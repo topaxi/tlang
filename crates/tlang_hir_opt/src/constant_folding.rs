@@ -78,10 +78,8 @@ impl<'hir> Visitor<'hir> for ConstantFolder {
     fn visit_stmt(&mut self, stmt: &'hir mut Stmt) {
         match &mut stmt.kind {
             StmtKind::Let(pat, expr, _) => {
-                // First visit the expression to fold any constants in it
                 self.visit_expr(expr);
 
-                // If the expression is now a constant, store it for future use
                 if let Some(lit) = self.try_eval_expr(expr) {
                     if let PatKind::Identifier(hir_id, _) = pat.kind {
                         // Only mark as changed if we haven't seen this constant before
@@ -89,26 +87,20 @@ impl<'hir> Visitor<'hir> for ConstantFolder {
                             self.constants.insert(hir_id, lit.clone());
                             self.changed = true;
                         }
-                        // Replace the expression with the constant and track that we've folded it
+
                         expr.kind = ExprKind::Literal(Box::new(lit.clone()));
                         self.folded_exprs.insert(expr.hir_id, lit);
                     }
                 }
-            }
-            StmtKind::Expr(expr) => {
-                self.visit_expr(expr);
             }
             _ => visit::walk_stmt(self, stmt),
         }
     }
 
     fn visit_expr(&mut self, expr: &'hir mut Expr) {
-        // Visit child expressions first (bottom-up)
         visit::walk_expr(self, expr);
 
-        // Try to evaluate the expression
         if let Some(lit) = self.try_eval_expr(expr) {
-            // Only mark as changed if we haven't folded this expression before
             if self.folded_exprs.get(&expr.hir_id) != Some(&lit) {
                 expr.kind = ExprKind::Literal(Box::new(lit.clone()));
                 self.folded_exprs.insert(expr.hir_id, lit);
