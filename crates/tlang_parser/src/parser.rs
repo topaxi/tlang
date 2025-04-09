@@ -903,6 +903,7 @@ impl<'src> Parser<'src> {
                         | Keyword::Fn
                         | Keyword::Rec
                         | Keyword::Match
+                        | Keyword::Loop
                         | Keyword::Not
                         | Keyword::Underscore
                         | Keyword::_Self
@@ -943,6 +944,11 @@ impl<'src> Parser<'src> {
             TokenKind::LBracket => self.parse_list_expression(),
             TokenKind::Keyword(Keyword::If) => self.parse_if_else_expression(),
             TokenKind::Keyword(Keyword::Fn) => self.parse_function_expression(),
+            TokenKind::Keyword(Keyword::Loop) => {
+                self.advance();
+                let block = self.parse_block();
+                node::expr!(self.unique_id(), Loop(Box::new(block)))
+            }
             TokenKind::Keyword(Keyword::Rec) => {
                 self.advance();
                 let expr = self.parse_expression();

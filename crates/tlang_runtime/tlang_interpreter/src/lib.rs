@@ -25,6 +25,8 @@ pub enum EvalResult {
     Value(TlangValue),
     Return(TlangValue),
     TailCall,
+    Continue,
+    Break(TlangValue),
 }
 
 impl EvalResult {
@@ -32,8 +34,10 @@ impl EvalResult {
         match self {
             EvalResult::Value(value) => value,
             EvalResult::Return(value) => value,
+            EvalResult::Break(value) => value,
             EvalResult::Void => TlangValue::Nil,
             EvalResult::TailCall => panic!("Tried to unwrap a TailCall"),
+            EvalResult::Continue => panic!("Tried to unwrap Continue"),
         }
     }
 }
@@ -263,6 +267,17 @@ impl Interpreter {
         self.with_new_scope(block, |this| this.eval_block_inner(block))
     }
 
+    fn eval_loop(&mut self, block: &hir::Block) -> EvalResult {
+        loop {
+            match self.with_new_scope(block, |this| this.eval_block_inner(block)) {
+                EvalResult::Break(value) => return EvalResult::Value(value),
+                EvalResult::Return(value) => return EvalResult::Return(value),
+                EvalResult::TailCall => return EvalResult::TailCall,
+                EvalResult::Continue | EvalResult::Void | EvalResult::Value(_) => continue,
+            }
+        }
+    }
+
     fn eval_stmt(&mut self, stmt: &hir::Stmt) -> EvalResult {
         self.state.set_current_span(stmt.span);
 
@@ -321,6 +336,7 @@ impl Interpreter {
             hir::ExprKind::IndexAccess(lhs, rhs) => self.eval_index_access(lhs, rhs),
             hir::ExprKind::FieldAccess(lhs, rhs) => self.eval_field_access(lhs, rhs),
             hir::ExprKind::Block(block) => self.eval_block(block),
+            hir::ExprKind::Loop(block) => self.eval_loop(block),
             hir::ExprKind::Binary(op, lhs, rhs) => self.eval_binary(*op, lhs, rhs),
             hir::ExprKind::Call(call_expr) => self.eval_call(call_expr),
             hir::ExprKind::TailCall(call_expr) => self.eval_tail_call(call_expr),

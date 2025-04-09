@@ -436,6 +436,7 @@ impl Expr {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum ExprKind {
     Block(Box<Block>),
+    Loop(Box<Block>),
     Call(Box<CallExpression>),
     TailCall(Box<CallExpression>),
     Cast(Box<Expr>, Box<Ty>),

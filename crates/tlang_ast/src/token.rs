@@ -17,6 +17,7 @@ define_keywords! {
     And => "and",
     Or => "or",
     As => "as",
+    Loop => "loop",
 
     // TODO: Similar to `self`, we might want to treat this as an identifier.
     Underscore => "_",
@@ -26,7 +27,6 @@ define_keywords! {
     // Reserved keywords, unused at the moment
     For => "for",
     In => "in",
-    Loop => "loop",
     Pub => "pub",
     SelfUpper => "Self",
     Use => "use",

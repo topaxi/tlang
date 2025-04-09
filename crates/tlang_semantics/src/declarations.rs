@@ -180,7 +180,7 @@ impl DeclarationAnalyzer {
 
     fn collect_declarations_expr(&mut self, expr: &Expr) {
         match &expr.kind {
-            ExprKind::Block(block) => {
+            ExprKind::Block(block) | ExprKind::Loop(block) => {
                 self.collect_declarations_block(block);
             }
             ExprKind::FunctionExpression(decl) => {

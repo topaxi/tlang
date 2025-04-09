@@ -261,6 +261,10 @@ impl HirPretty {
                 self.print_expr(expr);
             }
             hir::ExprKind::Block(block) => self.print_block(block),
+            hir::ExprKind::Loop(block) => {
+                self.push_str("loop ");
+                self.print_block(block)
+            }
             hir::ExprKind::Dict(kvs) => self.print_dict(kvs),
             hir::ExprKind::FunctionExpression(decl) => self.print_function_declaration(decl),
             hir::ExprKind::FieldAccess(expr, ident) => {

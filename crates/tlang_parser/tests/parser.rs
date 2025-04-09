@@ -90,6 +90,11 @@ fn test_block_expression() {
 }
 
 #[test]
+fn test_loop_expression() {
+    assert_parser_snapshot!("let x = loop { break 1 + 2; };");
+}
+
+#[test]
 fn test_if_statement() {
     assert_parser_snapshot!("if (1 + 2) { 3 + 4; }");
 }

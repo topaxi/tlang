@@ -235,7 +235,7 @@ impl SemanticAnalyzer {
                 self.analyze_expr(&expr.lhs);
                 self.analyze_expr(&expr.rhs);
             }
-            ExprKind::Block(block) => self.analyze_block(block),
+            ExprKind::Block(block) | ExprKind::Loop(block) => self.analyze_block(block),
             ExprKind::UnaryOp(_, node) => {
                 self.analyze_expr(node);
             }
