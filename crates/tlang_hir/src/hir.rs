@@ -437,6 +437,8 @@ impl Expr {
 pub enum ExprKind {
     Block(Box<Block>),
     Loop(Box<Block>),
+    Break(Option<Box<Expr>>),
+    Continue,
     Call(Box<CallExpression>),
     TailCall(Box<CallExpression>),
     Cast(Box<Expr>, Box<Ty>),

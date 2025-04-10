@@ -33,6 +33,10 @@ impl LoweringContext {
                 expression.as_ref(),
                 *span,
             ))),
+            ast::node::ExprKind::Break(expr) => {
+                hir::ExprKind::Break(expr.as_ref().map(|expr| Box::new(self.lower_expr(expr))))
+            }
+            ast::node::ExprKind::Continue => hir::ExprKind::Continue,
             ast::node::ExprKind::Call(call_expr) => {
                 hir::ExprKind::Call(Box::new(self.lower_call_expr(call_expr)))
             }

@@ -289,7 +289,8 @@ impl<'src> Parser<'src> {
                 (false, Some(node))
             }
             // Expressions like IfElse as statements also do not need to be terminated with a semicolon.
-            StmtKind::Expr(ref expr) if matches!(expr.kind,  ExprKind::IfElse(..) | ExprKind::Match(..)) => {
+            StmtKind::Expr(ref expr)
+                if matches!(expr.kind,  ExprKind::IfElse(..) | ExprKind::Match(..) | ExprKind::Loop(..)) => {
                 (false, Some(node))
             }
             _ => (true, Some(node))
@@ -904,6 +905,8 @@ impl<'src> Parser<'src> {
                         | Keyword::Rec
                         | Keyword::Match
                         | Keyword::Loop
+                        | Keyword::Break
+                        | Keyword::Continue
                         | Keyword::Not
                         | Keyword::Underscore
                         | Keyword::_Self
@@ -948,6 +951,25 @@ impl<'src> Parser<'src> {
                 self.advance();
                 let block = self.parse_block();
                 node::expr!(self.unique_id(), Loop(Box::new(block)))
+            }
+            TokenKind::Keyword(Keyword::Break) => {
+                self.advance();
+
+                if matches!(
+                    self.current_token_kind(),
+                    // Bit hacky...
+                    TokenKind::Semicolon | TokenKind::RBrace
+                ) {
+                    return node::expr!(self.unique_id(), Break(None));
+                }
+
+                let expr = self.parse_expression();
+                let expr = if matches!(expr.kind, ExprKind::None) {
+                    None
+                } else {
+                    Some(Box::new(expr))
+                };
+                node::expr!(self.unique_id(), Break(expr))
             }
             TokenKind::Keyword(Keyword::Rec) => {
                 self.advance();

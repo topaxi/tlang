@@ -183,6 +183,11 @@ impl DeclarationAnalyzer {
             ExprKind::Block(block) | ExprKind::Loop(block) => {
                 self.collect_declarations_block(block);
             }
+            ExprKind::Break(expr) => {
+                if let Some(expr) = expr {
+                    self.collect_declarations_expr(expr);
+                }
+            }
             ExprKind::FunctionExpression(decl) => {
                 self.push_symbol_table(decl.id);
                 let name_as_str = self.fn_identifier_to_string(&decl.name);
@@ -260,7 +265,11 @@ impl DeclarationAnalyzer {
                 self.collect_declarations_expr(&expr.start);
                 self.collect_declarations_expr(&expr.end);
             }
-            ExprKind::Path(_) | ExprKind::Literal(_) | ExprKind::Wildcard | ExprKind::None => {
+            ExprKind::Path(_)
+            | ExprKind::Literal(_)
+            | ExprKind::Wildcard
+            | ExprKind::Continue
+            | ExprKind::None => {
                 // Nothing to do here
             }
         }

@@ -244,6 +244,8 @@ pub enum ExprKind {
     Cast(Box<Expr>, Box<Ty>),
     Dict(Vec<(Expr, Expr)>),
     Loop(Box<Block>),
+    Break(Option<Box<Expr>>),
+    Continue,
     FunctionExpression(Box<FunctionDeclaration>),
     FieldExpression(Box<FieldAccessExpression>),
     IndexExpression(Box<IndexAccessExpression>),

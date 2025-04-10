@@ -268,8 +268,10 @@ impl Interpreter {
     }
 
     fn eval_loop(&mut self, block: &hir::Block) -> EvalResult {
+        debug!("eval_loop: {:?}", block);
+
         loop {
-            match self.with_new_scope(block, |this| this.eval_block_inner(block)) {
+            match self.eval_block(block) {
                 EvalResult::Break(value) => return EvalResult::Value(value),
                 EvalResult::Return(value) => return EvalResult::Return(value),
                 EvalResult::TailCall => return EvalResult::TailCall,
@@ -337,6 +339,11 @@ impl Interpreter {
             hir::ExprKind::FieldAccess(lhs, rhs) => self.eval_field_access(lhs, rhs),
             hir::ExprKind::Block(block) => self.eval_block(block),
             hir::ExprKind::Loop(block) => self.eval_loop(block),
+            hir::ExprKind::Break(Some(expr)) => {
+                EvalResult::Break(eval_value!(self.eval_expr(expr)))
+            }
+            hir::ExprKind::Break(_) => EvalResult::Break(TlangValue::Nil),
+            hir::ExprKind::Continue => EvalResult::Continue,
             hir::ExprKind::Binary(op, lhs, rhs) => self.eval_binary(*op, lhs, rhs),
             hir::ExprKind::Call(call_expr) => self.eval_call(call_expr),
             hir::ExprKind::TailCall(call_expr) => self.eval_tail_call(call_expr),
@@ -494,6 +501,27 @@ impl Interpreter {
                 return self.eval_expr(rhs);
             }
 
+            hir::BinaryOpKind::Assign if let hir::ExprKind::Path(path) = &lhs.kind => {
+                let value = eval_value!(self.eval_expr(rhs));
+
+                self.state.scope_stack.update_value(&path.res, value);
+
+                return EvalResult::Value(value);
+            }
+
+            hir::BinaryOpKind::Assign
+                if let hir::ExprKind::FieldAccess(base, ident) = &lhs.kind =>
+            {
+                let struct_value = eval_value!(self.eval_expr(base));
+                let value = eval_value!(self.eval_expr(rhs));
+
+                todo!()
+            }
+
+            hir::BinaryOpKind::Assign => {
+                todo!("eval_binary: Assign not implemented for {:?}", lhs);
+            }
+
             _ => {}
         }
 
@@ -530,12 +558,8 @@ impl Interpreter {
             hir::BinaryOpKind::BitwiseOr => self.eval_bitwise_op(lhs, rhs, |a, b| a | b),
             hir::BinaryOpKind::BitwiseXor => self.eval_bitwise_op(lhs, rhs, |a, b| a ^ b),
 
-            hir::BinaryOpKind::Assign => {
-                todo!("eval_binary: Assign not implemented");
-            }
-
-            hir::BinaryOpKind::And | hir::BinaryOpKind::Or => {
-                unreachable!();
+            hir::BinaryOpKind::Assign | hir::BinaryOpKind::And | hir::BinaryOpKind::Or => {
+                unreachable!("{:?} should be handled before", op)
             }
         };
 
@@ -938,6 +962,8 @@ impl Interpreter {
     }
 
     fn eval_call(&mut self, call_expr: &hir::CallExpression) -> EvalResult {
+        debug!("eval_call: {:?}", call_expr);
+
         if call_expr.has_wildcard() {
             return self.eval_partial_call(call_expr);
         }
@@ -1936,5 +1962,23 @@ mod tests {
         "});
 
         assert_matches!(interpreter.eval("foo()()"), TlangValue::U64(1));
+    }
+
+    #[test]
+    fn test_simple_loop() {
+        let mut interpreter = interpreter(indoc! {"
+            fn loop_test() {
+                let i = 0;
+                loop {
+                    if i >= 10 {
+                        break;
+                    }
+
+                    i = i + 1;
+                }
+                i
+            }
+        "});
+        assert_matches!(interpreter.eval("loop_test()"), TlangValue::U64(10));
     }
 }

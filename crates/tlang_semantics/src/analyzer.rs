@@ -239,6 +239,11 @@ impl SemanticAnalyzer {
             ExprKind::UnaryOp(_, node) => {
                 self.analyze_expr(node);
             }
+            ExprKind::Break(expr) => {
+                if let Some(expr) = expr {
+                    self.analyze_expr(expr);
+                }
+            }
             ExprKind::Call(expr) | ExprKind::RecursiveCall(expr) => {
                 for argument in &expr.arguments {
                     self.analyze_expr(argument);
@@ -312,7 +317,7 @@ impl SemanticAnalyzer {
                 self.analyze_expr(&expr.start);
                 self.analyze_expr(&expr.end);
             }
-            ExprKind::None | ExprKind::Literal(_) | ExprKind::Wildcard => {}
+            ExprKind::None | ExprKind::Continue | ExprKind::Literal(_) | ExprKind::Wildcard => {}
         }
 
         if let Some(symbol_table) = &self.get_symbol_table(expr.id) {

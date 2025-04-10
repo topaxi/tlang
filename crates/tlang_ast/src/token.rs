@@ -18,6 +18,8 @@ define_keywords! {
     Or => "or",
     As => "as",
     Loop => "loop",
+    Break => "break",
+    Continue => "continue",
 
     // TODO: Similar to `self`, we might want to treat this as an identifier.
     Underscore => "_",
