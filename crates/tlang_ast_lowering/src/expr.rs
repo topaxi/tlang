@@ -257,7 +257,7 @@ impl LoweringContext {
                 callee: self.expr(
                     iter.span,
                     hir::ExprKind::FieldAccess(
-                        self.lower_expr(iter),
+                        Box::new(self.lower_expr(iter)),
                         Ident::new("iter", Default::default()),
                     ),
                 ),
@@ -271,7 +271,7 @@ impl LoweringContext {
                 callee: self.expr(
                     iter.span,
                     hir::ExprKind::FieldAccess(
-                        self.lower_expr(iter),
+                        Box::new(iter),
                         Ident::new("next", Default::default()),
                     ),
                 ),
@@ -290,14 +290,14 @@ impl LoweringContext {
                         hir::MatchArm {
                             pat: hir::Pat {
                                 kind: hir::PatKind::Enum(
-                                    hir::Path::new(
+                                    Box::new(hir::Path::new(
                                         vec![hir::PathSegment::new(Ident::new(
                                             "Some",
                                             Default::default(),
                                         ))],
                                         Default::default(),
-                                    ),
-                                    vec![Ident::from("0"), pat],
+                                    )),
+                                    vec![(Ident::new("0", Default::default()), pat)],
                                 ),
                                 span: Default::default(),
                             },
@@ -309,19 +309,23 @@ impl LoweringContext {
                         hir::MatchArm {
                             pat: hir::Pat {
                                 kind: hir::PatKind::Enum(
-                                    hir::Path::new(
+                                    Box::new(hir::Path::new(
                                         vec![hir::PathSegment::new(Ident::new(
                                             "None",
                                             Default::default(),
                                         ))],
                                         Default::default(),
-                                    ),
+                                    )),
                                     vec![],
                                 ),
                                 span: Default::default(),
                             },
                             guard: None,
-                            block: inner_block,
+                            block: hir::Block::new(
+                                vec![],
+                                Some(self.expr(Default::default(), hir::ExprKind::Break(None))),
+                                Default::default(),
+                            ),
                             leading_comments: vec![],
                             trailing_comments: vec![],
                         },

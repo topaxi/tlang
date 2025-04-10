@@ -1,8 +1,8 @@
 use std::rc::Rc;
 use std::{cell::RefCell, collections::HashMap};
+use tlang_ast::keyword::kw;
 use tlang_ast::node_id::NodeId;
 use tlang_ast::span::Span;
-use tlang_ast::token::kw;
 use tlang_ast::{
     node::{
         Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, LetDeclaration, Module, Pat,

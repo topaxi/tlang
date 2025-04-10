@@ -1,3 +1,4 @@
+use tlang_ast::keyword::{Keyword, kw};
 use tlang_ast::node::{
     self, Associativity, BinaryOpExpression, BinaryOpKind, Block, CallExpression, ElseClause,
     EnumDeclaration, EnumPattern, EnumVariant, Expr, ExprKind, FieldAccessExpression,
@@ -7,7 +8,7 @@ use tlang_ast::node::{
 };
 use tlang_ast::node_id::NodeId;
 use tlang_ast::span::Span;
-use tlang_ast::token::{Keyword, Literal, Token, TokenKind, kw};
+use tlang_ast::token::{Literal, Token, TokenKind};
 use tlang_lexer::Lexer;
 
 use crate::error::{ParseError, ParseIssue, ParseIssueKind};
