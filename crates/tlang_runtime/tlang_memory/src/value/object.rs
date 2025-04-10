@@ -1,4 +1,4 @@
-use std::ops::Index;
+use std::ops::{Index, IndexMut};
 
 use smallvec::SmallVec;
 use tlang_hir::hir::HirId;
@@ -51,11 +51,23 @@ impl Shaped for &TlangStruct {
     }
 }
 
+impl Shaped for &mut TlangStruct {
+    fn shape(&self) -> ShapeKey {
+        self.shape
+    }
+}
+
 impl Index<usize> for TlangStruct {
     type Output = TlangValue;
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.values[index]
+    }
+}
+
+impl IndexMut<usize> for TlangStruct {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.values[index]
     }
 }
 
@@ -139,6 +151,13 @@ pub enum TlangObjectKind {
 
 impl TlangObjectKind {
     pub fn get_struct(&self) -> Option<&TlangStruct> {
+        match self {
+            TlangObjectKind::Struct(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    pub fn get_struct_mut(&mut self) -> Option<&mut TlangStruct> {
         match self {
             TlangObjectKind::Struct(s) => Some(s),
             _ => None,

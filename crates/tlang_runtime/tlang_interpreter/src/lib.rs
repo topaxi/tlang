@@ -151,6 +151,10 @@ impl Interpreter {
         self.state.get_struct(value)
     }
 
+    fn get_struct_mut(&mut self, value: TlangValue) -> Option<&mut TlangStruct> {
+        self.state.get_struct_mut(value)
+    }
+
     fn get_enum(&self, value: TlangValue) -> Option<&TlangEnum> {
         self.state.get_enum(value)
     }
@@ -273,10 +277,7 @@ impl Interpreter {
                 EvalResult::Break(value) => return EvalResult::Value(value),
                 EvalResult::Return(value) => return EvalResult::Return(value),
                 EvalResult::TailCall => return EvalResult::TailCall,
-                EvalResult::Value(value) => return EvalResult::Value(value),
-                EvalResult::Continue | EvalResult::Void => {
-                    continue;
-                }
+                EvalResult::Continue | EvalResult::Value(_) | EvalResult::Void => continue,
             }
         }
     }
@@ -285,30 +286,31 @@ impl Interpreter {
         self.state.set_current_span(stmt.span);
 
         match &stmt.kind {
-            hir::StmtKind::Expr(expr) => {
-                return self.eval_expr(expr);
-            }
+            hir::StmtKind::Expr(expr) => self.eval_expr(expr),
             hir::StmtKind::FunctionDeclaration(decl) => {
                 self.eval_fn_decl(decl);
+                EvalResult::Void
             }
             hir::StmtKind::DynFunctionDeclaration(decl) => {
                 self.eval_dyn_fn_decl(decl);
+                EvalResult::Void
             }
             hir::StmtKind::StructDeclaration(decl) => {
                 self.eval_struct_decl(decl);
+                EvalResult::Void
             }
             hir::StmtKind::EnumDeclaration(decl) => {
                 self.eval_enum_decl(decl);
+                EvalResult::Void
             }
-            hir::StmtKind::Let(pat, expr, ty) => return self.eval_let_stmt(pat, expr, ty),
+            hir::StmtKind::Let(pat, expr, ty) => self.eval_let_stmt(pat, expr, ty),
             hir::StmtKind::Return(box Some(expr)) => {
-                return EvalResult::Return(eval_value!(self.eval_expr(expr)));
+                let value = eval_value!(self.eval_expr(expr));
+                EvalResult::Return(value)
             }
-            hir::StmtKind::Return(_) => return EvalResult::Return(TlangValue::Nil),
+            hir::StmtKind::Return(_) => EvalResult::Return(TlangValue::Nil),
             hir::StmtKind::None => unreachable!(),
         }
-
-        EvalResult::Void
     }
 
     fn eval_stmts(&mut self, stmts: &[hir::Stmt]) -> EvalResult {
@@ -514,9 +516,29 @@ impl Interpreter {
                 if let hir::ExprKind::FieldAccess(base, ident) = &lhs.kind =>
             {
                 let struct_value = eval_value!(self.eval_expr(base));
+                let struct_shape = self
+                    .get_object(struct_value)
+                    .and_then(|o| o.shape())
+                    .unwrap_or_else(|| {
+                        self.panic(format!("Cannot assign to field `{}` on non-object", ident))
+                    });
+                let index = self
+                    .state
+                    .get_struct_field_index(struct_shape, ident.as_str())
+                    .unwrap_or_else(|| {
+                        self.panic(format!(
+                            "Cannot assign to field `{}` on struct `{:?}`",
+                            ident, struct_shape
+                        ))
+                    });
+
                 let value = eval_value!(self.eval_expr(rhs));
 
-                todo!()
+                let struct_obj = self.get_struct_mut(struct_value).unwrap();
+
+                struct_obj[index] = value;
+
+                return EvalResult::Value(value);
             }
 
             hir::BinaryOpKind::Assign => {
@@ -1338,14 +1360,14 @@ impl Interpreter {
     }
 
     fn eval_match(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) -> EvalResult {
-        let match_value = eval_value!(self.eval_expr(expr));
+        let value = eval_value!(self.eval_expr(expr));
 
-        debug!("eval_match: {}", self.state.stringify(match_value));
+        debug!("eval_match: {}", self.state.stringify(value));
 
         for arm in arms {
-            match self.eval_match_arm(arm, match_value) {
-                MatchResult::Matched(value) => return value,
-                MatchResult::NotMatched(eval_result) => propagate!(eval_result),
+            match self.eval_match_arm(arm, value) {
+                MatchResult::Matched(result) => return result,
+                MatchResult::NotMatched(_) => continue,
             }
         }
 

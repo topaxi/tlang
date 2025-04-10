@@ -397,6 +397,11 @@ impl InterpreterState {
     }
 
     #[inline(always)]
+    pub fn get_object_by_id_mut(&mut self, id: TlangObjectId) -> Option<&mut TlangObjectKind> {
+        self.objects.get_mut(id)
+    }
+
+    #[inline(always)]
     pub fn get_object_by_id(&self, id: TlangObjectId) -> Option<&TlangObjectKind> {
         self.objects.get(id)
     }
@@ -407,8 +412,19 @@ impl InterpreterState {
             .and_then(|id| self.get_object_by_id(id))
     }
 
+    pub fn get_object_mut(&mut self, value: TlangValue) -> Option<&mut TlangObjectKind> {
+        value
+            .get_object_id()
+            .and_then(|id| self.get_object_by_id_mut(id))
+    }
+
     pub fn get_struct(&self, value: TlangValue) -> Option<&TlangStruct> {
         self.get_object(value).and_then(|obj| obj.get_struct())
+    }
+
+    pub fn get_struct_mut(&mut self, value: TlangValue) -> Option<&mut TlangStruct> {
+        self.get_object_mut(value)
+            .and_then(|obj| obj.get_struct_mut())
     }
 
     pub fn get_enum(&self, value: TlangValue) -> Option<&TlangEnum> {
