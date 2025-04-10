@@ -1,5 +1,6 @@
 use pretty_assertions::assert_eq;
-use tlang_ast::token::{Keyword, Literal, TokenKind};
+use tlang_ast::keyword::Keyword;
+use tlang_ast::token::{Literal, TokenKind};
 
 use tlang_lexer::Lexer;
 

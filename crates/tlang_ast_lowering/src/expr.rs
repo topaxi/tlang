@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use log::debug;
 use tlang_ast as ast;
-use tlang_ast::node::{BinaryOpExpression, BinaryOpKind};
+use tlang_ast::node::{BinaryOpExpression, BinaryOpKind, Ident};
 use tlang_hir::hir;
 
 use crate::LoweringContext;
@@ -37,6 +37,7 @@ impl LoweringContext {
                 expression.as_ref(),
                 *span,
             ))),
+            ast::node::ExprKind::ForLoop(box for_loop) => self.lower_for_loop(for_loop),
             ast::node::ExprKind::Break(expr) => {
                 hir::ExprKind::Break(expr.as_ref().map(|expr| Box::new(self.lower_expr(expr))))
             }
@@ -239,6 +240,99 @@ impl LoweringContext {
         }
 
         hir::ExprKind::Match(Box::new(expr), arms)
+    }
+
+    fn lower_for_loop(&mut self, for_loop: &ast::node::ForLoop) -> hir::ExprKind {
+        let ast::node::ForLoop {
+            pat,
+            iter,
+            acc,
+            block,
+        } = for_loop;
+        let pat = self.lower_pat(pat);
+        let iter = self.expr(
+            iter.span,
+            hir::ExprKind::Call(Box::new(hir::CallExpression {
+                hir_id: self.unique_id(),
+                callee: self.expr(
+                    iter.span,
+                    hir::ExprKind::FieldAccess(
+                        self.lower_expr(iter),
+                        Ident::new("iter", Default::default()),
+                    ),
+                ),
+                arguments: vec![],
+            })),
+        );
+        let iter_next = self.expr(
+            iter.span,
+            hir::ExprKind::Call(Box::new(hir::CallExpression {
+                hir_id: self.unique_id(),
+                callee: self.expr(
+                    iter.span,
+                    hir::ExprKind::FieldAccess(
+                        self.lower_expr(iter),
+                        Ident::new("next", Default::default()),
+                    ),
+                ),
+                arguments: vec![],
+            })),
+        );
+        let inner_block =
+            self.lower_block(&block.statements, block.expression.as_ref(), block.span);
+        let block = hir::Block::new(
+            vec![],
+            Some(hir::Expr {
+                hir_id: self.unique_id(),
+                kind: hir::ExprKind::Match(
+                    Box::new(iter_next),
+                    vec![
+                        hir::MatchArm {
+                            pat: hir::Pat {
+                                kind: hir::PatKind::Enum(
+                                    hir::Path::new(
+                                        vec![hir::PathSegment::new(Ident::new(
+                                            "Some",
+                                            Default::default(),
+                                        ))],
+                                        Default::default(),
+                                    ),
+                                    vec![Ident::from("0"), pat],
+                                ),
+                                span: Default::default(),
+                            },
+                            guard: None,
+                            block: inner_block,
+                            leading_comments: vec![],
+                            trailing_comments: vec![],
+                        },
+                        hir::MatchArm {
+                            pat: hir::Pat {
+                                kind: hir::PatKind::Enum(
+                                    hir::Path::new(
+                                        vec![hir::PathSegment::new(Ident::new(
+                                            "None",
+                                            Default::default(),
+                                        ))],
+                                        Default::default(),
+                                    ),
+                                    vec![],
+                                ),
+                                span: Default::default(),
+                            },
+                            guard: None,
+                            block: inner_block,
+                            leading_comments: vec![],
+                            trailing_comments: vec![],
+                        },
+                    ],
+                ),
+                span: block.span,
+            }),
+            block.span,
+        );
+
+        todo!()
     }
 
     fn lower_callee(&mut self, callee: &ast::node::Expr, arg_len: usize) -> hir::Expr {
