@@ -22,8 +22,12 @@ impl LoweringContext {
                 statements,
                 expression,
                 span,
-            })
-            | ast::node::ExprKind::Loop(box ast::node::Block {
+            }) => hir::ExprKind::Block(Box::new(self.lower_block(
+                statements,
+                expression.as_ref(),
+                *span,
+            ))),
+            ast::node::ExprKind::Loop(box ast::node::Block {
                 id: _,
                 statements,
                 expression,

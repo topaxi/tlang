@@ -265,6 +265,15 @@ impl HirPretty {
                 self.push_str("loop ");
                 self.print_block(block)
             }
+            hir::ExprKind::Break(expr) => {
+                self.push_str("break");
+
+                if let Some(expr) = expr.as_ref() {
+                    self.push_char(' ');
+                    self.print_expr(expr);
+                }
+            }
+            hir::ExprKind::Continue => self.push_str("continue"),
             hir::ExprKind::Dict(kvs) => self.print_dict(kvs),
             hir::ExprKind::FunctionExpression(decl) => self.print_function_declaration(decl),
             hir::ExprKind::FieldAccess(expr, ident) => {

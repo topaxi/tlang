@@ -135,6 +135,8 @@ impl CodegenJS {
             }
             hir::ExprKind::Block(block) => self.generate_block(block),
             hir::ExprKind::Loop(_block) => todo!(),
+            hir::ExprKind::Break(_expr) => todo!(),
+            hir::ExprKind::Continue => todo!(),
             hir::ExprKind::Call(expr) => self.generate_call_expression(expr),
             hir::ExprKind::TailCall(expr) => self.generate_recursive_call_expression(expr),
             hir::ExprKind::Cast(expr, _) => {
@@ -495,6 +497,8 @@ pub(crate) fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
         hir::ExprKind::Unary(_, expr) => expr_can_render_as_js_expr(expr),
         hir::ExprKind::Block(..) => false,
         hir::ExprKind::Loop(..) => false,
+        hir::ExprKind::Break(..) => false,
+        hir::ExprKind::Continue => false,
         hir::ExprKind::IfElse(..) => false,
         hir::ExprKind::Match(..) => false,
         hir::ExprKind::Call(call_expr) => {
