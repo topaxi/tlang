@@ -268,14 +268,15 @@ impl Interpreter {
     }
 
     fn eval_loop(&mut self, block: &hir::Block) -> EvalResult {
-        debug!("eval_loop: {:?}", block);
-
         loop {
             match self.eval_block(block) {
                 EvalResult::Break(value) => return EvalResult::Value(value),
                 EvalResult::Return(value) => return EvalResult::Return(value),
                 EvalResult::TailCall => return EvalResult::TailCall,
-                EvalResult::Continue | EvalResult::Void | EvalResult::Value(_) => continue,
+                EvalResult::Value(value) => return EvalResult::Value(value),
+                EvalResult::Continue | EvalResult::Void => {
+                    continue;
+                }
             }
         }
     }
