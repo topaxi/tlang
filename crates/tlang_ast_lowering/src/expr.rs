@@ -250,31 +250,30 @@ impl LoweringContext {
             block,
         } = for_loop;
         let pat = self.lower_pat(pat);
+        let hir_id = self.unique_id();
+        let iter_expr = self.lower_expr(iter);
+        let call_iter = self.expr(
+            iter.span,
+            hir::ExprKind::FieldAccess(Box::new(iter_expr), Ident::new("iter", Default::default())),
+        );
         let iter = self.expr(
             iter.span,
             hir::ExprKind::Call(Box::new(hir::CallExpression {
-                hir_id: self.unique_id(),
-                callee: self.expr(
-                    iter.span,
-                    hir::ExprKind::FieldAccess(
-                        Box::new(self.lower_expr(iter)),
-                        Ident::new("iter", Default::default()),
-                    ),
-                ),
+                hir_id,
+                callee: call_iter,
                 arguments: vec![],
             })),
         );
-        let iter_next = self.expr(
+        let hir_id = self.unique_id();
+        let call_next = self.expr(
             iter.span,
+            hir::ExprKind::FieldAccess(Box::new(iter), Ident::new("next", Default::default())),
+        );
+        let iter_next = self.expr(
+            Default::default(),
             hir::ExprKind::Call(Box::new(hir::CallExpression {
-                hir_id: self.unique_id(),
-                callee: self.expr(
-                    iter.span,
-                    hir::ExprKind::FieldAccess(
-                        Box::new(iter),
-                        Ident::new("next", Default::default()),
-                    ),
-                ),
+                hir_id,
+                callee: call_next,
                 arguments: vec![],
             })),
         );
@@ -336,7 +335,13 @@ impl LoweringContext {
             block.span,
         );
 
-        todo!()
+        let mut for_loop = hir::ExprKind::Loop(Box::new(block));
+
+        if let Some(acc) = acc {
+            todo!();
+        }
+
+        for_loop
     }
 
     fn lower_callee(&mut self, callee: &ast::node::Expr, arg_len: usize) -> hir::Expr {

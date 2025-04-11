@@ -15,6 +15,7 @@ define_keywords! {
     Or => "or",
     As => "as",
     For => "for",
+    In => "in",
     Loop => "loop",
     Break => "break",
     Continue => "continue",
@@ -25,7 +26,6 @@ define_keywords! {
     _Self => "self",
 
     // Reserved keywords, unused at the moment
-    In => "in",
     Pub => "pub",
     SelfUpper => "Self",
     Use => "use",

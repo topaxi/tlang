@@ -291,7 +291,7 @@ impl<'src> Parser<'src> {
             }
             // Expressions like IfElse as statements also do not need to be terminated with a semicolon.
             StmtKind::Expr(ref expr)
-                if matches!(expr.kind,  ExprKind::IfElse(..) | ExprKind::Match(..) | ExprKind::Loop(..)) => {
+                if matches!(expr.kind, ExprKind::IfElse(..) | ExprKind::Match(..) | ExprKind::Loop(..) | ExprKind::ForLoop(..)) => {
                 (false, Some(node))
             }
             _ => (true, Some(node))
@@ -906,6 +906,7 @@ impl<'src> Parser<'src> {
                         | Keyword::Rec
                         | Keyword::Match
                         | Keyword::Loop
+                        | Keyword::For
                         | Keyword::Break
                         | Keyword::Continue
                         | Keyword::Not
@@ -952,6 +953,33 @@ impl<'src> Parser<'src> {
                 self.advance();
                 let block = self.parse_block();
                 node::expr!(self.unique_id(), Loop(Box::new(block)))
+            }
+            TokenKind::Keyword(Keyword::For) => {
+                self.advance();
+                let pat = self.parse_pattern();
+                self.consume_token(TokenKind::Keyword(Keyword::In));
+                let iter = self.parse_expression();
+                let acc = if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::With))
+                {
+                    self.advance();
+                    let pat = self.parse_pattern();
+                    self.consume_token(TokenKind::EqualSign);
+                    let expr = self.parse_expression();
+                    Some((pat, expr))
+                } else {
+                    None
+                };
+                let block = self.parse_block();
+
+                node::expr!(
+                    self.unique_id(),
+                    ForLoop(Box::new(node::ForLoop {
+                        pat,
+                        iter,
+                        acc,
+                        block
+                    }))
+                )
             }
             TokenKind::Keyword(Keyword::Break) => {
                 self.advance();

@@ -2004,4 +2004,30 @@ mod tests {
         "});
         assert_matches!(interpreter.eval("loop_test()"), TlangValue::U64(10));
     }
+
+    #[test]
+    fn test_for_loop_on_list() {
+        let mut interpreter = interpreter(indoc! {"
+            fn for_test() {
+                let sum = 0;
+                for i in [1, 2, 3, 4, 5] {
+                    sum = sum + i;
+                }
+                sum
+            }
+        "});
+        assert_matches!(interpreter.eval("for_test()"), TlangValue::U64(15));
+    }
+
+    #[test]
+    fn test_for_loop_on_list_with_accumulator() {
+        let mut interpreter = interpreter(indoc! {"
+            fn for_test() {
+                for i in [1, 2, 3, 4, 5] with sum = 0 {
+                    sum + i;
+                }
+            }
+        "});
+        assert_matches!(interpreter.eval("for_test()"), TlangValue::U64(15));
+    }
 }
