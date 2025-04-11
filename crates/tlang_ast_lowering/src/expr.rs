@@ -322,6 +322,47 @@ impl LoweringContext {
                 })),
             );
 
+            let accumulator_binding_name = Ident::new("accumulator$$", Default::default());
+            let accumulator_initializer = if let Some((_pat, expr)) = &accumulator_binding {
+                let hir_id = this.unique_id();
+                this.scope().def_local("accumulator$$", hir_id);
+                let accumulator_declaration = hir::Stmt::new(
+                    hir_id,
+                    hir::StmtKind::Let(
+                        Box::new(hir::Pat {
+                            kind: hir::PatKind::Identifier(
+                                hir_id,
+                                Box::new(accumulator_binding_name.clone()),
+                            ),
+                            span: Default::default(),
+                        }),
+                        Box::new(expr.clone()),
+                        Default::default(),
+                    ),
+                    Default::default(),
+                );
+
+                Some(accumulator_declaration)
+            } else {
+                None
+            };
+
+            let accumulator_binding_res = this
+                .scope()
+                .lookup(accumulator_binding_name.as_str())
+                .map(|b| b.res())
+                .unwrap_or_default();
+            let accumulator_path_expr = this.expr(
+                Default::default(),
+                hir::ExprKind::Path(Box::new(
+                    hir::Path::new(
+                        vec![hir::PathSegment::new(accumulator_binding_name.clone())],
+                        Default::default(),
+                    )
+                    .with_res(accumulator_binding_res),
+                )),
+            );
+
             let loop_arm = this.with_new_scope(|this| {
                 let for_loop_pat = this.lower_pat(&for_loop.pat);
 
@@ -352,61 +393,100 @@ impl LoweringContext {
                 }
             });
 
-            let break_arm = hir::MatchArm {
-                pat: hir::Pat {
-                    kind: hir::PatKind::Enum(
-                        Box::new(hir::Path::new(
-                            vec![hir::PathSegment::new(Ident::new(
-                                "None",
-                                Default::default(),
-                            ))],
+            let break_arm = this.with_new_scope(|this| {
+                let accumulator_path_expr = accumulator_binding.clone().map(|_| {
+                    Box::new(
+                        this.expr(
                             Default::default(),
-                        )),
+                            hir::ExprKind::Path(Box::new(
+                                hir::Path::new(
+                                    vec![hir::PathSegment::new(accumulator_binding_name)],
+                                    Default::default(),
+                                )
+                                .with_res(accumulator_binding_res),
+                            )),
+                        ),
+                    )
+                });
+                hir::MatchArm {
+                    pat: hir::Pat {
+                        kind: hir::PatKind::Enum(
+                            Box::new(hir::Path::new(
+                                vec![hir::PathSegment::new(Ident::new(
+                                    "None",
+                                    Default::default(),
+                                ))],
+                                Default::default(),
+                            )),
+                            vec![],
+                        ),
+                        span: Default::default(),
+                    },
+                    guard: None,
+                    block: hir::Block::new(
                         vec![],
+                        Some(this.expr(
+                            Default::default(),
+                            hir::ExprKind::Break(accumulator_path_expr),
+                        )),
+                        Default::default(),
                     ),
-                    span: Default::default(),
-                },
-                guard: None,
-                block: hir::Block::new(
-                    vec![],
-                    Some(this.expr(Default::default(), hir::ExprKind::Break(None))),
-                    Default::default(),
-                ),
-                leading_comments: vec![],
-                trailing_comments: vec![],
-            };
+                    leading_comments: vec![],
+                    trailing_comments: vec![],
+                }
+            });
 
             let match_expr = this.expr(
                 Default::default(),
                 hir::ExprKind::Match(Box::new(call_next), vec![loop_arm, break_arm]),
             );
 
-            let loop_stmt = hir::Stmt::new(
-                this.unique_id(),
-                hir::StmtKind::Expr(Box::new(this.expr(
+            let match_expr = if accumulator_binding.is_some() {
+                this.expr(
                     Default::default(),
-                    hir::ExprKind::Loop(Box::new(hir::Block::new(
-                        vec![],
-                        Some(match_expr),
-                        Default::default(),
-                    ))),
-                ))),
+                    hir::ExprKind::Binary(
+                        hir::BinaryOpKind::Assign,
+                        Box::new(accumulator_path_expr.clone()),
+                        Box::new(match_expr),
+                    ),
+                )
+            } else {
+                match_expr
+            };
+
+            let loop_statements = if let Some((pat, _)) = &accumulator_binding {
+                let hir_id = this.unique_id();
+                let accumulator_ressignment = hir::Stmt::new(
+                    hir_id,
+                    hir::StmtKind::Let(
+                        Box::new(pat.clone()),
+                        Box::new(accumulator_path_expr.clone()),
+                        Box::default(),
+                    ),
+                    Default::default(),
+                );
+                vec![accumulator_ressignment]
+            } else {
+                vec![]
+            };
+
+            let loop_expr = this.expr(
                 Default::default(),
+                hir::ExprKind::Loop(Box::new(hir::Block::new(
+                    loop_statements,
+                    Some(match_expr),
+                    Default::default(),
+                ))),
             );
 
             let mut init_loop_block = hir::Block::new(
-                vec![iterator_binding_stmt, loop_stmt],
-                accumulator_binding.as_ref().map(|_| todo!()),
+                vec![iterator_binding_stmt],
+                Some(loop_expr),
                 for_loop.iter.span,
             );
 
-            if let Some((pat, expr)) = accumulator_binding {
-                let accumulator_stmt = hir::Stmt::new(
-                    this.unique_id(),
-                    hir::StmtKind::Let(Box::new(pat), Box::new(expr), Default::default()),
-                    Default::default(),
-                );
-                init_loop_block.stmts.insert(1, accumulator_stmt);
+            if let Some(stmt) = accumulator_initializer {
+                init_loop_block.stmts.push(stmt);
             }
 
             init_loop_block

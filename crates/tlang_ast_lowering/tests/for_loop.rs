@@ -29,7 +29,7 @@ fn test_lower_for_loop() {
                         break
                     },
                 }
-            };
+            }
         }
     };
     "###);
@@ -53,22 +53,18 @@ fn test_lower_for_loop_with_accumulator() {
     fn main() -> unknown {
         let sum: unknown = {
             let iterator$$: unknown = [1, 2, 3].iter();
-            let accumulator$$: unknown = 0; // generalized case compatible with patterns
-                                            // could optimize away intermediate variable
-                                            // when `acc` is just a single ident path.
-                                            // Could be done in an optimization pass though.
+            let accumulator$$: unknown = 0;
             loop {
-                let acc = accumulator$$;
-                accumulator$$ = match iterator$$.next() {
+                let acc: unknown = accumulator$$;
+                (accumulator$$ = match iterator$$.next() {
                     Some? { 0: i } => {
                         (acc + i)
                     },
                     None? => {
-                        break
+                        break accumulator$$
                     },
-                };
-            };
-            accumulator$$
+                })
+            }
         };
         log?(sum);
     };
