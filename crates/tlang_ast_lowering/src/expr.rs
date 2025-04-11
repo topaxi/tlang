@@ -396,7 +396,7 @@ impl LoweringContext {
 
             let mut init_loop_block = hir::Block::new(
                 vec![iterator_binding_stmt, loop_stmt],
-                None,
+                accumulator_binding.as_ref().map(|_| todo!()),
                 for_loop.iter.span,
             );
 

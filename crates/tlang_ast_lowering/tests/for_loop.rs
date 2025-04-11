@@ -66,7 +66,7 @@ fn test_lower_for_loop_with_accumulator() {
                     None? => {
                         break
                     },
-                }
+                };
             };
             accumulator$$
         };
