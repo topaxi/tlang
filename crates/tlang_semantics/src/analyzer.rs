@@ -246,6 +246,10 @@ impl SemanticAnalyzer {
                 }
 
                 self.analyze_block(&for_loop.block);
+
+                if let Some(else_block) = &for_loop.else_block {
+                    self.analyze_block(else_block);
+                }
             }
             ExprKind::UnaryOp(_, node) => {
                 self.analyze_expr(node);

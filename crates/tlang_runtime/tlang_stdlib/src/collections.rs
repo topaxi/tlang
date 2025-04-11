@@ -14,7 +14,12 @@ pub fn len(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
 }
 
 pub fn define_list_shape(state: &mut InterpreterState) {
-    let mut method_map = HashMap::with_capacity(1);
+    let mut method_map = HashMap::with_capacity(2);
+
+    method_map.insert(
+        "iter".to_string(),
+        state.new_native_method(|state, this, _args| todo!()),
+    );
 
     method_map.insert(
         "slice".to_string(),

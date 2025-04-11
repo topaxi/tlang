@@ -959,17 +959,31 @@ impl<'src> Parser<'src> {
                 let pat = self.parse_pattern();
                 self.consume_token(TokenKind::Keyword(Keyword::In));
                 let iter = self.parse_expression();
+                if matches!(self.current_token_kind(), TokenKind::Semicolon) {
+                    self.advance();
+                }
                 let acc = if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::With))
                 {
                     self.advance();
                     let pat = self.parse_pattern();
                     self.consume_token(TokenKind::EqualSign);
                     let expr = self.parse_expression();
+                    if matches!(self.current_token_kind(), TokenKind::Semicolon) {
+                        self.advance();
+                    }
                     Some((pat, expr))
                 } else {
                     None
                 };
                 let block = self.parse_block();
+
+                let else_block =
+                    if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Else)) {
+                        self.advance();
+                        Some(self.parse_block())
+                    } else {
+                        None
+                    };
 
                 node::expr!(
                     self.unique_id(),
@@ -977,7 +991,8 @@ impl<'src> Parser<'src> {
                         pat,
                         iter,
                         acc,
-                        block
+                        block,
+                        else_block,
                     }))
                 )
             }

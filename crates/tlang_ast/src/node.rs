@@ -242,6 +242,7 @@ pub struct ForLoop {
     pub iter: Expr,
     pub acc: Option<(Pat, Expr)>,
     pub block: Block,
+    pub else_block: Option<Block>,
 }
 
 #[derive(Debug, Default, Clone)]

@@ -187,11 +187,18 @@ impl DeclarationAnalyzer {
                 self.push_symbol_table(expr.id);
                 self.collect_pattern(&for_loop.pat);
                 self.collect_declarations_expr(&for_loop.iter);
+
                 if let Some((pat, expr)) = &for_loop.acc {
                     self.collect_pattern(pat);
                     self.collect_declarations_expr(expr);
                 }
+
                 self.collect_declarations_block(&for_loop.block);
+
+                if let Some(else_block) = &for_loop.else_block {
+                    self.collect_declarations_block(else_block);
+                }
+
                 self.pop_symbol_table();
             }
             ExprKind::Break(expr) => {

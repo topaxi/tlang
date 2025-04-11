@@ -274,6 +274,18 @@ pub struct Stmt {
     pub trailing_comments: Vec<Token>,
 }
 
+impl Stmt {
+    pub fn new(hir_id: HirId, kind: StmtKind, span: Span) -> Self {
+        Stmt {
+            hir_id,
+            kind,
+            span,
+            leading_comments: vec![],
+            trailing_comments: vec![],
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum StmtKind {

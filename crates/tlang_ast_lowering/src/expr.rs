@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use log::debug;
 use tlang_ast as ast;
 use tlang_ast::node::{BinaryOpExpression, BinaryOpKind, Ident};
+use tlang_ast::token::Literal;
 use tlang_hir::hir;
 
 use crate::LoweringContext;
@@ -243,105 +244,175 @@ impl LoweringContext {
     }
 
     fn lower_for_loop(&mut self, for_loop: &ast::node::ForLoop) -> hir::ExprKind {
-        let ast::node::ForLoop {
-            pat,
-            iter,
-            acc,
-            block,
-        } = for_loop;
-        let pat = self.lower_pat(pat);
-        let hir_id = self.unique_id();
-        let iter_expr = self.lower_expr(iter);
-        let call_iter = self.expr(
-            iter.span,
-            hir::ExprKind::FieldAccess(Box::new(iter_expr), Ident::new("iter", Default::default())),
-        );
-        let iter = self.expr(
-            iter.span,
-            hir::ExprKind::Call(Box::new(hir::CallExpression {
-                hir_id,
-                callee: call_iter,
-                arguments: vec![],
-            })),
-        );
-        let hir_id = self.unique_id();
-        let call_next = self.expr(
-            iter.span,
-            hir::ExprKind::FieldAccess(Box::new(iter), Ident::new("next", Default::default())),
-        );
-        let iter_next = self.expr(
-            Default::default(),
-            hir::ExprKind::Call(Box::new(hir::CallExpression {
-                hir_id,
-                callee: call_next,
-                arguments: vec![],
-            })),
-        );
-        let inner_block =
-            self.lower_block(&block.statements, block.expression.as_ref(), block.span);
-        let block = hir::Block::new(
-            vec![],
-            Some(hir::Expr {
-                hir_id: self.unique_id(),
-                kind: hir::ExprKind::Match(
-                    Box::new(iter_next),
-                    vec![
-                        hir::MatchArm {
-                            pat: hir::Pat {
-                                kind: hir::PatKind::Enum(
-                                    Box::new(hir::Path::new(
-                                        vec![hir::PathSegment::new(Ident::new(
-                                            "Some",
-                                            Default::default(),
-                                        ))],
-                                        Default::default(),
-                                    )),
-                                    vec![(Ident::new("0", Default::default()), pat)],
-                                ),
-                                span: Default::default(),
-                            },
-                            guard: None,
-                            block: inner_block,
-                            leading_comments: vec![],
-                            trailing_comments: vec![],
-                        },
-                        hir::MatchArm {
-                            pat: hir::Pat {
-                                kind: hir::PatKind::Enum(
-                                    Box::new(hir::Path::new(
-                                        vec![hir::PathSegment::new(Ident::new(
-                                            "None",
-                                            Default::default(),
-                                        ))],
-                                        Default::default(),
-                                    )),
-                                    vec![],
-                                ),
-                                span: Default::default(),
-                            },
-                            guard: None,
-                            block: hir::Block::new(
-                                vec![],
-                                Some(self.expr(Default::default(), hir::ExprKind::Break(None))),
-                                Default::default(),
-                            ),
-                            leading_comments: vec![],
-                            trailing_comments: vec![],
-                        },
-                    ],
+        let block = self.with_new_scope(|this| {
+            let iterator_binding_name = Ident::new("iterator$$", Default::default());
+            let hir_id = this.unique_id();
+            let iterator_binding_pat = hir::Pat {
+                kind: hir::PatKind::Identifier(hir_id, Box::new(iterator_binding_name.clone())),
+                span: Default::default(),
+            };
+            this.scope()
+                .def_local(iterator_binding_name.as_str(), hir_id);
+            let hir_id = this.unique_id();
+            let iter_expr = this.lower_expr(&for_loop.iter);
+            let iterator_binding_call = this.expr(
+                for_loop.iter.span,
+                hir::ExprKind::FieldAccess(
+                    Box::new(iter_expr),
+                    Ident::new("iter", Default::default()),
                 ),
-                span: block.span,
-            }),
-            block.span,
-        );
+            );
+            let iterator_binding_value = this.expr(
+                for_loop.iter.span,
+                hir::ExprKind::Call(Box::new(hir::CallExpression {
+                    hir_id,
+                    callee: iterator_binding_call,
+                    arguments: vec![],
+                })),
+            );
+            let iterator_binding_stmt = hir::Stmt::new(
+                this.unique_id(),
+                hir::StmtKind::Let(
+                    Box::new(iterator_binding_pat),
+                    Box::new(iterator_binding_value),
+                    Default::default(),
+                ),
+                Default::default(),
+            );
 
-        let mut for_loop = hir::ExprKind::Loop(Box::new(block));
+            let accumulator_binding = for_loop.acc.as_ref().map(|(pat, expr)| {
+                let pat = this.lower_pat(pat);
+                let expr = this.lower_expr(expr);
 
-        if let Some(acc) = acc {
-            todo!();
-        }
+                (pat, expr)
+            });
 
-        for_loop
+            let iterator_binding_res = this
+                .scope()
+                .lookup(iterator_binding_name.as_str())
+                .unwrap()
+                .res();
+
+            let iterator_binding = this.expr(
+                Default::default(),
+                hir::ExprKind::Path(Box::new(
+                    hir::Path::new(
+                        vec![hir::PathSegment::new(iterator_binding_name)],
+                        Default::default(),
+                    )
+                    .with_res(iterator_binding_res),
+                )),
+            );
+
+            let iterator_next_field = this.expr(
+                Default::default(),
+                hir::ExprKind::FieldAccess(
+                    Box::new(iterator_binding),
+                    Ident::new("next", Default::default()),
+                ),
+            );
+
+            let hir_id = this.unique_id();
+            let call_next = this.expr(
+                Default::default(),
+                hir::ExprKind::Call(Box::new(hir::CallExpression {
+                    hir_id,
+                    callee: iterator_next_field,
+                    arguments: vec![],
+                })),
+            );
+
+            let loop_arm = this.with_new_scope(|this| {
+                let for_loop_pat = this.lower_pat(&for_loop.pat);
+
+                let loop_body = this.lower_block_in_current_scope(
+                    &for_loop.block.statements,
+                    for_loop.block.expression.as_ref(),
+                    for_loop.block.span,
+                );
+
+                hir::MatchArm {
+                    pat: hir::Pat {
+                        kind: hir::PatKind::Enum(
+                            Box::new(hir::Path::new(
+                                vec![hir::PathSegment::new(Ident::new(
+                                    "Some",
+                                    Default::default(),
+                                ))],
+                                Default::default(),
+                            )),
+                            vec![(Ident::new("0", Default::default()), for_loop_pat)],
+                        ),
+                        span: Default::default(),
+                    },
+                    guard: None,
+                    block: loop_body,
+                    leading_comments: vec![],
+                    trailing_comments: vec![],
+                }
+            });
+
+            let break_arm = hir::MatchArm {
+                pat: hir::Pat {
+                    kind: hir::PatKind::Enum(
+                        Box::new(hir::Path::new(
+                            vec![hir::PathSegment::new(Ident::new(
+                                "None",
+                                Default::default(),
+                            ))],
+                            Default::default(),
+                        )),
+                        vec![],
+                    ),
+                    span: Default::default(),
+                },
+                guard: None,
+                block: hir::Block::new(
+                    vec![],
+                    Some(this.expr(Default::default(), hir::ExprKind::Break(None))),
+                    Default::default(),
+                ),
+                leading_comments: vec![],
+                trailing_comments: vec![],
+            };
+
+            let match_expr = this.expr(
+                Default::default(),
+                hir::ExprKind::Match(Box::new(call_next), vec![loop_arm, break_arm]),
+            );
+
+            let loop_stmt = hir::Stmt::new(
+                this.unique_id(),
+                hir::StmtKind::Expr(Box::new(this.expr(
+                    Default::default(),
+                    hir::ExprKind::Loop(Box::new(hir::Block::new(
+                        vec![],
+                        Some(match_expr),
+                        Default::default(),
+                    ))),
+                ))),
+                Default::default(),
+            );
+
+            let mut init_loop_block = hir::Block::new(
+                vec![iterator_binding_stmt, loop_stmt],
+                None,
+                for_loop.iter.span,
+            );
+
+            if let Some((pat, expr)) = accumulator_binding {
+                let accumulator_stmt = hir::Stmt::new(
+                    this.unique_id(),
+                    hir::StmtKind::Let(Box::new(pat), Box::new(expr), Default::default()),
+                    Default::default(),
+                );
+                init_loop_block.stmts.insert(1, accumulator_stmt);
+            }
+
+            init_loop_block
+        });
+
+        hir::ExprKind::Block(Box::new(block))
     }
 
     fn lower_callee(&mut self, callee: &ast::node::Expr, arg_len: usize) -> hir::Expr {

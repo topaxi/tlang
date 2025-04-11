@@ -108,6 +108,12 @@ impl Literal {
     }
 }
 
+impl From<bool> for Literal {
+    fn from(value: bool) -> Self {
+        Literal::Boolean(value)
+    }
+}
+
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Token {

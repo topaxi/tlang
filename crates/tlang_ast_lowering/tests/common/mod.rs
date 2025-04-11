@@ -119,3 +119,8 @@ pub fn collect_paths(node: &hir::Module) -> Vec<hir::Path> {
     collector.collect(node);
     collector.paths
 }
+
+#[allow(dead_code)]
+pub fn pretty_print(node: &hir::Module) -> String {
+    tlang_hir_pretty::HirPretty::pretty_print(node)
+}

@@ -479,16 +479,19 @@ impl HirPretty {
             hir::PatKind::Identifier(_id, name) => self.print_ident(name),
             hir::PatKind::Enum(path, fields) => {
                 self.print_path(path);
-                self.push_str(" { ");
-                for (i, (ident, pat)) in fields.iter().enumerate() {
-                    if i > 0 {
-                        self.push_str(", ");
+
+                if !fields.is_empty() {
+                    self.push_str(" { ");
+                    for (i, (ident, pat)) in fields.iter().enumerate() {
+                        if i > 0 {
+                            self.push_str(", ");
+                        }
+                        self.print_ident(ident);
+                        self.push_str(": ");
+                        self.print_pat(pat);
                     }
-                    self.print_ident(ident);
-                    self.push_str(": ");
-                    self.print_pat(pat);
+                    self.push_str(" }");
                 }
-                self.push_str(" }");
             }
             hir::PatKind::List(pats) => {
                 self.push_char('[');
