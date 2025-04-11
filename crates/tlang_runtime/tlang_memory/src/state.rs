@@ -60,6 +60,7 @@ impl CallStackEntry {
 
 pub struct BuiltinShapes {
     pub list: ShapeKey,
+    pub list_iterator: ShapeKey,
     pub option: ShapeKey,
     pub result: ShapeKey,
 
@@ -79,11 +80,13 @@ impl BuiltinShapes {
         let option = Self::create_option_shape(&mut store);
         let result = Self::create_result_shape(&mut store);
         let list = Self::create_list_shape(&mut store);
+        let list_iterator = Self::create_list_iterator_shape(&mut store);
 
         Self {
             option,
             result,
             list,
+            list_iterator,
             store,
         }
     }
@@ -130,6 +133,14 @@ impl BuiltinShapes {
         )))
     }
 
+    fn create_list_iterator_shape(store: &mut Slab<TlangShape>) -> ShapeKey {
+        ShapeKey::new_native(store.insert(TlangShape::new_struct_shape(
+            "ListIterator".to_string(),
+            vec!["list".to_string(), "index".to_string()],
+            HashMap::new(),
+        )))
+    }
+
     pub fn get_list_shape(&self) -> &TlangStructShape {
         self.store
             .get(self.list.get_native_index())
@@ -140,6 +151,20 @@ impl BuiltinShapes {
     pub fn get_list_shape_mut(&mut self) -> &mut TlangStructShape {
         self.store
             .get_mut(self.list.get_native_index())
+            .and_then(|s| s.get_struct_shape_mut())
+            .unwrap()
+    }
+
+    pub fn get_list_iterator_shape(&self) -> &TlangStructShape {
+        self.store
+            .get(self.list_iterator.get_native_index())
+            .and_then(|s| s.get_struct_shape())
+            .unwrap()
+    }
+
+    pub fn get_list_iterator_shape_mut(&mut self) -> &mut TlangStructShape {
+        self.store
+            .get_mut(self.list_iterator.get_native_index())
             .and_then(|s| s.get_struct_shape_mut())
             .unwrap()
     }
