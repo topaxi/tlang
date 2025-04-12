@@ -636,8 +636,7 @@ impl InterpreterState {
                             result.push_str(", ");
                         }
                         result.push_str(field);
-                        result.push(':');
-                        result.push(' ');
+                        result.push_str(": ");
                         result.push_str(&self.stringify(e.field_values[*idx]));
                     }
                     result.push(')');
