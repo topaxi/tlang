@@ -507,6 +507,12 @@ impl Interpreter {
             hir::BinaryOpKind::Assign if let hir::ExprKind::Path(path) = &lhs.kind => {
                 let value = eval_value!(self.eval_expr(rhs));
 
+                debug!(
+                    "eval_binary: {:?} = {:?}",
+                    path.join("::"),
+                    self.state.stringify(value)
+                );
+
                 self.state.scope_stack.update_value(&path.res, value);
 
                 return EvalResult::Value(value);
@@ -2029,7 +2035,7 @@ mod tests {
         let mut interpreter = interpreter(indoc! {"
             fn for_test() {
                 for i in [1, 2, 3, 4, 5] with sum = 0 {
-                    sum + i;
+                    sum + i
                 }
             }
         "});
