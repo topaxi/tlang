@@ -70,3 +70,46 @@ fn test_lower_for_loop_on_list_with_accumulator() {
     };
     "###);
 }
+
+#[test]
+fn test_lower_for_loop_on_list_with_accumulator_pat() {
+    let hir = hir_from_str(
+        r#"
+            fn main() {
+                let even_odd = for n in [1, 2, 3, 4] with [even, odd] = [[], []]; {
+                    if n % 2 == 0 {
+                        [[...even, n], odd]
+                    } else {
+                        [even, [...odd, n]]
+                    }
+                };
+                log(even_odd);
+            }
+        "#,
+    );
+
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        let even_odd: unknown = {
+            let iterator$$: unknown = [1, 2, 3, 4].iter();
+            let accumulator$$: unknown = [[], []];
+            loop {
+                let [even, odd]: unknown = accumulator$$;
+                (accumulator$$ = match iterator$$.next() {
+                    Option::Some? { 0: n } => {
+                        if ((n % 2) == 0) {
+                            [[...even, n], odd]
+                        } else {
+                            [even, [...odd, n]]
+                        }
+                    },
+                    Option::None? => {
+                        break accumulator$$
+                    },
+                })
+            }
+        };
+        log?(even_odd);
+    };
+    "###);
+}

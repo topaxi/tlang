@@ -1653,6 +1653,10 @@ mod tests {
                 _ => todo!("eval: {:?}", hir),
             }
         }
+
+        fn state(&self) -> &InterpreterState {
+            self.interpreter.state()
+        }
     }
 
     fn interpreter(initial_source: &str) -> TestInterpreter {
@@ -2040,5 +2044,24 @@ mod tests {
             }
         "});
         assert_matches!(interpreter.eval("for_test()"), TlangValue::U64(15));
+    }
+
+    #[test]
+    fn test_for_loop_on_list_with_accumulator_pat() {
+        let mut interpreter = interpreter(indoc! {"
+            fn even_odd() {
+                for n in [1, 2, 3, 4] with [even, odd] = [[], []]; {
+                    if n % 2 == 0 {
+                        [[...even, n], odd]
+                    } else {
+                        [even, [...odd, n]]
+                    }
+                }
+            }
+        "});
+
+        let result = interpreter.eval("even_odd()");
+
+        assert_eq!(interpreter.state().stringify(result), "[[2, 4], [1, 3]]");
     }
 }
