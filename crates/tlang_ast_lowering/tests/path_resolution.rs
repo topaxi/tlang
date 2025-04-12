@@ -267,11 +267,6 @@ fn test_enum_res() {
 
     let paths = collect_paths(&hir);
 
-    println!(
-        "paths: {:#?}",
-        paths.iter().map(|p| p.join("::")).collect::<Vec<_>>()
-    );
-
     assert_eq!(
         paths[0].res,
         hir::Res::Def(DefKind::Enum, hir::HirId::new(1), 0)

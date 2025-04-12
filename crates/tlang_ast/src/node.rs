@@ -2,8 +2,9 @@
 use serde::Serialize;
 use std::fmt::Display;
 
+use crate::keyword::kw;
 use crate::node_id::NodeId;
-use crate::token::{Token, kw};
+use crate::token::Token;
 use crate::{
     span::{Span, Spanned},
     token::Literal,
@@ -234,6 +235,16 @@ pub struct RangeExpression {
     pub inclusive: bool,
 }
 
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct ForLoop {
+    pub pat: Pat,
+    pub iter: Expr,
+    pub acc: Option<(Pat, Expr)>,
+    pub block: Block,
+    pub else_block: Option<Block>,
+}
+
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum ExprKind {
@@ -243,6 +254,10 @@ pub enum ExprKind {
     Call(Box<CallExpression>),
     Cast(Box<Expr>, Box<Ty>),
     Dict(Vec<(Expr, Expr)>),
+    Loop(Box<Block>),
+    ForLoop(Box<ForLoop>),
+    Break(Option<Box<Expr>>),
+    Continue,
     FunctionExpression(Box<FunctionDeclaration>),
     FieldExpression(Box<FieldAccessExpression>),
     IndexExpression(Box<IndexAccessExpression>),

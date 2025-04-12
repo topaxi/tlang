@@ -60,6 +60,7 @@ impl CallStackEntry {
 
 pub struct BuiltinShapes {
     pub list: ShapeKey,
+    pub list_iterator: ShapeKey,
     pub option: ShapeKey,
     pub result: ShapeKey,
 
@@ -79,11 +80,13 @@ impl BuiltinShapes {
         let option = Self::create_option_shape(&mut store);
         let result = Self::create_result_shape(&mut store);
         let list = Self::create_list_shape(&mut store);
+        let list_iterator = Self::create_list_iterator_shape(&mut store);
 
         Self {
             option,
             result,
             list,
+            list_iterator,
             store,
         }
     }
@@ -94,7 +97,7 @@ impl BuiltinShapes {
             vec![
                 TlangEnumVariant {
                     name: "Some".to_string(),
-                    field_map: HashMap::new(),
+                    field_map: HashMap::from([("0".to_string(), 0)]),
                 },
                 TlangEnumVariant {
                     name: "None".to_string(),
@@ -111,11 +114,11 @@ impl BuiltinShapes {
             vec![
                 TlangEnumVariant {
                     name: "Ok".to_string(),
-                    field_map: HashMap::new(),
+                    field_map: HashMap::from([("0".to_string(), 0)]),
                 },
                 TlangEnumVariant {
                     name: "Err".to_string(),
-                    field_map: HashMap::new(),
+                    field_map: HashMap::from([("0".to_string(), 0)]),
                 },
             ],
             HashMap::new(),
@@ -130,6 +133,14 @@ impl BuiltinShapes {
         )))
     }
 
+    fn create_list_iterator_shape(store: &mut Slab<TlangShape>) -> ShapeKey {
+        ShapeKey::new_native(store.insert(TlangShape::new_struct_shape(
+            "ListIterator".to_string(),
+            vec!["list".to_string(), "index".to_string()],
+            HashMap::new(),
+        )))
+    }
+
     pub fn get_list_shape(&self) -> &TlangStructShape {
         self.store
             .get(self.list.get_native_index())
@@ -140,6 +151,20 @@ impl BuiltinShapes {
     pub fn get_list_shape_mut(&mut self) -> &mut TlangStructShape {
         self.store
             .get_mut(self.list.get_native_index())
+            .and_then(|s| s.get_struct_shape_mut())
+            .unwrap()
+    }
+
+    pub fn get_list_iterator_shape(&self) -> &TlangStructShape {
+        self.store
+            .get(self.list_iterator.get_native_index())
+            .and_then(|s| s.get_struct_shape())
+            .unwrap()
+    }
+
+    pub fn get_list_iterator_shape_mut(&mut self) -> &mut TlangStructShape {
+        self.store
+            .get_mut(self.list_iterator.get_native_index())
             .and_then(|s| s.get_struct_shape_mut())
             .unwrap()
     }
@@ -397,6 +422,11 @@ impl InterpreterState {
     }
 
     #[inline(always)]
+    pub fn get_object_by_id_mut(&mut self, id: TlangObjectId) -> Option<&mut TlangObjectKind> {
+        self.objects.get_mut(id)
+    }
+
+    #[inline(always)]
     pub fn get_object_by_id(&self, id: TlangObjectId) -> Option<&TlangObjectKind> {
         self.objects.get(id)
     }
@@ -407,8 +437,19 @@ impl InterpreterState {
             .and_then(|id| self.get_object_by_id(id))
     }
 
+    pub fn get_object_mut(&mut self, value: TlangValue) -> Option<&mut TlangObjectKind> {
+        value
+            .get_object_id()
+            .and_then(|id| self.get_object_by_id_mut(id))
+    }
+
     pub fn get_struct(&self, value: TlangValue) -> Option<&TlangStruct> {
         self.get_object(value).and_then(|obj| obj.get_struct())
+    }
+
+    pub fn get_struct_mut(&mut self, value: TlangValue) -> Option<&mut TlangStruct> {
+        self.get_object_mut(value)
+            .and_then(|obj| obj.get_struct_mut())
     }
 
     pub fn get_enum(&self, value: TlangValue) -> Option<&TlangEnum> {
@@ -595,8 +636,7 @@ impl InterpreterState {
                             result.push_str(", ");
                         }
                         result.push_str(field);
-                        result.push(':');
-                        result.push(' ');
+                        result.push_str(": ");
                         result.push_str(&self.stringify(e.field_values[*idx]));
                     }
                     result.push(')');

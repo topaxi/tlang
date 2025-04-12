@@ -10,4 +10,6 @@ log = { workspace = true }
 
 [dev-dependencies]
 tlang_parser = { path = "../tlang_parser" }
+tlang_hir_pretty = { path = "../tlang_hir_pretty" }
+insta = { workspace = true }
 pretty_assertions = { workspace = true }

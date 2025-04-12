@@ -235,9 +235,29 @@ impl SemanticAnalyzer {
                 self.analyze_expr(&expr.lhs);
                 self.analyze_expr(&expr.rhs);
             }
-            ExprKind::Block(block) => self.analyze_block(block),
+            ExprKind::Block(block) | ExprKind::Loop(block) => self.analyze_block(block),
+            ExprKind::ForLoop(for_loop) => {
+                self.analyze_expr(&for_loop.iter);
+                self.analyze_pat(&for_loop.pat);
+
+                if let Some((pat, expr)) = &for_loop.acc {
+                    self.analyze_pat(pat);
+                    self.analyze_expr(expr);
+                }
+
+                self.analyze_block(&for_loop.block);
+
+                if let Some(else_block) = &for_loop.else_block {
+                    self.analyze_block(else_block);
+                }
+            }
             ExprKind::UnaryOp(_, node) => {
                 self.analyze_expr(node);
+            }
+            ExprKind::Break(expr) => {
+                if let Some(expr) = expr {
+                    self.analyze_expr(expr);
+                }
             }
             ExprKind::Call(expr) | ExprKind::RecursiveCall(expr) => {
                 for argument in &expr.arguments {
@@ -312,7 +332,7 @@ impl SemanticAnalyzer {
                 self.analyze_expr(&expr.start);
                 self.analyze_expr(&expr.end);
             }
-            ExprKind::None | ExprKind::Literal(_) | ExprKind::Wildcard => {}
+            ExprKind::None | ExprKind::Continue | ExprKind::Literal(_) | ExprKind::Wildcard => {}
         }
 
         if let Some(symbol_table) = &self.get_symbol_table(expr.id) {

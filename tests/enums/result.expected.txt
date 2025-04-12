@@ -5,7 +5,7 @@ true
 10
 
 
-thread 'main' panicked at crates/tlang_runtime/tlang_memory/src/state.rs:292:9:
+thread 'main' panicked at crates/tlang_runtime/tlang_memory/src/state.rs:317:9:
 Called unwrap on Err
   at root 10:1
 
@@ -16,8 +16,8 @@ stack backtrace:
    3: tlang_memory::state::InterpreterState::new_native_method::{{closure}}
    4: tlang_interpreter::Interpreter::exec_native_fn
    5: tlang_interpreter::Interpreter::call_shape_method
-   6: tlang_interpreter::Interpreter::eval_expr
-   7: tlang_interpreter::Interpreter::eval_expr
+   6: tlang_interpreter::Interpreter::eval_call
+   7: tlang_interpreter::Interpreter::eval_call
    8: tlang_interpreter::Interpreter::eval_stmts
    9: tlangdi::main
 note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.

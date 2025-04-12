@@ -81,6 +81,17 @@ impl ScopeStack {
         }
     }
 
+    pub fn update_value(&self, res: &hir::Res, value: TlangValue) {
+        match res {
+            hir::Res::Local(_, index) => self.current_scope().borrow_mut().set(*index, value),
+            hir::Res::Upvar(relative_scope_index, index) => {
+                let scope_index = self.scopes.len() - 1 - relative_scope_index;
+                self.scopes[scope_index].borrow_mut().set(*index, value);
+            }
+            _ => panic!("Cannot update value for {:?}", res),
+        }
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = Rc<RefCell<Scope>>> {
         self.scopes.iter().cloned()
     }
@@ -117,6 +128,10 @@ impl Scope {
 
     pub fn get(&self, index: usize) -> Option<TlangValue> {
         self.locals.get(index).copied()
+    }
+
+    pub fn set(&mut self, index: usize, value: TlangValue) {
+        self.locals[index] = value;
     }
 
     pub fn get_locals(&self) -> &[TlangValue] {

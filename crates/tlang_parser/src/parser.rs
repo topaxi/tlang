@@ -1,3 +1,4 @@
+use tlang_ast::keyword::{Keyword, kw};
 use tlang_ast::node::{
     self, Associativity, BinaryOpExpression, BinaryOpKind, Block, CallExpression, ElseClause,
     EnumDeclaration, EnumPattern, EnumVariant, Expr, ExprKind, FieldAccessExpression,
@@ -7,7 +8,7 @@ use tlang_ast::node::{
 };
 use tlang_ast::node_id::NodeId;
 use tlang_ast::span::Span;
-use tlang_ast::token::{Keyword, Literal, Token, TokenKind, kw};
+use tlang_ast::token::{Literal, Token, TokenKind};
 use tlang_lexer::Lexer;
 
 use crate::error::{ParseError, ParseIssue, ParseIssueKind};
@@ -289,7 +290,8 @@ impl<'src> Parser<'src> {
                 (false, Some(node))
             }
             // Expressions like IfElse as statements also do not need to be terminated with a semicolon.
-            StmtKind::Expr(ref expr) if matches!(expr.kind,  ExprKind::IfElse(..) | ExprKind::Match(..)) => {
+            StmtKind::Expr(ref expr)
+                if matches!(expr.kind, ExprKind::IfElse(..) | ExprKind::Match(..) | ExprKind::Loop(..) | ExprKind::ForLoop(..)) => {
                 (false, Some(node))
             }
             _ => (true, Some(node))
@@ -903,6 +905,10 @@ impl<'src> Parser<'src> {
                         | Keyword::Fn
                         | Keyword::Rec
                         | Keyword::Match
+                        | Keyword::Loop
+                        | Keyword::For
+                        | Keyword::Break
+                        | Keyword::Continue
                         | Keyword::Not
                         | Keyword::Underscore
                         | Keyword::_Self
@@ -943,6 +949,72 @@ impl<'src> Parser<'src> {
             TokenKind::LBracket => self.parse_list_expression(),
             TokenKind::Keyword(Keyword::If) => self.parse_if_else_expression(),
             TokenKind::Keyword(Keyword::Fn) => self.parse_function_expression(),
+            TokenKind::Keyword(Keyword::Loop) => {
+                self.advance();
+                let block = self.parse_block();
+                node::expr!(self.unique_id(), Loop(Box::new(block)))
+            }
+            TokenKind::Keyword(Keyword::For) => {
+                self.advance();
+                let pat = self.parse_pattern();
+                self.consume_token(TokenKind::Keyword(Keyword::In));
+                let iter = self.parse_expression();
+                if matches!(self.current_token_kind(), TokenKind::Semicolon) {
+                    self.advance();
+                }
+                let acc = if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::With))
+                {
+                    self.advance();
+                    let pat = self.parse_pattern();
+                    self.consume_token(TokenKind::EqualSign);
+                    let expr = self.parse_expression();
+                    if matches!(self.current_token_kind(), TokenKind::Semicolon) {
+                        self.advance();
+                    }
+                    Some((pat, expr))
+                } else {
+                    None
+                };
+                let block = self.parse_block();
+
+                let else_block =
+                    if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Else)) {
+                        self.advance();
+                        Some(self.parse_block())
+                    } else {
+                        None
+                    };
+
+                node::expr!(
+                    self.unique_id(),
+                    ForLoop(Box::new(node::ForLoop {
+                        pat,
+                        iter,
+                        acc,
+                        block,
+                        else_block,
+                    }))
+                )
+            }
+            TokenKind::Keyword(Keyword::Break) => {
+                self.advance();
+
+                if matches!(
+                    self.current_token_kind(),
+                    // Bit hacky...
+                    TokenKind::Semicolon | TokenKind::RBrace
+                ) {
+                    return node::expr!(self.unique_id(), Break(None));
+                }
+
+                let expr = self.parse_expression();
+                let expr = if matches!(expr.kind, ExprKind::None) {
+                    None
+                } else {
+                    Some(Box::new(expr))
+                };
+                node::expr!(self.unique_id(), Break(expr))
+            }
             TokenKind::Keyword(Keyword::Rec) => {
                 self.advance();
                 let expr = self.parse_expression();

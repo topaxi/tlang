@@ -25,6 +25,8 @@ pub enum EvalResult {
     Value(TlangValue),
     Return(TlangValue),
     TailCall,
+    Continue,
+    Break(TlangValue),
 }
 
 impl EvalResult {
@@ -32,8 +34,10 @@ impl EvalResult {
         match self {
             EvalResult::Value(value) => value,
             EvalResult::Return(value) => value,
+            EvalResult::Break(value) => value,
             EvalResult::Void => TlangValue::Nil,
             EvalResult::TailCall => panic!("Tried to unwrap a TailCall"),
+            EvalResult::Continue => panic!("Tried to unwrap Continue"),
         }
     }
 }
@@ -145,6 +149,10 @@ impl Interpreter {
 
     fn get_struct(&self, value: TlangValue) -> Option<&TlangStruct> {
         self.state.get_struct(value)
+    }
+
+    fn get_struct_mut(&mut self, value: TlangValue) -> Option<&mut TlangStruct> {
+        self.state.get_struct_mut(value)
     }
 
     fn get_enum(&self, value: TlangValue) -> Option<&TlangEnum> {
@@ -263,34 +271,46 @@ impl Interpreter {
         self.with_new_scope(block, |this| this.eval_block_inner(block))
     }
 
+    fn eval_loop(&mut self, block: &hir::Block) -> EvalResult {
+        loop {
+            match self.eval_block(block) {
+                EvalResult::Break(value) => return EvalResult::Value(value),
+                EvalResult::Return(value) => return EvalResult::Return(value),
+                EvalResult::TailCall => return EvalResult::TailCall,
+                EvalResult::Continue | EvalResult::Value(_) | EvalResult::Void => continue,
+            }
+        }
+    }
+
     fn eval_stmt(&mut self, stmt: &hir::Stmt) -> EvalResult {
         self.state.set_current_span(stmt.span);
 
         match &stmt.kind {
-            hir::StmtKind::Expr(expr) => {
-                return self.eval_expr(expr);
-            }
+            hir::StmtKind::Expr(expr) => self.eval_expr(expr),
             hir::StmtKind::FunctionDeclaration(decl) => {
                 self.eval_fn_decl(decl);
+                EvalResult::Void
             }
             hir::StmtKind::DynFunctionDeclaration(decl) => {
                 self.eval_dyn_fn_decl(decl);
+                EvalResult::Void
             }
             hir::StmtKind::StructDeclaration(decl) => {
                 self.eval_struct_decl(decl);
+                EvalResult::Void
             }
             hir::StmtKind::EnumDeclaration(decl) => {
                 self.eval_enum_decl(decl);
+                EvalResult::Void
             }
-            hir::StmtKind::Let(pat, expr, ty) => return self.eval_let_stmt(pat, expr, ty),
+            hir::StmtKind::Let(pat, expr, ty) => self.eval_let_stmt(pat, expr, ty),
             hir::StmtKind::Return(box Some(expr)) => {
-                return EvalResult::Return(eval_value!(self.eval_expr(expr)));
+                let value = eval_value!(self.eval_expr(expr));
+                EvalResult::Return(value)
             }
-            hir::StmtKind::Return(_) => return EvalResult::Return(TlangValue::Nil),
+            hir::StmtKind::Return(_) => EvalResult::Return(TlangValue::Nil),
             hir::StmtKind::None => unreachable!(),
         }
-
-        EvalResult::Void
     }
 
     fn eval_stmts(&mut self, stmts: &[hir::Stmt]) -> EvalResult {
@@ -321,6 +341,12 @@ impl Interpreter {
             hir::ExprKind::IndexAccess(lhs, rhs) => self.eval_index_access(lhs, rhs),
             hir::ExprKind::FieldAccess(lhs, rhs) => self.eval_field_access(lhs, rhs),
             hir::ExprKind::Block(block) => self.eval_block(block),
+            hir::ExprKind::Loop(block) => self.eval_loop(block),
+            hir::ExprKind::Break(Some(expr)) => {
+                EvalResult::Break(eval_value!(self.eval_expr(expr)))
+            }
+            hir::ExprKind::Break(_) => EvalResult::Break(TlangValue::Nil),
+            hir::ExprKind::Continue => EvalResult::Continue,
             hir::ExprKind::Binary(op, lhs, rhs) => self.eval_binary(*op, lhs, rhs),
             hir::ExprKind::Call(call_expr) => self.eval_call(call_expr),
             hir::ExprKind::TailCall(call_expr) => self.eval_tail_call(call_expr),
@@ -478,6 +504,53 @@ impl Interpreter {
                 return self.eval_expr(rhs);
             }
 
+            hir::BinaryOpKind::Assign if let hir::ExprKind::Path(path) = &lhs.kind => {
+                let value = eval_value!(self.eval_expr(rhs));
+
+                debug!(
+                    "eval_binary: {:?} = {:?}",
+                    path.join("::"),
+                    self.state.stringify(value)
+                );
+
+                self.state.scope_stack.update_value(&path.res, value);
+
+                return EvalResult::Value(value);
+            }
+
+            hir::BinaryOpKind::Assign
+                if let hir::ExprKind::FieldAccess(base, ident) = &lhs.kind =>
+            {
+                let struct_value = eval_value!(self.eval_expr(base));
+                let struct_shape = self
+                    .get_object(struct_value)
+                    .and_then(|o| o.shape())
+                    .unwrap_or_else(|| {
+                        self.panic(format!("Cannot assign to field `{}` on non-object", ident))
+                    });
+                let index = self
+                    .state
+                    .get_struct_field_index(struct_shape, ident.as_str())
+                    .unwrap_or_else(|| {
+                        self.panic(format!(
+                            "Cannot assign to field `{}` on struct `{:?}`",
+                            ident, struct_shape
+                        ))
+                    });
+
+                let value = eval_value!(self.eval_expr(rhs));
+
+                let struct_obj = self.get_struct_mut(struct_value).unwrap();
+
+                struct_obj[index] = value;
+
+                return EvalResult::Value(value);
+            }
+
+            hir::BinaryOpKind::Assign => {
+                todo!("eval_binary: Assign not implemented for {:?}", lhs);
+            }
+
             _ => {}
         }
 
@@ -514,12 +587,8 @@ impl Interpreter {
             hir::BinaryOpKind::BitwiseOr => self.eval_bitwise_op(lhs, rhs, |a, b| a | b),
             hir::BinaryOpKind::BitwiseXor => self.eval_bitwise_op(lhs, rhs, |a, b| a ^ b),
 
-            hir::BinaryOpKind::Assign => {
-                todo!("eval_binary: Assign not implemented");
-            }
-
-            hir::BinaryOpKind::And | hir::BinaryOpKind::Or => {
-                unreachable!();
+            hir::BinaryOpKind::Assign | hir::BinaryOpKind::And | hir::BinaryOpKind::Or => {
+                unreachable!("{:?} should be handled before", op)
             }
         };
 
@@ -922,6 +991,8 @@ impl Interpreter {
     }
 
     fn eval_call(&mut self, call_expr: &hir::CallExpression) -> EvalResult {
+        debug!("eval_call: {:?}", call_expr);
+
         if call_expr.has_wildcard() {
             return self.eval_partial_call(call_expr);
         }
@@ -1295,14 +1366,14 @@ impl Interpreter {
     }
 
     fn eval_match(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) -> EvalResult {
-        let match_value = eval_value!(self.eval_expr(expr));
+        let value = eval_value!(self.eval_expr(expr));
 
-        debug!("eval_match: {}", self.state.stringify(match_value));
+        debug!("eval_match: {}", self.state.stringify(value));
 
         for arm in arms {
-            match self.eval_match_arm(arm, match_value) {
-                MatchResult::Matched(value) => return value,
-                MatchResult::NotMatched(eval_result) => propagate!(eval_result),
+            match self.eval_match_arm(arm, value) {
+                MatchResult::Matched(result) => return result,
+                MatchResult::NotMatched(_) => continue,
             }
         }
 
@@ -1311,7 +1382,12 @@ impl Interpreter {
 
     /// Evaluates a match arm and returns the value if it matches, otherwise returns None.
     fn eval_match_arm(&mut self, arm: &hir::MatchArm, value: TlangValue) -> MatchResult {
-        debug!("eval_match_arm: {:?} {}", arm, self.state.stringify(value));
+        debug!(
+            "eval_match_arm: {:?} {:?} {}",
+            arm.pat.kind,
+            arm.guard,
+            self.state.stringify(value)
+        );
 
         self.with_new_scope(arm, |this| {
             if !this.eval_pat(&arm.pat, value) {
@@ -1576,6 +1652,10 @@ mod tests {
                 hir::StmtKind::Expr(expr) => self.interpreter.eval_expr(expr).unwrap_value(),
                 _ => todo!("eval: {:?}", hir),
             }
+        }
+
+        fn state(&self) -> &InterpreterState {
+            self.interpreter.state()
         }
     }
 
@@ -1920,5 +2000,68 @@ mod tests {
         "});
 
         assert_matches!(interpreter.eval("foo()()"), TlangValue::U64(1));
+    }
+
+    #[test]
+    fn test_simple_loop() {
+        let mut interpreter = interpreter(indoc! {"
+            fn loop_test() {
+                let i = 0;
+                loop {
+                    if i >= 10 {
+                        break;
+                    }
+
+                    i = i + 1;
+                }
+                i
+            }
+        "});
+        assert_matches!(interpreter.eval("loop_test()"), TlangValue::U64(10));
+    }
+
+    #[test]
+    fn test_for_loop_on_list_simple() {
+        let mut interpreter = interpreter(indoc! {"
+            fn for_test() {
+                let sum = 0;
+                for i in [1, 2, 3, 4, 5] {
+                    sum = sum + i;
+                }
+                sum
+            }
+        "});
+        assert_matches!(interpreter.eval("for_test()"), TlangValue::U64(15));
+    }
+
+    #[test]
+    fn test_for_loop_on_list_with_accumulator() {
+        let mut interpreter = interpreter(indoc! {"
+            fn for_test() {
+                for i in [1, 2, 3, 4, 5] with sum = 0 {
+                    sum + i
+                }
+            }
+        "});
+        assert_matches!(interpreter.eval("for_test()"), TlangValue::U64(15));
+    }
+
+    #[test]
+    fn test_for_loop_on_list_with_accumulator_pat() {
+        let mut interpreter = interpreter(indoc! {"
+            fn even_odd() {
+                for n in [1, 2, 3, 4] with [even, odd] = [[], []]; {
+                    if n % 2 == 0 {
+                        [[...even, n], odd]
+                    } else {
+                        [even, [...odd, n]]
+                    }
+                }
+            }
+        "});
+
+        let result = interpreter.eval("even_odd()");
+
+        assert_eq!(interpreter.state().stringify(result), "[[2, 4], [1, 3]]");
     }
 }

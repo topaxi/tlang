@@ -1,8 +1,8 @@
 use std::rc::Rc;
 use std::{cell::RefCell, collections::HashMap};
+use tlang_ast::keyword::kw;
 use tlang_ast::node_id::NodeId;
 use tlang_ast::span::Span;
-use tlang_ast::token::kw;
 use tlang_ast::{
     node::{
         Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, LetDeclaration, Module, Pat,
@@ -180,8 +180,31 @@ impl DeclarationAnalyzer {
 
     fn collect_declarations_expr(&mut self, expr: &Expr) {
         match &expr.kind {
-            ExprKind::Block(block) => {
+            ExprKind::Block(block) | ExprKind::Loop(block) => {
                 self.collect_declarations_block(block);
+            }
+            ExprKind::ForLoop(for_loop) => {
+                self.push_symbol_table(expr.id);
+                self.collect_pattern(&for_loop.pat);
+                self.collect_declarations_expr(&for_loop.iter);
+
+                if let Some((pat, expr)) = &for_loop.acc {
+                    self.collect_pattern(pat);
+                    self.collect_declarations_expr(expr);
+                }
+
+                self.collect_declarations_block(&for_loop.block);
+
+                if let Some(else_block) = &for_loop.else_block {
+                    self.collect_declarations_block(else_block);
+                }
+
+                self.pop_symbol_table();
+            }
+            ExprKind::Break(expr) => {
+                if let Some(expr) = expr {
+                    self.collect_declarations_expr(expr);
+                }
             }
             ExprKind::FunctionExpression(decl) => {
                 self.push_symbol_table(decl.id);
@@ -260,7 +283,11 @@ impl DeclarationAnalyzer {
                 self.collect_declarations_expr(&expr.start);
                 self.collect_declarations_expr(&expr.end);
             }
-            ExprKind::Path(_) | ExprKind::Literal(_) | ExprKind::Wildcard | ExprKind::None => {
+            ExprKind::Path(_)
+            | ExprKind::Literal(_)
+            | ExprKind::Wildcard
+            | ExprKind::Continue
+            | ExprKind::None => {
                 // Nothing to do here
             }
         }

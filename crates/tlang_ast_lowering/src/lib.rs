@@ -4,8 +4,8 @@ use std::collections::HashMap;
 
 use log::debug;
 use tlang_ast as ast;
+use tlang_ast::keyword::kw;
 use tlang_ast::node::{EnumPattern, FunctionDeclaration, Ident};
-use tlang_ast::token::kw;
 use tlang_hir::hir::{self, HirId};
 
 use self::scope::Scope;

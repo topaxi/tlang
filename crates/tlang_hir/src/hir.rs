@@ -170,7 +170,11 @@ impl Path {
 
     pub fn as_init(&self) -> Self {
         Path {
-            segments: self.segments[0..self.segments.len() - 1].to_vec(),
+            segments: if self.segments.len() > 1 {
+                self.segments[0..self.segments.len() - 1].to_vec()
+            } else {
+                vec![self.segments[0].clone()]
+            },
             res: Default::default(),
             span: self.span,
         }
@@ -272,6 +276,18 @@ pub struct Stmt {
     //       HIR, which feels somewhat unnecessary.
     pub leading_comments: Vec<Token>,
     pub trailing_comments: Vec<Token>,
+}
+
+impl Stmt {
+    pub fn new(hir_id: HirId, kind: StmtKind, span: Span) -> Self {
+        Stmt {
+            hir_id,
+            kind,
+            span,
+            leading_comments: vec![],
+            trailing_comments: vec![],
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -436,6 +452,9 @@ impl Expr {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum ExprKind {
     Block(Box<Block>),
+    Loop(Box<Block>),
+    Break(Option<Box<Expr>>),
+    Continue,
     Call(Box<CallExpression>),
     TailCall(Box<CallExpression>),
     Cast(Box<Expr>, Box<Ty>),

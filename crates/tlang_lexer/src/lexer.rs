@@ -1,6 +1,7 @@
 use tlang_ast::{
+    keyword::{Keyword, is_keyword},
     span::{LineColumn, Span},
-    token::{Keyword, Literal, Token, TokenKind, is_keyword},
+    token::{Literal, Token, TokenKind},
 };
 
 #[derive(Debug, Clone)]

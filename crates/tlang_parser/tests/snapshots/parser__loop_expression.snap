@@ -1,0 +1,176 @@
+---
+source: crates/tlang_parser/tests/parser.rs
+expression: "parse! (\"let x = loop { break 1 + 2; };\")"
+---
+Module(
+  id: NodeId(1),
+  statements: [
+    Stmt(
+      id: NodeId(10),
+      kind: Let(LetDeclaration(
+        pattern: Pat(
+          id: NodeId(2),
+          kind: Identifier(Ident(
+            name: "x",
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 4,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 5,
+              ),
+            ),
+          )),
+          leading_comments: [],
+          trailing_comments: [],
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 4,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 5,
+            ),
+          ),
+        ),
+        expression: Expr(
+          id: NodeId(9),
+          kind: Loop(Block(
+            id: NodeId(8),
+            statements: [
+              Stmt(
+                id: NodeId(3),
+                kind: Expr(Expr(
+                  id: NodeId(7),
+                  kind: Break(Some(Expr(
+                    id: NodeId(6),
+                    kind: BinaryOp(BinaryOpExpression(
+                      op: Add,
+                      lhs: Expr(
+                        id: NodeId(4),
+                        kind: Literal(UnsignedInteger(1)),
+                        leading_comments: [],
+                        trailing_comments: [],
+                        span: Span(
+                          start: LineColumn(
+                            line: 0,
+                            column: 21,
+                          ),
+                          end: LineColumn(
+                            line: 0,
+                            column: 22,
+                          ),
+                        ),
+                      ),
+                      rhs: Expr(
+                        id: NodeId(5),
+                        kind: Literal(UnsignedInteger(2)),
+                        leading_comments: [],
+                        trailing_comments: [],
+                        span: Span(
+                          start: LineColumn(
+                            line: 0,
+                            column: 25,
+                          ),
+                          end: LineColumn(
+                            line: 0,
+                            column: 26,
+                          ),
+                        ),
+                      ),
+                    )),
+                    leading_comments: [],
+                    trailing_comments: [],
+                    span: Span(
+                      start: LineColumn(
+                        line: 0,
+                        column: 21,
+                      ),
+                      end: LineColumn(
+                        line: 0,
+                        column: 26,
+                      ),
+                    ),
+                  ))),
+                  leading_comments: [],
+                  trailing_comments: [],
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 15,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 26,
+                    ),
+                  ),
+                )),
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 15,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 27,
+                  ),
+                ),
+                leading_comments: [],
+                trailing_comments: [],
+              ),
+            ],
+            expression: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 13,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 29,
+              ),
+            ),
+          )),
+          leading_comments: [],
+          trailing_comments: [],
+          span: Span(
+            start: LineColumn(
+              line: 0,
+              column: 8,
+            ),
+            end: LineColumn(
+              line: 0,
+              column: 29,
+            ),
+          ),
+        ),
+        type_annotation: None,
+      )),
+      span: Span(
+        start: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end: LineColumn(
+          line: 0,
+          column: 30,
+        ),
+      ),
+      leading_comments: [],
+      trailing_comments: [],
+    ),
+  ],
+  span: Span(
+    start: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+  ),
+)

@@ -261,6 +261,19 @@ impl HirPretty {
                 self.print_expr(expr);
             }
             hir::ExprKind::Block(block) => self.print_block(block),
+            hir::ExprKind::Loop(block) => {
+                self.push_str("loop ");
+                self.print_block(block)
+            }
+            hir::ExprKind::Break(expr) => {
+                self.push_str("break");
+
+                if let Some(expr) = expr.as_ref() {
+                    self.push_char(' ');
+                    self.print_expr(expr);
+                }
+            }
+            hir::ExprKind::Continue => self.push_str("continue"),
             hir::ExprKind::Dict(kvs) => self.print_dict(kvs),
             hir::ExprKind::FunctionExpression(decl) => self.print_function_declaration(decl),
             hir::ExprKind::FieldAccess(expr, ident) => {
@@ -466,16 +479,19 @@ impl HirPretty {
             hir::PatKind::Identifier(_id, name) => self.print_ident(name),
             hir::PatKind::Enum(path, fields) => {
                 self.print_path(path);
-                self.push_str(" { ");
-                for (i, (ident, pat)) in fields.iter().enumerate() {
-                    if i > 0 {
-                        self.push_str(", ");
+
+                if !fields.is_empty() {
+                    self.push_str(" { ");
+                    for (i, (ident, pat)) in fields.iter().enumerate() {
+                        if i > 0 {
+                            self.push_str(", ");
+                        }
+                        self.print_ident(ident);
+                        self.push_str(": ");
+                        self.print_pat(pat);
                     }
-                    self.print_ident(ident);
-                    self.push_str(": ");
-                    self.print_pat(pat);
+                    self.push_str(" }");
                 }
-                self.push_str(" }");
             }
             hir::PatKind::List(pats) => {
                 self.push_char('[');
