@@ -5,7 +5,7 @@ mod common;
 use self::common::{hir_from_str, pretty_print};
 
 #[test]
-fn test_lower_for_loop() {
+fn test_lower_for_loop_on_list_simple() {
     let hir = hir_from_str(
         r#"
             fn main() {
@@ -22,10 +22,10 @@ fn test_lower_for_loop() {
             let iterator$$: unknown = [1, 2, 3].iter();
             loop {
                 match iterator$$.next() {
-                    Some? { 0: i } => {
+                    Option::Some? { 0: i } => {
                         log?(i);
                     },
-                    None? => {
+                    Option::None? => {
                         break
                     },
                 }
@@ -36,7 +36,7 @@ fn test_lower_for_loop() {
 }
 
 #[test]
-fn test_lower_for_loop_with_accumulator() {
+fn test_lower_for_loop_on_list_with_accumulator() {
     let hir = hir_from_str(
         r#"
             fn main() {
@@ -57,10 +57,10 @@ fn test_lower_for_loop_with_accumulator() {
             loop {
                 let acc: unknown = accumulator$$;
                 (accumulator$$ = match iterator$$.next() {
-                    Some? { 0: i } => {
+                    Option::Some? { 0: i } => {
                         (acc + i)
                     },
-                    None? => {
+                    Option::None? => {
                         break accumulator$$
                     },
                 })

@@ -1376,7 +1376,12 @@ impl Interpreter {
 
     /// Evaluates a match arm and returns the value if it matches, otherwise returns None.
     fn eval_match_arm(&mut self, arm: &hir::MatchArm, value: TlangValue) -> MatchResult {
-        debug!("eval_match_arm: {:?} {}", arm, self.state.stringify(value));
+        debug!(
+            "eval_match_arm: {:?} {:?} {}",
+            arm.pat.kind,
+            arm.guard,
+            self.state.stringify(value)
+        );
 
         self.with_new_scope(arm, |this| {
             if !this.eval_pat(&arm.pat, value) {
@@ -2006,7 +2011,7 @@ mod tests {
     }
 
     #[test]
-    fn test_for_loop_on_list() {
+    fn test_for_loop_on_list_simple() {
         let mut interpreter = interpreter(indoc! {"
             fn for_test() {
                 let sum = 0;

@@ -346,6 +346,22 @@ impl LoweringContext {
                     )),
                 );
 
+                let loop_statements = if let Some((pat, _)) = &for_loop.acc {
+                    let hir_id = this.unique_id();
+                    let accumulator_ressignment = hir::Stmt::new(
+                        hir_id,
+                        hir::StmtKind::Let(
+                            Box::new(this.lower_pat(pat)),
+                            Box::new(accumulator_path_expr.clone()),
+                            Box::default(),
+                        ),
+                        Default::default(),
+                    );
+                    vec![accumulator_ressignment]
+                } else {
+                    vec![]
+                };
+
                 let loop_arm = this.with_new_scope(|this| {
                     let for_loop_pat = this.lower_pat(&for_loop.pat);
 
@@ -359,10 +375,16 @@ impl LoweringContext {
                         pat: hir::Pat {
                             kind: hir::PatKind::Enum(
                                 Box::new(hir::Path::new(
-                                    vec![hir::PathSegment::new(Ident::new(
-                                        "Some",
-                                        Default::default(),
-                                    ))],
+                                    vec![
+                                        hir::PathSegment::new(Ident::new(
+                                            "Option",
+                                            Default::default(),
+                                        )),
+                                        hir::PathSegment::new(Ident::new(
+                                            "Some",
+                                            Default::default(),
+                                        )),
+                                    ],
                                     Default::default(),
                                 )),
                                 vec![(Ident::new("0", Default::default()), for_loop_pat)],
@@ -401,10 +423,16 @@ impl LoweringContext {
                         pat: hir::Pat {
                             kind: hir::PatKind::Enum(
                                 Box::new(hir::Path::new(
-                                    vec![hir::PathSegment::new(Ident::new(
-                                        "None",
-                                        Default::default(),
-                                    ))],
+                                    vec![
+                                        hir::PathSegment::new(Ident::new(
+                                            "Option",
+                                            Default::default(),
+                                        )),
+                                        hir::PathSegment::new(Ident::new(
+                                            "None",
+                                            Default::default(),
+                                        )),
+                                    ],
                                     Default::default(),
                                 )),
                                 vec![],
@@ -441,22 +469,6 @@ impl LoweringContext {
                     )
                 } else {
                     match_expr
-                };
-
-                let loop_statements = if let Some((pat, _)) = &for_loop.acc {
-                    let hir_id = this.unique_id();
-                    let accumulator_ressignment = hir::Stmt::new(
-                        hir_id,
-                        hir::StmtKind::Let(
-                            Box::new(this.lower_pat(pat)),
-                            Box::new(accumulator_path_expr.clone()),
-                            Box::default(),
-                        ),
-                        Default::default(),
-                    );
-                    vec![accumulator_ressignment]
-                } else {
-                    vec![]
                 };
 
                 hir::Block::new(loop_statements, Some(match_expr), Default::default())

@@ -97,7 +97,7 @@ impl BuiltinShapes {
             vec![
                 TlangEnumVariant {
                     name: "Some".to_string(),
-                    field_map: HashMap::new(),
+                    field_map: HashMap::from([("0".to_string(), 0)]),
                 },
                 TlangEnumVariant {
                     name: "None".to_string(),
@@ -114,11 +114,11 @@ impl BuiltinShapes {
             vec![
                 TlangEnumVariant {
                     name: "Ok".to_string(),
-                    field_map: HashMap::new(),
+                    field_map: HashMap::from([("0".to_string(), 0)]),
                 },
                 TlangEnumVariant {
                     name: "Err".to_string(),
-                    field_map: HashMap::new(),
+                    field_map: HashMap::from([("0".to_string(), 0)]),
                 },
             ],
             HashMap::new(),

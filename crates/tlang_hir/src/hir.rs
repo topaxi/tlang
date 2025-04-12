@@ -170,7 +170,11 @@ impl Path {
 
     pub fn as_init(&self) -> Self {
         Path {
-            segments: self.segments[0..self.segments.len() - 1].to_vec(),
+            segments: if self.segments.len() > 1 {
+                self.segments[0..self.segments.len() - 1].to_vec()
+            } else {
+                vec![self.segments[0].clone()]
+            },
             res: Default::default(),
             span: self.span,
         }
