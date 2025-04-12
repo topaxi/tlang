@@ -134,9 +134,47 @@ impl CodegenJS {
                 self.generate_block_expression(block)
             }
             hir::ExprKind::Block(block) => self.generate_block(block),
-            hir::ExprKind::Loop(_block) => todo!(),
-            hir::ExprKind::Break(_expr) => todo!(),
-            hir::ExprKind::Continue => todo!(),
+            hir::ExprKind::Loop(block) => {
+                self.push_str("(() => {");
+                self.push_newline();
+                self.inc_indent();
+                self.push_indent();
+
+                self.push_indent();
+                self.push_str("for (;;) {");
+                self.push_newline();
+                self.inc_indent();
+
+                for stmt in &block.stmts {
+                    self.generate_stmt(stmt);
+                }
+
+                if block.has_completion() {
+                    self.generate_expr(block.expr.as_ref().unwrap(), None);
+                    self.push_char(';');
+                    self.push_newline();
+                }
+
+                self.dec_indent();
+                self.push_indent();
+                self.push_char('}');
+                self.push_newline();
+
+                self.dec_indent();
+                self.push_indent();
+                self.push_str("})()");
+            }
+            hir::ExprKind::Break(expr) => {
+                self.push_str("return");
+
+                if let Some(expr) = expr {
+                    self.push_char(' ');
+                    self.generate_expr(expr, parent_op);
+                }
+
+                self.push_char(';');
+            }
+            hir::ExprKind::Continue => self.push_str("continue"),
             hir::ExprKind::Call(expr) => self.generate_call_expression(expr),
             hir::ExprKind::TailCall(expr) => self.generate_recursive_call_expression(expr),
             hir::ExprKind::Cast(expr, _) => {
