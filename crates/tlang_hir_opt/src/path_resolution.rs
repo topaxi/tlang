@@ -1,6 +1,8 @@
-use std::collections::HashMap;
 use log::debug;
-use tlang_hir::hir::{self, Block, Expr, ExprKind, HirId, Module, Path, Res, Stmt, StmtKind, Pat, PatKind};
+use std::collections::HashMap;
+use tlang_hir::hir::{
+    self, Block, Expr, ExprKind, HirId, Module, Pat, PatKind, Path, Res, Stmt, StmtKind,
+};
 use tlang_hir::visit::{self, Visitor};
 
 use crate::HirPass;
@@ -70,6 +72,12 @@ pub struct PathResolver {
     changed: bool,
 }
 
+impl Default for PathResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PathResolver {
     pub fn new() -> Self {
         Self {
@@ -132,31 +140,28 @@ impl PathResolver {
 
 impl<'hir> Visitor<'hir> for PathResolver {
     fn visit_module(&mut self, module: &'hir mut Module) {
-        // Visit the module block directly
         self.visit_block(&mut module.block);
     }
 
     fn visit_block(&mut self, block: &'hir mut Block) {
-        // First collect let bindings in the current scope
-        for stmt in &mut block.stmts {
-            if let StmtKind::Let(pat, _, _) = &mut stmt.kind {
-                if let PatKind::Identifier(hir_id, ref ident) = pat.kind {
-                    self.scope().def_local(ident.as_str(), hir_id);
+        self.with_new_scope(|this| {
+            for stmt in &mut block.stmts {
+                if let StmtKind::Let(pat, _, _) = &mut stmt.kind {
+                    if let PatKind::Identifier(hir_id, ref ident) = pat.kind {
+                        this.scope().def_local(ident.as_str(), hir_id);
+                    }
                 }
             }
-        }
 
-        // Then visit all statements in a new scope
-        self.with_new_scope(|this| {
-            // Visit all statements
             for stmt in &mut block.stmts {
                 this.visit_stmt(stmt);
             }
+
             if let Some(expr) = &mut block.expr {
                 this.visit_expr(expr);
             }
 
-            block.clone()
+            block
         });
     }
 
@@ -176,4 +181,5 @@ impl HirPass for PathResolver {
         self.visit_module(module);
         self.changed
     }
-} 
+}
+
