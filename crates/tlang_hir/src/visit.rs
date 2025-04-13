@@ -113,7 +113,11 @@ pub fn walk_expr<'hir, V: Visitor<'hir>>(visitor: &mut V, expr: &'hir mut hir::E
                 visitor.visit_block(consequence);
             }
         }
-        hir::ExprKind::Block(block) => visitor.visit_block(block),
+        hir::ExprKind::Block(block) | hir::ExprKind::Loop(block) => visitor.visit_block(block),
+        hir::ExprKind::Break(Some(expr)) => {
+            visitor.visit_expr(expr);
+        }
+        hir::ExprKind::Break(_) => {}
         hir::ExprKind::FunctionExpression(decl) => {
             visitor.visit_expr(&mut decl.name);
 
@@ -169,6 +173,7 @@ pub fn walk_expr<'hir, V: Visitor<'hir>>(visitor: &mut V, expr: &'hir mut hir::E
             visitor.visit_ty(ty);
         }
         hir::ExprKind::Wildcard => {}
+        hir::ExprKind::Continue => {}
         hir::ExprKind::Range(..) => todo!(),
     }
 }
