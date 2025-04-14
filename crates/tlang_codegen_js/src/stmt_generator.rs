@@ -1,6 +1,7 @@
 use tlang_hir::hir;
 
 use crate::generator::{BlockContext, CodegenJS};
+use crate::expr_generator::expr_contains_return;
 
 impl CodegenJS {
     pub(crate) fn generate_stmt(&mut self, statement: &hir::Stmt) {
@@ -10,16 +11,25 @@ impl CodegenJS {
             hir::StmtKind::Expr(expr) => {
                 self.push_indent();
                 self.push_context(BlockContext::Statement);
-                self.generate_expr(expr, None);
+                self.generate_expr(expr, None, BlockContext::Statement);
                 self.pop_context();
-
-                if self.needs_semicolon(Some(expr)) {
-                    self.push_char(';');
-                }
-                self.push_newline();
             }
             hir::StmtKind::Let(pattern, expression, _ty) => {
-                self.generate_variable_declaration(pattern, expression);
+                // Check if the initializer requires statement transformation
+                let needs_stmt_transform = match &expression.kind {
+                    hir::ExprKind::Block(_) | hir::ExprKind::IfElse(_,_,_) | hir::ExprKind::Match(_,_) => {
+                        expr_contains_return(expression)
+                    }
+                    _ => false,
+                };
+
+                if needs_stmt_transform {
+                    // Handle complex expressions with returns by transforming to statements.
+                    self.generate_variable_declaration_stmt_transform(pattern, expression);
+                } else {
+                    // Use existing logic for simple expressions or those without return.
+                    self.generate_variable_declaration(pattern, expression);
+                }
             }
             hir::StmtKind::FunctionDeclaration(decl) => self.generate_function_declaration(decl),
             hir::StmtKind::DynFunctionDeclaration(decl) => {
@@ -107,7 +117,7 @@ impl CodegenJS {
 
         self.push_str("] = ");
         self.push_context(BlockContext::Expression);
-        self.generate_expr(value, None);
+        self.generate_expr(value, None, BlockContext::Expression);
 
         for (ident_pattern, var_name) in bindings {
             self.current_scope()
@@ -116,5 +126,37 @@ impl CodegenJS {
 
         self.pop_context();
         self.push_str(";\n");
+    }
+
+    /// Generates a variable declaration where the initializer expression
+    /// contains a `return` and needs to be generated as statements.
+    fn generate_variable_declaration_stmt_transform(
+        &mut self,
+        pattern: &hir::Pat,
+        expression: &hir::Expr,
+    ) {
+        // 1. Declare the variable(s) from the pattern first.
+        match &pattern.kind {
+            hir::PatKind::Identifier(_, ident) => {
+                let var_name = self.current_scope().declare_variable(ident.as_str());
+                // Generate `let var_name;`
+                self.push_indent();
+                self.push_str(&format!("let {};\n", var_name));
+                self.flush_statement_buffer(); // Ensure declaration is separate
+
+                // 2. Generate the initializer expression as statements assigning to the var.
+                self.generate_expr_assignment_stmt(expression, &var_name, None);
+                self.flush_statement_buffer(); // Ensure assignment is separate
+
+                self.current_scope()
+                    .declare_variable_alias(ident.as_str(), &var_name);
+            }
+            // TODO: Handle list patterns and other patterns if needed for statement transform
+            _ => {
+                // Fallback or error for unsupported patterns in this context
+                eprintln!("Warning: Statement transformation for let with complex pattern {:?} containing return is not fully implemented. Falling back to default generation.", pattern.kind);
+                self.generate_variable_declaration(pattern, expression);
+            }
+        }
     }
 }

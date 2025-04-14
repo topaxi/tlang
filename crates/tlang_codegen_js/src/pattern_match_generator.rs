@@ -50,23 +50,19 @@ fn match_args_have_completions(arms: &[hir::MatchArm]) -> bool {
 impl CodegenJS {
     fn generate_match_arm_block(&mut self, block: &hir::Block) {
         self.flush_statement_buffer();
-        if !block.stmts.is_empty() {
-            self.generate_block_expression(block);
-        } else if self.current_completion_variable() == Some("return") {
-            if block.expr.as_ref().is_some_and(|expr| expr.is_tail_call()) {
-                self.generate_block_expression(block);
-            } else if let Some(expr) = &block.expr {
+        if !block.stmts.is_empty() || block.expr.is_none() {
+            self.generate_block_statement(block);
+        } else if let Some(expr) = &block.expr {
+            if self.is_self_referencing_tail_call(expr) {
+                self.generate_return_statement(Some(expr));
+            } else {
                 self.push_indent();
                 self.push_str("return ");
-                self.generate_expr(expr, None);
+                self.generate_expr(expr, None, BlockContext::Expression);
                 self.push_str(";\n");
             }
-        } else if let Some(expr) = &block.expr {
-            self.push_indent();
-            self.push_current_completion_variable();
-            self.push_str(" = ");
-            self.generate_expr(expr, None);
-            self.push_str(";\n");
+        } else {
+            self.generate_block_statement(block);
         }
     }
 
@@ -98,8 +94,6 @@ impl CodegenJS {
     fn generate_pat_condition(&mut self, pat: &hir::Pat, root_pat: bool, parent_js_expr: &str) {
         match &pat.kind {
             hir::PatKind::Identifier(_, ident_pattern) => {
-                // If you ended up here due to a `somevar = somevar`, we shouldn't have rendered
-                // the match arm condition in the first place.
                 let binding_name = self
                     .current_scope()
                     .resolve_variable(ident_pattern.as_str())
@@ -182,8 +176,6 @@ impl CodegenJS {
                     }
 
                     self.push_str(" && ");
-                    // This feels awkward, could this be handled when we match the Rest pattern
-                    // below?
                     let parent_js_expr = if matches!(pattern.kind, hir::PatKind::Rest(_)) {
                         parent_js_expr.to_string() + ".slice(" + &i.to_string() + ")"
                     } else {
@@ -200,27 +192,7 @@ impl CodegenJS {
     }
 
     pub(crate) fn generate_match_expression(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) {
-        // TODO: A lot here is copied from the if statement generator.
-        let mut lhs = self.replace_statement_buffer(String::new());
-        let has_block_completions =
-            self.current_context() == BlockContext::Expression && match_args_have_completions(arms);
-        let mut has_let = false;
-        if has_block_completions {
-            // TODO: We could probably reuse existing completion vars here.
-            if let Some("return") = self.current_completion_variable() {
-                self.push_completion_variable(Some("return"));
-                lhs = self.replace_statement_buffer_with_empty_string();
-            } else {
-                let completion_tmp_var = self.current_scope().declare_tmp_variable();
-                self.push_indent();
-                self.push_str("let ");
-                self.push_str(&completion_tmp_var);
-                self.push_completion_variable(Some(&completion_tmp_var));
-                has_let = true;
-            }
-        } else {
-            self.push_completion_variable(None);
-        }
+        let original_buffer = self.replace_statement_buffer_with_empty_string();
 
         match &expr.kind {
             hir::ExprKind::Path(path) => {
@@ -250,32 +222,15 @@ impl CodegenJS {
 
         let match_value_binding = match self.match_context_stack.last() {
             Some(MatchContext::Identifier(identifier)) => identifier.clone(),
-            Some(MatchContext::ListOfIdentifiers(_)) => "".to_string(), // ohoh...
+            Some(MatchContext::ListOfIdentifiers(_)) => "".to_string(),
             _ => {
                 let match_value_binding = self.current_scope().declare_tmp_variable();
-
-                if has_let {
-                    self.push_char(',');
-                    self.push_str(&match_value_binding);
-                    self.push_str(" = ");
-                    self.generate_expr(expr, None);
-                } else {
-                    self.push_let_declaration_to_expr(&match_value_binding, expr);
-                    has_let = true;
-                }
-
+                self.push_let_declaration_to_expr(&match_value_binding, expr);
                 match_value_binding
             }
         };
 
         let let_guard_var = if arms.iter().any(|arm| arm.has_let_guard()) {
-            if !has_let {
-                self.push_indent();
-                self.push_str("let ");
-                has_let = true;
-            } else {
-                self.push_char(',');
-            }
             let binding = self.current_scope().declare_tmp_variable();
             self.push_str(&binding);
             binding
@@ -284,9 +239,6 @@ impl CodegenJS {
         };
 
         let mut unique = HashSet::new();
-        // There's optimization opportunities in case the match expression is a
-        // list of identifiers, then we can just alias the identifiers within the arms. This
-        // case should be pretty common in function overloads.
         let mut all_pat_identifiers = arms
             .iter()
             .flat_map(|arm| {
@@ -313,103 +265,39 @@ impl CodegenJS {
         for binding in all_pat_identifiers {
             if unique.insert(binding.clone()) {
                 let binding = self.current_scope().declare_variable(&binding);
-                // TODO: Ugly workaround, as we always push a comma when generating pat identifiers
-                //       bindings.
-                if has_let {
-                    self.push_char(',');
-                } else {
-                    self.push_indent();
-                    self.push_str("let ");
-                    has_let = true;
-                }
                 self.push_str(&binding);
             }
         }
 
-        if has_let {
-            self.push_char(';');
-        } else {
-            self.push_indent();
-        }
+        self.push_str("}");
 
-        for (
-            i,
-            hir::MatchArm {
-                pat,
-                guard,
-                block,
-                leading_comments,
-                trailing_comments,
-                ..
-            },
-        ) in arms.iter().enumerate()
-        {
-            let no_cond_need = pat.is_wildcard() || expr_idents_match_pat_idents(expr, pat);
-            let need_cond = guard.is_some() || pat.is_empty_list();
+        // Restore original buffer content if needed (though likely empty now)
+        let current_buffer = self.replace_statement_buffer(original_buffer);
 
-            if !no_cond_need || need_cond {
-                self.push_str("if (");
-                self.generate_pat_condition(pat, true, &match_value_binding);
-                if !pat.is_wildcard() && guard.is_some() && !is_fixed_list_pattern(pat) {
-                    self.push_str(" && ");
-                }
-                if let Some(guard) = guard {
-                    self.generate_match_arm_guard(guard, &let_guard_var);
-                }
-                self.push_str(") ");
-            }
+        // The IIFE approach directly appends to the main buffer.
+        // If this old function were still used, this part would need rethinking.
+        // TODO: This function (`generate_match_expression`) is likely superseded by the
+        //       IIFE logic (`generate_match_return`/`generate_match_statement`)
+        //       and its buffer/output handling is probably incorrect now.
+        //       Verify if it's still used and refactor or remove.
+        self.push_str(&current_buffer); // Append the generated match if/else chain to current buffer
 
-            self.push_str("{\n");
-            self.inc_indent();
-            self.generate_comments(leading_comments);
-            self.generate_match_arm_block(block);
-            self.generate_comments(trailing_comments);
-            self.dec_indent();
-            self.push_indent();
+        // Old logic tried to push the final result (temp var or undefined).
+        // IIFE handles this via its return value.
 
-            if i == arms.len() - 1 {
-                self.push_char('}');
-            } else {
-                self.push_str("} else ");
-            }
-        }
-
-        if has_block_completions && self.current_completion_variable() != Some("return") {
-            self.push_newline();
-            // If we have an lhs, put the completion var as the rhs of the lhs.
-            // Otherwise, we assign the completion_var to the previous completion_var.
-            if !lhs.is_empty() {
-                self.push_str(&lhs);
-                self.push_current_completion_variable();
-            } else {
-                self.push_indent();
-                let prev_completion_var = self
-                    .nth_completion_variable(self.current_completion_variable_count() - 2)
-                    .unwrap()
-                    .to_string();
-                self.push_str(&prev_completion_var);
-                self.push_str(" = ");
-                self.push_current_completion_variable();
-                self.push_char(';');
-                self.push_newline();
-            }
-        }
-        self.pop_completion_variable();
         self.match_context_stack.pop();
     }
 
     fn generate_match_arm_guard(&mut self, guard: &hir::Expr, let_guard_var: &str) {
-        // If the guard is a let expression, we special case this here, normal if let expressions
-        // are handled in the lowering process and will be transformed to a match expression.
         if let hir::ExprKind::Let(pat, expr) = &guard.kind {
             self.push_char('(');
             self.push_str(let_guard_var);
             self.push_str(" = ");
-            self.generate_expr(expr, None);
+            self.generate_expr(expr, None, BlockContext::Expression);
             self.push_str(", true) && ");
             self.generate_pat_condition(pat, false, let_guard_var);
         } else {
-            self.generate_expr(guard, None);
+            self.generate_expr(guard, None, BlockContext::Expression);
         }
     }
 }

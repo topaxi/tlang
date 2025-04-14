@@ -1060,6 +1060,7 @@ dependencies = [
  "ctor",
  "env_logger",
  "indoc",
+ "log",
  "pretty_assertions",
  "tlang_ast",
  "tlang_ast_lowering",

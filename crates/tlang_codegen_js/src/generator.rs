@@ -46,7 +46,6 @@ pub struct CodegenJS {
     function_context_stack: Vec<FunctionContext>,
     pub(crate) match_context_stack: MatchContextStack,
     statement_buffer: Vec<String>,
-    completion_variables: Vec<Option<Box<str>>>,
     render_ternary: bool,
 }
 
@@ -66,7 +65,6 @@ impl CodegenJS {
             function_context_stack: vec![],
             match_context_stack: Default::default(),
             statement_buffer: vec![String::with_capacity(STATEMENT_BUFFER_CAPACITY)],
-            completion_variables: vec![None],
             render_ternary: true,
         }
     }
@@ -282,42 +280,6 @@ impl CodegenJS {
         self.function_context_stack.pop();
     }
 
-    #[inline(always)]
-    pub(crate) fn push_completion_variable(&mut self, name: Option<&str>) {
-        self.completion_variables.push(name.map(|name| name.into()));
-    }
-
-    #[inline(always)]
-    pub(crate) fn pop_completion_variable(&mut self) -> Option<Box<str>> {
-        self.completion_variables.pop()?
-    }
-
-    #[inline(always)]
-    pub(crate) fn current_completion_variable(&self) -> Option<&str> {
-        self.completion_variables.last().unwrap().as_deref()
-    }
-
-    #[inline(always)]
-    pub(crate) fn current_completion_variable_count(&self) -> usize {
-        self.completion_variables.len()
-    }
-
-    #[inline(always)]
-    pub(crate) fn nth_completion_variable(&self, index: usize) -> Option<&str> {
-        self.completion_variables.get(index).unwrap().as_deref()
-    }
-
-    #[inline(always)]
-    pub(crate) fn push_current_completion_variable(&mut self) {
-        let current_completion_variable = self.pop_completion_variable();
-
-        if let Some(str) = &current_completion_variable {
-            self.push_str(str);
-        }
-
-        self.completion_variables.push(current_completion_variable);
-    }
-
     pub(crate) fn push_let_declaration(&mut self, name: &str) {
         self.push_indent();
         self.push_str("let ");
@@ -334,7 +296,7 @@ impl CodegenJS {
 
     pub(crate) fn push_let_declaration_to_expr(&mut self, name: &str, expr: &hir::Expr) {
         self.push_open_let_declaration(name);
-        self.generate_expr(expr, None);
+        self.generate_expr(expr, None, BlockContext::Expression);
     }
 
     pub(crate) fn generate_comment(&mut self, comment: &Token) {

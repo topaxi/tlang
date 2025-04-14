@@ -1,6 +1,6 @@
 use tlang_hir::hir;
 
-use crate::expr_generator::expr_can_render_as_js_expr;
+use crate::expr_generator::{expr_can_render_as_js_expr, expr_contains_return};
 use crate::generator::{BlockContext, CodegenJS, FunctionContext};
 
 impl CodegenJS {
@@ -198,7 +198,7 @@ impl CodegenJS {
             && expr_can_render_as_js_expr(declaration.body.expr.as_ref().unwrap())
         {
             self.push_char(' ');
-            self.generate_expr(declaration.body.expr.as_ref().unwrap(), None);
+            self.generate_expr(declaration.body.expr.as_ref().unwrap(), None, BlockContext::Expression);
         } else {
             self.push_str(" {\n");
             self.inc_indent();
@@ -232,48 +232,59 @@ impl CodegenJS {
         self.generate_statements(&block.stmts);
 
         if block.has_completion() {
-            self.generate_return_statement(block.expr.as_ref());
-            self.flush_statement_buffer();
+            let final_expr = block.expr.as_ref().unwrap(); // block.has_completion() ensures this unwrap is safe.
+
+            // If the final expression actually CONTAINS a return, generate it as a statement.
+            // Otherwise, use a standard return statement.
+            if expr_contains_return(final_expr) {
+                 self.generate_expr_stmt(final_expr, None); // Generate as statement
+                 self.flush_statement_buffer();
+            } else {
+                 // Generate `return <expr>;`
+                 self.generate_return_statement(Some(final_expr));
+                 self.flush_statement_buffer();
+            }
         }
     }
 
-    pub(crate) fn generate_return_statement(self: &mut CodegenJS, expr: Option<&hir::Expr>) {
-        // We do not render a return statement if we are in a tail recursive function body.
-        // Which calls the current function recursively.
-        if let Some(hir::ExprKind::TailCall(call_expr)) = expr.map(|e| &e.kind) {
-            let call_identifier = if let hir::ExprKind::Path(_) = &call_expr.callee.kind {
-                Some(fn_identifier_to_string(&call_expr.callee))
-            } else {
-                None
+    pub(crate) fn generate_return_statement(self: &mut CodegenJS, expr_opt: Option<&hir::Expr>) {
+        // Check if this is a tail recursive call.
+        if expr_opt.map_or(false, |e| self.is_self_referencing_tail_call(e)) {
+            let call_expr = match &expr_opt.unwrap().kind {
+                hir::ExprKind::TailCall(call) => call,
+                _ => unreachable!("Expected TailCall expression"),
             };
 
-            if call_identifier.is_some() {
-                if let Some(function_context) = self.get_function_context() {
-                    if function_context.is_tail_recursive
-                        && function_context.name == call_identifier.unwrap()
-                    {
-                        return self.generate_optional_expr(expr, None);
+            // Tail recursive call, generate assignments and continue.
+            self.generate_recursive_call_expression(call_expr);
+            self.push_indent();
+            self.push_str("continue rec;\n");
+        } else {
+            // Regular return statement.
+            if let Some(expr) = expr_opt {
+                 // Check if the expression to return is complex and needs statement generation.
+                 let needs_stmt_gen = matches!(expr.kind, hir::ExprKind::Block(_) | hir::ExprKind::IfElse(_,_,_) | hir::ExprKind::Match(_,_));
+
+                 if needs_stmt_gen && !expr_contains_return(expr) {
+                     // Generate complex expr directly as statements if it doesn't contain return.
+                     self.generate_expr_stmt(expr, None);
+                 } else {
+                    // Otherwise, generate `return <expr>;`
+                    self.push_indent();
+                    self.push_str("return");
+                    // Add space only if there is an expression to return
+                    if expr_opt.is_some() { 
+                        self.push_char(' ');
                     }
-                }
+                    self.generate_expr(expr, None, BlockContext::Expression);
+                    self.push_str(";\n");
+                 }
+            } else {
+                // Generate `return;`
+                self.push_indent();
+                self.push_str("return;\n");
             }
         }
-
-        self.push_indent();
-        self.push_context(BlockContext::Expression);
-        self.push_str("return");
-
-        if let Some(expr) = expr {
-            self.push_char(' ');
-            self.push_completion_variable(Some("return"));
-            self.generate_expr(expr, None);
-            self.pop_completion_variable();
-        }
-
-        if self.needs_semicolon(expr) {
-            self.push_char(';');
-        }
-        self.push_newline();
-        self.pop_context();
     }
 
     fn get_self_referencing_tail_call_function_context(
@@ -404,6 +415,16 @@ fn is_function_body_tail_recursive(function_name: &str, node: &hir::Expr) -> boo
                         false
                     }
                 })
+        }
+        _ => false,
+    }
+}
+
+/// Helper function to check if an expression needs statement transformation.
+fn needs_statement_transform(expr: &hir::Expr) -> bool {
+    match &expr.kind {
+        hir::ExprKind::Block(_) | hir::ExprKind::IfElse(_,_,_) | hir::ExprKind::Match(_,_) => {
+            expr_contains_return(expr)
         }
         _ => false,
     }

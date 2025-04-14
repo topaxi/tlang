@@ -1,6 +1,6 @@
 use tlang_hir::hir;
 
-use crate::generator::CodegenJS;
+use crate::generator::{CodegenJS, BlockContext};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum JSAssociativity {
@@ -30,9 +30,9 @@ impl CodegenJS {
             self.push_char('(');
         }
 
-        self.generate_expr(lhs, Some(op));
+        self.generate_expr(lhs, Some(op), BlockContext::Expression);
         self.generate_binary_operator_token(op);
-        self.generate_expr(rhs, Some(op));
+        self.generate_expr(rhs, Some(op), BlockContext::Expression);
 
         if needs_parentheses {
             self.push_char(')');
