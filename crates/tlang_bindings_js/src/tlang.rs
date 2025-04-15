@@ -2,6 +2,7 @@ use serde::Deserialize;
 use tlang_ast::node::{self as ast};
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_hir::hir;
+use tlang_hir_opt::HirOptimizer;
 use tlang_hir_pretty::{HirPretty, HirPrettyOptions};
 use tlang_parser::Parser;
 use tlang_parser::error::{ParseError, ParseIssue};
@@ -152,7 +153,10 @@ impl Tlang {
         }
 
         if let Some(ast) = self.ast() {
-            self.build.hir = Some(tlang_ast_lowering::lower_to_hir(ast));
+            let mut hir = tlang_ast_lowering::lower_to_hir(ast);
+            let mut optimizer = HirOptimizer::default();
+            optimizer.optimize_module(&mut hir);
+            self.build.hir = Some(hir);
         }
     }
 

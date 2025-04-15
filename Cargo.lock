@@ -1021,6 +1021,7 @@ dependencies = [
  "tlang_ast_lowering",
  "tlang_codegen_js",
  "tlang_hir",
+ "tlang_hir_opt",
  "tlang_hir_pretty",
  "tlang_interpreter",
  "tlang_macros",
