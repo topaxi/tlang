@@ -60,6 +60,7 @@ updates:
         patterns:
           - 'lit'
           - 'ts-lit-plugin'
+          - '@lit/*'
       typescript:
         patterns:
           - 'typescript'
