@@ -114,6 +114,7 @@ impl Lexer<'_> {
 
     fn line_column(&self) -> LineColumn {
         LineColumn {
+            index: self.position as u32,
             line: self.current_line,
             column: self.current_column,
         }

@@ -4,7 +4,7 @@ use std::fmt::{Display, Formatter};
 use serde::Serialize;
 use tlang_ast::span::Span;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum Severity {
     Error,
@@ -44,12 +44,12 @@ impl Diagnostic {
         &self.message
     }
 
-    pub fn severity(&self) -> &Severity {
-        &self.severity
+    pub fn severity(&self) -> Severity {
+        self.severity
     }
 
-    pub fn span(&self) -> &Span {
-        &self.span
+    pub fn span(&self) -> Span {
+        self.span
     }
 
     pub fn is_error(&self) -> bool {

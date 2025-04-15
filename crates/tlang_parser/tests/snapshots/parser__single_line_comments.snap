@@ -14,10 +14,12 @@ Module(
             name: "x",
             span: Span(
               start: LineColumn(
+                index: 25,
                 line: 1,
                 column: 5,
               ),
               end: LineColumn(
+                index: 26,
                 line: 1,
                 column: 6,
               ),
@@ -27,10 +29,12 @@ Module(
           trailing_comments: [],
           span: Span(
             start: LineColumn(
+              index: 25,
               line: 1,
               column: 5,
             ),
             end: LineColumn(
+              index: 26,
               line: 1,
               column: 6,
             ),
@@ -43,10 +47,12 @@ Module(
           trailing_comments: [],
           span: Span(
             start: LineColumn(
+              index: 29,
               line: 1,
               column: 9,
             ),
             end: LineColumn(
+              index: 30,
               line: 1,
               column: 10,
             ),
@@ -56,10 +62,12 @@ Module(
       )),
       span: Span(
         start: LineColumn(
+          index: 21,
           line: 1,
           column: 1,
         ),
         end: LineColumn(
+          index: 31,
           line: 1,
           column: 11,
         ),
@@ -69,10 +77,12 @@ Module(
           kind: SingleLineComment(" this is a comment"),
           span: Span(
             start: LineColumn(
+              index: 0,
               line: 0,
               column: 0,
             ),
             end: LineColumn(
+              index: 20,
               line: 0,
               column: 20,
             ),
@@ -84,10 +94,12 @@ Module(
   ],
   span: Span(
     start: LineColumn(
+      index: 0,
       line: 0,
       column: 0,
     ),
     end: LineColumn(
+      index: 0,
       line: 0,
       column: 0,
     ),

@@ -21,10 +21,12 @@ Module(
                       name: "foo",
                       span: Span(
                         start: LineColumn(
+                          index: 0,
                           line: 0,
                           column: 0,
                         ),
                         end: LineColumn(
+                          index: 3,
                           line: 0,
                           column: 3,
                         ),
@@ -33,10 +35,12 @@ Module(
                   ],
                   span: Span(
                     start: LineColumn(
+                      index: 0,
                       line: 0,
                       column: 0,
                     ),
                     end: LineColumn(
+                      index: 3,
                       line: 0,
                       column: 3,
                     ),
@@ -46,10 +50,12 @@ Module(
                 trailing_comments: [],
                 span: Span(
                   start: LineColumn(
+                    index: 0,
                     line: 0,
                     column: 0,
                   ),
                   end: LineColumn(
+                    index: 3,
                     line: 0,
                     column: 3,
                   ),
@@ -59,10 +65,12 @@ Module(
                 name: "bar",
                 span: Span(
                   start: LineColumn(
+                    index: 4,
                     line: 0,
                     column: 4,
                   ),
                   end: LineColumn(
+                    index: 7,
                     line: 0,
                     column: 7,
                   ),
@@ -73,10 +81,12 @@ Module(
             trailing_comments: [],
             span: Span(
               start: LineColumn(
+                index: 0,
                 line: 0,
                 column: 0,
               ),
               end: LineColumn(
+                index: 0,
                 line: 0,
                 column: 0,
               ),
@@ -86,10 +96,12 @@ Module(
             name: "baz",
             span: Span(
               start: LineColumn(
+                index: 8,
                 line: 0,
                 column: 8,
               ),
               end: LineColumn(
+                index: 11,
                 line: 0,
                 column: 11,
               ),
@@ -100,10 +112,12 @@ Module(
         trailing_comments: [],
         span: Span(
           start: LineColumn(
+            index: 0,
             line: 0,
             column: 0,
           ),
           end: LineColumn(
+            index: 11,
             line: 0,
             column: 11,
           ),
@@ -111,10 +125,12 @@ Module(
       )),
       span: Span(
         start: LineColumn(
+          index: 0,
           line: 0,
           column: 0,
         ),
         end: LineColumn(
+          index: 12,
           line: 0,
           column: 12,
         ),
@@ -125,10 +141,12 @@ Module(
   ],
   span: Span(
     start: LineColumn(
+      index: 0,
       line: 0,
       column: 0,
     ),
     end: LineColumn(
+      index: 0,
       line: 0,
       column: 0,
     ),
