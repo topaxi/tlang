@@ -68,12 +68,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anyhow"
-version = "1.0.97"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcfed56ad506cb2c684a14971b8861fdc3baaaae314b9e5f9bb532cbe3ba7a4f"
-
-[[package]]
 name = "autocfg"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1081,7 +1075,6 @@ dependencies = [
 name = "tlang_hir_opt"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "env_logger",
  "insta",
  "log",
@@ -1157,7 +1150,6 @@ dependencies = [
 name = "tlang_parser"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "ctor",
  "env_logger",
  "indoc",
