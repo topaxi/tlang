@@ -101,7 +101,7 @@ impl<'src> Parser<'src> {
             .source()
             .lines()
             .nth(start_span.line as usize)
-            .unwrap();
+            .unwrap_or_default();
         let caret = " ".repeat(start_span.column as usize) + "^";
 
         panic!(
@@ -118,7 +118,7 @@ impl<'src> Parser<'src> {
             .source()
             .lines()
             .nth(start_span.line as usize)
-            .unwrap();
+            .unwrap_or_default();
         let caret = " ".repeat(start_span.column as usize) + "^";
 
         panic!(
@@ -136,7 +136,7 @@ impl<'src> Parser<'src> {
             .source()
             .lines()
             .nth(start_span.line as usize)
-            .unwrap();
+            .unwrap_or_default();
         let caret = " ".repeat(start_span.column as usize) + "^";
 
         panic!(
