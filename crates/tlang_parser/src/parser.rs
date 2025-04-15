@@ -94,7 +94,7 @@ impl<'src> Parser<'src> {
     }
 
     #[inline(never)]
-    fn panic_unexpected_token(&self, expected: &str, actual: Token) {
+    fn panic_unexpected_token(&self, expected: &str, actual: Token) -> ! {
         let start_span = actual.span.start;
         let source_line = self
             .lexer
@@ -111,7 +111,7 @@ impl<'src> Parser<'src> {
     }
 
     #[inline(never)]
-    fn panic_unexpected_stmt(&self, expected: &str, actual: Stmt) {
+    fn panic_unexpected_stmt(&self, expected: &str, actual: Stmt) -> ! {
         let start_span = actual.span.start;
         let source_line = self
             .lexer
@@ -128,7 +128,7 @@ impl<'src> Parser<'src> {
     }
 
     #[inline(never)]
-    fn panic_unexpected_expr(&self, expected: &str, actual: Option<Expr>) {
+    fn panic_unexpected_expr(&self, expected: &str, actual: Option<Expr>) -> ! {
         let node = actual.as_ref().unwrap();
         let start_span = node.span.start;
         let source_line = self
@@ -489,13 +489,10 @@ impl<'src> Parser<'src> {
                         StmtKind::FunctionDeclaration(decl) => {
                             Box::new(node::expr!(self.unique_id(), FunctionExpression(decl)))
                         }
-                        _ => {
-                            self.panic_unexpected_stmt(
-                                "expression statement or function declaration",
-                                statement,
-                            );
-                            unreachable!()
-                        }
+                        _ => self.panic_unexpected_stmt(
+                            "expression statement or function declaration",
+                            statement,
+                        ),
                     };
                     self.end_span_from_previous_token(&mut statement.span);
                     expression.span = statement.span;
@@ -1020,10 +1017,7 @@ impl<'src> Parser<'src> {
                 let expr = self.parse_expression();
                 let call_expr = match expr.kind {
                     ExprKind::Call(call) => call,
-                    _ => {
-                        self.panic_unexpected_expr("call expression", Some(expr));
-                        unreachable!()
-                    }
+                    _ => self.panic_unexpected_expr("call expression", Some(expr)),
                 };
 
                 node::expr!(self.unique_id(), RecursiveCall(call_expr)).with_span(expr.span)
@@ -1094,7 +1088,6 @@ impl<'src> Parser<'src> {
             }
             _ => {
                 self.panic_unexpected_token("primary expression", self.current_token.clone());
-                unreachable!("Expected primary expression")
             }
         };
 
@@ -1402,7 +1395,6 @@ impl<'src> Parser<'src> {
                         // Stop parsing function declarations and rewind the lexer and panic.
                         self.restore_state(saved_state);
                         self.panic_unexpected_token("identifier", self.current_token.clone());
-                        unreachable!();
                     }
                 }
             }
@@ -1739,13 +1731,10 @@ impl<'src> Parser<'src> {
             ExprKind::FieldExpression(field) => {
                 self.fn_name_identifier_to_string(&field.base) + "." + field.field.as_str()
             }
-            _ => {
-                self.panic_unexpected_expr(
-                    "identifier, nested identifier or field expression",
-                    Some(identifier.clone()),
-                );
-                unreachable!()
-            }
+            _ => self.panic_unexpected_expr(
+                "identifier, nested identifier or field expression",
+                Some(identifier.clone()),
+            ),
         }
     }
 }
