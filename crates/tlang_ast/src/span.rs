@@ -4,6 +4,7 @@ use serde::Serialize;
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct LineColumn {
+    pub index: u32,
     pub line: u32,
     pub column: u32,
 }

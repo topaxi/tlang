@@ -18,10 +18,12 @@ Module(
                   name: "foldl",
                   span: Span(
                     start: LineColumn(
+                      index: 3,
                       line: 0,
                       column: 3,
                     ),
                     end: LineColumn(
+                      index: 8,
                       line: 0,
                       column: 8,
                     ),
@@ -30,10 +32,12 @@ Module(
               ],
               span: Span(
                 start: LineColumn(
+                  index: 3,
                   line: 0,
                   column: 3,
                 ),
                 end: LineColumn(
+                  index: 8,
                   line: 0,
                   column: 8,
                 ),
@@ -43,10 +47,12 @@ Module(
             trailing_comments: [],
             span: Span(
               start: LineColumn(
+                index: 3,
                 line: 0,
                 column: 3,
               ),
               end: LineColumn(
+                index: 8,
                 line: 0,
                 column: 8,
               ),
@@ -61,10 +67,12 @@ Module(
                 trailing_comments: [],
                 span: Span(
                   start: LineColumn(
+                    index: 9,
                     line: 0,
                     column: 9,
                   ),
                   end: LineColumn(
+                    index: 11,
                     line: 0,
                     column: 11,
                   ),
@@ -73,10 +81,12 @@ Module(
               type_annotation: None,
               span: Span(
                 start: LineColumn(
+                  index: 9,
                   line: 0,
                   column: 9,
                 ),
                 end: LineColumn(
+                  index: 11,
                   line: 0,
                   column: 11,
                 ),
@@ -89,10 +99,12 @@ Module(
                   name: "acc",
                   span: Span(
                     start: LineColumn(
+                      index: 13,
                       line: 0,
                       column: 13,
                     ),
                     end: LineColumn(
+                      index: 16,
                       line: 0,
                       column: 16,
                     ),
@@ -102,10 +114,12 @@ Module(
                 trailing_comments: [],
                 span: Span(
                   start: LineColumn(
+                    index: 13,
                     line: 0,
                     column: 13,
                   ),
                   end: LineColumn(
+                    index: 16,
                     line: 0,
                     column: 16,
                   ),
@@ -114,10 +128,12 @@ Module(
               type_annotation: None,
               span: Span(
                 start: LineColumn(
+                  index: 13,
                   line: 0,
                   column: 13,
                 ),
                 end: LineColumn(
+                  index: 16,
                   line: 0,
                   column: 16,
                 ),
@@ -131,10 +147,12 @@ Module(
                 trailing_comments: [],
                 span: Span(
                   start: LineColumn(
+                    index: 18,
                     line: 0,
                     column: 18,
                   ),
                   end: LineColumn(
+                    index: 19,
                     line: 0,
                     column: 19,
                   ),
@@ -143,10 +161,12 @@ Module(
               type_annotation: None,
               span: Span(
                 start: LineColumn(
+                  index: 18,
                   line: 0,
                   column: 18,
                 ),
                 end: LineColumn(
+                  index: 19,
                   line: 0,
                   column: 19,
                 ),
@@ -166,10 +186,12 @@ Module(
                     name: "acc",
                     span: Span(
                       start: LineColumn(
+                        index: 23,
                         line: 0,
                         column: 23,
                       ),
                       end: LineColumn(
+                        index: 26,
                         line: 0,
                         column: 26,
                       ),
@@ -178,10 +200,12 @@ Module(
                 ],
                 span: Span(
                   start: LineColumn(
+                    index: 23,
                     line: 0,
                     column: 23,
                   ),
                   end: LineColumn(
+                    index: 26,
                     line: 0,
                     column: 26,
                   ),
@@ -191,10 +215,12 @@ Module(
               trailing_comments: [],
               span: Span(
                 start: LineColumn(
+                  index: 23,
                   line: 0,
                   column: 23,
                 ),
                 end: LineColumn(
+                  index: 26,
                   line: 0,
                   column: 26,
                 ),
@@ -202,10 +228,12 @@ Module(
             )),
             span: Span(
               start: LineColumn(
+                index: 21,
                 line: 0,
                 column: 21,
               ),
               end: LineColumn(
+                index: 28,
                 line: 0,
                 column: 28,
               ),
@@ -215,10 +243,12 @@ Module(
           trailing_comments: [],
           span: Span(
             start: LineColumn(
+              index: 0,
               line: 0,
               column: 0,
             ),
             end: LineColumn(
+              index: 28,
               line: 0,
               column: 28,
             ),
@@ -234,10 +264,12 @@ Module(
                   name: "foldl",
                   span: Span(
                     start: LineColumn(
+                      index: 32,
                       line: 1,
                       column: 4,
                     ),
                     end: LineColumn(
+                      index: 37,
                       line: 1,
                       column: 9,
                     ),
@@ -246,10 +278,12 @@ Module(
               ],
               span: Span(
                 start: LineColumn(
+                  index: 32,
                   line: 1,
                   column: 4,
                 ),
                 end: LineColumn(
+                  index: 37,
                   line: 1,
                   column: 9,
                 ),
@@ -259,10 +293,12 @@ Module(
             trailing_comments: [],
             span: Span(
               start: LineColumn(
+                index: 32,
                 line: 1,
                 column: 4,
               ),
               end: LineColumn(
+                index: 37,
                 line: 1,
                 column: 9,
               ),
@@ -279,10 +315,12 @@ Module(
                       name: "x",
                       span: Span(
                         start: LineColumn(
+                          index: 39,
                           line: 1,
                           column: 11,
                         ),
                         end: LineColumn(
+                          index: 40,
                           line: 1,
                           column: 12,
                         ),
@@ -292,10 +330,12 @@ Module(
                     trailing_comments: [],
                     span: Span(
                       start: LineColumn(
+                        index: 39,
                         line: 1,
                         column: 11,
                       ),
                       end: LineColumn(
+                        index: 40,
                         line: 1,
                         column: 12,
                       ),
@@ -309,10 +349,12 @@ Module(
                         name: "xs",
                         span: Span(
                           start: LineColumn(
+                            index: 45,
                             line: 1,
                             column: 17,
                           ),
                           end: LineColumn(
+                            index: 47,
                             line: 1,
                             column: 19,
                           ),
@@ -322,10 +364,12 @@ Module(
                       trailing_comments: [],
                       span: Span(
                         start: LineColumn(
+                          index: 45,
                           line: 1,
                           column: 17,
                         ),
                         end: LineColumn(
+                          index: 47,
                           line: 1,
                           column: 19,
                         ),
@@ -335,10 +379,12 @@ Module(
                     trailing_comments: [],
                     span: Span(
                       start: LineColumn(
+                        index: 0,
                         line: 0,
                         column: 0,
                       ),
                       end: LineColumn(
+                        index: 0,
                         line: 0,
                         column: 0,
                       ),
@@ -349,10 +395,12 @@ Module(
                 trailing_comments: [],
                 span: Span(
                   start: LineColumn(
+                    index: 38,
                     line: 1,
                     column: 10,
                   ),
                   end: LineColumn(
+                    index: 48,
                     line: 1,
                     column: 20,
                   ),
@@ -361,10 +409,12 @@ Module(
               type_annotation: None,
               span: Span(
                 start: LineColumn(
+                  index: 38,
                   line: 1,
                   column: 10,
                 ),
                 end: LineColumn(
+                  index: 48,
                   line: 1,
                   column: 20,
                 ),
@@ -377,10 +427,12 @@ Module(
                   name: "acc",
                   span: Span(
                     start: LineColumn(
+                      index: 50,
                       line: 1,
                       column: 22,
                     ),
                     end: LineColumn(
+                      index: 53,
                       line: 1,
                       column: 25,
                     ),
@@ -390,10 +442,12 @@ Module(
                 trailing_comments: [],
                 span: Span(
                   start: LineColumn(
+                    index: 50,
                     line: 1,
                     column: 22,
                   ),
                   end: LineColumn(
+                    index: 53,
                     line: 1,
                     column: 25,
                   ),
@@ -402,10 +456,12 @@ Module(
               type_annotation: None,
               span: Span(
                 start: LineColumn(
+                  index: 50,
                   line: 1,
                   column: 22,
                 ),
                 end: LineColumn(
+                  index: 53,
                   line: 1,
                   column: 25,
                 ),
@@ -418,10 +474,12 @@ Module(
                   name: "f",
                   span: Span(
                     start: LineColumn(
+                      index: 55,
                       line: 1,
                       column: 27,
                     ),
                     end: LineColumn(
+                      index: 56,
                       line: 1,
                       column: 28,
                     ),
@@ -431,10 +489,12 @@ Module(
                 trailing_comments: [],
                 span: Span(
                   start: LineColumn(
+                    index: 55,
                     line: 1,
                     column: 27,
                   ),
                   end: LineColumn(
+                    index: 56,
                     line: 1,
                     column: 28,
                   ),
@@ -443,10 +503,12 @@ Module(
               type_annotation: None,
               span: Span(
                 start: LineColumn(
+                  index: 55,
                   line: 1,
                   column: 27,
                 ),
                 end: LineColumn(
+                  index: 56,
                   line: 1,
                   column: 28,
                 ),
@@ -469,10 +531,12 @@ Module(
                         name: "foldl",
                         span: Span(
                           start: LineColumn(
+                            index: 64,
                             line: 1,
                             column: 36,
                           ),
                           end: LineColumn(
+                            index: 69,
                             line: 1,
                             column: 41,
                           ),
@@ -481,10 +545,12 @@ Module(
                     ],
                     span: Span(
                       start: LineColumn(
+                        index: 64,
                         line: 1,
                         column: 36,
                       ),
                       end: LineColumn(
+                        index: 69,
                         line: 1,
                         column: 41,
                       ),
@@ -494,10 +560,12 @@ Module(
                   trailing_comments: [],
                   span: Span(
                     start: LineColumn(
+                      index: 64,
                       line: 1,
                       column: 36,
                     ),
                     end: LineColumn(
+                      index: 69,
                       line: 1,
                       column: 41,
                     ),
@@ -512,10 +580,12 @@ Module(
                           name: "xs",
                           span: Span(
                             start: LineColumn(
+                              index: 70,
                               line: 1,
                               column: 42,
                             ),
                             end: LineColumn(
+                              index: 72,
                               line: 1,
                               column: 44,
                             ),
@@ -524,10 +594,12 @@ Module(
                       ],
                       span: Span(
                         start: LineColumn(
+                          index: 70,
                           line: 1,
                           column: 42,
                         ),
                         end: LineColumn(
+                          index: 72,
                           line: 1,
                           column: 44,
                         ),
@@ -537,10 +609,12 @@ Module(
                     trailing_comments: [],
                     span: Span(
                       start: LineColumn(
+                        index: 70,
                         line: 1,
                         column: 42,
                       ),
                       end: LineColumn(
+                        index: 72,
                         line: 1,
                         column: 44,
                       ),
@@ -557,10 +631,12 @@ Module(
                               name: "f",
                               span: Span(
                                 start: LineColumn(
+                                  index: 74,
                                   line: 1,
                                   column: 46,
                                 ),
                                 end: LineColumn(
+                                  index: 75,
                                   line: 1,
                                   column: 47,
                                 ),
@@ -569,10 +645,12 @@ Module(
                           ],
                           span: Span(
                             start: LineColumn(
+                              index: 74,
                               line: 1,
                               column: 46,
                             ),
                             end: LineColumn(
+                              index: 75,
                               line: 1,
                               column: 47,
                             ),
@@ -582,10 +660,12 @@ Module(
                         trailing_comments: [],
                         span: Span(
                           start: LineColumn(
+                            index: 74,
                             line: 1,
                             column: 46,
                           ),
                           end: LineColumn(
+                            index: 75,
                             line: 1,
                             column: 47,
                           ),
@@ -600,10 +680,12 @@ Module(
                                 name: "acc",
                                 span: Span(
                                   start: LineColumn(
+                                    index: 76,
                                     line: 1,
                                     column: 48,
                                   ),
                                   end: LineColumn(
+                                    index: 79,
                                     line: 1,
                                     column: 51,
                                   ),
@@ -612,10 +694,12 @@ Module(
                             ],
                             span: Span(
                               start: LineColumn(
+                                index: 76,
                                 line: 1,
                                 column: 48,
                               ),
                               end: LineColumn(
+                                index: 79,
                                 line: 1,
                                 column: 51,
                               ),
@@ -625,10 +709,12 @@ Module(
                           trailing_comments: [],
                           span: Span(
                             start: LineColumn(
+                              index: 76,
                               line: 1,
                               column: 48,
                             ),
                             end: LineColumn(
+                              index: 79,
                               line: 1,
                               column: 51,
                             ),
@@ -642,10 +728,12 @@ Module(
                                 name: "x",
                                 span: Span(
                                   start: LineColumn(
+                                    index: 81,
                                     line: 1,
                                     column: 53,
                                   ),
                                   end: LineColumn(
+                                    index: 82,
                                     line: 1,
                                     column: 54,
                                   ),
@@ -654,10 +742,12 @@ Module(
                             ],
                             span: Span(
                               start: LineColumn(
+                                index: 81,
                                 line: 1,
                                 column: 53,
                               ),
                               end: LineColumn(
+                                index: 82,
                                 line: 1,
                                 column: 54,
                               ),
@@ -667,10 +757,12 @@ Module(
                           trailing_comments: [],
                           span: Span(
                             start: LineColumn(
+                              index: 81,
                               line: 1,
                               column: 53,
                             ),
                             end: LineColumn(
+                              index: 82,
                               line: 1,
                               column: 54,
                             ),
@@ -682,10 +774,12 @@ Module(
                     trailing_comments: [],
                     span: Span(
                       start: LineColumn(
+                        index: 74,
                         line: 1,
                         column: 46,
                       ),
                       end: LineColumn(
+                        index: 83,
                         line: 1,
                         column: 55,
                       ),
@@ -699,10 +793,12 @@ Module(
                           name: "f",
                           span: Span(
                             start: LineColumn(
+                              index: 85,
                               line: 1,
                               column: 57,
                             ),
                             end: LineColumn(
+                              index: 86,
                               line: 1,
                               column: 58,
                             ),
@@ -711,10 +807,12 @@ Module(
                       ],
                       span: Span(
                         start: LineColumn(
+                          index: 85,
                           line: 1,
                           column: 57,
                         ),
                         end: LineColumn(
+                          index: 86,
                           line: 1,
                           column: 58,
                         ),
@@ -724,10 +822,12 @@ Module(
                     trailing_comments: [],
                     span: Span(
                       start: LineColumn(
+                        index: 85,
                         line: 1,
                         column: 57,
                       ),
                       end: LineColumn(
+                        index: 86,
                         line: 1,
                         column: 58,
                       ),
@@ -739,10 +839,12 @@ Module(
               trailing_comments: [],
               span: Span(
                 start: LineColumn(
+                  index: 60,
                   line: 1,
                   column: 32,
                 ),
                 end: LineColumn(
+                  index: 87,
                   line: 1,
                   column: 59,
                 ),
@@ -750,10 +852,12 @@ Module(
             )),
             span: Span(
               start: LineColumn(
+                index: 58,
                 line: 1,
                 column: 30,
               ),
               end: LineColumn(
+                index: 89,
                 line: 1,
                 column: 61,
               ),
@@ -763,10 +867,12 @@ Module(
           trailing_comments: [],
           span: Span(
             start: LineColumn(
+              index: 29,
               line: 1,
               column: 1,
             ),
             end: LineColumn(
+              index: 89,
               line: 1,
               column: 61,
             ),
@@ -775,10 +881,12 @@ Module(
       ]),
       span: Span(
         start: LineColumn(
+          index: 0,
           line: 0,
           column: 0,
         ),
         end: LineColumn(
+          index: 89,
           line: 1,
           column: 61,
         ),
@@ -789,10 +897,12 @@ Module(
   ],
   span: Span(
     start: LineColumn(
+      index: 0,
       line: 0,
       column: 0,
     ),
     end: LineColumn(
+      index: 0,
       line: 0,
       column: 0,
     ),

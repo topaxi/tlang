@@ -49,7 +49,7 @@ impl SymbolId {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Clone)]
+#[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct SymbolInfo {
     pub id: SymbolId,
@@ -87,7 +87,7 @@ impl SymbolInfo {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Clone)]
+#[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct SymbolTable {
     #[cfg_attr(feature = "serde", serde(skip_serializing))]

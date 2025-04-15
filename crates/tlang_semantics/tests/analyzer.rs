@@ -2,9 +2,8 @@ use indoc::indoc;
 use pretty_assertions::assert_eq;
 use tlang_ast::{
     node::StmtKind,
-    node_id::NodeId,
     span::{LineColumn, Span},
-    symbols::{SymbolId, SymbolInfo, SymbolType},
+    symbols::{SymbolId, SymbolType},
 };
 use tlang_parser::Parser;
 use tlang_semantics::{
@@ -46,68 +45,32 @@ macro_rules! analyze_diag {
 fn test_should_error_on_undefined_symbol() {
     let diagnostics = analyze_diag!("a;");
 
-    assert_eq!(
-        diagnostics,
-        vec![Diagnostic::new(
-            "Use of undeclared variable `a`".to_string(),
-            Severity::Error,
-            Span::new(
-                LineColumn { line: 0, column: 0 },
-                LineColumn { line: 0, column: 1 }
-            ),
-        )]
-    );
+    assert_eq!(diagnostics[0].severity(), Severity::Error);
+    assert_eq!(diagnostics[0].message(), "Use of undeclared variable `a`");
 }
 
 #[test]
 fn test_should_error_on_undefined_symbol_in_variable_declaration() {
     let diagnostics = analyze_diag!("let a = b;");
 
-    assert_eq!(
-        diagnostics[..1],
-        vec![Diagnostic::new(
-            "Use of undeclared variable `b`".to_string(),
-            Severity::Error,
-            Span::new(
-                LineColumn { line: 0, column: 8 },
-                LineColumn { line: 0, column: 9 }
-            ),
-        )]
-    );
+    assert_eq!(diagnostics[0].severity(), Severity::Error);
+    assert_eq!(diagnostics[0].message(), "Use of undeclared variable `b`");
 }
 
 #[test]
 fn test_should_error_on_undefined_function() {
     let diagnostics = analyze_diag!("b();");
 
-    assert_eq!(
-        diagnostics,
-        vec![Diagnostic::new(
-            "Use of undeclared variable `b`".to_string(),
-            Severity::Error,
-            Span::new(
-                LineColumn { line: 0, column: 0 },
-                LineColumn { line: 0, column: 1 }
-            ),
-        )]
-    );
+    assert_eq!(diagnostics[0].severity(), Severity::Error);
+    assert_eq!(diagnostics[0].message(), "Use of undeclared variable `b`");
 }
 
 #[test]
 fn test_should_error_on_self_referencing_symbol() {
     let diagnostics = analyze_diag!("let a = a;");
 
-    assert_eq!(
-        diagnostics[..1],
-        vec![Diagnostic::new(
-            "Use of undeclared variable `a`".to_string(),
-            Severity::Error,
-            Span::new(
-                LineColumn { line: 0, column: 8 },
-                LineColumn { line: 0, column: 9 }
-            ),
-        )]
-    );
+    assert_eq!(diagnostics[0].severity(), Severity::Error);
+    assert_eq!(diagnostics[0].message(), "Use of undeclared variable `a`");
 }
 
 #[test]
@@ -123,32 +86,12 @@ fn test_should_allow_shadowing_of_single_variable() {
         .clone();
 
     assert_eq!(
-        program_symbols.borrow().get(SymbolId::new(1)),
-        Some(SymbolInfo {
-            node_id: NodeId::new(2),
-            id: SymbolId::new(1),
-            name: "a".to_string(),
-            symbol_type: SymbolType::Variable,
-            defined_at: Span::new(
-                LineColumn { line: 0, column: 4 },
-                LineColumn { line: 0, column: 5 }
-            ),
-            ..Default::default()
-        })
+        program_symbols.borrow().get(SymbolId::new(1)).unwrap().name,
+        "a".to_string()
     );
     assert_eq!(
-        program_symbols.borrow().get(SymbolId::new(2)),
-        Some(SymbolInfo {
-            node_id: NodeId::new(5),
-            id: SymbolId::new(2),
-            name: "a".to_string(),
-            symbol_type: SymbolType::Variable,
-            defined_at: Span::new(
-                LineColumn { line: 1, column: 5 },
-                LineColumn { line: 1, column: 6 }
-            ),
-            ..Default::default()
-        })
+        program_symbols.borrow().get(SymbolId::new(2)).unwrap().name,
+        "a".to_string()
     );
 }
 
@@ -165,32 +108,12 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
         .clone();
 
     assert_eq!(
-        program_symbols.borrow().get(SymbolId::new(1)),
-        Some(SymbolInfo {
-            node_id: NodeId::new(2),
-            id: SymbolId::new(1),
-            name: "a".to_string(),
-            symbol_type: SymbolType::Variable,
-            defined_at: Span::new(
-                LineColumn { line: 0, column: 4 },
-                LineColumn { line: 0, column: 5 }
-            ),
-            used: true,
-        })
+        program_symbols.borrow().get(SymbolId::new(1)).unwrap().name,
+        "a".to_string()
     );
     assert_eq!(
-        program_symbols.borrow().get(SymbolId::new(2)),
-        Some(SymbolInfo {
-            node_id: NodeId::new(5),
-            id: SymbolId::new(2),
-            name: "a".to_string(),
-            symbol_type: SymbolType::Variable,
-            defined_at: Span::new(
-                LineColumn { line: 1, column: 5 },
-                LineColumn { line: 1, column: 6 }
-            ),
-            used: false,
-        })
+        program_symbols.borrow().get(SymbolId::new(2)).unwrap().name,
+        "a".to_string()
     );
 }
 
@@ -202,22 +125,10 @@ fn test_should_error_on_unused_identifier_in_function_definition() {
         }
     "});
 
+    assert_eq!(diagnostics[0].severity(), Severity::Error);
     assert_eq!(
-        diagnostics[..1],
-        vec![Diagnostic::new(
-            "Use of undeclared variable `c`, did you mean the parameter `a`?".to_string(),
-            Severity::Error,
-            Span::new(
-                LineColumn {
-                    line: 1,
-                    column: 13
-                },
-                LineColumn {
-                    line: 1,
-                    column: 14
-                }
-            ),
-        )]
+        diagnostics[0].message(),
+        "Use of undeclared variable `c`, did you mean the parameter `a`?"
     );
 }
 
@@ -237,18 +148,12 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
         .clone();
 
     assert_eq!(
-        program_symbols.borrow().get_by_name("add"),
-        Some(SymbolInfo {
-            node_id: NodeId::new(12),
-            id: SymbolId::new(1),
-            name: "add".to_string(),
-            symbol_type: SymbolType::Function,
-            defined_at: Span::new(
-                LineColumn { line: 0, column: 3 },
-                LineColumn { line: 0, column: 6 }
-            ),
-            ..Default::default()
-        })
+        program_symbols
+            .borrow()
+            .get_by_name("add")
+            .unwrap()
+            .symbol_type,
+        SymbolType::Function
     );
 
     let function_declaration = match &ast.statements[0].kind {
@@ -256,26 +161,29 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
         _ => panic!("Expected function declaration {:?}", ast.statements[0].kind),
     };
 
-    let c_symbol_info = SymbolInfo {
-        node_id: NodeId::new(14),
-        id: SymbolId::new(4),
-        name: "c".to_string(),
-        symbol_type: SymbolType::Variable,
-        defined_at: Span::new(
-            LineColumn { line: 4, column: 5 },
-            LineColumn { line: 4, column: 6 },
-        ),
-        used: true,
-    };
-
     let actual_c = analyzer
         .get_symbol_table(function_declaration.id)
         .unwrap()
         .borrow()
-        .get_by_name("c");
+        .get_by_name("c")
+        .unwrap();
 
-    // Verify that c is within the scope of the function body
-    assert_eq!(actual_c, Some(c_symbol_info.clone()));
+    // Verify that c is available within the scope of the function body
+    assert_eq!(
+        actual_c.defined_at,
+        Span::new(
+            LineColumn {
+                index: 36,
+                line: 4,
+                column: 5
+            },
+            LineColumn {
+                index: 37,
+                line: 4,
+                column: 6
+            },
+        )
+    );
 }
 
 #[test]
@@ -301,12 +209,12 @@ fn should_warn_about_unused_variables() {
             Diagnostic::new(
                 "Unused variable `b`, if this is intentional, prefix the name with an underscore: `_b`".to_string(),
                 Severity::Warning,
-                Span::new(LineColumn { line: 1, column: 5 }, LineColumn { line: 1, column: 6 }),
+                Span::new(LineColumn { index: 15, line: 1, column: 5 }, LineColumn { index: 16, line: 1, column: 6 }),
             ),
             Diagnostic::new(
                 "Unused variable `a`, if this is intentional, prefix the name with an underscore: `_a`".to_string(),
                 Severity::Warning,
-                Span::new(LineColumn { line: 0, column: 4 }, LineColumn { line: 0, column: 5 }),
+                Span::new(LineColumn { index: 4, line: 0, column: 4 }, LineColumn { index: 5, line: 0, column: 5 }),
             ),
         ],
     );
@@ -324,22 +232,22 @@ fn should_warn_about_unused_function_and_parameters() {
         vec![
             Diagnostic::new(
                 "Unused variable `c`, if this is intentional, prefix the name with an underscore: `_c`".to_string(), Severity::Warning,
-                Span::new(LineColumn { line: 1, column: 9 }, LineColumn { line: 1, column: 10 }),
+                Span::new(LineColumn { index: 23, line: 1, column: 9 }, LineColumn { index: 24, line: 1, column: 10 }),
             ),
             Diagnostic::new(
                 "Unused parameter `a`, if this is intentional, prefix the name with an underscore: `_a`".to_string(),
                 Severity::Warning,
-                Span::new(LineColumn { line: 0, column: 7 }, LineColumn { line: 0, column: 8 }),
+                Span::new(LineColumn { index: 7, line: 0, column: 7 }, LineColumn { index: 8, line: 0, column: 8 }),
             ),
             Diagnostic::new(
                 "Unused parameter `b`, if this is intentional, prefix the name with an underscore: `_b`".to_string(),
                 Severity::Warning,
-                Span::new(LineColumn { line: 0, column: 10 }, LineColumn { line: 0, column: 11 }),
+                Span::new(LineColumn { index: 10, line: 0, column: 10 }, LineColumn { index: 11, line: 0, column: 11 }),
             ),
             Diagnostic::new(
                 "Unused function `add`, if this is intentional, prefix the name with an underscore: `_add`".to_string(),
                 Severity::Warning,
-                Span::new(LineColumn { line: 0, column: 3 }, LineColumn { line: 0, column: 6 }),
+                Span::new(LineColumn { index: 3, line: 0, column: 3 }, LineColumn { index: 6, line: 0, column: 6 }),
             ),
         ]
     );

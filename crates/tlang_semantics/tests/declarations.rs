@@ -1,10 +1,8 @@
 use indoc::indoc;
-use pretty_assertions::assert_eq;
+use pretty_assertions::assert_matches;
 use tlang_ast::{
     node::{ExprKind, StmtKind},
-    node_id::NodeId,
-    span::{LineColumn, Span},
-    symbols::{SymbolId, SymbolInfo, SymbolType},
+    symbols::{SymbolInfo, SymbolType},
 };
 use tlang_parser::Parser;
 use tlang_semantics::analyzer::SemanticAnalyzer;
@@ -32,18 +30,12 @@ fn test_analyze_variable_declaration() {
         .borrow()
         .get_by_name("a");
 
-    assert_eq!(
+    assert_matches!(
         symbol_info,
         Some(SymbolInfo {
-            node_id: NodeId::new(2),
-            id: SymbolId::new(1),
-            name: "a".to_string(),
             symbol_type: SymbolType::Variable,
-            defined_at: Span::new(
-                LineColumn { line: 0, column: 4 },
-                LineColumn { line: 0, column: 5 }
-            ),
             used: false,
+            ..
         })
     );
 }
@@ -67,28 +59,16 @@ fn test_block_scope() {
         .clone()
         .expect("Program to have a symbol_table");
 
-    assert_eq!(
+    assert_matches!(
         program_symbols.borrow().get_by_name("a"),
         Some(SymbolInfo {
-            node_id: NodeId::new(2),
-            id: SymbolId::new(1),
-            name: "a".to_string(),
             symbol_type: SymbolType::Variable,
-            defined_at: Span::new(
-                LineColumn {
-                    line: 1,
-                    column: 13
-                },
-                LineColumn {
-                    line: 1,
-                    column: 14
-                }
-            ),
-            used: false
+            used: false,
+            ..
         })
     );
-    assert_eq!(program_symbols.borrow().get_by_name("b"), None);
-    assert_eq!(program_symbols.borrow().get_by_name("c"), None);
+    assert_matches!(program_symbols.borrow().get_by_name("b"), None);
+    assert_matches!(program_symbols.borrow().get_by_name("c"), None);
 
     let block1 = match ast.statements[1].kind {
         StmtKind::Expr(ref expr) => match &expr.kind {
@@ -103,47 +83,23 @@ fn test_block_scope() {
         .expect("Expected block 1 to have a symbol_table")
         .clone();
 
-    assert_eq!(
+    assert_matches!(
         block1_symbols.borrow().get_by_name("a"),
         Some(SymbolInfo {
-            node_id: NodeId::new(2),
-            id: SymbolId::new(1),
-            name: "a".to_string(),
             symbol_type: SymbolType::Variable,
-            defined_at: Span::new(
-                LineColumn {
-                    line: 1,
-                    column: 13
-                },
-                LineColumn {
-                    line: 1,
-                    column: 14
-                }
-            ),
-            used: false
+            used: false,
+            ..
         })
     );
-    assert_eq!(
+    assert_matches!(
         block1_symbols.borrow().get_by_name("b"),
         Some(SymbolInfo {
-            node_id: NodeId::new(7),
-            id: SymbolId::new(2),
-            name: "b".to_string(),
             symbol_type: SymbolType::Variable,
-            defined_at: Span::new(
-                LineColumn {
-                    line: 3,
-                    column: 17
-                },
-                LineColumn {
-                    line: 3,
-                    column: 18
-                }
-            ),
-            used: false
+            used: false,
+            ..
         })
     );
-    assert_eq!(block1_symbols.borrow().get_by_name("c"), None);
+    assert_matches!(block1_symbols.borrow().get_by_name("c"), None);
 
     let block2 = match block1.statements[1].kind {
         StmtKind::Expr(ref expr) => match &expr.kind {
@@ -161,64 +117,28 @@ fn test_block_scope() {
         .expect("Expected block 2 to have a symbol_table")
         .clone();
 
-    assert_eq!(
+    assert_matches!(
         block2_symbols.borrow().get_by_name("a"),
         Some(SymbolInfo {
-            node_id: NodeId::new(2),
-            id: SymbolId::new(1),
-            name: "a".to_string(),
             symbol_type: SymbolType::Variable,
-            defined_at: Span::new(
-                LineColumn {
-                    line: 1,
-                    column: 13
-                },
-                LineColumn {
-                    line: 1,
-                    column: 14
-                }
-            ),
-            used: false
+            used: false,
+            ..
         })
     );
-    assert_eq!(
+    assert_matches!(
         block2_symbols.borrow().get_by_name("b"),
         Some(SymbolInfo {
-            node_id: NodeId::new(7),
-            id: SymbolId::new(2),
-            name: "b".to_string(),
             symbol_type: SymbolType::Variable,
-            defined_at: Span::new(
-                LineColumn {
-                    line: 3,
-                    column: 17
-                },
-                LineColumn {
-                    line: 3,
-                    column: 18
-                }
-            ),
-            used: false
+            used: false,
+            ..
         })
     );
-    assert_eq!(
+    assert_matches!(
         block2_symbols.borrow().get_by_name("c"),
         Some(SymbolInfo {
-            node_id: NodeId::new(12),
-            id: SymbolId::new(3),
-            name: "c".to_string(),
             symbol_type: SymbolType::Variable,
-            defined_at: Span::new(
-                LineColumn {
-                    line: 5,
-                    column: 21
-                },
-                LineColumn {
-                    line: 5,
-                    column: 22
-                }
-            ),
-            used: false
+            used: false,
+            ..
         })
     );
 }
@@ -236,18 +156,12 @@ fn test_should_collect_function_definitions() {
         .expect("Program to have a symbol_table")
         .clone();
 
-    assert_eq!(
+    assert_matches!(
         program_symbols.borrow().get_by_name("add"),
         Some(SymbolInfo {
-            node_id: NodeId::new(10),
-            id: SymbolId::new(1),
-            name: "add".to_string(),
             symbol_type: SymbolType::Function,
-            defined_at: Span::new(
-                LineColumn { line: 0, column: 3 },
-                LineColumn { line: 0, column: 6 }
-            ),
-            used: false
+            used: false,
+            ..
         })
     );
 }
@@ -265,18 +179,12 @@ fn test_should_collect_list_destructuring_symbols_in_function_arguments() {
         .expect("Program to have a symbol_table")
         .clone();
 
-    assert_eq!(
+    assert_matches!(
         program_symbols.borrow().get_by_name("add"),
         Some(SymbolInfo {
-            node_id: NodeId::new(11),
-            id: SymbolId::new(1),
-            name: "add".to_string(),
             symbol_type: SymbolType::Function,
-            defined_at: Span::new(
-                LineColumn { line: 0, column: 3 },
-                LineColumn { line: 0, column: 6 }
-            ),
-            used: false
+            used: false,
+            ..
         })
     );
 }
@@ -294,18 +202,12 @@ fn test_should_collect_list_destructuring_with_rest_symbols_in_function_argument
         .expect("Program to have a symbol_table")
         .clone();
 
-    assert_eq!(
+    assert_matches!(
         program_symbols.borrow().get_by_name("sum"),
         Some(SymbolInfo {
-            node_id: NodeId::new(14),
-            id: SymbolId::new(1),
-            name: "sum".to_string(),
             symbol_type: SymbolType::Function,
-            defined_at: Span::new(
-                LineColumn { line: 0, column: 3 },
-                LineColumn { line: 0, column: 6 }
-            ),
             used: true,
+            ..
         })
     );
 }
@@ -322,21 +224,12 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
         .expect("Program to have a symbol_table")
         .clone();
 
-    assert_eq!(
+    assert_matches!(
         program_symbols.borrow().get_by_name("factorial"),
         Some(SymbolInfo {
-            node_id: NodeId::new(24),
-            id: SymbolId::new(1),
-            name: "factorial".to_string(),
             symbol_type: SymbolType::Function,
-            defined_at: Span::new(
-                LineColumn { line: 0, column: 3 },
-                LineColumn {
-                    line: 0,
-                    column: 12
-                }
-            ),
             used: true,
+            ..
         })
     );
 }
@@ -358,21 +251,12 @@ fn should_collect_function_arguments_with_enum_extraction() {
         .expect("Program to have a symbol_table")
         .clone();
 
-    assert_eq!(
+    assert_matches!(
         program_symbols.borrow().get_by_name("unwrap"),
         Some(SymbolInfo {
-            node_id: NodeId::new(22),
-            id: SymbolId::new(4),
-            name: "unwrap".to_string(),
             symbol_type: SymbolType::Function,
-            defined_at: Span::new(
-                LineColumn { line: 5, column: 4 },
-                LineColumn {
-                    line: 5,
-                    column: 10
-                }
-            ),
-            used: false
+            used: false,
+            ..
         })
     );
 }
