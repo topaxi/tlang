@@ -99,7 +99,7 @@ fn test_enum_variant_res() {
     );
     let paths = collect_paths(&hir);
 
-    assert_eq!(paths[1].res, hir::Res::Upvar(1, 1));
+    assert_matches!(paths[1].res, hir::Res::Upvar(_, 1, 1));
 
     match hir.block.stmts[1].kind {
         hir::StmtKind::FunctionDeclaration(ref fn_decl) => {
@@ -121,7 +121,7 @@ fn test_variadic_fn_res() {
     );
     let paths = collect_paths(&hir);
 
-    assert_matches!(paths[1].res, hir::Res::Upvar(1, 1));
+    assert_matches!(paths[1].res, hir::Res::Upvar(_, 1, 1));
     assert_matches!(paths[2].res, hir::Res::Local(_, 1));
 
     match hir.block.stmts[0].kind {
@@ -139,7 +139,7 @@ fn test_variadic_fn_res() {
     // [0, acc] => acc/*0*/
     assert_matches!(paths[6].res, hir::Res::Local(_, 0));
     // [n, acc] => rec factorial$$2((n - 1), (n * acc))
-    assert_matches!(paths[7].res, hir::Res::Upvar(1, 0));
+    assert_matches!(paths[7].res, hir::Res::Upvar(_, 1, 0));
     assert_matches!(paths[8].res, hir::Res::Local(_, 0));
     assert_matches!(paths[9].res, hir::Res::Local(_, 0));
     assert_matches!(paths[10].res, hir::Res::Local(_, 1));

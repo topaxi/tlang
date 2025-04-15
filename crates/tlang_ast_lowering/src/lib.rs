@@ -70,9 +70,14 @@ impl LoweringContext {
         if scope_index < self.scopes.len() - 1 {
             let relative_scope_index = self.scopes.len() - 1 - scope_index;
             let slot_index = binding.res().slot_index().unwrap();
+            let original_hir_id = binding
+                .res()
+                .hir_id()
+                .expect("Upvar source binding should have a valid HirId");
 
             return Some(self.scopes.last_mut().unwrap().def_upvar(
                 binding.name(),
+                original_hir_id,
                 relative_scope_index,
                 slot_index,
             ));

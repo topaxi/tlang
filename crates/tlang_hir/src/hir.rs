@@ -73,7 +73,7 @@ pub enum Res {
     Unknown,
     Def(DefKind, HirId, usize),
     Local(HirId, usize),
-    Upvar(usize, usize),
+    Upvar(HirId, usize, usize),
 }
 
 impl Res {
@@ -110,14 +110,16 @@ impl Res {
 
     pub fn hir_id(self) -> Option<HirId> {
         match self {
-            Res::Def(_, hir_id, ..) | Res::Local(hir_id, ..) => Some(hir_id),
+            Res::Def(_, hir_id, ..) | Res::Local(hir_id, ..) | Res::Upvar(hir_id, ..) => {
+                Some(hir_id)
+            }
             _ => None,
         }
     }
 
     pub fn slot_index(self) -> Option<usize> {
         match self {
-            Res::Def(.., index) | Res::Local(.., index) | Res::Upvar(.., index) => Some(index),
+            Res::Def(.., index) | Res::Local(.., index) | Res::Upvar(_, _, index) => Some(index),
             Res::Unknown => None,
         }
     }

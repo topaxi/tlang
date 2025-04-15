@@ -57,10 +57,10 @@ impl Binding {
         )
     }
 
-    pub(crate) fn new_upvar(name: String, scope: usize, index: usize) -> Self {
+    pub(crate) fn new_upvar(name: String, hir_id: HirId, scope: usize, index: usize) -> Self {
         Self {
             name,
-            res: hir::Res::Upvar(scope, index),
+            res: hir::Res::Upvar(hir_id, scope, index),
         }
     }
 
@@ -195,8 +195,8 @@ impl Scope {
         self.def_local(&(enum_name.to_string() + "::" + variant_name), hir_id);
     }
 
-    pub(crate) fn def_upvar(&self, name: &str, scope: usize, index: usize) -> Binding {
-        let binding = Binding::new_upvar(name.to_string(), scope, index);
+    pub(crate) fn def_upvar(&self, name: &str, hir_id: HirId, scope: usize, index: usize) -> Binding {
+        let binding = Binding::new_upvar(name.to_string(), hir_id, scope, index);
 
         self.create_upvar(name.to_string(), binding.clone());
 

@@ -72,7 +72,7 @@ impl ScopeStack {
     fn resolve_value(&self, res: &hir::Res) -> Option<TlangValue> {
         match res {
             hir::Res::Local(_, index) => self.get_local(*index),
-            hir::Res::Upvar(relative_scope_index, index) => {
+            hir::Res::Upvar(_, relative_scope_index, index) => {
                 let scope_index = self.scopes.len() - 1 - relative_scope_index;
 
                 self.get_upvar(scope_index, *index)
@@ -84,7 +84,7 @@ impl ScopeStack {
     pub fn update_value(&self, res: &hir::Res, value: TlangValue) {
         match res {
             hir::Res::Local(_, index) => self.current_scope().borrow_mut().set(*index, value),
-            hir::Res::Upvar(relative_scope_index, index) => {
+            hir::Res::Upvar(_, relative_scope_index, index) => {
                 let scope_index = self.scopes.len() - 1 - relative_scope_index;
                 self.scopes[scope_index].borrow_mut().set(*index, value);
             }
