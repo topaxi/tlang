@@ -8,7 +8,7 @@ pub fn floor(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
     match value.as_primitive() {
         TlangPrimitive::Float(f) => TlangValue::from(f.floor()),
         TlangPrimitive::Int(_) | TlangPrimitive::UInt(_) => value,
-        value => state.panic(format!("Expected float or int, got {:?}", value)),
+        value => state.panic(format!("Expected float or int, got {value:?}")),
     }
 }
 
@@ -28,8 +28,7 @@ pub fn max(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
         (TlangPrimitive::Float(f), TlangPrimitive::UInt(i)) => TlangValue::from(f.max(i as f64)),
         (TlangPrimitive::Float(f), TlangPrimitive::Int(i)) => TlangValue::from(f.max(i as f64)),
         (value1, value2) => state.panic(format!(
-            "Expected float or int, got {:?} and {:?}",
-            value1, value2
+            "Expected float or int, got {value1:?} and {value2:?}"
         )),
     }
 }
@@ -46,6 +45,6 @@ pub fn random_int(state: &mut InterpreterState, args: &[TlangValue]) -> TlangVal
     match args[0].as_primitive() {
         TlangPrimitive::UInt(i) => TlangValue::from(rand::random::<u64>() % i),
         TlangPrimitive::Int(i) => TlangValue::from(rand::random::<i64>() % i),
-        value => state.panic(format!("Expected int, got {:?}", value)),
+        value => state.panic(format!("Expected int, got {value:?}")),
     }
 }

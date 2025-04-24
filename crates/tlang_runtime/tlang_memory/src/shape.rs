@@ -25,7 +25,7 @@ impl ShapeKey {
     pub fn get_native_index(self) -> usize {
         match self {
             ShapeKey::Native(index) => index,
-            _ => panic!("Expected native shape key, got {:?}", self),
+            _ => panic!("Expected native shape key, got {self:?}"),
         }
     }
 

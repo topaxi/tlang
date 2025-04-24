@@ -393,7 +393,7 @@ impl<'src> Parser<'src> {
     fn parse_enum_variant(&mut self) -> EnumVariant {
         let span = self.create_span_from_current_token();
         let name = self.parse_identifier();
-        log::debug!("Parsing enum variant {}", name);
+        log::debug!("Parsing enum variant {name}");
         let mut node = match self.current_token_kind() {
             TokenKind::LParen => {
                 self.advance();
@@ -585,7 +585,7 @@ impl<'src> Parser<'src> {
         let is_dict_call = matches!(self.current_token_kind(), TokenKind::LBrace);
         let mut arguments = Vec::new();
 
-        log::debug!("Is dict call: {}", is_dict_call);
+        log::debug!("Is dict call: {is_dict_call}");
 
         if is_dict_call {
             arguments.push(self.parse_block_or_dict());
@@ -1645,8 +1645,7 @@ impl<'src> Parser<'src> {
         associativity: Associativity,
     ) -> Expr {
         debug!(
-            "Parsing expression with precedence {} {:#?}",
-            precedence, associativity
+            "Parsing expression with precedence {precedence} {associativity:#?}"
         );
         let mut lhs = self.parse_primary_expression();
         let mut span = lhs.span;

@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
     let expected_output_path = {
         let base_path = file_path.with_extension(""); // Strip `.tlang` extension
-        let backend_path = base_path.with_extension(format!("expected.{}.txt", backend));
+        let backend_path = base_path.with_extension(format!("expected.{backend}.txt"));
         if backend_path.exists() {
             backend_path
         } else {
@@ -114,7 +114,7 @@ fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
 
             javascript_output.wait_with_output().unwrap()
         }
-        _ => return Err(format!("Unsupported backend: {}", backend)),
+        _ => return Err(format!("Unsupported backend: {backend}")),
     };
     let elapsed = start.elapsed();
     let exec_elapsed = exec_start.elapsed();

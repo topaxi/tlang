@@ -1,4 +1,3 @@
-use env_logger;
 use insta::assert_snapshot;
 
 mod common;

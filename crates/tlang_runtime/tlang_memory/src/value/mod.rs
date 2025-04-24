@@ -242,7 +242,7 @@ impl TlangValue {
                 ArithmeticOp::Rem => TlangValue::F64(lhs % rhs as f64),
                 ArithmeticOp::Pow => TlangValue::F64(lhs.powf(rhs as f64)),
             },
-            (lhs, rhs) => panic!("Unsupported operation: {:?} {:?} {:?}", lhs, op, rhs),
+            (lhs, rhs) => panic!("Unsupported operation: {lhs:?} {op:?} {rhs:?}"),
         }
     }
 }
@@ -280,22 +280,22 @@ impl std::fmt::Display for TlangValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             TlangValue::Nil => write!(f, "nil"),
-            TlangValue::Bool(b) => write!(f, "{}", b),
+            TlangValue::Bool(b) => write!(f, "{b}"),
 
-            TlangValue::U8(i) => write!(f, "{}", i),
-            TlangValue::U16(i) => write!(f, "{}", i),
-            TlangValue::U32(i) => write!(f, "{}", i),
-            TlangValue::U64(i) => write!(f, "{}", i),
+            TlangValue::U8(i) => write!(f, "{i}"),
+            TlangValue::U16(i) => write!(f, "{i}"),
+            TlangValue::U32(i) => write!(f, "{i}"),
+            TlangValue::U64(i) => write!(f, "{i}"),
 
-            TlangValue::I8(i) => write!(f, "{}", i),
-            TlangValue::I16(i) => write!(f, "{}", i),
-            TlangValue::I32(i) => write!(f, "{}", i),
-            TlangValue::I64(i) => write!(f, "{}", i),
+            TlangValue::I8(i) => write!(f, "{i}"),
+            TlangValue::I16(i) => write!(f, "{i}"),
+            TlangValue::I32(i) => write!(f, "{i}"),
+            TlangValue::I64(i) => write!(f, "{i}"),
 
-            TlangValue::F32(fl) => write!(f, "{}", fl),
-            TlangValue::F64(fl) => write!(f, "{}", fl),
+            TlangValue::F32(fl) => write!(f, "{fl}"),
+            TlangValue::F64(fl) => write!(f, "{fl}"),
 
-            TlangValue::Object(id) => write!(f, "Object({})", id),
+            TlangValue::Object(id) => write!(f, "Object({id})"),
         }
     }
 }

@@ -175,8 +175,7 @@ impl Interpreter {
         match self.get_object(value)?.shape() {
             Some(s) => self.state.get_shape_by_key(s),
             _ => self.panic(format!(
-                "Cannot get shape of non-struct object: {:?}",
-                value
+                "Cannot get shape of non-struct object: {value:?}"
             )),
         }
     }
@@ -526,15 +525,14 @@ impl Interpreter {
                     .get_object(struct_value)
                     .and_then(|o| o.shape())
                     .unwrap_or_else(|| {
-                        self.panic(format!("Cannot assign to field `{}` on non-object", ident))
+                        self.panic(format!("Cannot assign to field `{ident}` on non-object"))
                     });
                 let index = self
                     .state
                     .get_struct_field_index(struct_shape, ident.as_str())
                     .unwrap_or_else(|| {
                         self.panic(format!(
-                            "Cannot assign to field `{}` on struct `{:?}`",
-                            ident, struct_shape
+                            "Cannot assign to field `{ident}` on struct `{struct_shape:?}`"
                         ))
                     });
 
@@ -735,8 +733,7 @@ impl Interpreter {
                     }
                     Res::Unknown => {
                         self.panic(format!(
-                            "Could not define method {ident} on unresolved path: {:?}",
-                            path
+                            "Could not define method {ident} on unresolved path: {path:?}"
                         ));
                     }
                     _ => todo!("eval_fn_decl: {:?}", path),
@@ -932,7 +929,7 @@ impl Interpreter {
                 .take()
                 .unwrap();
 
-            debug!("tail_call: {:?}", tail_call);
+            debug!("tail_call: {tail_call:?}");
 
             let fn_hir_id = match tail_call.callee {
                 TlangValue::Object(obj) => match self.get_object_by_id(obj) {
@@ -1016,7 +1013,7 @@ impl Interpreter {
     }
 
     fn eval_call(&mut self, call_expr: &hir::CallExpression) -> EvalResult {
-        debug!("eval_call: {:?}", call_expr);
+        debug!("eval_call: {call_expr:?}");
 
         if call_expr.has_wildcard() {
             return self.eval_partial_call(call_expr);

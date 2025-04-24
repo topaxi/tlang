@@ -88,7 +88,7 @@ impl ScopeStack {
                 let scope_index = self.scopes.len() - 1 - relative_scope_index;
                 self.scopes[scope_index].borrow_mut().set(*index, value);
             }
-            _ => panic!("Cannot update value for {:?}", res),
+            _ => panic!("Cannot update value for {res:?}"),
         }
     }
 

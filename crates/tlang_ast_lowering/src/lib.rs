@@ -222,7 +222,7 @@ impl LoweringContext {
         };
 
         if let Some(arity) = arity {
-            fn_name += &format!("$${}", arity);
+            fn_name += &format!("$${arity}");
         }
 
         self.scope().def_fn_local(fn_name.as_str(), hir_id);
@@ -364,7 +364,7 @@ impl LoweringContext {
     }
 
     fn lower_ty(&mut self, node: Option<&ast::node::Ty>) -> hir::Ty {
-        debug!("Lowering type {:?}", node);
+        debug!("Lowering type {node:?}");
 
         if let Some(node) = node {
             hir::Ty {

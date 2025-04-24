@@ -126,7 +126,7 @@ impl Scope {
     }
 
     fn create_binding(&mut self, name: String, binding: Binding) {
-        debug!("Creating binding for {}: {:?}", name, binding);
+        debug!("Creating binding for {name}: {binding:?}");
 
         self.bindings.push(binding);
     }

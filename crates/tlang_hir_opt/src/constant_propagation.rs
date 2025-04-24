@@ -79,7 +79,6 @@ impl<'hir> Visitor<'hir> for ConstantPropagator {
                         _ => { /* Not a literal, do nothing */ }
                     }
                 }
-                return;
             }
             _ => visit::walk_stmt(self, stmt),
         }

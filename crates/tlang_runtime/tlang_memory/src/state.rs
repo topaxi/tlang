@@ -306,7 +306,7 @@ impl InterpreterState {
                     ));
                 }
                 CallStackKind::NativeFn(name) => {
-                    call_stack.push_str(&format!("  at native function {}:0:0\n", name));
+                    call_stack.push_str(&format!("  at native function {name}:0:0\n"));
                 }
                 CallStackKind::Root => {
                     call_stack.push_str(&format!("  at root {}\n", entry.current_span.start));
@@ -314,7 +314,7 @@ impl InterpreterState {
             }
         }
 
-        panic!("{}\n{}", message, call_stack)
+        panic!("{message}\n{call_stack}")
     }
 
     pub fn set_current_span(&mut self, span: tlang_ast::span::Span) {
@@ -573,7 +573,7 @@ impl InterpreterState {
             .map(|v| self.stringify(*v))
             .collect::<Vec<String>>()
             .join(", ");
-        format!("[{}]", values)
+        format!("[{values}]")
     }
 
     pub fn stringify(&self, value: TlangValue) -> String {
@@ -649,7 +649,7 @@ impl InterpreterState {
                         .map(|v| self.stringify(*v))
                         .collect::<Vec<String>>()
                         .join(", ");
-                    format!("&[{}]", values)
+                    format!("&[{values}]")
                 }
                 Some(TlangObjectKind::Closure(s)) => {
                     let fn_decl = self.closures.get(&s.id).unwrap();
