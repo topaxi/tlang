@@ -27,10 +27,3 @@ impl Span {
         Self { start, end }
     }
 }
-
-#[derive(Debug, PartialEq, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
-pub struct Spanned<T> {
-    pub node: T,
-    pub span: Span,
-}

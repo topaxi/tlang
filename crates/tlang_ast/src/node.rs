@@ -5,10 +5,7 @@ use std::fmt::Display;
 use crate::keyword::kw;
 use crate::node_id::NodeId;
 use crate::token::Token;
-use crate::{
-    span::{Span, Spanned},
-    token::Literal,
-};
+use crate::{span::Span, token::Literal};
 
 pub use crate::macros::*;
 
@@ -572,5 +569,3 @@ pub enum BinaryOpKind {
     BitwiseXor,
     Pipeline,
 }
-
-pub type BinaryOp = Spanned<BinaryOpKind>;
