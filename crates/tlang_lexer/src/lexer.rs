@@ -330,16 +330,16 @@ impl Lexer<'_> {
                 self.token(TokenKind::Hash, start)
             }
             '0'..='9' => self.read_number_literal(start),
-            '"' | '\'' => {
-                let quote = ch;
+            '\'' => {
                 self.advance();
-                let literal = self.read_string_literal(quote).to_string();
-
-                if quote == '"' {
-                    self.token(TokenKind::Literal(Literal::String(literal)), start)
-                } else {
-                    self.token(TokenKind::Literal(Literal::Char(literal)), start)
-                }
+                let string = self.read_string_literal('\'');
+                let character = string.chars().nth(0).unwrap_or('\0');
+                self.token(TokenKind::Literal(Literal::Char(character)), start)
+            }
+            '"' => {
+                self.advance();
+                self.read_string_literal('"');
+                self.token(TokenKind::Literal(Literal::String), start)
             }
             ch if Self::is_alphanumeric(ch) => match self.read_identifier() {
                 "true" => self.token(TokenKind::Literal(Literal::Boolean(true)), start),

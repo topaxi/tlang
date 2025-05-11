@@ -1,3 +1,5 @@
+use std::ops::Index;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
@@ -25,5 +27,15 @@ pub struct Span {
 impl Span {
     pub fn new(start: LineColumn, end: LineColumn) -> Self {
         Self { start, end }
+    }
+}
+
+impl Index<Span> for str {
+    type Output = str;
+
+    fn index(&self, span: Span) -> &Self::Output {
+        let start = span.start.index as usize;
+        let end = span.end.index as usize;
+        &self[start..end]
     }
 }

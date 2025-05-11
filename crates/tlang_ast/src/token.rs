@@ -73,28 +73,16 @@ pub enum TokenKind {
     Eof,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum Literal {
     Boolean(bool),
     Integer(i64),
     UnsignedInteger(u64),
     Float(f64),
-    String(String),
-    Char(String),
+    String,
+    Char(char),
     None,
-}
-
-impl Clone for Literal {
-    fn clone(&self) -> Self {
-        // TODO: Would be great if literal string and char just refer to the string in the
-        //       source. Or we do some kind of interning at some point.
-        match self {
-            Literal::String(value) => Literal::String(value.clone()),
-            Literal::Char(value) => Literal::Char(value.clone()),
-            _ => unsafe { std::ptr::read(self) },
-        }
-    }
 }
 
 impl Literal {

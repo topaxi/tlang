@@ -302,19 +302,14 @@ fn test_multi_line_comments() {
 fn test_string_literal() {
     let mut lexer = Lexer::new("\"this is a string\"");
 
-    assert_tokens!(
-        lexer,
-        [TokenKind::Literal(Literal::String(
-            "this is a string".to_string()
-        ))]
-    );
+    assert_tokens!(lexer, [TokenKind::Literal(Literal::String)]);
 }
 
 #[test]
 fn test_char_literal() {
     let mut lexer = Lexer::new("'a'");
 
-    assert_tokens!(lexer, [TokenKind::Literal(Literal::Char("a".to_string()))]);
+    assert_tokens!(lexer, [TokenKind::Literal(Literal::Char('a'))]);
 }
 
 #[test]
