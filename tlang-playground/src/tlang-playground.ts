@@ -211,27 +211,24 @@ export class TlangPlayground extends LitElement {
   private desktop!: boolean;
 
   @state()
-  selectedExample = defaultExample();
+  private selectedExample = defaultExample();
 
   @state()
   source = examples[this.selectedExample];
 
   @state()
-  consoleMessages: ConsoleMessage[] = [];
+  private consoleMessages: ConsoleMessage[] = [];
 
   @state()
-  display: OutputDisplay = defaultDisplay();
+  private display: OutputDisplay = defaultDisplay();
 
-  get availableDisplayOptions(): OutputDisplay[] {
+  private get availableDisplayOptions(): OutputDisplay[] {
     if (this.runner === 'interpreter') {
       return ['hir', 'ast'];
     } else {
       return ['javascript', 'hir', 'ast'];
     }
   }
-
-  @state()
-  showConsole = true;
 
   /**
    * No need to be a state, as it is derived on `source` change.
@@ -243,13 +240,13 @@ export class TlangPlayground extends LitElement {
   // The editor which the user can use to write code, as it's always rendered,
   // we cache the query selector.
   @query('.editor', true)
-  codemirror!: TCodeMirror;
+  private codemirror!: TCodeMirror;
 
   @query('.output-split', true)
-  outputSplit!: SplitElement;
+  private outputSplit!: SplitElement;
 
   @query('t-console', true)
-  consoleElement!: ConsoleElement;
+  private consoleElement!: ConsoleElement;
 
   private tlangConsole = {
     log: (...args: unknown[]) => {
@@ -306,7 +303,7 @@ export class TlangPlayground extends LitElement {
       .length;
   }
 
-  run() {
+  private run() {
     if (!this.consoleElement.persist) {
       this.clearConsole();
     }
@@ -366,7 +363,7 @@ export class TlangPlayground extends LitElement {
     this.tlang.eval();
   }
 
-  async share() {
+  private async share() {
     await updateSourceHashparam(this.source);
 
     try {
@@ -393,7 +390,7 @@ export class TlangPlayground extends LitElement {
     };
   }
 
-  protected createTlang(source: string) {
+  private createTlang(source: string) {
     this.tlang = new Tlang(source);
 
     this.tlang.defineFunction('log', this.tlangConsole.log);
@@ -443,18 +440,18 @@ export class TlangPlayground extends LitElement {
     }
   }
 
-  handleSourceChange(event: CustomEvent) {
+  private handleSourceChange(event: CustomEvent) {
     this.source = event.detail.source;
   }
 
-  handleExampleSelect(event: Event) {
+  private handleExampleSelect(event: Event) {
     const target = event.target as HTMLSelectElement;
     this.codemirror.source = examples[target.value];
     this.selectedExample = target.value;
     updateExampleHashparam(this.selectedExample);
   }
 
-  handleRunnerChange(event: Event) {
+  private handleRunnerChange(event: Event) {
     const target = event.target as HTMLSelectElement;
     this.runner = target.value as 'compiler' | 'interpreter';
 
@@ -467,12 +464,12 @@ export class TlangPlayground extends LitElement {
     updateRunnerHashparam(this.runner);
   }
 
-  handleDisplayChange(event: CustomEvent<{ id: string }>) {
+  private handleDisplayChange(event: CustomEvent<{ id: string }>) {
     this.display = event.detail.id as OutputDisplay;
     updateDisplayHashparam(this.display);
   }
 
-  handleConsoleCollapse(event: CustomEvent<{ collapsed: boolean }>) {
+  private handleConsoleCollapse(event: CustomEvent<{ collapsed: boolean }>) {
     this.outputSplit.disabled = event.detail.collapsed ? 'resize-only' : false;
 
     if (event.detail.collapsed) {
@@ -482,7 +479,7 @@ export class TlangPlayground extends LitElement {
     }
   }
 
-  handleOutputSplitToggle(event: SplitEvent) {
+  private handleOutputSplitToggle(event: SplitEvent) {
     if (this.outputSplit.isTouched) {
       // Default behavior, reset the split.
       return;
@@ -494,7 +491,7 @@ export class TlangPlayground extends LitElement {
     this.consoleElement.collapse();
   }
 
-  handleConsoleClear(event: Event) {
+  private handleConsoleClear(event: Event) {
     event.preventDefault();
 
     this.clearConsole();
@@ -504,11 +501,11 @@ export class TlangPlayground extends LitElement {
     this.consoleMessages = [];
   }
 
-  showKeyboardShortcuts() {
+  private showKeyboardShortcuts() {
     this.shadowRoot!.querySelector('t-shortcuts')!.showShortcutsReference();
   }
 
-  renderOutput() {
+  private renderOutput() {
     switch (this.display) {
       case 'ast':
         return html`<pre class="output-ast">${this.tlang.getASTString()}</pre>`;

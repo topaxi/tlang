@@ -102,7 +102,7 @@ export class ConsoleMessageElement extends LitElement {
     }
 
     [part^='icon']::before {
-      content: attr(icon, '\\a0');
+      content: attr(data-icon, '\\a0');
     }
 
     [part='args'] {
@@ -149,9 +149,9 @@ export class ConsoleMessageElement extends LitElement {
   protected renderMessageIcon() {
     switch (this.type) {
       case 'warn':
-        return html`<i part="icon icon-${this.type}" icon=""></i>`;
+        return html`<i part="icon icon-${this.type}" data-icon=""></i>`;
       case 'error':
-        return html`<i part="icon icon-${this.type}" icon=""></i>`;
+        return html`<i part="icon icon-${this.type}" data-icon=""></i>`;
       default:
         return this.forceIcon
           ? html`<i part="icon icon-${this.type} icon-none"></i>`

@@ -32,7 +32,7 @@ export class TCodeMirror extends LitElement {
   private view: EditorView | null = null;
 
   @property()
-  source = '';
+  source: string | undefined = '';
 
   @property({ type: Boolean })
   readonly = false;
