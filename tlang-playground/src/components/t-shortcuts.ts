@@ -242,7 +242,7 @@ export class ShortcutsElement extends LitElement {
   protected override render(): unknown {
     return html`
       <slot></slot>
-      <dialog part="shortcutlegend" popover>
+      <dialog part="shortcutlegend" popover="auto">
         <header>
           <h2>Keyboard Shortcuts</h2>
         </header>
