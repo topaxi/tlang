@@ -23,7 +23,7 @@ impl CodegenJS {
             }
             hir::StmtKind::FunctionDeclaration(decl) => self.generate_function_declaration(decl),
             hir::StmtKind::DynFunctionDeclaration(decl) => {
-                self.generate_dyn_function_declaration(decl)
+                self.generate_dyn_function_declaration(decl);
             }
             hir::StmtKind::Return(box expr) => self.generate_return_statement(expr.as_ref()),
             hir::StmtKind::EnumDeclaration(decl) => self.generate_enum_declaration(decl),

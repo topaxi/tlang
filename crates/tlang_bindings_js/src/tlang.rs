@@ -73,7 +73,7 @@ impl Tlang {
         analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());
 
         Self {
-            source: source.to_string(),
+            source,
             build: BuildArtifacts::default(),
             analyzer,
             js: CodegenJS::default(),

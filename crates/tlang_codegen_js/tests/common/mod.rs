@@ -39,7 +39,7 @@ impl<'a> From<Vec<(&'a str, SymbolType)>> for CodegenOptions<'a> {
     }
 }
 
-pub fn compile_src(source: &str, options: CodegenOptions) -> String {
+pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
     let mut parser = Parser::from_source(source);
     let ast = match parser.parse() {
         Ok(ast) => ast,
@@ -62,6 +62,6 @@ pub fn compile_src(source: &str, options: CodegenOptions) -> String {
 
 #[macro_export]
 macro_rules! compile {
-    ($source:expr) => {{ $crate::common::compile_src($source, Default::default()) }};
-    ($source:expr, $options:expr) => {{ $crate::common::compile_src($source, $options.into()) }};
+    ($source:expr) => {{ $crate::common::compile_src($source, &Default::default()) }};
+    ($source:expr, $options:expr) => {{ $crate::common::compile_src($source, &$options.into()) }};
 }

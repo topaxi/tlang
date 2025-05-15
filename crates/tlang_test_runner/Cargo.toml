@@ -5,3 +5,6 @@ edition.workspace = true
 
 [dependencies]
 glob = "0.3"
+
+[lints]
+workspace = true

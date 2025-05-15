@@ -13,3 +13,6 @@ tlang_interpreter = { path = "../tlang_runtime/tlang_interpreter" }
 ron = { workspace = true }
 clap = { version = "4", features = ["cargo"] }
 indoc = { workspace = true }
+
+[lints]
+workspace = true

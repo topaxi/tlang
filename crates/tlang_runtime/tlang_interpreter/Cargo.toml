@@ -42,3 +42,6 @@ criterion = "0.5"
 [[bench]]
 name = "interpreter_benchmark"
 harness = false
+
+[lints]
+workspace = true

@@ -15,3 +15,6 @@ log = { workspace = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 rand = { version = "0.9" }
+
+[lints]
+workspace = true

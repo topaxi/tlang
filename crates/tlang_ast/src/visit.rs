@@ -38,7 +38,7 @@ pub trait Visitor<'ast>: Sized {
 
     fn visit_fn_decls(&mut self, declarations: &'ast [node::FunctionDeclaration]) {
         for declaration in declarations {
-            walk_fn_decl(self, declaration)
+            walk_fn_decl(self, declaration);
         }
     }
 
@@ -213,7 +213,7 @@ pub fn walk_fn_decl<'ast, V: Visitor<'ast>>(
     declaration: &'ast node::FunctionDeclaration,
 ) {
     for parameter in &declaration.parameters {
-        visitor.visit_fn_param(parameter)
+        visitor.visit_fn_param(parameter);
     }
     if let Some(ref guard) = declaration.guard {
         visitor.visit_fn_guard(guard);

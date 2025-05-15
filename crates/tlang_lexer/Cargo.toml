@@ -8,3 +8,6 @@ tlang_ast = { path = "../tlang_ast" }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }
+
+[lints]
+workspace = true

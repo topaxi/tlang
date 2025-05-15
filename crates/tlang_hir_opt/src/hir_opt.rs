@@ -31,8 +31,8 @@ impl HirPass for HirOptGroup {
             }
 
             changed = false;
-            for pass in self.passes.iter_mut() {
-                changed |= pass.optimize_module(module)
+            for pass in &mut self.passes {
+                changed |= pass.optimize_module(module);
             }
         }
         false

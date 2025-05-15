@@ -64,7 +64,7 @@ impl std::hash::Hash for TlangValue {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 enum ArithmeticOp {
     Add,
     Sub,

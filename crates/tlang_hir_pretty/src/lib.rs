@@ -71,6 +71,7 @@ impl HirPretty {
         self.output.push_str(string);
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     fn push_string(&mut self, string: String) {
         self.push_str(&string);
     }
@@ -167,7 +168,7 @@ impl HirPretty {
             hir::StmtKind::Expr(expr) => self.print_expr(expr),
             hir::StmtKind::FunctionDeclaration(decl) => self.print_function_declaration(decl),
             hir::StmtKind::DynFunctionDeclaration(decl) => {
-                self.print_dyn_function_declaration(decl)
+                self.print_dyn_function_declaration(decl);
             }
             hir::StmtKind::Let(pat, expr, ty) => self.print_variable_declaration(pat, expr, ty),
             hir::StmtKind::Return(expr) => {
@@ -263,7 +264,7 @@ impl HirPretty {
             hir::ExprKind::Block(block) => self.print_block(block),
             hir::ExprKind::Loop(block) => {
                 self.push_str("loop ");
-                self.print_block(block)
+                self.print_block(block);
             }
             hir::ExprKind::Break(expr) => {
                 self.push_str("break");

@@ -15,3 +15,6 @@ serde = { workspace = true, optional = true }
 tlang_parser = { path = "../tlang_parser" }
 indoc = { workspace = true }
 pretty_assertions = { workspace = true }
+
+[lints]
+workspace = true

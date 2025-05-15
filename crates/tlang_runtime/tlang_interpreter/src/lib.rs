@@ -174,9 +174,7 @@ impl Interpreter {
     fn get_shape_of(&self, value: TlangValue) -> Option<&TlangShape> {
         match self.get_object(value)?.shape() {
             Some(s) => self.state.get_shape_by_key(s),
-            _ => self.panic(format!(
-                "Cannot get shape of non-struct object: {value:?}"
-            )),
+            _ => self.panic(format!("Cannot get shape of non-struct object: {value:?}")),
         }
     }
 
@@ -215,13 +213,13 @@ impl Interpreter {
     }
 
     #[inline(always)]
-    fn with_new_fn_scope<F, R>(&mut self, fn_decl: Rc<hir::FunctionDeclaration>, f: F) -> R
+    fn with_new_fn_scope<F, R>(&mut self, fn_decl: &Rc<hir::FunctionDeclaration>, f: F) -> R
     where
         F: FnOnce(&mut Self) -> R,
     {
         self.state
-            .push_call_stack(state::CallStackEntry::new_call(fn_decl.clone()));
-        let result = self.with_new_scope(&fn_decl.clone(), f);
+            .push_call_stack(state::CallStackEntry::new_call(fn_decl));
+        let result = self.with_new_scope(fn_decl, f);
         self.state.pop_call_stack();
         result
     }
@@ -882,22 +880,21 @@ impl Interpreter {
 
         match self.get_object_by_id(id) {
             TlangObjectKind::Closure(closure) => {
-                let closure_decl = self.get_closure_decl(closure.id).unwrap().clone();
+                let closure_decl = self.get_closure_decl(closure.id).unwrap();
 
                 self.with_scope(closure.scope_stack.clone(), |this| {
-                    this.eval_fn_call(closure_decl, callee, args).unwrap_value()
+                    this.eval_fn_call(&closure_decl, callee, args)
+                        .unwrap_value()
                 })
             }
             TlangObjectKind::Fn(hir_id) => {
                 let fn_decl = self
                     .state
                     .get_fn_decl(*hir_id)
-                    .unwrap_or_else(|| self.panic("Function not found".to_string()))
-                    .clone();
+                    .unwrap_or_else(|| self.panic("Function not found".to_string()));
 
                 self.with_root_scope(|this| {
-                    this.eval_fn_call(fn_decl.clone(), callee, args)
-                        .unwrap_value()
+                    this.eval_fn_call(&fn_decl, callee, args).unwrap_value()
                 })
             }
             TlangObjectKind::NativeFn => self.exec_native_fn(id, callee, args),
@@ -949,7 +946,7 @@ impl Interpreter {
             };
 
             // Instead of a recursive call, replace the current function scope
-            self.replace_current_fn_scope(fn_decl.clone(), tail_call.callee, &tail_call.args);
+            self.replace_current_fn_scope(&fn_decl, tail_call.callee, &tail_call.args);
             match self.eval_block_inner(&fn_decl.body) {
                 EvalResult::TailCall => continue,
                 result => return result,
@@ -959,7 +956,7 @@ impl Interpreter {
 
     fn replace_current_fn_scope(
         &mut self,
-        fn_decl: Rc<hir::FunctionDeclaration>,
+        fn_decl: &Rc<hir::FunctionDeclaration>,
         callee: TlangValue,
         args: &[TlangValue],
     ) {
@@ -1099,7 +1096,7 @@ impl Interpreter {
 
     fn eval_fn_call(
         &mut self,
-        fn_decl: Rc<hir::FunctionDeclaration>,
+        fn_decl: &Rc<hir::FunctionDeclaration>,
         callee: TlangValue,
         args: &[TlangValue],
     ) -> EvalResult {
@@ -1121,7 +1118,7 @@ impl Interpreter {
             ));
         }
 
-        self.with_new_fn_scope(fn_decl.clone(), |this| {
+        self.with_new_fn_scope(fn_decl, |this| {
             this.push_value(callee);
 
             for arg in args {
@@ -1153,7 +1150,7 @@ impl Interpreter {
             NativeFnReturn::Return(value) => value,
             NativeFnReturn::DynamicCall(id) => {
                 if let Some(fn_decl) = self.state.get_fn_decl(id) {
-                    self.with_root_scope(|this| this.eval_fn_call(fn_decl.clone(), callee, args))
+                    self.with_root_scope(|this| this.eval_fn_call(&fn_decl, callee, args))
                         .unwrap_value()
                 } else {
                     self.panic(format!("Function not found: {id:?}"));
@@ -1283,10 +1280,10 @@ impl Interpreter {
 
         match shape.get_method(method_name.as_str()) {
             Some(TlangStructMethod::HirId(id)) => {
-                let fn_decl = self.state.get_fn_decl(*id).unwrap().clone();
+                let fn_decl = self.state.get_fn_decl(*id).unwrap();
                 self.with_root_scope(|this| {
                     // TODO: Struct methods should have a value to refer to.
-                    this.eval_fn_call(fn_decl.clone(), TlangValue::Nil, args)
+                    this.eval_fn_call(&fn_decl, TlangValue::Nil, args)
                         .unwrap_value()
                 })
             }
@@ -1332,11 +1329,11 @@ impl Interpreter {
                         TlangObjectKind::Slice(slice) => {
                             let values = self.get_slice_values(*slice);
                             field_values.reserve(values.len());
-                            field_values.extend_from_slice(values)
+                            field_values.extend_from_slice(values);
                         }
                         TlangObjectKind::Struct(list_struct) => {
                             field_values.reserve(list_struct.len());
-                            field_values.extend(list_struct.values())
+                            field_values.extend(list_struct.values());
                         }
                         obj => self.panic(format!("Expected list, got {obj:?}")),
                     }
@@ -1368,7 +1365,7 @@ impl Interpreter {
             match &entry.0.kind {
                 hir::ExprKind::Path(path) => shape_keys.push(path.first_ident().to_string()),
                 _ => todo!("eval_dict_expr: {:?}", entry.0),
-            };
+            }
         }
 
         let shape = ShapeKey::from_dict_keys(&shape_keys);

@@ -45,6 +45,12 @@ impl TlangStruct {
     }
 }
 
+impl Shaped for TlangStruct {
+    fn shape(&self) -> ShapeKey {
+        self.shape
+    }
+}
+
 impl Shaped for &TlangStruct {
     fn shape(&self) -> ShapeKey {
         self.shape
@@ -85,6 +91,12 @@ impl TlangEnum {
             variant,
             field_values: values,
         }
+    }
+}
+
+impl Shaped for TlangEnum {
+    fn shape(&self) -> ShapeKey {
+        self.shape
     }
 }
 

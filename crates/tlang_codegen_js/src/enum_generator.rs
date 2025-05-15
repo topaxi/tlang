@@ -100,7 +100,7 @@ impl CodegenJS {
 
             if parameter_name != param_field_name {
                 if param.name.as_str().chars().all(char::is_numeric) {
-                    self.push_str(&format!("[{param_field_name}]: "))
+                    self.push_str(&format!("[{param_field_name}]: "));
                 } else {
                     self.push_str(&format!("{param_field_name}: "));
                 }

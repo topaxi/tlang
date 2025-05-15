@@ -131,7 +131,7 @@ impl CodegenJS {
     pub(crate) fn generate_expr(&mut self, expr: &hir::Expr, parent_op: Option<hir::BinaryOpKind>) {
         match &expr.kind {
             hir::ExprKind::Block(block) if self.current_context() == BlockContext::Expression => {
-                self.generate_block_expression(block)
+                self.generate_block_expression(block);
             }
             hir::ExprKind::Block(block) => self.generate_block(block),
             hir::ExprKind::Loop(block) => {
@@ -181,11 +181,11 @@ impl CodegenJS {
                 self.generate_expr(expr, parent_op);
             }
             hir::ExprKind::FieldAccess(base, field) => {
-                self.generate_field_access_expression(base, field)
+                self.generate_field_access_expression(base, field);
             }
             hir::ExprKind::Path(path) => self.generate_path_expression(path),
             hir::ExprKind::IndexAccess(base, index) => {
-                self.generate_index_access_expression(base, index)
+                self.generate_index_access_expression(base, index);
             }
             hir::ExprKind::Let(_pattern, _expr) => todo!("Let expression not implemented yet."),
             hir::ExprKind::Literal(literal) => self.generate_literal(literal),
@@ -193,11 +193,11 @@ impl CodegenJS {
             hir::ExprKind::Dict(kvs) => self.generate_dict_expression(kvs),
             hir::ExprKind::Unary(op, expr) => self.generate_unary_op(op, expr),
             hir::ExprKind::Binary(op, lhs, rhs) => {
-                self.generate_binary_op(*op, lhs, rhs, parent_op)
+                self.generate_binary_op(*op, lhs, rhs, parent_op);
             }
             hir::ExprKind::Match(expr, arms) => self.generate_match_expression(expr, arms),
             hir::ExprKind::IfElse(expr, then_branch, else_branches) => {
-                self.generate_if_else(expr, then_branch, else_branches, parent_op)
+                self.generate_if_else(expr, then_branch, else_branches, parent_op);
             }
             hir::ExprKind::FunctionExpression(decl) => self.generate_function_expression(decl),
             hir::ExprKind::Range(_) => todo!("Range expression not implemented yet."),
@@ -263,7 +263,7 @@ impl CodegenJS {
     fn generate_dict_expression(&mut self, kvs: &[(hir::Expr, hir::Expr)]) {
         self.push_str("{\n");
         self.inc_indent();
-        for (key, value) in kvs.iter() {
+        for (key, value) in kvs {
             self.push_indent();
             self.generate_expr(key, None);
 
@@ -414,10 +414,7 @@ impl CodegenJS {
 
             // If we have an lhs, put the completion var as the rhs of the lhs.
             // Otherwise, we assign the completion_var to the previous completion_var.
-            if !lhs.is_empty() {
-                self.push_str(&lhs);
-                self.push_current_completion_variable();
-            } else {
+            if lhs.is_empty() {
                 self.push_indent();
                 let prev_completion_var = self
                     .nth_completion_variable(self.current_completion_variable_count() - 2)
@@ -427,6 +424,9 @@ impl CodegenJS {
                 self.push_str(" = ");
                 self.push_current_completion_variable();
                 self.push_str(";\n");
+            } else {
+                self.push_str(&lhs);
+                self.push_current_completion_variable();
             }
         }
         self.pop_completion_variable();

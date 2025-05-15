@@ -135,7 +135,7 @@ impl CodegenJS {
             hir::PatKind::Literal(literal) => {
                 self.push_str(parent_js_expr);
                 self.push_str(" === ");
-                self.generate_literal(literal)
+                self.generate_literal(literal);
             }
             hir::PatKind::List(patterns) if patterns.is_empty() => {
                 self.push_str(parent_js_expr);
@@ -241,7 +241,7 @@ impl CodegenJS {
                             .iter()
                             .map(|expr| expr.path().unwrap().first_ident().to_string())
                             .collect(),
-                    ))
+                    ));
             }
             _ => {
                 self.match_context_stack.push(MatchContext::Dynamic);
@@ -250,7 +250,7 @@ impl CodegenJS {
 
         let match_value_binding = match self.match_context_stack.last() {
             Some(MatchContext::Identifier(identifier)) => identifier.clone(),
-            Some(MatchContext::ListOfIdentifiers(_)) => "".to_string(), // ohoh...
+            Some(MatchContext::ListOfIdentifiers(_)) => String::new(), // ohoh...
             _ => {
                 let match_value_binding = self.current_scope().declare_tmp_variable();
 
@@ -269,12 +269,12 @@ impl CodegenJS {
         };
 
         let let_guard_var = if arms.iter().any(|arm| arm.has_let_guard()) {
-            if !has_let {
+            if has_let {
+                self.push_char(',');
+            } else {
                 self.push_indent();
                 self.push_str("let ");
                 has_let = true;
-            } else {
-                self.push_char(',');
             }
             let binding = self.current_scope().declare_tmp_variable();
             self.push_str(&binding);
@@ -378,10 +378,7 @@ impl CodegenJS {
             self.push_newline();
             // If we have an lhs, put the completion var as the rhs of the lhs.
             // Otherwise, we assign the completion_var to the previous completion_var.
-            if !lhs.is_empty() {
-                self.push_str(&lhs);
-                self.push_current_completion_variable();
-            } else {
+            if lhs.is_empty() {
                 self.push_indent();
                 let prev_completion_var = self
                     .nth_completion_variable(self.current_completion_variable_count() - 2)
@@ -392,6 +389,9 @@ impl CodegenJS {
                 self.push_current_completion_variable();
                 self.push_char(';');
                 self.push_newline();
+            } else {
+                self.push_str(&lhs);
+                self.push_current_completion_variable();
             }
         }
         self.pop_completion_variable();

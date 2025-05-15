@@ -81,7 +81,7 @@ impl<'src> Parser<'src> {
     }
 
     fn end_span_from_previous_token(&self, span: &mut Span) {
-        span.end = self.previous_span.end
+        span.end = self.previous_span.end;
     }
 
     #[inline(never)]
@@ -94,6 +94,7 @@ impl<'src> Parser<'src> {
     }
 
     #[inline(never)]
+    #[allow(clippy::needless_pass_by_value)]
     fn panic_unexpected_token(&self, expected: &str, actual: Token) -> ! {
         let start_span = actual.span.start;
         let source_line = self
@@ -111,6 +112,7 @@ impl<'src> Parser<'src> {
     }
 
     #[inline(never)]
+    #[allow(clippy::needless_pass_by_value)]
     fn panic_unexpected_stmt(&self, expected: &str, actual: Stmt) -> ! {
         let start_span = actual.span.start;
         let source_line = self
@@ -128,6 +130,7 @@ impl<'src> Parser<'src> {
     }
 
     #[inline(never)]
+    #[allow(clippy::needless_pass_by_value)]
     fn panic_unexpected_expr(&self, expected: &str, actual: Option<Expr>) -> ! {
         let node = actual.as_ref().unwrap();
         let start_span = node.span.start;
@@ -145,6 +148,7 @@ impl<'src> Parser<'src> {
         );
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     fn expect_token(&mut self, expected: TokenKind) {
         expect_token_matches!(
             self,
@@ -153,6 +157,7 @@ impl<'src> Parser<'src> {
         );
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     fn expect_token_not(&mut self, expected: TokenKind) {
         expect_token_matches!(
             self,
@@ -1644,9 +1649,7 @@ impl<'src> Parser<'src> {
         precedence: u8,
         associativity: Associativity,
     ) -> Expr {
-        debug!(
-            "Parsing expression with precedence {precedence} {associativity:#?}"
-        );
+        debug!("Parsing expression with precedence {precedence} {associativity:#?}");
         let mut lhs = self.parse_primary_expression();
         let mut span = lhs.span;
 

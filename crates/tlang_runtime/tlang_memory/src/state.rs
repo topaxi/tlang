@@ -34,7 +34,7 @@ pub struct CallStackEntry {
 }
 
 impl CallStackEntry {
-    pub fn new_call(fn_decl: Rc<hir::FunctionDeclaration>) -> Self {
+    pub fn new_call(fn_decl: &Rc<hir::FunctionDeclaration>) -> Self {
         Self {
             kind: CallStackKind::Function(fn_decl.clone()),
             tail_call: None,
@@ -293,6 +293,8 @@ impl InterpreterState {
         self.enum_decls.insert(path_name, decl);
     }
 
+    /// # Panics
+    #[allow(clippy::needless_pass_by_value)]
     pub fn panic(&self, message: String) -> ! {
         let mut call_stack = String::new();
 
@@ -506,7 +508,7 @@ impl InterpreterState {
     }
 
     #[inline(always)]
-    pub fn get_shape<T>(&self, shaped: T) -> Option<&TlangShape>
+    pub fn get_shape<T>(&self, shaped: &T) -> Option<&TlangShape>
     where
         T: Shaped,
     {
@@ -555,7 +557,7 @@ impl InterpreterState {
         let mut out = "[\n".to_string();
         for scope in self.scope_stack.iter() {
             out.push_str("  {\n");
-            for entry in scope.borrow().get_locals().iter() {
+            for entry in scope.borrow().get_locals() {
                 out.push_str("    ");
                 out.push_str(self.stringify(*entry).as_str());
                 out.push_str(",\n");

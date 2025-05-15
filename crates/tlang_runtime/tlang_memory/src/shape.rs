@@ -36,7 +36,7 @@ impl ShapeKey {
     pub fn from_dict_keys(keys: &[String]) -> Self {
         let mut hasher = DefaultHasher::new();
 
-        for key in keys.iter() {
+        for key in keys {
             std::hash::Hash::hash(&key, &mut hasher);
         }
 

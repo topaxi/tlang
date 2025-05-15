@@ -64,7 +64,7 @@ impl CodegenJS {
             scopes: Scope::default(),
             context_stack: vec![BlockContext::Program],
             function_context_stack: vec![],
-            match_context_stack: Default::default(),
+            match_context_stack: MatchContextStack::default(),
             statement_buffer: vec![String::with_capacity(STATEMENT_BUFFER_CAPACITY)],
             completion_variables: vec![None],
             render_ternary: true,

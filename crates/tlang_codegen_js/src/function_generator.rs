@@ -37,7 +37,7 @@ impl CodegenJS {
             // the comma being rendered in the loop ahead.
             if is_method {
                 if let Some(param) = iter.next() {
-                    self.generate_function_param(param, false)
+                    self.generate_function_param(param, false);
                 }
             }
         }
@@ -330,7 +330,7 @@ impl CodegenJS {
         }
 
         // For any other referenced function, we do a normal call expression.
-        self.generate_call_expression(expr)
+        self.generate_call_expression(expr);
     }
 }
 

@@ -26,7 +26,7 @@ impl CodegenJS {
             self.push_char('\n');
         }
 
-        for field in decl.fields.iter() {
+        for field in &decl.fields {
             self.generate_struct_field(&field.name, &field.ty);
         }
 

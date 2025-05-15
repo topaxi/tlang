@@ -125,8 +125,8 @@ impl Scope {
         }
     }
 
-    fn create_binding(&mut self, name: String, binding: Binding) {
-        debug!("Creating binding for {name}: {binding:?}");
+    fn create_binding(&mut self, binding: Binding) {
+        debug!("Creating binding: {binding:?}");
 
         self.bindings.push(binding);
     }
@@ -138,19 +138,13 @@ impl Scope {
     pub(crate) fn def_local(&mut self, name: &str, hir_id: HirId) {
         let index = self.bindings.len();
 
-        self.create_binding(
-            name.to_string(),
-            Binding::new_local(name.to_string(), hir_id, index),
-        );
+        self.create_binding(Binding::new_local(name.to_string(), hir_id, index));
     }
 
     pub(crate) fn def_fn_local(&mut self, name: &str, hir_id: HirId) {
         let index = self.bindings.len();
 
-        self.create_binding(
-            name.to_string(),
-            Binding::new_fn_def(name.to_string(), hir_id, index),
-        );
+        self.create_binding(Binding::new_fn_def(name.to_string(), hir_id, index));
     }
 
     pub(crate) fn def_struct_local(&mut self, name: &str, hir_id: HirId) {
@@ -195,7 +189,13 @@ impl Scope {
         self.def_local(&(enum_name.to_string() + "::" + variant_name), hir_id);
     }
 
-    pub(crate) fn def_upvar(&self, name: &str, hir_id: HirId, scope: usize, index: usize) -> Binding {
+    pub(crate) fn def_upvar(
+        &self,
+        name: &str,
+        hir_id: HirId,
+        scope: usize,
+        index: usize,
+    ) -> Binding {
         let binding = Binding::new_upvar(name.to_string(), hir_id, scope, index);
 
         self.create_upvar(name.to_string(), binding.clone());
