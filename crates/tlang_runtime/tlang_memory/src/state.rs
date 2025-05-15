@@ -141,6 +141,7 @@ impl BuiltinShapes {
         )))
     }
 
+    /// # Panics
     pub fn get_list_shape(&self) -> &TlangStructShape {
         self.store
             .get(self.list.get_native_index())
@@ -148,6 +149,7 @@ impl BuiltinShapes {
             .unwrap()
     }
 
+    /// # Panics
     pub fn get_list_shape_mut(&mut self) -> &mut TlangStructShape {
         self.store
             .get_mut(self.list.get_native_index())
@@ -155,6 +157,7 @@ impl BuiltinShapes {
             .unwrap()
     }
 
+    /// # Panics
     pub fn get_list_iterator_shape(&self) -> &TlangStructShape {
         self.store
             .get(self.list_iterator.get_native_index())
@@ -162,6 +165,7 @@ impl BuiltinShapes {
             .unwrap()
     }
 
+    /// # Panics
     pub fn get_list_iterator_shape_mut(&mut self) -> &mut TlangStructShape {
         self.store
             .get_mut(self.list_iterator.get_native_index())
@@ -169,6 +173,7 @@ impl BuiltinShapes {
             .unwrap()
     }
 
+    /// # Panics
     pub fn get_option_shape(&self) -> &TlangEnumShape {
         self.store
             .get(self.option.get_native_index())
@@ -176,6 +181,7 @@ impl BuiltinShapes {
             .unwrap()
     }
 
+    /// # Panics
     pub fn get_option_shape_mut(&mut self) -> &mut TlangEnumShape {
         self.store
             .get_mut(self.option.get_native_index())
@@ -183,6 +189,7 @@ impl BuiltinShapes {
             .unwrap()
     }
 
+    /// # Panics
     pub fn get_result_shape(&self) -> &TlangEnumShape {
         self.store
             .get(self.result.get_native_index())
@@ -190,6 +197,7 @@ impl BuiltinShapes {
             .unwrap()
     }
 
+    /// # Panics
     pub fn get_result_shape_mut(&mut self) -> &mut TlangEnumShape {
         self.store
             .get_mut(self.result.get_native_index())
@@ -319,6 +327,7 @@ impl InterpreterState {
         panic!("{message}\n{call_stack}")
     }
 
+    /// # Panics
     pub fn set_current_span(&mut self, span: tlang_ast::span::Span) {
         self.call_stack.last_mut().unwrap().current_span = span;
     }
@@ -327,14 +336,17 @@ impl InterpreterState {
         self.call_stack.push(entry);
     }
 
+    /// # Panics
     pub fn pop_call_stack(&mut self) -> CallStackEntry {
         self.call_stack.pop().unwrap()
     }
 
+    /// # Panics
     pub fn current_call_frame(&mut self) -> &CallStackEntry {
         self.call_stack.last().unwrap()
     }
 
+    /// # Panics
     pub fn current_call_frame_mut(&mut self) -> &mut CallStackEntry {
         self.call_stack.last_mut().unwrap()
     }
@@ -384,6 +396,7 @@ impl InterpreterState {
         }))
     }
 
+    /// # Panics
     pub fn new_native_fn<F>(&mut self, f: F) -> TlangValue
     where
         F: Fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn + 'static,
@@ -462,11 +475,13 @@ impl InterpreterState {
         self.get_object(value).and_then(|obj| obj.get_slice())
     }
 
+    /// # Panics
     pub fn get_slice_value(&self, slice: TlangSlice, index: usize) -> TlangValue {
         let list = self.get_struct(slice.of()).unwrap();
         list.get(slice.start() + index).unwrap()
     }
 
+    /// # Panics
     pub fn get_slice_values(&self, slice: TlangSlice) -> &[TlangValue] {
         let list = self.get_struct(slice.of()).unwrap();
         &list.values()[slice.range()]
@@ -578,6 +593,7 @@ impl InterpreterState {
         format!("[{values}]")
     }
 
+    /// # Panics
     pub fn stringify(&self, value: TlangValue) -> String {
         match value {
             TlangValue::Object(id) => match self.get_object_by_id(id) {

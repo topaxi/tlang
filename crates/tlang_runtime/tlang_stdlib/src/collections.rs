@@ -13,6 +13,7 @@ pub fn len(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
     }
 }
 
+#[allow(clippy::missing_panics_doc)]
 pub fn define_list_shape(state: &mut InterpreterState) {
     define_list_iterator_shape(state);
 

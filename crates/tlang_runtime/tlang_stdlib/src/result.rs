@@ -14,6 +14,7 @@ pub fn new_result_err(state: &mut InterpreterState, args: &[TlangValue]) -> Tlan
     state.new_enum(state.builtin_shapes.result, 1, vec![args[0]])
 }
 
+#[allow(clippy::missing_panics_doc)]
 pub fn define_result_shape(state: &mut InterpreterState) {
     let mut method_map = HashMap::with_capacity(3);
 

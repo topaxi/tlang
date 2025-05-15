@@ -43,10 +43,12 @@ impl ScopeStack {
         debug!("Popping scope");
     }
 
+    /// # Panics
     pub fn current_scope(&self) -> Rc<RefCell<Scope>> {
         self.scopes.last().unwrap().clone()
     }
 
+    /// # Panics
     pub fn root_scope(&self) -> Rc<RefCell<Scope>> {
         self.scopes.first().unwrap().clone()
     }
@@ -81,6 +83,7 @@ impl ScopeStack {
         }
     }
 
+    /// # Panics
     pub fn update_value(&self, res: &hir::Res, value: TlangValue) {
         match res {
             hir::Res::Local(_, index) => self.current_scope().borrow_mut().set(*index, value),

@@ -115,6 +115,7 @@ impl TlangValue {
         }
     }
 
+    /// # Panics
     pub fn as_primitive(self) -> TlangPrimitive {
         match self {
             TlangValue::Nil => TlangPrimitive::Nil,

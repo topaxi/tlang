@@ -22,6 +22,7 @@ impl ShapeKey {
         ShapeKey::Native(index)
     }
 
+    /// # Panics
     pub fn get_native_index(self) -> usize {
         match self {
             ShapeKey::Native(index) => index,
@@ -164,7 +165,7 @@ impl TlangStructShape {
             return false;
         }
 
-        let mut fields = fields.map(|f| f.unwrap()).collect::<Vec<_>>();
+        let mut fields = fields.flatten().collect::<Vec<_>>();
 
         fields.sort();
 

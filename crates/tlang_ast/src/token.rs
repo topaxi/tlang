@@ -98,6 +98,7 @@ impl Clone for Literal {
 }
 
 impl Literal {
+    /// # Panics
     pub fn invert_sign(&self) -> Self {
         match self {
             Literal::UnsignedInteger(value) => Literal::Integer(-(*value as i64)),

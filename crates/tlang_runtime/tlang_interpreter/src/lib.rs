@@ -65,6 +65,7 @@ impl Default for Interpreter {
 }
 
 impl Interpreter {
+    /// # Panics
     pub fn new() -> Self {
         let mut interpreter = Self {
             state: InterpreterState::default(),
@@ -274,7 +275,7 @@ impl Interpreter {
                 EvalResult::Break(value) => return EvalResult::Value(value),
                 EvalResult::Return(value) => return EvalResult::Return(value),
                 EvalResult::TailCall => return EvalResult::TailCall,
-                EvalResult::Continue | EvalResult::Value(_) | EvalResult::Void => continue,
+                EvalResult::Continue | EvalResult::Value(_) | EvalResult::Void => {}
             }
         }
     }
@@ -948,7 +949,7 @@ impl Interpreter {
             // Instead of a recursive call, replace the current function scope
             self.replace_current_fn_scope(&fn_decl, tail_call.callee, &tail_call.args);
             match self.eval_block_inner(&fn_decl.body) {
-                EvalResult::TailCall => continue,
+                EvalResult::TailCall => {}
                 result => return result,
             }
         }
@@ -1390,9 +1391,8 @@ impl Interpreter {
         debug!("eval_match: {}", self.state.stringify(value));
 
         for arm in arms {
-            match self.eval_match_arm(arm, value) {
-                MatchResult::Matched(result) => return result,
-                MatchResult::NotMatched(_) => continue,
+            if let MatchResult::Matched(result) = self.eval_match_arm(arm, value) {
+                return result;
             }
         }
 

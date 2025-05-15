@@ -9,6 +9,7 @@ pub fn new_option_some(state: &mut InterpreterState, args: &[TlangValue]) -> Tla
     state.new_enum(state.builtin_shapes.option, 0, vec![args[0]])
 }
 
+#[allow(clippy::missing_panics_doc)]
 pub fn define_option_shape(state: &mut InterpreterState) {
     let mut method_map = HashMap::with_capacity(3);
 

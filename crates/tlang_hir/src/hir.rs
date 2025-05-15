@@ -550,6 +550,7 @@ impl FunctionDeclaration {
         }
     }
 
+    /// # Panics
     pub fn name(&self) -> String {
         match &self.name.kind {
             ExprKind::Path(path) => path.join("::"),
