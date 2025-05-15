@@ -107,3 +107,20 @@ fn constant_folding_mutable_variable() {
     log(loop_test());
     "###);
 }
+
+#[test]
+fn constant_folding_booleans() {
+    let source = r#"
+        let a: unknown = true && false;
+        let b: unknown = true || false;
+        let c: unknown = !true;
+        println(a, b, c);
+    "#;
+    let hir = common::compile_and_optimize(source);
+    assert_snapshot!(common::pretty_print(&hir), @r###"
+    let a: unknown = false;
+    let b: unknown = true;
+    let c: unknown = false;
+    println(false, true, false);
+    "###);
+}

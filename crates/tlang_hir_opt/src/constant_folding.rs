@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use tlang_ast::token::Literal;
+use tlang_ast::{node::UnaryOp, token::Literal};
 use tlang_hir::{
     hir::{BinaryOpKind, Expr, ExprKind, HirId, Module},
     visit::{self, Visitor},
@@ -33,6 +33,7 @@ impl ConstantFolder {
         rhs: &Literal,
     ) -> Option<Literal> {
         match (op, lhs, rhs) {
+            // Unsigned integers
             (BinaryOpKind::Add, Literal::UnsignedInteger(l), Literal::UnsignedInteger(r)) => {
                 Some(Literal::UnsignedInteger(l + r))
             }
@@ -42,6 +43,26 @@ impl ConstantFolder {
             (BinaryOpKind::Mul, Literal::UnsignedInteger(l), Literal::UnsignedInteger(r)) => {
                 Some(Literal::UnsignedInteger(l * r))
             }
+
+            // Booleans
+            (BinaryOpKind::And, Literal::Boolean(lhs), Literal::Boolean(rhs)) => {
+                Some(Literal::Boolean(*lhs && *rhs))
+            }
+            (BinaryOpKind::Or, Literal::Boolean(lhs), Literal::Boolean(rhs)) => {
+                Some(Literal::Boolean(*lhs || *rhs))
+            }
+            (BinaryOpKind::NotEq, Literal::Boolean(lhs), Literal::Boolean(rhs)) => {
+                Some(Literal::Boolean(lhs != rhs))
+            }
+
+            // Everything else we don't support yet
+            _ => None,
+        }
+    }
+
+    fn try_eval_unary_op(&self, op: UnaryOp, val: &Literal) -> Option<Literal> {
+        match (op, val) {
+            (UnaryOp::Not, Literal::Boolean(v)) => Some(Literal::Boolean(!v)),
             _ => None,
         }
     }
@@ -52,6 +73,7 @@ impl ConstantFolder {
         }
 
         match &expr.kind {
+            ExprKind::Unary(op, expr) => self.try_eval_unary_op(*op, &self.try_eval_expr(expr)?),
             ExprKind::Binary(op, lhs, rhs) => {
                 let lhs_val = self.try_eval_expr(lhs)?;
                 let rhs_val = self.try_eval_expr(rhs)?;
