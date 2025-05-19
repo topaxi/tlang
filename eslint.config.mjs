@@ -9,6 +9,7 @@ export default defineConfig([
   {
     ignores: [
       '**/dist/',
+      '.benchmark-main-worktree/',
       'crates/tlang_bindings_js/pkg/',
       'packages/codemirror-lang-tlang/src/parser.js',
       'packages/codemirror-lang-tlang/src/parser.terms.js',
@@ -34,5 +35,9 @@ export default defineConfig([
         },
       ],
     },
+  },
+  {
+    files: ['scripts/**/*.js'],
+    languageOptions: { globals: globals.node },
   },
 ]);
