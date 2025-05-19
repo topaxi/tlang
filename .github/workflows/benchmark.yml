@@ -29,47 +29,40 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@nightly
-        with:
-          components: rustfmt, clippy
-
-      - name: Install cargo tools
-        uses: baptiste0928/cargo-install@v3
-        with:
-          crate: cargo-nextest
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
 
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      # Make scripts executable
       - name: Make scripts executable
         run: |
           chmod +x scripts/run_benchmarks.sh
           chmod +x scripts/compare_benchmarks.js
 
-      # Run benchmarks using our unified script
       - name: Run benchmarks
         run: |
-          ./scripts/run_benchmarks.sh
-          
-          # Generate a more formatted report file for the PR comment
+          # Run benchmarks and store the output
+          ./scripts/run_benchmarks.sh | tee benchmark_output.txt
+
+      - name: Generate report for PR comment
+        run: |
+          # Extract benchmark results using our comparison script 
           node scripts/compare_benchmarks.js \
             crates/tlang_runtime/tlang_interpreter/pr_benchmark.txt \
             crates/tlang_runtime/tlang_interpreter/main_benchmark.txt > benchmark_report.md || \
             echo -e "## ⚠️ Benchmark Error\n\nThere was an error generating the benchmark comparison. Please check the workflow logs for more details." > benchmark_report.md
 
-      - name: Upload benchmark results as artifacts
+      - name: Upload benchmark results
         uses: actions/upload-artifact@v3
         with:
           name: benchmark-results
           path: |
-            benchmark_report.md
             crates/tlang_runtime/tlang_interpreter/pr_benchmark.txt
             crates/tlang_runtime/tlang_interpreter/main_benchmark.txt
+            target/criterion/report
+            benchmark_output.txt
+            benchmark_report.md
           retention-days: 14
 
       - name: Comment on PR
@@ -82,9 +75,12 @@ jobs:
             // Read the report from the file
             const report = fs.readFileSync('benchmark_report.md', 'utf8');
             
+            // Add footer with link to artifacts
+            const footer = '\n\n---\n**Note**: Full benchmark details including Criterion HTML reports are available in the workflow artifacts.';
+            
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: report
+              body: report + footer
             });
