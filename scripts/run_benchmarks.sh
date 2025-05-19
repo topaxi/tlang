@@ -125,13 +125,11 @@ if [[ $SKIP_MAIN -eq 0 ]]; then
   echo "Running benchmarks for main branch..."
   cd "$CRATE_PATH"
   cargo bench | tee "$MAIN_BENCHMARK_FILE"
-  cd ../../..
   
-  # Copy the benchmark files back to the main working directory
-  echo "Copying benchmark data from worktree to main directory..."
-  if [[ -f "$WORKTREE_DIR/$CRATE_PATH/$MAIN_BENCHMARK_FILE" ]]; then
-    cp "$WORKTREE_DIR/$CRATE_PATH/$MAIN_BENCHMARK_FILE" "$CRATE_PATH/"
-  fi
+  # Copy the benchmark file to the current directory
+  echo "Copying benchmark data from worktree to current directory..."
+  cp "$MAIN_BENCHMARK_FILE" "../../../"
+  cd ../../..
   
   # Backup the Criterion data from the main branch
   if [[ -d "$WORKTREE_DIR/$CRITERION_DIR" ]]; then
@@ -146,14 +144,14 @@ if [[ $SKIP_MAIN -eq 0 ]]; then
   echo "Cleaning up worktree..."
   git worktree remove -f "$WORKTREE_DIR"
   
-  echo "Main branch benchmark results saved to $CRATE_PATH/$MAIN_BENCHMARK_FILE"
+  echo "Main branch benchmark results saved to $MAIN_BENCHMARK_FILE"
 else
   echo "=== Skipping main branch benchmarks as requested ==="
   # Check if main benchmark file exists
-  if [[ ! -f "$CRATE_PATH/$MAIN_BENCHMARK_FILE" ]]; then
-    echo "Warning: Main benchmark file doesn't exist: $CRATE_PATH/$MAIN_BENCHMARK_FILE"
+  if [[ ! -f "$MAIN_BENCHMARK_FILE" ]]; then
+    echo "Warning: Main benchmark file doesn't exist: $MAIN_BENCHMARK_FILE"
   else
-    echo "Using existing main benchmark file: $CRATE_PATH/$MAIN_BENCHMARK_FILE"
+    echo "Using existing main benchmark file: $MAIN_BENCHMARK_FILE"
   fi
 fi
 
@@ -194,15 +192,15 @@ if [[ $RUN_COMPARE -eq 1 ]]; then
   # Check if both benchmark files exist
   if [[ ! -f "$CRATE_PATH/$PR_BENCHMARK_FILE" ]]; then
     echo "Warning: PR benchmark file not found: $CRATE_PATH/$PR_BENCHMARK_FILE"
-  elif [[ ! -f "$CRATE_PATH/$MAIN_BENCHMARK_FILE" ]]; then
-    echo "Warning: Main benchmark file not found: $CRATE_PATH/$MAIN_BENCHMARK_FILE"
+  elif [[ ! -f "$MAIN_BENCHMARK_FILE" ]]; then
+    echo "Warning: Main benchmark file not found: $MAIN_BENCHMARK_FILE"
   else
     echo "=== Generating comparison report ==="
     # Ensure comparison script is executable
     if [[ -f "scripts/compare_benchmarks.js" ]]; then
       chmod +x scripts/compare_benchmarks.js
       echo "Running benchmark comparison script..."
-      node scripts/compare_benchmarks.js "$CRATE_PATH/$PR_BENCHMARK_FILE" "$CRATE_PATH/$MAIN_BENCHMARK_FILE"
+      node scripts/compare_benchmarks.js "$CRATE_PATH/$PR_BENCHMARK_FILE" "$MAIN_BENCHMARK_FILE"
     else
       echo "Warning: Benchmark comparison script not found: scripts/compare_benchmarks.js"
     fi
