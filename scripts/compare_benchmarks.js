@@ -1,4 +1,6 @@
-const fs = require('fs');
+#!/usr/bin/env node
+
+import * as fs from 'fs';
 
 /**
  * Standalone benchmark comparison script that can be run locally
