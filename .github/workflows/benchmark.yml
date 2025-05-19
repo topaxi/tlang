@@ -53,18 +53,6 @@ jobs:
             crates/tlang_runtime/tlang_interpreter/main_benchmark.txt > benchmark_report.md || \
             echo -e "## ⚠️ Benchmark Error\n\nThere was an error generating the benchmark comparison. Please check the workflow logs for more details." > benchmark_report.md
 
-      - name: Upload benchmark results
-        uses: actions/upload-artifact@v3
-        with:
-          name: benchmark-results
-          path: |
-            crates/tlang_runtime/tlang_interpreter/pr_benchmark.txt
-            crates/tlang_runtime/tlang_interpreter/main_benchmark.txt
-            target/criterion/report
-            benchmark_output.txt
-            benchmark_report.md
-          retention-days: 14
-
       - name: Comment on PR
         uses: actions/github-script@v7
         with:
@@ -75,8 +63,8 @@ jobs:
             // Read the report from the file
             const report = fs.readFileSync('benchmark_report.md', 'utf8');
             
-            // Add footer with link to artifacts
-            const footer = '\n\n---\n**Note**: Full benchmark details including Criterion HTML reports are available in the workflow artifacts.';
+            // Add footer with link to logs
+            const footer = '\n\n---\n**Note**: To run these benchmarks locally, use `./scripts/run_benchmarks.sh`';
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,
