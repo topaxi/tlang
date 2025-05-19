@@ -15,6 +15,7 @@ on:
       - 'Cargo.lock'
       - '.github/workflows/benchmark.yml'
       - 'scripts/compare_benchmarks.js'
+      - 'scripts/run_benchmarks.sh'
 
 jobs:
   benchmark:
@@ -44,48 +45,31 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
-      # First run main branch benchmarks
-      - name: Checkout main
-        run: git checkout main
-
-      - name: Build project for benchmarking on main branch
-        run: cargo build --release -p tlang_interpreter
-
-      - name: Run benchmarks on main
-        run: cd crates/tlang_runtime/tlang_interpreter && cargo bench | tee main_benchmark.txt
-
-      # Then run PR branch benchmarks
-      - name: Checkout PR
-        run: git checkout ${{ github.event.pull_request.head.sha }}
-
-      - name: Build project for benchmarking on PR branch
-        run: cargo build --release -p tlang_interpreter
-
-      - name: Run benchmarks on PR branch
-        run: cd crates/tlang_runtime/tlang_interpreter && cargo bench | tee pr_benchmark.txt
-
-      - name: Debug benchmark files
+      # Make scripts executable
+      - name: Make scripts executable
         run: |
-          echo "PR benchmark file exists: $(test -f crates/tlang_runtime/tlang_interpreter/pr_benchmark.txt && echo 'Yes' || echo 'No')"
-          echo "Main benchmark file exists: $(test -f crates/tlang_runtime/tlang_interpreter/main_benchmark.txt && echo 'Yes' || echo 'No')"
-          echo "File sizes:"
-          ls -la crates/tlang_runtime/tlang_interpreter/*.txt 2>/dev/null || echo "No benchmark files found"
+          chmod +x scripts/run_benchmarks.sh
+          chmod +x scripts/compare_benchmarks.js
 
-      - name: Make benchmark comparison script executable
-        run: chmod +x scripts/compare_benchmarks.js
-
-      - name: Run benchmark comparison
+      # Run benchmarks using our unified script
+      - name: Run benchmarks
         run: |
+          ./scripts/run_benchmarks.sh
+          
+          # Generate a more formatted report file for the PR comment
           node scripts/compare_benchmarks.js \
             crates/tlang_runtime/tlang_interpreter/pr_benchmark.txt \
             crates/tlang_runtime/tlang_interpreter/main_benchmark.txt > benchmark_report.md || \
             echo -e "## ⚠️ Benchmark Error\n\nThere was an error generating the benchmark comparison. Please check the workflow logs for more details." > benchmark_report.md
 
-      - name: Upload benchmark report as artifact
+      - name: Upload benchmark results as artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: benchmark-report
-          path: benchmark_report.md
+          name: benchmark-results
+          path: |
+            benchmark_report.md
+            crates/tlang_runtime/tlang_interpreter/pr_benchmark.txt
+            crates/tlang_runtime/tlang_interpreter/main_benchmark.txt
           retention-days: 14
 
       - name: Comment on PR
