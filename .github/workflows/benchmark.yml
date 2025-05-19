@@ -14,6 +14,8 @@ on:
       - 'Cargo.toml'
       - 'Cargo.lock'
       - '.github/workflows/benchmark.yml'
+      - 'scripts/compare_benchmarks.js'
+      - 'scripts/run_benchmarks.sh'
 
 jobs:
   benchmark:
@@ -35,180 +37,51 @@ jobs:
         with:
           crate: cargo-nextest
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
-      - name: Get main branch SHA
-        id: get-main-sha
-        run: echo "MAIN_SHA=$(git rev-parse origin/main)" >> $GITHUB_OUTPUT
+      # Make scripts executable
+      - name: Make scripts executable
+        run: |
+          chmod +x scripts/run_benchmarks.sh
+          chmod +x scripts/compare_benchmarks.js
 
-      - name: Cache main branch benchmarks
-        id: cache-main-benchmarks
-        uses: actions/cache@v3
+      # Run benchmarks using our unified script
+      - name: Run benchmarks
+        run: |
+          ./scripts/run_benchmarks.sh
+          
+          # Generate a more formatted report file for the PR comment
+          node scripts/compare_benchmarks.js \
+            crates/tlang_runtime/tlang_interpreter/pr_benchmark.txt \
+            crates/tlang_runtime/tlang_interpreter/main_benchmark.txt > benchmark_report.md || \
+            echo -e "## ⚠️ Benchmark Error\n\nThere was an error generating the benchmark comparison. Please check the workflow logs for more details." > benchmark_report.md
+
+      - name: Upload benchmark results as artifacts
+        uses: actions/upload-artifact@v3
         with:
-          path: crates/tlang_runtime/tlang_interpreter/main_benchmark.txt
-          key: benchmark-main-${{ steps.get-main-sha.outputs.MAIN_SHA }}
-
-      - name: Checkout main
-        if: steps.cache-main-benchmarks.outputs.cache-hit != 'true'
-        run: git checkout main
-
-      - name: Build project for benchmarking on main branch
-        if: steps.cache-main-benchmarks.outputs.cache-hit != 'true'
-        run: cargo build --release -p tlang_interpreter
-
-      - name: Run benchmarks on main
-        if: steps.cache-main-benchmarks.outputs.cache-hit != 'true'
-        run: cd crates/tlang_runtime/tlang_interpreter && cargo bench | tee main_benchmark.txt
-
-      - name: Checkout PR
-        run: git checkout ${{ github.event.pull_request.head.sha }}
-
-      - name: Build project for benchmarking on PR branch
-        run: cargo build --release -p tlang_interpreter
-
-      - name: Run benchmarks on PR branch
-        run: cd crates/tlang_runtime/tlang_interpreter && cargo bench | tee pr_benchmark.txt
-
-      - name: Generate benchmark report
-        id: bench-report
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-
-            // Function to safely read a file, returning empty string if it doesn't exist
-            function safeReadFile(filePath) {
-              try {
-                return fs.readFileSync(filePath, 'utf8');
-              } catch (error) {
-                console.error(`Error reading file ${filePath}: ${error.message}`);
-                return '';
-              }
-            }
-
-            // Parse Criterion benchmark results from text output
-            function parseBenchmarkOutput(filePath) {
-              const content = safeReadFile(filePath);
-              if (!content) {
-                console.error(`No content found in ${filePath}`);
-                return {};
-              }
-
-              const lines = content.split('\n');
-              
-              const results = {};
-              let currentGroup = null;
-              
-              for (const line of lines) {
-                // Match benchmark group name
-                const groupMatch = line.match(/^([a-zA-Z0-9 ]+)\/([a-zA-Z0-9_() ]+)$/);
-                if (groupMatch) {
-                  const groupName = groupMatch[1].trim();
-                  const benchName = groupMatch[2].trim();
-                  
-                  if (!results[groupName]) {
-                    results[groupName] = {};
-                  }
-                  
-                  if (!results[groupName][benchName]) {
-                    results[groupName][benchName] = {};
-                  }
-                  
-                  currentGroup = [groupName, benchName];
-                  continue;
-                }
-                
-                // Match time
-                const timeMatch = line.match(/time:\s+\[([\d.]+)\s\ws\s([\d.]+)\s\ws\s([\d.]+)\s\ws\]/);
-                if (timeMatch && currentGroup) {
-                  const [groupName, benchName] = currentGroup;
-                  const median = parseFloat(timeMatch[2]) * 1e9; // convert to ns
-                  
-                  if (!isNaN(median)) {
-                    results[groupName][benchName] = { median };
-                  }
-                }
-              }
-              
-              return results;
-            }
-
-            // Safe number formatter
-            function safeToFixed(value, digits = 2) {
-              if (value === undefined || value === null || isNaN(value)) {
-                return "N/A";
-              }
-              return value.toFixed(digits);
-            }
-
-            try {
-              // Parse the results from both branches
-              const prResults = parseBenchmarkOutput('crates/tlang_runtime/tlang_interpreter/pr_benchmark.txt');
-              const mainResults = parseBenchmarkOutput('crates/tlang_runtime/tlang_interpreter/main_benchmark.txt');
-
-              // Check if we have valid results
-              if (Object.keys(prResults).length === 0) {
-                throw new Error("PR benchmark results are empty");
-              }
-              
-              if (Object.keys(mainResults).length === 0) {
-                throw new Error("Main benchmark results are empty");
-              }
-
-              // Generate markdown report
-              let report = '## Benchmark Results\n\n';
-
-              for (const [group, benchmarks] of Object.entries(prResults)) {
-                if (!mainResults[group]) continue;
-                
-                report += `### ${group}\n\n`;
-                report += '| Benchmark | PR (ns) | Main (ns) | Difference | Change |\n';
-                report += '|-----------|---------|-----------|------------|--------|\n';
-                
-                for (const [benchmark, prResult] of Object.entries(benchmarks)) {
-                  if (!mainResults[group][benchmark]) continue;
-                  
-                  const prMedian = prResult?.median;
-                  const mainMedian = mainResults[group][benchmark]?.median;
-                  
-                  // Skip if either value is missing
-                  if (prMedian === undefined || mainMedian === undefined) {
-                    report += `| ${benchmark} | ${prMedian || 'N/A'} | ${mainMedian || 'N/A'} | N/A | ⚠️ Missing data |\n`;
-                    continue;
-                  }
-                  
-                  const diff = prMedian - mainMedian;
-                  const percentChange = (mainMedian !== 0) ? (diff / mainMedian) * 100 : 0;
-                  const isImprovement = diff < 0;
-                  
-                  const emoji = isImprovement ? '🟢' : (Math.abs(percentChange) < 1 ? '⚪' : '🔴');
-                  
-                  report += `| ${benchmark} | ${safeToFixed(prMedian)} | ${safeToFixed(mainMedian)} | ${safeToFixed(diff)} | ${emoji} ${safeToFixed(percentChange)}% |\n`;
-                }
-                
-                report += '\n';
-              }
-
-              report += '\n🟢 Improvement | ⚪ Neutral (< 1%) | 🔴 Regression | ⚠️ Missing data\n';
-
-              // Set output for the next step
-              core.setOutput('report', report);
-            } catch (error) {
-              console.error(`Error generating benchmark report: ${error.message}`);
-              
-              // Output an error report instead
-              const errorReport = `## ⚠️ Benchmark Error\n\nThere was an error generating the benchmark comparison: ${error.message}\n\nPlease check the workflow logs for more details.`;
-              core.setOutput('report', errorReport);
-            }
+          name: benchmark-results
+          path: |
+            benchmark_report.md
+            crates/tlang_runtime/tlang_interpreter/pr_benchmark.txt
+            crates/tlang_runtime/tlang_interpreter/main_benchmark.txt
+          retention-days: 14
 
       - name: Comment on PR
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const report = `${{ steps.bench-report.outputs.report }}`;
-
+            const fs = require('fs');
+            
+            // Read the report from the file
+            const report = fs.readFileSync('benchmark_report.md', 'utf8');
+            
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,

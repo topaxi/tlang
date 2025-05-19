@@ -8,3 +8,8 @@ tsconfig.tsbuildinfo
 /*.perf
 
 *.pending-snap
+
+# Benchmark output files
+*_benchmark.txt
+benchmark_report.md
+.benchmark-main-worktree/
