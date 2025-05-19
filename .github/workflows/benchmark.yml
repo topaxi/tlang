@@ -20,10 +20,9 @@ jobs:
     name: Run benchmarks
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout PR
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - name: Install Rust toolchain
@@ -39,20 +38,37 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
+      - name: Get main branch SHA
+        id: get-main-sha
+        run: echo "MAIN_SHA=$(git rev-parse origin/main)" >> $GITHUB_OUTPUT
+
+      - name: Cache main branch benchmarks
+        id: cache-main-benchmarks
+        uses: actions/cache@v3
+        with:
+          path: crates/tlang_runtime/tlang_interpreter/main_benchmark.txt
+          key: benchmark-main-${{ steps.get-main-sha.outputs.MAIN_SHA }}
+
+      - name: Checkout main
+        if: steps.cache-main-benchmarks.outputs.cache-hit != 'true'
+        run: git checkout main
+
+      - name: Build project for benchmarking on main branch
+        if: steps.cache-main-benchmarks.outputs.cache-hit != 'true'
+        run: cargo build --release -p tlang_interpreter
+
+      - name: Run benchmarks on main
+        if: steps.cache-main-benchmarks.outputs.cache-hit != 'true'
+        run: cd crates/tlang_runtime/tlang_interpreter && cargo bench | tee main_benchmark.txt
+
+      - name: Checkout PR
+        run: git checkout ${{ github.event.pull_request.head.sha }}
+
       - name: Build project for benchmarking on PR branch
         run: cargo build --release -p tlang_interpreter
 
       - name: Run benchmarks on PR branch
         run: cd crates/tlang_runtime/tlang_interpreter && cargo bench | tee pr_benchmark.txt
-
-      - name: Checkout main
-        run: git checkout main
-
-      - name: Build project for benchmarking on main branch
-        run: cargo build --release -p tlang_interpreter
-
-      - name: Run benchmarks on main
-        run: cd crates/tlang_runtime/tlang_interpreter && cargo bench | tee main_benchmark.txt
 
       - name: Generate benchmark report
         id: bench-report
