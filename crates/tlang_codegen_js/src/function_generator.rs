@@ -35,10 +35,8 @@ impl CodegenJS {
 
             // If the first param was the self param, we didn't render anything and we need to skip
             // the comma being rendered in the loop ahead.
-            if is_method {
-                if let Some(param) = iter.next() {
-                    self.generate_function_param(param, false);
-                }
+            if is_method && let Some(param) = iter.next() {
+                self.generate_function_param(param, false);
             }
         }
 
@@ -247,14 +245,12 @@ impl CodegenJS {
                 None
             };
 
-            if call_identifier.is_some() {
-                if let Some(function_context) = self.get_function_context() {
-                    if function_context.is_tail_recursive
-                        && function_context.name == call_identifier.unwrap()
-                    {
-                        return self.generate_optional_expr(expr, None);
-                    }
-                }
+            if call_identifier.is_some()
+                && let Some(function_context) = self.get_function_context()
+                && function_context.is_tail_recursive
+                && function_context.name == call_identifier.unwrap()
+            {
+                return self.generate_optional_expr(expr, None);
             }
         }
 
@@ -369,10 +365,10 @@ fn is_function_body_tail_recursive(function_name: &str, node: &hir::Expr) -> boo
     match &node.kind {
         hir::ExprKind::TailCall(call_expr) => {
             // If the function is an identifier, check if it's the same as the current function name.
-            if let hir::ExprKind::Path(_) = &call_expr.callee.kind {
-                if fn_identifier_to_string(&call_expr.callee) == function_name {
-                    return true;
-                }
+            if let hir::ExprKind::Path(_) = &call_expr.callee.kind
+                && fn_identifier_to_string(&call_expr.callee) == function_name
+            {
+                return true;
             }
             false
         }

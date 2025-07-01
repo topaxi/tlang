@@ -34,9 +34,7 @@ macro_rules! propagate {
 /// Evaluate a list of hir:Expr expressions into a vector of values, propagating control flow if necessary.
 #[macro_export]
 macro_rules! eval_exprs {
-    ($this:expr, $eval:expr, $exprs:expr) => {{
-        eval_exprs!($this, $eval, $exprs, $exprs.len())
-    }};
+    ($this:expr, $eval:expr, $exprs:expr) => {{ eval_exprs!($this, $eval, $exprs, $exprs.len()) }};
     ($this:expr, $eval:expr, $exprs:expr, $capacity:expr) => {{
         let mut exprs = SmallVec::<[TlangValue; 4]>::with_capacity($capacity);
         for expr in &$exprs {

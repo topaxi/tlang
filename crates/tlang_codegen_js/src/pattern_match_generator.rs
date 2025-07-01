@@ -291,10 +291,10 @@ impl CodegenJS {
             .iter()
             .flat_map(|arm| {
                 let mut idents = Self::get_pat_identifiers(&arm.pat);
-                if let Some(guard) = &arm.guard {
-                    if let hir::ExprKind::Let(pat, _) = &guard.kind {
-                        idents.extend(Self::get_pat_identifiers(pat));
-                    }
+                if let Some(guard) = &arm.guard
+                    && let hir::ExprKind::Let(pat, _) = &guard.kind
+                {
+                    idents.extend(Self::get_pat_identifiers(pat));
                 }
                 idents
             })
@@ -415,40 +415,40 @@ impl CodegenJS {
 }
 
 fn expr_idents_match_pat_idents(expr: &hir::Expr, pat: &hir::Pat) -> bool {
-    if let hir::PatKind::Identifier(_, ident) = &pat.kind {
-        if let hir::ExprKind::Path(path) = &expr.kind {
-            return ident.as_str() == path.join("::");
-        }
+    if let hir::PatKind::Identifier(_, ident) = &pat.kind
+        && let hir::ExprKind::Path(path) = &expr.kind
+    {
+        return ident.as_str() == path.join("::");
     }
 
-    if let hir::PatKind::List(list_pats) = &pat.kind {
-        if let hir::ExprKind::List(list_exprs) = &expr.kind {
-            return list_pats.len() == list_exprs.len()
-                && list_pats
-                    .iter()
-                    .all(|pat| pat.is_identifier() || pat.is_wildcard())
-                && list_exprs
-                    .iter()
-                    .all(|expr| matches!(&expr.kind, hir::ExprKind::Path(_)))
-                && list_pats.iter().zip(list_exprs.iter()).all(|(pat, expr)| {
-                    if pat.is_wildcard() {
-                        return true;
-                    }
+    if let hir::PatKind::List(list_pats) = &pat.kind
+        && let hir::ExprKind::List(list_exprs) = &expr.kind
+    {
+        return list_pats.len() == list_exprs.len()
+            && list_pats
+                .iter()
+                .all(|pat| pat.is_identifier() || pat.is_wildcard())
+            && list_exprs
+                .iter()
+                .all(|expr| matches!(&expr.kind, hir::ExprKind::Path(_)))
+            && list_pats.iter().zip(list_exprs.iter()).all(|(pat, expr)| {
+                if pat.is_wildcard() {
+                    return true;
+                }
 
-                    let pat_ident = if let hir::PatKind::Identifier(_, ident) = &pat.kind {
-                        ident.as_str()
-                    } else {
-                        unreachable!()
-                    };
-                    let expr_ident = if let hir::ExprKind::Path(path) = &expr.kind {
-                        path.join("::")
-                    } else {
-                        unreachable!()
-                    };
+                let pat_ident = if let hir::PatKind::Identifier(_, ident) = &pat.kind {
+                    ident.as_str()
+                } else {
+                    unreachable!()
+                };
+                let expr_ident = if let hir::ExprKind::Path(path) = &expr.kind {
+                    path.join("::")
+                } else {
+                    unreachable!()
+                };
 
-                    pat_ident == expr_ident
-                });
-        }
+                pat_ident == expr_ident
+            });
     }
 
     false

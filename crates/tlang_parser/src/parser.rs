@@ -730,19 +730,18 @@ impl<'src> Parser<'src> {
 
             // If key is an single identifier and we follow up with a comma or rbrace, then we are
             // using the short hand syntax for dictionary elements.
-            if let ExprKind::Path(path) = &key.kind {
-                if path.segments.len() == 1
-                    && matches!(
-                        self.current_token_kind(),
-                        TokenKind::Comma | TokenKind::RBrace
-                    )
-                {
-                    if matches!(self.current_token_kind(), TokenKind::Comma) {
-                        self.advance();
-                    }
-                    elements.push((key.clone(), key));
-                    continue;
+            if let ExprKind::Path(path) = &key.kind
+                && path.segments.len() == 1
+                && matches!(
+                    self.current_token_kind(),
+                    TokenKind::Comma | TokenKind::RBrace
+                )
+            {
+                if matches!(self.current_token_kind(), TokenKind::Comma) {
+                    self.advance();
                 }
+                elements.push((key.clone(), key));
+                continue;
             }
 
             self.consume_token(TokenKind::Colon);

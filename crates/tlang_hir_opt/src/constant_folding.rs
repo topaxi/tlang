@@ -90,12 +90,12 @@ impl<'hir> Visitor<'hir> for ConstantFolder {
     fn visit_expr(&mut self, expr: &'hir mut Expr) {
         visit::walk_expr(self, expr);
 
-        if let Some(lit) = self.try_eval_expr(expr) {
-            if self.folded_exprs.get(&expr.hir_id) != Some(&lit) {
-                expr.kind = ExprKind::Literal(Box::new(lit.clone()));
-                self.folded_exprs.insert(expr.hir_id, lit);
-                self.changed = true;
-            }
+        if let Some(lit) = self.try_eval_expr(expr)
+            && self.folded_exprs.get(&expr.hir_id) != Some(&lit)
+        {
+            expr.kind = ExprKind::Literal(Box::new(lit.clone()));
+            self.folded_exprs.insert(expr.hir_id, lit);
+            self.changed = true;
         }
     }
 }

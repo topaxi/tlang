@@ -22,12 +22,11 @@ impl AssignmentCollector {
 
 impl<'hir> Visitor<'hir> for AssignmentCollector {
     fn visit_expr(&mut self, expr: &'hir mut Expr) {
-        if let ExprKind::Binary(BinaryOpKind::Assign, lhs, _rhs) = &mut expr.kind {
-            if let ExprKind::Path(lhs_path) = &lhs.kind {
-                if let Some(resolved_hir_id) = lhs_path.res.hir_id() {
-                    self.reassigned_variables.insert(resolved_hir_id);
-                }
-            }
+        if let ExprKind::Binary(BinaryOpKind::Assign, lhs, _rhs) = &mut expr.kind
+            && let ExprKind::Path(lhs_path) = &lhs.kind
+            && let Some(resolved_hir_id) = lhs_path.res.hir_id()
+        {
+            self.reassigned_variables.insert(resolved_hir_id);
         }
 
         visit::walk_expr(self, expr);
@@ -86,12 +85,12 @@ impl<'hir> Visitor<'hir> for ConstantPropagator {
 
     fn visit_expr(&mut self, expr: &'hir mut Expr) {
         if let ExprKind::Path(path) = &expr.kind {
-            if let Some(resolved_hir_id) = path.res.hir_id() {
-                if let Some(lit) = self.constants.get(&resolved_hir_id) {
-                    expr.kind = ExprKind::Literal(Box::new(lit.clone()));
-                    self.changed = true;
-                    return;
-                }
+            if let Some(resolved_hir_id) = path.res.hir_id()
+                && let Some(lit) = self.constants.get(&resolved_hir_id)
+            {
+                expr.kind = ExprKind::Literal(Box::new(lit.clone()));
+                self.changed = true;
+                return;
             }
             return;
         }
