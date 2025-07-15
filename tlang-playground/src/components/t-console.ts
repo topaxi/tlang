@@ -67,13 +67,13 @@ export class ConsoleElement extends LitElement {
   messages: Array<ConsoleMessage> = [];
 
   @state()
-  collapsed = false;
+  private collapsed = false;
 
   @state()
-  showTimestamps = false;
+  private showTimestamps = false;
 
   @state()
-  persist = true;
+  private persist = true;
 
   @query('.messages-container')
   consoleMessagesContainer!: HTMLElement;
