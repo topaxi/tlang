@@ -16,7 +16,7 @@ pub struct Lexer<'src> {
 }
 
 impl Lexer<'_> {
-    pub fn new(source: &str) -> Lexer {
+    pub fn new(source: &str) -> Lexer<'_> {
         let mut chars = source.chars();
         let current_char = chars.next().unwrap_or('\0');
         let next_char = chars.next().unwrap_or('\0');
