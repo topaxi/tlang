@@ -24,11 +24,11 @@
     "@catppuccin/palette": "^1.7.1",
     "@codemirror/lang-javascript": "^6.2.4",
     "@floating-ui/dom": "^1.7.2",
-    "@lit/context": "^1.1.5",
+    "@lit/context": "^1.1.6",
     "codemirror": "^6.0.2",
     "codemirror-lang-tlang": "file:../packages/codemirror-lang-tlang",
     "codemirror-theme-catppuccin": "^0.3.0",
-    "lit": "3.3.0",
+    "lit": "3.3.1",
     "lz-string": "^1.5.0",
     "tlang_bindings_js": "file:../crates/tlang_bindings_js/pkg"
   },
