@@ -130,12 +130,12 @@ impl HirPretty {
             TokenKind::SingleLineComment(comment) => {
                 self.push_indent();
                 self.push_str("// ");
-                self.push_str(comment.as_str());
+                self.push_str(comment);
             }
             TokenKind::MultiLineComment(comment) => {
                 self.push_indent();
                 self.push_str("/* ");
-                self.push_str(comment.as_str());
+                self.push_str(comment);
                 self.push_str(" */");
             }
             _ => unreachable!(),
@@ -382,24 +382,24 @@ impl HirPretty {
         self.push_char(' ');
 
         match op {
-            hir::BinaryOpKind::Add => self.push_str("+"),
-            hir::BinaryOpKind::Assign => self.push_str("="),
-            hir::BinaryOpKind::Sub => self.push_str("-"),
-            hir::BinaryOpKind::Mul => self.push_str("*"),
-            hir::BinaryOpKind::Div => self.push_str("/"),
-            hir::BinaryOpKind::Mod => self.push_str("%"),
+            hir::BinaryOpKind::Add => self.push_char('+'),
+            hir::BinaryOpKind::Assign => self.push_char('='),
+            hir::BinaryOpKind::Sub => self.push_char('-'),
+            hir::BinaryOpKind::Mul => self.push_char('*'),
+            hir::BinaryOpKind::Div => self.push_char('/'),
+            hir::BinaryOpKind::Mod => self.push_char('%'),
             hir::BinaryOpKind::Exp => self.push_str("**"),
             hir::BinaryOpKind::And => self.push_str("&&"),
             hir::BinaryOpKind::Or => self.push_str("||"),
             hir::BinaryOpKind::Eq => self.push_str("=="),
             hir::BinaryOpKind::NotEq => self.push_str("!="),
-            hir::BinaryOpKind::Less => self.push_str("<"),
+            hir::BinaryOpKind::Less => self.push_char('<'),
             hir::BinaryOpKind::LessEq => self.push_str("<="),
-            hir::BinaryOpKind::Greater => self.push_str(">"),
+            hir::BinaryOpKind::Greater => self.push_char('>'),
             hir::BinaryOpKind::GreaterEq => self.push_str(">="),
-            hir::BinaryOpKind::BitwiseOr => self.push_str("|"),
-            hir::BinaryOpKind::BitwiseAnd => self.push_str("&"),
-            hir::BinaryOpKind::BitwiseXor => self.push_str("^"),
+            hir::BinaryOpKind::BitwiseOr => self.push_char('|'),
+            hir::BinaryOpKind::BitwiseAnd => self.push_char('&'),
+            hir::BinaryOpKind::BitwiseXor => self.push_char('^'),
         }
 
         self.push_char(' ');
@@ -409,14 +409,14 @@ impl HirPretty {
 
     fn print_call_expr(&mut self, call_expr: &hir::CallExpression) {
         self.print_expr(&call_expr.callee);
-        self.push_str("(");
+        self.push_char('(');
         for (i, arg) in call_expr.arguments.iter().enumerate() {
             if i > 0 {
                 self.push_str(", ");
             }
             self.print_expr(arg);
         }
-        self.push_str(")");
+        self.push_char(')');
     }
 
     fn print_function_name(&mut self, name: &hir::Expr) {
@@ -430,7 +430,7 @@ impl HirPretty {
     fn print_function_declaration(&mut self, decl: &hir::FunctionDeclaration) {
         self.push_str("fn ");
         self.print_function_name(&decl.name);
-        self.push_str("(");
+        self.push_char('(');
         for (i, param) in decl.parameters.iter().enumerate() {
             if i > 0 {
                 self.push_str(", ");
