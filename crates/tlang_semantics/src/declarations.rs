@@ -1,6 +1,7 @@
 use std::rc::Rc;
 use std::{cell::RefCell, collections::HashMap};
 use tlang_ast::keyword::kw;
+use tlang_ast::node::MatchExpression;
 use tlang_ast::node_id::NodeId;
 use tlang_ast::span::Span;
 use tlang_ast::{
@@ -207,20 +208,7 @@ impl DeclarationAnalyzer {
                 }
             }
             ExprKind::FunctionExpression(decl) => {
-                self.push_symbol_table(decl.id);
-                let name_as_str = self.fn_identifier_to_string(&decl.name);
-
-                if name_as_str != "anonymous" {
-                    self.declare_symbol(
-                        decl.id,
-                        &name_as_str,
-                        SymbolType::Function,
-                        decl.name.span,
-                    );
-                }
-
-                self.collect_declarations_from_fn(decl);
-                self.pop_symbol_table();
+                self.collect_function_expression(decl);
             }
             ExprKind::Call(expr) | ExprKind::RecursiveCall(expr) => {
                 self.collect_declarations_expr(&expr.callee);
@@ -270,14 +258,7 @@ impl DeclarationAnalyzer {
                 self.collect_declarations_expr(&expr.index);
             }
             ExprKind::Match(expr) => {
-                self.collect_declarations_expr(&expr.expression);
-                for arm in &expr.arms {
-                    self.push_symbol_table(arm.id);
-                    self.collect_pattern(&arm.pattern);
-                    self.collect_optional_declarations_expr(&arm.guard);
-                    self.collect_declarations_expr(&arm.expression);
-                    self.pop_symbol_table();
-                }
+                self.collect_match_expr(expr);
             }
             ExprKind::Range(expr) => {
                 self.collect_declarations_expr(&expr.start);
@@ -290,6 +271,18 @@ impl DeclarationAnalyzer {
             | ExprKind::None => {
                 // Nothing to do here
             }
+        }
+    }
+
+    fn collect_match_expr(&mut self, match_expr: &MatchExpression) {
+        self.collect_declarations_expr(&match_expr.expression);
+
+        for arm in &match_expr.arms {
+            self.push_symbol_table(arm.id);
+            self.collect_pattern(&arm.pattern);
+            self.collect_optional_declarations_expr(&arm.guard);
+            self.collect_declarations_expr(&arm.expression);
+            self.pop_symbol_table();
         }
     }
 
@@ -334,6 +327,18 @@ impl DeclarationAnalyzer {
         self.collect_optional_declarations_expr(&declaration.guard);
         self.collect_declarations_block(&declaration.body);
 
+        self.pop_symbol_table();
+    }
+
+    fn collect_function_expression(&mut self, decl: &FunctionDeclaration) {
+        self.push_symbol_table(decl.id);
+        let name_as_str = self.fn_identifier_to_string(&decl.name);
+
+        if name_as_str != "anonymous" {
+            self.declare_symbol(decl.id, &name_as_str, SymbolType::Function, decl.name.span);
+        }
+
+        self.collect_declarations_from_fn(decl);
         self.pop_symbol_table();
     }
 
