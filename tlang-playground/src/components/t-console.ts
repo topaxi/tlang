@@ -73,7 +73,11 @@ export class ConsoleElement extends LitElement {
   private showTimestamps = false;
 
   @state()
-  private persist = true;
+  private _persist = true;
+
+  get persist(): boolean {
+    return this._persist;
+  }
 
   @query('.messages-container')
   consoleMessagesContainer!: HTMLElement;
@@ -93,7 +97,7 @@ export class ConsoleElement extends LitElement {
   togglePersist(event: Event) {
     event.preventDefault();
 
-    this.persist = !(event.target as MenuItemCheckboxElement).checked;
+    this._persist = !(event.target as MenuItemCheckboxElement).checked;
   }
 
   private handleCollapse(_event: Event) {
@@ -184,7 +188,7 @@ export class ConsoleElement extends LitElement {
         <t-menu id="menu" popover=${floating()}>
           <t-menuitem-checkbox
             @change=${this.togglePersist}
-            ?checked=${this.persist}
+            ?checked=${this._persist}
           >
             Persist Logs
           </t-menuitem-checkbox>
