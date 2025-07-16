@@ -60,6 +60,12 @@ const displayLabels = {
   javascript: 'JavaScript',
 } satisfies Record<OutputDisplay, string>;
 
+const displayTitles = {
+  ast: 'Abstract Syntax Tree',
+  hir: 'High-level Intermediate Representation',
+  javascript: 'JavaScript Code',
+} satisfies Record<OutputDisplay, string>;
+
 function defaultDisplay(): OutputDisplay {
   let params = getHashParams();
   let display: OutputDisplay = 'hir';
@@ -591,7 +597,11 @@ export class TlangPlayground extends LitElement {
                   this.availableDisplayOptions,
                   (display) => display,
                   (display) => html`
-                    <t-tab slot="tab" id=${display}>
+                    <t-tab
+                      slot="tab"
+                      id=${display}
+                      title=${displayTitles[display]}
+                    >
                       ${displayLabels[display]}
                     </t-tab>
                   `,
