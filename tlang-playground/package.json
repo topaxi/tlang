@@ -33,8 +33,8 @@
     "tlang_bindings_js": "file:../crates/tlang_bindings_js/pkg"
   },
   "devDependencies": {
-    "@jackolope/ts-lit-plugin": "^3.1.5",
-    "vite": "^7.0.4",
+    "@jackolope/ts-lit-plugin": "^3.1.6",
+    "vite": "^7.0.5",
     "vite-plugin-wasm": "^3.5.0"
   }
 }
