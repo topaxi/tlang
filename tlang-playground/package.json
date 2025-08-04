@@ -23,7 +23,7 @@
   "dependencies": {
     "@catppuccin/palette": "^1.7.1",
     "@codemirror/lang-javascript": "^6.2.4",
-    "@floating-ui/dom": "^1.7.2",
+    "@floating-ui/dom": "^1.7.3",
     "@lit/context": "^1.1.6",
     "codemirror": "^6.0.2",
     "codemirror-lang-tlang": "file:../packages/codemirror-lang-tlang",
