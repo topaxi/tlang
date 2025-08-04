@@ -169,7 +169,7 @@ impl TlangValue {
                 ArithmeticOp::Sub if lhs as i64 >= 0 => TlangValue::I64(lhs as i64 - rhs as i64),
                 ArithmeticOp::Sub => TlangValue::I64((lhs as i128 - rhs as i128) as i64),
                 ArithmeticOp::Mul => TlangValue::U64(lhs * rhs),
-                ArithmeticOp::Div if lhs % rhs == 0 => TlangValue::U64(lhs / rhs),
+                ArithmeticOp::Div if lhs.is_multiple_of(rhs) => TlangValue::U64(lhs / rhs),
                 ArithmeticOp::Div => TlangValue::F64(lhs as f64 / rhs as f64),
                 ArithmeticOp::Rem => TlangValue::U64(lhs % rhs),
                 ArithmeticOp::Pow => TlangValue::U64(lhs.pow(rhs as u32)),

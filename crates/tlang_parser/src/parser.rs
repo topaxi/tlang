@@ -950,72 +950,9 @@ impl<'src> Parser<'src> {
             TokenKind::LBracket => self.parse_list_expression(),
             TokenKind::Keyword(Keyword::If) => self.parse_if_else_expression(),
             TokenKind::Keyword(Keyword::Fn) => self.parse_function_expression(),
-            TokenKind::Keyword(Keyword::Loop) => {
-                self.advance();
-                let block = self.parse_block();
-                node::expr!(self.unique_id(), Loop(Box::new(block)))
-            }
-            TokenKind::Keyword(Keyword::For) => {
-                self.advance();
-                let pat = self.parse_pattern();
-                self.consume_token(TokenKind::Keyword(Keyword::In));
-                let iter = self.parse_expression();
-                if matches!(self.current_token_kind(), TokenKind::Semicolon) {
-                    self.advance();
-                }
-                let acc = if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::With))
-                {
-                    self.advance();
-                    let pat = self.parse_pattern();
-                    self.consume_token(TokenKind::EqualSign);
-                    let expr = self.parse_expression();
-                    if matches!(self.current_token_kind(), TokenKind::Semicolon) {
-                        self.advance();
-                    }
-                    Some((pat, expr))
-                } else {
-                    None
-                };
-                let block = self.parse_block();
-
-                let else_block =
-                    if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Else)) {
-                        self.advance();
-                        Some(self.parse_block())
-                    } else {
-                        None
-                    };
-
-                node::expr!(
-                    self.unique_id(),
-                    ForLoop(Box::new(node::ForLoop {
-                        pat,
-                        iter,
-                        acc,
-                        block,
-                        else_block,
-                    }))
-                )
-            }
-            TokenKind::Keyword(Keyword::Break) => {
-                self.advance();
-
-                if matches!(
-                    self.current_token_kind(),
-                    // Bit hacky...
-                    TokenKind::Semicolon | TokenKind::RBrace
-                ) {
-                    return node::expr!(self.unique_id(), Break(None));
-                }
-
-                let expr = self.parse_expression();
-                let expr = if matches!(expr.kind, ExprKind::None) {
-                    None
-                } else {
-                    Some(Box::new(expr))
-                };
-                node::expr!(self.unique_id(), Break(expr))
-            }
+            TokenKind::Keyword(Keyword::Loop) => self.parse_loop(),
+            TokenKind::Keyword(Keyword::For) => self.parse_for_loop(),
+            TokenKind::Keyword(Keyword::Break) => self.parse_break_expr(),
             TokenKind::Keyword(Keyword::Rec) => {
                 self.advance();
                 let expr = self.parse_expression();
@@ -1063,33 +1000,7 @@ impl<'src> Parser<'src> {
 
                 expr
             }
-            TokenKind::Identifier(_) => {
-                let identifier_span = self.create_span_from_current_token();
-
-                let token = self.advance();
-                let identifier = token.get_identifier().unwrap();
-
-                let mut path = Path::from_ident(Ident::new(identifier, identifier_span));
-                let mut span = path.span;
-
-                while matches!(self.current_token_kind(), TokenKind::PathSeparator) {
-                    self.advance();
-                    path.push(self.parse_identifier());
-                }
-
-                self.end_span_from_previous_token(&mut span);
-
-                let mut expr = node::expr!(self.unique_id(), Path(Box::new(path))).with_span(span);
-
-                if matches!(
-                    self.current_token_kind(),
-                    TokenKind::LParen | TokenKind::LBrace
-                ) {
-                    expr = self.parse_call_expression(expr);
-                }
-
-                expr
-            }
+            TokenKind::Identifier(_) => self.parse_identifier_expr(),
             _ => {
                 self.panic_unexpected_token("primary expression", self.current_token.clone());
             }
@@ -1100,6 +1011,34 @@ impl<'src> Parser<'src> {
         node.leading_comments = comments;
         node.trailing_comments = self.parse_comments();
         node
+    }
+
+    fn parse_identifier_expr(&mut self) -> Expr {
+        let identifier_span = self.create_span_from_current_token();
+
+        let token = self.advance();
+        let identifier = token.get_identifier().unwrap();
+
+        let mut path = Path::from_ident(Ident::new(identifier, identifier_span));
+        let mut span = path.span;
+
+        while matches!(self.current_token_kind(), TokenKind::PathSeparator) {
+            self.advance();
+            path.push(self.parse_identifier());
+        }
+
+        self.end_span_from_previous_token(&mut span);
+
+        let mut expr = node::expr!(self.unique_id(), Path(Box::new(path))).with_span(span);
+
+        if matches!(
+            self.current_token_kind(),
+            TokenKind::LParen | TokenKind::LBrace
+        ) {
+            expr = self.parse_call_expression(expr);
+        }
+
+        expr
     }
 
     fn parse_match_expression(&mut self) -> Expr {
@@ -1737,5 +1676,72 @@ impl<'src> Parser<'src> {
                 Some(identifier.clone()),
             ),
         }
+    }
+
+    fn parse_loop(&mut self) -> Expr {
+        self.advance();
+        let block = self.parse_block();
+        node::expr!(self.unique_id(), Loop(Box::new(block)))
+    }
+
+    fn parse_for_loop(&mut self) -> Expr {
+        self.advance();
+        let pat = self.parse_pattern();
+        self.consume_token(TokenKind::Keyword(Keyword::In));
+        let iter = self.parse_expression();
+        if matches!(self.current_token_kind(), TokenKind::Semicolon) {
+            self.advance();
+        }
+        let acc = if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::With)) {
+            self.advance();
+            let pat = self.parse_pattern();
+            self.consume_token(TokenKind::EqualSign);
+            let expr = self.parse_expression();
+            if matches!(self.current_token_kind(), TokenKind::Semicolon) {
+                self.advance();
+            }
+            Some((pat, expr))
+        } else {
+            None
+        };
+        let block = self.parse_block();
+
+        let else_block = if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Else)) {
+            self.advance();
+            Some(self.parse_block())
+        } else {
+            None
+        };
+
+        node::expr!(
+            self.unique_id(),
+            ForLoop(Box::new(node::ForLoop {
+                pat,
+                iter,
+                acc,
+                block,
+                else_block,
+            }))
+        )
+    }
+
+    fn parse_break_expr(&mut self) -> Expr {
+        self.advance();
+
+        if matches!(
+            self.current_token_kind(),
+            // Bit hacky...
+            TokenKind::Semicolon | TokenKind::RBrace
+        ) {
+            return node::expr!(self.unique_id(), Break(None));
+        }
+
+        let expr = self.parse_expression();
+        let expr = if matches!(expr.kind, ExprKind::None) {
+            None
+        } else {
+            Some(Box::new(expr))
+        };
+        node::expr!(self.unique_id(), Break(expr))
     }
 }

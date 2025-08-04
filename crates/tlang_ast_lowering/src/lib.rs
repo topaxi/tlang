@@ -11,6 +11,7 @@ use tlang_hir::hir::{self, HirId};
 use self::scope::Scope;
 
 mod expr;
+mod r#loop;
 mod scope;
 mod stmt;
 
