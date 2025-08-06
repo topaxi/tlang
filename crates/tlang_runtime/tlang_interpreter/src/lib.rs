@@ -307,7 +307,6 @@ impl Interpreter {
                 EvalResult::Return(value)
             }
             hir::StmtKind::Return(_) => EvalResult::Return(TlangValue::Nil),
-            hir::StmtKind::None => unreachable!(),
         }
     }
 

@@ -89,15 +89,11 @@ impl LoweringContext {
                 }]
             }
             ast::node::StmtKind::EnumDeclaration(decl) => vec![self.lower_enum_decl(node, decl)],
-            ast::node::StmtKind::None => {
-                vec![hir::Stmt {
-                    hir_id: self.lower_node_id(node.id),
-                    kind: hir::StmtKind::None,
-                    span: node.span,
-                    leading_comments: node.leading_comments.clone(),
-                    trailing_comments: node.trailing_comments.clone(),
-                }]
-            }
+
+            // This is a no-op, we do not emit any statement for this.
+            // We might be losing some comments here, but this shouldn't be a problem within
+            // HIR.
+            ast::node::StmtKind::None => vec![],
         }
     }
 

@@ -332,8 +332,6 @@ pub enum StmtKind {
     Return(Box<Option<Expr>>),
     EnumDeclaration(Box<EnumDeclaration>),
     StructDeclaration(Box<StructDeclaration>),
-    // TODO: We shouldn't need to have this in HIR
-    None,
 }
 
 #[derive(Debug, Clone)]

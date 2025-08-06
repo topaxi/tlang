@@ -81,7 +81,6 @@ pub fn walk_stmt<'hir, V: Visitor<'hir>>(visitor: &mut V, stmt: &'hir mut hir::S
             }
         }
         hir::StmtKind::DynFunctionDeclaration(_decl) => {}
-        hir::StmtKind::None => {}
     }
 }
 

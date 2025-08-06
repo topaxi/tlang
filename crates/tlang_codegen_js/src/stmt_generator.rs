@@ -28,7 +28,6 @@ impl CodegenJS {
             hir::StmtKind::Return(box expr) => self.generate_return_statement(expr.as_ref()),
             hir::StmtKind::EnumDeclaration(decl) => self.generate_enum_declaration(decl),
             hir::StmtKind::StructDeclaration(decl) => self.generate_struct_declaration(decl),
-            hir::StmtKind::None => {}
         }
 
         self.generate_comments(&statement.trailing_comments);
