@@ -307,12 +307,12 @@ impl<'src> Parser<'src> {
         self.consume_keyword_token(Keyword::Return);
 
         if matches!(self.current_token_kind(), TokenKind::Semicolon) {
-            return node::stmt!(self.unique_id(), Return(Box::new(None)));
+            return node::stmt!(self.unique_id(), Return(None));
         }
 
         node::stmt!(
             self.unique_id(),
-            Return(Box::new(Some(self.parse_expression())))
+            Return(Some(Box::new(self.parse_expression())))
         )
     }
 

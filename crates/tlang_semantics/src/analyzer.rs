@@ -174,7 +174,8 @@ impl SemanticAnalyzer {
                     self.analyze_fn_decl(decl);
                 }
             }
-            StmtKind::Return(expr) => self.analyze_optional_expr(expr),
+            StmtKind::Return(Some(expr)) => self.analyze_expr(expr),
+            StmtKind::Return(_) => {}
             StmtKind::EnumDeclaration(_decl) => {
                 // TODO
             }

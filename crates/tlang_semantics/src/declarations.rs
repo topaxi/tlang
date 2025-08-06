@@ -133,7 +133,8 @@ impl DeclarationAnalyzer {
                     self.collect_function_declaration(declaration);
                 }
             }
-            StmtKind::Return(expr) => self.collect_optional_declarations_expr(expr),
+            StmtKind::Return(Some(expr)) => self.collect_declarations_expr(expr),
+            StmtKind::Return(_) => {}
             StmtKind::EnumDeclaration(decl) => {
                 self.declare_symbol(stmt.id, decl.name.as_str(), SymbolType::Enum, stmt.span);
 

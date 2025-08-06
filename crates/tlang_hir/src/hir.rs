@@ -329,7 +329,7 @@ pub enum StmtKind {
     Let(Box<Pat>, Box<Expr>, Box<Ty>),
     FunctionDeclaration(Box<FunctionDeclaration>),
     DynFunctionDeclaration(Box<DynFunctionDeclaration>),
-    Return(Box<Option<Expr>>),
+    Return(Option<Box<Expr>>),
     EnumDeclaration(Box<EnumDeclaration>),
     StructDeclaration(Box<StructDeclaration>),
 }

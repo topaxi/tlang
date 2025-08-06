@@ -302,10 +302,10 @@ impl Interpreter {
                 EvalResult::Void
             }
             hir::StmtKind::Let(pat, expr, ty) => self.eval_let_stmt(pat, expr, ty),
-            hir::StmtKind::Return(box Some(expr)) => {
-                let value = eval_value!(self.eval_expr(expr));
-                EvalResult::Return(value)
+            hir::StmtKind::Return(Some(expr)) => {
+                EvalResult::Return(eval_value!(self.eval_expr(expr)))
             }
+
             hir::StmtKind::Return(_) => EvalResult::Return(TlangValue::Nil),
         }
     }

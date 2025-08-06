@@ -459,7 +459,7 @@ pub enum StmtKind {
     FunctionDeclaration(Box<FunctionDeclaration>),
     // TODO: We should deal with this in HIR instead.
     FunctionDeclarations(Vec<FunctionDeclaration>),
-    Return(Box<Option<Expr>>),
+    Return(Option<Box<Expr>>),
     EnumDeclaration(Box<EnumDeclaration>),
     StructDeclaration(Box<StructDeclaration>),
 }

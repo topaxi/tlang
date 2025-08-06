@@ -55,12 +55,12 @@ impl LoweringContext {
             // by the parser in the AST, for now), we emit multiple function declarations whith
             // their own name.
             ast::node::StmtKind::FunctionDeclarations(decls) => self.lower_fn_decls(node, decls),
-            ast::node::StmtKind::Return(box expr) => {
-                let expr = expr.as_ref().map(|expr| self.lower_expr(expr));
+            ast::node::StmtKind::Return(expr) => {
+                let expr = expr.as_deref().map(|expr| Box::new(self.lower_expr(expr)));
 
                 vec![hir::Stmt {
                     hir_id: self.lower_node_id(node.id),
-                    kind: hir::StmtKind::Return(Box::new(expr)),
+                    kind: hir::StmtKind::Return(expr),
                     span: node.span,
                     leading_comments: node.leading_comments.clone(),
                     trailing_comments: node.trailing_comments.clone(),
