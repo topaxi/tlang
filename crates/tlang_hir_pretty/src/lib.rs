@@ -180,7 +180,6 @@ impl HirPretty {
                 }
             }
             hir::StmtKind::StructDeclaration(decl) => self.print_struct_declaration(decl),
-            hir::StmtKind::None => {}
         }
 
         self.push_char(';');

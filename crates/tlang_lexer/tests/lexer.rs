@@ -25,7 +25,7 @@ macro_rules! assert_tokens {
 fn test_identifier() {
     let mut lexer = Lexer::new("test");
 
-    assert_tokens!(lexer, [TokenKind::Identifier("test".to_string())]);
+    assert_tokens!(lexer, [TokenKind::Identifier("test".into())]);
 }
 
 #[test]
@@ -50,7 +50,7 @@ fn test_typed_integer() {
         lexer,
         [
             TokenKind::Literal(Literal::UnsignedInteger(123)),
-            TokenKind::Identifier("i64".to_string())
+            TokenKind::Identifier("i64".into())
         ]
     );
 }
@@ -63,7 +63,7 @@ fn test_typed_float() {
         lexer,
         [
             TokenKind::Literal(Literal::Float(123.456)),
-            TokenKind::Identifier("f64".to_string())
+            TokenKind::Identifier("f64".into())
         ]
     );
 }
@@ -186,7 +186,7 @@ fn test_simple_assignment() {
         lexer,
         [
             TokenKind::Keyword(Keyword::Let),
-            TokenKind::Identifier("x".to_string()),
+            TokenKind::Identifier("x".into()),
             TokenKind::EqualSign,
             TokenKind::Literal(Literal::UnsignedInteger(1)),
             TokenKind::Plus,
@@ -204,23 +204,23 @@ fn test_function_declaration_with_explicit_return_statement() {
         lexer,
         [
             TokenKind::Keyword(Keyword::Fn),
-            TokenKind::Identifier("add".to_string()),
+            TokenKind::Identifier("add".into()),
             TokenKind::LParen,
-            TokenKind::Identifier("a".to_string()),
+            TokenKind::Identifier("a".into()),
             TokenKind::Colon,
-            TokenKind::Identifier("i64".to_string()),
+            TokenKind::Identifier("i64".into()),
             TokenKind::Comma,
-            TokenKind::Identifier("b".to_string()),
+            TokenKind::Identifier("b".into()),
             TokenKind::Colon,
-            TokenKind::Identifier("i64".to_string()),
+            TokenKind::Identifier("i64".into()),
             TokenKind::RParen,
             TokenKind::Arrow,
-            TokenKind::Identifier("i64".to_string()),
+            TokenKind::Identifier("i64".into()),
             TokenKind::LBrace,
             TokenKind::Keyword(Keyword::Return),
-            TokenKind::Identifier("a".to_string()),
+            TokenKind::Identifier("a".into()),
             TokenKind::Plus,
-            TokenKind::Identifier("b".to_string()),
+            TokenKind::Identifier("b".into()),
             TokenKind::Semicolon,
             TokenKind::RBrace,
         ]
@@ -235,7 +235,7 @@ fn test_regression_integer_literal_followed_by_dot() {
         lexer,
         [
             TokenKind::Keyword(Keyword::Fn),
-            TokenKind::Identifier("sum".to_string()),
+            TokenKind::Identifier("sum".into()),
             TokenKind::LParen,
             TokenKind::LBracket,
             TokenKind::RBracket,
@@ -244,21 +244,21 @@ fn test_regression_integer_literal_followed_by_dot() {
             TokenKind::Literal(Literal::UnsignedInteger(0)),
             TokenKind::RBrace,
             TokenKind::Keyword(Keyword::Fn),
-            TokenKind::Identifier("sum".to_string()),
+            TokenKind::Identifier("sum".into()),
             TokenKind::LParen,
             TokenKind::LBracket,
-            TokenKind::Identifier("x".to_string()),
+            TokenKind::Identifier("x".into()),
             TokenKind::Comma,
             TokenKind::DotDotDot,
-            TokenKind::Identifier("xs".to_string()),
+            TokenKind::Identifier("xs".into()),
             TokenKind::RBracket,
             TokenKind::RParen,
             TokenKind::LBrace,
-            TokenKind::Identifier("x".to_string()),
+            TokenKind::Identifier("x".into()),
             TokenKind::Plus,
-            TokenKind::Identifier("sum".to_string()),
+            TokenKind::Identifier("sum".into()),
             TokenKind::LParen,
-            TokenKind::Identifier("xs".to_string()),
+            TokenKind::Identifier("xs".into()),
             TokenKind::RParen,
             TokenKind::RBrace,
         ]
@@ -271,9 +271,7 @@ fn test_single_line_comments() {
 
     assert_tokens!(
         lexer,
-        [TokenKind::SingleLineComment(
-            " this is a comment".to_string()
-        )]
+        [TokenKind::SingleLineComment(" this is a comment".into())]
     );
 }
 
@@ -283,9 +281,7 @@ fn test_multi_line_comments() {
 
     assert_tokens!(
         lexer,
-        [TokenKind::MultiLineComment(
-            " this is a comment ".to_string()
-        )]
+        [TokenKind::MultiLineComment(" this is a comment ".into())]
     );
 
     let mut lexer = Lexer::new("/* this is a comment\non multiple lines */");
@@ -293,7 +289,7 @@ fn test_multi_line_comments() {
     assert_tokens!(
         lexer,
         [TokenKind::MultiLineComment(
-            " this is a comment\non multiple lines ".to_string()
+            " this is a comment\non multiple lines ".into()
         )]
     );
 }
@@ -305,7 +301,7 @@ fn test_string_literal() {
     assert_tokens!(
         lexer,
         [TokenKind::Literal(Literal::String(
-            "this is a string".to_string()
+            "this is a string".into()
         ))]
     );
 }
@@ -314,7 +310,7 @@ fn test_string_literal() {
 fn test_char_literal() {
     let mut lexer = Lexer::new("'a'");
 
-    assert_tokens!(lexer, [TokenKind::Literal(Literal::Char("a".to_string()))]);
+    assert_tokens!(lexer, [TokenKind::Literal(Literal::Char("a".into()))]);
 }
 
 #[test]
@@ -342,7 +338,7 @@ fn test_underscore_keyword() {
         lexer,
         [
             TokenKind::Keyword(Keyword::Underscore),
-            TokenKind::Identifier("_test".to_string())
+            TokenKind::Identifier("_test".into())
         ]
     );
 }
