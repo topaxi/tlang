@@ -1440,7 +1440,7 @@ impl Interpreter {
                     (value, literal)
                     && let TlangObjectKind::String(lhs) = self.get_object_by_id(lhs)
                 {
-                    return **lhs == *rhs;
+                    return *lhs == rhs;
                 }
 
                 false
