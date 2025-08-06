@@ -566,7 +566,7 @@ impl FunctionDeclaration {
         match &self.name.kind {
             ExprKind::Path(path) => path.to_string(),
             ExprKind::FieldAccess(expr, ident) => {
-                format!("{}.{}", expr.path().unwrap().to_string(), ident)
+                format!("{}.{}", expr.path().unwrap(), ident)
             }
             _ => unreachable!(),
         }
