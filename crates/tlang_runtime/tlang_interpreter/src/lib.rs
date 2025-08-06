@@ -1454,63 +1454,63 @@ impl Interpreter {
                 true
             }
             hir::PatKind::Wildcard => true,
-            hir::PatKind::Enum(path, kvs) => match self.get_object(value) {
-                Some(TlangObjectKind::Enum(_)) => {
-                    let variant_index = self.get_enum(value).unwrap().variant;
-                    let shape = self
-                        .get_shape_of(value)
-                        .unwrap_or_else(|| {
-                            self.panic(format!(
-                                "Enum shape not found for value {:?}",
-                                self.state.stringify(value)
-                            ))
-                        })
-                        .get_enum_shape()
-                        .unwrap_or_else(|| {
-                            self.panic(format!(
-                                "Value has a shape, but not an enum shape {:?}",
-                                self.state.stringify(value)
-                            ))
-                        });
-                    let path_name = path.as_init().to_string();
-
-                    if shape.name != path_name {
-                        debug!("eval_pat: Not matched as {} != {}", shape.name, path_name);
-
-                        return false;
-                    }
-
-                    let variant_name = path.last_ident().as_str();
-                    let variant_shape = &shape.variants[variant_index];
-
-                    if variant_shape.name != variant_name {
-                        debug!(
-                            "eval_pat: Not matched as {} != {}",
-                            shape.variants[variant_index].name, variant_name
-                        );
-
-                        return false;
-                    }
-
-                    kvs.iter().all(|(k, pat)| {
-                        self.get_shape_of(value)
-                            .and_then(|shape| shape.get_enum_shape())
-                            .map(|shape| &shape.variants[variant_index])
-                            .and_then(|variant| variant.get_field_index(&k.to_string()))
-                            .is_some_and(|field_index| {
-                                let tlang_enum = self.get_enum(value).unwrap();
-                                self.eval_pat(pat, tlang_enum.field_values[field_index])
-                            })
+            hir::PatKind::Enum(path, kvs) if let Some(tlang_enum) = self.get_enum(value) => {
+                let variant_index = tlang_enum.variant;
+                let shape = self
+                    .get_shape_of(value)
+                    .unwrap_or_else(|| {
+                        self.panic(format!(
+                            "Enum shape not found for value {:?}",
+                            self.state.stringify(value)
+                        ))
                     })
+                    .get_enum_shape()
+                    .unwrap_or_else(|| {
+                        self.panic(format!(
+                            "Value has a shape, but not an enum shape {:?}",
+                            self.state.stringify(value)
+                        ))
+                    });
+                let path_name = path.as_init().to_string();
+
+                if shape.name != path_name {
+                    debug!("eval_pat: Not matched as {} != {}", shape.name, path_name);
+
+                    return false;
                 }
-                _ => todo!(
+
+                let variant_name = path.last_ident().as_str();
+                let variant_shape = &shape.variants[variant_index];
+
+                if variant_shape.name != variant_name {
+                    debug!(
+                        "eval_pat: Not matched as {} != {}",
+                        shape.variants[variant_index].name, variant_name
+                    );
+
+                    return false;
+                }
+
+                kvs.iter().all(|(k, pat)| {
+                    self.get_shape_of(value)
+                        .and_then(|shape| shape.get_enum_shape())
+                        .map(|shape| &shape.variants[variant_index])
+                        .and_then(|variant| variant.get_field_index(&k.to_string()))
+                        .is_some_and(|field_index| {
+                            let tlang_enum = self.get_enum(value).unwrap();
+                            self.eval_pat(pat, tlang_enum.field_values[field_index])
+                        })
+                })
+            }
+            hir::PatKind::Enum(path, kvs) => {
+                todo!(
                     "eval_pat: Enum({:?}, {:?}) for value {}\nCurrent scope: {}",
                     path,
                     kvs,
                     self.state.stringify(value),
                     self.state.debug_stringify_scope_stack()
-                ),
-            },
+                )
+            }
             hir::PatKind::Rest(_) => unreachable!("Rest patterns can only appear in list patterns"),
         }
     }
