@@ -421,7 +421,7 @@ impl HirPretty {
 
     fn print_function_name(&mut self, name: &hir::Expr) {
         if let hir::ExprKind::Path(path) = &name.kind {
-            self.push_string(path.join("::"));
+            self.push_string(path.to_string());
         } else {
             self.print_expr(name);
         }
@@ -521,7 +521,7 @@ impl HirPretty {
     }
 
     fn print_path(&mut self, path: &hir::Path) {
-        self.push_string(path.join("::"));
+        self.push_string(path.to_string());
 
         // We print unresolved paths with a question mark.
         if self.options.mark_unresolved && path.res.is_unknown() {

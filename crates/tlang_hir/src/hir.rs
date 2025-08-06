@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::num::NonZero;
 
 #[cfg(feature = "serde")]
@@ -141,6 +142,12 @@ impl PartialEq for Path {
     }
 }
 
+impl Display for Path {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.join("::"))
+    }
+}
+
 impl Path {
     pub fn new(segments: Vec<PathSegment>, span: Span) -> Self {
         Self {
@@ -161,6 +168,10 @@ impl Path {
             .map(|segment| segment.ident.as_str())
             .collect::<Vec<_>>()
             .join(separator)
+    }
+
+    pub fn join_with(&self, segment_str: &str) -> String {
+        self.to_string() + "::" + segment_str
     }
 
     pub fn first_ident(&self) -> &Ident {
@@ -333,13 +344,6 @@ pub struct Pat {
 }
 
 impl Pat {
-    pub fn is_self(&self) -> bool {
-        match self.kind {
-            PatKind::Identifier(_, ref ident) => ident.is_self(),
-            _ => false,
-        }
-    }
-
     pub fn is_wildcard(&self) -> bool {
         matches!(self.kind, PatKind::Wildcard)
     }
@@ -348,7 +352,7 @@ impl Pat {
         matches!(self.kind, PatKind::Rest(_))
     }
 
-    pub fn is_identifier(&self) -> bool {
+    pub fn is_ident(&self) -> bool {
         matches!(self.kind, PatKind::Identifier(_, _))
     }
 
@@ -356,6 +360,13 @@ impl Pat {
         match &self.kind {
             PatKind::List(pats) => pats.is_empty(),
             _ => false,
+        }
+    }
+
+    pub fn ident(&self) -> Option<&Ident> {
+        match &self.kind {
+            PatKind::Identifier(_, ident) => Some(ident),
+            _ => None,
         }
     }
 }
@@ -553,9 +564,9 @@ impl FunctionDeclaration {
     /// # Panics
     pub fn name(&self) -> String {
         match &self.name.kind {
-            ExprKind::Path(path) => path.join("::"),
+            ExprKind::Path(path) => path.to_string(),
             ExprKind::FieldAccess(expr, ident) => {
-                format!("{}.{}", expr.path().unwrap().join("::"), ident)
+                format!("{}.{}", expr.path().unwrap().to_string(), ident)
             }
             _ => unreachable!(),
         }

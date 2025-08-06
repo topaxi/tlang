@@ -1666,7 +1666,7 @@ impl<'src> Parser<'src> {
 
     fn fn_name_identifier_to_string(&self, identifier: &Expr) -> String {
         match &identifier.kind {
-            ExprKind::Path(path) => path.join("::"),
+            ExprKind::Path(path) => path.to_string(),
 
             ExprKind::FieldExpression(field) => {
                 self.fn_name_identifier_to_string(&field.base) + "." + field.field.as_str()

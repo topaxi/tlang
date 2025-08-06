@@ -211,13 +211,13 @@ impl LoweringContext {
 
     fn def_fn_local(&mut self, name_expr: &ast::node::Expr, hir_id: HirId, arity: Option<usize>) {
         let mut fn_name = match &name_expr.kind {
-            ast::node::ExprKind::Path(path) => path.join("::"),
+            ast::node::ExprKind::Path(path) => path.to_string(),
             ast::node::ExprKind::FieldExpression(fe) => {
                 let ast::node::ExprKind::Path(path) = &fe.base.kind else {
                     unreachable!("FieldExpression base should be a path");
                 };
 
-                path.join("::") + fe.field.as_str()
+                path.join_with(fe.field.as_str())
             }
             _ => unreachable!(),
         };
@@ -262,7 +262,7 @@ impl LoweringContext {
 
     fn lower_path(&mut self, path: &ast::node::Path) -> hir::Path {
         let res = self
-            .lookup(&path.join("::"))
+            .lookup(&path.to_string())
             .map_or(hir::Res::Unknown, |binding| binding.res());
 
         if path.segments.len() == 1 {

@@ -248,7 +248,7 @@ impl LoweringContext {
                     .unwrap()
                     .set_name(&new_name);
 
-                if self.has_binding(&path_with_argnum.join("::")) {
+                if self.has_binding(&path_with_argnum.to_string()) {
                     self.lower_expr(&ast::node::Expr {
                         id: callee.id,
                         kind: ast::node::ExprKind::Path(path_with_argnum),

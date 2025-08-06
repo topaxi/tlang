@@ -327,7 +327,7 @@ impl Interpreter {
                 EvalResult::Value(self.resolve_value(path).unwrap_or_else(|| {
                     self.panic(format!(
                         "Could not resolve path: {} ({:?})\nCurrent scope: {}",
-                        path.join("::"),
+                        path,
                         path.res,
                         self.state.debug_stringify_scope_stack()
                     ))
@@ -505,11 +505,7 @@ impl Interpreter {
             hir::BinaryOpKind::Assign if let hir::ExprKind::Path(path) = &lhs.kind => {
                 let value = eval_value!(self.eval_expr(rhs));
 
-                debug!(
-                    "eval_binary: {:?} = {:?}",
-                    path.join("::"),
-                    self.state.stringify(value)
-                );
+                debug!("eval_binary: {} = {}", path, self.state.stringify(value));
 
                 self.state.scope_stack.update_value(&path.res, value);
 
@@ -699,7 +695,7 @@ impl Interpreter {
         match &decl.name.kind {
             hir::ExprKind::Path(path) => {
                 // Used for static struct method resolution, for now..
-                self.state.set_global(path.join("::"), fn_object);
+                self.state.set_global(path.to_string(), fn_object);
             }
             hir::ExprKind::FieldAccess(expr, ident) => {
                 let path = match &expr.kind {
@@ -709,7 +705,7 @@ impl Interpreter {
 
                 // Used for static struct method resolution, for now..
                 self.state
-                    .set_global(path.join("::") + ident.as_str(), fn_object);
+                    .set_global(path.to_string() + ident.as_str(), fn_object);
 
                 match &path.res {
                     Res::Def(DefKind::Struct, ..) => {
@@ -744,14 +740,14 @@ impl Interpreter {
 
     fn create_dyn_fn_object(&mut self, decl: &hir::DynFunctionDeclaration) -> TlangValue {
         let name = match &decl.name.kind {
-            hir::ExprKind::Path(path) => path.join("::"),
+            hir::ExprKind::Path(path) => path.to_string(),
             hir::ExprKind::FieldAccess(expr, ident) => {
                 let path = match &expr.kind {
-                    hir::ExprKind::Path(path) => path.join("::"),
+                    hir::ExprKind::Path(path) => path,
                     _ => todo!("create_dyn_fn_object: {:?}", expr),
                 };
 
-                path + "::" + ident.as_str()
+                path.join_with(ident.as_str())
             }
             _ => todo!("create_dyn_fn_object: {:?}", decl.name),
         };
@@ -1026,7 +1022,7 @@ impl Interpreter {
                 let Some(struct_decl) = self.state.get_struct_decl(path) else {
                     self.panic(format!(
                         "Struct `{}` not found\nCurrent scope: {:?}",
-                        path.join("::"),
+                        path,
                         self.state.current_scope().borrow()
                     ));
                 };
@@ -1037,7 +1033,7 @@ impl Interpreter {
                 let Some(enum_decl) = self.state.get_enum_decl(&path.as_init()) else {
                     self.panic(format!(
                         "Enum variant `{}` not found\nCurrent scope: {:?}",
-                        path.join("::"),
+                        path,
                         self.state.current_scope().borrow()
                     ));
                 };
@@ -1058,7 +1054,7 @@ impl Interpreter {
             hir::ExprKind::Path(path) => {
                 self.panic(format!(
                     "Function `{}` not found\nCurrent scope: {:?}",
-                    path.join("::"),
+                    path,
                     self.state.current_scope().borrow()
                 ));
             }
@@ -1476,7 +1472,7 @@ impl Interpreter {
                                 self.state.stringify(value)
                             ))
                         });
-                    let path_name = path.as_init().join("::");
+                    let path_name = path.as_init().to_string();
 
                     if shape.name != path_name {
                         debug!("eval_pat: Not matched as {} != {}", shape.name, path_name);

@@ -235,11 +235,11 @@ impl Resolver for InterpreterState {
         let value = self
             .scope_stack
             .resolve_value(path)
-            .or_else(|| self.globals.get(&path.join("::")).copied());
+            .or_else(|| self.globals.get(&path.to_string()).copied());
 
         debug!(
-            "Resolved path: {:?} ({:?}), got: {:?}",
-            path.join("::"),
+            "Resolved path: {} ({:?}), got: {:?}",
+            path,
             path.res,
             value.map(|v| self.stringify(v))
         );
@@ -282,9 +282,7 @@ impl InterpreterState {
     }
 
     pub fn get_struct_decl(&self, path: &hir::Path) -> Option<Rc<hir::StructDeclaration>> {
-        let path_name = path.join("::");
-
-        self.struct_decls.get(&path_name).cloned()
+        self.struct_decls.get(&path.to_string()).cloned()
     }
 
     pub fn set_struct_decl(&mut self, path_name: String, decl: Rc<hir::StructDeclaration>) {
@@ -292,9 +290,7 @@ impl InterpreterState {
     }
 
     pub fn get_enum_decl(&self, path: &hir::Path) -> Option<Rc<hir::EnumDeclaration>> {
-        let path_name = path.join("::");
-
-        self.enum_decls.get(&path_name).cloned()
+        self.enum_decls.get(&path.to_string()).cloned()
     }
 
     pub fn set_enum_decl(&mut self, path_name: String, decl: Rc<hir::EnumDeclaration>) {

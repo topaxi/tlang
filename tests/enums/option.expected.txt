@@ -5,7 +5,7 @@ true
 10
 
 
-thread 'main' panicked at crates/tlang_runtime/tlang_memory/src/state.rs:327:9:
+thread 'main' panicked at crates/tlang_runtime/tlang_memory/src/state.rs:323:9:
 Called unwrap on None
   at root 10:1
 

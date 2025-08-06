@@ -243,7 +243,7 @@ fn test_simple_enum_res() {
         paths[3].res,
         hir::Res::Def(DefKind::Variant, hir::HirId::new(1), 0),
         "path {}",
-        paths[3].join("::")
+        paths[3].to_string()
     );
 }
 
@@ -279,7 +279,7 @@ fn test_enum_res() {
         paths[2].res,
         hir::Res::Def(DefKind::Variant, hir::HirId::new(2), 1),
         "path {}",
-        paths[2].join("::")
+        paths[2].to_string()
     );
 
     // Path 3 is `x`
@@ -288,6 +288,6 @@ fn test_enum_res() {
         paths[4].res,
         hir::Res::Def(DefKind::Variant, hir::HirId::new(4), 2),
         "path {}",
-        paths[4].join("::")
+        paths[4].to_string()
     );
 }

@@ -283,6 +283,12 @@ pub struct Path {
     pub span: Span,
 }
 
+impl Display for Path {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.join("::"))
+    }
+}
+
 impl Path {
     pub fn new(segments: Vec<Ident>) -> Self {
         Path {
@@ -315,6 +321,10 @@ impl Path {
             .map(Ident::as_str)
             .collect::<Vec<_>>()
             .join(separator)
+    }
+
+    pub fn join_with(&self, segment_str: &str) -> String {
+        self.to_string() + "::" + segment_str
     }
 }
 
@@ -357,7 +367,8 @@ impl Pat {
                     enum_pattern
                         .elements
                         .iter()
-                        .flat_map(|(_, pattern)| pattern.get_all_node_ids()),
+                        .map(|(_ident, pattern)| pattern)
+                        .flat_map(Pat::get_all_node_ids),
                 );
             }
             PatKind::None

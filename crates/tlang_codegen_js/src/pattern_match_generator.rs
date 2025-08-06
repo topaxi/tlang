@@ -116,7 +116,7 @@ impl CodegenJS {
                 self.push_str(".tag === ");
                 let resolved = self
                     .current_scope()
-                    .resolve_variable(path.join("::").as_str())
+                    .resolve_variable(&path.to_string())
                     .unwrap_or_else(|| path.join("."));
                 self.push_str(&resolved);
 
@@ -145,7 +145,7 @@ impl CodegenJS {
                 if root_pat && self.match_context_stack.fixed_list() {
                     let mut push_and = false;
                     for (i, pattern) in patterns.iter().enumerate() {
-                        if pattern.is_wildcard() || pattern.is_identifier() {
+                        if pattern.is_wildcard() || pattern.is_ident() {
                             continue;
                         }
 
@@ -418,7 +418,7 @@ fn expr_idents_match_pat_idents(expr: &hir::Expr, pat: &hir::Pat) -> bool {
     if let hir::PatKind::Identifier(_, ident) = &pat.kind
         && let hir::ExprKind::Path(path) = &expr.kind
     {
-        return ident.as_str() == path.join("::");
+        return ident.as_str() == path.to_string();
     }
 
     if let hir::PatKind::List(list_pats) = &pat.kind
@@ -427,7 +427,7 @@ fn expr_idents_match_pat_idents(expr: &hir::Expr, pat: &hir::Pat) -> bool {
         return list_pats.len() == list_exprs.len()
             && list_pats
                 .iter()
-                .all(|pat| pat.is_identifier() || pat.is_wildcard())
+                .all(|pat| pat.is_ident() || pat.is_wildcard())
             && list_exprs
                 .iter()
                 .all(|expr| matches!(&expr.kind, hir::ExprKind::Path(_)))
@@ -436,18 +436,7 @@ fn expr_idents_match_pat_idents(expr: &hir::Expr, pat: &hir::Pat) -> bool {
                     return true;
                 }
 
-                let pat_ident = if let hir::PatKind::Identifier(_, ident) = &pat.kind {
-                    ident.as_str()
-                } else {
-                    unreachable!()
-                };
-                let expr_ident = if let hir::ExprKind::Path(path) = &expr.kind {
-                    path.join("::")
-                } else {
-                    unreachable!()
-                };
-
-                pat_ident == expr_ident
+                pat.ident().unwrap().as_str() == expr.path().unwrap().to_string()
             });
     }
 
@@ -457,10 +446,7 @@ fn expr_idents_match_pat_idents(expr: &hir::Expr, pat: &hir::Pat) -> bool {
 fn is_fixed_list_pattern(pat: &hir::Pat) -> bool {
     match &pat.kind {
         hir::PatKind::List(pats) => {
-            !pats.is_empty()
-                && pats
-                    .iter()
-                    .all(|pat| pat.is_wildcard() || pat.is_identifier())
+            !pats.is_empty() && pats.iter().all(|pat| pat.is_wildcard() || pat.is_ident())
         }
         _ => false,
     }
