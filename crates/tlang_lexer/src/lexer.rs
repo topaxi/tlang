@@ -332,7 +332,7 @@ impl Lexer<'_> {
             '"' | '\'' => {
                 let quote = ch;
                 self.advance();
-                let literal = self.read_string_literal(quote).to_string();
+                let literal = self.read_string_literal(quote).into();
 
                 if quote == '"' {
                     self.token(TokenKind::Literal(Literal::String(literal)), start)

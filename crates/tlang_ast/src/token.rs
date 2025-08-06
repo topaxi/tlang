@@ -80,8 +80,8 @@ pub enum Literal {
     Integer(i64),
     UnsignedInteger(u64),
     Float(f64),
-    String(String),
-    Char(String),
+    String(Box<str>),
+    Char(Box<str>),
     None,
 }
 
