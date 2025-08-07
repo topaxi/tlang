@@ -14,7 +14,7 @@ pub enum SymbolType {
     Module,
     #[default]
     Variable,
-    Function,
+    Function(u16),
     Parameter,
     Enum,
     EnumVariant,
@@ -26,7 +26,7 @@ impl Display for SymbolType {
         match self {
             SymbolType::Module => write!(f, "module"),
             SymbolType::Variable => write!(f, "variable"),
-            SymbolType::Function => write!(f, "function"),
+            SymbolType::Function(_) => write!(f, "function"),
             SymbolType::Parameter => write!(f, "parameter"),
             SymbolType::Enum => write!(f, "enum"),
             SymbolType::EnumVariant => write!(f, "enum variant"),
@@ -130,17 +130,21 @@ impl SymbolTable {
         }
     }
 
-    fn get_local_by_name(&self, name: &str) -> Option<&SymbolInfo> {
-        self.symbols.iter().find(|s| s.name == name)
+    fn get_locals_by_name(&self, name: &str) -> Vec<&SymbolInfo> {
+        self.symbols.iter().filter(|s| s.name == name).collect()
     }
 
-    pub fn get_by_name(&self, name: &str) -> Option<SymbolInfo> {
-        if let Some(symbol) = self.get_local_by_name(name) {
-            Some(symbol.clone())
-        } else if let Some(ref parent) = self.parent {
+    pub fn get_by_name(&self, name: &str) -> Vec<SymbolInfo> {
+        let locals = self.get_locals_by_name(name);
+
+        if !locals.is_empty() {
+            return locals.into_iter().cloned().collect();
+        }
+
+        if let Some(parent) = &self.parent {
             parent.borrow().get_by_name(name)
         } else {
-            None
+            vec![]
         }
     }
 

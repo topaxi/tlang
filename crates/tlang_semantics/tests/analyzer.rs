@@ -77,19 +77,32 @@ fn test_should_error_on_undefined_symbol_in_variable_declaration() {
 }
 
 #[test]
-fn test_should_error_on_undefined_function() {
-    let diagnostics = analyze_diag!("b();");
+fn test_should_error_on_undefined_functions() {
+    let diagnostics = analyze_diag!(indoc! {"
+        b();
+        b(1);
+    "});
 
     assert_eq!(
         diagnostics,
-        vec![Diagnostic::new(
-            "Use of undeclared variable `b`".to_string(),
-            Severity::Error,
-            Span::new(
-                LineColumn { line: 0, column: 0 },
-                LineColumn { line: 0, column: 1 }
+        vec![
+            Diagnostic::new(
+                "Use of undeclared function `b` with arity 0".to_string(),
+                Severity::Error,
+                Span::new(
+                    LineColumn { line: 0, column: 0 },
+                    LineColumn { line: 0, column: 1 }
+                ),
             ),
-        )]
+            Diagnostic::new(
+                "Use of undeclared function `b` with arity 1".to_string(),
+                Severity::Error,
+                Span::new(
+                    LineColumn { line: 1, column: 1 },
+                    LineColumn { line: 1, column: 2 }
+                ),
+            )
+        ]
     );
 }
 
@@ -238,17 +251,17 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
 
     assert_eq!(
         program_symbols.borrow().get_by_name("add"),
-        Some(SymbolInfo {
+        vec![SymbolInfo {
             node_id: NodeId::new(12),
             id: SymbolId::new(1),
             name: "add".to_string(),
-            symbol_type: SymbolType::Function,
+            symbol_type: SymbolType::Function(2),
             defined_at: Span::new(
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
             ),
             ..Default::default()
-        })
+        }]
     );
 
     let function_declaration = match &ast.statements[0].kind {
@@ -275,7 +288,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
         .get_by_name("c");
 
     // Verify that c is within the scope of the function body
-    assert_eq!(actual_c, Some(c_symbol_info.clone()));
+    assert_eq!(actual_c, vec![c_symbol_info.clone()]);
 }
 
 #[test]
@@ -417,10 +430,12 @@ fn should_handle_fn_guard_variables() {
                 binary_search(list, target, low, mid - 1)
             }
         }
+
+        binary_search([1, 2, 3, 4, 5], 3);
     "},
         [
-            ("len", SymbolType::Function),
-            ("floor", SymbolType::Function)
+            ("len", SymbolType::Function(1)),
+            ("floor", SymbolType::Function(1))
         ]
     );
     assert_eq!(diagnostics, vec![]);

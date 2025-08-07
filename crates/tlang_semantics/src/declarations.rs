@@ -39,7 +39,7 @@ impl DeclarationAnalyzer {
     }
 
     #[inline(always)]
-    pub fn get_symbol_tables(&self) -> &HashMap<NodeId, Rc<RefCell<SymbolTable>>> {
+    pub fn symbol_tables(&self) -> &HashMap<NodeId, Rc<RefCell<SymbolTable>>> {
         &self.symbol_tables
     }
 
@@ -52,12 +52,12 @@ impl DeclarationAnalyzer {
         &self.symbol_table_stack[0]
     }
 
-    fn get_last_symbol_table(&self) -> &Rc<RefCell<SymbolTable>> {
+    fn current_symbol_table(&self) -> &Rc<RefCell<SymbolTable>> {
         self.symbol_table_stack.last().unwrap()
     }
 
     fn push_symbol_table(&mut self, node_id: NodeId) -> Rc<RefCell<SymbolTable>> {
-        let parent = Rc::clone(self.get_last_symbol_table());
+        let parent = Rc::clone(self.current_symbol_table());
         let new_symbol_table = Rc::new(RefCell::new(SymbolTable::new(parent)));
         self.symbol_tables
             .insert(node_id, Rc::clone(&new_symbol_table));
@@ -73,7 +73,7 @@ impl DeclarationAnalyzer {
     #[inline(always)]
     fn declare_symbol(&mut self, node_id: NodeId, name: &str, symbol_type: SymbolType, span: Span) {
         let symbol_info = SymbolInfo::new(node_id, self.unique_id(), name, symbol_type, span);
-        let symbol_table = self.get_last_symbol_table();
+        let symbol_table = self.current_symbol_table();
 
         symbol_table.borrow_mut().insert(symbol_info);
     }
@@ -106,29 +106,9 @@ impl DeclarationAnalyzer {
             StmtKind::Expr(expr) => self.collect_declarations_expr(expr),
             StmtKind::Let(decl) => self.collect_variable_declaration(decl),
             StmtKind::FunctionDeclaration(declaration) => {
-                let name_as_str = self.fn_identifier_to_string(&declaration.name);
-
-                self.declare_symbol(
-                    declaration.id,
-                    &name_as_str,
-                    SymbolType::Function,
-                    declaration.name.span,
-                );
-
                 self.collect_function_declaration(declaration);
             }
             StmtKind::FunctionDeclarations(declarations) => {
-                // TODO: We might want to be more clever about this in the future.
-                let first_declaration = &declarations[0];
-                let name_as_str = self.fn_identifier_to_string(&first_declaration.name);
-
-                self.declare_symbol(
-                    stmt.id,
-                    &name_as_str,
-                    SymbolType::Function,
-                    first_declaration.name.span,
-                );
-
                 for declaration in declarations {
                     self.collect_function_declaration(declaration);
                 }
@@ -317,6 +297,15 @@ impl DeclarationAnalyzer {
     }
 
     fn collect_function_declaration(&mut self, declaration: &FunctionDeclaration) {
+        let name_as_str = self.fn_identifier_to_string(&declaration.name);
+
+        self.declare_symbol(
+            declaration.id,
+            &name_as_str,
+            SymbolType::Function(declaration.parameters.len() as u16),
+            declaration.name.span,
+        );
+
         self.push_symbol_table(declaration.id);
 
         self.symbol_type_context.push(SymbolType::Parameter);
@@ -336,7 +325,12 @@ impl DeclarationAnalyzer {
         let name_as_str = self.fn_identifier_to_string(&decl.name);
 
         if name_as_str != "anonymous" {
-            self.declare_symbol(decl.id, &name_as_str, SymbolType::Function, decl.name.span);
+            self.declare_symbol(
+                decl.id,
+                &name_as_str,
+                SymbolType::Function(decl.parameters.len() as u16),
+                decl.name.span,
+            );
         }
 
         self.collect_declarations_from_fn(decl);

@@ -2,8 +2,8 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use tlang_ast::{
     node::{
-        Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, LetDeclaration, Module, Pat,
-        PatKind, Path, Stmt, StmtKind, StructDeclaration,
+        BinaryOpKind, Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter,
+        LetDeclaration, Module, Pat, PatKind, Path, Stmt, StmtKind, StructDeclaration,
     },
     node_id::NodeId,
     span::Span,
@@ -40,7 +40,7 @@ impl SemanticAnalyzer {
 
     #[inline(always)]
     fn symbol_tables(&self) -> &HashMap<NodeId, Rc<RefCell<SymbolTable>>> {
-        self.declaration_analyzer.get_symbol_tables()
+        self.declaration_analyzer.symbol_tables()
     }
 
     #[inline(always)]
@@ -64,7 +64,7 @@ impl SemanticAnalyzer {
         self.struct_declarations.get(name)
     }
 
-    fn get_last_symbol_table(&self) -> Rc<RefCell<SymbolTable>> {
+    fn current_symbol_table(&self) -> Rc<RefCell<SymbolTable>> {
         Rc::clone(self.symbol_table_stack.last().unwrap())
     }
 
@@ -97,24 +97,61 @@ impl SemanticAnalyzer {
     }
 
     fn mark_as_used_by_name(&mut self, name: &str, span: Span) {
-        let symbol_info = self.get_last_symbol_table().borrow().get_by_name(name);
+        let symbol_info = self.current_symbol_table().borrow().get_by_name(name);
 
-        if let Some(symbol_info) = symbol_info {
+        if symbol_info.is_empty() {
+            self.report_undeclared_variable(name, span);
+
+            return;
+        }
+
+        for symbol in &symbol_info {
             // TODO: This only marks the by it's name, not by it's id. Maybe we should
             //       mark it in the collection pass? Or keep track of the current id in
             //       case the name is being shadowed?
-            self.get_last_symbol_table()
+            self.current_symbol_table()
                 .borrow_mut()
-                .mark_as_used(symbol_info.id);
-        } else {
-            self.report_undeclared_variable(name, span);
+                .mark_as_used(symbol.id);
+        }
+    }
+
+    fn mark_as_used_by_name_and_arity(&mut self, name: &str, arity: usize, span: Span) {
+        let symbol_info_ids: Vec<_> = self
+            .current_symbol_table()
+            .borrow()
+            .get_by_name(name)
+            .iter()
+            .filter(|s| {
+                if let SymbolType::Function(a) = s.symbol_type {
+                    a as usize == arity
+                } else {
+                    // Not a function, so we don't care about arity
+                    true
+                }
+            })
+            .map(|s| s.id)
+            .collect();
+
+        if symbol_info_ids.is_empty() {
+            self.report_undeclared_function(name, arity, span);
+
+            return;
+        }
+
+        for symbol_id in symbol_info_ids {
+            // TODO: This only marks the by it's name, not by it's id. Maybe we should
+            //       mark it in the collection pass? Or keep track of the current id in
+            //       case the name is being shadowed?
+            self.current_symbol_table()
+                .borrow_mut()
+                .mark_as_used(symbol_id);
         }
     }
 
     fn report_undeclared_variable(&mut self, name: &str, span: Span) {
         let did_you_mean = did_you_mean(
             name,
-            &self.get_last_symbol_table().borrow().get_all_symbols(),
+            &self.current_symbol_table().borrow().get_all_symbols(),
         );
 
         if let Some(suggestion) = did_you_mean {
@@ -135,10 +172,34 @@ impl SemanticAnalyzer {
         }
     }
 
+    fn report_undeclared_function(&mut self, name: &str, arity: usize, span: Span) {
+        let did_you_mean = did_you_mean(
+            name,
+            &self.current_symbol_table().borrow().get_all_symbols(),
+        );
+
+        if let Some(suggestion) = did_you_mean {
+            self.diagnostics.push(Diagnostic::new(
+                format!(
+                    "Use of undeclared function `{}` with arity {}, did you mean the {} `{}`?",
+                    name, arity, suggestion.symbol_type, suggestion.name
+                ),
+                Severity::Error,
+                span,
+            ));
+        } else {
+            self.diagnostics.push(Diagnostic::new(
+                format!("Use of undeclared function `{name}` with arity {arity}"),
+                Severity::Error,
+                span,
+            ));
+        }
+    }
+
     #[inline(always)]
     fn analyze_optional_expr(&mut self, expr: &Option<Expr>) {
         if let Some(expr) = expr {
-            self.analyze_expr(expr);
+            self.analyze_expr(expr, false);
         }
     }
 
@@ -166,7 +227,7 @@ impl SemanticAnalyzer {
 
         match &stmt.kind {
             StmtKind::None => {}
-            StmtKind::Expr(expr) => self.analyze_expr(expr),
+            StmtKind::Expr(expr) => self.analyze_expr(expr, false),
             StmtKind::Let(decl) => self.analyze_variable_declaration(decl),
             StmtKind::FunctionDeclaration(decl) => self.analyze_fn_decl(decl),
             StmtKind::FunctionDeclarations(decls) => {
@@ -174,7 +235,7 @@ impl SemanticAnalyzer {
                     self.analyze_fn_decl(decl);
                 }
             }
-            StmtKind::Return(Some(expr)) => self.analyze_expr(expr),
+            StmtKind::Return(Some(expr)) => self.analyze_expr(expr, false),
             StmtKind::Return(_) => {}
             StmtKind::EnumDeclaration(_decl) => {
                 // TODO
@@ -204,8 +265,8 @@ impl SemanticAnalyzer {
             self.analyze_fn_param(parameter);
         }
 
-        if let Some(ref guard) = decl.guard {
-            self.analyze_expr(guard);
+        if let Some(guard) = &decl.guard {
+            self.analyze_expr(guard, false);
         }
 
         self.analyze_block(&decl.body);
@@ -226,24 +287,36 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn analyze_expr(&mut self, expr: &Expr) {
+    fn analyze_path_with_known_arity(&mut self, path: &Path, arity: usize, span: Span) {
+        let mut path_str = String::new();
+
+        for segment in path.segments.iter().take(path.segments.len() - 1) {
+            path_str.push_str(segment.as_str());
+            self.mark_as_used_by_name(&path_str, span);
+            path_str.push_str("::");
+        }
+
+        self.mark_as_used_by_name_and_arity(&path.to_string(), arity, span);
+    }
+
+    fn analyze_expr(&mut self, expr: &Expr, parent_pipeline: bool) {
         if let Some(symbol_table) = &self.get_symbol_table(expr.id) {
             self.push_symbol_table(symbol_table);
         }
 
         match &expr.kind {
             ExprKind::BinaryOp(expr) => {
-                self.analyze_expr(&expr.lhs);
-                self.analyze_expr(&expr.rhs);
+                self.analyze_expr(&expr.lhs, false);
+                self.analyze_expr(&expr.rhs, expr.op == BinaryOpKind::Pipeline);
             }
             ExprKind::Block(block) | ExprKind::Loop(block) => self.analyze_block(block),
             ExprKind::ForLoop(for_loop) => {
-                self.analyze_expr(&for_loop.iter);
+                self.analyze_expr(&for_loop.iter, false);
                 self.analyze_pat(&for_loop.pat);
 
                 if let Some((pat, expr)) = &for_loop.acc {
                     self.analyze_pat(pat);
-                    self.analyze_expr(expr);
+                    self.analyze_expr(expr, false);
                 }
 
                 self.analyze_block(&for_loop.block);
@@ -253,25 +326,34 @@ impl SemanticAnalyzer {
                 }
             }
             ExprKind::UnaryOp(_, node) => {
-                self.analyze_expr(node);
+                self.analyze_expr(node, false);
             }
             ExprKind::Break(expr) => {
                 if let Some(expr) = expr {
-                    self.analyze_expr(expr);
+                    self.analyze_expr(expr, false);
                 }
             }
             ExprKind::Call(expr) | ExprKind::RecursiveCall(expr) => {
                 for argument in &expr.arguments {
-                    self.analyze_expr(argument);
+                    self.analyze_expr(argument, false);
                 }
 
-                self.analyze_expr(&expr.callee);
+                if let ExprKind::Path(path) = &expr.callee.kind {
+                    let arity = if parent_pipeline {
+                        expr.arguments.len() + 1 // +1 for the pipeline operator
+                    } else {
+                        expr.arguments.len()
+                    };
+                    self.analyze_path_with_known_arity(path, arity, expr.callee.span);
+                } else {
+                    self.analyze_expr(&expr.callee, false);
+                }
             }
             ExprKind::Cast(expr, _) => {
-                self.analyze_expr(expr);
+                self.analyze_expr(expr, false);
             }
             ExprKind::IfElse(expr) => {
-                self.analyze_expr(&expr.condition);
+                self.analyze_expr(&expr.condition, false);
                 self.analyze_block(&expr.then_branch);
 
                 for else_branch in &expr.else_branches {
@@ -281,26 +363,26 @@ impl SemanticAnalyzer {
             }
             ExprKind::Let(pat, expr) => {
                 self.analyze_pat(pat);
-                self.analyze_expr(expr);
+                self.analyze_expr(expr, false);
             }
             ExprKind::List(values) => {
                 for value in values {
-                    self.analyze_expr(value);
+                    self.analyze_expr(value, false);
                 }
             }
             ExprKind::Dict(kvs) => {
                 for (_key, value) in kvs {
                     // TODO: Keys are currently not properly analyzed
-                    // self.analyze_expr(key);
-                    self.analyze_expr(value);
+                    // self.analyze_expr(key, false);
+                    self.analyze_expr(value, false);
                 }
             }
             ExprKind::IndexExpression(expr) => {
-                self.analyze_expr(&expr.index);
-                self.analyze_expr(&expr.base);
+                self.analyze_expr(&expr.index, false);
+                self.analyze_expr(&expr.base, false);
             }
             ExprKind::FieldExpression(expr) => {
-                self.analyze_expr(&expr.base);
+                self.analyze_expr(&expr.base, false);
                 // TODO: We are checking for unused variables, this should be refactored into
                 //       it's own pass. Skipping analyzing field of variable as we do not have
                 //       any type information yet.
@@ -313,7 +395,7 @@ impl SemanticAnalyzer {
                 self.analyze_path(path, expr.span);
             }
             ExprKind::Match(expr) => {
-                self.analyze_expr(&expr.expression);
+                self.analyze_expr(&expr.expression, false);
 
                 for arm in &expr.arms {
                     if let Some(symbol_table) = &self.get_symbol_table(arm.id) {
@@ -321,7 +403,7 @@ impl SemanticAnalyzer {
                     }
 
                     self.analyze_pat(&arm.pattern);
-                    self.analyze_expr(&arm.expression);
+                    self.analyze_expr(&arm.expression, false);
 
                     if let Some(symbol_table) = &self.get_symbol_table(arm.id) {
                         self.report_unused_symbols(symbol_table);
@@ -330,8 +412,8 @@ impl SemanticAnalyzer {
                 }
             }
             ExprKind::Range(expr) => {
-                self.analyze_expr(&expr.start);
-                self.analyze_expr(&expr.end);
+                self.analyze_expr(&expr.start, false);
+                self.analyze_expr(&expr.end, false);
             }
             ExprKind::None | ExprKind::Continue | ExprKind::Literal(_) | ExprKind::Wildcard => {}
         }
@@ -416,18 +498,18 @@ impl SemanticAnalyzer {
             .get_all_node_ids()
             .iter()
             .filter_map(|id| {
-                self.get_last_symbol_table()
+                self.current_symbol_table()
                     .borrow()
                     .get_local_by_node_id(*id)
                     .map(|symbol_info| symbol_info.id)
             })
-            .filter_map(|id| self.get_last_symbol_table().borrow_mut().remove(id))
+            .filter_map(|id| self.current_symbol_table().borrow_mut().remove(id))
             .collect::<Vec<_>>();
 
-        self.analyze_expr(&decl.expression);
+        self.analyze_expr(&decl.expression, false);
 
         for symbol in pattern_symbols {
-            self.get_last_symbol_table()
+            self.current_symbol_table()
                 .borrow_mut()
                 .insert_beginning(symbol);
         }

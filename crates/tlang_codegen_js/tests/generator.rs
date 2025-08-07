@@ -266,7 +266,10 @@ fn test_list_literal() {
 
 #[test]
 fn test_partial_application() {
-    let output = compile!("let add1 = add(_, 1);", vec![("add", SymbolType::Function)]);
+    let output = compile!(
+        "let add1 = add(_, 1);",
+        vec![("add", SymbolType::Function(2))]
+    );
     let expected_output = indoc! {"
         let add1 = (_) => add(_, 1);
     "};
@@ -277,7 +280,7 @@ fn test_partial_application() {
 fn test_partial_application_with_multiple_arguments() {
     let output = compile!(
         "let add1 = add(_, 1, _);",
-        vec![("add", SymbolType::Function)]
+        vec![("add", SymbolType::Function(3))]
     );
     let expected_output = indoc! {"
         let add1 = (_0, _1) => add(_0, 1, _1);

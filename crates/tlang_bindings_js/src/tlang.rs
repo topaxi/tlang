@@ -107,9 +107,11 @@ impl Tlang {
 
     #[wasm_bindgen(js_name = "defineFunction")]
     pub fn define_js_fn(&mut self, name: &str, f: js_sys::Function) {
+        let arity = f.length() as u16;
+
         self.interpreter.define_js_fn(name, f);
         self.analyzer
-            .add_builtin_symbols(&[(name, tlang_ast::symbols::SymbolType::Function)]);
+            .add_builtin_symbols(&[(name, tlang_ast::symbols::SymbolType::Function(arity))]);
     }
 
     fn parse(&mut self) -> Result<&ast::Module, &ParseError> {
