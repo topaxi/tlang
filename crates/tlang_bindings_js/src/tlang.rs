@@ -1,6 +1,7 @@
 use serde::Deserialize;
 use tlang_ast::node::{self as ast};
 use tlang_codegen_js::generator::CodegenJS;
+use tlang_codegen_js::hir_normalizer::HirNormalizer;
 use tlang_hir::hir;
 use tlang_hir_opt::HirOptimizer;
 use tlang_hir_pretty::{HirPretty, HirPrettyOptions};
@@ -155,6 +156,7 @@ impl Tlang {
         if let Some(ast) = self.ast() {
             let mut hir = tlang_ast_lowering::lower_to_hir(ast);
             let mut optimizer = HirOptimizer::default();
+            optimizer.add_pass(Box::new(HirNormalizer));
             optimizer.optimize_module(&mut hir);
             self.build.hir = Some(hir);
         }

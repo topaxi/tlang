@@ -1,7 +1,7 @@
 use tlang_hir::hir;
 
-use crate::expr_generator::expr_can_render_as_js_expr;
 use crate::generator::{BlockContext, CodegenJS, FunctionContext};
+use crate::hir_normalizer::expr_can_render_as_js_expr;
 
 impl CodegenJS {
     fn generate_function_param(&mut self, param: &hir::FunctionParameter, is_self: bool) {

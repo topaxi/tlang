@@ -1001,6 +1001,8 @@ dependencies = [
  "tlang_ast",
  "tlang_ast_lowering",
  "tlang_codegen_js",
+ "tlang_hir",
+ "tlang_hir_opt",
  "tlang_interpreter",
  "tlang_parser",
  "tlang_semantics",
@@ -1017,6 +1019,7 @@ dependencies = [
  "tlang_ast",
  "tlang_ast_lowering",
  "tlang_hir",
+ "tlang_hir_opt",
  "tlang_parser",
  "tlang_semantics",
 ]

@@ -1,9 +1,11 @@
 #![feature(box_patterns)]
+
 mod binary_operator_generator;
 mod enum_generator;
 mod expr_generator;
 mod function_generator;
 pub mod generator;
+pub mod hir_normalizer;
 mod js;
 mod pattern_match_generator;
 mod scope;

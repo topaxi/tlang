@@ -5,8 +5,9 @@ use std::{
 };
 
 use clap::{ArgMatches, arg, command};
-use tlang_ast_lowering::lower_to_hir;
-use tlang_codegen_js::generator::CodegenJS;
+use tlang_codegen_js::{generator::CodegenJS, hir_normalizer::HirNormalizer};
+use tlang_hir::hir;
+use tlang_hir_opt::HirOptimizer;
 use tlang_parser::error::ParseIssue;
 use tlang_semantics::{SemanticAnalyzer, diagnostic::Diagnostic};
 
@@ -76,7 +77,7 @@ fn get_args() -> Args {
 }
 
 fn compile_standard_library() -> Result<String, ParserError> {
-    let mut js = compile(&CodegenJS::get_standard_library_source())?;
+    let mut js = compile_to_js_string(&CodegenJS::get_standard_library_source())?;
 
     js.push_str("\nfunction panic(msg) { throw new Error(msg); }\n");
 
@@ -108,9 +109,9 @@ fn main() {
         }
 
         let output = match args.output_type {
-            OutputType::Ast => compile_to_ast(&source),
-            OutputType::Hir => compile_to_hir(&source),
-            OutputType::Js => compile(&source),
+            OutputType::Ast => compile_to_ast_string(&source),
+            OutputType::Hir => compile_to_hir_string(&source),
+            OutputType::Js => compile_to_js_string(&source),
         };
 
         let output = match output {
@@ -165,20 +166,28 @@ impl From<Vec<Diagnostic>> for ParserError {
     }
 }
 
-fn compile_to_ast(source: &str) -> Result<String, ParserError> {
+fn lower_to_hir(ast: &tlang_ast::node::Module) -> hir::Module {
+    let mut hir = tlang_ast_lowering::lower_to_hir(ast);
+    let mut optimizer = HirOptimizer::default();
+    optimizer.add_pass(Box::new(HirNormalizer));
+    optimizer.optimize_module(&mut hir);
+    hir
+}
+
+fn compile_to_ast_string(source: &str) -> Result<String, ParserError> {
     let mut parser = tlang_parser::Parser::from_source(source);
     let ast = parser.parse()?;
     Ok(ron::ser::to_string_pretty(&ast, ron::ser::PrettyConfig::default()).unwrap())
 }
 
-fn compile_to_hir(source: &str) -> Result<String, ParserError> {
+fn compile_to_hir_string(source: &str) -> Result<String, ParserError> {
     let mut parser = tlang_parser::Parser::from_source(source);
     let ast = parser.parse()?;
     let hir = lower_to_hir(&ast);
     Ok(ron::ser::to_string_pretty(&hir, ron::ser::PrettyConfig::default()).unwrap())
 }
 
-fn compile(source: &str) -> Result<String, ParserError> {
+fn compile_to_js_string(source: &str) -> Result<String, ParserError> {
     let mut parser = tlang_parser::Parser::from_source(source);
     let ast = parser.parse()?;
     let mut semantic_analyzer = SemanticAnalyzer::default();

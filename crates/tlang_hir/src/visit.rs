@@ -1,4 +1,5 @@
 use crate::hir;
+use tlang_ast as ast;
 
 pub trait Visitor<'hir>: Sized {
     fn visit_module(&mut self, module: &'hir mut hir::Module) {
@@ -21,10 +22,10 @@ pub trait Visitor<'hir>: Sized {
         walk_pat(self, pat);
     }
 
-    fn visit_ident(&mut self, _ident: &'hir mut tlang_ast::node::Ident) {}
+    fn visit_ident(&mut self, _ident: &'hir mut ast::node::Ident) {}
     fn visit_path(&mut self, _path: &'hir mut hir::Path) {}
     fn visit_ty(&mut self, _ty: &'hir mut hir::Ty) {}
-    fn visit_literal(&mut self, _literal: &'hir mut tlang_ast::token::Literal) {}
+    fn visit_literal(&mut self, _literal: &'hir mut ast::token::Literal) {}
 }
 
 pub fn walk_module<'hir, V: Visitor<'hir>>(visitor: &mut V, module: &'hir mut hir::Module) {
@@ -50,7 +51,7 @@ pub fn walk_stmt<'hir, V: Visitor<'hir>>(visitor: &mut V, stmt: &'hir mut hir::S
         }
         hir::StmtKind::Expr(expr) => visitor.visit_expr(expr),
         hir::StmtKind::Return(expr) => {
-            if let Some(expr) = expr.as_mut() {
+            if let Some(expr) = expr {
                 visitor.visit_expr(expr);
             }
         }
@@ -173,7 +174,10 @@ pub fn walk_expr<'hir, V: Visitor<'hir>>(visitor: &mut V, expr: &'hir mut hir::E
         }
         hir::ExprKind::Wildcard => {}
         hir::ExprKind::Continue => {}
-        hir::ExprKind::Range(..) => todo!(),
+        hir::ExprKind::Range(range_expr) => {
+            visitor.visit_expr(&mut range_expr.start);
+            visitor.visit_expr(&mut range_expr.end);
+        }
     }
 }
 
