@@ -297,53 +297,55 @@ impl LoweringContext {
             BinaryOpKind::BitwiseAnd => hir::BinaryOpKind::BitwiseAnd,
             BinaryOpKind::BitwiseOr => hir::BinaryOpKind::BitwiseOr,
             BinaryOpKind::BitwiseXor => hir::BinaryOpKind::BitwiseXor,
-            BinaryOpKind::Pipeline => {
-                return match &node.rhs.kind {
-                    ast::node::ExprKind::Path(_) => {
-                        let lhs = self.lower_expr(&node.lhs);
-                        let rhs = self.lower_callee(&node.rhs, 1);
-
-                        hir::ExprKind::Call(Box::new(hir::CallExpression {
-                            hir_id: self.unique_id(),
-                            callee: rhs,
-                            arguments: vec![lhs],
-                        }))
-                    }
-                    ast::node::ExprKind::Call(call_expr) => {
-                        let arguments = if call_expr.has_wildcard() {
-                            call_expr
-                                .arguments
-                                .iter()
-                                .map(|arg| {
-                                    if matches!(arg.kind, ast::node::ExprKind::Wildcard) {
-                                        self.lower_expr(&node.lhs)
-                                    } else {
-                                        self.lower_expr(arg)
-                                    }
-                                })
-                                .collect()
-                        } else {
-                            let mut arguments = Vec::with_capacity(call_expr.arguments.len() + 1);
-                            arguments.push(self.lower_expr(&node.lhs));
-                            arguments.extend(self.lower_exprs(&call_expr.arguments));
-                            arguments
-                        };
-                        let callee = self.lower_callee(&call_expr.callee, arguments.len());
-
-                        hir::ExprKind::Call(Box::new(hir::CallExpression {
-                            hir_id: self.unique_id(),
-                            callee,
-                            arguments,
-                        }))
-                    }
-                    _ => unreachable!("Validate AST before lowering"),
-                };
-            }
+            BinaryOpKind::Pipeline => return self.lower_pipeline_operator(node),
         };
 
         let lhs = self.lower_expr(&node.lhs);
         let rhs = self.lower_expr(&node.rhs);
 
         hir::ExprKind::Binary(binary_op_kind, Box::new(lhs), Box::new(rhs))
+    }
+
+    fn lower_pipeline_operator(&mut self, node: &BinaryOpExpression) -> hir::ExprKind {
+        match &node.rhs.kind {
+            ast::node::ExprKind::Path(_) => {
+                let lhs = self.lower_expr(&node.lhs);
+                let rhs = self.lower_callee(&node.rhs, 1);
+
+                hir::ExprKind::Call(Box::new(hir::CallExpression {
+                    hir_id: self.unique_id(),
+                    callee: rhs,
+                    arguments: vec![lhs],
+                }))
+            }
+            ast::node::ExprKind::Call(call_expr) => {
+                let arguments = if call_expr.has_wildcard() {
+                    call_expr
+                        .arguments
+                        .iter()
+                        .map(|arg| {
+                            if matches!(arg.kind, ast::node::ExprKind::Wildcard) {
+                                self.lower_expr(&node.lhs)
+                            } else {
+                                self.lower_expr(arg)
+                            }
+                        })
+                        .collect()
+                } else {
+                    let mut arguments = Vec::with_capacity(call_expr.arguments.len() + 1);
+                    arguments.push(self.lower_expr(&node.lhs));
+                    arguments.extend(self.lower_exprs(&call_expr.arguments));
+                    arguments
+                };
+                let callee = self.lower_callee(&call_expr.callee, arguments.len());
+
+                hir::ExprKind::Call(Box::new(hir::CallExpression {
+                    hir_id: self.unique_id(),
+                    callee,
+                    arguments,
+                }))
+            }
+            _ => unreachable!("Validate AST before lowering"),
+        }
     }
 }
