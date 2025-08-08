@@ -6,4 +6,6 @@ pub mod span;
 pub mod symbols;
 pub mod token;
 pub mod visit;
+
+pub use node_id::NodeId;
 pub use visit::Visitor;
