@@ -90,42 +90,7 @@ impl LoweringContext {
             ast::node::ExprKind::Literal(box literal) => {
                 hir::ExprKind::Literal(Box::new(literal.clone()))
             }
-            ast::node::ExprKind::Match(box ast::node::MatchExpression { expression, arms }) => {
-                let mut idents = HashMap::new();
-                let expr = self.lower_expr(expression);
-                let arms = arms
-                    .iter()
-                    .map(|arm| {
-                        self.with_new_scope(|this| {
-                            let pat = this.lower_pat_with_idents(&arm.pattern, &mut idents);
-                            let guard = arm.guard.as_ref().map(|expr| this.lower_expr(expr));
-                            let block =
-                                if let ast::node::ExprKind::Block(block) = &arm.expression.kind {
-                                    this.lower_block_in_current_scope(
-                                        &block.statements,
-                                        block.expression.as_ref(),
-                                        block.span,
-                                    )
-                                } else {
-                                    hir::Block::new(
-                                        vec![],
-                                        Some(this.lower_expr(&arm.expression)),
-                                        arm.expression.span,
-                                    )
-                                };
-
-                            hir::MatchArm {
-                                pat,
-                                guard,
-                                block,
-                                leading_comments: vec![],
-                                trailing_comments: vec![],
-                            }
-                        })
-                    })
-                    .collect();
-                hir::ExprKind::Match(Box::new(expr), arms)
-            }
+            ast::node::ExprKind::Match(match_expr) => self.lower_match(match_expr),
             ast::node::ExprKind::Range(box ast::node::RangeExpression {
                 start,
                 end,
@@ -150,6 +115,43 @@ impl LoweringContext {
             kind,
             span: node.span,
         }
+    }
+
+    fn lower_match(&mut self, match_expr: &ast::node::MatchExpression) -> hir::ExprKind {
+        let ast::node::MatchExpression { expression, arms } = match_expr;
+        let mut idents = HashMap::new();
+        let expr = self.lower_expr(expression);
+        let arms = arms
+            .iter()
+            .map(|arm| {
+                self.with_new_scope(|this| {
+                    let pat = this.lower_pat_with_idents(&arm.pattern, &mut idents);
+                    let guard = arm.guard.as_ref().map(|expr| this.lower_expr(expr));
+                    let block = if let ast::node::ExprKind::Block(block) = &arm.expression.kind {
+                        this.lower_block_in_current_scope(
+                            &block.statements,
+                            block.expression.as_ref(),
+                            block.span,
+                        )
+                    } else {
+                        hir::Block::new(
+                            vec![],
+                            Some(this.lower_expr(&arm.expression)),
+                            arm.expression.span,
+                        )
+                    };
+
+                    hir::MatchArm {
+                        pat,
+                        guard,
+                        block,
+                        leading_comments: vec![],
+                        trailing_comments: vec![],
+                    }
+                })
+            })
+            .collect();
+        hir::ExprKind::Match(Box::new(expr), arms)
     }
 
     fn lower_if_else(&mut self, if_else_expr: &ast::node::IfElseExpression) -> hir::ExprKind {
