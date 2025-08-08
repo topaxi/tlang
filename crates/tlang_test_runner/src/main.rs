@@ -3,6 +3,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 
 use glob::glob;
+use regex::Regex;
 
 enum Backend {
     Interpreter,
@@ -124,6 +125,7 @@ fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
+    let actual_output = normalize_output(&actual_output);
 
     if actual_output.trim() == expected_output.trim() {
         println!(
@@ -142,4 +144,14 @@ fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
         );
         Err("Test failed".to_string())
     }
+}
+
+fn normalize_output(output: &str) -> std::borrow::Cow<'_, str> {
+    // Normalize rust panic message from
+    // thread 'main' (6734) panicked at...
+    // to
+    // thread 'main' panicked at...
+    let re = Regex::new(r"thread '(\w+)' \(\d+\) panicked at").expect("Failed to compile regex");
+
+    re.replace_all(output, "thread '$1' panicked at")
 }

@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 glob = "0.3"
+regex = "1.11"
 
 [lints]
 workspace = true
