@@ -1,6 +1,8 @@
 #![feature(box_patterns)]
 #![feature(if_let_guard)]
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use log::debug;
 use tlang_ast as ast;
@@ -20,16 +22,20 @@ mod stmt;
 // See: https://github.com/rust-lang/rust/blob/de7cef75be8fab7a7e1b4d5bb01b51b4bac925c3/compiler/rustc_resolve/src/lib.rs#L408
 pub struct LoweringContext {
     unique_id: HirId,
-    node_id_to_hir_id: HashMap<ast::node_id::NodeId, HirId>,
+    node_id_to_hir_id: HashMap<ast::NodeId, HirId>,
+    symbol_tables: HashMap<ast::NodeId, Rc<RefCell<ast::symbols::SymbolTable>>>,
     scopes: Vec<Scope>,
 }
 
 impl LoweringContext {
-    pub fn new() -> Self {
+    pub fn new(
+        symbol_tables: HashMap<ast::NodeId, Rc<RefCell<ast::symbols::SymbolTable>>>,
+    ) -> Self {
         Self {
             unique_id: HirId::new(1),
             node_id_to_hir_id: HashMap::default(),
             scopes: vec![Scope::default()],
+            symbol_tables,
         }
     }
 
