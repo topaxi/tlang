@@ -17,16 +17,9 @@ impl LoweringContext {
 
         let kind = match &node.kind {
             ast::node::ExprKind::BinaryOp(binary_expr) => self.lower_binary_expr(binary_expr),
-            ast::node::ExprKind::Block(box ast::node::Block {
-                id: _,
-                statements,
-                expression,
-                span,
-            }) => hir::ExprKind::Block(Box::new(self.lower_block(
-                statements,
-                expression.as_ref(),
-                *span,
-            ))),
+            ast::node::ExprKind::Block(block) => {
+                hir::ExprKind::Block(Box::new(self.lower_block(block)))
+            }
             ast::node::ExprKind::Loop(block) => self.lower_loop(block),
             ast::node::ExprKind::ForLoop(for_loop) => self.lower_for_loop(for_loop),
             ast::node::ExprKind::Break(expr) => {
@@ -124,15 +117,11 @@ impl LoweringContext {
         let arms = arms
             .iter()
             .map(|arm| {
-                self.with_new_scope(|this| {
+                self.with_scope(arm.id, |this| {
                     let pat = this.lower_pat_with_idents(&arm.pattern, &mut idents);
                     let guard = arm.guard.as_ref().map(|expr| this.lower_expr(expr));
                     let block = if let ast::node::ExprKind::Block(block) = &arm.expression.kind {
-                        this.lower_block_in_current_scope(
-                            &block.statements,
-                            block.expression.as_ref(),
-                            block.span,
-                        )
+                        this.lower_block_in_current_scope(block)
                     } else {
                         hir::Block::new(
                             vec![],
@@ -162,22 +151,12 @@ impl LoweringContext {
         } = if_else_expr;
 
         let condition = self.lower_expr(condition);
-
-        let consequence = self.lower_block(
-            &then_branch.statements,
-            then_branch.expression.as_ref(),
-            then_branch.span,
-        );
-
+        let consequence = self.lower_block(then_branch);
         let else_branches = else_branches
             .iter()
             .map(|clause| hir::ElseClause {
                 condition: clause.condition.as_ref().map(|expr| self.lower_expr(expr)),
-                consequence: self.lower_block(
-                    &clause.consequence.statements,
-                    clause.consequence.expression.as_ref(),
-                    clause.consequence.span,
-                ),
+                consequence: self.lower_block(&clause.consequence),
             })
             .collect();
 
@@ -195,11 +174,7 @@ impl LoweringContext {
         let pat = self.lower_pat(pat);
         let expr = self.lower_expr(expr);
         let mut arms = Vec::with_capacity(else_branches.len() + 1);
-        let block = self.lower_block(
-            &then_branch.statements,
-            then_branch.expression.as_ref(),
-            then_branch.span,
-        );
+        let block = self.lower_block(then_branch);
 
         arms.push(hir::MatchArm {
             pat,
@@ -214,11 +189,7 @@ impl LoweringContext {
                 .condition
                 .as_ref()
                 .map(|expr| self.lower_expr(expr));
-            let block = self.lower_block(
-                &else_branch.consequence.statements,
-                else_branch.consequence.expression.as_ref(),
-                else_branch.consequence.span,
-            );
+            let block = self.lower_block(&else_branch.consequence);
 
             arms.push(hir::MatchArm {
                 pat: hir::Pat {

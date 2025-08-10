@@ -37,8 +37,6 @@ impl LoweringContext {
                 }]
             }
             ast::node::StmtKind::FunctionDeclaration(box decl) => {
-                self.def_fn_local(&decl.name, None);
-
                 let decl = self.lower_fn_decl(decl);
 
                 vec![hir::Stmt {
@@ -74,8 +72,6 @@ impl LoweringContext {
                         .map(|field| self.lower_struct_field(field))
                         .collect(),
                 };
-
-                self.scope().def_local(decl.name.as_str());
 
                 vec![hir::Stmt {
                     hir_id: self.lower_node_id(node.id),
@@ -119,10 +115,6 @@ impl LoweringContext {
                 .collect::<Vec<_>>();
             fn_variant_ids.sort_by_key(|(arg_len, _)| *arg_len);
             fn_variant_ids.dedup_by_key(|(arg_len, _)| *arg_len);
-
-            for (arg_len, _hir_id) in &fn_variant_ids {
-                self.def_fn_local(&first_declaration.name, Some(*arg_len));
-            }
 
             let mut grouped_decls = vec![];
             for (i, (arg_len, _hir_id)) in fn_variant_ids.iter().enumerate() {
@@ -198,8 +190,6 @@ impl LoweringContext {
             let mut leading_comments = node.leading_comments.clone();
             leading_comments.extend(decls.iter().flat_map(|d| d.leading_comments.clone()));
 
-            self.def_fn_local(&first_declaration.name, None);
-
             let hir_fn_decl =
                 self.lower_fn_decl_matching(decls, &all_param_names, &node.leading_comments);
 
@@ -237,8 +227,6 @@ impl LoweringContext {
                 .collect::<Vec<_>>(),
         };
 
-        self.scope().def_local(decl.name.as_str());
-
         hir::Stmt {
             hir_id: self.lower_node_id(node.id),
             kind: hir::StmtKind::EnumDeclaration(Box::new(decl)),
@@ -266,14 +254,13 @@ impl LoweringContext {
             return self.lower_fn_decl(&decls[0]);
         }
 
-        self.with_new_scope(|this| {
+        // TODO: node_id is wrong
+        self.with_scope(decls[0].id, |this| {
             let mut span = decls[0].span;
             span.end = decls.last().unwrap().span.end;
 
             let first_declaration = &decls[0];
             let hir_id = this.lower_node_id(first_declaration.id);
-
-            this.def_fn_local(&first_declaration.name, None);
 
             let param_names = get_param_names(decls)
                 .iter()
@@ -301,7 +288,12 @@ impl LoweringContext {
                     .map(|ident| {
                         let hir_id = this.unique_id();
 
-                        this.create_fn_param(hir_id, ident.clone(), hir::Ty::default(), ident.span)
+                        hir::FunctionParameter {
+                            hir_id,
+                            name: ident.clone(),
+                            type_annotation: hir::Ty::default(),
+                            span: ident.span,
+                        }
                     })
                     .collect(),
             );
@@ -369,7 +361,7 @@ impl LoweringContext {
         hir_id: hir::HirId,
         idents: &mut HashMap<String, String>,
     ) -> hir::MatchArm {
-        self.with_new_scope(|this| {
+        self.with_scope(decl.id, |this| {
             // All declarations with the same amount of arguments refer to the same
             // function now, we map this in our symbol_id_to_hir_id table.
             this.node_id_to_hir_id.insert(decl.id, hir_id);
@@ -396,11 +388,7 @@ impl LoweringContext {
 
             let guard = decl.guard.as_ref().map(|expr| this.lower_expr(expr));
 
-            let body = this.lower_block_in_current_scope(
-                &decl.body.statements,
-                decl.body.expression.as_ref(),
-                decl.body.span,
-            );
+            let body = this.lower_block_in_current_scope(&decl.body);
 
             hir::MatchArm {
                 pat,

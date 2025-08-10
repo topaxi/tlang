@@ -1713,9 +1713,12 @@ impl<'src> Parser<'src> {
             None
         };
 
+        let loop_id = self.unique_id();
+
         node::expr!(
             self.unique_id(),
             ForLoop(Box::new(node::ForLoop {
+                id: loop_id,
                 pat,
                 iter,
                 acc,

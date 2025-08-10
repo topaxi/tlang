@@ -4,6 +4,7 @@ use tlang_ast::keyword::kw;
 use tlang_ast::node::MatchExpression;
 use tlang_ast::node_id::NodeId;
 use tlang_ast::span::Span;
+use tlang_ast::symbols::SymbolIdAllocator;
 use tlang_ast::{
     node::{
         Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, LetDeclaration, Module, Pat,
@@ -16,7 +17,7 @@ use tlang_ast::{
  * The declaration analyzer is responsible for collecting all the declarations in a module.
  */
 pub struct DeclarationAnalyzer {
-    unique_id: SymbolId,
+    symbol_id_allocator: SymbolIdAllocator,
     symbol_tables: HashMap<NodeId, Rc<RefCell<SymbolTable>>>,
     symbol_table_stack: Vec<Rc<RefCell<SymbolTable>>>,
     symbol_type_context: Vec<SymbolType>,
@@ -31,7 +32,7 @@ impl Default for DeclarationAnalyzer {
 impl DeclarationAnalyzer {
     pub fn new() -> Self {
         DeclarationAnalyzer {
-            unique_id: SymbolId::new(0),
+            symbol_id_allocator: Default::default(),
             symbol_tables: HashMap::new(),
             symbol_table_stack: vec![Rc::new(RefCell::new(SymbolTable::default()))],
             symbol_type_context: vec![],
@@ -43,9 +44,12 @@ impl DeclarationAnalyzer {
         &self.symbol_tables
     }
 
+    pub(crate) fn symbol_id_allocator(&self) -> SymbolIdAllocator {
+        self.symbol_id_allocator
+    }
+
     fn unique_id(&mut self) -> SymbolId {
-        self.unique_id = self.unique_id.next();
-        self.unique_id
+        self.symbol_id_allocator.next_id()
     }
 
     fn root_symbol_table(&self) -> &Rc<RefCell<SymbolTable>> {

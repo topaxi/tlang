@@ -1,39 +1,41 @@
 use tlang_ast as ast;
 use tlang_ast::node::Ident;
+use tlang_ast::symbols::{SymbolInfo, SymbolType};
 use tlang_hir::hir;
 
 use crate::LoweringContext;
 
 impl LoweringContext {
     pub(crate) fn lower_loop(&mut self, loop_expr: &ast::node::Block) -> hir::ExprKind {
-        let ast::node::Block {
-            id: _,
-            statements,
-            expression,
-            span,
-        } = loop_expr;
-
-        hir::ExprKind::Loop(Box::new(self.lower_block(
-            statements,
-            expression.as_ref(),
-            *span,
-        )))
+        hir::ExprKind::Loop(Box::new(self.lower_block(loop_expr)))
     }
 
     pub(crate) fn lower_for_loop(&mut self, for_loop: &ast::node::ForLoop) -> hir::ExprKind {
-        let block = self.with_new_scope(|this| {
+        let block = self.with_scope(for_loop.id, |this| {
             let iterator_binding_name = Ident::new("iterator$$", Default::default());
+            this.scope().borrow_mut().insert(SymbolInfo::new(
+                ast::NodeId::new(0),
+                this.symbol_id_allocator.next_id(),
+                iterator_binding_name.as_str(),
+                SymbolType::Variable,
+                Default::default(),
+            ));
             let hir_id = this.unique_id();
             let iterator_binding_pat = hir::Pat {
                 kind: hir::PatKind::Identifier(hir_id, Box::new(iterator_binding_name.clone())),
                 span: Default::default(),
             };
-            this.scope().def_local(iterator_binding_name.as_str());
 
             let accumulator_binding_name = Ident::new("accumulator$$", Default::default());
             let accumulator_initializer = if let Some((_pat, expr)) = &for_loop.acc {
                 let hir_id = this.unique_id();
-                this.scope().def_local(accumulator_binding_name.as_str());
+                this.scope().borrow_mut().insert(SymbolInfo::new(
+                    ast::NodeId::new(0),
+                    this.symbol_id_allocator.next_id(),
+                    accumulator_binding_name.as_str(),
+                    SymbolType::Variable,
+                    Default::default(),
+                ));
                 let accumulator_declaration = hir::Stmt::new(
                     hir_id,
                     hir::StmtKind::Let(
@@ -73,7 +75,7 @@ impl LoweringContext {
                 })),
             );
 
-            let loop_block = this.with_new_scope(|this| {
+            let loop_block = this.with_scope(for_loop.block.id, |this| {
                 this.lower_for_loop_body(for_loop, iterator_binding_name, &accumulator_binding_name)
             });
 
@@ -164,14 +166,11 @@ impl LoweringContext {
             vec![]
         };
 
-        let loop_arm = self.with_new_scope(|this| {
+        // TODO, node id is wrong
+        let loop_arm = self.with_scope(for_loop.id, |this| {
             let for_loop_pat = this.lower_pat(&for_loop.pat);
 
-            let loop_body = this.lower_block_in_current_scope(
-                &for_loop.block.statements,
-                for_loop.block.expression.as_ref(),
-                for_loop.block.span,
-            );
+            let loop_body = this.lower_block_in_current_scope(&for_loop.block);
 
             hir::MatchArm {
                 pat: hir::Pat {
@@ -194,7 +193,8 @@ impl LoweringContext {
             }
         });
 
-        let break_arm = self.with_new_scope(|this| {
+        // TODO, node id is wrong
+        let break_arm = self.with_scope(for_loop.id, |this| {
             let accumulator_path_expr = for_loop.acc.as_ref().map(|_| {
                 Box::new(this.expr(
                     Default::default(),

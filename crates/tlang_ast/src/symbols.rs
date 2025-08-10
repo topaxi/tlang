@@ -49,6 +49,25 @@ impl SymbolId {
     }
 }
 
+#[derive(Debug, Default, Clone, Copy)]
+pub struct SymbolIdAllocator {
+    next_id: SymbolId,
+}
+
+impl SymbolIdAllocator {
+    pub fn new() -> Self {
+        SymbolIdAllocator {
+            next_id: SymbolId::new(0),
+        }
+    }
+
+    pub fn next_id(&mut self) -> SymbolId {
+        let id = self.next_id;
+        self.next_id = self.next_id.next();
+        id
+    }
+}
+
 #[derive(Debug, Default, PartialEq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct SymbolInfo {
@@ -108,26 +127,12 @@ impl SymbolTable {
         self.parent.clone()
     }
 
-    fn get_local(&self, id: SymbolId) -> Option<&SymbolInfo> {
-        self.symbols.iter().find(|s| s.id == id)
-    }
-
     fn get_local_mut(&mut self, id: SymbolId) -> Option<&mut SymbolInfo> {
         self.symbols.iter_mut().find(|s| s.id == id)
     }
 
     pub fn get_local_by_node_id(&self, node_id: NodeId) -> Option<&SymbolInfo> {
         self.symbols.iter().find(|s| s.node_id == node_id)
-    }
-
-    pub fn get(&self, id: SymbolId) -> Option<SymbolInfo> {
-        if let Some(symbol) = self.get_local(id) {
-            Some(symbol.clone())
-        } else if let Some(ref parent) = self.parent {
-            parent.borrow().get(id)
-        } else {
-            None
-        }
     }
 
     fn get_locals_by_name(&self, name: &str) -> Vec<&SymbolInfo> {
@@ -146,6 +151,12 @@ impl SymbolTable {
         } else {
             vec![]
         }
+    }
+
+    pub fn has_name(&self, name: &str) -> bool {
+        // TODO: This is not efficient, we might want to cache or avoid cloning anything
+        // here.
+        !self.get_by_name(name).is_empty()
     }
 
     pub fn insert(&mut self, symbol_info: SymbolInfo) {

@@ -9,7 +9,7 @@ fn parse_from_str(input: &str) -> ast::node::Module {
 #[allow(dead_code)]
 pub fn hir_from_str(input: &str) -> hir::Module {
     let ast = parse_from_str(input);
-    tlang_ast_lowering::lower_to_hir(&ast)
+    tlang_ast_lowering::lower_to_hir(&ast, Default::default(), Default::default())
 }
 
 struct PathCollector {

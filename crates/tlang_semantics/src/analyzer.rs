@@ -7,7 +7,7 @@ use tlang_ast::{
     },
     node_id::NodeId,
     span::Span,
-    symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
+    symbols::{SymbolId, SymbolIdAllocator, SymbolInfo, SymbolTable, SymbolType},
 };
 
 use crate::{
@@ -46,6 +46,10 @@ impl SemanticAnalyzer {
     #[inline(always)]
     pub fn get_symbol_table(&self, id: NodeId) -> Option<Rc<RefCell<SymbolTable>>> {
         self.symbol_tables().get(&id).cloned()
+    }
+
+    pub fn symbol_id_allocator(&self) -> SymbolIdAllocator {
+        self.declaration_analyzer.symbol_id_allocator()
     }
 
     pub fn get_diagnostics(&self) -> &[Diagnostic] {

@@ -238,6 +238,7 @@ pub struct RangeExpression {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ForLoop {
+    pub id: NodeId,
     pub pat: Pat,
     pub iter: Expr,
     pub acc: Option<(Pat, Expr)>,
