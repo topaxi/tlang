@@ -41,5 +41,12 @@ pub fn collect_paths(node: &mut hir::Module) -> Vec<hir::Path> {
 
 #[allow(dead_code)]
 pub fn pretty_print(node: &hir::Module) -> String {
-    tlang_hir_pretty::HirPretty::pretty_print(node)
+    let mut printer = tlang_hir_pretty::HirPretty::new(tlang_hir_pretty::HirPrettyOptions {
+        // We don't resolve in ast lowering, but in a optimization phase.
+        mark_unresolved: false,
+        ..Default::default()
+    });
+
+    printer.print_module(node);
+    printer.output().to_string()
 }

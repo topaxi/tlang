@@ -53,44 +53,14 @@ impl LoweringContext {
 
     pub(crate) fn lookup_name(&mut self, name: &str) -> String {
         self.lookup(name)
-            .map_or(name.to_string(), |binding| binding.name().to_string())
+            .map_or(name.to_string(), |binding| binding.to_string())
     }
 
-    pub(crate) fn lookup<'a>(&'a mut self, name: &'a str) -> Option<scope::Binding> {
-        let (scope_index, binding) = self
-            .scopes
+    pub(crate) fn lookup<'a>(&'a mut self, name: &'a str) -> Option<&str> {
+        self.scopes
             .iter()
-            .enumerate()
             .rev()
-            .find_map(|(i, scope)| scope.lookup(name).map(|binding| (i, binding.clone())))
-            .or_else(|| {
-                Some((
-                    usize::MAX,
-                    self.scopes
-                        .iter()
-                        .rev()
-                        .find_map(|scope| scope.lookup_definition(name))?
-                        .clone(),
-                ))
-            })?;
-
-        if scope_index < self.scopes.len() - 1 {
-            let relative_scope_index = self.scopes.len() - 1 - scope_index;
-            let slot_index = binding.res().slot_index().unwrap();
-            let original_hir_id = binding
-                .res()
-                .hir_id()
-                .expect("Upvar source binding should have a valid HirId");
-
-            return Some(self.scopes.last_mut().unwrap().def_upvar(
-                binding.name(),
-                original_hir_id,
-                relative_scope_index,
-                slot_index,
-            ));
-        }
-
-        Some(binding)
+            .find_map(|scope| scope.lookup(name))
     }
 
     pub(crate) fn with_new_scope<F, R>(&mut self, f: F) -> R
@@ -100,9 +70,7 @@ impl LoweringContext {
     {
         debug!("Entering new scope");
         self.scopes.push(Scope::new());
-        let mut result = f(self);
-        result.set_locals(self.scope().locals());
-        result.set_upvars(self.scope().upvars());
+        let result = f(self);
         debug!("Leaving scope");
         self.scopes.pop();
         result
@@ -197,7 +165,7 @@ impl LoweringContext {
         ty: hir::Ty,
         span: ast::span::Span,
     ) -> hir::FunctionParameter {
-        self.scope().def_local(name.as_str(), hir_id);
+        self.scope().def_local(name.as_str());
 
         hir::FunctionParameter {
             hir_id,
@@ -215,7 +183,7 @@ impl LoweringContext {
         self.create_fn_param(hir_id, name, ty, node.span)
     }
 
-    fn def_fn_local(&mut self, name_expr: &ast::node::Expr, hir_id: HirId, arity: Option<usize>) {
+    fn def_fn_local(&mut self, name_expr: &ast::node::Expr, arity: Option<usize>) {
         let mut fn_name = match &name_expr.kind {
             ast::node::ExprKind::Path(path) => path.to_string(),
             ast::node::ExprKind::FieldExpression(fe) => {
@@ -229,17 +197,18 @@ impl LoweringContext {
         };
 
         if let Some(arity) = arity {
-            fn_name += &format!("$${arity}");
+            fn_name += "$$";
+            fn_name += &arity.to_string();
         }
 
-        self.scope().def_fn_local(fn_name.as_str(), hir_id);
+        self.scope().def_local(&fn_name);
     }
 
     fn lower_fn_decl(&mut self, decl: &FunctionDeclaration) -> hir::FunctionDeclaration {
         self.with_new_scope(|this| {
             let hir_id = this.lower_node_id(decl.id);
 
-            this.def_fn_local(&decl.name, hir_id, None);
+            this.def_fn_local(&decl.name, None);
 
             let name = this.lower_expr(&decl.name);
 
@@ -267,16 +236,12 @@ impl LoweringContext {
     }
 
     fn lower_path(&mut self, path: &ast::node::Path) -> hir::Path {
-        let res = self
-            .lookup(&path.to_string())
-            .map_or(hir::Res::Unknown, |binding| binding.res());
-
         if path.segments.len() == 1 {
             let segment = path.segments.first().unwrap();
             let segment =
                 hir::PathSegment::from_str(&self.lookup_name(segment.as_str()), segment.span);
 
-            return hir::Path::new(vec![segment], path.span).with_res(res);
+            return hir::Path::new(vec![segment], path.span);
         }
 
         let segments = path
@@ -285,7 +250,7 @@ impl LoweringContext {
             .map(|seg| self.lower_path_segment(seg))
             .collect();
 
-        hir::Path::new(segments, path.span).with_res(res)
+        hir::Path::new(segments, path.span)
     }
 
     fn lower_path_segment(&mut self, seg: &Ident) -> hir::PathSegment {
@@ -319,7 +284,7 @@ impl LoweringContext {
             ast::node::PatKind::Identifier(box ident) => {
                 let hir_id = self.lower_node_id(node.id);
 
-                self.scope().def_local(ident.as_str(), hir_id);
+                self.scope().def_local(ident.as_str());
                 // TODO: As mentioned above, create_unique_binding was supposed to help with
                 // resolving shadowed variables by giving them unique names. Due to some
                 // regressions as this was a too generic solution, this is disabled. As a first

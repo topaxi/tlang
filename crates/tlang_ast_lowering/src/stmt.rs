@@ -37,9 +37,7 @@ impl LoweringContext {
                 }]
             }
             ast::node::StmtKind::FunctionDeclaration(box decl) => {
-                let hir_id = self.lower_node_id(decl.id);
-
-                self.def_fn_local(&decl.name, hir_id, None);
+                self.def_fn_local(&decl.name, None);
 
                 let decl = self.lower_fn_decl(decl);
 
@@ -77,8 +75,7 @@ impl LoweringContext {
                         .collect(),
                 };
 
-                self.scope()
-                    .def_struct_local(decl.name.as_str(), decl.hir_id);
+                self.scope().def_local(decl.name.as_str());
 
                 vec![hir::Stmt {
                     hir_id: self.lower_node_id(node.id),
@@ -123,8 +120,8 @@ impl LoweringContext {
             fn_variant_ids.sort_by_key(|(arg_len, _)| *arg_len);
             fn_variant_ids.dedup_by_key(|(arg_len, _)| *arg_len);
 
-            for (arg_len, hir_id) in &fn_variant_ids {
-                self.def_fn_local(&first_declaration.name, *hir_id, Some(*arg_len));
+            for (arg_len, _hir_id) in &fn_variant_ids {
+                self.def_fn_local(&first_declaration.name, Some(*arg_len));
             }
 
             let mut grouped_decls = vec![];
@@ -201,9 +198,7 @@ impl LoweringContext {
             let mut leading_comments = node.leading_comments.clone();
             leading_comments.extend(decls.iter().flat_map(|d| d.leading_comments.clone()));
 
-            let hir_id = self.lower_node_id(first_declaration.id);
-
-            self.def_fn_local(&first_declaration.name, hir_id, None);
+            self.def_fn_local(&first_declaration.name, None);
 
             let hir_fn_decl =
                 self.lower_fn_decl_matching(decls, &all_param_names, &node.leading_comments);
@@ -242,24 +237,7 @@ impl LoweringContext {
                 .collect::<Vec<_>>(),
         };
 
-        self.scope().def_enum_local(decl.name.as_str(), decl.hir_id);
-
-        for variant in &decl.variants {
-            // Variants with no params are values, they need a slot in the current scope.
-            if variant.parameters.is_empty() {
-                self.scope().def_untagged_enum_variant_local(
-                    decl.name.as_str(),
-                    variant.name.as_str(),
-                    variant.hir_id,
-                );
-            } else {
-                self.scope().def_tagged_enum_variant_local(
-                    decl.name.as_str(),
-                    variant.name.as_str(),
-                    variant.hir_id,
-                );
-            }
-        }
+        self.scope().def_local(decl.name.as_str());
 
         hir::Stmt {
             hir_id: self.lower_node_id(node.id),
@@ -295,7 +273,7 @@ impl LoweringContext {
             let first_declaration = &decls[0];
             let hir_id = this.lower_node_id(first_declaration.id);
 
-            this.def_fn_local(&first_declaration.name, hir_id, None);
+            this.def_fn_local(&first_declaration.name, None);
 
             let param_names = get_param_names(decls)
                 .iter()
@@ -352,14 +330,12 @@ impl LoweringContext {
                     param_names
                         .iter()
                         .map(|ident| {
-                            let res = this.lookup(ident.as_str()).unwrap().res();
                             let path = hir::Path::new(
                                 vec![hir::PathSegment {
                                     ident: ident.clone(),
                                 }],
                                 span,
-                            )
-                            .with_res(res);
+                            );
 
                             this.expr(span, hir::ExprKind::Path(Box::new(path)))
                         })
@@ -369,8 +345,7 @@ impl LoweringContext {
                 this.expr(ast::span::Span::default(), argument_list)
             } else {
                 let ident = param_names.first().unwrap().clone();
-                let res = this.lookup(ident.as_str()).unwrap().res();
-                let path = hir::Path::new(vec![hir::PathSegment { ident }], span).with_res(res);
+                let path = hir::Path::new(vec![hir::PathSegment { ident }], span);
 
                 this.expr(
                     ast::span::Span::default(),

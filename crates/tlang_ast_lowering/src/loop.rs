@@ -28,14 +28,12 @@ impl LoweringContext {
                 kind: hir::PatKind::Identifier(hir_id, Box::new(iterator_binding_name.clone())),
                 span: Default::default(),
             };
-            this.scope()
-                .def_local(iterator_binding_name.as_str(), hir_id);
+            this.scope().def_local(iterator_binding_name.as_str());
 
             let accumulator_binding_name = Ident::new("accumulator$$", Default::default());
             let accumulator_initializer = if let Some((_pat, expr)) = &for_loop.acc {
                 let hir_id = this.unique_id();
-                this.scope()
-                    .def_local(accumulator_binding_name.as_str(), hir_id);
+                this.scope().def_local(accumulator_binding_name.as_str());
                 let accumulator_declaration = hir::Stmt::new(
                     hir_id,
                     hir::StmtKind::Let(
@@ -116,20 +114,12 @@ impl LoweringContext {
         iterator_binding_name: Ident,
         accumulator_binding_name: &Ident,
     ) -> hir::Block {
-        let iterator_binding_res = self
-            .lookup(iterator_binding_name.as_str())
-            .map(|binding| binding.res())
-            .expect("Iterator binding should be in scope");
-
         let iterator_binding = self.expr(
             Default::default(),
-            hir::ExprKind::Path(Box::new(
-                hir::Path::new(
-                    vec![hir::PathSegment::new(iterator_binding_name)],
-                    Default::default(),
-                )
-                .with_res(iterator_binding_res),
-            )),
+            hir::ExprKind::Path(Box::new(hir::Path::new(
+                vec![hir::PathSegment::new(iterator_binding_name)],
+                Default::default(),
+            ))),
         );
 
         let iterator_next_field = self.expr(
@@ -150,19 +140,12 @@ impl LoweringContext {
             })),
         );
 
-        let accumulator_binding_res = self
-            .lookup(accumulator_binding_name.as_str())
-            .map(|b| b.res())
-            .unwrap_or_default();
         let accumulator_path_expr = self.expr(
             Default::default(),
-            hir::ExprKind::Path(Box::new(
-                hir::Path::new(
-                    vec![hir::PathSegment::new(accumulator_binding_name.clone())],
-                    Default::default(),
-                )
-                .with_res(accumulator_binding_res),
-            )),
+            hir::ExprKind::Path(Box::new(hir::Path::new(
+                vec![hir::PathSegment::new(accumulator_binding_name.clone())],
+                Default::default(),
+            ))),
         );
 
         let loop_statements = if let Some((pat, _)) = &for_loop.acc {
@@ -212,23 +195,14 @@ impl LoweringContext {
         });
 
         let break_arm = self.with_new_scope(|this| {
-            let accumulator_binding_res = this
-                .lookup(accumulator_binding_name.as_str())
-                .map(|b| b.res())
-                .unwrap_or_default();
             let accumulator_path_expr = for_loop.acc.as_ref().map(|_| {
-                Box::new(
-                    this.expr(
+                Box::new(this.expr(
+                    Default::default(),
+                    hir::ExprKind::Path(Box::new(hir::Path::new(
+                        vec![hir::PathSegment::new(accumulator_binding_name.clone())],
                         Default::default(),
-                        hir::ExprKind::Path(Box::new(
-                            hir::Path::new(
-                                vec![hir::PathSegment::new(accumulator_binding_name.clone())],
-                                Default::default(),
-                            )
-                            .with_res(accumulator_binding_res),
-                        )),
-                    ),
-                )
+                    ))),
+                ))
             });
             hir::MatchArm {
                 pat: hir::Pat {
