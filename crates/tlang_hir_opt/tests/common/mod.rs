@@ -8,10 +8,17 @@ use tlang_hir_opt::{
 };
 use tlang_hir_pretty::HirPrettyOptions;
 use tlang_parser::Parser;
+use tlang_semantics::SemanticAnalyzer;
 
 pub fn compile(source: &str) -> Module {
     let ast = Parser::from_source(source).parse().unwrap();
-    lower_to_hir(&ast)
+    let mut semantic_analyzer = SemanticAnalyzer::default();
+    semantic_analyzer.analyze(&ast).unwrap();
+    lower_to_hir(
+        &ast,
+        semantic_analyzer.symbol_id_allocator(),
+        semantic_analyzer.symbol_tables().clone(),
+    )
 }
 
 pub fn optimize(module: &mut hir::Module, passes: Vec<Box<dyn HirPass>>) {

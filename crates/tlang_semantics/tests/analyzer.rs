@@ -136,32 +136,31 @@ fn test_should_allow_shadowing_of_single_variable() {
         .clone();
 
     assert_eq!(
-        program_symbols.borrow().get(SymbolId::new(1)),
-        Some(SymbolInfo {
-            node_id: NodeId::new(2),
-            id: SymbolId::new(1),
-            name: "a".to_string(),
-            symbol_type: SymbolType::Variable,
-            defined_at: Span::new(
-                LineColumn { line: 0, column: 4 },
-                LineColumn { line: 0, column: 5 }
-            ),
-            ..Default::default()
-        })
-    );
-    assert_eq!(
-        program_symbols.borrow().get(SymbolId::new(2)),
-        Some(SymbolInfo {
-            node_id: NodeId::new(5),
-            id: SymbolId::new(2),
-            name: "a".to_string(),
-            symbol_type: SymbolType::Variable,
-            defined_at: Span::new(
-                LineColumn { line: 1, column: 5 },
-                LineColumn { line: 1, column: 6 }
-            ),
-            ..Default::default()
-        })
+        program_symbols.borrow().get_by_name("a"),
+        vec![
+            SymbolInfo {
+                node_id: NodeId::new(2),
+                id: SymbolId::new(1),
+                name: "a".to_string(),
+                symbol_type: SymbolType::Variable,
+                defined_at: Span::new(
+                    LineColumn { line: 0, column: 4 },
+                    LineColumn { line: 0, column: 5 }
+                ),
+                ..Default::default()
+            },
+            SymbolInfo {
+                node_id: NodeId::new(5),
+                id: SymbolId::new(2),
+                name: "a".to_string(),
+                symbol_type: SymbolType::Variable,
+                defined_at: Span::new(
+                    LineColumn { line: 1, column: 5 },
+                    LineColumn { line: 1, column: 6 }
+                ),
+                ..Default::default()
+            }
+        ]
     );
 }
 
@@ -178,10 +177,15 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
         .clone();
 
     assert_eq!(
-        program_symbols.borrow().get(SymbolId::new(1)),
+        program_symbols
+            .borrow()
+            .get_by_name("a")
+            .iter()
+            .find(|s| s.id == SymbolId::new(0))
+            .cloned(),
         Some(SymbolInfo {
             node_id: NodeId::new(2),
-            id: SymbolId::new(1),
+            id: SymbolId::new(0),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
             defined_at: Span::new(
@@ -192,10 +196,15 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
         })
     );
     assert_eq!(
-        program_symbols.borrow().get(SymbolId::new(2)),
+        program_symbols
+            .borrow()
+            .get_by_name("a")
+            .iter()
+            .find(|s| s.id == SymbolId::new(1))
+            .cloned(),
         Some(SymbolInfo {
             node_id: NodeId::new(5),
-            id: SymbolId::new(2),
+            id: SymbolId::new(1),
             name: "a".to_string(),
             symbol_type: SymbolType::Variable,
             defined_at: Span::new(

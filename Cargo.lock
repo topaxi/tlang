@@ -1035,6 +1035,7 @@ dependencies = [
  "tlang_hir",
  "tlang_hir_pretty",
  "tlang_parser",
+ "tlang_semantics",
 ]
 
 [[package]]

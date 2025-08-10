@@ -52,7 +52,11 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
         Ok(()) => {
             let mut codegen = CodegenJS::default();
             codegen.set_render_ternary(options.render_ternary);
-            let hir = tlang_ast_lowering::lower_to_hir(&ast);
+            let hir = tlang_ast_lowering::lower_to_hir(
+                &ast,
+                semantic_analyzer.symbol_id_allocator(),
+                semantic_analyzer.symbol_tables().clone(),
+            );
             codegen.generate_code(&hir);
             codegen.get_output().to_string()
         }

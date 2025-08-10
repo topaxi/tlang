@@ -39,7 +39,7 @@ impl SemanticAnalyzer {
     }
 
     #[inline(always)]
-    fn symbol_tables(&self) -> &HashMap<NodeId, Rc<RefCell<SymbolTable>>> {
+    pub fn symbol_tables(&self) -> &HashMap<NodeId, Rc<RefCell<SymbolTable>>> {
         self.declaration_analyzer.symbol_tables()
     }
 

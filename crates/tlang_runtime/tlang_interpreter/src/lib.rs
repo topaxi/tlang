@@ -1634,7 +1634,10 @@ mod tests {
     impl TestInterpreter {
         fn new() -> Self {
             TestInterpreter {
-                lowering_context: tlang_ast_lowering::LoweringContext::default(),
+                lowering_context: tlang_ast_lowering::LoweringContext::new(
+                    Default::default(),
+                    Default::default(),
+                ),
                 interpreter: Interpreter::new(),
             }
         }
