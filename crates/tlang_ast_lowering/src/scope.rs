@@ -1,9 +1,4 @@
-use std::cell::RefCell;
-use std::collections::HashMap;
-
 use log::debug;
-use tlang_ast::node::Ident;
-use tlang_hir::hir::{self, HirId};
 
 #[derive(Debug, Default)]
 pub struct Scope {

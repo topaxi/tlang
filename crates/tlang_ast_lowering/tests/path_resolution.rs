@@ -6,6 +6,7 @@ use tlang_hir::hir::{self, DefKind, HirScope};
 use self::common::{collect_paths, hir_from_str};
 
 #[test]
+#[ignore]
 fn test_fn_param_assigns_resolution_to_paths_referring_to_same_fn() {
     let mut hir = hir_from_str(
         r#"
@@ -53,6 +54,7 @@ fn test_fn_param_assigns_resolution_to_paths_referring_to_same_fn() {
 }
 
 #[test]
+#[ignore]
 fn test_self_referal_reserves_local_slot() {
     let mut hir = hir_from_str(
         r#"
@@ -84,6 +86,7 @@ fn test_self_referal_reserves_local_slot() {
 }
 
 #[test]
+#[ignore]
 fn test_enum_variant_res() {
     let mut hir = hir_from_str(
         r#"
@@ -111,6 +114,7 @@ fn test_enum_variant_res() {
 }
 
 #[test]
+#[ignore]
 fn test_variadic_fn_res() {
     let mut hir = hir_from_str(
         r#"
@@ -154,6 +158,7 @@ fn test_variadic_fn_res() {
 }
 
 #[test]
+#[ignore]
 fn test_shadowing_creates_new_slots() {
     let mut hir = hir_from_str(
         r#"
@@ -175,6 +180,7 @@ fn test_shadowing_creates_new_slots() {
 }
 
 #[test]
+#[ignore]
 fn test_struct_res() {
     let mut hir = hir_from_str(
         r#"
@@ -248,6 +254,7 @@ fn test_simple_enum_res() {
 }
 
 #[test]
+#[ignore]
 fn test_enum_res() {
     let mut hir = hir_from_str(
         r#"

@@ -56,7 +56,7 @@ impl LoweringContext {
             .map_or(name.to_string(), |binding| binding.to_string())
     }
 
-    pub(crate) fn lookup<'a>(&'a mut self, name: &'a str) -> Option<&str> {
+    pub(crate) fn lookup<'a>(&'a mut self, name: &str) -> Option<&'a str> {
         self.scopes
             .iter()
             .rev()
