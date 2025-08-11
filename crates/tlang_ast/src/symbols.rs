@@ -104,6 +104,10 @@ impl SymbolInfo {
             ..Default::default()
         }
     }
+
+    pub fn is_fn(&self, arity: usize) -> bool {
+        matches!(self.symbol_type, SymbolType::Function(a) if a as usize == arity)
+    }
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -157,6 +161,12 @@ impl SymbolTable {
         // TODO: This is not efficient, we might want to cache or avoid cloning anything
         // here.
         !self.get_by_name(name).is_empty()
+    }
+
+    pub fn has_fn(&self, name: &str, arity: usize) -> bool {
+        self.symbols
+            .iter()
+            .any(|s| s.name == name && s.is_fn(arity))
     }
 
     pub fn insert(&mut self, symbol_info: SymbolInfo) {
