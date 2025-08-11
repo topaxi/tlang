@@ -205,6 +205,8 @@ impl SymbolTable {
     }
 
     pub fn insert_beginning(&mut self, symbol_info: SymbolInfo) {
+        debug!("Inserting symbol at beginning: {:?}", symbol_info);
+
         self.symbols.insert(0, symbol_info);
     }
 
