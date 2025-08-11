@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use tlang_macros::native_fn;
-use tlang_memory::value::object::NativeFnReturn;
+use tlang_memory::value::function::NativeFnReturn;
 use tlang_memory::{InterpreterState, prelude::*};
 
 #[native_fn(name = "len")]

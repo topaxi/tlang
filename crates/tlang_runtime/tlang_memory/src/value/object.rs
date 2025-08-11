@@ -1,9 +1,7 @@
 use std::ops::{Index, IndexMut};
 
-use smallvec::SmallVec;
 use tlang_hir::hir::HirId;
 
-use crate::InterpreterState;
 use crate::scope::ScopeStack;
 use crate::shape::{ShapeKey, Shaped};
 
@@ -140,15 +138,6 @@ impl TlangSlice {
 }
 
 pub type TlangObjectId = usize;
-
-pub type TlangNativeFn = Box<dyn FnMut(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn>;
-
-#[derive(Debug)]
-pub enum NativeFnReturn {
-    Return(TlangValue),
-    DynamicCall(HirId),
-    CallObject(Box<(TlangValue, SmallVec<[TlangValue; 4]>)>),
-}
 
 #[derive(Debug)]
 pub enum TlangObjectKind {

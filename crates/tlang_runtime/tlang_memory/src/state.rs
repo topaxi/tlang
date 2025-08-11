@@ -15,10 +15,8 @@ use crate::shape::{
 };
 use crate::value::{
     TlangValue,
-    object::{
-        NativeFnReturn, TlangClosure, TlangEnum, TlangNativeFn, TlangObjectId, TlangObjectKind,
-        TlangSlice, TlangStruct,
-    },
+    function::{NativeFnReturn, TlangNativeFn},
+    object::{TlangClosure, TlangEnum, TlangObjectId, TlangObjectKind, TlangSlice, TlangStruct},
 };
 
 pub enum CallStackKind {

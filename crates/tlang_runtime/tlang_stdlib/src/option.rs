@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
 use tlang_macros::native_fn;
-use tlang_memory::value::object::NativeFnReturn;
-use tlang_memory::{InterpreterState, TlangValue};
+use tlang_memory::{InterpreterState, NativeFnReturn, TlangValue};
 
 #[native_fn(name = "Option::Some")]
 pub fn new_option_some(state: &mut InterpreterState, value: TlangValue) -> TlangValue {

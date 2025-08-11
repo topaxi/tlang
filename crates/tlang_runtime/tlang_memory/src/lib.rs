@@ -9,12 +9,13 @@ pub use resolver::Resolver;
 pub use state::InterpreterState;
 pub use value::{TlangValue, object::TlangObjectKind};
 
-use self::value::object::NativeFnReturn;
+pub use self::value::function::NativeFnReturn;
 
 pub mod prelude {
     pub use crate::value::{
         TlangPrimitive, TlangValue,
-        object::{TlangNativeFn, TlangObjectId, TlangObjectKind, TlangSlice, TlangStruct},
+        function::TlangNativeFn,
+        object::{TlangObjectId, TlangObjectKind, TlangSlice, TlangStruct},
     };
 
     pub use crate::shape::{

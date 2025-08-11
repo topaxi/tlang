@@ -2,6 +2,7 @@ use crate::{InterpreterState, impl_from_tlang_value};
 
 pub use self::object::TlangObjectId;
 
+pub mod function;
 pub mod object;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
