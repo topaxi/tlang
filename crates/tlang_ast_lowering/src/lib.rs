@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use log::debug;
+use log::{debug, warn};
 use tlang_ast as ast;
 use tlang_ast::keyword::kw;
 use tlang_ast::node::{EnumPattern, FunctionDeclaration, Ident};
@@ -38,6 +38,20 @@ impl LoweringContext {
             symbol_tables,
             current_symbol_table: Default::default(),
         }
+    }
+
+    pub fn symbol_tables(&self) -> HashMap<HirId, Rc<RefCell<ast::symbols::SymbolTable>>> {
+        let mut symbol_tables = HashMap::new();
+
+        for (node_id, symbol_table) in &self.symbol_tables {
+            if let Some(hir_id) = self.node_id_to_hir_id.get(node_id) {
+                symbol_tables.insert(*hir_id, symbol_table.clone());
+            } else {
+                warn!("No HIR ID found for node ID: {:?}", node_id);
+            }
+        }
+
+        symbol_tables
     }
 
     #[inline(always)]
