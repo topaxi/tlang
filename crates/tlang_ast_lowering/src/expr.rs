@@ -209,7 +209,7 @@ impl LoweringContext {
     fn lower_callee(&mut self, callee: &ast::node::Expr, arg_len: usize) -> hir::Expr {
         match &callee.kind {
             ast::node::ExprKind::Path(path) => {
-                if self.has_fn_binding(path.segments.last().unwrap().as_str(), arg_len) {
+                if self.has_multi_arity_fn(path.segments.last().unwrap().as_str(), arg_len) {
                     let mut path_with_argnum = path.clone();
                     let new_name = format!(
                         "{}$${}",

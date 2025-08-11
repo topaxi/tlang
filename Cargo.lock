@@ -939,6 +939,7 @@ name = "tlang_ast"
 version = "0.1.0"
 dependencies = [
  "indoc",
+ "log",
  "pretty_assertions",
  "serde",
 ]

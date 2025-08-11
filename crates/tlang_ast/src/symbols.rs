@@ -1,7 +1,9 @@
 // TODO: Does this module belong in the ast crate?
+use log::debug;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::fmt::Display;
 use std::rc::Rc;
 
@@ -19,6 +21,15 @@ pub enum SymbolType {
     Enum,
     EnumVariant,
     Struct,
+}
+
+impl SymbolType {
+    pub fn arity(self) -> Option<u16> {
+        match self {
+            SymbolType::Function(arity) => Some(arity),
+            _ => None,
+        }
+    }
 }
 
 impl Display for SymbolType {
@@ -108,6 +119,10 @@ impl SymbolInfo {
     pub fn is_fn(&self, arity: usize) -> bool {
         matches!(self.symbol_type, SymbolType::Function(a) if a as usize == arity)
     }
+
+    pub fn is_any_fn(&self) -> bool {
+        matches!(self.symbol_type, SymbolType::Function(_))
+    }
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -163,13 +178,29 @@ impl SymbolTable {
         !self.get_by_name(name).is_empty()
     }
 
-    pub fn has_fn(&self, name: &str, arity: usize) -> bool {
-        self.symbols
+    pub fn has_multi_arity_fn(&self, name: &str, arity: usize) -> bool {
+        let symbols = self.get_by_name(name);
+        let mut hashset = HashSet::new();
+        let fn_symbols: Vec<_> = symbols
             .iter()
-            .any(|s| s.name == name && s.is_fn(arity))
+            .filter(|s| s.name == name && s.is_any_fn())
+            .flat_map(|s| s.symbol_type.arity())
+            .filter(|a| hashset.insert(*a))
+            .collect();
+
+        let has_fn = fn_symbols.len() > 1 && fn_symbols.iter().any(|s| *s as usize == arity);
+
+        debug!(
+            "Checking if symbol table has function: {} with arity {}: {:?}",
+            name, arity, fn_symbols
+        );
+
+        has_fn
     }
 
     pub fn insert(&mut self, symbol_info: SymbolInfo) {
+        debug!("Inserting symbol: {:?}", symbol_info);
+
         self.symbols.push(symbol_info);
     }
 

@@ -49,8 +49,8 @@ impl LoweringContext {
         self.scope().borrow().has_name(name)
     }
 
-    fn has_fn_binding(&self, name: &str, arity: usize) -> bool {
-        self.scope().borrow().has_fn(name, arity)
+    fn has_multi_arity_fn(&self, name: &str, arity: usize) -> bool {
+        self.scope().borrow().has_multi_arity_fn(name, arity)
     }
 
     pub(crate) fn lookup_name(&mut self, name: &str) -> String {
