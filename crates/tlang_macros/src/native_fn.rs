@@ -17,33 +17,32 @@ pub(crate) fn parse_native_fn_meta(
     };
 
     for meta_item in args {
-        match meta_item {
-            Meta::NameValue(MetaNameValue { path, value, .. }) => {
-                if path.is_ident("name") {
-                    if let Expr::Lit(ExprLit {
-                        lit: Lit::Str(lit_str),
-                        ..
-                    }) = value
-                    {
-                        meta.name = Some(lit_str.value());
-                    }
-                } else if path.is_ident("arity") {
-                    if let Expr::Lit(ExprLit {
-                        lit: Lit::Int(lit_int),
-                        ..
-                    }) = value
-                    {
-                        meta.arity = Some(lit_int.base10_parse().expect("Invalid arity"));
-                    }
+        if let Meta::NameValue(MetaNameValue { path, value, .. }) = meta_item {
+            if path.is_ident("name") {
+                if let Expr::Lit(ExprLit {
+                    lit: Lit::Str(lit_str),
+                    ..
+                }) = value
+                {
+                    meta.name = Some(lit_str.value());
                 }
+            } else if path.is_ident("arity")
+                && let Expr::Lit(ExprLit {
+                    lit: Lit::Int(lit_int),
+                    ..
+                }) = value
+            {
+                meta.arity = Some(lit_int.base10_parse().expect("Invalid arity"));
             }
-            _ => {}
         }
     }
     meta
 }
 
-pub(crate) fn generate_native_fn(input_fn: syn::ItemFn, native_fn_meta: NativeFnMeta) -> TokenStream {
+pub(crate) fn generate_native_fn(
+    input_fn: &syn::ItemFn,
+    native_fn_meta: NativeFnMeta,
+) -> TokenStream {
     use syn::{FnArg, Ident, PatType, Type};
 
     let fn_name_ident = input_fn.sig.ident.clone();
@@ -56,17 +55,17 @@ pub(crate) fn generate_native_fn(input_fn: syn::ItemFn, native_fn_meta: NativeFn
     iter.next().expect("Native function must have state arg");
 
     for arg in iter {
-        if let FnArg::Typed(PatType { pat, ty, .. }) = arg {
-            if let Type::Path(type_path) = &**ty {
-                if type_path.path.segments.last().unwrap().ident == "TlangValue" {
-                    arity += 1;
-                    arg_idents.push(pat.clone());
-                } else if let Some(seg) = type_path.path.segments.last() {
-                    if seg.ident == "TlangValue" {
-                        arity += 1;
-                        arg_idents.push(pat.clone());
-                    }
-                }
+        if let FnArg::Typed(PatType { pat, ty, .. }) = arg
+            && let Type::Path(type_path) = &**ty
+        {
+            if type_path.path.segments.last().unwrap().ident == "TlangValue" {
+                arity += 1;
+                arg_idents.push(pat.clone());
+            } else if let Some(seg) = type_path.path.segments.last()
+                && seg.ident == "TlangValue"
+            {
+                arity += 1;
+                arg_idents.push(pat.clone());
             }
         }
     }

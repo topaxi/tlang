@@ -10,5 +10,5 @@ pub fn native_fn(attr: TokenStream, input: TokenStream) -> TokenStream {
         parse_macro_input!(attr with syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated),
     );
 
-    native_fn::generate_native_fn(input_fn, native_fn_meta)
+    native_fn::generate_native_fn(&input_fn, native_fn_meta)
 }
