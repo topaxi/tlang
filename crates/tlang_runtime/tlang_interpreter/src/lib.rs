@@ -76,7 +76,12 @@ impl Interpreter {
         for native_fn in inventory::iter::<NativeFnDef> {
             let fn_name = if native_fn.binding_name.is_empty() {
                 let module_name = native_fn.module_path.split("::").last().unwrap();
-                module_name.to_string() + "::" + native_fn.name
+
+                if module_name == "globals" {
+                    native_fn.name.to_string()
+                } else {
+                    module_name.to_string() + "::" + native_fn.name
+                }
             } else {
                 native_fn.binding_name.to_string()
             };
@@ -130,6 +135,8 @@ impl Interpreter {
         F: Fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn + 'static,
     {
         let fn_object = self.create_native_fn(f);
+
+        debug!("Defining global native function: {name}");
 
         self.state.set_global(name.to_string(), fn_object);
 

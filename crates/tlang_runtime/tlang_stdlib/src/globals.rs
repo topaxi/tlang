@@ -1,7 +1,7 @@
 use tlang_macros::native_fn;
-use tlang_memory::{InterpreterState, prelude::*};
+use tlang_memory::{InterpreterState, TlangValue};
 
-#[native_fn(name = "log")]
+#[native_fn]
 pub fn log(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
     println!(
         "{}",
@@ -13,7 +13,7 @@ pub fn log(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
     TlangValue::Nil
 }
 
-#[native_fn(name = "panic")]
+#[native_fn]
 pub fn panic(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
     state.panic(format!(
         "Panic!: {}",
