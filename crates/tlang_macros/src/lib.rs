@@ -97,27 +97,29 @@ pub fn native_fn(attr: TokenStream, input: TokenStream) -> TokenStream {
                 )
         );
 
-    let mut fn_native_name_ident =
+    let fn_native_name_ident =
         Ident::new(&format!("{}_native", fn_name_string), fn_name_ident.span());
-    let binding_name = native_fn_meta.name.unwrap_or(String::new());
+    let binding_name = native_fn_meta.name.unwrap_or_default();
     let mut arity = native_fn_meta.arity.unwrap_or(arity);
 
     let wrapper_fn = if is_n_ary {
-        // n-ary functions are identified by taking a slice of TlangValue, therefore we won't need
-        // to generate a wrapper function, we remap the function back to the original.
+        // n-ary functions are identified by taking a slice of TlangValue.
         // This should be an edge case.
         arity = usize::MAX;
-        fn_native_name_ident = fn_name_ident.clone();
-        quote! {}
+        quote! {
+            pub fn #fn_native_name_ident(state: &mut tlang_memory::InterpreterState, args: &[tlang_memory::TlangValue]) -> tlang_memory::value::object::NativeFnReturn {
+                tlang_memory::value::object::NativeFnReturn::Return(#fn_name_ident(state, args))
+            }
+        }
     } else {
         quote! {
-            pub fn #fn_native_name_ident(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
+            pub fn #fn_native_name_ident(state: &mut tlang_memory::InterpreterState, args: &[tlang_memory::TlangValue]) -> tlang_memory::value::object::NativeFnReturn {
                 if args.len() != #arity {
                     state.panic(format!("Expected {} arguments, got {}", #arity, args.len()));
                 }
                 let mut iter = args.iter().cloned();
                 #(let #arg_idents = iter.next().unwrap();)*
-                #fn_name_ident(state, #(#arg_idents),*)
+                tlang_memory::value::object::NativeFnReturn::Return(#fn_name_ident(state, #(#arg_idents),*))
             }
         }
     };
@@ -127,13 +129,13 @@ pub fn native_fn(attr: TokenStream, input: TokenStream) -> TokenStream {
         #wrapper_fn
 
         inventory::submit! {
-            crate::NativeFnDef {
-                name: #fn_name_string,
-                binding_name: #binding_name,
-                arity: #arity,
-                function: #fn_native_name_ident,
-                module_path: module_path!(),
-            }
+            crate::NativeFnDef::new(
+                #fn_name_string,
+                #binding_name,
+                #arity,
+                #fn_native_name_ident,
+                module_path!(),
+            )
         }
     };
 

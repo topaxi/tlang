@@ -73,24 +73,8 @@ impl Interpreter {
 
         interpreter.init_stdlib();
 
-        for native_fn in inventory::iter::<NativeFnDef> {
-            let fn_name = if native_fn.binding_name.is_empty() {
-                let module_name = native_fn.module_path.split("::").last().unwrap();
-
-                if module_name == "globals" {
-                    native_fn.name.to_string()
-                } else {
-                    module_name.to_string() + "::" + native_fn.name
-                }
-            } else {
-                native_fn.binding_name.to_string()
-            };
-
-            let fn_ptr = native_fn.function;
-
-            interpreter.define_native_fn(&fn_name, move |state, args| {
-                NativeFnReturn::Return(fn_ptr(state, args))
-            });
+        for native_fn_def in inventory::iter::<NativeFnDef> {
+            interpreter.define_native_fn(&native_fn_def.name(), native_fn_def.fn_ptr());
         }
 
         interpreter.state.set_global(

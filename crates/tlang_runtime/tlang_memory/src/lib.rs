@@ -9,6 +9,8 @@ pub use resolver::Resolver;
 pub use state::InterpreterState;
 pub use value::{TlangValue, object::TlangObjectKind};
 
+use self::value::object::NativeFnReturn;
+
 pub mod prelude {
     pub use crate::value::{
         TlangPrimitive, TlangValue,
@@ -21,11 +23,51 @@ pub mod prelude {
 }
 
 pub struct NativeFnDef {
-    pub name: &'static str,
-    pub binding_name: &'static str,
-    pub arity: usize,
-    pub function: fn(&mut InterpreterState, &[TlangValue]) -> TlangValue,
-    pub module_path: &'static str,
+    name: &'static str,
+    binding_name: &'static str,
+    arity: usize,
+    function: fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn,
+    module_path: &'static str,
+}
+
+impl NativeFnDef {
+    pub const fn new(
+        name: &'static str,
+        binding_name: &'static str,
+        arity: usize,
+        function: fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn,
+        module_path: &'static str,
+    ) -> Self {
+        Self {
+            name,
+            binding_name,
+            arity,
+            function,
+            module_path,
+        }
+    }
+
+    pub fn name(&self) -> String {
+        if self.binding_name.is_empty() {
+            let module_name = self.module_path.split("::").last().unwrap_or_default();
+
+            if module_name == "globals" {
+                self.name.to_string()
+            } else {
+                module_name.to_string() + "::" + self.name
+            }
+        } else {
+            self.binding_name.to_string()
+        }
+    }
+
+    pub const fn arity(&self) -> usize {
+        self.arity
+    }
+
+    pub const fn fn_ptr(&self) -> fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn {
+        self.function
+    }
 }
 
 inventory::collect!(NativeFnDef);
