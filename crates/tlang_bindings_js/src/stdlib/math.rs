@@ -2,13 +2,13 @@ use tlang_macros::native_fn;
 use tlang_memory::{InterpreterState, prelude::*};
 
 #[native_fn]
-pub fn random(_: &mut InterpreterState, _: &[TlangValue]) -> TlangValue {
+pub fn random(_: &mut InterpreterState) -> TlangValue {
     TlangValue::from(js_sys::Math::random())
 }
 
 #[native_fn]
-pub fn random_int(_: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
+pub fn random_int(_: &mut InterpreterState, max: TlangValue) -> TlangValue {
     let random_float = js_sys::Math::random();
-    let random_int = (random_float * args[0].as_f64()) as i64;
+    let random_int = (random_float * max.as_f64()) as i64;
     TlangValue::from(random_int)
 }

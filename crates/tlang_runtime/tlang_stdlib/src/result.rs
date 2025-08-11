@@ -5,13 +5,13 @@ use tlang_memory::value::object::NativeFnReturn;
 use tlang_memory::{InterpreterState, TlangValue};
 
 #[native_fn(name = "Result::Ok")]
-pub fn new_result_ok(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
-    state.new_enum(state.builtin_shapes.result, 0, vec![args[0]])
+pub fn new_result_ok(state: &mut InterpreterState, value: TlangValue) -> TlangValue {
+    state.new_enum(state.builtin_shapes.result, 0, vec![value])
 }
 
 #[native_fn(name = "Result::Err")]
-pub fn new_result_err(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
-    state.new_enum(state.builtin_shapes.result, 1, vec![args[0]])
+pub fn new_result_err(state: &mut InterpreterState, err: TlangValue) -> TlangValue {
+    state.new_enum(state.builtin_shapes.result, 1, vec![err])
 }
 
 #[allow(clippy::missing_panics_doc)]

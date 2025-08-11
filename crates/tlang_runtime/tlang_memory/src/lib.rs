@@ -23,6 +23,7 @@ pub mod prelude {
 pub struct NativeFnDef {
     pub name: &'static str,
     pub binding_name: &'static str,
+    pub arity: usize,
     pub function: fn(&mut InterpreterState, &[TlangValue]) -> TlangValue,
     pub module_path: &'static str,
 }

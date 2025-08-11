@@ -2,40 +2,136 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse_macro_input;
 
+struct NativeFnMeta {
+    name: Option<String>,
+    arity: Option<usize>,
+}
+
+fn parse_native_fn_meta(
+    args: syn::punctuated::Punctuated<syn::Meta, syn::token::Comma>,
+) -> NativeFnMeta {
+    use syn::*;
+
+    let mut meta = NativeFnMeta {
+        name: None,
+        arity: None,
+    };
+
+    for meta_item in args {
+        match meta_item {
+            Meta::NameValue(MetaNameValue { path, value, .. }) => {
+                if path.is_ident("name") {
+                    if let Expr::Lit(ExprLit {
+                        lit: Lit::Str(lit_str),
+                        ..
+                    }) = value
+                    {
+                        meta.name = Some(lit_str.value());
+                    }
+                } else if path.is_ident("arity") {
+                    if let Expr::Lit(ExprLit {
+                        lit: Lit::Int(lit_int),
+                        ..
+                    }) = value
+                    {
+                        meta.arity = Some(lit_int.base10_parse().expect("Invalid arity"));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    meta
+}
+
 #[proc_macro_attribute]
 pub fn native_fn(attr: TokenStream, input: TokenStream) -> TokenStream {
-    let args = parse_macro_input!(attr with syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated);
+    use syn::{FnArg, Ident, PatType, Type};
     let input_fn = parse_macro_input!(input as syn::ItemFn);
 
     let fn_name_ident = input_fn.sig.ident.clone();
     let fn_name_string = fn_name_ident.to_string();
-    let mut binding_name = String::new();
 
-    for meta in args {
-        match meta {
-            syn::Meta::NameValue(syn::MetaNameValue {
-                path,
-                value:
-                    syn::Expr::Lit(syn::ExprLit {
-                        lit: syn::Lit::Str(lit_str),
-                        ..
-                    }),
-                ..
-            }) if path.is_ident("name") => {
-                binding_name = lit_str.value();
+    let native_fn_meta = parse_native_fn_meta(
+        parse_macro_input!(attr with syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated),
+    );
+
+    let mut arity = 0usize;
+    let mut arg_idents = Vec::new();
+
+    let mut iter = input_fn.sig.inputs.iter();
+    iter.next().expect("Native function must have state arg");
+
+    for arg in iter {
+        if let FnArg::Typed(PatType { pat, ty, .. }) = arg {
+            if let Type::Path(type_path) = &**ty {
+                if type_path.path.segments.last().unwrap().ident == "TlangValue" {
+                    arity += 1;
+                    arg_idents.push(pat.clone());
+                } else if let Some(seg) = type_path.path.segments.last() {
+                    if seg.ident == "TlangValue" {
+                        arity += 1;
+                        arg_idents.push(pat.clone());
+                    }
+                }
             }
-            _ => {} // Ignore other attributes
         }
     }
 
+    let is_n_ary = input_fn.sig.inputs.len() == 2
+        && matches!(
+            input_fn.sig.inputs.iter().nth(1),
+            Some(syn::FnArg::Typed(pat_type))
+                if matches!(
+                    &*pat_type.ty,
+                    syn::Type::Reference(type_ref)
+                        if matches!(
+                            &*type_ref.elem,
+                            syn::Type::Slice(slice)
+                                if matches!(
+                                    &*slice.elem,
+                                    syn::Type::Path(type_path)
+                                        if type_path.path.is_ident("TlangValue")
+                                )
+                        )
+                )
+        );
+
+    let mut fn_native_name_ident =
+        Ident::new(&format!("{}_native", fn_name_string), fn_name_ident.span());
+    let binding_name = native_fn_meta.name.unwrap_or(String::new());
+    let mut arity = native_fn_meta.arity.unwrap_or(arity);
+
+    let wrapper_fn = if is_n_ary {
+        // n-ary functions are identified by taking a slice of TlangValue, therefore we won't need
+        // to generate a wrapper function, we remap the function back to the original.
+        // This should be an edge case.
+        arity = usize::MAX;
+        fn_native_name_ident = fn_name_ident.clone();
+        quote! {}
+    } else {
+        quote! {
+            pub fn #fn_native_name_ident(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
+                if args.len() != #arity {
+                    state.panic(format!("Expected {} arguments, got {}", #arity, args.len()));
+                }
+                let mut iter = args.iter().cloned();
+                #(let #arg_idents = iter.next().unwrap();)*
+                #fn_name_ident(state, #(#arg_idents),*)
+            }
+        }
+    };
+
     let generated = quote! {
         #input_fn
+        #wrapper_fn
 
         inventory::submit! {
             crate::NativeFnDef {
                 name: #fn_name_string,
                 binding_name: #binding_name,
-                function: #fn_name_ident,
+                arity: #arity,
+                function: #fn_native_name_ident,
                 module_path: module_path!(),
             }
         }

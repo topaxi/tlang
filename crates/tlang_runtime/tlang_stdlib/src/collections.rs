@@ -5,11 +5,11 @@ use tlang_memory::value::object::NativeFnReturn;
 use tlang_memory::{InterpreterState, prelude::*};
 
 #[native_fn(name = "len")]
-pub fn len(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
-    match state.get_object(args[0]) {
+pub fn len(state: &mut InterpreterState, iterable: TlangValue) -> TlangValue {
+    match state.get_object(iterable) {
         Some(TlangObjectKind::Struct(obj)) => TlangValue::from(obj.len()),
         Some(TlangObjectKind::String(string)) => TlangValue::from(string.len()),
-        _ => state.panic(format!("Expected struct or string, got {:?}", args[0])),
+        _ => state.panic(format!("Expected struct or string, got {:?}", iterable)),
     }
 }
 

@@ -5,8 +5,8 @@ use tlang_memory::value::object::NativeFnReturn;
 use tlang_memory::{InterpreterState, TlangValue};
 
 #[native_fn(name = "Option::Some")]
-pub fn new_option_some(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
-    state.new_enum(state.builtin_shapes.option, 0, vec![args[0]])
+pub fn new_option_some(state: &mut InterpreterState, value: TlangValue) -> TlangValue {
+    state.new_enum(state.builtin_shapes.option, 0, vec![value])
 }
 
 #[allow(clippy::missing_panics_doc)]
