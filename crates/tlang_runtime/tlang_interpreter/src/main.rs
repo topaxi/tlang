@@ -44,7 +44,7 @@ fn main() {
         Ok(_) => {}
         Err(diagnostics) => {
             for diagnostic in &diagnostics {
-                eprintln!("Error: {}", diagnostic);
+                eprintln!("{}", diagnostic);
             }
 
             if diagnostics.iter().any(|d| d.is_error()) {
