@@ -178,7 +178,7 @@ fn compile_to_hir(source: &str) -> Result<String, ParserError> {
     semantic_analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());
     semantic_analyzer
         .analyze(&ast)
-        .map_err(|diagnostics| diagnostics.into())?;
+        .map_err(|diagnostics| <Vec<Diagnostic> as Into<ParserError>>::into(diagnostics))?;
     let hir = lower_to_hir(
         &ast,
         semantic_analyzer.symbol_id_allocator(),

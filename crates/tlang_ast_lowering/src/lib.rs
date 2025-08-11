@@ -53,7 +53,7 @@ impl LoweringContext {
         self.lookup(name).unwrap_or(name.to_string())
     }
 
-    fn lookup<'a>(&'a self, name: &str) -> Option<String> {
+    fn lookup(&self, name: &str) -> Option<String> {
         self.scope()
             .borrow()
             .get_by_name(name)
