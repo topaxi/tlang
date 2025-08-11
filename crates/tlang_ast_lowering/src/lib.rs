@@ -45,24 +45,8 @@ impl LoweringContext {
         self.current_symbol_table.clone()
     }
 
-    fn has_binding(&self, name: &str) -> bool {
-        self.scope().borrow().has_name(name)
-    }
-
     fn has_multi_arity_fn(&self, name: &str, arity: usize) -> bool {
         self.scope().borrow().has_multi_arity_fn(name, arity)
-    }
-
-    pub(crate) fn lookup_name(&mut self, name: &str) -> String {
-        self.lookup(name).unwrap_or(name.to_string())
-    }
-
-    fn lookup(&self, name: &str) -> Option<String> {
-        self.scope()
-            .borrow()
-            .get_by_name(name)
-            .last()
-            .map(|s| s.name.clone())
     }
 
     pub(crate) fn with_scope<F, R>(&mut self, node_id: ast::NodeId, f: F) -> R
@@ -202,8 +186,7 @@ impl LoweringContext {
     fn lower_path(&mut self, path: &ast::node::Path) -> hir::Path {
         if path.segments.len() == 1 {
             let segment = path.segments.first().unwrap();
-            let segment =
-                hir::PathSegment::from_str(&self.lookup_name(segment.as_str()), segment.span);
+            let segment = hir::PathSegment::from_str(segment.as_str(), segment.span);
 
             return hir::Path::new(vec![segment], path.span);
         }

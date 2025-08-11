@@ -48,6 +48,7 @@ impl Default for HirOptimizer {
         Self::new(HirOptGroup::new(vec![
             Box::new(crate::ConstantFolder::default()),
             Box::new(crate::ConstantPropagator::default()),
+            Box::new(crate::symbol_resolution::SymbolResolution::default()),
         ]))
     }
 }
