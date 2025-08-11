@@ -311,11 +311,22 @@ impl LoweringContext {
     }
 }
 
+pub struct LowerResult {
+    pub module: hir::Module,
+    pub symbol_tables: HashMap<HirId, Rc<RefCell<ast::symbols::SymbolTable>>>,
+}
+
 pub fn lower_to_hir(
     tlang_ast: &ast::node::Module,
     symbol_id_allocator: SymbolIdAllocator,
     symbol_tables: HashMap<tlang_ast::NodeId, Rc<RefCell<tlang_ast::symbols::SymbolTable>>>,
-) -> hir::Module {
+) -> LowerResult {
     let mut ctx = LoweringContext::new(symbol_id_allocator, symbol_tables);
-    ctx.lower_module(tlang_ast)
+    let module = ctx.lower_module(tlang_ast);
+    let symbol_tables = ctx.symbol_tables();
+
+    LowerResult {
+        module,
+        symbol_tables,
+    }
 }

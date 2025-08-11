@@ -1,6 +1,5 @@
-use tlang_ast_lowering::lower_to_hir;
+use tlang_ast_lowering::{LowerResult, lower_to_hir};
 use tlang_hir::hir;
-use tlang_hir::hir::Module;
 use tlang_hir_opt::hir_opt::HirOptGroup;
 use tlang_hir_opt::{
     HirPass, constant_folding::ConstantFolder, constant_propagation::ConstantPropagator,
@@ -10,7 +9,7 @@ use tlang_hir_pretty::HirPrettyOptions;
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
 
-pub fn compile(source: &str) -> Module {
+pub fn compile(source: &str) -> LowerResult {
     let ast = Parser::from_source(source).parse().unwrap();
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.analyze(&ast).unwrap();
@@ -37,9 +36,9 @@ pub fn compile_and_optimize(source: &str) -> hir::Module {
 }
 
 pub fn compile_with_passes(source: &str, passes: Vec<Box<dyn HirPass>>) -> hir::Module {
-    let mut module = compile(source);
-    optimize(&mut module, passes);
-    module
+    let mut hir = compile(source);
+    optimize(&mut hir.module, passes);
+    hir.module
 }
 
 pub fn pretty_print(module: &hir::Module) -> String {

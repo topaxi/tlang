@@ -184,7 +184,7 @@ fn compile_to_hir(source: &str) -> Result<String, ParserError> {
         semantic_analyzer.symbol_id_allocator(),
         semantic_analyzer.symbol_tables().clone(),
     );
-    Ok(ron::ser::to_string_pretty(&hir, ron::ser::PrettyConfig::default()).unwrap())
+    Ok(ron::ser::to_string_pretty(&hir.module, ron::ser::PrettyConfig::default()).unwrap())
 }
 
 fn compile(source: &str) -> Result<String, ParserError> {
@@ -200,7 +200,7 @@ fn compile(source: &str) -> Result<String, ParserError> {
                 semantic_analyzer.symbol_id_allocator(),
                 semantic_analyzer.symbol_tables().clone(),
             );
-            generator.generate_code(&hir);
+            generator.generate_code(&hir.module);
             Ok(generator.get_output().to_string())
         }
         Err(diagnostics) => Err(diagnostics.into()),

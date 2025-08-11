@@ -161,8 +161,8 @@ impl Tlang {
                 self.analyzer.symbol_tables().clone(),
             );
             let mut optimizer = HirOptimizer::default();
-            optimizer.optimize_module(&mut hir);
-            self.build.hir = Some(hir);
+            optimizer.optimize_module(&mut hir.module);
+            self.build.hir = Some(hir.module);
         }
     }
 

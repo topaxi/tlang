@@ -57,7 +57,7 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
                 semantic_analyzer.symbol_id_allocator(),
                 semantic_analyzer.symbol_tables().clone(),
             );
-            codegen.generate_code(&hir);
+            codegen.generate_code(&hir.module);
             codegen.get_output().to_string()
         }
         Err(diagnostics) => panic!("{diagnostics:#?}"),

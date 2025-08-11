@@ -1,15 +1,15 @@
 use tlang_ast as ast;
 use tlang_hir::{Visitor, hir};
 
-fn parse_from_str(input: &str) -> ast::node::Module {
+fn parse_str(input: &str) -> ast::node::Module {
     let mut parser = tlang_parser::Parser::from_source(input);
     parser.parse().unwrap()
 }
 
 #[allow(dead_code)]
 pub fn hir_from_str(input: &str) -> hir::Module {
-    let ast = parse_from_str(input);
-    tlang_ast_lowering::lower_to_hir(&ast, Default::default(), Default::default())
+    let ast = parse_str(input);
+    tlang_ast_lowering::lower_to_hir(&ast, Default::default(), Default::default()).module
 }
 
 struct PathCollector {
