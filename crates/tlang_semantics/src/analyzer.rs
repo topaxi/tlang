@@ -80,7 +80,11 @@ impl SemanticAnalyzer {
         self.symbol_table_stack.pop().unwrap()
     }
 
-    pub fn add_builtin_symbols(&mut self, symbols: &[(&str, SymbolType)]) {
+    pub fn add_builtin_symbols<'a, S, I>(&mut self, symbols: I)
+    where
+        S: AsRef<str> + 'a,
+        I: IntoIterator<Item = &'a (S, SymbolType)>,
+    {
         self.declaration_analyzer.add_builtin_symbols(symbols);
     }
 

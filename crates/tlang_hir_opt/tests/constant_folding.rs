@@ -75,8 +75,6 @@ fn chained_constant_folding() {
 
 #[test]
 fn constant_folding_mutable_variable() {
-    let _ = env_logger::builder().is_test(true).try_init();
-
     let source = r#"
         fn loop_test() {
             let i = 0;

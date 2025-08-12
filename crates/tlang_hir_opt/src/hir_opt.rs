@@ -1,17 +1,23 @@
+use log::debug;
 use tlang_hir::hir::LowerResult;
 
 pub trait HirPass {
+    fn name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+
     fn optimize_hir(&mut self, hir: &mut LowerResult) -> bool;
 }
 
 #[derive(Default)]
 pub struct HirOptGroup {
+    name: &'static str,
     passes: Vec<Box<dyn HirPass>>,
 }
 
 impl HirOptGroup {
-    pub fn new(passes: Vec<Box<dyn HirPass>>) -> Self {
-        Self { passes }
+    pub fn new(name: &'static str, passes: Vec<Box<dyn HirPass>>) -> Self {
+        Self { name, passes }
     }
 
     pub fn add_pass(&mut self, pass: Box<dyn HirPass>) {
@@ -20,6 +26,10 @@ impl HirOptGroup {
 }
 
 impl HirPass for HirOptGroup {
+    fn name(&self) -> &'static str {
+        self.name
+    }
+
     fn optimize_hir(&mut self, module: &mut LowerResult) -> bool {
         let mut iteration = 0;
         let mut changed = true;
@@ -32,6 +42,8 @@ impl HirPass for HirOptGroup {
 
             changed = false;
             for pass in &mut self.passes {
+                debug!("Running pass: {}", pass.name());
+
                 changed |= pass.optimize_hir(module);
             }
         }
@@ -46,8 +58,7 @@ pub struct HirOptimizer {
 impl Default for HirOptimizer {
     fn default() -> Self {
         Self::new(vec![
-            Box::new(crate::ConstantFolder::default()),
-            Box::new(crate::ConstantPropagator::default()),
+            Box::new(crate::constant_folding::ConstantFolding::default()),
             Box::new(crate::symbol_resolution::SymbolResolution::default()),
         ])
     }
@@ -56,7 +67,7 @@ impl Default for HirOptimizer {
 impl HirOptimizer {
     pub fn new(passes: Vec<Box<dyn HirPass>>) -> Self {
         Self {
-            group: HirOptGroup::new(passes),
+            group: HirOptGroup::new("root", passes),
         }
     }
 

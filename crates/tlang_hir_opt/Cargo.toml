@@ -16,6 +16,7 @@ tlang_semantics = { path = "../tlang_semantics" }
 insta = { workspace = true }
 serde = { workspace = true }
 env_logger = { workspace = true }
+ctor = { workspace = true }
 
 [lints]
 workspace = true

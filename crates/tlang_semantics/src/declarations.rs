@@ -82,11 +82,15 @@ impl DeclarationAnalyzer {
         symbol_table.borrow_mut().insert(symbol_info);
     }
 
-    pub fn add_builtin_symbols(&mut self, symbols: &[(&str, SymbolType)]) {
+    pub fn add_builtin_symbols<'a, S, I>(&mut self, symbols: I)
+    where
+        S: AsRef<str> + 'a,
+        I: IntoIterator<Item = &'a (S, SymbolType)>,
+    {
         for (name, symbol_type) in symbols {
             self.root_symbol_table()
                 .borrow_mut()
-                .insert(SymbolInfo::new_builtin(name, *symbol_type));
+                .insert(SymbolInfo::new_builtin(name.as_ref(), *symbol_type));
         }
     }
 

@@ -1027,6 +1027,7 @@ dependencies = [
 name = "tlang_hir_opt"
 version = "0.1.0"
 dependencies = [
+ "ctor",
  "env_logger",
  "insta",
  "log",

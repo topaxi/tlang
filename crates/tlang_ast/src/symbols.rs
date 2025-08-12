@@ -83,7 +83,7 @@ impl SymbolIdAllocator {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct SymbolInfo {
     pub id: SymbolId,
-    pub name: String,
+    pub name: Box<str>,
     pub symbol_type: SymbolType,
     pub defined_at: Span,
     pub node_id: NodeId,
@@ -100,7 +100,7 @@ impl SymbolInfo {
     ) -> Self {
         SymbolInfo {
             id,
-            name: name.to_string(),
+            name: name.into(),
             symbol_type,
             defined_at,
             node_id,
@@ -110,7 +110,7 @@ impl SymbolInfo {
 
     pub fn new_builtin(name: &str, symbol_type: SymbolType) -> Self {
         SymbolInfo {
-            name: name.to_string(),
+            name: name.into(),
             symbol_type,
             ..Default::default()
         }
@@ -155,7 +155,7 @@ impl SymbolTable {
     }
 
     fn get_locals_by_name(&self, name: &str) -> Vec<&SymbolInfo> {
-        self.symbols.iter().filter(|s| s.name == name).collect()
+        self.symbols.iter().filter(|s| *s.name == *name).collect()
     }
 
     pub fn get_by_name(&self, name: &str) -> Vec<SymbolInfo> {
@@ -183,7 +183,7 @@ impl SymbolTable {
         let mut hashset = HashSet::new();
         let fn_symbols: Vec<_> = symbols
             .iter()
-            .filter(|s| s.name == name && s.is_any_fn())
+            .filter(|s| *s.name == *name && s.is_any_fn())
             .flat_map(|s| s.symbol_type.arity())
             .filter(|a| hashset.insert(*a))
             .collect();

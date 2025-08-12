@@ -2,7 +2,6 @@ use std::env;
 use std::fs;
 use std::process;
 
-use tlang_ast::symbols::SymbolInfo;
 use tlang_ast::symbols::SymbolType;
 use tlang_ast_lowering::lower_to_hir;
 use tlang_hir_opt::HirOptimizer;
@@ -45,12 +44,12 @@ fn main() {
     };
     let mut analyzer = SemanticAnalyzer::default();
 
-    analyzer.add_builtin_symbols(
-        inventory::iter::<NativeFnDef>
-            .into_iter()
-            .map(|def| (def.name(), SymbolType::Function(def.arity() as u16)))
-            .collect(),
-    );
+    let builtin_fn_symbols = inventory::iter::<NativeFnDef>
+        .into_iter()
+        .map(|def| (def.name(), SymbolType::Function(def.arity() as u16)))
+        .collect::<Vec<_>>();
+
+    analyzer.add_builtin_symbols(&builtin_fn_symbols);
 
     match analyzer.analyze(&ast) {
         Ok(_) => {}
@@ -59,7 +58,7 @@ fn main() {
                 eprintln!("{}", diagnostic);
             }
 
-            if diagnostics.into_iter().any(Diagnostic::is_error) {
+            if diagnostics.iter().any(Diagnostic::is_error) {
                 process::exit(1);
             }
         }
@@ -71,7 +70,7 @@ fn main() {
     );
 
     let mut optimizer = HirOptimizer::default();
-    optimizer.optimize_hir(&mut hir.module);
+    optimizer.optimize_hir(&mut hir);
 
     let mut interp = Interpreter::default();
     interp.eval(&hir.module);

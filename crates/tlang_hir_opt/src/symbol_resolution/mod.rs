@@ -11,17 +11,25 @@ use self::scope::Scope;
 
 mod scope;
 
-#[derive(Default)]
 pub struct SymbolResolution(HirOptGroup);
 
 impl SymbolResolution {
     pub fn new() -> Self {
         let ctx = Rc::new(RefCell::new(SymbolResolutionContext::default()));
 
-        Self(HirOptGroup::new(vec![
-            Box::new(DeclarationCollector::new(ctx.clone())),
-            Box::new(IdentifierResolver::new(ctx.clone())),
-        ]))
+        Self(HirOptGroup::new(
+            std::any::type_name::<Self>(),
+            vec![
+                Box::new(DeclarationCollector::new(ctx.clone())),
+                Box::new(IdentifierResolver::new(ctx.clone())),
+            ],
+        ))
+    }
+}
+
+impl Default for SymbolResolution {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

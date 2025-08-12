@@ -6,6 +6,11 @@ use tlang_hir_pretty::HirPrettyOptions;
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
 
+#[ctor::ctor]
+fn before_all() {
+    env_logger::init();
+}
+
 pub fn compile(source: &str) -> hir::LowerResult {
     let ast = Parser::from_source(source).parse().unwrap();
     let mut semantic_analyzer = SemanticAnalyzer::default();
