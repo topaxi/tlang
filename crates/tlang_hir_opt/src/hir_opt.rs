@@ -58,8 +58,8 @@ pub struct HirOptimizer {
 impl Default for HirOptimizer {
     fn default() -> Self {
         Self::new(vec![
-            Box::new(crate::constant_folding::ConstantFolding::default()),
             Box::new(crate::symbol_resolution::SymbolResolution::default()),
+            Box::new(crate::constant_folding::ConstantFolding::default()),
         ])
     }
 }
