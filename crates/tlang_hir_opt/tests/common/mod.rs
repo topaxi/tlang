@@ -1,3 +1,4 @@
+use tlang_ast::symbols::SymbolType;
 use tlang_ast_lowering::{LowerResult, lower_to_hir};
 use tlang_hir::hir;
 use tlang_hir_opt::hir_opt::HirOptGroup;
@@ -12,6 +13,7 @@ use tlang_semantics::SemanticAnalyzer;
 pub fn compile(source: &str) -> LowerResult {
     let ast = Parser::from_source(source).parse().unwrap();
     let mut semantic_analyzer = SemanticAnalyzer::default();
+    semantic_analyzer.add_builtin_symbols(&[("println", SymbolType::Function(u16::MAX))]);
     semantic_analyzer.analyze(&ast).unwrap();
     lower_to_hir(
         &ast,

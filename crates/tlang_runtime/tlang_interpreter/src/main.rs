@@ -2,9 +2,12 @@ use std::env;
 use std::fs;
 use std::process;
 
+use tlang_ast::symbols::SymbolInfo;
+use tlang_ast::symbols::SymbolType;
 use tlang_ast_lowering::lower_to_hir;
 use tlang_hir_opt::HirOptimizer;
 use tlang_interpreter::Interpreter;
+pub use tlang_memory::NativeFnDef;
 use tlang_semantics::SemanticAnalyzer;
 
 fn main() {
@@ -40,6 +43,14 @@ fn main() {
         }
     };
     let mut analyzer = SemanticAnalyzer::default();
+
+    analyzer.add_builtin_symbols(
+        inventory::iter::<NativeFnDef>
+            .into_iter()
+            .map(|def| (def.name(), SymbolType::Function(def.arity() as u16)))
+            .collect(),
+    );
+
     match analyzer.analyze(&ast) {
         Ok(_) => {}
         Err(diagnostics) => {

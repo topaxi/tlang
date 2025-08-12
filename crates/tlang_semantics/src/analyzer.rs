@@ -127,6 +127,7 @@ impl SemanticAnalyzer {
             .iter()
             .filter(|s| {
                 if let SymbolType::Function(a) = s.symbol_type {
+                    a == u16::MAX || // Builtin n-ary function
                     a as usize == arity
                 } else {
                     // Not a function, so we don't care about arity
