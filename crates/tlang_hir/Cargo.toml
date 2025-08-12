@@ -5,7 +5,7 @@ edition.workspace = true
 
 [features]
 default = []
-serde = ["dep:serde"]
+serde = ["dep:serde", "tlang_ast/serde"]
 
 [dependencies]
 tlang_ast = { path = "../tlang_ast" }
