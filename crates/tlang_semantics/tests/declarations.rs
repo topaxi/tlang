@@ -37,7 +37,7 @@ fn test_analyze_variable_declaration() {
         vec![SymbolInfo {
             node_id: NodeId::new(2),
             id: SymbolId::new(1),
-            name: "a".to_string(),
+            name: "a".into(),
             symbol_type: SymbolType::Variable,
             defined_at: Span::new(
                 LineColumn { line: 0, column: 4 },
@@ -72,7 +72,7 @@ fn test_block_scope() {
         vec![SymbolInfo {
             node_id: NodeId::new(2),
             id: SymbolId::new(1),
-            name: "a".to_string(),
+            name: "a".into(),
             symbol_type: SymbolType::Variable,
             defined_at: Span::new(
                 LineColumn {
@@ -108,7 +108,7 @@ fn test_block_scope() {
         vec![SymbolInfo {
             node_id: NodeId::new(2),
             id: SymbolId::new(1),
-            name: "a".to_string(),
+            name: "a".into(),
             symbol_type: SymbolType::Variable,
             defined_at: Span::new(
                 LineColumn {
@@ -128,7 +128,7 @@ fn test_block_scope() {
         vec![SymbolInfo {
             node_id: NodeId::new(7),
             id: SymbolId::new(2),
-            name: "b".to_string(),
+            name: "b".into(),
             symbol_type: SymbolType::Variable,
             defined_at: Span::new(
                 LineColumn {
@@ -166,7 +166,7 @@ fn test_block_scope() {
         vec![SymbolInfo {
             node_id: NodeId::new(2),
             id: SymbolId::new(1),
-            name: "a".to_string(),
+            name: "a".into(),
             symbol_type: SymbolType::Variable,
             defined_at: Span::new(
                 LineColumn {
@@ -186,7 +186,7 @@ fn test_block_scope() {
         vec![SymbolInfo {
             node_id: NodeId::new(7),
             id: SymbolId::new(2),
-            name: "b".to_string(),
+            name: "b".into(),
             symbol_type: SymbolType::Variable,
             defined_at: Span::new(
                 LineColumn {
@@ -206,7 +206,7 @@ fn test_block_scope() {
         vec![SymbolInfo {
             node_id: NodeId::new(12),
             id: SymbolId::new(3),
-            name: "c".to_string(),
+            name: "c".into(),
             symbol_type: SymbolType::Variable,
             defined_at: Span::new(
                 LineColumn {
@@ -241,7 +241,7 @@ fn test_should_collect_function_definitions() {
         vec![SymbolInfo {
             node_id: NodeId::new(10),
             id: SymbolId::new(1),
-            name: "add".to_string(),
+            name: "add".into(),
             symbol_type: SymbolType::Function(2),
             defined_at: Span::new(
                 LineColumn { line: 0, column: 3 },
@@ -270,7 +270,7 @@ fn test_should_collect_list_destructuring_symbols_in_function_arguments() {
         vec![SymbolInfo {
             node_id: NodeId::new(11),
             id: SymbolId::new(1),
-            name: "add".to_string(),
+            name: "add".into(),
             symbol_type: SymbolType::Function(1),
             defined_at: Span::new(
                 LineColumn { line: 0, column: 3 },
@@ -299,7 +299,7 @@ fn test_should_collect_list_destructuring_with_rest_symbols_in_function_argument
         vec![SymbolInfo {
             node_id: NodeId::new(14),
             id: SymbolId::new(1),
-            name: "sum".to_string(),
+            name: "sum".into(),
             symbol_type: SymbolType::Function(1),
             defined_at: Span::new(
                 LineColumn { line: 0, column: 3 },
@@ -328,7 +328,7 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
             SymbolInfo {
                 node_id: NodeId::new(8),
                 id: SymbolId::new(1),
-                name: "factorial".to_string(),
+                name: "factorial".into(),
                 symbol_type: SymbolType::Function(2),
                 defined_at: Span::new(
                     LineColumn { line: 0, column: 3 },
@@ -342,7 +342,7 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
             SymbolInfo {
                 node_id: NodeId::new(23),
                 id: SymbolId::new(3),
-                name: "factorial".to_string(),
+                name: "factorial".into(),
                 symbol_type: SymbolType::Function(2),
                 defined_at: Span::new(
                     LineColumn { line: 1, column: 4 },
@@ -380,7 +380,7 @@ fn should_collect_function_arguments_with_enum_extraction() {
             SymbolInfo {
                 node_id: NodeId::new(14),
                 id: SymbolId::new(4),
-                name: "unwrap".to_string(),
+                name: "unwrap".into(),
                 symbol_type: SymbolType::Function(1),
                 defined_at: Span::new(
                     LineColumn { line: 5, column: 4 },
@@ -394,7 +394,7 @@ fn should_collect_function_arguments_with_enum_extraction() {
             SymbolInfo {
                 node_id: NodeId::new(21),
                 id: SymbolId::new(5),
-                name: "unwrap".to_string(),
+                name: "unwrap".into(),
                 symbol_type: SymbolType::Function(1),
                 defined_at: Span::new(
                     LineColumn { line: 6, column: 4 },
@@ -429,7 +429,7 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
             SymbolInfo {
                 node_id: NodeId::new(4),
                 id: SymbolId::new(1),
-                name: "used_fn".to_string(),
+                name: "used_fn".into(),
                 symbol_type: SymbolType::Function(0),
                 defined_at: Span::new(
                     LineColumn { line: 0, column: 3 },
@@ -443,7 +443,7 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
             SymbolInfo {
                 node_id: NodeId::new(8),
                 id: SymbolId::new(2),
-                name: "used_fn".to_string(),
+                name: "used_fn".into(),
                 symbol_type: SymbolType::Function(1),
                 defined_at: Span::new(
                     LineColumn { line: 1, column: 4 },

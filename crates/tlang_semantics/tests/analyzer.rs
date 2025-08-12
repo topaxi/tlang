@@ -49,7 +49,7 @@ fn test_should_error_on_undefined_symbol() {
     assert_eq!(
         diagnostics,
         vec![Diagnostic::new(
-            "Use of undeclared variable `a`".to_string(),
+            "Use of undeclared variable `a`".into(),
             Severity::Error,
             Span::new(
                 LineColumn { line: 0, column: 0 },
@@ -66,7 +66,7 @@ fn test_should_error_on_undefined_symbol_in_variable_declaration() {
     assert_eq!(
         diagnostics[..1],
         vec![Diagnostic::new(
-            "Use of undeclared variable `b`".to_string(),
+            "Use of undeclared variable `b`".into(),
             Severity::Error,
             Span::new(
                 LineColumn { line: 0, column: 8 },
@@ -87,7 +87,7 @@ fn test_should_error_on_undefined_functions() {
         diagnostics,
         vec![
             Diagnostic::new(
-                "Use of undeclared function `b` with arity 0".to_string(),
+                "Use of undeclared function `b` with arity 0".into(),
                 Severity::Error,
                 Span::new(
                     LineColumn { line: 0, column: 0 },
@@ -95,7 +95,7 @@ fn test_should_error_on_undefined_functions() {
                 ),
             ),
             Diagnostic::new(
-                "Use of undeclared function `b` with arity 1".to_string(),
+                "Use of undeclared function `b` with arity 1".into(),
                 Severity::Error,
                 Span::new(
                     LineColumn { line: 1, column: 1 },
@@ -113,7 +113,7 @@ fn test_should_error_on_self_referencing_symbol() {
     assert_eq!(
         diagnostics[..1],
         vec![Diagnostic::new(
-            "Use of undeclared variable `a`".to_string(),
+            "Use of undeclared variable `a`".into(),
             Severity::Error,
             Span::new(
                 LineColumn { line: 0, column: 8 },
@@ -141,7 +141,7 @@ fn test_should_allow_shadowing_of_single_variable() {
             SymbolInfo {
                 node_id: NodeId::new(2),
                 id: SymbolId::new(1),
-                name: "a".to_string(),
+                name: "a".into(),
                 symbol_type: SymbolType::Variable,
                 defined_at: Span::new(
                     LineColumn { line: 0, column: 4 },
@@ -152,7 +152,7 @@ fn test_should_allow_shadowing_of_single_variable() {
             SymbolInfo {
                 node_id: NodeId::new(5),
                 id: SymbolId::new(2),
-                name: "a".to_string(),
+                name: "a".into(),
                 symbol_type: SymbolType::Variable,
                 defined_at: Span::new(
                     LineColumn { line: 1, column: 5 },
@@ -186,7 +186,7 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
         Some(SymbolInfo {
             node_id: NodeId::new(2),
             id: SymbolId::new(0),
-            name: "a".to_string(),
+            name: "a".into(),
             symbol_type: SymbolType::Variable,
             defined_at: Span::new(
                 LineColumn { line: 0, column: 4 },
@@ -205,7 +205,7 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
         Some(SymbolInfo {
             node_id: NodeId::new(5),
             id: SymbolId::new(1),
-            name: "a".to_string(),
+            name: "a".into(),
             symbol_type: SymbolType::Variable,
             defined_at: Span::new(
                 LineColumn { line: 1, column: 5 },
@@ -227,7 +227,7 @@ fn test_should_error_on_unused_identifier_in_function_definition() {
     assert_eq!(
         diagnostics[..1],
         vec![Diagnostic::new(
-            "Use of undeclared variable `c`, did you mean the parameter `a`?".to_string(),
+            "Use of undeclared variable `c`, did you mean the parameter `a`?".into(),
             Severity::Error,
             Span::new(
                 LineColumn {
@@ -263,7 +263,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
         vec![SymbolInfo {
             node_id: NodeId::new(12),
             id: SymbolId::new(1),
-            name: "add".to_string(),
+            name: "add".into(),
             symbol_type: SymbolType::Function(2),
             defined_at: Span::new(
                 LineColumn { line: 0, column: 3 },
@@ -281,7 +281,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
     let c_symbol_info = SymbolInfo {
         node_id: NodeId::new(14),
         id: SymbolId::new(4),
-        name: "c".to_string(),
+        name: "c".into(),
         symbol_type: SymbolType::Variable,
         defined_at: Span::new(
             LineColumn { line: 4, column: 5 },
@@ -321,12 +321,12 @@ fn should_warn_about_unused_variables() {
             // TODO: Might be nicer to have them report in order. This currently happens
             //       due to us reinserting variables in the beginning of the symbol table.
             Diagnostic::new(
-                "Unused variable `b`, if this is intentional, prefix the name with an underscore: `_b`".to_string(),
+                "Unused variable `b`, if this is intentional, prefix the name with an underscore: `_b`".into(),
                 Severity::Warning,
                 Span::new(LineColumn { line: 1, column: 5 }, LineColumn { line: 1, column: 6 }),
             ),
             Diagnostic::new(
-                "Unused variable `a`, if this is intentional, prefix the name with an underscore: `_a`".to_string(),
+                "Unused variable `a`, if this is intentional, prefix the name with an underscore: `_a`".into(),
                 Severity::Warning,
                 Span::new(LineColumn { line: 0, column: 4 }, LineColumn { line: 0, column: 5 }),
             ),
@@ -345,21 +345,21 @@ fn should_warn_about_unused_function_and_parameters() {
         diagnostics,
         vec![
             Diagnostic::new(
-                "Unused variable `c`, if this is intentional, prefix the name with an underscore: `_c`".to_string(), Severity::Warning,
+                "Unused variable `c`, if this is intentional, prefix the name with an underscore: `_c`".into(), Severity::Warning,
                 Span::new(LineColumn { line: 1, column: 9 }, LineColumn { line: 1, column: 10 }),
             ),
             Diagnostic::new(
-                "Unused parameter `a`, if this is intentional, prefix the name with an underscore: `_a`".to_string(),
+                "Unused parameter `a`, if this is intentional, prefix the name with an underscore: `_a`".into(),
                 Severity::Warning,
                 Span::new(LineColumn { line: 0, column: 7 }, LineColumn { line: 0, column: 8 }),
             ),
             Diagnostic::new(
-                "Unused parameter `b`, if this is intentional, prefix the name with an underscore: `_b`".to_string(),
+                "Unused parameter `b`, if this is intentional, prefix the name with an underscore: `_b`".into(),
                 Severity::Warning,
                 Span::new(LineColumn { line: 0, column: 10 }, LineColumn { line: 0, column: 11 }),
             ),
             Diagnostic::new(
-                "Unused function `add`, if this is intentional, prefix the name with an underscore: `_add`".to_string(),
+                "Unused function `add`, if this is intentional, prefix the name with an underscore: `_add`".into(),
                 Severity::Warning,
                 Span::new(LineColumn { line: 0, column: 3 }, LineColumn { line: 0, column: 6 }),
             ),
