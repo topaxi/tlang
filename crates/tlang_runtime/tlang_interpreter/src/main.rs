@@ -59,8 +59,8 @@ fn main() {
     );
 
     let mut optimizer = HirOptimizer::default();
-    optimizer.optimize_module(&mut hir);
+    optimizer.optimize_module(&mut hir.module);
 
     let mut interp = Interpreter::default();
-    interp.eval(&hir);
+    interp.eval(&hir.module);
 }
