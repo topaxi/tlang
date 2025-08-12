@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use tlang_ast::token::Literal;
 use tlang_hir::{
-    hir::{BinaryOpKind, Expr, ExprKind, HirId, Module, Pat, PatKind, Stmt, StmtKind},
+    hir::{self, BinaryOpKind, Expr, ExprKind, HirId, Module, Pat, PatKind, Stmt, StmtKind},
     visit::{self, Visitor},
 };
 
@@ -100,12 +100,12 @@ impl<'hir> Visitor<'hir> for ConstantPropagator {
 }
 
 impl HirPass for ConstantPropagator {
-    fn optimize_module(&mut self, module: &mut Module) -> bool {
+    fn optimize_hir(&mut self, hir: &mut hir::LowerResult) -> bool {
         self.constants.clear();
-        self.reassigned_variables = AssignmentCollector::collect(module);
+        self.reassigned_variables = AssignmentCollector::collect(&mut hir.module);
 
         self.changed = false;
-        self.visit_module(module);
+        self.visit_module(&mut hir.module);
         self.changed
     }
 }

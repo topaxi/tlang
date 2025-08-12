@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use tlang_ast::{node::UnaryOp, token::Literal};
 use tlang_hir::{
-    hir::{BinaryOpKind, Expr, ExprKind, HirId, Module},
+    hir::{self, BinaryOpKind, Expr, ExprKind, HirId, Module},
     visit::{self, Visitor},
 };
 
@@ -101,9 +101,9 @@ impl<'hir> Visitor<'hir> for ConstantFolder {
 }
 
 impl HirPass for ConstantFolder {
-    fn optimize_module(&mut self, module: &mut Module) -> bool {
+    fn optimize_hir(&mut self, hir: &mut hir::LowerResult) -> bool {
         self.changed = false;
-        self.visit_module(module);
+        self.visit_module(&mut hir.module);
         self.changed
     }
 }

@@ -9,6 +9,7 @@ use tlang_hir_opt::HirOptimizer;
 use tlang_interpreter::Interpreter;
 pub use tlang_memory::NativeFnDef;
 use tlang_semantics::SemanticAnalyzer;
+use tlang_semantics::diagnostic::Diagnostic;
 
 fn main() {
     env_logger::init();
@@ -58,7 +59,7 @@ fn main() {
                 eprintln!("{}", diagnostic);
             }
 
-            if diagnostics.iter().any(|d| d.is_error()) {
+            if diagnostics.into_iter().any(Diagnostic::is_error) {
                 process::exit(1);
             }
         }
@@ -70,7 +71,7 @@ fn main() {
     );
 
     let mut optimizer = HirOptimizer::default();
-    optimizer.optimize_module(&mut hir.module);
+    optimizer.optimize_hir(&mut hir.module);
 
     let mut interp = Interpreter::default();
     interp.eval(&hir.module);

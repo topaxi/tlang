@@ -27,7 +27,7 @@ impl BenchInterpreter {
         let mut parser = Parser::from_source(src);
         let ast = parser.parse().unwrap();
         let mut hir = self.lowering_context.lower_module_in_current_scope(&ast);
-        self.optimizer.optimize_module(&mut hir);
+        self.optimizer.optimize_hir(&mut hir);
         hir
     }
 

@@ -1,5 +1,8 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::num::NonZero;
+use std::rc::Rc;
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -669,4 +672,10 @@ pub enum BinaryOpKind {
     BitwiseAnd,
     BitwiseOr,
     BitwiseXor,
+}
+
+#[derive(Debug)]
+pub struct LowerResult {
+    pub module: Module,
+    pub symbol_tables: HashMap<HirId, Rc<RefCell<tlang_ast::symbols::SymbolTable>>>,
 }

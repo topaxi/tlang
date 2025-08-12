@@ -1,16 +1,12 @@
 use tlang_ast::symbols::SymbolType;
-use tlang_ast_lowering::{LowerResult, lower_to_hir};
+use tlang_ast_lowering::lower_to_hir;
 use tlang_hir::hir;
-use tlang_hir_opt::hir_opt::HirOptGroup;
-use tlang_hir_opt::{
-    HirPass, constant_folding::ConstantFolder, constant_propagation::ConstantPropagator,
-    hir_opt::HirOptimizer,
-};
+use tlang_hir_opt::hir_opt::HirOptimizer;
 use tlang_hir_pretty::HirPrettyOptions;
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
 
-pub fn compile(source: &str) -> LowerResult {
+pub fn compile(source: &str) -> hir::LowerResult {
     let ast = Parser::from_source(source).parse().unwrap();
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.add_builtin_symbols(&[("println", SymbolType::Function(u16::MAX))]);
@@ -22,24 +18,10 @@ pub fn compile(source: &str) -> LowerResult {
     )
 }
 
-pub fn optimize(module: &mut hir::Module, passes: Vec<Box<dyn HirPass>>) {
-    let mut optimizer = HirOptimizer::new(HirOptGroup::new(passes));
-    optimizer.optimize_module(module);
-}
-
 pub fn compile_and_optimize(source: &str) -> hir::Module {
-    compile_with_passes(
-        source,
-        vec![
-            Box::new(ConstantFolder::default()),
-            Box::new(ConstantPropagator::default()),
-        ],
-    )
-}
-
-pub fn compile_with_passes(source: &str, passes: Vec<Box<dyn HirPass>>) -> hir::Module {
     let mut hir = compile(source);
-    optimize(&mut hir.module, passes);
+    let mut optimizer = HirOptimizer::default();
+    optimizer.optimize_hir(&mut hir);
     hir.module
 }
 

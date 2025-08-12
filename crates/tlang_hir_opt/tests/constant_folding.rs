@@ -89,7 +89,7 @@ fn constant_folding_mutable_variable() {
             }
             i
         }
-        loop_test() |> log();
+        loop_test() |> println();
     "#;
 
     let hir = common::compile_and_optimize(source);
@@ -104,7 +104,7 @@ fn constant_folding_mutable_variable() {
         };
         i
     };
-    log(loop_test());
+    println(loop_test());
     "###);
 }
 

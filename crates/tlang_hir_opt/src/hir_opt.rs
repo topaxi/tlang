@@ -1,7 +1,7 @@
-use tlang_hir::hir::Module;
+use tlang_hir::hir::LowerResult;
 
 pub trait HirPass {
-    fn optimize_module(&mut self, module: &mut Module) -> bool;
+    fn optimize_hir(&mut self, hir: &mut LowerResult) -> bool;
 }
 
 #[derive(Default)]
@@ -20,7 +20,7 @@ impl HirOptGroup {
 }
 
 impl HirPass for HirOptGroup {
-    fn optimize_module(&mut self, module: &mut Module) -> bool {
+    fn optimize_hir(&mut self, module: &mut LowerResult) -> bool {
         let mut iteration = 0;
         let mut changed = true;
 
@@ -32,7 +32,7 @@ impl HirPass for HirOptGroup {
 
             changed = false;
             for pass in &mut self.passes {
-                changed |= pass.optimize_module(module);
+                changed |= pass.optimize_hir(module);
             }
         }
         false
@@ -45,24 +45,26 @@ pub struct HirOptimizer {
 
 impl Default for HirOptimizer {
     fn default() -> Self {
-        Self::new(HirOptGroup::new(vec![
+        Self::new(vec![
             Box::new(crate::ConstantFolder::default()),
             Box::new(crate::ConstantPropagator::default()),
             Box::new(crate::symbol_resolution::SymbolResolution::default()),
-        ]))
+        ])
     }
 }
 
 impl HirOptimizer {
-    pub fn new(group: HirOptGroup) -> Self {
-        Self { group }
+    pub fn new(passes: Vec<Box<dyn HirPass>>) -> Self {
+        Self {
+            group: HirOptGroup::new(passes),
+        }
     }
 
     pub fn add_pass(&mut self, pass: Box<dyn HirPass>) {
         self.group.passes.push(pass);
     }
 
-    pub fn optimize_module(&mut self, module: &mut Module) -> bool {
-        self.group.optimize_module(module)
+    pub fn optimize_hir(&mut self, hir: &mut LowerResult) -> bool {
+        self.group.optimize_hir(hir)
     }
 }

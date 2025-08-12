@@ -26,8 +26,8 @@ impl SymbolResolution {
 }
 
 impl HirPass for SymbolResolution {
-    fn optimize_module(&mut self, module: &mut hir::Module) -> bool {
-        self.0.optimize_module(module)
+    fn optimize_hir(&mut self, hir: &mut hir::LowerResult) -> bool {
+        self.0.optimize_hir(hir)
     }
 }
 
@@ -117,7 +117,7 @@ impl DeclarationCollector {
 }
 
 impl HirPass for DeclarationCollector {
-    fn optimize_module(&mut self, _module: &mut tlang_hir::hir::Module) -> bool {
+    fn optimize_hir(&mut self, _hir: &mut hir::LowerResult) -> bool {
         false
     }
 }
@@ -133,7 +133,7 @@ impl IdentifierResolver {
 }
 
 impl HirPass for IdentifierResolver {
-    fn optimize_module(&mut self, _module: &mut tlang_hir::hir::Module) -> bool {
+    fn optimize_hir(&mut self, _hir: &mut hir::LowerResult) -> bool {
         false
     }
 }
