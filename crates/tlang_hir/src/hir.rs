@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::num::NonZero;
 use std::rc::Rc;
 
 #[cfg(feature = "serde")]
@@ -10,27 +9,17 @@ use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::span::Span;
 use tlang_ast::token::{Literal, Token};
 
+#[deprecated(note = "Use `tlang_span::HirId` instead")]
+pub use tlang_span::HirId;
+
 pub trait HirScope {
+    // fn hir_id(&self) -> HirId;
+
     fn locals(&self) -> usize;
     fn upvars(&self) -> usize;
 
     fn set_locals(&mut self, locals: usize);
     fn set_upvars(&mut self, upvars: usize);
-}
-
-#[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
-pub struct HirId(NonZero<usize>);
-
-impl HirId {
-    /// # Panics
-    pub fn new(id: usize) -> Self {
-        HirId(NonZero::new(id).expect("HirId must be non-zero"))
-    }
-
-    pub fn next(self) -> Self {
-        HirId(self.0.saturating_add(1))
-    }
 }
 
 #[derive(Debug, Default, Clone)]

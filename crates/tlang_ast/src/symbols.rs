@@ -5,9 +5,11 @@ use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fmt::Display;
+use std::num::NonZero;
 use std::rc::Rc;
 
-use crate::node_id::NodeId;
+use tlang_span::NodeId;
+
 use crate::span::Span;
 
 #[derive(Debug, Default, PartialEq, Copy, Clone)]
@@ -46,21 +48,21 @@ impl Display for SymbolType {
     }
 }
 
-#[derive(Debug, Default, Eq, PartialEq, Clone, Copy, Hash)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-pub struct SymbolId(usize);
+pub struct SymbolId(NonZero<usize>);
 
 impl SymbolId {
     pub fn new(id: usize) -> Self {
-        SymbolId(id)
+        SymbolId(NonZero::new(id).expect("SymbolId cannot be zero"))
     }
 
     pub fn next(self) -> Self {
-        SymbolId(self.0 + 1)
+        SymbolId(self.0.saturating_add(1))
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct SymbolIdAllocator {
     next_id: SymbolId,
 }
@@ -68,7 +70,7 @@ pub struct SymbolIdAllocator {
 impl SymbolIdAllocator {
     pub fn new() -> Self {
         SymbolIdAllocator {
-            next_id: SymbolId::new(0),
+            next_id: SymbolId::new(1),
         }
     }
 
@@ -79,41 +81,46 @@ impl SymbolIdAllocator {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Clone)]
+impl Default for SymbolIdAllocator {
+    fn default() -> Self {
+        SymbolIdAllocator::new()
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct SymbolInfo {
     pub id: SymbolId,
     pub name: Box<str>,
     pub symbol_type: SymbolType,
     pub defined_at: Span,
-    pub node_id: NodeId,
+    pub node_id: Option<NodeId>,
+    pub builtin: bool,
     pub used: bool,
 }
 
 impl SymbolInfo {
-    pub fn new(
-        node_id: NodeId,
-        id: SymbolId,
-        name: &str,
-        symbol_type: SymbolType,
-        defined_at: Span,
-    ) -> Self {
+    pub fn new(id: SymbolId, name: &str, symbol_type: SymbolType, defined_at: Span) -> Self {
         SymbolInfo {
             id,
             name: name.into(),
             symbol_type,
             defined_at,
-            node_id,
-            ..Default::default()
+            node_id: None,
+            builtin: false,
+            used: false,
         }
     }
 
-    pub fn new_builtin(name: &str, symbol_type: SymbolType) -> Self {
-        SymbolInfo {
-            name: name.into(),
-            symbol_type,
-            ..Default::default()
-        }
+    pub fn new_builtin(id: SymbolId, name: &str, symbol_type: SymbolType) -> Self {
+        let mut symbol_info = SymbolInfo::new(id, name, symbol_type, Span::default());
+        symbol_info.builtin = true;
+        symbol_info
+    }
+
+    pub fn with_node_id(mut self, node_id: NodeId) -> Self {
+        self.node_id = Some(node_id);
+        self
     }
 
     pub fn is_fn(&self, arity: usize) -> bool {
@@ -151,7 +158,7 @@ impl SymbolTable {
     }
 
     pub fn get_local_by_node_id(&self, node_id: NodeId) -> Option<&SymbolInfo> {
-        self.symbols.iter().find(|s| s.node_id == node_id)
+        self.symbols.iter().find(|s| s.node_id == Some(node_id))
     }
 
     fn get_locals_by_name(&self, name: &str) -> Vec<&SymbolInfo> {

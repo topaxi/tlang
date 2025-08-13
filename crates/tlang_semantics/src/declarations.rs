@@ -1,8 +1,8 @@
 use std::rc::Rc;
 use std::{cell::RefCell, collections::HashMap};
+use tlang_ast::NodeId;
 use tlang_ast::keyword::kw;
 use tlang_ast::node::MatchExpression;
-use tlang_ast::node_id::NodeId;
 use tlang_ast::span::Span;
 use tlang_ast::symbols::SymbolIdAllocator;
 use tlang_ast::{
@@ -76,7 +76,8 @@ impl DeclarationAnalyzer {
 
     #[inline(always)]
     fn declare_symbol(&mut self, node_id: NodeId, name: &str, symbol_type: SymbolType, span: Span) {
-        let symbol_info = SymbolInfo::new(node_id, self.unique_id(), name, symbol_type, span);
+        let symbol_info =
+            SymbolInfo::new(self.unique_id(), name, symbol_type, span).with_node_id(node_id);
         let symbol_table = self.current_symbol_table();
 
         symbol_table.borrow_mut().insert(symbol_info);
@@ -88,9 +89,10 @@ impl DeclarationAnalyzer {
         I: IntoIterator<Item = &'a (S, SymbolType)>,
     {
         for (name, symbol_type) in symbols {
-            self.root_symbol_table()
-                .borrow_mut()
-                .insert(SymbolInfo::new_builtin(name.as_ref(), *symbol_type));
+            let symbol_info =
+                SymbolInfo::new_builtin(self.unique_id(), name.as_ref(), *symbol_type);
+
+            self.root_symbol_table().borrow_mut().insert(symbol_info);
         }
     }
 

@@ -942,6 +942,7 @@ dependencies = [
  "log",
  "pretty_assertions",
  "serde",
+ "tlang_span",
 ]
 
 [[package]]
@@ -1022,6 +1023,7 @@ dependencies = [
  "pretty_assertions",
  "serde",
  "tlang_ast",
+ "tlang_span",
 ]
 
 [[package]]
@@ -1114,6 +1116,7 @@ dependencies = [
  "serde",
  "tlang_ast",
  "tlang_lexer",
+ "tlang_span",
 ]
 
 [[package]]
@@ -1125,6 +1128,13 @@ dependencies = [
  "serde",
  "tlang_ast",
  "tlang_parser",
+]
+
+[[package]]
+name = "tlang_span"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

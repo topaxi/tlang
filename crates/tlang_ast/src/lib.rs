@@ -1,11 +1,11 @@
 pub mod keyword;
 pub(crate) mod macros;
 pub mod node;
-pub mod node_id;
 pub mod span;
 pub mod symbols;
 pub mod token;
 pub mod visit;
 
-pub use node_id::NodeId;
+#[deprecated(note = "Use `tlang_span::NodeId` instead")]
+pub use tlang_span::NodeId;
 pub use visit::Visitor;

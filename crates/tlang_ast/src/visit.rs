@@ -321,8 +321,9 @@ mod tests {
     use self::node::{BinaryOpExpression, BinaryOpKind, Ident, Path};
     use pretty_assertions::assert_eq;
 
+    use tlang_span::NodeId;
+
     use super::*;
-    use crate::node_id::NodeId;
     use crate::span::Span;
     use crate::token::Literal;
 
@@ -381,7 +382,10 @@ mod tests {
 
     #[test]
     fn test_walk_module() {
-        let module = node::Module::new(NodeId::new(0), vec![node::Stmt::default()]);
+        let module = node::Module::new(
+            NodeId::new(1),
+            vec![node::Stmt::new(NodeId::new(2), node::StmtKind::None)],
+        );
         let mut visitor = TestVisitor { visited: vec![] };
         walk_module(&mut visitor, &module);
         assert_eq!(visitor.visited, vec!["visit_statement"]);
@@ -389,8 +393,8 @@ mod tests {
 
     #[test]
     fn test_walk_block() {
-        let statements = vec![node::Stmt::default()];
-        let expression = Some(node::Expr::default());
+        let statements = vec![node::Stmt::new(NodeId::new(1), node::StmtKind::None)];
+        let expression = Some(node::Expr::new(NodeId::new(2), node::ExprKind::None));
         let mut visitor = TestVisitor { visited: vec![] };
         walk_block(&mut visitor, &statements, &expression);
         assert_eq!(visitor.visited, vec!["visit_statement", "visit_expression"]);
@@ -398,7 +402,13 @@ mod tests {
 
     #[test]
     fn test_walk_statement() {
-        let statement = node::Stmt::new(NodeId::new(0), node::StmtKind::Expr(Box::default()));
+        let statement = node::Stmt::new(
+            NodeId::new(1),
+            node::StmtKind::Expr(Box::new(node::Expr::new(
+                NodeId::new(2),
+                node::ExprKind::None,
+            ))),
+        );
         let mut visitor = TestVisitor { visited: vec![] };
         walk_stmt(&mut visitor, &statement);
         assert_eq!(visitor.visited, vec!["visit_expression"]);
@@ -407,9 +417,9 @@ mod tests {
     #[test]
     fn test_walk_function_declaration() {
         let declaration = node::FunctionDeclaration {
-            id: NodeId::new(0),
+            id: NodeId::new(1),
             name: node::Expr::new(
-                NodeId::new(0),
+                NodeId::new(2),
                 node::ExprKind::Path(Box::new(node::Path::new(vec![Ident::new(
                     "my_fn",
                     Span::default(),
@@ -417,31 +427,34 @@ mod tests {
             ),
             parameters: vec![node::FunctionParameter {
                 pattern: node::Pat::new(
-                    NodeId::new(0),
+                    NodeId::new(3),
                     node::PatKind::Identifier(Box::new(Ident::new("x", Span::default()))),
                 ),
                 type_annotation: None,
                 span: Span::default(),
             }],
             guard: Some(node::Expr::new(
-                NodeId::new(0),
+                NodeId::new(4),
                 node::ExprKind::BinaryOp(Box::new(BinaryOpExpression {
                     op: BinaryOpKind::GreaterThanOrEqual,
                     lhs: node::Expr::new(
-                        NodeId::new(0),
+                        NodeId::new(5),
                         node::ExprKind::Path(Box::new(Path::new(vec![Ident::new(
                             "x",
                             Span::default(),
                         )]))),
                     ),
                     rhs: node::Expr::new(
-                        NodeId::new(0),
+                        NodeId::new(6),
                         node::ExprKind::Literal(Box::new(Literal::Integer(5))),
                     ),
                 })),
             )),
             return_type_annotation: None,
-            ..Default::default()
+            body: node::Block::new(NodeId::new(7), vec![], None),
+            leading_comments: vec![],
+            trailing_comments: vec![],
+            span: Span::default(),
         };
         let mut visitor = TestVisitor { visited: vec![] };
         walk_fn_decl(&mut visitor, &declaration);

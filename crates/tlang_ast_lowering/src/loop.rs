@@ -14,7 +14,6 @@ impl LoweringContext {
         let block = self.with_scope(for_loop.id, |this| {
             let iterator_binding_name = Ident::new("iterator$$", Default::default());
             this.scope().borrow_mut().insert(SymbolInfo::new(
-                ast::NodeId::new(0),
                 this.symbol_id_allocator.next_id(),
                 iterator_binding_name.as_str(),
                 SymbolType::Variable,
@@ -30,7 +29,6 @@ impl LoweringContext {
             let accumulator_initializer = if let Some((_pat, expr)) = &for_loop.acc {
                 let hir_id = this.unique_id();
                 this.scope().borrow_mut().insert(SymbolInfo::new(
-                    ast::NodeId::new(0),
                     this.symbol_id_allocator.next_id(),
                     accumulator_binding_name.as_str(),
                     SymbolType::Variable,

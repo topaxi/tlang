@@ -1,13 +1,13 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use tlang_ast::{
+    NodeId,
     node::{
         BinaryOpKind, Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter,
         LetDeclaration, Module, Pat, PatKind, Path, Stmt, StmtKind, StructDeclaration,
     },
-    node_id::NodeId,
     span::Span,
-    symbols::{SymbolId, SymbolIdAllocator, SymbolInfo, SymbolTable, SymbolType},
+    symbols::{SymbolIdAllocator, SymbolInfo, SymbolTable, SymbolType},
 };
 
 use crate::{
@@ -474,7 +474,7 @@ impl SemanticAnalyzer {
             .iter()
             // Internal symbols are currently represented with id 0 and internal symbols are not
             // reported as unused.
-            .filter(|symbol| symbol.id != SymbolId::new(0))
+            .filter(|symbol| !symbol.builtin)
             .filter(|symbol| !symbol.used)
             .filter(|symbol| !symbol.name.starts_with('_'))
             // TODO: We currently do not track member methods, as we do not have any type

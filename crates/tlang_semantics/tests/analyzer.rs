@@ -1,8 +1,8 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
 use tlang_ast::{
+    NodeId,
     node::StmtKind,
-    node_id::NodeId,
     span::{LineColumn, Span},
     symbols::{SymbolId, SymbolInfo, SymbolType},
 };
@@ -139,18 +139,7 @@ fn test_should_allow_shadowing_of_single_variable() {
         program_symbols.borrow().get_by_name("a"),
         vec![
             SymbolInfo {
-                node_id: NodeId::new(2),
-                id: SymbolId::new(1),
-                name: "a".into(),
-                symbol_type: SymbolType::Variable,
-                defined_at: Span::new(
-                    LineColumn { line: 0, column: 4 },
-                    LineColumn { line: 0, column: 5 }
-                ),
-                ..Default::default()
-            },
-            SymbolInfo {
-                node_id: NodeId::new(5),
+                node_id: Some(NodeId::new(5)),
                 id: SymbolId::new(2),
                 name: "a".into(),
                 symbol_type: SymbolType::Variable,
@@ -158,8 +147,21 @@ fn test_should_allow_shadowing_of_single_variable() {
                     LineColumn { line: 1, column: 5 },
                     LineColumn { line: 1, column: 6 }
                 ),
-                ..Default::default()
-            }
+                builtin: false,
+                used: false,
+            },
+            SymbolInfo {
+                node_id: Some(NodeId::new(2)),
+                id: SymbolId::new(1),
+                name: "a".into(),
+                symbol_type: SymbolType::Variable,
+                defined_at: Span::new(
+                    LineColumn { line: 0, column: 4 },
+                    LineColumn { line: 0, column: 5 }
+                ),
+                builtin: false,
+                used: false,
+            },
         ]
     );
 }
@@ -181,17 +183,18 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
             .borrow()
             .get_by_name("a")
             .iter()
-            .find(|s| s.id == SymbolId::new(0))
+            .find(|s| s.id == SymbolId::new(1))
             .cloned(),
         Some(SymbolInfo {
-            node_id: NodeId::new(2),
-            id: SymbolId::new(0),
+            node_id: Some(NodeId::new(2)),
+            id: SymbolId::new(1),
             name: "a".into(),
             symbol_type: SymbolType::Variable,
             defined_at: Span::new(
                 LineColumn { line: 0, column: 4 },
                 LineColumn { line: 0, column: 5 }
             ),
+            builtin: false,
             used: true,
         })
     );
@@ -200,17 +203,18 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
             .borrow()
             .get_by_name("a")
             .iter()
-            .find(|s| s.id == SymbolId::new(1))
+            .find(|s| s.id == SymbolId::new(2))
             .cloned(),
         Some(SymbolInfo {
-            node_id: NodeId::new(5),
-            id: SymbolId::new(1),
+            node_id: Some(NodeId::new(5)),
+            id: SymbolId::new(2),
             name: "a".into(),
             symbol_type: SymbolType::Variable,
             defined_at: Span::new(
                 LineColumn { line: 1, column: 5 },
                 LineColumn { line: 1, column: 6 }
             ),
+            builtin: false,
             used: false,
         })
     );
@@ -261,7 +265,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
     assert_eq!(
         program_symbols.borrow().get_by_name("add"),
         vec![SymbolInfo {
-            node_id: NodeId::new(12),
+            node_id: Some(NodeId::new(12)),
             id: SymbolId::new(1),
             name: "add".into(),
             symbol_type: SymbolType::Function(2),
@@ -269,7 +273,8 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
             ),
-            ..Default::default()
+            builtin: false,
+            used: false,
         }]
     );
 
@@ -279,7 +284,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
     };
 
     let c_symbol_info = SymbolInfo {
-        node_id: NodeId::new(14),
+        node_id: Some(NodeId::new(14)),
         id: SymbolId::new(4),
         name: "c".into(),
         symbol_type: SymbolType::Variable,
@@ -287,6 +292,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
             LineColumn { line: 4, column: 5 },
             LineColumn { line: 4, column: 6 },
         ),
+        builtin: false,
         used: true,
     };
 

@@ -99,9 +99,7 @@ impl LoweringContext {
         }
     }
 
-    fn lower_node_id(&mut self, id: ast::node_id::NodeId) -> HirId {
-        debug_assert!(id != ast::node_id::NodeId::new(0));
-
+    fn lower_node_id(&mut self, id: ast::NodeId) -> HirId {
         if let Some(hir_id) = self.node_id_to_hir_id.get(&id) {
             *hir_id
         } else {

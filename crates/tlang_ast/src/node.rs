@@ -2,8 +2,9 @@
 use serde::Serialize;
 use std::fmt::Display;
 
+use tlang_span::NodeId;
+
 use crate::keyword::kw;
-use crate::node_id::NodeId;
 use crate::token::Token;
 use crate::{
     span::{Span, Spanned},
@@ -91,7 +92,7 @@ impl FunctionParameter {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct FunctionDeclaration {
     pub id: NodeId,
@@ -105,7 +106,7 @@ pub struct FunctionDeclaration {
     pub span: Span,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Block {
     pub id: NodeId,
@@ -120,7 +121,7 @@ impl Block {
             id,
             statements,
             expression,
-            ..Default::default()
+            span: Span::default(),
         }
     }
 
@@ -176,7 +177,7 @@ pub struct IfElseExpression {
     pub else_branches: Vec<ElseClause>,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Expr {
     pub id: NodeId,
@@ -191,7 +192,9 @@ impl Expr {
         Expr {
             id,
             kind,
-            ..Default::default()
+            leading_comments: vec![],
+            trailing_comments: vec![],
+            span: Span::default(),
         }
     }
 
@@ -329,7 +332,7 @@ impl Path {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Pat {
     pub id: NodeId,
@@ -344,7 +347,9 @@ impl Pat {
         Pat {
             id,
             kind,
-            ..Default::default()
+            leading_comments: vec![],
+            trailing_comments: vec![],
+            span: Span::default(),
         }
     }
 
@@ -425,7 +430,7 @@ pub struct EnumDeclaration {
     pub variants: Vec<EnumVariant>,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Stmt {
     pub id: NodeId,
@@ -440,7 +445,9 @@ impl Stmt {
         Stmt {
             id,
             kind,
-            ..Default::default()
+            span: Span::default(),
+            leading_comments: vec![],
+            trailing_comments: vec![],
         }
     }
 
@@ -527,7 +534,7 @@ pub struct MatchArm {
     pub expression: Expr,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Module {
     pub id: NodeId,

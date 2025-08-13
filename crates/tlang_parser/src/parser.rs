@@ -1,3 +1,4 @@
+use tlang_ast::NodeId;
 use tlang_ast::keyword::{Keyword, kw};
 use tlang_ast::node::{
     self, Associativity, BinaryOpExpression, BinaryOpKind, Block, CallExpression, ElseClause,
@@ -6,7 +7,6 @@ use tlang_ast::node::{
     LetDeclaration, MatchArm, MatchExpression, Module, OperatorInfo, Pat, Path, Stmt, StmtKind,
     StructDeclaration, StructField, Ty, UnaryOp,
 };
-use tlang_ast::node_id::NodeId;
 use tlang_ast::span::Span;
 use tlang_ast::token::{Literal, Token, TokenKind};
 use tlang_lexer::Lexer;
@@ -35,7 +35,7 @@ impl<'src> Parser<'src> {
             previous_span: Span::default(),
             current_token: Token::default(),
             next_token: Token::default(),
-            unique_id: NodeId::new(0),
+            unique_id: NodeId::new(1),
             errors: Vec::new(),
             recoverable: false,
         }
@@ -55,8 +55,9 @@ impl<'src> Parser<'src> {
     }
 
     fn unique_id(&mut self) -> NodeId {
+        let unique_id = self.unique_id;
         self.unique_id = self.unique_id.next();
-        self.unique_id
+        unique_id
     }
 
     pub fn from_source(source: &'src str) -> Parser<'src> {
@@ -1214,7 +1215,9 @@ impl<'src> Parser<'src> {
                 body,
                 return_type_annotation: return_type,
                 span,
-                ..Default::default()
+                guard: None,
+                leading_comments: vec![],
+                trailing_comments: vec![],
             }))
         )
         .with_span(span)
@@ -1358,8 +1361,8 @@ impl<'src> Parser<'src> {
                 body,
                 return_type_annotation: return_type,
                 leading_comments: comments,
+                trailing_comments: vec![],
                 span,
-                ..Default::default()
             });
         }
 
