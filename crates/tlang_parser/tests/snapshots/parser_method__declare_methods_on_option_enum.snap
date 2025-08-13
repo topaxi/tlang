@@ -1,12 +1,12 @@
 ---
 source: crates/tlang_parser/tests/parser_method.rs
-expression: "parse!\n(indoc!\n{\n    \"\n        enum Option {\n            Some(x),\n            None,\n        }\n\n        fn Option::is_option(Option::Some(_)) { true }\n        fn Option::is_option(Option::None) { true }\n        fn Option::is_option(_) { false }\n\n        fn Option.is_some(Option::Some(_)) { true }\n        fn Option.is_some(Option::None) { false }\n\n        fn Option.map(Option::Some(x), f) { Option::Some(f(x)) }\n        fn Option.map(Option::None, _) { Option::None }\n    \"\n})"
+expression: "parse!\n(indoc!\n{\"\n        enum Option {\n            Some(x),\n            None,\n        }\n\n        fn Option::is_option(Option::Some(_)) { true }\n        fn Option::is_option(Option::None) { true }\n        fn Option::is_option(_) { false }\n\n        fn Option.is_some(Option::Some(_)) { true }\n        fn Option.is_some(Option::None) { false }\n\n        fn Option.map(Option::Some(x), f) { Option::Some(f(x)) }\n        fn Option.map(Option::None, _) { Option::None }\n    \"})"
 ---
 Module(
-  id: NodeId(1),
+  id: 1,
   statements: [
     Stmt(
-      id: NodeId(6),
+      id: 6,
       kind: EnumDeclaration(EnumDeclaration(
         name: Ident(
           name: "Option",
@@ -23,7 +23,7 @@ Module(
         ),
         variants: [
           EnumVariant(
-            id: NodeId(4),
+            id: 4,
             name: Ident(
               name: "Some",
               span: Span(
@@ -39,7 +39,7 @@ Module(
             ),
             parameters: [
               StructField(
-                id: NodeId(3),
+                id: 3,
                 name: Ident(
                   name: "0",
                   span: Span(
@@ -54,7 +54,7 @@ Module(
                   ),
                 ),
                 ty: Ty(
-                  id: NodeId(2),
+                  id: 2,
                   name: Path(
                     segments: [
                       Ident(
@@ -108,7 +108,7 @@ Module(
             ),
           ),
           EnumVariant(
-            id: NodeId(5),
+            id: 5,
             name: Ident(
               name: "None",
               span: Span(
@@ -150,12 +150,12 @@ Module(
       trailing_comments: [],
     ),
     Stmt(
-      id: NodeId(28),
+      id: 28,
       kind: FunctionDeclarations([
         FunctionDeclaration(
-          id: NodeId(13),
+          id: 13,
           name: Expr(
-            id: NodeId(7),
+            id: 7,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -212,7 +212,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: NodeId(9),
+                id: 9,
                 kind: Enum(EnumPattern(
                   path: Path(
                     segments: [
@@ -268,7 +268,7 @@ Module(
                         ),
                       ),
                     ), Pat(
-                      id: NodeId(8),
+                      id: 8,
                       kind: Wildcard,
                       leading_comments: [],
                       trailing_comments: [],
@@ -314,10 +314,10 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: NodeId(12),
+            id: 12,
             statements: [],
             expression: Some(Expr(
-              id: NodeId(11),
+              id: 11,
               kind: Literal(Boolean(true)),
               leading_comments: [],
               trailing_comments: [],
@@ -357,9 +357,9 @@ Module(
           ),
         ),
         FunctionDeclaration(
-          id: NodeId(19),
+          id: 19,
           name: Expr(
-            id: NodeId(14),
+            id: 14,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -416,7 +416,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: NodeId(15),
+                id: 15,
                 kind: Enum(EnumPattern(
                   path: Path(
                     segments: [
@@ -489,10 +489,10 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: NodeId(18),
+            id: 18,
             statements: [],
             expression: Some(Expr(
-              id: NodeId(17),
+              id: 17,
               kind: Literal(Boolean(true)),
               leading_comments: [],
               trailing_comments: [],
@@ -532,9 +532,9 @@ Module(
           ),
         ),
         FunctionDeclaration(
-          id: NodeId(25),
+          id: 25,
           name: Expr(
-            id: NodeId(20),
+            id: 20,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -591,7 +591,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: NodeId(21),
+                id: 21,
                 kind: Wildcard,
                 leading_comments: [],
                 trailing_comments: [],
@@ -622,10 +622,10 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: NodeId(24),
+            id: 24,
             statements: [],
             expression: Some(Expr(
-              id: NodeId(23),
+              id: 23,
               kind: Literal(Boolean(false)),
               leading_comments: [],
               trailing_comments: [],
@@ -679,15 +679,15 @@ Module(
       trailing_comments: [],
     ),
     Stmt(
-      id: NodeId(46),
+      id: 46,
       kind: FunctionDeclarations([
         FunctionDeclaration(
-          id: NodeId(36),
+          id: 36,
           name: Expr(
-            id: NodeId(30),
+            id: 30,
             kind: FieldExpression(FieldAccessExpression(
               base: Expr(
-                id: NodeId(29),
+                id: 29,
                 kind: Path(Path(
                   segments: [
                     Ident(
@@ -758,7 +758,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: NodeId(32),
+                id: 32,
                 kind: Enum(EnumPattern(
                   path: Path(
                     segments: [
@@ -814,7 +814,7 @@ Module(
                         ),
                       ),
                     ), Pat(
-                      id: NodeId(31),
+                      id: 31,
                       kind: Wildcard,
                       leading_comments: [],
                       trailing_comments: [],
@@ -860,10 +860,10 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: NodeId(35),
+            id: 35,
             statements: [],
             expression: Some(Expr(
-              id: NodeId(34),
+              id: 34,
               kind: Literal(Boolean(true)),
               leading_comments: [],
               trailing_comments: [],
@@ -903,12 +903,12 @@ Module(
           ),
         ),
         FunctionDeclaration(
-          id: NodeId(43),
+          id: 43,
           name: Expr(
-            id: NodeId(38),
+            id: 38,
             kind: FieldExpression(FieldAccessExpression(
               base: Expr(
-                id: NodeId(37),
+                id: 37,
                 kind: Path(Path(
                   segments: [
                     Ident(
@@ -979,7 +979,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: NodeId(39),
+                id: 39,
                 kind: Enum(EnumPattern(
                   path: Path(
                     segments: [
@@ -1052,10 +1052,10 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: NodeId(42),
+            id: 42,
             statements: [],
             expression: Some(Expr(
-              id: NodeId(41),
+              id: 41,
               kind: Literal(Boolean(false)),
               leading_comments: [],
               trailing_comments: [],
@@ -1109,15 +1109,15 @@ Module(
       trailing_comments: [],
     ),
     Stmt(
-      id: NodeId(68),
+      id: 68,
       kind: FunctionDeclarations([
         FunctionDeclaration(
-          id: NodeId(59),
+          id: 59,
           name: Expr(
-            id: NodeId(48),
+            id: 48,
             kind: FieldExpression(FieldAccessExpression(
               base: Expr(
-                id: NodeId(47),
+                id: 47,
                 kind: Path(Path(
                   segments: [
                     Ident(
@@ -1188,7 +1188,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: NodeId(50),
+                id: 50,
                 kind: Enum(EnumPattern(
                   path: Path(
                     segments: [
@@ -1244,7 +1244,7 @@ Module(
                         ),
                       ),
                     ), Pat(
-                      id: NodeId(49),
+                      id: 49,
                       kind: Identifier(Ident(
                         name: "x",
                         span: Span(
@@ -1300,7 +1300,7 @@ Module(
             ),
             FunctionParameter(
               pattern: Pat(
-                id: NodeId(51),
+                id: 51,
                 kind: Identifier(Ident(
                   name: "f",
                   span: Span(
@@ -1343,13 +1343,13 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: NodeId(58),
+            id: 58,
             statements: [],
             expression: Some(Expr(
-              id: NodeId(57),
+              id: 57,
               kind: Call(CallExpression(
                 callee: Expr(
-                  id: NodeId(53),
+                  id: 53,
                   kind: Path(Path(
                     segments: [
                       Ident(
@@ -1405,10 +1405,10 @@ Module(
                 ),
                 arguments: [
                   Expr(
-                    id: NodeId(56),
+                    id: 56,
                     kind: Call(CallExpression(
                       callee: Expr(
-                        id: NodeId(54),
+                        id: 54,
                         kind: Path(Path(
                           segments: [
                             Ident(
@@ -1451,7 +1451,7 @@ Module(
                       ),
                       arguments: [
                         Expr(
-                          id: NodeId(55),
+                          id: 55,
                           kind: Path(Path(
                             segments: [
                               Ident(
@@ -1547,12 +1547,12 @@ Module(
           ),
         ),
         FunctionDeclaration(
-          id: NodeId(67),
+          id: 67,
           name: Expr(
-            id: NodeId(61),
+            id: 61,
             kind: FieldExpression(FieldAccessExpression(
               base: Expr(
-                id: NodeId(60),
+                id: 60,
                 kind: Path(Path(
                   segments: [
                     Ident(
@@ -1623,7 +1623,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: NodeId(62),
+                id: 62,
                 kind: Enum(EnumPattern(
                   path: Path(
                     segments: [
@@ -1694,7 +1694,7 @@ Module(
             ),
             FunctionParameter(
               pattern: Pat(
-                id: NodeId(63),
+                id: 63,
                 kind: Wildcard,
                 leading_comments: [],
                 trailing_comments: [],
@@ -1725,10 +1725,10 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: NodeId(66),
+            id: 66,
             statements: [],
             expression: Some(Expr(
-              id: NodeId(65),
+              id: 65,
               kind: Path(Path(
                 segments: [
                   Ident(

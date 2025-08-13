@@ -3,13 +3,13 @@ source: crates/tlang_parser/tests/parser_types.rs
 expression: "parse! (\"let expr = fn foo() -> i64 { 1 };\")"
 ---
 Module(
-  id: NodeId(1),
+  id: 1,
   statements: [
     Stmt(
-      id: NodeId(10),
+      id: 10,
       kind: Let(LetDeclaration(
         pattern: Pat(
-          id: NodeId(2),
+          id: 2,
           kind: Identifier(Ident(
             name: "expr",
             span: Span(
@@ -37,11 +37,11 @@ Module(
           ),
         ),
         expression: Expr(
-          id: NodeId(8),
+          id: 8,
           kind: FunctionExpression(FunctionDeclaration(
-            id: NodeId(9),
+            id: 9,
             name: Expr(
-              id: NodeId(3),
+              id: 3,
               kind: Path(Path(
                 segments: [
                   Ident(
@@ -85,7 +85,7 @@ Module(
             parameters: [],
             guard: None,
             return_type_annotation: Some(Ty(
-              id: NodeId(4),
+              id: 4,
               name: Path(
                 segments: [
                   Ident(
@@ -126,10 +126,10 @@ Module(
               ),
             )),
             body: Block(
-              id: NodeId(7),
+              id: 7,
               statements: [],
               expression: Some(Expr(
-                id: NodeId(6),
+                id: 6,
                 kind: Literal(UnsignedInteger(1)),
                 leading_comments: [],
                 trailing_comments: [],

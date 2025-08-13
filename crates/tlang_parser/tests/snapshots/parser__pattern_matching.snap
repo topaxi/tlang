@@ -3,13 +3,13 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse! (\"let x = match 1 { 1 => 2, 3 => 4, _ => 5 };\")"
 ---
 Module(
-  id: NodeId(1),
+  id: 1,
   statements: [
     Stmt(
-      id: NodeId(14),
+      id: 14,
       kind: Let(LetDeclaration(
         pattern: Pat(
-          id: NodeId(2),
+          id: 2,
           kind: Identifier(Ident(
             name: "x",
             span: Span(
@@ -37,10 +37,10 @@ Module(
           ),
         ),
         expression: Expr(
-          id: NodeId(13),
+          id: 13,
           kind: Match(MatchExpression(
             expression: Expr(
-              id: NodeId(3),
+              id: 3,
               kind: Literal(UnsignedInteger(1)),
               leading_comments: [],
               trailing_comments: [],
@@ -57,9 +57,9 @@ Module(
             ),
             arms: [
               MatchArm(
-                id: NodeId(6),
+                id: 6,
                 pattern: Pat(
-                  id: NodeId(4),
+                  id: 4,
                   kind: Literal(UnsignedInteger(1)),
                   leading_comments: [],
                   trailing_comments: [],
@@ -76,7 +76,7 @@ Module(
                 ),
                 guard: None,
                 expression: Expr(
-                  id: NodeId(5),
+                  id: 5,
                   kind: Literal(UnsignedInteger(2)),
                   leading_comments: [],
                   trailing_comments: [],
@@ -93,9 +93,9 @@ Module(
                 ),
               ),
               MatchArm(
-                id: NodeId(9),
+                id: 9,
                 pattern: Pat(
-                  id: NodeId(7),
+                  id: 7,
                   kind: Literal(UnsignedInteger(3)),
                   leading_comments: [],
                   trailing_comments: [],
@@ -112,7 +112,7 @@ Module(
                 ),
                 guard: None,
                 expression: Expr(
-                  id: NodeId(8),
+                  id: 8,
                   kind: Literal(UnsignedInteger(4)),
                   leading_comments: [],
                   trailing_comments: [],
@@ -129,9 +129,9 @@ Module(
                 ),
               ),
               MatchArm(
-                id: NodeId(12),
+                id: 12,
                 pattern: Pat(
-                  id: NodeId(10),
+                  id: 10,
                   kind: Wildcard,
                   leading_comments: [],
                   trailing_comments: [],
@@ -148,7 +148,7 @@ Module(
                 ),
                 guard: None,
                 expression: Expr(
-                  id: NodeId(11),
+                  id: 11,
                   kind: Literal(UnsignedInteger(5)),
                   leading_comments: [],
                   trailing_comments: [],

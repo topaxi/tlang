@@ -22,7 +22,7 @@ pub trait HirScope {
     fn set_upvars(&mut self, upvars: usize);
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct HirScopeData {
     // How many slots to allocate for local variables.
@@ -119,7 +119,6 @@ impl Res {
     }
 }
 
-/// HIR representation of a path.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Path {
@@ -149,8 +148,12 @@ impl Path {
         }
     }
 
-    pub fn with_res(mut self, res: Res) -> Self {
+    pub fn set_res(&mut self, res: Res) {
         self.res = res;
+    }
+
+    pub fn with_res(mut self, res: Res) -> Self {
+        self.set_res(res);
         self
     }
 

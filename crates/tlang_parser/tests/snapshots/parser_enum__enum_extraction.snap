@@ -1,12 +1,12 @@
 ---
 source: crates/tlang_parser/tests/parser_enum.rs
-expression: "parse!\n(indoc!\n{\n    \"\n        enum Option {\n            Some(value),\n            None,\n        }\n\n        fn unwrap(Option::None) { panic(\\\"Cannot unwrap None\\\") }\n        fn unwrap(Option::Some(value)) { value }\n    \"\n})"
+expression: "parse!\n(indoc!\n{\"\n        enum Option {\n            Some(value),\n            None,\n        }\n\n        fn unwrap(Option::None) { panic(\\\"Cannot unwrap None\\\") }\n        fn unwrap(Option::Some(value)) { value }\n    \"})"
 ---
 Module(
-  id: NodeId(1),
+  id: 1,
   statements: [
     Stmt(
-      id: NodeId(6),
+      id: 6,
       kind: EnumDeclaration(EnumDeclaration(
         name: Ident(
           name: "Option",
@@ -23,7 +23,7 @@ Module(
         ),
         variants: [
           EnumVariant(
-            id: NodeId(4),
+            id: 4,
             name: Ident(
               name: "Some",
               span: Span(
@@ -39,7 +39,7 @@ Module(
             ),
             parameters: [
               StructField(
-                id: NodeId(3),
+                id: 3,
                 name: Ident(
                   name: "0",
                   span: Span(
@@ -54,7 +54,7 @@ Module(
                   ),
                 ),
                 ty: Ty(
-                  id: NodeId(2),
+                  id: 2,
                   name: Path(
                     segments: [
                       Ident(
@@ -108,7 +108,7 @@ Module(
             ),
           ),
           EnumVariant(
-            id: NodeId(5),
+            id: 5,
             name: Ident(
               name: "None",
               span: Span(
@@ -150,12 +150,12 @@ Module(
       trailing_comments: [],
     ),
     Stmt(
-      id: NodeId(22),
+      id: 22,
       kind: FunctionDeclarations([
         FunctionDeclaration(
-          id: NodeId(14),
+          id: 14,
           name: Expr(
-            id: NodeId(7),
+            id: 7,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -199,7 +199,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: NodeId(8),
+                id: 8,
                 kind: Enum(EnumPattern(
                   path: Path(
                     segments: [
@@ -272,13 +272,13 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: NodeId(13),
+            id: 13,
             statements: [],
             expression: Some(Expr(
-              id: NodeId(12),
+              id: 12,
               kind: Call(CallExpression(
                 callee: Expr(
-                  id: NodeId(10),
+                  id: 10,
                   kind: Path(Path(
                     segments: [
                       Ident(
@@ -321,7 +321,7 @@ Module(
                 ),
                 arguments: [
                   Expr(
-                    id: NodeId(11),
+                    id: 11,
                     kind: Literal(String("Cannot unwrap None")),
                     leading_comments: [],
                     trailing_comments: [],
@@ -376,9 +376,9 @@ Module(
           ),
         ),
         FunctionDeclaration(
-          id: NodeId(21),
+          id: 21,
           name: Expr(
-            id: NodeId(15),
+            id: 15,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -422,7 +422,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: NodeId(17),
+                id: 17,
                 kind: Enum(EnumPattern(
                   path: Path(
                     segments: [
@@ -478,7 +478,7 @@ Module(
                         ),
                       ),
                     ), Pat(
-                      id: NodeId(16),
+                      id: 16,
                       kind: Identifier(Ident(
                         name: "value",
                         span: Span(
@@ -536,10 +536,10 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: NodeId(20),
+            id: 20,
             statements: [],
             expression: Some(Expr(
-              id: NodeId(19),
+              id: 19,
               kind: Path(Path(
                 segments: [
                   Ident(

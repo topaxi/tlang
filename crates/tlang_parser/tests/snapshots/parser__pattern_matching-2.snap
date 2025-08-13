@@ -3,15 +3,15 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse!\n(r\"\n        match foo; {\n            [] => Ok(bar),\n            [bar, ...baz] => Ok(qux),\n            _ => Err(error),\n        }\n        \")"
 ---
 Module(
-  id: NodeId(1),
+  id: 1,
   statements: [
     Stmt(
-      id: NodeId(2),
+      id: 2,
       kind: Expr(Expr(
-        id: NodeId(22),
+        id: 22,
         kind: Match(MatchExpression(
           expression: Expr(
-            id: NodeId(3),
+            id: 3,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -54,9 +54,9 @@ Module(
           ),
           arms: [
             MatchArm(
-              id: NodeId(8),
+              id: 8,
               pattern: Pat(
-                id: NodeId(4),
+                id: 4,
                 kind: List([]),
                 leading_comments: [],
                 trailing_comments: [],
@@ -73,10 +73,10 @@ Module(
               ),
               guard: None,
               expression: Expr(
-                id: NodeId(7),
+                id: 7,
                 kind: Call(CallExpression(
                   callee: Expr(
-                    id: NodeId(5),
+                    id: 5,
                     kind: Path(Path(
                       segments: [
                         Ident(
@@ -119,7 +119,7 @@ Module(
                   ),
                   arguments: [
                     Expr(
-                      id: NodeId(6),
+                      id: 6,
                       kind: Path(Path(
                         segments: [
                           Ident(
@@ -177,12 +177,12 @@ Module(
               ),
             ),
             MatchArm(
-              id: NodeId(16),
+              id: 16,
               pattern: Pat(
-                id: NodeId(12),
+                id: 12,
                 kind: List([
                   Pat(
-                    id: NodeId(9),
+                    id: 9,
                     kind: Identifier(Ident(
                       name: "bar",
                       span: Span(
@@ -210,9 +210,9 @@ Module(
                     ),
                   ),
                   Pat(
-                    id: NodeId(10),
+                    id: 10,
                     kind: Rest(Pat(
-                      id: NodeId(11),
+                      id: 11,
                       kind: Identifier(Ident(
                         name: "baz",
                         span: Span(
@@ -268,10 +268,10 @@ Module(
               ),
               guard: None,
               expression: Expr(
-                id: NodeId(15),
+                id: 15,
                 kind: Call(CallExpression(
                   callee: Expr(
-                    id: NodeId(13),
+                    id: 13,
                     kind: Path(Path(
                       segments: [
                         Ident(
@@ -314,7 +314,7 @@ Module(
                   ),
                   arguments: [
                     Expr(
-                      id: NodeId(14),
+                      id: 14,
                       kind: Path(Path(
                         segments: [
                           Ident(
@@ -372,9 +372,9 @@ Module(
               ),
             ),
             MatchArm(
-              id: NodeId(21),
+              id: 21,
               pattern: Pat(
-                id: NodeId(17),
+                id: 17,
                 kind: Wildcard,
                 leading_comments: [],
                 trailing_comments: [],
@@ -391,10 +391,10 @@ Module(
               ),
               guard: None,
               expression: Expr(
-                id: NodeId(20),
+                id: 20,
                 kind: Call(CallExpression(
                   callee: Expr(
-                    id: NodeId(18),
+                    id: 18,
                     kind: Path(Path(
                       segments: [
                         Ident(
@@ -437,7 +437,7 @@ Module(
                   ),
                   arguments: [
                     Expr(
-                      id: NodeId(19),
+                      id: 19,
                       kind: Path(Path(
                         segments: [
                           Ident(

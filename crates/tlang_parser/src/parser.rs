@@ -9,7 +9,7 @@ use tlang_ast::node::{
 };
 use tlang_ast::token::{Literal, Token, TokenKind};
 use tlang_lexer::Lexer;
-use tlang_span::Span;
+use tlang_span::{NodeIdAllocator, Span};
 
 use crate::error::{ParseError, ParseIssue, ParseIssueKind};
 use crate::macros::expect_token_matches;
@@ -23,7 +23,7 @@ pub struct Parser<'src> {
 
     recoverable: bool,
 
-    unique_id: NodeId,
+    node_id_allocator: NodeIdAllocator,
 
     errors: Vec<ParseIssue>,
 }
@@ -35,7 +35,7 @@ impl<'src> Parser<'src> {
             previous_span: Span::default(),
             current_token: Token::default(),
             next_token: Token::default(),
-            unique_id: NodeId::new(1),
+            node_id_allocator: NodeIdAllocator::default(),
             errors: Vec::new(),
             recoverable: false,
         }
@@ -55,9 +55,7 @@ impl<'src> Parser<'src> {
     }
 
     fn unique_id(&mut self) -> NodeId {
-        let unique_id = self.unique_id;
-        self.unique_id = self.unique_id.next();
-        unique_id
+        self.node_id_allocator.next_id()
     }
 
     pub fn from_source(source: &'src str) -> Parser<'src> {

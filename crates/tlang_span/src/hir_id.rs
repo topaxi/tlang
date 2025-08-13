@@ -1,19 +1,7 @@
-use std::num::NonZero;
-
-#[cfg(feature = "serde")]
-use serde::Serialize;
+use crate::id::{Id, IdAllocator};
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
-pub struct HirId(NonZero<usize>);
+pub struct HirIdTag;
 
-impl HirId {
-    /// # Panics
-    pub fn new(id: usize) -> Self {
-        HirId(NonZero::new(id).expect("HirId must be non-zero"))
-    }
-
-    pub fn next(self) -> Self {
-        HirId(self.0.saturating_add(1))
-    }
-}
+pub type HirId = Id<HirIdTag>;
+pub type HirIdAllocator = IdAllocator<HirIdTag>;

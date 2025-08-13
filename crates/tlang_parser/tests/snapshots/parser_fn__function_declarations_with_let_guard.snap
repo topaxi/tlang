@@ -1,17 +1,17 @@
 ---
 source: crates/tlang_parser/tests/parser_fn.rs
-expression: "parse!\n(indoc!\n{\n    \"\n        fn filter_map([], f) { [] }\n        fn filter_map([x, ...xs], f) if let y = f(x) { [y, ...filter_map(xs, f)] }\n        fn filter_map([x, ...xs], f) { rec filter_map(xs, f) }\n    \"\n})"
+expression: "parse!\n(indoc!\n{\"\n        fn filter_map([], f) { [] }\n        fn filter_map([x, ...xs], f) if let y = f(x) { [y, ...filter_map(xs, f)] }\n        fn filter_map([x, ...xs], f) { rec filter_map(xs, f) }\n    \"})"
 ---
 Module(
-  id: NodeId(1),
+  id: 1,
   statements: [
     Stmt(
-      id: NodeId(44),
+      id: 44,
       kind: FunctionDeclarations([
         FunctionDeclaration(
-          id: NodeId(8),
+          id: 8,
           name: Expr(
-            id: NodeId(2),
+            id: 2,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -55,7 +55,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: NodeId(3),
+                id: 3,
                 kind: List([]),
                 leading_comments: [],
                 trailing_comments: [],
@@ -84,7 +84,7 @@ Module(
             ),
             FunctionParameter(
               pattern: Pat(
-                id: NodeId(4),
+                id: 4,
                 kind: Identifier(Ident(
                   name: "f",
                   span: Span(
@@ -127,10 +127,10 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: NodeId(7),
+            id: 7,
             statements: [],
             expression: Some(Expr(
-              id: NodeId(6),
+              id: 6,
               kind: List([]),
               leading_comments: [],
               trailing_comments: [],
@@ -170,9 +170,9 @@ Module(
           ),
         ),
         FunctionDeclaration(
-          id: NodeId(29),
+          id: 29,
           name: Expr(
-            id: NodeId(9),
+            id: 9,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -216,10 +216,10 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: NodeId(13),
+                id: 13,
                 kind: List([
                   Pat(
-                    id: NodeId(10),
+                    id: 10,
                     kind: Identifier(Ident(
                       name: "x",
                       span: Span(
@@ -247,9 +247,9 @@ Module(
                     ),
                   ),
                   Pat(
-                    id: NodeId(11),
+                    id: 11,
                     kind: Rest(Pat(
-                      id: NodeId(12),
+                      id: 12,
                       kind: Identifier(Ident(
                         name: "xs",
                         span: Span(
@@ -317,7 +317,7 @@ Module(
             ),
             FunctionParameter(
               pattern: Pat(
-                id: NodeId(14),
+                id: 14,
                 kind: Identifier(Ident(
                   name: "f",
                   span: Span(
@@ -358,9 +358,9 @@ Module(
             ),
           ],
           guard: Some(Expr(
-            id: NodeId(19),
+            id: 19,
             kind: Let(Pat(
-              id: NodeId(15),
+              id: 15,
               kind: Identifier(Ident(
                 name: "y",
                 span: Span(
@@ -387,10 +387,10 @@ Module(
                 ),
               ),
             ), Expr(
-              id: NodeId(18),
+              id: 18,
               kind: Call(CallExpression(
                 callee: Expr(
-                  id: NodeId(16),
+                  id: 16,
                   kind: Path(Path(
                     segments: [
                       Ident(
@@ -433,7 +433,7 @@ Module(
                 ),
                 arguments: [
                   Expr(
-                    id: NodeId(17),
+                    id: 17,
                     kind: Path(Path(
                       segments: [
                         Ident(
@@ -504,13 +504,13 @@ Module(
           )),
           return_type_annotation: None,
           body: Block(
-            id: NodeId(28),
+            id: 28,
             statements: [],
             expression: Some(Expr(
-              id: NodeId(27),
+              id: 27,
               kind: List([
                 Expr(
-                  id: NodeId(21),
+                  id: 21,
                   kind: Path(Path(
                     segments: [
                       Ident(
@@ -552,12 +552,12 @@ Module(
                   ),
                 ),
                 Expr(
-                  id: NodeId(22),
+                  id: 22,
                   kind: UnaryOp(Spread, Expr(
-                    id: NodeId(26),
+                    id: 26,
                     kind: Call(CallExpression(
                       callee: Expr(
-                        id: NodeId(23),
+                        id: 23,
                         kind: Path(Path(
                           segments: [
                             Ident(
@@ -600,7 +600,7 @@ Module(
                       ),
                       arguments: [
                         Expr(
-                          id: NodeId(24),
+                          id: 24,
                           kind: Path(Path(
                             segments: [
                               Ident(
@@ -642,7 +642,7 @@ Module(
                           ),
                         ),
                         Expr(
-                          id: NodeId(25),
+                          id: 25,
                           kind: Path(Path(
                             segments: [
                               Ident(
@@ -750,9 +750,9 @@ Module(
           ),
         ),
         FunctionDeclaration(
-          id: NodeId(43),
+          id: 43,
           name: Expr(
-            id: NodeId(30),
+            id: 30,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -796,10 +796,10 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: NodeId(34),
+                id: 34,
                 kind: List([
                   Pat(
-                    id: NodeId(31),
+                    id: 31,
                     kind: Identifier(Ident(
                       name: "x",
                       span: Span(
@@ -827,9 +827,9 @@ Module(
                     ),
                   ),
                   Pat(
-                    id: NodeId(32),
+                    id: 32,
                     kind: Rest(Pat(
-                      id: NodeId(33),
+                      id: 33,
                       kind: Identifier(Ident(
                         name: "xs",
                         span: Span(
@@ -897,7 +897,7 @@ Module(
             ),
             FunctionParameter(
               pattern: Pat(
-                id: NodeId(35),
+                id: 35,
                 kind: Identifier(Ident(
                   name: "f",
                   span: Span(
@@ -940,13 +940,13 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: NodeId(42),
+            id: 42,
             statements: [],
             expression: Some(Expr(
-              id: NodeId(41),
+              id: 41,
               kind: RecursiveCall(CallExpression(
                 callee: Expr(
-                  id: NodeId(37),
+                  id: 37,
                   kind: Path(Path(
                     segments: [
                       Ident(
@@ -989,7 +989,7 @@ Module(
                 ),
                 arguments: [
                   Expr(
-                    id: NodeId(38),
+                    id: 38,
                     kind: Path(Path(
                       segments: [
                         Ident(
@@ -1031,7 +1031,7 @@ Module(
                     ),
                   ),
                   Expr(
-                    id: NodeId(39),
+                    id: 39,
                     kind: Path(Path(
                       segments: [
                         Ident(

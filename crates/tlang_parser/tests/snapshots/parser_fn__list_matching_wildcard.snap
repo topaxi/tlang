@@ -3,14 +3,14 @@ source: crates/tlang_parser/tests/parser_fn.rs
 expression: "parse! (\"fn tail([_, ...xs]) { xs }\")"
 ---
 Module(
-  id: NodeId(1),
+  id: 1,
   statements: [
     Stmt(
-      id: NodeId(11),
+      id: 11,
       kind: FunctionDeclaration(FunctionDeclaration(
-        id: NodeId(10),
+        id: 10,
         name: Expr(
-          id: NodeId(2),
+          id: 2,
           kind: Path(Path(
             segments: [
               Ident(
@@ -54,10 +54,10 @@ Module(
         parameters: [
           FunctionParameter(
             pattern: Pat(
-              id: NodeId(6),
+              id: 6,
               kind: List([
                 Pat(
-                  id: NodeId(3),
+                  id: 3,
                   kind: Wildcard,
                   leading_comments: [],
                   trailing_comments: [],
@@ -73,9 +73,9 @@ Module(
                   ),
                 ),
                 Pat(
-                  id: NodeId(4),
+                  id: 4,
                   kind: Rest(Pat(
-                    id: NodeId(5),
+                    id: 5,
                     kind: Identifier(Ident(
                       name: "xs",
                       span: Span(
@@ -145,10 +145,10 @@ Module(
         guard: None,
         return_type_annotation: None,
         body: Block(
-          id: NodeId(9),
+          id: 9,
           statements: [],
           expression: Some(Expr(
-            id: NodeId(8),
+            id: 8,
             kind: Path(Path(
               segments: [
                 Ident(

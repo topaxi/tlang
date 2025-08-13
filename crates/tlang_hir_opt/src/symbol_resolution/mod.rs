@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use log::debug;
 use tlang_hir::hir;
+use tlang_hir::visit::scoped_visitor::ScopedVisitor;
 
 use crate::HirPass;
 use crate::hir_opt::HirOptGroup;
@@ -127,6 +128,30 @@ impl DeclarationCollector {
 impl HirPass for DeclarationCollector {
     fn optimize_hir(&mut self, _hir: &mut hir::LowerResult) -> bool {
         false
+    }
+}
+
+impl<'hir> ScopedVisitor<'hir> for DeclarationCollector {
+    type ScopeHandle = hir::HirId;
+
+    fn push_scope(&mut self, hir_id: hir::HirId) -> Option<Self::ScopeHandle> {
+        self.ctx.borrow_mut().scopes.push(Scope::new());
+
+        Some(hir_id)
+    }
+
+    fn pop_scope(&mut self, _scope_handle: Self::ScopeHandle) {
+        self.ctx.borrow_mut().scopes.pop();
+    }
+
+    fn visit_path(&mut self, path: &'hir mut hir::Path, _parent_scope: Self::ScopeHandle) {
+        let res = self
+            .ctx
+            .borrow_mut()
+            .lookup(&path.to_string())
+            .map_or(hir::Res::Unknown, |binding| binding.res());
+
+        path.set_res(res);
     }
 }
 

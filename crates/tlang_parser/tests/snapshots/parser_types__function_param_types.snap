@@ -3,14 +3,14 @@ source: crates/tlang_parser/tests/parser_types.rs
 expression: "parse! (\"fn foo(x: i64, y: i64) -> i64 { x }\")"
 ---
 Module(
-  id: NodeId(1),
+  id: 1,
   statements: [
     Stmt(
-      id: NodeId(12),
+      id: 12,
       kind: FunctionDeclaration(FunctionDeclaration(
-        id: NodeId(11),
+        id: 11,
         name: Expr(
-          id: NodeId(2),
+          id: 2,
           kind: Path(Path(
             segments: [
               Ident(
@@ -54,7 +54,7 @@ Module(
         parameters: [
           FunctionParameter(
             pattern: Pat(
-              id: NodeId(3),
+              id: 3,
               kind: Identifier(Ident(
                 name: "x",
                 span: Span(
@@ -82,7 +82,7 @@ Module(
               ),
             ),
             type_annotation: Some(Ty(
-              id: NodeId(4),
+              id: 4,
               name: Path(
                 segments: [
                   Ident(
@@ -135,7 +135,7 @@ Module(
           ),
           FunctionParameter(
             pattern: Pat(
-              id: NodeId(5),
+              id: 5,
               kind: Identifier(Ident(
                 name: "y",
                 span: Span(
@@ -163,7 +163,7 @@ Module(
               ),
             ),
             type_annotation: Some(Ty(
-              id: NodeId(6),
+              id: 6,
               name: Path(
                 segments: [
                   Ident(
@@ -217,7 +217,7 @@ Module(
         ],
         guard: None,
         return_type_annotation: Some(Ty(
-          id: NodeId(7),
+          id: 7,
           name: Path(
             segments: [
               Ident(
@@ -258,10 +258,10 @@ Module(
           ),
         )),
         body: Block(
-          id: NodeId(10),
+          id: 10,
           statements: [],
           expression: Some(Expr(
-            id: NodeId(9),
+            id: 9,
             kind: Path(Path(
               segments: [
                 Ident(

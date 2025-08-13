@@ -5,7 +5,6 @@ use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fmt::Display;
-use std::num::NonZero;
 use std::rc::Rc;
 
 use tlang_span::NodeId;
@@ -48,44 +47,10 @@ impl Display for SymbolType {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
-pub struct SymbolId(NonZero<usize>);
+pub struct SymbolIdTag;
 
-impl SymbolId {
-    /// # Panics
-    pub fn new(id: usize) -> Self {
-        SymbolId(NonZero::new(id).expect("SymbolId cannot be zero"))
-    }
-
-    pub fn next(self) -> Self {
-        SymbolId(self.0.saturating_add(1))
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct SymbolIdAllocator {
-    next_id: SymbolId,
-}
-
-impl SymbolIdAllocator {
-    pub fn new() -> Self {
-        SymbolIdAllocator {
-            next_id: SymbolId::new(1),
-        }
-    }
-
-    pub fn next_id(&mut self) -> SymbolId {
-        let id = self.next_id;
-        self.next_id = self.next_id.next();
-        id
-    }
-}
-
-impl Default for SymbolIdAllocator {
-    fn default() -> Self {
-        SymbolIdAllocator::new()
-    }
-}
+pub type SymbolId = tlang_span::id::Id<SymbolIdTag>;
+pub type SymbolIdAllocator = tlang_span::id::IdAllocator<SymbolIdTag>;
 
 #[derive(Debug, PartialEq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]

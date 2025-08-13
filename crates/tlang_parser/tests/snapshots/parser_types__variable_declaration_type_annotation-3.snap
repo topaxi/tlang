@@ -3,13 +3,13 @@ source: crates/tlang_parser/tests/parser_types.rs
 expression: "parse! (\"let x: std::hash::Map<str, i64> = std::hash::Map();\")"
 ---
 Module(
-  id: NodeId(1),
+  id: 1,
   statements: [
     Stmt(
-      id: NodeId(8),
+      id: 8,
       kind: Let(LetDeclaration(
         pattern: Pat(
-          id: NodeId(2),
+          id: 2,
           kind: Identifier(Ident(
             name: "x",
             span: Span(
@@ -37,10 +37,10 @@ Module(
           ),
         ),
         expression: Expr(
-          id: NodeId(7),
+          id: 7,
           kind: Call(CallExpression(
             callee: Expr(
-              id: NodeId(6),
+              id: 6,
               kind: Path(Path(
                 segments: [
                   Ident(
@@ -123,7 +123,7 @@ Module(
           ),
         ),
         type_annotation: Some(Ty(
-          id: NodeId(5),
+          id: 5,
           name: Path(
             segments: [
               Ident(
@@ -179,7 +179,7 @@ Module(
           ),
           parameters: [
             Ty(
-              id: NodeId(3),
+              id: 3,
               name: Path(
                 segments: [
                   Ident(
@@ -220,7 +220,7 @@ Module(
               ),
             ),
             Ty(
-              id: NodeId(4),
+              id: 4,
               name: Path(
                 segments: [
                   Ident(

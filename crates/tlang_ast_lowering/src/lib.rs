@@ -10,17 +10,16 @@ use tlang_ast::keyword::kw;
 use tlang_ast::node::{EnumPattern, FunctionDeclaration, Ident};
 use tlang_ast::symbols::SymbolIdAllocator;
 use tlang_hir::hir::{self, HirId};
+use tlang_span::HirIdAllocator;
 
 mod expr;
 mod r#loop;
 mod stmt;
 
-// TODO: Add scopes and variable resolutions. There should be two kinds of bindings, one for a
-// whole block (declarations) and one for variable definitions (from definition forward).
-// See: https://github.com/rust-lang/rust/blob/de7cef75be8fab7a7e1b4d5bb01b51b4bac925c3/compiler/rustc_resolve/src/lib.rs#L408
+#[derive(Debug)]
 pub struct LoweringContext {
-    unique_id: HirId,
     node_id_to_hir_id: HashMap<ast::NodeId, HirId>,
+    hir_id_allocator: HirIdAllocator,
     symbol_id_allocator: SymbolIdAllocator,
     symbol_tables: HashMap<ast::NodeId, Rc<RefCell<ast::symbols::SymbolTable>>>,
     current_symbol_table: Rc<RefCell<ast::symbols::SymbolTable>>,
@@ -32,7 +31,7 @@ impl LoweringContext {
         symbol_tables: HashMap<ast::NodeId, Rc<RefCell<ast::symbols::SymbolTable>>>,
     ) -> Self {
         Self {
-            unique_id: HirId::new(1),
+            hir_id_allocator: HirIdAllocator::default(),
             node_id_to_hir_id: HashMap::default(),
             symbol_id_allocator,
             symbol_tables,
@@ -85,9 +84,7 @@ impl LoweringContext {
     }
 
     fn unique_id(&mut self) -> HirId {
-        let id = self.unique_id;
-        self.unique_id = self.unique_id.next();
-        id
+        self.hir_id_allocator.next_id()
     }
 
     #[inline(always)]
