@@ -1018,6 +1018,7 @@ dependencies = [
 name = "tlang_hir"
 version = "0.1.0"
 dependencies = [
+ "log",
  "pretty_assertions",
  "serde",
  "tlang_ast",

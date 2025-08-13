@@ -280,24 +280,6 @@ impl LoweringContext {
             // parameters, for each parameter/argument we reuse the existing plain
             // identifier if it exists, otherwise we create a new one which will be reused
             // in a match expression in the resulting block.
-            let mut hir_fn_decl = hir::FunctionDeclaration::new_empty_fn(
-                hir_id,
-                this.lower_expr(&first_declaration.name),
-                param_names
-                    .iter()
-                    .map(|ident| {
-                        let hir_id = this.unique_id();
-
-                        hir::FunctionParameter {
-                            hir_id,
-                            name: ident.clone(),
-                            type_annotation: hir::Ty::default(),
-                            span: ident.span,
-                        }
-                    })
-                    .collect(),
-            );
-
             let mut idents = HashMap::new();
             let match_arms = decls
                 .iter()
@@ -345,13 +327,33 @@ impl LoweringContext {
                 )
             };
 
-            hir_fn_decl.body.expr = Some(hir::Expr {
-                hir_id: this.unique_id(),
-                kind: hir::ExprKind::Match(Box::new(match_value), match_arms),
-                span: ast::span::Span::default(),
-            });
+            hir::FunctionDeclaration::new(
+                hir_id,
+                this.lower_expr(&first_declaration.name),
+                param_names
+                    .iter()
+                    .map(|ident| {
+                        let hir_id = this.unique_id();
 
-            hir_fn_decl
+                        hir::FunctionParameter {
+                            hir_id,
+                            name: ident.clone(),
+                            type_annotation: hir::Ty::default(),
+                            span: ident.span,
+                        }
+                    })
+                    .collect(),
+                hir::Block::new(
+                    this.unique_id(),
+                    vec![],
+                    Some(hir::Expr {
+                        hir_id: this.unique_id(),
+                        kind: hir::ExprKind::Match(Box::new(match_value), match_arms),
+                        span: ast::span::Span::default(),
+                    }),
+                    ast::span::Span::default(),
+                ),
+            )
         })
     }
 

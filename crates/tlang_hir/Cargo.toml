@@ -10,6 +10,7 @@ serde = ["dep:serde", "tlang_ast/serde"]
 [dependencies]
 tlang_ast = { path = "../tlang_ast" }
 serde = { workspace = true, optional = true }
+log = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }

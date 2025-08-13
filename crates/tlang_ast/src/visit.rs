@@ -441,7 +441,6 @@ mod tests {
                 })),
             )),
             return_type_annotation: None,
-            body: node::Block::default(),
             ..Default::default()
         };
         let mut visitor = TestVisitor { visited: vec![] };

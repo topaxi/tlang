@@ -216,9 +216,10 @@ impl PathSegment {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Module {
+    pub hir_id: HirId,
     pub block: Block,
     pub span: Span,
 }
@@ -241,9 +242,10 @@ impl HirScope for Module {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Block {
+    pub hir_id: HirId,
     pub stmts: Vec<Stmt>,
     pub expr: Option<Expr>,
     scope: HirScopeData,
@@ -251,8 +253,9 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn new(stmts: Vec<Stmt>, expr: Option<Expr>, span: Span) -> Self {
+    pub fn new(hir_id: HirId, stmts: Vec<Stmt>, expr: Option<Expr>, span: Span) -> Self {
         Block {
+            hir_id,
             stmts,
             expr,
             scope: Default::default(),
@@ -551,13 +554,13 @@ pub struct FunctionDeclaration {
 }
 
 impl FunctionDeclaration {
-    pub fn new_empty_fn(hir_id: HirId, name: Expr, parameters: Vec<FunctionParameter>) -> Self {
+    pub fn new(hir_id: HirId, name: Expr, parameters: Vec<FunctionParameter>, body: Block) -> Self {
         FunctionDeclaration {
             hir_id,
             name,
             parameters,
             return_type: Ty::default(),
-            body: Block::default(),
+            body,
             span: Span::default(),
         }
     }

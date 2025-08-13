@@ -121,8 +121,16 @@ impl LoweringContext {
             module.statements.len()
         );
 
+        let hir_id = self.lower_node_id(module.id);
+
         hir::Module {
-            block: hir::Block::new(self.lower_stmts(&module.statements), None, module.span),
+            hir_id,
+            block: hir::Block::new(
+                hir_id,
+                self.lower_stmts(&module.statements),
+                None,
+                module.span,
+            ),
             span: module.span,
         }
     }
@@ -141,9 +149,10 @@ impl LoweringContext {
     }
 
     fn lower_block_in_current_scope(&mut self, block: &ast::node::Block) -> hir::Block {
+        let hir_id = self.lower_node_id(block.id);
         let stmts = self.lower_stmts(&block.statements);
         let expr = block.expression.as_ref().map(|expr| self.lower_expr(expr));
-        hir::Block::new(stmts, expr, block.span)
+        hir::Block::new(hir_id, stmts, expr, block.span)
     }
 
     fn lower_fn_param_pat(&mut self, node: &ast::node::FunctionParameter) -> Ident {

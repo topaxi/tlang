@@ -95,6 +95,7 @@ impl LoweringContext {
             );
 
             let mut init_loop_block = hir::Block::new(
+                this.unique_id(),
                 vec![iterator_binding_stmt],
                 Some(loop_expr),
                 for_loop.iter.span,
@@ -220,6 +221,7 @@ impl LoweringContext {
                 },
                 guard: None,
                 block: hir::Block::new(
+                    this.unique_id(),
                     vec![],
                     Some(this.expr(
                         Default::default(),
@@ -250,6 +252,11 @@ impl LoweringContext {
             match_expr
         };
 
-        hir::Block::new(loop_statements, Some(match_expr), Default::default())
+        hir::Block::new(
+            self.unique_id(),
+            loop_statements,
+            Some(match_expr),
+            Default::default(),
+        )
     }
 }

@@ -124,6 +124,7 @@ impl LoweringContext {
                         this.lower_block_in_current_scope(block)
                     } else {
                         hir::Block::new(
+                            this.lower_node_id(arm.id),
                             vec![],
                             Some(this.lower_expr(&arm.expression)),
                             arm.expression.span,
