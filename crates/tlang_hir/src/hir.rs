@@ -91,11 +91,11 @@ pub struct Res {
 }
 
 impl Res {
-    pub fn new(hir_id: HirId, binding_kind: BindingKind, slot: Slot) -> Self {
+    pub fn new(hir_id: HirId, binding_kind: BindingKind, slot_index: usize) -> Self {
         Res {
             hir_id: Some(hir_id),
             binding_kind,
-            slot,
+            slot: Slot::Local(slot_index),
         }
     }
 
@@ -145,6 +145,14 @@ impl Res {
 
     pub fn hir_id(self) -> Option<HirId> {
         self.hir_id
+    }
+
+    pub fn binding_kind(self) -> BindingKind {
+        self.binding_kind
+    }
+
+    pub fn slot(self) -> Slot {
+        self.slot
     }
 
     pub fn slot_index(self) -> Option<usize> {

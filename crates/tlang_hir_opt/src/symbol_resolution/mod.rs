@@ -149,7 +149,7 @@ impl<'hir> ScopedVisitor<'hir> for DeclarationCollector {
             .ctx
             .borrow_mut()
             .lookup(&path.to_string())
-            .map_or(hir::Res::Unknown, |binding| binding.res());
+            .map_or(hir::Res::default(), |binding| binding.res());
 
         path.set_res(res);
     }

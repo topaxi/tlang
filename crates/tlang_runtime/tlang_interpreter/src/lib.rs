@@ -7,7 +7,7 @@ use log::debug;
 use smallvec::SmallVec;
 use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token;
-use tlang_hir::hir::{self, BindingKind, HirId, Res};
+use tlang_hir::hir::{self, BindingKind, HirId};
 use tlang_memory::shape::{ShapeKey, Shaped, TlangEnumVariant, TlangShape};
 use tlang_memory::state::TailCall;
 use tlang_memory::value::TlangArithmetic;
@@ -697,8 +697,8 @@ impl Interpreter {
                 self.state
                     .set_global(path.to_string() + ident.as_str(), fn_object);
 
-                match &path.res {
-                    Res::Def(BindingKind::Struct, ..) => {
+                match &path.res.binding_kind() {
+                    BindingKind::Struct => {
                         let struct_decl = self.state.get_struct_decl(path).unwrap();
 
                         self.state.set_struct_method(
@@ -707,7 +707,7 @@ impl Interpreter {
                             TlangStructMethod::HirId(decl.hir_id),
                         );
                     }
-                    Res::Def(BindingKind::Enum, ..) => {
+                    BindingKind::Enum => {
                         let enum_decl = self.state.get_enum_decl(path).unwrap();
 
                         self.state.set_enum_method(
@@ -716,7 +716,7 @@ impl Interpreter {
                             TlangStructMethod::HirId(decl.hir_id),
                         );
                     }
-                    Res::Unknown => {
+                    BindingKind::Unknown => {
                         self.panic(format!(
                             "Could not define method {ident} on unresolved path: {path:?}"
                         ));

@@ -72,12 +72,12 @@ impl ScopeStack {
     }
 
     fn resolve_value(&self, res: &hir::Res) -> Option<TlangValue> {
-        match res {
-            hir::Res::Local(_, index) => self.get_local(*index),
-            hir::Res::Upvar(_, relative_scope_index, index) => {
+        match res.slot() {
+            hir::Slot::Local(index) => self.get_local(index),
+            hir::Slot::Upvar(index, relative_scope_index) => {
                 let scope_index = self.scopes.len() - 1 - relative_scope_index;
 
-                self.get_upvar(scope_index, *index)
+                self.get_upvar(scope_index, index)
             }
             _ => None,
         }
@@ -85,11 +85,11 @@ impl ScopeStack {
 
     /// # Panics
     pub fn update_value(&self, res: &hir::Res, value: TlangValue) {
-        match res {
-            hir::Res::Local(_, index) => self.current_scope().borrow_mut().set(*index, value),
-            hir::Res::Upvar(_, relative_scope_index, index) => {
+        match res.slot() {
+            hir::Slot::Local(index) => self.current_scope().borrow_mut().set(index, value),
+            hir::Slot::Upvar(index, relative_scope_index) => {
                 let scope_index = self.scopes.len() - 1 - relative_scope_index;
-                self.scopes[scope_index].borrow_mut().set(*index, value);
+                self.scopes[scope_index].borrow_mut().set(index, value);
             }
             _ => panic!("Cannot update value for {res:?}"),
         }
