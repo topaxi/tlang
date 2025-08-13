@@ -50,7 +50,7 @@ impl NativeFnDef {
 
     pub fn name(&self) -> String {
         if self.binding_name.is_empty() {
-            let module_name = self.module_path.split("::").last().unwrap_or_default();
+            let module_name = self.module();
 
             if module_name == "globals" {
                 self.name.to_string()
@@ -60,6 +60,10 @@ impl NativeFnDef {
         } else {
             self.binding_name.to_string()
         }
+    }
+
+    pub fn module(&self) -> &str {
+        self.module_path.split("::").last().unwrap_or_default()
     }
 
     pub const fn arity(&self) -> usize {

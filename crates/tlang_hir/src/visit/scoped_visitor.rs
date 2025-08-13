@@ -3,7 +3,8 @@ use crate::hir;
 pub trait ScopedVisitor<'hir>: Sized {
     type ScopeHandle: Copy;
 
-    fn get_scope_handle(&mut self, hir_id: hir::HirId) -> Option<Self::ScopeHandle>;
+    fn push_scope(&mut self, hir_id: hir::HirId) -> Option<Self::ScopeHandle>;
+    fn pop_scope(&mut self, scope_handle: Self::ScopeHandle);
 
     fn visit_module(&mut self, module: &'hir mut hir::Module, parent_scope: Self::ScopeHandle) {
         walk_module(self, module, parent_scope);
@@ -50,10 +51,10 @@ pub fn walk_module<'hir, V: ScopedVisitor<'hir>>(
     _parent_scope: V::ScopeHandle,
 ) {
     let module_scope = visitor
-        .get_scope_handle(module.hir_id)
+        .push_scope(module.hir_id)
         .expect("Module should have a symbol table");
-
     visitor.visit_block(&mut module.block, module_scope);
+    visitor.pop_scope(module_scope);
 }
 
 pub fn walk_block<'hir, V: ScopedVisitor<'hir>>(
@@ -64,8 +65,8 @@ pub fn walk_block<'hir, V: ScopedVisitor<'hir>>(
     // TODO: We made a mess where modules have blocks without scopes, and potentially in other
     //       places like loops and function bodies etc.
     let block_scope = visitor
-        .get_scope_handle(block.hir_id)
-        .unwrap_or_else(|| parent_scope.clone());
+        .push_scope(block.hir_id)
+        .unwrap_or_else(|| parent_scope);
 
     for statement in &mut block.stmts {
         visitor.visit_stmt(statement, block_scope);
@@ -74,6 +75,8 @@ pub fn walk_block<'hir, V: ScopedVisitor<'hir>>(
     if let Some(expr) = &mut block.expr {
         visitor.visit_expr(expr, block_scope);
     }
+
+    visitor.pop_scope(block_scope);
 }
 
 pub fn walk_stmt<'hir, V: ScopedVisitor<'hir>>(
