@@ -28,7 +28,7 @@ pub enum CallStackKind {
 pub struct CallStackEntry {
     pub kind: CallStackKind,
     pub tail_call: Option<TailCall>,
-    pub current_span: tlang_ast::span::Span,
+    pub current_span: tlang_span::Span,
 }
 
 impl CallStackEntry {
@@ -253,7 +253,7 @@ impl InterpreterState {
         call_stack.push(CallStackEntry {
             kind: CallStackKind::Root,
             tail_call: None,
-            current_span: tlang_ast::span::Span::default(),
+            current_span: tlang_span::Span::default(),
         });
 
         Self {
@@ -322,7 +322,7 @@ impl InterpreterState {
     }
 
     /// # Panics
-    pub fn set_current_span(&mut self, span: tlang_ast::span::Span) {
+    pub fn set_current_span(&mut self, span: tlang_span::Span) {
         self.call_stack.last_mut().unwrap().current_span = span;
     }
 

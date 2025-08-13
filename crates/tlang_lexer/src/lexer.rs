@@ -1,8 +1,8 @@
 use tlang_ast::{
     keyword::{Keyword, is_keyword},
-    span::{LineColumn, Span},
     token::{Literal, Token, TokenKind},
 };
+use tlang_span::{LineColumn, Span};
 
 #[derive(Debug, Clone)]
 pub struct Lexer<'src> {

@@ -316,13 +316,13 @@ impl LoweringContext {
                         .collect(),
                 );
 
-                this.expr(ast::span::Span::default(), argument_list)
+                this.expr(tlang_span::Span::default(), argument_list)
             } else {
                 let ident = param_names.first().unwrap().clone();
                 let path = hir::Path::new(vec![hir::PathSegment { ident }], span);
 
                 this.expr(
-                    ast::span::Span::default(),
+                    tlang_span::Span::default(),
                     hir::ExprKind::Path(Box::new(path)),
                 )
             };
@@ -349,9 +349,9 @@ impl LoweringContext {
                     Some(hir::Expr {
                         hir_id: this.unique_id(),
                         kind: hir::ExprKind::Match(Box::new(match_value), match_arms),
-                        span: ast::span::Span::default(),
+                        span: tlang_span::Span::default(),
                     }),
-                    ast::span::Span::default(),
+                    tlang_span::Span::default(),
                 ),
             )
         })

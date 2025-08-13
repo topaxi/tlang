@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 tlang_ast = { path = "../tlang_ast" }
+tlang_span = { path = "../tlang_span" }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }

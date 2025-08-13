@@ -321,10 +321,9 @@ mod tests {
     use self::node::{BinaryOpExpression, BinaryOpKind, Ident, Path};
     use pretty_assertions::assert_eq;
 
-    use tlang_span::NodeId;
+    use tlang_span::{NodeId, Span};
 
     use super::*;
-    use crate::span::Span;
     use crate::token::Literal;
 
     struct TestVisitor {

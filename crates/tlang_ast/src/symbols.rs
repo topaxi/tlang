@@ -9,8 +9,7 @@ use std::num::NonZero;
 use std::rc::Rc;
 
 use tlang_span::NodeId;
-
-use crate::span::Span;
+use tlang_span::Span;
 
 #[derive(Debug, Default, PartialEq, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]

@@ -3,7 +3,6 @@ use std::{cell::RefCell, collections::HashMap};
 use tlang_ast::NodeId;
 use tlang_ast::keyword::kw;
 use tlang_ast::node::MatchExpression;
-use tlang_ast::span::Span;
 use tlang_ast::symbols::SymbolIdAllocator;
 use tlang_ast::{
     node::{
@@ -12,6 +11,7 @@ use tlang_ast::{
     },
     symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
 };
+use tlang_span::Span;
 
 /**
  * The declaration analyzer is responsible for collecting all the declarations in a module.

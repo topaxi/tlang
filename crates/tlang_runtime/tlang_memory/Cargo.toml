@@ -10,6 +10,7 @@ path = "src/lib.rs"
 [dependencies]
 tlang_ast = { path = "../../tlang_ast" }
 tlang_hir = { path = "../../tlang_hir" }
+tlang_span = { path = "../../tlang_span" }
 inventory = { workspace = true }
 log = { workspace = true }
 slab = "0.4"

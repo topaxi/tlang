@@ -91,7 +91,7 @@ impl LoweringContext {
     }
 
     #[inline(always)]
-    pub(crate) fn expr(&mut self, span: ast::span::Span, kind: hir::ExprKind) -> hir::Expr {
+    pub(crate) fn expr(&mut self, span: tlang_span::Span, kind: hir::ExprKind) -> hir::Expr {
         hir::Expr {
             hir_id: self.unique_id(),
             kind,
@@ -312,7 +312,7 @@ impl LoweringContext {
         } else {
             hir::Ty {
                 kind: hir::TyKind::Unknown,
-                span: ast::span::Span::default(),
+                span: tlang_span::Span::default(),
             }
         }
     }

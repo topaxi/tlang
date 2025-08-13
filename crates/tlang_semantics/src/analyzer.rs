@@ -6,9 +6,9 @@ use tlang_ast::{
         BinaryOpKind, Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter,
         LetDeclaration, Module, Pat, PatKind, Path, Stmt, StmtKind, StructDeclaration,
     },
-    span::Span,
     symbols::{SymbolIdAllocator, SymbolInfo, SymbolTable, SymbolType},
 };
+use tlang_span::Span;
 
 use crate::{
     declarations::DeclarationAnalyzer,

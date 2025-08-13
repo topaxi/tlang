@@ -44,7 +44,7 @@ macro_rules! stmt {
 #[macro_export]
 macro_rules! define_keywords {
     ($($keyword:ident => $str_value:expr),*) => {
-        #[derive(Copy, Clone, Debug, PartialEq)]
+        #[derive(Copy, Clone, Debug, PartialEq, Eq)]
         #[cfg_attr(feature = "serde", derive(serde::Serialize))]
         pub enum Keyword {
             $($keyword),*

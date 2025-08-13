@@ -1,15 +1,13 @@
 #[cfg(feature = "serde")]
 use serde::Serialize;
 use std::fmt::Display;
+use tlang_span::Spanned;
 
-use tlang_span::NodeId;
+use tlang_span::{NodeId, Span};
 
 use crate::keyword::kw;
+use crate::token::Literal;
 use crate::token::Token;
-use crate::{
-    span::{Span, Spanned},
-    token::Literal,
-};
 
 pub use crate::macros::*;
 

@@ -956,6 +956,7 @@ dependencies = [
  "tlang_hir",
  "tlang_hir_pretty",
  "tlang_parser",
+ "tlang_span",
 ]
 
 [[package]]
@@ -1080,6 +1081,7 @@ version = "0.1.0"
 dependencies = [
  "pretty_assertions",
  "tlang_ast",
+ "tlang_span",
 ]
 
 [[package]]
@@ -1101,6 +1103,7 @@ dependencies = [
  "smallvec",
  "tlang_ast",
  "tlang_hir",
+ "tlang_span",
 ]
 
 [[package]]
@@ -1128,6 +1131,7 @@ dependencies = [
  "serde",
  "tlang_ast",
  "tlang_parser",
+ "tlang_span",
 ]
 
 [[package]]

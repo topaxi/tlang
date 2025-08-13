@@ -3,7 +3,6 @@ use pretty_assertions::assert_eq;
 use tlang_ast::{
     NodeId,
     node::StmtKind,
-    span::{LineColumn, Span},
     symbols::{SymbolId, SymbolInfo, SymbolType},
 };
 use tlang_parser::Parser;
@@ -11,6 +10,7 @@ use tlang_semantics::{
     analyzer::SemanticAnalyzer,
     diagnostic::{Diagnostic, Severity},
 };
+use tlang_span::{LineColumn, Span};
 
 fn create_analyzer(builtin_symbols: &[(&str, SymbolType)]) -> SemanticAnalyzer {
     let mut analyzer = SemanticAnalyzer::default();

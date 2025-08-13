@@ -3,7 +3,8 @@ use std::fmt::{Display, Formatter};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
-use tlang_ast::{span::Span, token::Token};
+use tlang_ast::token::Token;
+use tlang_span::Span;
 
 #[derive(Debug, Clone)]
 pub struct ParseError {

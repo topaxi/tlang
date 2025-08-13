@@ -7,9 +7,9 @@ use tlang_ast::node::{
     LetDeclaration, MatchArm, MatchExpression, Module, OperatorInfo, Pat, Path, Stmt, StmtKind,
     StructDeclaration, StructField, Ty, UnaryOp,
 };
-use tlang_ast::span::Span;
 use tlang_ast::token::{Literal, Token, TokenKind};
 use tlang_lexer::Lexer;
+use tlang_span::Span;
 
 use crate::error::{ParseError, ParseIssue, ParseIssueKind};
 use crate::macros::expect_token_matches;

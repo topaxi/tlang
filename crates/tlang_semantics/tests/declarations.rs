@@ -3,11 +3,11 @@ use pretty_assertions::assert_eq;
 use tlang_ast::{
     NodeId,
     node::{ExprKind, StmtKind},
-    span::{LineColumn, Span},
     symbols::{SymbolId, SymbolInfo, SymbolType},
 };
 use tlang_parser::Parser;
 use tlang_semantics::analyzer::SemanticAnalyzer;
+use tlang_span::{LineColumn, Span};
 
 macro_rules! analyze {
     ($source:expr) => {{

@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
-use tlang_ast::span::Span;
+use tlang_span::Span;
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
