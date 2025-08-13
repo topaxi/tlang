@@ -53,6 +53,7 @@ impl Display for SymbolType {
 pub struct SymbolId(NonZero<usize>);
 
 impl SymbolId {
+    /// # Panics
     pub fn new(id: usize) -> Self {
         SymbolId(NonZero::new(id).expect("SymbolId cannot be zero"))
     }
