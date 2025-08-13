@@ -49,72 +49,109 @@ impl HirScope for HirScopeData {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
+pub struct BindingIdTag;
+
+pub type BindingId = tlang_span::id::Id<BindingIdTag>;
+pub type BindingIdAllocator = tlang_span::id::IdAllocator<BindingIdTag>;
+
+#[derive(Debug, Default, Eq, PartialEq, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-pub enum DefKind {
+pub enum BindingKind {
+    Local,
+    Upvar,
+    Temp,
     Struct,
     Enum,
     Variant,
     Fn,
+    Param,
     Field,
     Closure,
+    #[default]
+    Unknown,
 }
 
 #[derive(Debug, Default, Eq, PartialEq, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-pub enum Res {
+pub enum Slot {
+    Local(usize),
+    /// Upvar(slot_index, scope_index)
+    Upvar(usize, usize),
     #[default]
-    Unknown,
-    Def(DefKind, HirId, usize),
-    Local(HirId, usize),
-    Upvar(HirId, usize, usize),
+    None,
+}
+
+#[derive(Debug, Default, Eq, PartialEq, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct Res {
+    hir_id: Option<HirId>,
+    binding_kind: BindingKind,
+    slot: Slot,
 }
 
 impl Res {
+    pub fn new(hir_id: HirId, binding_kind: BindingKind, slot: Slot) -> Self {
+        Res {
+            hir_id: Some(hir_id),
+            binding_kind,
+            slot,
+        }
+    }
+
+    pub fn new_upvar(hir_id: HirId, slot_index: usize, scope_index: usize) -> Self {
+        Res {
+            hir_id: Some(hir_id),
+            binding_kind: BindingKind::Upvar,
+            slot: Slot::Upvar(slot_index, scope_index),
+        }
+    }
+
     pub fn is_value(self) -> bool {
         matches!(
-            self,
-            Res::Local(..)
-                | Res::Upvar(..)
-                | Res::Def(DefKind::Fn, ..)
-                | Res::Def(DefKind::Closure, ..)
-                | Res::Unknown
+            self.binding_kind,
+            BindingKind::Local
+                | BindingKind::Upvar
+                | BindingKind::Temp
+                | BindingKind::Fn
+                | BindingKind::Param
+                | BindingKind::Closure
+                | BindingKind::Field
         )
     }
 
     pub fn is_unknown(self) -> bool {
-        matches!(self, Res::Unknown)
+        matches!(self.binding_kind, BindingKind::Unknown)
     }
 
     pub fn is_def(self) -> bool {
-        matches!(self, Res::Def(..))
+        matches!(
+            self.binding_kind,
+            BindingKind::Struct | BindingKind::Enum | BindingKind::Fn
+        )
     }
 
     pub fn is_struct_def(self) -> bool {
-        matches!(self, Res::Def(DefKind::Struct, ..))
+        matches!(self.binding_kind, BindingKind::Struct)
     }
 
     pub fn is_enum_def(self) -> bool {
-        matches!(self, Res::Def(DefKind::Enum, ..))
+        matches!(self.binding_kind, BindingKind::Enum)
     }
 
     pub fn is_enum_variant_def(self) -> bool {
-        matches!(self, Res::Def(DefKind::Variant, ..))
+        matches!(self.binding_kind, BindingKind::Variant)
     }
 
     pub fn hir_id(self) -> Option<HirId> {
-        match self {
-            Res::Def(_, hir_id, ..) | Res::Local(hir_id, ..) | Res::Upvar(hir_id, ..) => {
-                Some(hir_id)
-            }
-            _ => None,
-        }
+        self.hir_id
     }
 
     pub fn slot_index(self) -> Option<usize> {
-        match self {
-            Res::Def(.., index) | Res::Local(.., index) | Res::Upvar(_, _, index) => Some(index),
-            Res::Unknown => None,
+        match self.slot {
+            Slot::Local(slot_index) => Some(slot_index),
+            Slot::Upvar(slot_index, _scope_index) => Some(slot_index),
+            Slot::None => None,
         }
     }
 }
@@ -143,7 +180,7 @@ impl Path {
     pub fn new(segments: Vec<PathSegment>, span: Span) -> Self {
         Self {
             segments,
-            res: Res::Unknown,
+            res: Res::default(),
             span,
         }
     }

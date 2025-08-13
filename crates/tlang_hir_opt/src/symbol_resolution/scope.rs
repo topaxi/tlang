@@ -15,27 +15,32 @@ impl Binding {
     pub(crate) fn new_local(name: &str, hir_id: HirId, index: usize) -> Self {
         Self {
             name: name.into(),
-            res: hir::Res::Local(hir_id, index),
+            res: hir::Res::new(hir_id, hir::BindingKind::Local, index),
         }
     }
 
-    pub(crate) fn new_def(name: &str, def_kind: hir::DefKind, hir_id: HirId, index: usize) -> Self {
+    pub(crate) fn new_def(
+        name: &str,
+        def_kind: hir::BindingKind,
+        hir_id: HirId,
+        index: usize,
+    ) -> Self {
         Self {
             name: name.into(),
-            res: hir::Res::Def(def_kind, hir_id, index),
+            res: hir::Res::new(hir_id, def_kind, index),
         }
     }
 
     pub(crate) fn new_fn_def(name: &str, hir_id: HirId, index: usize) -> Self {
-        Self::new_def(name, hir::DefKind::Fn, hir_id, index)
+        Self::new_def(name, hir::BindingKind::Fn, hir_id, index)
     }
 
     pub(crate) fn new_struct_def(name: &str, hir_id: HirId, index: usize) -> Self {
-        Self::new_def(name, hir::DefKind::Struct, hir_id, index)
+        Self::new_def(name, hir::BindingKind::Struct, hir_id, index)
     }
 
     pub(crate) fn new_enum_def(name: &str, hir_id: HirId, index: usize) -> Self {
-        Self::new_def(name, hir::DefKind::Enum, hir_id, index)
+        Self::new_def(name, hir::BindingKind::Enum, hir_id, index)
     }
 
     pub(crate) fn new_enum_variant_def(
@@ -46,7 +51,7 @@ impl Binding {
     ) -> Self {
         Self::new_def(
             &(enum_name.to_string() + "::" + variant_name),
-            hir::DefKind::Variant,
+            hir::BindingKind::Variant,
             hir_id,
             index,
         )
@@ -55,7 +60,7 @@ impl Binding {
     pub(crate) fn new_upvar(name: &str, hir_id: HirId, scope: usize, index: usize) -> Self {
         Self {
             name: name.into(),
-            res: hir::Res::Upvar(hir_id, scope, index),
+            res: hir::Res::new_upvar(hir_id, index, scope),
         }
     }
 
@@ -72,7 +77,7 @@ impl From<&str> for Binding {
     fn from(name: &str) -> Self {
         Self {
             name: name.into(),
-            res: hir::Res::Unknown,
+            res: hir::Res::default(),
         }
     }
 }
@@ -81,7 +86,7 @@ impl From<String> for Binding {
     fn from(name: String) -> Self {
         Self {
             name: name.into(),
-            res: hir::Res::Unknown,
+            res: hir::Res::default(),
         }
     }
 }
@@ -90,7 +95,7 @@ impl From<&String> for Binding {
     fn from(name: &String) -> Self {
         Self {
             name: name.as_str().into(),
-            res: hir::Res::Unknown,
+            res: hir::Res::default(),
         }
     }
 }
@@ -99,7 +104,7 @@ impl From<&Ident> for Binding {
     fn from(ident: &Ident) -> Self {
         Self {
             name: ident.as_str().into(),
-            res: hir::Res::Unknown,
+            res: hir::Res::default(),
         }
     }
 }

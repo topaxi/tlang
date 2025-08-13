@@ -1,7 +1,7 @@
 mod common;
 
 use pretty_assertions::{assert_eq, assert_matches};
-use tlang_hir::hir::{self, DefKind, HirScope};
+use tlang_hir::hir::{self, BindingKind, HirScope};
 
 use self::common::{collect_paths, hir_from_str};
 
@@ -70,7 +70,7 @@ fn test_self_referal_reserves_local_slot() {
     // path 1 is `foo` of the call expression, it points to the fn declaration (hir 2)
     assert_eq!(
         paths[1].res,
-        hir::Res::Def(hir::DefKind::Fn, hir::HirId::new(1), 0)
+        hir::Res::Def(hir::BindingKind::Fn, hir::HirId::new(1), 0)
     );
     // path 2 is the `a` in the call expression, it points to the a fn param (hir 3)
     assert_eq!(paths[2].res, hir::Res::Local(hir::HirId::new(3), 1));
@@ -203,17 +203,17 @@ fn test_struct_res() {
 
     assert_eq!(
         paths[0].res,
-        hir::Res::Def(DefKind::Struct, hir::HirId::new(1), 0)
+        hir::Res::Def(BindingKind::Struct, hir::HirId::new(1), 0)
     );
 
     assert_eq!(
         paths[1].res,
-        hir::Res::Def(DefKind::Struct, hir::HirId::new(1), 0)
+        hir::Res::Def(BindingKind::Struct, hir::HirId::new(1), 0)
     );
 
     assert_eq!(
         paths[5].res,
-        hir::Res::Def(DefKind::Struct, hir::HirId::new(1), 0),
+        hir::Res::Def(BindingKind::Struct, hir::HirId::new(1), 0),
         "path {}",
         paths[5].join(""),
     );
@@ -242,12 +242,12 @@ fn test_simple_enum_res() {
 
     assert_eq!(
         paths[0].res,
-        hir::Res::Def(DefKind::Enum, hir::HirId::new(1), 0)
+        hir::Res::Def(BindingKind::Enum, hir::HirId::new(1), 0)
     );
 
     assert_eq!(
         paths[3].res,
-        hir::Res::Def(DefKind::Variant, hir::HirId::new(1), 0),
+        hir::Res::Def(BindingKind::Variant, hir::HirId::new(1), 0),
         "path {}",
         paths[3].to_string()
     );
@@ -276,7 +276,7 @@ fn test_enum_res() {
 
     assert_eq!(
         paths[0].res,
-        hir::Res::Def(DefKind::Enum, hir::HirId::new(1), 0)
+        hir::Res::Def(BindingKind::Enum, hir::HirId::new(1), 0)
     );
 
     // Path 1 is `foo` as pattern matched functions move their arguments into a match expression
@@ -284,7 +284,7 @@ fn test_enum_res() {
 
     assert_eq!(
         paths[2].res,
-        hir::Res::Def(DefKind::Variant, hir::HirId::new(2), 1),
+        hir::Res::Def(BindingKind::Variant, hir::HirId::new(2), 1),
         "path {}",
         paths[2].to_string()
     );
@@ -293,7 +293,7 @@ fn test_enum_res() {
 
     assert_eq!(
         paths[4].res,
-        hir::Res::Def(DefKind::Variant, hir::HirId::new(4), 2),
+        hir::Res::Def(BindingKind::Variant, hir::HirId::new(4), 2),
         "path {}",
         paths[4].to_string()
     );
