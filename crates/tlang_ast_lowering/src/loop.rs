@@ -1,6 +1,6 @@
 use tlang_ast as ast;
 use tlang_ast::node::Ident;
-use tlang_ast::symbols::{SymbolInfo, SymbolType};
+use tlang_ast::symbols::SymbolType;
 use tlang_hir::hir;
 
 use crate::LoweringContext;
@@ -12,14 +12,9 @@ impl LoweringContext {
 
     pub(crate) fn lower_for_loop(&mut self, for_loop: &ast::node::ForLoop) -> hir::ExprKind {
         let block = self.with_scope(for_loop.id, |this| {
-            let iterator_binding_name = Ident::new("iterator$$", Default::default());
-            this.scope().borrow_mut().insert(SymbolInfo::new(
-                this.symbol_id_allocator.next_id(),
-                iterator_binding_name.as_str(),
-                SymbolType::Variable,
-                Default::default(),
-            ));
             let hir_id = this.unique_id();
+            let iterator_binding_name = Ident::new("iterator$$", Default::default());
+            this.define_symbol(hir_id, iterator_binding_name.as_str(), SymbolType::Variable);
             let iterator_binding_pat = hir::Pat {
                 kind: hir::PatKind::Identifier(hir_id, Box::new(iterator_binding_name.clone())),
                 span: Default::default(),
@@ -28,12 +23,11 @@ impl LoweringContext {
             let accumulator_binding_name = Ident::new("accumulator$$", Default::default());
             let accumulator_initializer = if let Some((_pat, expr)) = &for_loop.acc {
                 let hir_id = this.unique_id();
-                this.scope().borrow_mut().insert(SymbolInfo::new(
-                    this.symbol_id_allocator.next_id(),
+                this.define_symbol(
+                    hir_id,
                     accumulator_binding_name.as_str(),
                     SymbolType::Variable,
-                    Default::default(),
-                ));
+                );
                 let accumulator_declaration = hir::Stmt::new(
                     hir_id,
                     hir::StmtKind::Let(

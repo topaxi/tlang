@@ -472,10 +472,8 @@ impl SemanticAnalyzer {
         let unused_symbols = symbol_table
             .get_all_local_symbols()
             .iter()
-            // Internal symbols are currently represented with id 0 and internal symbols are not
-            // reported as unused.
-            .filter(|symbol| !symbol.builtin)
             .filter(|symbol| !symbol.used)
+            .filter(|symbol| !symbol.is_builtin())
             .filter(|symbol| !symbol.name.starts_with('_'))
             // TODO: We currently do not track member methods, as we do not have any type
             //       information yet.

@@ -73,12 +73,14 @@ pub enum BindingKind {
     Unknown,
 }
 
+pub type SlotIndex = usize;
+pub type ScopeIndex = u16;
+
 #[derive(Debug, Default, Eq, PartialEq, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum Slot {
-    Local(usize),
-    /// Upvar(slot_index, scope_index)
-    Upvar(usize, usize),
+    Local(SlotIndex),
+    Upvar(SlotIndex, ScopeIndex),
     #[default]
     None,
 }
@@ -101,10 +103,12 @@ impl Res {
     }
 
     pub fn new_upvar(hir_id: HirId, slot_index: usize, scope_index: usize) -> Self {
+        debug_assert!(scope_index <= ScopeIndex::MAX as usize);
+
         Res {
             hir_id: Some(hir_id),
             binding_kind: BindingKind::Upvar,
-            slot: Slot::Upvar(slot_index, scope_index),
+            slot: Slot::Upvar(slot_index, scope_index as ScopeIndex),
         }
     }
 

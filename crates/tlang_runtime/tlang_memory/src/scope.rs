@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use log::debug;
-use tlang_hir::hir::{self, HirScope};
+use tlang_hir::hir::{self, HirScope, ScopeIndex};
 
 use crate::resolver::Resolver;
 use crate::value::TlangValue;
@@ -71,11 +71,15 @@ impl ScopeStack {
         self.scopes[scope_index].borrow().get(index)
     }
 
+    fn scope_index(&self, relative_scope_index: ScopeIndex) -> usize {
+        self.scopes.len() - 1 - (relative_scope_index as usize)
+    }
+
     fn resolve_value(&self, res: &hir::Res) -> Option<TlangValue> {
         match res.slot() {
             hir::Slot::Local(index) => self.get_local(index),
             hir::Slot::Upvar(index, relative_scope_index) => {
-                let scope_index = self.scopes.len() - 1 - relative_scope_index;
+                let scope_index = self.scope_index(relative_scope_index);
 
                 self.get_upvar(scope_index, index)
             }
@@ -88,7 +92,7 @@ impl ScopeStack {
         match res.slot() {
             hir::Slot::Local(index) => self.current_scope().borrow_mut().set(index, value),
             hir::Slot::Upvar(index, relative_scope_index) => {
-                let scope_index = self.scopes.len() - 1 - relative_scope_index;
+                let scope_index = self.scope_index(relative_scope_index);
                 self.scopes[scope_index].borrow_mut().set(index, value);
             }
             _ => panic!("Cannot update value for {res:?}"),

@@ -7,8 +7,7 @@ use std::collections::HashSet;
 use std::fmt::Display;
 use std::rc::Rc;
 
-use tlang_span::NodeId;
-use tlang_span::Span;
+use tlang_span::{HirId, NodeId, Span};
 
 #[derive(Debug, Default, PartialEq, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -52,6 +51,8 @@ pub struct SymbolIdTag;
 pub type SymbolId = tlang_span::id::Id<SymbolIdTag>;
 pub type SymbolIdAllocator = tlang_span::id::IdAllocator<SymbolIdTag>;
 
+// TODO: Make fields private and provide getters/setters if needed. Not done as tests rely too much
+//       on constructing `SymbolInfo` directly.
 #[derive(Debug, PartialEq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct SymbolInfo {
@@ -60,6 +61,10 @@ pub struct SymbolInfo {
     pub symbol_type: SymbolType,
     pub defined_at: Span,
     pub node_id: Option<NodeId>,
+    pub hir_id: Option<HirId>,
+    /// Whether the symbol is temporary (e.g., a loop variable), only used for information during
+    /// debugging.
+    pub temp: bool,
     pub builtin: bool,
     pub used: bool,
 }
@@ -72,7 +77,9 @@ impl SymbolInfo {
             symbol_type,
             defined_at,
             node_id: None,
+            hir_id: None,
             builtin: false,
+            temp: false,
             used: false,
         }
     }
@@ -86,6 +93,24 @@ impl SymbolInfo {
     pub fn with_node_id(mut self, node_id: NodeId) -> Self {
         self.node_id = Some(node_id);
         self
+    }
+
+    pub fn with_hir_id(mut self, hir_id: HirId) -> Self {
+        self.hir_id = Some(hir_id);
+        self
+    }
+
+    pub fn as_temp(mut self) -> Self {
+        self.temp = true;
+        self
+    }
+
+    pub fn is_temp(&self) -> bool {
+        self.temp
+    }
+
+    pub fn is_builtin(&self) -> bool {
+        self.builtin
     }
 
     pub fn is_fn(&self, arity: usize) -> bool {

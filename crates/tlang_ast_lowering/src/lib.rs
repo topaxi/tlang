@@ -87,6 +87,24 @@ impl LoweringContext {
         self.hir_id_allocator.next_id()
     }
 
+    pub(crate) fn define_symbol(
+        &mut self,
+        hir_id: HirId,
+        name: &str,
+        symbol_type: ast::symbols::SymbolType,
+    ) {
+        let symbol_info = ast::symbols::SymbolInfo::new(
+            self.symbol_id_allocator.next_id(),
+            name,
+            symbol_type,
+            Default::default(),
+        )
+        .with_hir_id(hir_id)
+        .as_temp();
+
+        self.scope().borrow_mut().insert(symbol_info);
+    }
+
     #[inline(always)]
     pub(crate) fn expr(&mut self, span: tlang_span::Span, kind: hir::ExprKind) -> hir::Expr {
         hir::Expr {

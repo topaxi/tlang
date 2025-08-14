@@ -32,6 +32,7 @@ impl CodegenOptions<'_> {
         self
     }
 
+    #[allow(dead_code)]
     pub fn optimize(mut self, optimize: bool) -> Self {
         self.optimize = optimize;
         self

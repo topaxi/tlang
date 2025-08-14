@@ -36,6 +36,7 @@ fn test_analyze_variable_declaration() {
         symbol_info,
         vec![SymbolInfo {
             node_id: Some(NodeId::new(2)),
+            hir_id: None,
             id: SymbolId::new(2),
             name: "a".into(),
             symbol_type: SymbolType::Variable,
@@ -43,6 +44,7 @@ fn test_analyze_variable_declaration() {
                 LineColumn { line: 0, column: 4 },
                 LineColumn { line: 0, column: 5 }
             ),
+            temp: false,
             builtin: false,
             used: false,
         }]
@@ -72,6 +74,7 @@ fn test_block_scope() {
         program_symbols.borrow().get_by_name("a"),
         vec![SymbolInfo {
             node_id: Some(NodeId::new(2)),
+            hir_id: None,
             id: SymbolId::new(2),
             name: "a".into(),
             symbol_type: SymbolType::Variable,
@@ -85,6 +88,7 @@ fn test_block_scope() {
                     column: 14
                 }
             ),
+            temp: false,
             builtin: false,
             used: false
         }]
@@ -109,6 +113,7 @@ fn test_block_scope() {
         block1_symbols.borrow().get_by_name("a"),
         vec![SymbolInfo {
             node_id: Some(NodeId::new(2)),
+            hir_id: None,
             id: SymbolId::new(2),
             name: "a".into(),
             symbol_type: SymbolType::Variable,
@@ -122,6 +127,7 @@ fn test_block_scope() {
                     column: 14
                 }
             ),
+            temp: false,
             builtin: false,
             used: false
         }]
@@ -130,6 +136,7 @@ fn test_block_scope() {
         block1_symbols.borrow().get_by_name("b"),
         vec![SymbolInfo {
             node_id: Some(NodeId::new(7)),
+            hir_id: None,
             id: SymbolId::new(3),
             name: "b".into(),
             symbol_type: SymbolType::Variable,
@@ -143,6 +150,7 @@ fn test_block_scope() {
                     column: 18
                 }
             ),
+            temp: false,
             builtin: false,
             used: false
         }]
@@ -169,6 +177,7 @@ fn test_block_scope() {
         block2_symbols.borrow().get_by_name("a"),
         vec![SymbolInfo {
             node_id: Some(NodeId::new(2)),
+            hir_id: None,
             id: SymbolId::new(2),
             name: "a".into(),
             symbol_type: SymbolType::Variable,
@@ -182,6 +191,7 @@ fn test_block_scope() {
                     column: 14
                 }
             ),
+            temp: false,
             builtin: false,
             used: false
         }]
@@ -190,6 +200,7 @@ fn test_block_scope() {
         block2_symbols.borrow().get_by_name("b"),
         vec![SymbolInfo {
             node_id: Some(NodeId::new(7)),
+            hir_id: None,
             id: SymbolId::new(3),
             name: "b".into(),
             symbol_type: SymbolType::Variable,
@@ -203,6 +214,7 @@ fn test_block_scope() {
                     column: 18
                 }
             ),
+            temp: false,
             builtin: false,
             used: false
         }]
@@ -211,6 +223,7 @@ fn test_block_scope() {
         block2_symbols.borrow().get_by_name("c"),
         vec![SymbolInfo {
             node_id: Some(NodeId::new(12)),
+            hir_id: None,
             id: SymbolId::new(4),
             name: "c".into(),
             symbol_type: SymbolType::Variable,
@@ -224,6 +237,7 @@ fn test_block_scope() {
                     column: 22
                 }
             ),
+            temp: false,
             builtin: false,
             used: false
         }]
@@ -247,6 +261,7 @@ fn test_should_collect_function_definitions() {
         program_symbols.borrow().get_by_name("add"),
         vec![SymbolInfo {
             node_id: Some(NodeId::new(10)),
+            hir_id: None,
             id: SymbolId::new(2),
             name: "add".into(),
             symbol_type: SymbolType::Function(2),
@@ -254,6 +269,7 @@ fn test_should_collect_function_definitions() {
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
             ),
+            temp: false,
             builtin: false,
             used: false
         }]
@@ -277,6 +293,7 @@ fn test_should_collect_list_destructuring_symbols_in_function_arguments() {
         program_symbols.borrow().get_by_name("add"),
         vec![SymbolInfo {
             node_id: Some(NodeId::new(11)),
+            hir_id: None,
             id: SymbolId::new(2),
             name: "add".into(),
             symbol_type: SymbolType::Function(1),
@@ -284,6 +301,7 @@ fn test_should_collect_list_destructuring_symbols_in_function_arguments() {
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
             ),
+            temp: false,
             builtin: false,
             used: false
         }]
@@ -307,6 +325,7 @@ fn test_should_collect_list_destructuring_with_rest_symbols_in_function_argument
         program_symbols.borrow().get_by_name("sum"),
         vec![SymbolInfo {
             node_id: Some(NodeId::new(14)),
+            hir_id: None,
             id: SymbolId::new(2),
             name: "sum".into(),
             symbol_type: SymbolType::Function(1),
@@ -314,6 +333,7 @@ fn test_should_collect_list_destructuring_with_rest_symbols_in_function_argument
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
             ),
+            temp: false,
             builtin: false,
             used: true,
         }]
@@ -337,6 +357,7 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
         vec![
             SymbolInfo {
                 node_id: Some(NodeId::new(8)),
+                hir_id: None,
                 id: SymbolId::new(2),
                 name: "factorial".into(),
                 symbol_type: SymbolType::Function(2),
@@ -347,11 +368,13 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
                         column: 12
                     }
                 ),
+                temp: false,
                 builtin: false,
                 used: true,
             },
             SymbolInfo {
                 node_id: Some(NodeId::new(23)),
+                hir_id: None,
                 id: SymbolId::new(4),
                 name: "factorial".into(),
                 symbol_type: SymbolType::Function(2),
@@ -362,6 +385,7 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
                         column: 13
                     }
                 ),
+                temp: false,
                 builtin: false,
                 used: true,
             }
@@ -391,6 +415,7 @@ fn should_collect_function_arguments_with_enum_extraction() {
         vec![
             SymbolInfo {
                 node_id: Some(NodeId::new(14)),
+                hir_id: None,
                 id: SymbolId::new(5),
                 name: "unwrap".into(),
                 symbol_type: SymbolType::Function(1),
@@ -401,11 +426,13 @@ fn should_collect_function_arguments_with_enum_extraction() {
                         column: 10
                     }
                 ),
+                temp: false,
                 builtin: false,
                 used: false
             },
             SymbolInfo {
                 node_id: Some(NodeId::new(21)),
+                hir_id: None,
                 id: SymbolId::new(6),
                 name: "unwrap".into(),
                 symbol_type: SymbolType::Function(1),
@@ -416,6 +443,7 @@ fn should_collect_function_arguments_with_enum_extraction() {
                         column: 10
                     }
                 ),
+                temp: false,
                 builtin: false,
                 used: false
             }
@@ -442,6 +470,7 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
         vec![
             SymbolInfo {
                 node_id: Some(NodeId::new(4)),
+                hir_id: None,
                 id: SymbolId::new(2),
                 name: "used_fn".into(),
                 symbol_type: SymbolType::Function(0),
@@ -452,11 +481,13 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
                         column: 10
                     }
                 ),
+                temp: false,
                 builtin: false,
                 used: true,
             },
             SymbolInfo {
                 node_id: Some(NodeId::new(8)),
+                hir_id: None,
                 id: SymbolId::new(3),
                 name: "used_fn".into(),
                 symbol_type: SymbolType::Function(1),
@@ -467,6 +498,7 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
                         column: 11
                     }
                 ),
+                temp: false,
                 builtin: false,
                 used: false,
             }

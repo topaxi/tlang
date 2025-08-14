@@ -140,6 +140,7 @@ fn test_should_allow_shadowing_of_single_variable() {
         vec![
             SymbolInfo {
                 node_id: Some(NodeId::new(5)),
+                hir_id: None,
                 id: SymbolId::new(2),
                 name: "a".into(),
                 symbol_type: SymbolType::Variable,
@@ -147,11 +148,13 @@ fn test_should_allow_shadowing_of_single_variable() {
                     LineColumn { line: 1, column: 5 },
                     LineColumn { line: 1, column: 6 }
                 ),
+                temp: false,
                 builtin: false,
                 used: false,
             },
             SymbolInfo {
                 node_id: Some(NodeId::new(2)),
+                hir_id: None,
                 id: SymbolId::new(1),
                 name: "a".into(),
                 symbol_type: SymbolType::Variable,
@@ -159,6 +162,7 @@ fn test_should_allow_shadowing_of_single_variable() {
                     LineColumn { line: 0, column: 4 },
                     LineColumn { line: 0, column: 5 }
                 ),
+                temp: false,
                 builtin: false,
                 used: false,
             },
@@ -187,6 +191,7 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
             .cloned(),
         Some(SymbolInfo {
             node_id: Some(NodeId::new(2)),
+            hir_id: None,
             id: SymbolId::new(1),
             name: "a".into(),
             symbol_type: SymbolType::Variable,
@@ -194,6 +199,7 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
                 LineColumn { line: 0, column: 4 },
                 LineColumn { line: 0, column: 5 }
             ),
+            temp: false,
             builtin: false,
             used: true,
         })
@@ -207,6 +213,7 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
             .cloned(),
         Some(SymbolInfo {
             node_id: Some(NodeId::new(5)),
+            hir_id: None,
             id: SymbolId::new(2),
             name: "a".into(),
             symbol_type: SymbolType::Variable,
@@ -214,6 +221,7 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
                 LineColumn { line: 1, column: 5 },
                 LineColumn { line: 1, column: 6 }
             ),
+            temp: false,
             builtin: false,
             used: false,
         })
@@ -266,6 +274,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
         program_symbols.borrow().get_by_name("add"),
         vec![SymbolInfo {
             node_id: Some(NodeId::new(12)),
+            hir_id: None,
             id: SymbolId::new(1),
             name: "add".into(),
             symbol_type: SymbolType::Function(2),
@@ -273,6 +282,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
             ),
+            temp: false,
             builtin: false,
             used: false,
         }]
@@ -285,6 +295,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
 
     let c_symbol_info = SymbolInfo {
         node_id: Some(NodeId::new(14)),
+        hir_id: None,
         id: SymbolId::new(4),
         name: "c".into(),
         symbol_type: SymbolType::Variable,
@@ -292,6 +303,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
             LineColumn { line: 4, column: 5 },
             LineColumn { line: 4, column: 6 },
         ),
+        temp: false,
         builtin: false,
         used: true,
     };
