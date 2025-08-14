@@ -10,11 +10,20 @@ use tlang_span::{HirId, HirIdAllocator};
 pub struct HirOptContext {
     pub symbols: HashMap<HirId, Rc<RefCell<SymbolTable>>>,
     pub hir_id_allocator: HirIdAllocator,
+    pub current_scope: Option<HirId>,
+}
+
+impl HirOptContext {
+    pub fn current_symbol_table(&self) -> Option<Rc<RefCell<SymbolTable>>> {
+        self.current_scope
+            .and_then(|scope| self.symbols.get(&scope).cloned())
+    }
 }
 
 impl From<hir::LowerResultMeta> for HirOptContext {
     fn from(lower_result_meta: hir::LowerResultMeta) -> Self {
         HirOptContext {
+            current_scope: None,
             symbols: lower_result_meta.symbol_tables,
             hir_id_allocator: lower_result_meta.hir_id_allocator,
         }

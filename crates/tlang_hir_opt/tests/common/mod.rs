@@ -8,7 +8,11 @@ use tlang_semantics::SemanticAnalyzer;
 
 #[ctor::ctor]
 fn before_all() {
-    env_logger::init();
+    let _ = env_logger::builder()
+        .filter_level(log::LevelFilter::Warn)
+        .parse_default_env()
+        .is_test(true)
+        .try_init();
 }
 
 pub fn compile(source: &str) -> hir::LowerResult {

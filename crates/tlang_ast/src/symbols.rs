@@ -150,6 +150,22 @@ impl SymbolTable {
         self.parent.clone()
     }
 
+    pub fn get_slot(&self, id: SymbolId) -> Option<(usize, usize)> {
+        let mut table = Some(Rc::new(RefCell::new(self.clone())));
+        let mut scope_index = 0;
+
+        while let Some(t) = table {
+            if let Some(index) = t.borrow().symbols.iter().position(|s| s.id == id) {
+                return Some((scope_index, index));
+            }
+
+            scope_index += 1;
+            table = t.borrow().parent.clone();
+        }
+
+        None
+    }
+
     fn get_local_mut(&mut self, id: SymbolId) -> Option<&mut SymbolInfo> {
         self.symbols.iter_mut().find(|s| s.id == id)
     }

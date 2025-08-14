@@ -52,14 +52,23 @@ impl LoweringContext {
                     .iter_mut()
                     .filter(|symbol| symbol.hir_id.is_none())
                     .for_each(|symbol| {
-                        symbol.hir_id = self.node_id_to_hir_id.get(node_id).copied();
+                        if let Some(node_id) = symbol.node_id {
+                            symbol.hir_id = self.node_id_to_hir_id.get(&node_id).copied();
+
+                            debug!(
+                                "Assigning HIR ID {:?} to symbol {} in node {:?}",
+                                symbol.hir_id, symbol.name, node_id
+                            );
+                        }
                     });
 
                 symbol_tables.insert(*hir_id, symbol_table);
             } else {
-                warn!("No HIR ID found for node ID: {:?}", node_id);
+                warn!("No HirId found for NodeId: {:?}", node_id);
             }
         }
+
+        debug!("NodeId to HirId mapping: {:#?}", self.node_id_to_hir_id);
 
         symbol_tables
     }
@@ -79,16 +88,9 @@ impl LoweringContext {
         R: hir::HirScope,
     {
         debug!("Entering scope for node_id: {:?}", node_id);
-        let symbol_table = self
-            .symbol_tables
-            .get(&node_id)
-            .cloned()
-            .unwrap_or_else(|| {
-                Rc::new(RefCell::new(ast::symbols::SymbolTable::new(
-                    self.current_symbol_table.clone(),
-                )))
-            });
-        self.current_symbol_table = symbol_table;
+        if let Some(symbol_table) = self.symbol_tables.get(&node_id).cloned() {
+            self.current_symbol_table = symbol_table;
+        }
         let result = f(self);
         debug!("Leaving scope for node_id: {:?}", node_id);
         result

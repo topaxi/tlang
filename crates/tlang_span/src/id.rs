@@ -4,7 +4,7 @@ use std::num::NonZeroUsize;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
+#[derive(Eq, PartialEq, Clone, Copy, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
 pub struct Id<T> {
@@ -23,6 +23,12 @@ impl<T> Id<T> {
 
     pub fn next(self) -> Self {
         Id::new(self.inner.get().saturating_add(1))
+    }
+}
+
+impl<T> std::fmt::Debug for Id<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}({})", std::any::type_name::<T>(), self.inner)
     }
 }
 

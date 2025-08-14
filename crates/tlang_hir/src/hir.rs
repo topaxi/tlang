@@ -152,6 +152,10 @@ impl Res {
         self.hir_id
     }
 
+    pub fn set_hir_id(&mut self, hir_id: HirId) {
+        self.hir_id = Some(hir_id);
+    }
+
     pub fn binding_kind(self) -> BindingKind {
         self.binding_kind
     }

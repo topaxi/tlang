@@ -102,7 +102,10 @@ fn test_block_expression() {
 
 #[test]
 fn test_block_expression_with_statements() {
-    let output = compile!("let one = { let x = 1; x };");
+    let output = compile!(
+        "let one = { let x = 1; x };",
+        CodegenOptions::default().optimize(false)
+    );
     let expected_output = indoc! {"
         let $tmp$0;{
             let x = 1;
@@ -501,13 +504,16 @@ fn test_dict_literal() {
 
 #[test]
 fn test_dict_literal_shorthand() {
-    let output = compile!(indoc! {"
-        fn main() {
-            let a = 1;
-            let b = 2;
-            let x = { a, b };
-        }
-    "});
+    let output = compile!(
+        indoc! {"
+            fn main() {
+                let a = 1;
+                let b = 2;
+                let x = { a, b };
+            }
+        "},
+        CodegenOptions::default().optimize(false)
+    );
     let expected_output = indoc! {"
         function main() {
             let a = 1;
