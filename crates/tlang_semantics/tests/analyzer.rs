@@ -139,20 +139,6 @@ fn test_should_allow_shadowing_of_single_variable() {
         program_symbols.borrow().get_by_name("a"),
         vec![
             SymbolInfo {
-                node_id: Some(NodeId::new(5)),
-                hir_id: None,
-                id: SymbolId::new(2),
-                name: "a".into(),
-                symbol_type: SymbolType::Variable,
-                defined_at: Span::new(
-                    LineColumn { line: 1, column: 5 },
-                    LineColumn { line: 1, column: 6 }
-                ),
-                temp: false,
-                builtin: false,
-                used: false,
-            },
-            SymbolInfo {
                 node_id: Some(NodeId::new(2)),
                 hir_id: None,
                 id: SymbolId::new(1),
@@ -162,6 +148,22 @@ fn test_should_allow_shadowing_of_single_variable() {
                     LineColumn { line: 0, column: 4 },
                     LineColumn { line: 0, column: 5 }
                 ),
+                declared: true,
+                temp: false,
+                builtin: false,
+                used: false,
+            },
+            SymbolInfo {
+                node_id: Some(NodeId::new(5)),
+                hir_id: None,
+                id: SymbolId::new(2),
+                name: "a".into(),
+                symbol_type: SymbolType::Variable,
+                defined_at: Span::new(
+                    LineColumn { line: 1, column: 5 },
+                    LineColumn { line: 1, column: 6 }
+                ),
+                declared: true,
                 temp: false,
                 builtin: false,
                 used: false,
@@ -199,6 +201,7 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
                 LineColumn { line: 0, column: 4 },
                 LineColumn { line: 0, column: 5 }
             ),
+            declared: true,
             temp: false,
             builtin: false,
             used: true,
@@ -221,6 +224,7 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
                 LineColumn { line: 1, column: 5 },
                 LineColumn { line: 1, column: 6 }
             ),
+            declared: true,
             temp: false,
             builtin: false,
             used: false,
@@ -282,6 +286,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
             ),
+            declared: true,
             temp: false,
             builtin: false,
             used: false,
@@ -303,6 +308,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
             LineColumn { line: 4, column: 5 },
             LineColumn { line: 4, column: 6 },
         ),
+        declared: true,
         temp: false,
         builtin: false,
         used: true,
@@ -336,17 +342,15 @@ fn should_warn_about_unused_variables() {
     assert_eq!(
         diagnostics,
         vec![
-            // TODO: Might be nicer to have them report in order. This currently happens
-            //       due to us reinserting variables in the beginning of the symbol table.
-            Diagnostic::new(
-                "Unused variable `b`, if this is intentional, prefix the name with an underscore: `_b`".into(),
-                Severity::Warning,
-                Span::new(LineColumn { line: 1, column: 5 }, LineColumn { line: 1, column: 6 }),
-            ),
             Diagnostic::new(
                 "Unused variable `a`, if this is intentional, prefix the name with an underscore: `_a`".into(),
                 Severity::Warning,
                 Span::new(LineColumn { line: 0, column: 4 }, LineColumn { line: 0, column: 5 }),
+            ),
+            Diagnostic::new(
+                "Unused variable `b`, if this is intentional, prefix the name with an underscore: `_b`".into(),
+                Severity::Warning,
+                Span::new(LineColumn { line: 1, column: 5 }, LineColumn { line: 1, column: 6 }),
             ),
         ],
     );

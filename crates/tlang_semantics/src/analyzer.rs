@@ -160,7 +160,10 @@ impl SemanticAnalyzer {
     fn report_undeclared_variable(&mut self, name: &str, span: Span) {
         let did_you_mean = did_you_mean(
             name,
-            &self.current_symbol_table().borrow().get_all_symbols(),
+            &self
+                .current_symbol_table()
+                .borrow()
+                .get_all_declared_symbols(),
         );
 
         if let Some(suggestion) = did_you_mean {
@@ -184,7 +187,10 @@ impl SemanticAnalyzer {
     fn report_undeclared_function(&mut self, name: &str, arity: usize, span: Span) {
         let did_you_mean = did_you_mean(
             name,
-            &self.current_symbol_table().borrow().get_all_symbols(),
+            &self
+                .current_symbol_table()
+                .borrow()
+                .get_all_declared_symbols(),
         );
 
         if let Some(suggestion) = did_you_mean {
@@ -470,8 +476,7 @@ impl SemanticAnalyzer {
     fn report_unused_symbols(&mut self, symbol_table: &Rc<RefCell<SymbolTable>>) {
         let symbol_table = symbol_table.borrow();
         let unused_symbols = symbol_table
-            .get_all_local_symbols()
-            .iter()
+            .get_all_declared_local_symbols()
             .filter(|symbol| !symbol.used)
             .filter(|symbol| !symbol.is_builtin())
             .filter(|symbol| !symbol.name.starts_with('_'))
@@ -498,27 +503,32 @@ impl SemanticAnalyzer {
         // When declaring a variable, we can only reference symbols that were declared before.
         // This includes our own variable name.
         // E.g. `let a = a;` is not allowed. But `let a = 1; let a = a;` is.
-        // By removing the symbol from the table while analyzing the expression, we can check
-        // whether the expression references any symbols that were not declared before.
+        // By marking the symbol as undeclared from the table while analyzing the expression,
+        // we can check whether the expression references any symbols that were not declared before.
         let pattern_symbols = decl
             .pattern
             .get_all_node_ids()
             .iter()
             .filter_map(|id| {
                 self.current_symbol_table()
-                    .borrow()
+                    .borrow_mut()
                     .get_local_by_node_id(*id)
-                    .map(|symbol_info| symbol_info.id)
+                    .map(|s| s.id)
             })
-            .filter_map(|id| self.current_symbol_table().borrow_mut().remove(id))
             .collect::<Vec<_>>();
+
+        for symbol_id in &pattern_symbols {
+            self.current_symbol_table()
+                .borrow_mut()
+                .set_declared(*symbol_id, false);
+        }
 
         self.analyze_expr(&decl.expression, false);
 
-        for symbol in pattern_symbols {
+        for symbol_id in &pattern_symbols {
             self.current_symbol_table()
                 .borrow_mut()
-                .insert_beginning(symbol);
+                .set_declared(*symbol_id, true);
         }
     }
 }

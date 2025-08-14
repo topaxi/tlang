@@ -44,6 +44,7 @@ fn test_analyze_variable_declaration() {
                 LineColumn { line: 0, column: 4 },
                 LineColumn { line: 0, column: 5 }
             ),
+            declared: true,
             temp: false,
             builtin: false,
             used: false,
@@ -88,6 +89,7 @@ fn test_block_scope() {
                     column: 14
                 }
             ),
+            declared: true,
             temp: false,
             builtin: false,
             used: false
@@ -127,6 +129,7 @@ fn test_block_scope() {
                     column: 14
                 }
             ),
+            declared: true,
             temp: false,
             builtin: false,
             used: false
@@ -150,6 +153,7 @@ fn test_block_scope() {
                     column: 18
                 }
             ),
+            declared: true,
             temp: false,
             builtin: false,
             used: false
@@ -191,6 +195,7 @@ fn test_block_scope() {
                     column: 14
                 }
             ),
+            declared: true,
             temp: false,
             builtin: false,
             used: false
@@ -214,6 +219,7 @@ fn test_block_scope() {
                     column: 18
                 }
             ),
+            declared: true,
             temp: false,
             builtin: false,
             used: false
@@ -237,6 +243,7 @@ fn test_block_scope() {
                     column: 22
                 }
             ),
+            declared: true,
             temp: false,
             builtin: false,
             used: false
@@ -269,6 +276,7 @@ fn test_should_collect_function_definitions() {
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
             ),
+            declared: true,
             temp: false,
             builtin: false,
             used: false
@@ -301,6 +309,7 @@ fn test_should_collect_list_destructuring_symbols_in_function_arguments() {
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
             ),
+            declared: true,
             temp: false,
             builtin: false,
             used: false
@@ -333,6 +342,7 @@ fn test_should_collect_list_destructuring_with_rest_symbols_in_function_argument
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
             ),
+            declared: true,
             temp: false,
             builtin: false,
             used: true,
@@ -368,6 +378,7 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
                         column: 12
                     }
                 ),
+                declared: true,
                 temp: false,
                 builtin: false,
                 used: true,
@@ -385,6 +396,7 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
                         column: 13
                     }
                 ),
+                declared: true,
                 temp: false,
                 builtin: false,
                 used: true,
@@ -426,6 +438,7 @@ fn should_collect_function_arguments_with_enum_extraction() {
                         column: 10
                     }
                 ),
+                declared: true,
                 temp: false,
                 builtin: false,
                 used: false
@@ -443,6 +456,7 @@ fn should_collect_function_arguments_with_enum_extraction() {
                         column: 10
                     }
                 ),
+                declared: true,
                 temp: false,
                 builtin: false,
                 used: false
@@ -481,6 +495,7 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
                         column: 10
                     }
                 ),
+                declared: true,
                 temp: false,
                 builtin: false,
                 used: true,
@@ -498,6 +513,7 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
                         column: 11
                     }
                 ),
+                declared: true,
                 temp: false,
                 builtin: false,
                 used: false,

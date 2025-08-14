@@ -67,6 +67,7 @@ pub struct SymbolInfo {
     pub temp: bool,
     pub builtin: bool,
     pub used: bool,
+    pub declared: bool,
 }
 
 impl SymbolInfo {
@@ -81,6 +82,7 @@ impl SymbolInfo {
             builtin: false,
             temp: false,
             used: false,
+            declared: true,
         }
     }
 
@@ -88,6 +90,11 @@ impl SymbolInfo {
         let mut symbol_info = SymbolInfo::new(id, name, symbol_type, Span::default());
         symbol_info.builtin = true;
         symbol_info
+    }
+
+    pub fn set_declared(&mut self, declared: bool) -> &mut Self {
+        self.declared = declared;
+        self
     }
 
     pub fn with_node_id(mut self, node_id: NodeId) -> Self {
@@ -151,8 +158,18 @@ impl SymbolTable {
         self.symbols.iter().find(|s| s.node_id == Some(node_id))
     }
 
+    pub fn set_declared(&mut self, id: SymbolId, declared: bool) {
+        self.get_local_mut(id).map(|s| {
+            s.set_declared(declared);
+        });
+    }
+
     fn get_locals_by_name(&self, name: &str) -> Vec<&SymbolInfo> {
-        self.symbols.iter().filter(|s| *s.name == *name).collect()
+        self.symbols
+            .iter()
+            .filter(|s| *s.name == *name)
+            .filter(|s| s.declared)
+            .collect()
     }
 
     pub fn get_by_name(&self, name: &str) -> Vec<SymbolInfo> {
@@ -215,21 +232,22 @@ impl SymbolTable {
         }
     }
 
-    pub fn remove(&mut self, id: SymbolId) -> Option<SymbolInfo> {
-        self.symbols
-            .iter()
-            .position(|s| s.id == id)
-            .map(|index| self.symbols.swap_remove(index))
+    pub fn get_all_declared_local_symbols(&self) -> impl Iterator<Item = SymbolInfo> {
+        self.symbols.iter().filter(|s| s.declared).cloned()
     }
 
     pub fn get_all_local_symbols(&self) -> &[SymbolInfo] {
         &self.symbols
     }
 
-    pub fn get_all_symbols(&self) -> Vec<SymbolInfo> {
-        let mut names = self.get_all_local_symbols().to_vec();
-        if let Some(ref parent) = self.parent {
-            names.extend(parent.borrow().get_all_symbols());
+    pub fn get_all_local_symbols_mut(&mut self) -> &mut Vec<SymbolInfo> {
+        &mut self.symbols
+    }
+
+    pub fn get_all_declared_symbols(&self) -> Vec<SymbolInfo> {
+        let mut names = self.get_all_declared_local_symbols().collect::<Vec<_>>();
+        if let Some(parent) = &self.parent {
+            names.extend(parent.borrow().get_all_declared_symbols());
         }
         names
     }

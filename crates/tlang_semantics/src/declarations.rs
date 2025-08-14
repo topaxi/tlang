@@ -353,10 +353,10 @@ impl DeclarationAnalyzer {
                 self.declare_symbol(
                     pattern.id,
                     ident.as_str(),
-                    *self
-                        .symbol_type_context
+                    self.symbol_type_context
                         .last()
-                        .unwrap_or(&SymbolType::Variable),
+                        .copied()
+                        .unwrap_or(SymbolType::Variable),
                     pattern.span,
                 );
             }

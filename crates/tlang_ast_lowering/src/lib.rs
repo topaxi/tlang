@@ -9,8 +9,8 @@ use tlang_ast as ast;
 use tlang_ast::keyword::kw;
 use tlang_ast::node::{EnumPattern, FunctionDeclaration, Ident};
 use tlang_ast::symbols::SymbolIdAllocator;
-use tlang_hir::hir::{self, HirId};
-use tlang_span::HirIdAllocator;
+use tlang_hir::hir;
+use tlang_span::{HirId, HirIdAllocator};
 
 mod expr;
 mod r#loop;
@@ -44,7 +44,18 @@ impl LoweringContext {
 
         for (node_id, symbol_table) in &self.symbol_tables {
             if let Some(hir_id) = self.node_id_to_hir_id.get(node_id) {
-                symbol_tables.insert(*hir_id, symbol_table.clone());
+                let symbol_table = symbol_table.clone();
+
+                symbol_table
+                    .borrow_mut()
+                    .get_all_local_symbols_mut()
+                    .iter_mut()
+                    .filter(|symbol| symbol.hir_id.is_none())
+                    .for_each(|symbol| {
+                        symbol.hir_id = self.node_id_to_hir_id.get(node_id).copied();
+                    });
+
+                symbol_tables.insert(*hir_id, symbol_table);
             } else {
                 warn!("No HIR ID found for node ID: {:?}", node_id);
             }
