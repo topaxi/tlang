@@ -66,7 +66,7 @@ pub fn walk_block<'hir, V: ScopedVisitor<'hir>>(
     //       places like loops and function bodies etc.
     let block_scope = visitor
         .push_scope(block.hir_id)
-        .unwrap_or_else(|| parent_scope);
+        .unwrap_or(parent_scope);
 
     for statement in &mut block.stmts {
         visitor.visit_stmt(statement, block_scope);

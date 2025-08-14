@@ -159,9 +159,9 @@ impl SymbolTable {
     }
 
     pub fn set_declared(&mut self, id: SymbolId, declared: bool) {
-        self.get_local_mut(id).map(|s| {
+        if let Some(s) = self.get_local_mut(id) {
             s.set_declared(declared);
-        });
+        }
     }
 
     fn get_locals_by_name(&self, name: &str) -> Vec<&SymbolInfo> {
