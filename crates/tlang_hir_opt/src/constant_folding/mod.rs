@@ -1,7 +1,7 @@
 use tlang_hir::hir;
 
 use crate::HirPass;
-use crate::hir_opt::HirOptGroup;
+use crate::hir_opt::{HirOptContext, HirOptGroup};
 
 mod constant_folder;
 mod constant_propagation;
@@ -30,7 +30,7 @@ impl Default for ConstantFolding {
 }
 
 impl HirPass for ConstantFolding {
-    fn optimize_hir(&mut self, hir: &mut hir::LowerResult) -> bool {
-        self.0.optimize_hir(hir)
+    fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
+        self.0.optimize_hir(module, ctx)
     }
 }

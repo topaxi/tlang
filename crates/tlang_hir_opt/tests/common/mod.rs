@@ -24,10 +24,11 @@ pub fn compile(source: &str) -> hir::LowerResult {
 }
 
 pub fn compile_and_optimize(source: &str) -> hir::Module {
-    let mut hir = compile(source);
+    let (mut module, meta) = compile(source);
     let mut optimizer = HirOptimizer::default();
-    optimizer.optimize_hir(&mut hir);
-    hir.module
+    let mut optimizer_context = meta.into();
+    optimizer.optimize_hir(&mut module, &mut optimizer_context);
+    module
 }
 
 pub fn pretty_print(module: &hir::Module) -> String {

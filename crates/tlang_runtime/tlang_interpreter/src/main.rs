@@ -74,15 +74,16 @@ fn main() {
             }
         }
     }
-    let mut hir = lower_to_hir(
+    let (mut module, meta) = lower_to_hir(
         &ast,
         analyzer.symbol_id_allocator(),
         analyzer.symbol_tables().clone(),
     );
 
     let mut optimizer = HirOptimizer::default();
-    optimizer.optimize_hir(&mut hir);
+    let mut optimizer_context = meta.into();
+    optimizer.optimize_hir(&mut module, &mut optimizer_context);
 
     let mut interp = Interpreter::default();
-    interp.eval(&hir.module);
+    interp.eval(&module);
 }

@@ -1012,6 +1012,7 @@ dependencies = [
  "tlang_ast",
  "tlang_ast_lowering",
  "tlang_hir",
+ "tlang_hir_opt",
  "tlang_parser",
  "tlang_semantics",
 ]
@@ -1042,6 +1043,7 @@ dependencies = [
  "tlang_hir_pretty",
  "tlang_parser",
  "tlang_semantics",
+ "tlang_span",
 ]
 
 [[package]]

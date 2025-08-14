@@ -1,12 +1,32 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
+
 use log::debug;
-use tlang_hir::hir::LowerResult;
+use tlang_ast::symbols::SymbolTable;
+use tlang_hir::hir;
+use tlang_span::{HirId, HirIdAllocator};
+
+pub struct HirOptContext {
+    pub symbols: HashMap<HirId, Rc<RefCell<SymbolTable>>>,
+    pub hir_id_allocator: HirIdAllocator,
+}
+
+impl From<hir::LowerResultMeta> for HirOptContext {
+    fn from(lower_result_meta: hir::LowerResultMeta) -> Self {
+        HirOptContext {
+            symbols: lower_result_meta.symbol_tables,
+            hir_id_allocator: lower_result_meta.hir_id_allocator,
+        }
+    }
+}
 
 pub trait HirPass {
     fn name(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
 
-    fn optimize_hir(&mut self, hir: &mut LowerResult) -> bool;
+    fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool;
 }
 
 #[derive(Default)]
@@ -30,7 +50,7 @@ impl HirPass for HirOptGroup {
         self.name
     }
 
-    fn optimize_hir(&mut self, module: &mut LowerResult) -> bool {
+    fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
         let mut iteration = 0;
         let mut changed = true;
 
@@ -44,7 +64,7 @@ impl HirPass for HirOptGroup {
             for pass in &mut self.passes {
                 debug!("Running pass: {}", pass.name());
 
-                changed |= pass.optimize_hir(module);
+                changed |= pass.optimize_hir(module, ctx);
             }
         }
         false
@@ -75,7 +95,7 @@ impl HirOptimizer {
         self.group.passes.push(pass);
     }
 
-    pub fn optimize_hir(&mut self, hir: &mut LowerResult) -> bool {
-        self.group.optimize_hir(hir)
+    pub fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
+        self.group.optimize_hir(module, ctx)
     }
 }

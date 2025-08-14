@@ -155,14 +155,15 @@ impl Tlang {
         }
 
         if let Some(ast) = self.ast() {
-            let mut hir = tlang_ast_lowering::lower_to_hir(
+            let (mut module, meta) = tlang_ast_lowering::lower_to_hir(
                 ast,
                 self.analyzer.symbol_id_allocator(),
                 self.analyzer.symbol_tables().clone(),
             );
             let mut optimizer = HirOptimizer::default();
-            optimizer.optimize_hir(&mut hir);
-            self.build.hir = Some(hir.module);
+            let mut optimizer_context = meta.into();
+            optimizer.optimize_hir(&mut module, &mut optimizer_context);
+            self.build.hir = Some(module);
         }
     }
 

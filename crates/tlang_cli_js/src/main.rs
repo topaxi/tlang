@@ -177,12 +177,12 @@ fn compile_to_hir(source: &str) -> Result<String, ParserError> {
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());
     semantic_analyzer.analyze(&ast)?;
-    let hir = lower_to_hir(
+    let (module, _) = lower_to_hir(
         &ast,
         semantic_analyzer.symbol_id_allocator(),
         semantic_analyzer.symbol_tables().clone(),
     );
-    Ok(ron::ser::to_string_pretty(&hir.module, ron::ser::PrettyConfig::default()).unwrap())
+    Ok(ron::ser::to_string_pretty(&module, ron::ser::PrettyConfig::default()).unwrap())
 }
 
 fn compile(source: &str) -> Result<String, ParserError> {
@@ -193,12 +193,12 @@ fn compile(source: &str) -> Result<String, ParserError> {
     match semantic_analyzer.analyze(&ast) {
         Ok(()) => {
             let mut generator = CodegenJS::default();
-            let hir = lower_to_hir(
+            let (module, _) = lower_to_hir(
                 &ast,
                 semantic_analyzer.symbol_id_allocator(),
                 semantic_analyzer.symbol_tables().clone(),
             );
-            generator.generate_code(&hir.module);
+            generator.generate_code(&module);
             Ok(generator.get_output().to_string())
         }
         Err(diagnostics) => Err(diagnostics.into()),

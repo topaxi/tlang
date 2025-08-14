@@ -323,9 +323,15 @@ pub fn lower_to_hir(
     let mut ctx = LoweringContext::new(symbol_id_allocator, symbol_tables);
     let module = ctx.lower_module(tlang_ast);
     let symbol_tables = ctx.symbol_tables();
+    let symbol_id_allocator = ctx.symbol_id_allocator;
+    let hir_id_allocator = ctx.hir_id_allocator;
 
-    hir::LowerResult {
+    (
         module,
-        symbol_tables,
-    }
+        hir::LowerResultMeta {
+            symbol_tables,
+            hir_id_allocator,
+            symbol_id_allocator,
+        },
+    )
 }

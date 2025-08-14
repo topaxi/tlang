@@ -6,7 +6,7 @@ use tlang_hir::hir;
 use tlang_hir::visit::scoped_visitor::ScopedVisitor;
 
 use crate::HirPass;
-use crate::hir_opt::HirOptGroup;
+use crate::hir_opt::{HirOptContext, HirOptGroup};
 
 use self::scope::Scope;
 
@@ -35,8 +35,8 @@ impl Default for SymbolResolution {
 }
 
 impl HirPass for SymbolResolution {
-    fn optimize_hir(&mut self, hir: &mut hir::LowerResult) -> bool {
-        self.0.optimize_hir(hir)
+    fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
+        self.0.optimize_hir(module, ctx)
     }
 }
 
@@ -126,7 +126,7 @@ impl DeclarationCollector {
 }
 
 impl HirPass for DeclarationCollector {
-    fn optimize_hir(&mut self, _hir: &mut hir::LowerResult) -> bool {
+    fn optimize_hir(&mut self, _module: &mut hir::Module, _ctx: &mut HirOptContext) -> bool {
         false
     }
 }
@@ -166,7 +166,7 @@ impl IdentifierResolver {
 }
 
 impl HirPass for IdentifierResolver {
-    fn optimize_hir(&mut self, _hir: &mut hir::LowerResult) -> bool {
+    fn optimize_hir(&mut self, _module: &mut hir::Module, _ctx: &mut HirOptContext) -> bool {
         false
     }
 }

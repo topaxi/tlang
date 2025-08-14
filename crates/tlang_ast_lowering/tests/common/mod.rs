@@ -9,7 +9,9 @@ fn parse_str(input: &str) -> ast::node::Module {
 #[allow(dead_code)]
 pub fn hir_from_str(input: &str) -> hir::Module {
     let ast = parse_str(input);
-    tlang_ast_lowering::lower_to_hir(&ast, Default::default(), Default::default()).module
+    let (module, _) =
+        tlang_ast_lowering::lower_to_hir(&ast, Default::default(), Default::default());
+    module
 }
 
 struct PathCollector {
@@ -22,12 +24,12 @@ impl PathCollector {
     }
 
     fn collect(&mut self, module: &mut hir::Module) {
-        self.visit_module(module);
+        self.visit_module(module, &mut ());
     }
 }
 
 impl<'hir> Visitor<'hir> for PathCollector {
-    fn visit_path(&mut self, path: &'hir mut hir::Path) {
+    fn visit_path(&mut self, path: &'hir mut hir::Path, _ctx: &mut Self::Context) {
         self.paths.push(path.clone());
     }
 }
