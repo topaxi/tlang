@@ -9,6 +9,8 @@ use tlang_parser::Parser;
 use tlang_semantics::analyzer::SemanticAnalyzer;
 use tlang_span::{LineColumn, Span};
 
+mod common;
+
 macro_rules! analyze {
     ($source:expr) => {{
         let mut parser = Parser::from_source($source);
@@ -44,6 +46,10 @@ fn test_analyze_variable_declaration() {
                 LineColumn { line: 0, column: 4 },
                 LineColumn { line: 0, column: 5 }
             ),
+            scope_start: LineColumn {
+                line: 0,
+                column: 10
+            },
             declared: true,
             temp: false,
             builtin: false,
@@ -89,6 +95,10 @@ fn test_block_scope() {
                     column: 14
                 }
             ),
+            scope_start: LineColumn {
+                line: 1,
+                column: 19
+            },
             declared: true,
             temp: false,
             builtin: false,
@@ -129,6 +139,10 @@ fn test_block_scope() {
                     column: 14
                 }
             ),
+            scope_start: LineColumn {
+                line: 1,
+                column: 19
+            },
             declared: true,
             temp: false,
             builtin: false,
@@ -153,6 +167,10 @@ fn test_block_scope() {
                     column: 18
                 }
             ),
+            scope_start: LineColumn {
+                line: 3,
+                column: 23
+            },
             declared: true,
             temp: false,
             builtin: false,
@@ -195,6 +213,10 @@ fn test_block_scope() {
                     column: 14
                 }
             ),
+            scope_start: LineColumn {
+                line: 1,
+                column: 19
+            },
             declared: true,
             temp: false,
             builtin: false,
@@ -219,6 +241,10 @@ fn test_block_scope() {
                     column: 18
                 }
             ),
+            scope_start: LineColumn {
+                line: 3,
+                column: 23
+            },
             declared: true,
             temp: false,
             builtin: false,
@@ -243,6 +269,10 @@ fn test_block_scope() {
                     column: 22
                 }
             ),
+            scope_start: LineColumn {
+                line: 5,
+                column: 27
+            },
             declared: true,
             temp: false,
             builtin: false,
@@ -276,6 +306,7 @@ fn test_should_collect_function_definitions() {
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
             ),
+            scope_start: LineColumn { line: 2, column: 2 },
             declared: true,
             temp: false,
             builtin: false,
@@ -309,6 +340,7 @@ fn test_should_collect_list_destructuring_symbols_in_function_arguments() {
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
             ),
+            scope_start: LineColumn { line: 2, column: 2 },
             declared: true,
             temp: false,
             builtin: false,
@@ -342,10 +374,11 @@ fn test_should_collect_list_destructuring_with_rest_symbols_in_function_argument
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
             ),
+            scope_start: LineColumn { line: 2, column: 2 },
             declared: true,
             temp: false,
             builtin: false,
-            used: true,
+            used: false,
         }]
     );
 }
@@ -378,15 +411,19 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
                         column: 12
                     }
                 ),
+                scope_start: LineColumn {
+                    line: 0,
+                    column: 28
+                },
                 declared: true,
                 temp: false,
                 builtin: false,
-                used: true,
+                used: false,
             },
             SymbolInfo {
                 node_id: Some(NodeId::new(23)),
                 hir_id: None,
-                id: SymbolId::new(4),
+                id: SymbolId::new(5),
                 name: "factorial".into(),
                 symbol_type: SymbolType::Function(2),
                 defined_at: Span::new(
@@ -396,10 +433,14 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
                         column: 13
                     }
                 ),
+                scope_start: LineColumn {
+                    line: 1,
+                    column: 63
+                },
                 declared: true,
                 temp: false,
                 builtin: false,
-                used: true,
+                used: false,
             }
         ]
     );
@@ -438,6 +479,10 @@ fn should_collect_function_arguments_with_enum_extraction() {
                         column: 10
                     }
                 ),
+                scope_start: LineColumn {
+                    line: 5,
+                    column: 57
+                },
                 declared: true,
                 temp: false,
                 builtin: false,
@@ -446,7 +491,7 @@ fn should_collect_function_arguments_with_enum_extraction() {
             SymbolInfo {
                 node_id: Some(NodeId::new(21)),
                 hir_id: None,
-                id: SymbolId::new(6),
+                id: SymbolId::new(7),
                 name: "unwrap".into(),
                 symbol_type: SymbolType::Function(1),
                 defined_at: Span::new(
@@ -456,6 +501,10 @@ fn should_collect_function_arguments_with_enum_extraction() {
                         column: 10
                     }
                 ),
+                scope_start: LineColumn {
+                    line: 6,
+                    column: 41
+                },
                 declared: true,
                 temp: false,
                 builtin: false,
@@ -495,6 +544,10 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
                         column: 10
                     }
                 ),
+                scope_start: LineColumn {
+                    line: 0,
+                    column: 15
+                },
                 declared: true,
                 temp: false,
                 builtin: false,
@@ -503,7 +556,7 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
             SymbolInfo {
                 node_id: Some(NodeId::new(8)),
                 hir_id: None,
-                id: SymbolId::new(3),
+                id: SymbolId::new(4),
                 name: "used_fn".into(),
                 symbol_type: SymbolType::Function(1),
                 defined_at: Span::new(
@@ -513,6 +566,10 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
                         column: 11
                     }
                 ),
+                scope_start: LineColumn {
+                    line: 1,
+                    column: 24
+                },
                 declared: true,
                 temp: false,
                 builtin: false,

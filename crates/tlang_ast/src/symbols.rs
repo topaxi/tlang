@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use std::fmt::Display;
 use std::rc::Rc;
 
-use tlang_span::{HirId, NodeId, Span};
+use tlang_span::{HirId, LineColumn, NodeId, Span};
 
 #[derive(Debug, Default, PartialEq, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -16,6 +16,7 @@ pub enum SymbolType {
     #[default]
     Variable,
     Function(u16),
+    FunctionSelfRef(u16),
     Parameter,
     Enum,
     EnumVariant,
@@ -25,7 +26,7 @@ pub enum SymbolType {
 impl SymbolType {
     pub fn arity(self) -> Option<u16> {
         match self {
-            SymbolType::Function(arity) => Some(arity),
+            SymbolType::Function(arity) | SymbolType::FunctionSelfRef(arity) => Some(arity),
             _ => None,
         }
     }
@@ -36,7 +37,7 @@ impl Display for SymbolType {
         match self {
             SymbolType::Module => write!(f, "module"),
             SymbolType::Variable => write!(f, "variable"),
-            SymbolType::Function(_) => write!(f, "function"),
+            SymbolType::Function(_) | SymbolType::FunctionSelfRef(_) => write!(f, "function"),
             SymbolType::Parameter => write!(f, "parameter"),
             SymbolType::Enum => write!(f, "enum"),
             SymbolType::EnumVariant => write!(f, "enum variant"),
@@ -60,6 +61,7 @@ pub struct SymbolInfo {
     pub name: Box<str>,
     pub symbol_type: SymbolType,
     pub defined_at: Span,
+    pub scope_start: LineColumn,
     pub node_id: Option<NodeId>,
     pub hir_id: Option<HirId>,
     /// Whether the symbol is temporary (e.g., a loop variable), only used for information during
@@ -71,12 +73,19 @@ pub struct SymbolInfo {
 }
 
 impl SymbolInfo {
-    pub fn new(id: SymbolId, name: &str, symbol_type: SymbolType, defined_at: Span) -> Self {
+    pub fn new(
+        id: SymbolId,
+        name: &str,
+        symbol_type: SymbolType,
+        defined_at: Span,
+        scope_start: LineColumn,
+    ) -> Self {
         SymbolInfo {
             id,
             name: name.into(),
             symbol_type,
             defined_at,
+            scope_start,
             node_id: None,
             hir_id: None,
             builtin: false,
@@ -87,7 +96,13 @@ impl SymbolInfo {
     }
 
     pub fn new_builtin(id: SymbolId, name: &str, symbol_type: SymbolType) -> Self {
-        let mut symbol_info = SymbolInfo::new(id, name, symbol_type, Span::default());
+        let mut symbol_info = SymbolInfo::new(
+            id,
+            name,
+            symbol_type,
+            Span::default(),
+            LineColumn::default(),
+        );
         symbol_info.builtin = true;
         symbol_info
     }
@@ -121,11 +136,19 @@ impl SymbolInfo {
     }
 
     pub fn is_fn(&self, arity: usize) -> bool {
-        matches!(self.symbol_type, SymbolType::Function(a) if a as usize == arity)
+        matches!(self.symbol_type, SymbolType::Function(a) | SymbolType::FunctionSelfRef(a) if a as usize == arity || a == u16::MAX)
     }
 
     pub fn is_any_fn(&self) -> bool {
-        matches!(self.symbol_type, SymbolType::Function(_))
+        matches!(
+            self.symbol_type,
+            SymbolType::Function(_) | SymbolType::FunctionSelfRef(_)
+        )
+    }
+
+    /// Whether the symbol is the function binding within the function body itself.
+    pub fn is_fn_self_binding(&self) -> bool {
+        matches!(self.symbol_type, SymbolType::FunctionSelfRef(_))
     }
 }
 
@@ -156,7 +179,7 @@ impl SymbolTable {
 
         while let Some(t) = table {
             if let Some(index) = t.borrow().symbols.iter().position(|s| s.id == id) {
-                return Some((scope_index, index));
+                return Some((index, scope_index));
             }
 
             scope_index += 1;
@@ -166,12 +189,23 @@ impl SymbolTable {
         None
     }
 
+    pub fn get_local(&self, id: SymbolId) -> Option<&SymbolInfo> {
+        self.symbols.iter().find(|s| s.id == id)
+    }
+
     fn get_local_mut(&mut self, id: SymbolId) -> Option<&mut SymbolInfo> {
         self.symbols.iter_mut().find(|s| s.id == id)
     }
 
     pub fn get_local_by_node_id(&self, node_id: NodeId) -> Option<&SymbolInfo> {
         self.symbols.iter().find(|s| s.node_id == Some(node_id))
+    }
+
+    pub fn get_symbol_id_by_hir_id(&self, hir_id: HirId) -> Option<SymbolId> {
+        self.get_all_declared_symbols()
+            .iter()
+            .find(|s| s.hir_id == Some(hir_id))
+            .map(|s| s.id)
     }
 
     pub fn set_declared(&mut self, id: SymbolId, declared: bool) {
@@ -202,6 +236,44 @@ impl SymbolTable {
         }
     }
 
+    pub fn get_by_name_and_arity(&self, name: &str, arity: usize) -> Vec<SymbolInfo> {
+        let locals = self
+            .get_locals_by_name(name)
+            .into_iter()
+            .filter(|s| {
+                if let SymbolType::Function(a) | SymbolType::FunctionSelfRef(a) = s.symbol_type {
+                    a == u16::MAX || // Builtin n-ary function
+                    a as usize == arity
+                } else {
+                    // Not a function, so we don't care about arity, might be a variable instead.
+                    true
+                }
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+
+        if !locals.is_empty() {
+            return locals;
+        }
+
+        if let Some(parent) = &self.parent {
+            parent.borrow().get_by_name_and_arity(name, arity)
+        } else {
+            vec![]
+        }
+    }
+
+    pub fn get_closest_by_name(&self, name: &str, span: Span) -> Option<SymbolInfo> {
+        let symbols = self.get_by_name(name);
+
+        symbols
+            .iter()
+            .rev()
+            .filter(|s| s.declared)
+            .find(|s| s.scope_start < span.start || s.is_any_fn() || s.is_builtin())
+            .cloned()
+    }
+
     pub fn has_name(&self, name: &str) -> bool {
         // TODO: This is not efficient, we might want to cache or avoid cloning anything
         // here.
@@ -209,7 +281,7 @@ impl SymbolTable {
     }
 
     pub fn has_multi_arity_fn(&self, name: &str, arity: usize) -> bool {
-        let symbols = self.get_by_name(name);
+        let symbols = self.get_all_declared_symbols();
         let mut hashset = HashSet::new();
         let fn_symbols: Vec<_> = symbols
             .iter()
@@ -242,6 +314,21 @@ impl SymbolTable {
 
     pub fn mark_as_used(&mut self, id: SymbolId) {
         if let Some(symbol_info) = self.get_local_mut(id) {
+            if symbol_info.is_any_fn() {
+                debug!(
+                    "Marking {} `{}/{}` with {:?} as used",
+                    symbol_info.symbol_type,
+                    symbol_info.name,
+                    symbol_info.symbol_type.arity().unwrap_or_default(),
+                    id
+                );
+            } else {
+                debug!(
+                    "Marking {} `{}` with {:?} as used",
+                    symbol_info.symbol_type, symbol_info.name, id
+                );
+            }
+
             symbol_info.used = true;
         } else if let Some(ref parent) = self.parent {
             parent.borrow_mut().mark_as_used(id);

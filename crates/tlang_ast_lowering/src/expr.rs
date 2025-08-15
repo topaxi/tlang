@@ -117,14 +117,21 @@ impl LoweringContext {
         let arms = arms
             .iter()
             .map(|arm| {
-                self.with_scope(arm.id, |this| {
+                let scope_id = if let ast::node::ExprKind::Block(block) = &arm.expression.kind {
+                    block.id
+                } else {
+                    arm.id
+                };
+
+                self.with_scope(scope_id, |this| {
+                    let hir_id = this.lower_node_id(arm.id);
                     let pat = this.lower_pat_with_idents(&arm.pattern, &mut idents);
                     let guard = arm.guard.as_ref().map(|expr| this.lower_expr(expr));
                     let block = if let ast::node::ExprKind::Block(block) = &arm.expression.kind {
                         this.lower_block_in_current_scope(block)
                     } else {
                         hir::Block::new(
-                            this.lower_node_id(arm.id),
+                            hir_id,
                             vec![],
                             Some(this.lower_expr(&arm.expression)),
                             arm.expression.span,

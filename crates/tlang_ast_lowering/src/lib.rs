@@ -10,7 +10,7 @@ use tlang_ast::keyword::kw;
 use tlang_ast::node::{EnumPattern, FunctionDeclaration, Ident};
 use tlang_ast::symbols::SymbolIdAllocator;
 use tlang_hir::hir;
-use tlang_span::{HirId, HirIdAllocator};
+use tlang_span::{HirId, HirIdAllocator, LineColumn};
 
 mod expr;
 mod r#loop;
@@ -105,12 +105,14 @@ impl LoweringContext {
         hir_id: HirId,
         name: &str,
         symbol_type: ast::symbols::SymbolType,
+        scope_start: LineColumn,
     ) {
         let symbol_info = ast::symbols::SymbolInfo::new(
             self.symbol_id_allocator.next_id(),
             name,
             symbol_type,
             Default::default(),
+            scope_start,
         )
         .with_hir_id(hir_id)
         .as_temp();

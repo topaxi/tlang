@@ -12,6 +12,8 @@ use tlang_semantics::{
 };
 use tlang_span::{LineColumn, Span};
 
+mod common;
+
 fn create_analyzer(builtin_symbols: &[(&str, SymbolType)]) -> SemanticAnalyzer {
     let mut analyzer = SemanticAnalyzer::default();
     analyzer.add_builtin_symbols(builtin_symbols);
@@ -148,6 +150,10 @@ fn test_should_allow_shadowing_of_single_variable() {
                     LineColumn { line: 0, column: 4 },
                     LineColumn { line: 0, column: 5 }
                 ),
+                scope_start: LineColumn {
+                    line: 0,
+                    column: 10
+                },
                 declared: true,
                 temp: false,
                 builtin: false,
@@ -163,6 +169,10 @@ fn test_should_allow_shadowing_of_single_variable() {
                     LineColumn { line: 1, column: 5 },
                     LineColumn { line: 1, column: 6 }
                 ),
+                scope_start: LineColumn {
+                    line: 1,
+                    column: 11
+                },
                 declared: true,
                 temp: false,
                 builtin: false,
@@ -201,6 +211,10 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
                 LineColumn { line: 0, column: 4 },
                 LineColumn { line: 0, column: 5 }
             ),
+            scope_start: LineColumn {
+                line: 0,
+                column: 10
+            },
             declared: true,
             temp: false,
             builtin: false,
@@ -224,6 +238,10 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
                 LineColumn { line: 1, column: 5 },
                 LineColumn { line: 1, column: 6 }
             ),
+            scope_start: LineColumn {
+                line: 1,
+                column: 15
+            },
             declared: true,
             temp: false,
             builtin: false,
@@ -286,6 +304,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
                 LineColumn { line: 0, column: 3 },
                 LineColumn { line: 0, column: 6 }
             ),
+            scope_start: LineColumn { line: 2, column: 2 },
             declared: true,
             temp: false,
             builtin: false,
@@ -301,13 +320,17 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
     let c_symbol_info = SymbolInfo {
         node_id: Some(NodeId::new(14)),
         hir_id: None,
-        id: SymbolId::new(4),
+        id: SymbolId::new(5),
         name: "c".into(),
         symbol_type: SymbolType::Variable,
         defined_at: Span::new(
             LineColumn { line: 4, column: 5 },
             LineColumn { line: 4, column: 6 },
         ),
+        scope_start: LineColumn {
+            line: 4,
+            column: 11,
+        },
         declared: true,
         temp: false,
         builtin: false,
@@ -321,7 +344,7 @@ fn should_allow_using_variables_from_outer_function_scope_before_declaration() {
         .get_by_name("c");
 
     // Verify that c is within the scope of the function body
-    assert_eq!(actual_c, vec![c_symbol_info.clone()]);
+    assert_eq!(actual_c, vec![c_symbol_info]);
 }
 
 #[test]
@@ -367,10 +390,6 @@ fn should_warn_about_unused_function_and_parameters() {
         diagnostics,
         vec![
             Diagnostic::new(
-                "Unused variable `c`, if this is intentional, prefix the name with an underscore: `_c`".into(), Severity::Warning,
-                Span::new(LineColumn { line: 1, column: 9 }, LineColumn { line: 1, column: 10 }),
-            ),
-            Diagnostic::new(
                 "Unused parameter `a`, if this is intentional, prefix the name with an underscore: `_a`".into(),
                 Severity::Warning,
                 Span::new(LineColumn { line: 0, column: 7 }, LineColumn { line: 0, column: 8 }),
@@ -381,7 +400,11 @@ fn should_warn_about_unused_function_and_parameters() {
                 Span::new(LineColumn { line: 0, column: 10 }, LineColumn { line: 0, column: 11 }),
             ),
             Diagnostic::new(
-                "Unused function `add`, if this is intentional, prefix the name with an underscore: `_add`".into(),
+                "Unused variable `c`, if this is intentional, prefix the name with an underscore: `_c`".into(), Severity::Warning,
+                Span::new(LineColumn { line: 1, column: 9 }, LineColumn { line: 1, column: 10 }),
+            ),
+            Diagnostic::new(
+                "Unused function `add/2`".into(),
                 Severity::Warning,
                 Span::new(LineColumn { line: 0, column: 3 }, LineColumn { line: 0, column: 6 }),
             ),
@@ -442,6 +465,8 @@ fn should_handle_fn_guard_variables() {
     let diagnostics = analyze_diag!(indoc! {"
         fn fib(n) if n < 2 { n }
         fn fib(n) { fib(n - 1) + fib(n - 2) }
+
+        fib(5);
     "});
     assert_eq!(diagnostics, vec![]);
 

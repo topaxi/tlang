@@ -1,6 +1,7 @@
 #![feature(box_patterns)]
 pub mod constant_folding;
 pub mod hir_opt;
+pub mod slot_allocation;
 pub mod symbol_resolution;
 
 pub use constant_folding::{ConstantFolder, ConstantFolding, ConstantPropagator};

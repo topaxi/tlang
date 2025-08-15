@@ -1,5 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
+use log::debug;
 use tlang_ast::{
     NodeId,
     node::{
@@ -127,17 +128,8 @@ impl SemanticAnalyzer {
         let symbol_info_ids: Vec<_> = self
             .current_symbol_table()
             .borrow()
-            .get_by_name(name)
+            .get_by_name_and_arity(name, arity)
             .iter()
-            .filter(|s| {
-                if let SymbolType::Function(a) = s.symbol_type {
-                    a == u16::MAX || // Builtin n-ary function
-                    a as usize == arity
-                } else {
-                    // Not a function, so we don't care about arity
-                    true
-                }
-            })
             .map(|s| s.id)
             .collect();
 
@@ -148,9 +140,9 @@ impl SemanticAnalyzer {
         }
 
         for symbol_id in symbol_info_ids {
-            // TODO: This only marks the by it's name, not by it's id. Maybe we should
-            //       mark it in the collection pass? Or keep track of the current id in
-            //       case the name is being shadowed?
+            // TODO: This only marks the fn by it's name and arity, not by it's id.
+            //       Maybe we should mark it in the collection pass?
+            //       Or keep track of the current id in case the name is being shadowed?
             self.current_symbol_table()
                 .borrow_mut()
                 .mark_as_used(symbol_id);
@@ -293,6 +285,8 @@ impl SemanticAnalyzer {
     }
 
     fn analyze_path(&mut self, path: &Path, span: Span) {
+        debug!("Analyzing path: {}", path);
+
         let mut path_str = String::new();
 
         for segment in &path.segments {
@@ -303,6 +297,11 @@ impl SemanticAnalyzer {
     }
 
     fn analyze_path_with_known_arity(&mut self, path: &Path, arity: usize, span: Span) {
+        debug!(
+            "Analyzing path with known arity: {}, arity: {}",
+            path, arity
+        );
+
         let mut path_str = String::new();
 
         for segment in path.segments.iter().take(path.segments.len() - 1) {
@@ -479,6 +478,9 @@ impl SemanticAnalyzer {
             .get_all_declared_local_symbols()
             .filter(|symbol| !symbol.used)
             .filter(|symbol| !symbol.is_builtin())
+            // Do not report the binding introduced within function bodies to reference to
+            // themselves.
+            .filter(|symbol| !symbol.is_fn_self_binding())
             .filter(|symbol| !symbol.name.starts_with('_'))
             // TODO: We currently do not track member methods, as we do not have any type
             //       information yet.
@@ -486,7 +488,19 @@ impl SemanticAnalyzer {
             .collect::<Vec<_>>();
 
         for unused_symbol in &unused_symbols {
-            self.diagnostics.push(Diagnostic::new(
+            if unused_symbol.is_any_fn() {
+                self.diagnostics.push(Diagnostic::new(
+                    format!(
+                        "Unused {} `{}/{}`",
+                        unused_symbol.symbol_type,
+                        unused_symbol.name,
+                        unused_symbol.symbol_type.arity().unwrap(),
+                    ),
+                    Severity::Warning,
+                    unused_symbol.defined_at,
+                ));
+            } else {
+                self.diagnostics.push(Diagnostic::new(
                     format!(
                         "Unused {} `{}`, if this is intentional, prefix the name with an underscore: `_{}`",
                         unused_symbol.symbol_type, unused_symbol.name, unused_symbol.name
@@ -494,6 +508,7 @@ impl SemanticAnalyzer {
                     Severity::Warning,
                     unused_symbol.defined_at
                 ));
+            }
         }
     }
 

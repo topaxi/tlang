@@ -85,6 +85,27 @@ pub enum Slot {
     None,
 }
 
+impl Slot {
+    pub fn new_local(slot_index: usize) -> Self {
+        Slot::Local(slot_index)
+    }
+
+    pub fn new_upvar(slot_index: usize, scope_index: usize) -> Self {
+        debug_assert!(scope_index <= ScopeIndex::MAX as usize);
+
+        Slot::Upvar(slot_index, scope_index as ScopeIndex)
+    }
+}
+
+impl From<(usize, usize)> for Slot {
+    fn from(slot_data: (usize, usize)) -> Self {
+        match slot_data {
+            (slot_index, 0) => Slot::new_local(slot_index),
+            (slot_index, scope_index) => Slot::new_upvar(slot_index, scope_index),
+        }
+    }
+}
+
 #[derive(Debug, Default, Eq, PartialEq, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Res {
@@ -162,6 +183,10 @@ impl Res {
 
     pub fn slot(self) -> Slot {
         self.slot
+    }
+
+    pub fn set_slot(&mut self, slot: Slot) {
+        self.slot = slot;
     }
 }
 

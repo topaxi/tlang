@@ -1036,6 +1036,7 @@ dependencies = [
  "env_logger",
  "insta",
  "log",
+ "pretty_assertions",
  "serde",
  "tlang_ast",
  "tlang_ast_lowering",
@@ -1128,7 +1129,10 @@ dependencies = [
 name = "tlang_semantics"
 version = "0.1.0"
 dependencies = [
+ "ctor",
+ "env_logger",
  "indoc",
+ "log",
  "pretty_assertions",
  "serde",
  "tlang_ast",

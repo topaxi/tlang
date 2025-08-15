@@ -94,6 +94,7 @@ pub fn walk_stmt<'hir, V: Visitor<'hir>>(
         }
         hir::StmtKind::FunctionDeclaration(decl) => {
             visitor.visit_expr(&mut decl.name, ctx);
+            visitor.enter_scope(decl.hir_id, ctx);
 
             for param in &mut decl.parameters {
                 visitor.visit_ident(&mut param.name, ctx);
@@ -101,6 +102,7 @@ pub fn walk_stmt<'hir, V: Visitor<'hir>>(
             }
 
             visitor.visit_block(&mut decl.body, ctx);
+            visitor.leave_scope(decl.hir_id, ctx);
         }
         hir::StmtKind::StructDeclaration(decl) => {
             for field in &mut decl.fields {
@@ -190,6 +192,8 @@ pub fn walk_expr<'hir, V: Visitor<'hir>>(
             visitor.visit_expr(expr, ctx);
 
             for arm in arms {
+                let hir_id = arm.block.hir_id;
+                visitor.enter_scope(hir_id, ctx);
                 visitor.visit_pat(&mut arm.pat, ctx);
 
                 if let Some(guard) = &mut arm.guard {
@@ -197,6 +201,7 @@ pub fn walk_expr<'hir, V: Visitor<'hir>>(
                 }
 
                 visitor.visit_block(&mut arm.block, ctx);
+                visitor.leave_scope(hir_id, ctx);
             }
         }
         hir::ExprKind::Dict(pairs) => {

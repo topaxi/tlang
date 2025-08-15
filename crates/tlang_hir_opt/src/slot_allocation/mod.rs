@@ -6,11 +6,11 @@ use crate::HirPass;
 use crate::hir_opt::HirOptContext;
 
 #[derive(Debug, Default)]
-pub struct IdentifierResolver {
+pub struct SlotAllocator {
     scopes: Vec<HirId>,
 }
 
-impl<'hir> Visitor<'hir> for IdentifierResolver {
+impl<'hir> Visitor<'hir> for SlotAllocator {
     type Context = HirOptContext;
 
     fn enter_scope(&mut self, hir_id: hir::HirId, ctx: &mut Self::Context) {
@@ -40,18 +40,16 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
                 )
             });
 
-        let symbol_hir_id = symbol_table
-            .borrow()
-            .get_closest_by_name(&path.to_string(), path.span)
-            .and_then(|s| s.hir_id);
+        let slot = path
+            .res
+            .hir_id()
+            .and_then(|hir_id| symbol_table.borrow().get_symbol_id_by_hir_id(hir_id))
+            .and_then(|symbol_id| symbol_table.borrow().get_slot(symbol_id));
 
-        if let Some(hir_id) = symbol_hir_id {
-            debug!(
-                "Resolved path '{}' as {} to {:?}",
-                path, path.span.start, hir_id
-            );
+        if let Some(slot) = slot {
+            debug!("Assigning path '{}' to slot {:?}", path, slot);
 
-            path.res.set_hir_id(hir_id);
+            path.res.set_slot(slot.into());
         } else {
             // TODO: Builtin symbols do not have a HirId, we should handle/resolve these somehow.
             warn!(
@@ -63,7 +61,7 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
     }
 }
 
-impl HirPass for IdentifierResolver {
+impl HirPass for SlotAllocator {
     fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
         self.visit_module(module, ctx);
 

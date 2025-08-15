@@ -14,7 +14,12 @@ impl LoweringContext {
         let block = self.with_scope(for_loop.id, |this| {
             let hir_id = this.unique_id();
             let iterator_binding_name = Ident::new("iterator$$", Default::default());
-            this.define_symbol(hir_id, iterator_binding_name.as_str(), SymbolType::Variable);
+            this.define_symbol(
+                hir_id,
+                iterator_binding_name.as_str(),
+                SymbolType::Variable,
+                Default::default(),
+            );
             let iterator_binding_pat = hir::Pat {
                 kind: hir::PatKind::Identifier(hir_id, Box::new(iterator_binding_name.clone())),
                 span: Default::default(),
@@ -27,6 +32,7 @@ impl LoweringContext {
                     hir_id,
                     accumulator_binding_name.as_str(),
                     SymbolType::Variable,
+                    Default::default(),
                 );
                 let accumulator_declaration = hir::Stmt::new(
                     hir_id,

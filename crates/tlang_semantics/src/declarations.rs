@@ -11,7 +11,7 @@ use tlang_ast::{
     },
     symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
 };
-use tlang_span::Span;
+use tlang_span::{LineColumn, Span};
 
 /**
  * The declaration analyzer is responsible for collecting all the declarations in a module.
@@ -75,9 +75,17 @@ impl DeclarationAnalyzer {
     }
 
     #[inline(always)]
-    fn declare_symbol(&mut self, node_id: NodeId, name: &str, symbol_type: SymbolType, span: Span) {
+    fn declare_symbol(
+        &mut self,
+        node_id: NodeId,
+        name: &str,
+        symbol_type: SymbolType,
+        defined_at: Span,
+        scope_start: LineColumn,
+    ) {
+        let id = self.unique_id();
         let symbol_info =
-            SymbolInfo::new(self.unique_id(), name, symbol_type, span).with_node_id(node_id);
+            SymbolInfo::new(id, name, symbol_type, defined_at, scope_start).with_node_id(node_id);
         let symbol_table = self.current_symbol_table();
 
         symbol_table.borrow_mut().insert(symbol_info);
@@ -114,7 +122,10 @@ impl DeclarationAnalyzer {
     fn collect_declarations_stmt(&mut self, stmt: &Stmt) {
         match &stmt.kind {
             StmtKind::Expr(expr) => self.collect_declarations_expr(expr),
-            StmtKind::Let(decl) => self.collect_variable_declaration(decl),
+            StmtKind::Let(decl) => {
+                self.collect_declarations_expr(&decl.expression);
+                self.collect_pattern(&decl.pattern, stmt.span.end);
+            }
             StmtKind::FunctionDeclaration(declaration) => {
                 self.collect_function_declaration(declaration);
             }
@@ -126,7 +137,13 @@ impl DeclarationAnalyzer {
             StmtKind::Return(Some(expr)) => self.collect_declarations_expr(expr),
             StmtKind::Return(_) => {}
             StmtKind::EnumDeclaration(decl) => {
-                self.declare_symbol(stmt.id, decl.name.as_str(), SymbolType::Enum, stmt.span);
+                self.declare_symbol(
+                    stmt.id,
+                    decl.name.as_str(),
+                    SymbolType::Enum,
+                    stmt.span,
+                    stmt.span.end,
+                );
 
                 for element in &decl.variants {
                     self.declare_symbol(
@@ -134,11 +151,18 @@ impl DeclarationAnalyzer {
                         &(decl.name.to_string() + "::" + element.name.as_str()),
                         SymbolType::EnumVariant,
                         element.span,
+                        element.span.end,
                     );
                 }
             }
             StmtKind::StructDeclaration(decl) => {
-                self.declare_symbol(stmt.id, decl.name.as_str(), SymbolType::Struct, stmt.span);
+                self.declare_symbol(
+                    stmt.id,
+                    decl.name.as_str(),
+                    SymbolType::Struct,
+                    stmt.span,
+                    stmt.span.end,
+                );
             }
             StmtKind::None => {
                 // Nothing to do here
@@ -157,17 +181,21 @@ impl DeclarationAnalyzer {
     }
 
     fn collect_declarations_from_fn_param(&mut self, param: &FunctionParameter) {
-        self.collect_pattern(&param.pattern);
+        self.collect_pattern(&param.pattern, param.span.end);
     }
 
     fn collect_declarations_block(&mut self, block: &Block) {
         self.push_symbol_table(block.id);
+        self.collect_declarations_block_scopeless(block);
+        self.pop_symbol_table();
+    }
+
+    fn collect_declarations_block_scopeless(&mut self, block: &Block) {
         for stmt in &block.statements {
             self.collect_declarations_stmt(stmt);
         }
 
         self.collect_optional_declarations_expr(&block.expression);
-        self.pop_symbol_table();
     }
 
     fn collect_declarations_expr(&mut self, expr: &Expr) {
@@ -177,11 +205,11 @@ impl DeclarationAnalyzer {
             }
             ExprKind::ForLoop(for_loop) => {
                 self.push_symbol_table(expr.id);
-                self.collect_pattern(&for_loop.pat);
+                self.collect_pattern(&for_loop.pat, for_loop.pat.span.end);
                 self.collect_declarations_expr(&for_loop.iter);
 
                 if let Some((pat, expr)) = &for_loop.acc {
-                    self.collect_pattern(pat);
+                    self.collect_pattern(pat, expr.span.end);
                     self.collect_declarations_expr(expr);
                 }
 
@@ -230,7 +258,7 @@ impl DeclarationAnalyzer {
             }
             ExprKind::Let(pattern, expr) => {
                 self.collect_declarations_expr(expr);
-                self.collect_pattern(pattern);
+                self.collect_pattern(pattern, expr.span.end);
             }
             ExprKind::IfElse(expr) => {
                 self.collect_declarations_expr(&expr.condition);
@@ -270,9 +298,14 @@ impl DeclarationAnalyzer {
 
         for arm in &match_expr.arms {
             self.push_symbol_table(arm.id);
-            self.collect_pattern(&arm.pattern);
+            self.collect_pattern(&arm.pattern, arm.pattern.span.end);
             self.collect_optional_declarations_expr(&arm.guard);
-            self.collect_declarations_expr(&arm.expression);
+
+            match &arm.expression.kind {
+                ExprKind::Block(block) => self.collect_declarations_block_scopeless(block),
+                _ => self.collect_declarations_expr(&arm.expression),
+            }
+
             self.pop_symbol_table();
         }
     }
@@ -285,11 +318,6 @@ impl DeclarationAnalyzer {
         }
 
         self.pop_symbol_table();
-    }
-
-    fn collect_variable_declaration(&mut self, decl: &LetDeclaration) {
-        self.collect_declarations_expr(&decl.expression);
-        self.collect_pattern(&decl.pattern);
     }
 
     /// TODO: This is a temporary solution. We need to find a better way to handle this.
@@ -314,9 +342,20 @@ impl DeclarationAnalyzer {
             &name_as_str,
             SymbolType::Function(declaration.parameters.len() as u16),
             declaration.name.span,
+            declaration.span.end,
         );
 
         self.push_symbol_table(declaration.id);
+
+        // The function name is also declared and bound within the function itself.
+        // Similar to what JS does.
+        self.declare_symbol(
+            declaration.id,
+            &name_as_str,
+            SymbolType::FunctionSelfRef(declaration.parameters.len() as u16),
+            declaration.name.span,
+            declaration.name.span.end,
+        );
 
         self.symbol_type_context.push(SymbolType::Parameter);
         for param in &declaration.parameters {
@@ -325,7 +364,7 @@ impl DeclarationAnalyzer {
         self.symbol_type_context.pop();
 
         self.collect_optional_declarations_expr(&declaration.guard);
-        self.collect_declarations_block(&declaration.body);
+        self.collect_declarations_block_scopeless(&declaration.body);
 
         self.pop_symbol_table();
     }
@@ -340,6 +379,7 @@ impl DeclarationAnalyzer {
                 &name_as_str,
                 SymbolType::Function(decl.parameters.len() as u16),
                 decl.name.span,
+                decl.name.span.end,
             );
         }
 
@@ -347,7 +387,7 @@ impl DeclarationAnalyzer {
         self.pop_symbol_table();
     }
 
-    fn collect_pattern(&mut self, pattern: &Pat) {
+    fn collect_pattern(&mut self, pattern: &Pat, scope_start: LineColumn) {
         match &pattern.kind {
             PatKind::Identifier(ident) => {
                 self.declare_symbol(
@@ -358,22 +398,29 @@ impl DeclarationAnalyzer {
                         .copied()
                         .unwrap_or(SymbolType::Variable),
                     pattern.span,
+                    scope_start,
                 );
             }
             PatKind::_Self => {
-                self.declare_symbol(pattern.id, kw::_Self, SymbolType::Variable, pattern.span);
+                self.declare_symbol(
+                    pattern.id,
+                    kw::_Self,
+                    SymbolType::Variable,
+                    pattern.span,
+                    scope_start,
+                );
             }
             PatKind::List(patterns) => {
                 for pattern in patterns {
-                    self.collect_pattern(pattern);
+                    self.collect_pattern(pattern, scope_start);
                 }
             }
             PatKind::Rest(pattern) => {
-                self.collect_pattern(pattern);
+                self.collect_pattern(pattern, scope_start);
             }
             PatKind::Enum(enum_pattern) => {
                 for (_ident, pat) in &enum_pattern.elements {
-                    self.collect_pattern(pat);
+                    self.collect_pattern(pat, scope_start);
                 }
             }
             PatKind::Wildcard => {} // Wildcard discards values, nothing to do here.

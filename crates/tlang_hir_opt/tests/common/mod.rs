@@ -1,6 +1,6 @@
 use tlang_ast::symbols::SymbolType;
 use tlang_ast_lowering::lower_to_hir;
-use tlang_hir::hir;
+use tlang_hir::{Visitor, hir};
 use tlang_hir_opt::hir_opt::HirOptimizer;
 use tlang_hir_pretty::HirPrettyOptions;
 use tlang_parser::Parser;
@@ -27,9 +27,8 @@ pub fn compile(source: &str) -> hir::LowerResult {
     )
 }
 
-pub fn compile_and_optimize(source: &str) -> hir::Module {
+pub fn compile_and_optimize(source: &str, optimizer: &mut HirOptimizer) -> hir::Module {
     let (mut module, meta) = compile(source);
-    let mut optimizer = HirOptimizer::default();
     let mut optimizer_context = meta.into();
     optimizer.optimize_hir(&mut module, &mut optimizer_context);
     module
@@ -43,4 +42,30 @@ pub fn pretty_print(module: &hir::Module) -> String {
     let mut prettier = tlang_hir_pretty::HirPretty::new(options);
     prettier.print_module(module);
     prettier.output().to_string()
+}
+
+pub fn collect_paths(node: &mut hir::Module) -> Vec<hir::Path> {
+    let mut collector = PathCollector::new();
+    collector.collect(node);
+    collector.paths
+}
+
+struct PathCollector {
+    paths: Vec<hir::Path>,
+}
+
+impl PathCollector {
+    fn new() -> Self {
+        Self { paths: Vec::new() }
+    }
+
+    fn collect(&mut self, module: &mut hir::Module) {
+        self.visit_module(module, &mut ());
+    }
+}
+
+impl<'hir> Visitor<'hir> for PathCollector {
+    fn visit_path(&mut self, path: &'hir mut hir::Path, _ctx: &mut Self::Context) {
+        self.paths.push(path.clone());
+    }
 }
