@@ -45,12 +45,18 @@ impl ScopeStack {
 
     /// # Panics
     pub fn current_scope(&self) -> Rc<RefCell<Scope>> {
-        self.scopes.last().unwrap().clone()
+        self.scopes
+            .last()
+            .cloned()
+            .expect("No current scope available")
     }
 
     /// # Panics
     pub fn root_scope(&self) -> Rc<RefCell<Scope>> {
-        self.scopes.first().unwrap().clone()
+        self.scopes
+            .first()
+            .cloned()
+            .expect("No root scope available")
     }
 
     pub fn as_root(&self) -> Self {
@@ -67,8 +73,20 @@ impl ScopeStack {
         self.current_scope().borrow().get(index)
     }
 
-    fn get_upvar(&self, scope_index: usize, index: usize) -> Option<TlangValue> {
+    fn set_local(&self, index: usize, value: TlangValue) {
+        self.current_scope().borrow_mut().set(index, value);
+    }
+
+    fn get_upvar(&self, relative_scope_index: u16, index: usize) -> Option<TlangValue> {
+        let scope_index = self.scope_index(relative_scope_index);
+
         self.scopes[scope_index].borrow().get(index)
+    }
+
+    fn set_upvar(&self, relative_scope_index: u16, index: usize, value: TlangValue) {
+        let scope_index = self.scope_index(relative_scope_index);
+
+        self.scopes[scope_index].borrow_mut().set(index, value);
     }
 
     fn scope_index(&self, relative_scope_index: ScopeIndex) -> usize {
@@ -79,9 +97,7 @@ impl ScopeStack {
         match res.slot() {
             hir::Slot::Local(index) => self.get_local(index),
             hir::Slot::Upvar(index, relative_scope_index) => {
-                let scope_index = self.scope_index(relative_scope_index);
-
-                self.get_upvar(scope_index, index)
+                self.get_upvar(relative_scope_index, index)
             }
             _ => None,
         }
@@ -90,10 +106,9 @@ impl ScopeStack {
     /// # Panics
     pub fn update_value(&self, res: &hir::Res, value: TlangValue) {
         match res.slot() {
-            hir::Slot::Local(index) => self.current_scope().borrow_mut().set(index, value),
+            hir::Slot::Local(index) => self.set_local(index, value),
             hir::Slot::Upvar(index, relative_scope_index) => {
-                let scope_index = self.scope_index(relative_scope_index);
-                self.scopes[scope_index].borrow_mut().set(index, value);
+                self.set_upvar(relative_scope_index, index, value);
             }
             _ => panic!("Cannot update value for {res:?}"),
         }

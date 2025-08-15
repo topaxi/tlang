@@ -163,14 +163,6 @@ impl Res {
     pub fn slot(self) -> Slot {
         self.slot
     }
-
-    pub fn slot_index(self) -> Option<usize> {
-        match self.slot {
-            Slot::Local(slot_index) => Some(slot_index),
-            Slot::Upvar(slot_index, _scope_index) => Some(slot_index),
-            Slot::None => None,
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
