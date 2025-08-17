@@ -173,12 +173,12 @@ impl SymbolTable {
         self.parent.clone()
     }
 
-    pub fn get_slot(&self, id: SymbolId) -> Option<(usize, usize)> {
+    pub fn get_slot(&self, predicate: impl Fn(&SymbolInfo) -> bool) -> Option<(usize, usize)> {
         let mut table = Some(Rc::new(RefCell::new(self.clone())));
         let mut scope_index = 0;
 
         while let Some(t) = table {
-            if let Some(index) = t.borrow().symbols.iter().position(|s| s.id == id) {
+            if let Some(index) = t.borrow().symbols.iter().position(&predicate) {
                 return Some((index, scope_index));
             }
 
@@ -199,13 +199,6 @@ impl SymbolTable {
 
     pub fn get_local_by_node_id(&self, node_id: NodeId) -> Option<&SymbolInfo> {
         self.symbols.iter().find(|s| s.node_id == Some(node_id))
-    }
-
-    pub fn get_symbol_id_by_hir_id(&self, hir_id: HirId) -> Option<SymbolId> {
-        self.get_all_declared_symbols()
-            .iter()
-            .find(|s| s.hir_id == Some(hir_id))
-            .map(|s| s.id)
     }
 
     pub fn set_declared(&mut self, id: SymbolId, declared: bool) {

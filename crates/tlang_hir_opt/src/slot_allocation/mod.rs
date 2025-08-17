@@ -40,11 +40,9 @@ impl<'hir> Visitor<'hir> for SlotAllocator {
                 )
             });
 
-        let slot = path
-            .res
-            .hir_id()
-            .and_then(|hir_id| symbol_table.borrow().get_symbol_id_by_hir_id(hir_id))
-            .and_then(|symbol_id| symbol_table.borrow().get_slot(symbol_id));
+        let slot = symbol_table
+            .borrow()
+            .get_slot(|s| s.hir_id == path.res.hir_id());
 
         if let Some(slot) = slot {
             debug!("Assigning path '{}' to slot {:?}", path, slot);
