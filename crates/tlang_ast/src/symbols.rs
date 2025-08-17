@@ -183,7 +183,7 @@ impl SymbolTable {
             }
 
             scope_index += 1;
-            table = t.borrow().parent.clone();
+            table = t.borrow().parent();
         }
 
         None
@@ -322,7 +322,7 @@ impl SymbolTable {
             }
 
             symbol_info.used = true;
-        } else if let Some(ref parent) = self.parent {
+        } else if let Some(parent) = &self.parent {
             parent.borrow_mut().mark_as_used(id);
         }
     }
