@@ -527,7 +527,7 @@ impl SemanticAnalyzer {
             .filter_map(|id| {
                 self.current_symbol_table()
                     .borrow_mut()
-                    .get_local_by_node_id(*id)
+                    .get_local(|s| s.node_id == Some(*id))
                     .map(|s| s.id)
             })
             .collect::<Vec<_>>();

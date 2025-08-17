@@ -6,7 +6,7 @@ use tlang_ast::node::MatchExpression;
 use tlang_ast::symbols::SymbolIdAllocator;
 use tlang_ast::{
     node::{
-        Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, LetDeclaration, Module, Pat,
+        Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, Module, Pat,
         PatKind, Stmt, StmtKind,
     },
     symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},

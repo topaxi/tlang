@@ -189,20 +189,19 @@ impl SymbolTable {
         None
     }
 
-    pub fn get_local(&self, id: SymbolId) -> Option<&SymbolInfo> {
-        self.symbols.iter().find(|s| s.id == id)
+    pub fn get_local(&self, predicate: impl Fn(&SymbolInfo) -> bool) -> Option<&SymbolInfo> {
+        self.symbols.iter().find(|s| predicate(s))
     }
 
-    fn get_local_mut(&mut self, id: SymbolId) -> Option<&mut SymbolInfo> {
-        self.symbols.iter_mut().find(|s| s.id == id)
-    }
-
-    pub fn get_local_by_node_id(&self, node_id: NodeId) -> Option<&SymbolInfo> {
-        self.symbols.iter().find(|s| s.node_id == Some(node_id))
+    fn get_local_mut(
+        &mut self,
+        predicate: impl Fn(&SymbolInfo) -> bool,
+    ) -> Option<&mut SymbolInfo> {
+        self.symbols.iter_mut().find(|s| predicate(s))
     }
 
     pub fn set_declared(&mut self, id: SymbolId, declared: bool) {
-        if let Some(s) = self.get_local_mut(id) {
+        if let Some(s) = self.get_local_mut(|s| s.id == id) {
             s.set_declared(declared);
         }
     }
@@ -306,7 +305,7 @@ impl SymbolTable {
     }
 
     pub fn mark_as_used(&mut self, id: SymbolId) {
-        if let Some(symbol_info) = self.get_local_mut(id) {
+        if let Some(symbol_info) = self.get_local_mut(|s| s.id == id) {
             if symbol_info.is_any_fn() {
                 debug!(
                     "Marking {} `{}/{}` with {:?} as used",
