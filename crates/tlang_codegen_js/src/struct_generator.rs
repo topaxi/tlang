@@ -2,6 +2,7 @@ use tlang_ast::node::Ident;
 use tlang_hir::hir;
 
 use crate::generator::CodegenJS;
+use crate::js;
 
 impl CodegenJS {
     /// Generate the struct declaration
@@ -12,14 +13,14 @@ impl CodegenJS {
     pub(crate) fn generate_struct_declaration(&mut self, decl: &hir::StructDeclaration) {
         self.push_indent();
         self.push_str("function ");
-        self.push_str(decl.name.as_str());
+        self.push_str(&js::safe_js_variable_name(decl.name.as_str()));
         self.push_str("() {\n");
 
         self.inc_indent();
 
         self.push_indent();
         self.push_str("if (new.target == null) return Object.assign(new ");
-        self.push_str(decl.name.as_str());
+        self.push_str(&js::safe_js_variable_name(decl.name.as_str()));
         self.push_str(", arguments[0]);\n");
 
         if !decl.fields.is_empty() {
@@ -37,7 +38,7 @@ impl CodegenJS {
     fn generate_struct_field(&mut self, field_name: &Ident, _field_type: &hir::Ty) {
         self.push_indent();
         self.push_str("this.");
-        self.push_str(field_name.as_str());
+        self.push_str(&js::safe_js_variable_name(field_name.as_str()));
         self.push_str(" = undefined;\n");
     }
 }

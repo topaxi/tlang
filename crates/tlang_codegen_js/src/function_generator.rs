@@ -53,7 +53,14 @@ impl CodegenJS {
         match &name.kind {
             hir::ExprKind::Path(path) if path.segments.len() > 1 => {
                 self.push_indent();
-                self.push_str(&path.join("."));
+                self.push_str(
+                    &path
+                        .segments
+                        .iter()
+                        .map(|s| js::safe_js_variable_name(s.ident.as_str()))
+                        .collect::<Vec<_>>()
+                        .join("."),
+                );
                 self.push_str(" = ");
             }
             hir::ExprKind::FieldAccess(base, field) => {
