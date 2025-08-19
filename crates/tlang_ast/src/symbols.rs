@@ -178,7 +178,14 @@ impl SymbolTable {
         let mut scope_index = 0;
 
         while let Some(t) = table {
-            if let Some(index) = t.borrow().symbols.iter().position(&predicate) {
+            if let Some(index) = t
+                .borrow()
+                .symbols
+                .iter()
+                // Builtins are currently not slotted and are looked up by name.
+                .filter(|s| !s.builtin)
+                .position(&predicate)
+            {
                 return Some((index, scope_index));
             }
 

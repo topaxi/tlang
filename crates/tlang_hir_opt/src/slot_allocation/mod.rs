@@ -55,6 +55,15 @@ impl<'hir> Visitor<'hir> for SlotAllocator {
                 )
             });
 
+        if path.res.hir_id().is_none() {
+            warn!(
+                "Unable to assign slot for path '{}' on line {}, as it has not been resolved",
+                path, path.span.start,
+            );
+
+            return;
+        }
+
         let slot = symbol_table
             .borrow()
             .get_slot(|s| s.hir_id == path.res.hir_id());

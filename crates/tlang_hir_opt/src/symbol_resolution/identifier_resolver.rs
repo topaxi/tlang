@@ -54,19 +54,21 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
                 )
             });
 
-        let symbol_hir_id = symbol_table
+        let symbol_info = symbol_table
             .borrow()
             // TODO: Also match function names with explicit arity in their name
-            .get_closest_by_name(&path.to_string(), path.span)
-            .and_then(|s| s.hir_id);
+            .get_closest_by_name(&path.to_string(), path.span);
 
-        if let Some(hir_id) = symbol_hir_id {
+        if let Some(symbol_info) = symbol_info
+            && let Some(hir_id) = symbol_info.hir_id
+        {
             debug!(
                 "Resolved path '{}' on line {} to {:?}",
                 path, path.span.start, hir_id
             );
 
             path.res.set_hir_id(hir_id);
+            path.res.set_binding_kind(symbol_info.symbol_type.into());
         } else {
             // TODO: Builtin symbols do not have a HirId, we should handle/resolve these somehow.
             warn!(

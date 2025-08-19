@@ -1043,9 +1043,9 @@ impl Interpreter {
             }
             hir::ExprKind::Path(path) => {
                 self.panic(format!(
-                    "Function `{}` not found\nCurrent scope: {:?}",
+                    "Function `{}` not found\nCurrent scope: {}",
                     path,
-                    self.state.current_scope().borrow()
+                    self.state.debug_stringify_scope_stack()
                 ));
             }
             hir::ExprKind::FieldAccess(expr, ident) => {

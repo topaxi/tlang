@@ -6,7 +6,7 @@ use std::rc::Rc;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 use tlang_ast::node::{Ident, UnaryOp};
-use tlang_ast::symbols::SymbolIdAllocator;
+use tlang_ast::symbols::{SymbolIdAllocator, SymbolType};
 use tlang_ast::token::{Literal, Token};
 
 #[deprecated(note = "Use `tlang_span::HirId` instead")]
@@ -71,6 +71,20 @@ pub enum BindingKind {
     Closure,
     #[default]
     Unknown,
+}
+
+impl From<SymbolType> for BindingKind {
+    fn from(symbol_type: SymbolType) -> Self {
+        match symbol_type {
+            SymbolType::Variable => BindingKind::Local,
+            SymbolType::Struct => BindingKind::Struct,
+            SymbolType::Enum => BindingKind::Enum,
+            SymbolType::EnumVariant => BindingKind::Variant,
+            SymbolType::Function(_) | SymbolType::FunctionSelfRef(_) => BindingKind::Fn,
+            SymbolType::Parameter => BindingKind::Param,
+            SymbolType::Module => todo!(),
+        }
+    }
 }
 
 pub type SlotIndex = usize;
@@ -143,6 +157,7 @@ impl Res {
                 | BindingKind::Param
                 | BindingKind::Closure
                 | BindingKind::Field
+                | BindingKind::Unknown
         )
     }
 
