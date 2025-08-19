@@ -206,12 +206,16 @@ impl SymbolTable {
         }
     }
 
-    fn get_locals_by_name(&self, name: &str) -> Vec<&SymbolInfo> {
+    fn get_locals(&self, predicate: impl Fn(&SymbolInfo) -> bool) -> Vec<&SymbolInfo> {
         self.symbols
             .iter()
-            .filter(|s| *s.name == *name)
             .filter(|s| s.declared)
+            .filter(|s| predicate(s))
             .collect()
+    }
+
+    fn get_locals_by_name(&self, name: &str) -> Vec<&SymbolInfo> {
+        self.get_locals(|s| *s.name == *name)
     }
 
     pub fn get_by_name(&self, name: &str) -> Vec<SymbolInfo> {
@@ -256,13 +260,23 @@ impl SymbolTable {
     }
 
     pub fn get_closest_by_name(&self, name: &str, span: Span) -> Option<SymbolInfo> {
-        let symbols = self.get_by_name(name);
-
-        symbols
+        let closest = self
+            .get_by_name(name)
             .iter()
             .rev()
             .filter(|s| s.declared)
-            .find(|s| s.scope_start < span.start || s.is_any_fn() || s.is_builtin())
+            .find(|s| s.scope_start < span.start)
+            .cloned();
+
+        if closest.is_some() {
+            return closest;
+        }
+
+        self.get_by_name(name)
+            .iter()
+            .rev()
+            .filter(|s| s.declared)
+            .find(|s| s.defined_at.start < span.start || s.is_any_fn() || s.is_builtin())
             .cloned()
     }
 
