@@ -86,10 +86,11 @@ fn test_self_referal_reserves_local_slot() {
 
     // path 0 is the function declaration name `foo`
 
-    // path 1 is `foo` of the call expression, it points to the fn declaration (hir 2)
-    assert_eq!(paths[1].res.slot(), hir::Slot::Local(0));
-    // path 2 is the `a` in the call expression, it points to the a fn param (hir 3)
-    assert_eq!(paths[2].res.slot(), hir::Slot::Local(1));
+    // path 1 is the `a` in the call expression, it points to the a fn param (hir 2)
+    assert_eq!(paths[1].res.slot(), hir::Slot::Local(1));
+
+    // path 2 is `foo` of the call expression, it points to the fn declaration (hir 3)
+    assert_eq!(paths[2].res.slot(), hir::Slot::Local(0));
 
     // foo has two local slots, for a and the fn itself
     //match hir.block.stmts[0].kind {
@@ -182,8 +183,6 @@ fn test_struct_res() {
         "#,
     );
 
-    let paths = collect_paths(&mut hir);
-
     assert_eq!(
         collect_slots(&mut hir),
         vec![
@@ -253,6 +252,7 @@ fn test_enum_res() {
             ("x".to_string(), hir::Slot::Local(1)),
             ("Foo::Baz".to_string(), hir::Slot::Upvar(2, 1)),
             ("x".to_string(), hir::Slot::Local(1)),
+            ("foo".to_string(), hir::Slot::Local(5)),
             ("Foo::Bar".to_string(), hir::Slot::Upvar(1, 1)),
         ]
     );
