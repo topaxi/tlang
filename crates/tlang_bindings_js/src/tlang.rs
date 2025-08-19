@@ -22,6 +22,7 @@ pub struct JsHirPrettyOptions {
     pub tab_indent: Option<bool>,
     pub indent_size: Option<usize>,
     pub mark_unresolved: Option<bool>,
+    pub print_ids: Option<bool>,
     pub comments: Option<bool>,
 }
 
@@ -39,6 +40,10 @@ impl JsHirPrettyOptions {
 
         if let Some(mark_unresolved) = self.mark_unresolved {
             options.mark_unresolved = mark_unresolved;
+        }
+
+        if let Some(print_ids) = self.print_ids {
+            options.print_ids = print_ids;
         }
 
         if let Some(comments) = self.comments {

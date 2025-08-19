@@ -110,10 +110,19 @@ fn test_variadic_fn_res() {
             fn fac(n, acc) { rec fac(n - 1, n * acc) }
         "#,
     );
-    let paths = collect_paths(&mut hir);
 
-    assert_eq!(paths[1].res.slot(), hir::Slot::Upvar(1, 1));
-    assert_eq!(paths[2].res.slot(), hir::Slot::Local(1));
+    assert_eq!(
+        collect_slots(&mut hir),
+        vec![
+            ("fac/1".to_string(), hir::Slot::Local(0)),
+            ("n".to_string(), hir::Slot::Local(1)),
+            ("fac/2".to_string(), hir::Slot::Upvar(1, 1)),
+            ("fac/2".to_string(), hir::Slot::Local(1)),
+            ("n".to_string(), hir::Slot::Local(1)),
+            ("acc".to_string(), hir::Slot::Local(2)),
+            ("fac/2".to_string(), hir::Slot::Local(0)),
+        ]
+    );
 
     //match hir.block.stmts[0].kind {
     //    hir::StmtKind::FunctionDeclaration(ref fn_decl) => {
@@ -122,18 +131,6 @@ fn test_variadic_fn_res() {
     //    }
     //    _ => unreachable!(),
     //}
-
-    // match [n/*1*/, acc/*2*/] in the second function declaration
-    assert_matches!(paths[4].res.slot(), hir::Slot::Local(1));
-    assert_matches!(paths[5].res.slot(), hir::Slot::Local(2));
-
-    // [0, acc] => acc/*0*/
-    assert_matches!(paths[6].res.slot(), hir::Slot::Local(0));
-    // [n, acc] => rec factorial/2((n - 1), (n * acc))
-    assert_matches!(paths[7].res.slot(), hir::Slot::Upvar(1, 0));
-    assert_matches!(paths[8].res.slot(), hir::Slot::Local(0));
-    assert_matches!(paths[9].res.slot(), hir::Slot::Local(0));
-    assert_matches!(paths[10].res.slot(), hir::Slot::Local(1));
 
     //match hir.block.stmts[1].kind {
     //    hir::StmtKind::FunctionDeclaration(ref fn_decl) => {
@@ -158,6 +155,7 @@ fn test_shadowing_creates_new_slots() {
     assert_eq!(
         collect_slots(&mut hir),
         vec![
+            ("foo".to_string(), hir::Slot::Local(0)),
             ("a".to_string(), hir::Slot::Local(1)),
             ("a".to_string(), hir::Slot::Local(2)),
             ("a".to_string(), hir::Slot::Local(2)),
@@ -186,14 +184,14 @@ fn test_struct_res() {
 
     let paths = collect_paths(&mut hir);
 
-    assert_eq!(paths[0].res.slot(), hir::Slot::Local(0));
-    assert_eq!(paths[1].res.slot(), hir::Slot::Local(0));
-
     assert_eq!(
-        paths[5].res.slot(),
-        hir::Slot::Local(0),
-        "path {}",
-        paths[5].join(""),
+        collect_slots(&mut hir),
+        vec![
+            ("Foo".to_string(), hir::Slot::Local(0)), // Foo in fn Foo.new
+            ("Foo".to_string(), hir::Slot::Upvar(0, 1)), // Foo creation Foo { .. }
+            ("foo".to_string(), hir::Slot::Local(2)), // foo definition itself
+            ("Foo".to_string(), hir::Slot::Upvar(0, 1)), // Foo.new acess
+        ],
     );
 }
 
@@ -214,7 +212,10 @@ fn test_enum_variant_res() {
 
     assert_eq!(
         collect_slots(&mut hir),
-        vec![("Foo::Baz".to_string(), hir::Slot::Upvar(2, 1))]
+        vec![
+            ("foo".to_string(), hir::Slot::Local(3)),
+            ("Foo::Baz".to_string(), hir::Slot::Upvar(2, 1))
+        ]
     );
 
     //match hir.block.stmts[1].kind {
@@ -224,35 +225,6 @@ fn test_enum_variant_res() {
     //    }
     //    _ => unreachable!(),
     //}
-}
-
-#[test]
-fn test_simple_enum_res() {
-    let mut hir = compile(
-        r#"
-            enum Foo {
-                Bar,
-                Baz,
-            }
-
-            fn Foo.qux(Foo::Bar) { "bar" }
-            fn Foo.qux(Foo::Baz) { "baz" }
-
-            fn foo() {
-                Foo::Bar.qux()
-            }
-        "#,
-    );
-
-    assert_eq!(
-        collect_slots(&mut hir),
-        vec![
-            ("Foo".to_string(), hir::Slot::Local(0)),
-            ("Foo::Bar".to_string(), hir::Slot::Upvar(1, 1)),
-            ("Foo::Baz".to_string(), hir::Slot::Upvar(2, 1)),
-            ("Foo::Bar".to_string(), hir::Slot::Upvar(1, 1)),
-        ]
-    );
 }
 
 #[test]

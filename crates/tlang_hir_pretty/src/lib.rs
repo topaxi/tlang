@@ -6,6 +6,7 @@ pub struct HirPrettyOptions {
     pub tab_indent: bool,
     pub indent_size: usize,
     pub mark_unresolved: bool,
+    pub print_ids: bool,
     pub comments: bool,
 }
 
@@ -15,6 +16,7 @@ impl Default for HirPrettyOptions {
             indent_size: 4,
             tab_indent: false,
             mark_unresolved: true,
+            print_ids: false,
             comments: true,
         }
     }
@@ -23,6 +25,7 @@ impl Default for HirPrettyOptions {
 struct HirPrettyResolvedOptions {
     indent_string: String,
     mark_unresolved: bool,
+    print_ids: bool,
     comments: bool,
 }
 
@@ -41,6 +44,7 @@ impl From<HirPrettyOptions> for HirPrettyResolvedOptions {
                 " ".repeat(options.indent_size)
             },
             mark_unresolved: options.mark_unresolved,
+            print_ids: options.print_ids,
             comments: options.comments,
         }
     }
@@ -418,17 +422,22 @@ impl HirPretty {
         self.push_char(')');
     }
 
-    fn print_function_name(&mut self, name: &hir::Expr) {
+    fn print_function_name(&mut self, name: &hir::Expr, hir_id: hir::HirId) {
         if let hir::ExprKind::Path(path) = &name.kind {
             self.push_string(path.to_string());
         } else {
             self.print_expr(name);
         }
+
+        if self.options.print_ids {
+            self.push_char('#');
+            self.push_str(&hir_id.to_string());
+        }
     }
 
     fn print_function_declaration(&mut self, decl: &hir::FunctionDeclaration) {
         self.push_str("fn ");
-        self.print_function_name(&decl.name);
+        self.print_function_name(&decl.name, decl.hir_id);
         self.push_char('(');
         for (i, param) in decl.parameters.iter().enumerate() {
             if i > 0 {
@@ -436,6 +445,10 @@ impl HirPretty {
             }
 
             self.print_ident(&param.name);
+            if self.options.print_ids {
+                self.push_char('#');
+                self.push_str(&param.hir_id.to_string());
+            }
             self.push_str(": ");
             self.print_ty(&param.type_annotation);
         }
@@ -447,13 +460,13 @@ impl HirPretty {
 
     fn print_dyn_function_declaration(&mut self, decl: &hir::DynFunctionDeclaration) {
         self.push_str("dyn fn ");
-        self.print_function_name(&decl.name);
+        self.print_function_name(&decl.name, decl.hir_id);
         self.inc_indent();
         for variant in &decl.variants {
             self.push_newline();
             self.push_indent();
             self.push_str("-> ");
-            self.print_function_name(&decl.name);
+            self.print_function_name(&decl.name, variant.1);
             self.push_char('/');
             self.push_string(variant.0.to_string());
         }
@@ -476,7 +489,14 @@ impl HirPretty {
 
     fn print_pat(&mut self, pat: &hir::Pat) {
         match &pat.kind {
-            hir::PatKind::Identifier(_id, name) => self.print_ident(name),
+            hir::PatKind::Identifier(hir_id, name) => {
+                self.print_ident(name);
+
+                if self.options.print_ids {
+                    self.push_char('#');
+                    self.push_str(&hir_id.to_string());
+                }
+            }
             hir::PatKind::Enum(path, fields) => {
                 self.print_path(path);
 
@@ -523,8 +543,14 @@ impl HirPretty {
         self.push_string(path.to_string());
 
         // We print unresolved paths with a question mark.
-        if self.options.mark_unresolved && path.res.is_unknown() {
+        if self.options.mark_unresolved && path.res.hir_id().is_none() {
             self.push_char('?');
+        }
+
+        if self.options.print_ids {
+            if let Some(hir_id) = path.res.hir_id() {
+                self.push_str(&format!("#{}", hir_id));
+            }
         }
     }
 

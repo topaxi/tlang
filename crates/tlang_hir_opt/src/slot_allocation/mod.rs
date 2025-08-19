@@ -1,4 +1,5 @@
 use log::{debug, warn};
+use tlang_hir::visit::walk_expr;
 use tlang_hir::{Visitor, hir};
 use tlang_span::HirId;
 
@@ -25,6 +26,20 @@ impl<'hir> Visitor<'hir> for SlotAllocator {
             debug_assert!(self.scopes.pop() == Some(hir_id), "Mismatched scope exit");
 
             ctx.current_scope = self.scopes.last().copied();
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
+        if let hir::ExprKind::Dict(pairs) = &mut expr.kind {
+            for (key, value) in pairs.iter_mut() {
+                if !key.is_path() {
+                    self.visit_expr(key, ctx);
+                }
+
+                self.visit_expr(value, ctx);
+            }
+        } else {
+            walk_expr(self, expr, ctx);
         }
     }
 

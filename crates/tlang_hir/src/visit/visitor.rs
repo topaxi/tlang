@@ -120,7 +120,9 @@ pub fn walk_stmt<'hir, V: Visitor<'hir>>(
                 }
             }
         }
-        hir::StmtKind::DynFunctionDeclaration(_decl) => {}
+        hir::StmtKind::DynFunctionDeclaration(decl) => {
+            visitor.visit_expr(&mut decl.name, ctx);
+        }
     }
 }
 
@@ -174,11 +176,11 @@ pub fn walk_expr<'hir, V: Visitor<'hir>>(
             visitor.visit_block(&mut decl.body, ctx);
         }
         hir::ExprKind::Call(call_expr) | hir::ExprKind::TailCall(call_expr) => {
-            visitor.visit_expr(&mut call_expr.callee, ctx);
-
             for arg in &mut call_expr.arguments {
                 visitor.visit_expr(arg, ctx);
             }
+
+            visitor.visit_expr(&mut call_expr.callee, ctx);
         }
         hir::ExprKind::FieldAccess(base, ident) => {
             visitor.visit_expr(base, ctx);

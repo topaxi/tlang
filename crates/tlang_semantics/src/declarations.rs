@@ -6,8 +6,8 @@ use tlang_ast::node::MatchExpression;
 use tlang_ast::symbols::SymbolIdAllocator;
 use tlang_ast::{
     node::{
-        Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, Module, Pat,
-        PatKind, Stmt, StmtKind,
+        Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter, Module, Pat, PatKind, Stmt,
+        StmtKind,
     },
     symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
 };
@@ -230,10 +230,11 @@ impl DeclarationAnalyzer {
                 self.collect_function_expression(decl);
             }
             ExprKind::Call(expr) | ExprKind::RecursiveCall(expr) => {
-                self.collect_declarations_expr(&expr.callee);
                 for argument in &expr.arguments {
                     self.collect_declarations_expr(argument);
                 }
+
+                self.collect_declarations_expr(&expr.callee);
             }
             ExprKind::Cast(expr, _) => {
                 self.collect_declarations_expr(expr);

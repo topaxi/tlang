@@ -26,6 +26,12 @@ impl<T> Id<T> {
     }
 }
 
+impl<T> std::fmt::Display for Id<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.inner.to_string())
+    }
+}
+
 impl<T> std::fmt::Debug for Id<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}({})", std::any::type_name::<T>(), self.inner)

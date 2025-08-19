@@ -55,6 +55,7 @@ export class HirPrettyElement extends LitElement {
     indentSize: 4,
     tabIndent: false,
     markUnresolved: true,
+    printIds: false,
     comments: false,
   };
 
@@ -94,6 +95,13 @@ export class HirPrettyElement extends LitElement {
           .checked=${this.hirPrettyOptions.markUnresolved}
         >
           Mark unresolved
+        </t-menuitem-checkbox>
+        <t-menuitem-checkbox
+          .disabled=${!this.pretty}
+          @change=${() => this.toggleHirPrettyOption('printIds')}
+          .checked=${this.hirPrettyOptions.printIds}
+        >
+          Print IDs
         </t-menuitem-checkbox>
         <t-menuitem-checkbox
           .disabled=${!this.pretty}
