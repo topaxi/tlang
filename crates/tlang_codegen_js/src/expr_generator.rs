@@ -6,6 +6,7 @@ use crate::binary_operator_generator::{
     JSAssociativity, JSOperatorInfo, map_operator_info, should_wrap_with_parentheses,
 };
 use crate::generator::{BlockContext, CodegenJS};
+use crate::js;
 
 impl CodegenJS {
     /// Generates blocks in expression position.
@@ -233,7 +234,7 @@ impl CodegenJS {
         // If we have a full identifier which resolves in the current scope, we use it directly.
         // We currently do not really have a path resolution mechanism, just a naive lookup.
         if let Some(identifier) = self.current_scope().resolve_variable(&path.to_string()) {
-            self.push_str(&identifier);
+            self.push_str(&js::safe_js_variable_name(&identifier));
             return;
         }
 
@@ -243,9 +244,8 @@ impl CodegenJS {
         self.push_str(
             &path.segments[1..]
                 .iter()
-                .fold("".to_string(), |acc, segment| {
-                    acc + "." + segment.ident.as_str()
-                }),
+                .map(|segment| js::safe_js_variable_name(segment.ident.as_str()))
+                .fold("".to_string(), |acc, segment| acc + "." + &segment),
         );
     }
 
@@ -285,7 +285,7 @@ impl CodegenJS {
             .current_scope()
             .resolve_variable(name_string)
             .unwrap_or_else(|| name_string.to_string());
-        self.push_str(&identifier);
+        self.push_str(&js::safe_js_variable_name(&identifier));
     }
 
     fn generate_ternary_op(

@@ -408,8 +408,8 @@ fn is_function_body_tail_recursive(function_name: &str, node: &hir::Expr) -> boo
 
 pub(crate) fn fn_identifier_to_string(expr: &hir::Expr) -> String {
     match &expr.kind {
-        hir::ExprKind::Path(path) => path.join("__"),
-        hir::ExprKind::FieldAccess(_base, field) => field.to_string(),
+        hir::ExprKind::Path(path) => js::safe_js_variable_name(&path.join("__")),
+        hir::ExprKind::FieldAccess(_base, field) => js::safe_js_variable_name(&field.to_string()),
         _ => unreachable!(),
     }
 }
