@@ -220,7 +220,7 @@ impl LoweringContext {
                 if self.has_multi_arity_fn(path.segments.last().unwrap().as_str(), arg_len) {
                     let mut path_with_argnum = path.clone();
                     let new_name = format!(
-                        "{}$${}",
+                        "{}/{}",
                         path_with_argnum.segments.last().unwrap().as_str(),
                         arg_len
                     );
