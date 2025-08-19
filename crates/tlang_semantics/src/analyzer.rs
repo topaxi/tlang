@@ -13,7 +13,7 @@ use tlang_span::Span;
 
 use crate::{
     declarations::DeclarationAnalyzer,
-    diagnostic::{Diagnostic, Severity},
+    diagnostic::{self, Diagnostic},
 };
 
 pub struct SemanticAnalyzer {
@@ -106,21 +106,16 @@ impl SemanticAnalyzer {
     }
 
     fn mark_as_used_by_name(&mut self, name: &str, span: Span) {
-        let symbol_info = self.current_symbol_table().borrow().get_by_name(name);
-
-        if symbol_info.is_empty() {
-            self.report_undeclared_variable(name, span);
-
-            return;
-        }
-
-        for symbol in &symbol_info {
-            // TODO: This only marks the by it's name, not by it's id. Maybe we should
-            //       mark it in the collection pass? Or keep track of the current id in
-            //       case the name is being shadowed?
+        let symbol_info = self
+            .current_symbol_table()
+            .borrow()
+            .get_closest_by_name(name, span);
+        if let Some(symbol_info) = symbol_info {
             self.current_symbol_table()
                 .borrow_mut()
-                .mark_as_used(symbol.id);
+                .mark_as_used(symbol_info.id);
+        } else {
+            self.report_undeclared_variable(name, span);
         }
     }
 
@@ -159,19 +154,16 @@ impl SemanticAnalyzer {
         );
 
         if let Some(suggestion) = did_you_mean {
-            self.diagnostics.push(Diagnostic::new(
-                format!(
-                    "Use of undeclared variable `{}`, did you mean the {} `{}`?",
-                    name, suggestion.symbol_type, suggestion.name
-                ),
-                Severity::Error,
+            self.diagnostics.push(diagnostic::error_at!(
                 span,
+                "Use of undeclared variable `{name}`, did you mean the {} `{}`?",
+                suggestion.symbol_type,
+                suggestion.name,
             ));
         } else {
-            self.diagnostics.push(Diagnostic::new(
-                format!("Use of undeclared variable `{name}`"),
-                Severity::Error,
+            self.diagnostics.push(diagnostic::error_at!(
                 span,
+                "Use of undeclared variable `{name}`",
             ));
         }
     }
@@ -186,19 +178,16 @@ impl SemanticAnalyzer {
         );
 
         if let Some(suggestion) = did_you_mean {
-            self.diagnostics.push(Diagnostic::new(
-                format!(
-                    "Use of undeclared function `{}` with arity {}, did you mean the {} `{}`?",
-                    name, arity, suggestion.symbol_type, suggestion.name
-                ),
-                Severity::Error,
+            self.diagnostics.push(diagnostic::error_at!(
                 span,
+                "Use of undeclared function `{name}` with arity {arity}, did you mean the {} `{}`?",
+                suggestion.symbol_type,
+                suggestion.name
             ));
         } else {
-            self.diagnostics.push(Diagnostic::new(
-                format!("Use of undeclared function `{name}` with arity {arity}"),
-                Severity::Error,
+            self.diagnostics.push(diagnostic::error_at!(
                 span,
+                "Use of undeclared function `{name}` with arity {arity}",
             ));
         }
     }
@@ -489,24 +478,18 @@ impl SemanticAnalyzer {
 
         for unused_symbol in &unused_symbols {
             if unused_symbol.is_any_fn() {
-                self.diagnostics.push(Diagnostic::new(
-                    format!(
-                        "Unused {} `{}/{}`",
-                        unused_symbol.symbol_type,
-                        unused_symbol.name,
-                        unused_symbol.symbol_type.arity().unwrap(),
-                    ),
-                    Severity::Warning,
+                self.diagnostics.push(diagnostic::warn_at!(
                     unused_symbol.defined_at,
+                    "Unused {} `{}/{}`",
+                    unused_symbol.symbol_type,
+                    unused_symbol.name,
+                    unused_symbol.symbol_type.arity().unwrap(),
                 ));
             } else {
-                self.diagnostics.push(Diagnostic::new(
-                    format!(
-                        "Unused {} `{}`, if this is intentional, prefix the name with an underscore: `_{}`",
-                        unused_symbol.symbol_type, unused_symbol.name, unused_symbol.name
-                    ),
-                    Severity::Warning,
-                    unused_symbol.defined_at
+                self.diagnostics.push(diagnostic::warn_at!(
+                    unused_symbol.defined_at,
+                    "Unused {} `{}`, if this is intentional, prefix the name with an underscore: `_{}`",
+                    unused_symbol.symbol_type, unused_symbol.name, unused_symbol.name
                 ));
             }
         }

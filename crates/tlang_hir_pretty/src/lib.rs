@@ -454,7 +454,7 @@ impl HirPretty {
             self.push_indent();
             self.push_str("-> ");
             self.print_function_name(&decl.name);
-            self.push_str("$$");
+            self.push_char('/');
             self.push_string(variant.0.to_string());
         }
         self.dec_indent();

@@ -51,9 +51,13 @@ impl<'hir> Visitor<'hir> for SlotAllocator {
         } else {
             // TODO: Builtin symbols do not have a HirId, we should handle/resolve these somehow.
             warn!(
-                "No symbols found for path '{}'. Available symbols: {:#?}",
+                "No symbols found for path '{}' on line {}. Available symbols: {:#?}",
                 path,
-                symbol_table.borrow()
+                path.span.start,
+                symbol_table
+                    .borrow()
+                    .get_all_declared_local_symbols()
+                    .collect::<Vec<_>>()
             );
         }
     }

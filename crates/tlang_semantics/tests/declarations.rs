@@ -2,7 +2,7 @@ use indoc::indoc;
 use pretty_assertions::assert_eq;
 use tlang_ast::{
     NodeId,
-    node::{ExprKind, StmtKind},
+    node::{self, ExprKind, StmtKind},
     symbols::{SymbolId, SymbolInfo, SymbolType},
 };
 use tlang_parser::Parser;
@@ -22,6 +22,16 @@ macro_rules! analyze {
             Err(diagnostics) => panic!("Expected no diagnostics, got {:#?}", diagnostics),
         }
     }};
+}
+
+struct PathVisitor {
+    paths: Vec<node::Path>,
+}
+
+impl<'ast> tlang_ast::Visitor<'ast> for PathVisitor {
+    fn visit_path(&mut self, path: &'ast node::Path) {
+        self.paths.push(path.clone());
+    }
 }
 
 #[test]

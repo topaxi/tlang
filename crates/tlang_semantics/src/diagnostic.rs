@@ -32,12 +32,20 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
-    pub fn new(message: String, severity: Severity, span: Span) -> Self {
+    pub fn new(severity: Severity, message: String, span: Span) -> Self {
         Diagnostic {
             message,
             span,
             severity,
         }
+    }
+
+    pub fn warn(message: &str, span: Span) -> Self {
+        Diagnostic::new(Severity::Warning, message.to_string(), span)
+    }
+
+    pub fn error(message: &str, span: Span) -> Self {
+        Diagnostic::new(Severity::Error, message.to_string(), span)
     }
 
     pub fn message(&self) -> &str {
@@ -73,3 +81,22 @@ impl Display for Diagnostic {
         )
     }
 }
+
+#[macro_export]
+macro_rules! warn_at {
+    ($span:expr, $fmt:expr, $($arg:tt)*) => {{
+        let msg = format!($fmt, $($arg)*);
+        $crate::diagnostic::Diagnostic::warn(&msg, $span)
+    }};
+}
+
+#[macro_export]
+macro_rules! error_at {
+    ($span:expr, $fmt:expr, $($arg:tt)*) => {{
+        let msg = format!($fmt, $($arg)*);
+        $crate::diagnostic::Diagnostic::error(&msg, $span)
+    }};
+}
+
+pub use error_at;
+pub use warn_at;

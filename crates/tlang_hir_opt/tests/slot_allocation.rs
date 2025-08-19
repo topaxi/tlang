@@ -129,7 +129,7 @@ fn test_variadic_fn_res() {
 
     // [0, acc] => acc/*0*/
     assert_matches!(paths[6].res.slot(), hir::Slot::Local(0));
-    // [n, acc] => rec factorial$$2((n - 1), (n * acc))
+    // [n, acc] => rec factorial/2((n - 1), (n * acc))
     assert_matches!(paths[7].res.slot(), hir::Slot::Upvar(1, 0));
     assert_matches!(paths[8].res.slot(), hir::Slot::Local(0));
     assert_matches!(paths[9].res.slot(), hir::Slot::Local(0));

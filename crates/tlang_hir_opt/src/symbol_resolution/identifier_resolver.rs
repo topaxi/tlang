@@ -29,6 +29,17 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
     }
 
     fn visit_path(&mut self, path: &'hir mut hir::Path, ctx: &mut Self::Context) {
+        if path.res.hir_id().is_some() {
+            debug!(
+                "Path '{}' on line {} already resolved to {:?}",
+                path,
+                path.span.start,
+                path.res.hir_id()
+            );
+
+            return;
+        }
+
         let symbol_table = ctx
             .current_symbol_table()
             .unwrap_or_else(|| {
@@ -47,7 +58,7 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
 
         if let Some(hir_id) = symbol_hir_id {
             debug!(
-                "Resolved path '{}' as {} to {:?}",
+                "Resolved path '{}' on line {} to {:?}",
                 path, path.span.start, hir_id
             );
 
@@ -55,9 +66,13 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
         } else {
             // TODO: Builtin symbols do not have a HirId, we should handle/resolve these somehow.
             warn!(
-                "No symbols found for path '{}'. Available symbols: {:#?}",
+                "No symbols found for path '{}' on line {}. Available symbols: {:#?}",
                 path,
-                symbol_table.borrow()
+                path.span.start,
+                symbol_table
+                    .borrow()
+                    .get_all_declared_local_symbols()
+                    .collect::<Vec<_>>()
             );
         }
     }

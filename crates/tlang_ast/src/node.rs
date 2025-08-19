@@ -277,11 +277,18 @@ pub enum ExprKind {
     Wildcard,
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct Res {
+    pub node_id: Option<NodeId>,
+}
+
 /// AST representation of a path.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Path {
     pub segments: Vec<Ident>,
+    pub res: Res,
     pub span: Span,
 }
 
@@ -295,6 +302,7 @@ impl Path {
     pub fn new(segments: Vec<Ident>) -> Self {
         Path {
             segments,
+            res: Res::default(),
             span: Span::default(),
         }
     }
@@ -304,6 +312,7 @@ impl Path {
 
         Path {
             segments: vec![ident],
+            res: Res::default(),
             span,
         }
     }

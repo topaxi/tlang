@@ -109,6 +109,9 @@ Module(
                                   ),
                                 ),
                               ],
+                              res: Res(
+                                node_id: None,
+                              ),
                               span: Span(
                                 start: LineColumn(
                                   line: 1,
@@ -156,6 +159,9 @@ Module(
                                         ),
                                       ),
                                     ],
+                                    res: Res(
+                                      node_id: None,
+                                    ),
                                     span: Span(
                                       start: LineColumn(
                                         line: 0,
@@ -250,6 +256,9 @@ Module(
                                               ),
                                             ),
                                           ],
+                                          res: Res(
+                                            node_id: None,
+                                          ),
                                           span: Span(
                                             start: LineColumn(
                                               line: 1,
@@ -391,6 +400,9 @@ Module(
                               ),
                             ),
                           ],
+                          res: Res(
+                            node_id: None,
+                          ),
                           span: Span(
                             start: LineColumn(
                               line: 2,
@@ -438,6 +450,9 @@ Module(
                                     ),
                                   ),
                                 ],
+                                res: Res(
+                                  node_id: None,
+                                ),
                                 span: Span(
                                   start: LineColumn(
                                     line: 0,
@@ -536,6 +551,9 @@ Module(
                                               ),
                                             ),
                                           ],
+                                          res: Res(
+                                            node_id: None,
+                                          ),
                                           span: Span(
                                             start: LineColumn(
                                               line: 2,
@@ -707,6 +725,9 @@ Module(
                           ),
                         ),
                       ],
+                      res: Res(
+                        node_id: None,
+                      ),
                       span: Span(
                         start: LineColumn(
                           line: 3,
@@ -754,6 +775,9 @@ Module(
                                 ),
                               ),
                             ],
+                            res: Res(
+                              node_id: None,
+                            ),
                             span: Span(
                               start: LineColumn(
                                 line: 0,
@@ -889,6 +913,9 @@ Module(
                                       ),
                                     ),
                                   ],
+                                  res: Res(
+                                    node_id: None,
+                                  ),
                                   span: Span(
                                     start: LineColumn(
                                       line: 3,
@@ -931,6 +958,9 @@ Module(
                                       ),
                                     ),
                                   ],
+                                  res: Res(
+                                    node_id: None,
+                                  ),
                                   span: Span(
                                     start: LineColumn(
                                       line: 3,
@@ -1072,6 +1102,9 @@ Module(
                       ),
                     ),
                   ],
+                  res: Res(
+                    node_id: None,
+                  ),
                   span: Span(
                     start: LineColumn(
                       line: 4,

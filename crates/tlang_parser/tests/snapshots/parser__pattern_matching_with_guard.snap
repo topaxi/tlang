@@ -108,6 +108,9 @@ Module(
                             ),
                           ),
                         ],
+                        res: Res(
+                          node_id: None,
+                        ),
                         span: Span(
                           start: LineColumn(
                             line: 0,

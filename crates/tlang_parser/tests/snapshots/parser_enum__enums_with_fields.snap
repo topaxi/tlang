@@ -71,6 +71,9 @@ Module(
                         ),
                       ),
                     ],
+                    res: Res(
+                      node_id: None,
+                    ),
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -214,6 +217,9 @@ Module(
                     ),
                   ),
                 ],
+                res: Res(
+                  node_id: None,
+                ),
                 span: Span(
                   start: LineColumn(
                     line: 4,
@@ -260,6 +266,9 @@ Module(
                           ),
                         ),
                       ],
+                      res: Res(
+                        node_id: None,
+                      ),
                       span: Span(
                         start: LineColumn(
                           line: 4,

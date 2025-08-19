@@ -71,6 +71,9 @@ Module(
                         ),
                       ),
                     ],
+                    res: Res(
+                      node_id: None,
+                    ),
                     span: Span(
                       start: LineColumn(
                         line: 1,
@@ -172,6 +175,9 @@ Module(
                   ),
                 ),
               ],
+              res: Res(
+                node_id: None,
+              ),
               span: Span(
                 start: LineColumn(
                   line: 5,
@@ -230,6 +236,9 @@ Module(
                         ),
                       ),
                     ],
+                    res: Res(
+                      node_id: None,
+                    ),
                     span: Span(
                       start: LineColumn(
                         line: 5,
@@ -295,6 +304,9 @@ Module(
                         ),
                       ),
                     ],
+                    res: Res(
+                      node_id: None,
+                    ),
                     span: Span(
                       start: LineColumn(
                         line: 5,
@@ -395,6 +407,9 @@ Module(
                   ),
                 ),
               ],
+              res: Res(
+                node_id: None,
+              ),
               span: Span(
                 start: LineColumn(
                   line: 6,
@@ -453,6 +468,9 @@ Module(
                         ),
                       ),
                     ],
+                    res: Res(
+                      node_id: None,
+                    ),
                     span: Span(
                       start: LineColumn(
                         line: 6,
@@ -556,6 +574,9 @@ Module(
                     ),
                   ),
                 ],
+                res: Res(
+                  node_id: None,
+                ),
                 span: Span(
                   start: LineColumn(
                     line: 6,

@@ -126,11 +126,11 @@ impl LoweringContext {
                         match &mut decl.name.kind {
                             ast::node::ExprKind::Path(path) => {
                                 let ident = path.segments.last_mut().unwrap();
-                                ident.set_name(&format!("{}$${}", ident.as_str(), arg_len));
+                                ident.set_name(&format!("{}/{}", ident.as_str(), arg_len));
                             }
                             ast::node::ExprKind::FieldExpression(fe) => {
                                 let ident = &mut fe.field;
-                                ident.set_name(&format!("{}$${}", ident.as_str(), arg_len));
+                                ident.set_name(&format!("{}/{}", ident.as_str(), arg_len));
                             }
                             _ => unreachable!(),
                         };

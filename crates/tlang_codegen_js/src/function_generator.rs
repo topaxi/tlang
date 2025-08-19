@@ -2,6 +2,7 @@ use tlang_hir::hir;
 
 use crate::expr_generator::expr_can_render_as_js_expr;
 use crate::generator::{BlockContext, CodegenJS, FunctionContext};
+use crate::js;
 
 impl CodegenJS {
     fn generate_function_param(&mut self, param: &hir::FunctionParameter, is_self: bool) {
@@ -59,7 +60,7 @@ impl CodegenJS {
                 self.push_indent();
                 self.push_str(&fn_identifier_to_string(base));
                 self.push_str(".prototype.");
-                self.push_str(field.as_str());
+                self.push_str(&js::safe_js_variable_name(field.as_str()));
                 self.push_str(" = ");
             }
             _ => self.push_indent(),

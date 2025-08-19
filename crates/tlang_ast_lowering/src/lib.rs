@@ -40,6 +40,8 @@ impl LoweringContext {
     }
 
     pub fn symbol_tables(&self) -> HashMap<HirId, Rc<RefCell<ast::symbols::SymbolTable>>> {
+        debug!("Translating symbol tables to HirIds");
+
         let mut symbol_tables = HashMap::new();
 
         for (node_id, symbol_table) in &self.symbol_tables {
@@ -50,14 +52,20 @@ impl LoweringContext {
                     .borrow_mut()
                     .get_all_local_symbols_mut()
                     .iter_mut()
-                    .filter(|symbol| symbol.hir_id.is_none())
                     .for_each(|symbol| {
-                        if let Some(node_id) = symbol.node_id {
-                            symbol.hir_id = self.node_id_to_hir_id.get(&node_id).copied();
+                        if let Some(node_id) = symbol.node_id
+                            && let Some(hir_id) = self.node_id_to_hir_id.get(&node_id)
+                        {
+                            symbol.hir_id = Some(*hir_id);
 
                             debug!(
-                                "Assigning HIR ID {:?} to symbol {} in node {:?}",
-                                symbol.hir_id, symbol.name, node_id
+                                "Assigning {:?} to symbol {} on line {} from {:?}",
+                                hir_id, symbol.name, symbol.defined_at.start, node_id
+                            );
+                        } else {
+                            warn!(
+                                "Unable to map {:?} to HirId for symbol {}",
+                                node_id, symbol.name
                             );
                         }
                     });
