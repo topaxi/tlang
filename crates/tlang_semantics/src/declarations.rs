@@ -177,7 +177,7 @@ impl DeclarationAnalyzer {
         }
         self.symbol_type_context.pop();
         self.collect_optional_declarations_expr(&function_decl.guard);
-        self.collect_declarations_block(&function_decl.body);
+        self.collect_declarations_block_scopeless(&function_decl.body);
     }
 
     fn collect_declarations_from_fn_param(&mut self, param: &FunctionParameter) {
@@ -214,12 +214,11 @@ impl DeclarationAnalyzer {
                 }
 
                 self.collect_declarations_block(&for_loop.block);
+                self.pop_symbol_table();
 
                 if let Some(else_block) = &for_loop.else_block {
                     self.collect_declarations_block(else_block);
                 }
-
-                self.pop_symbol_table();
             }
             ExprKind::Break(expr) => {
                 if let Some(expr) = expr {

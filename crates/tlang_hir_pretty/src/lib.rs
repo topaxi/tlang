@@ -209,6 +209,10 @@ impl HirPretty {
         for variant in &decl.variants {
             self.push_indent();
             self.print_ident(&variant.name);
+            if self.options.print_ids {
+                self.push_char('#');
+                self.push_str(&variant.hir_id.to_string());
+            }
             self.push_str(" {");
             self.push_newline();
             self.inc_indent();
@@ -466,9 +470,20 @@ impl HirPretty {
             self.push_newline();
             self.push_indent();
             self.push_str("-> ");
-            self.print_function_name(&decl.name, variant.1);
+
+            if let hir::ExprKind::Path(path) = &decl.name.kind {
+                self.push_string(path.to_string());
+            } else {
+                self.print_expr(&decl.name);
+            }
+
             self.push_char('/');
             self.push_string(variant.0.to_string());
+
+            if self.options.print_ids {
+                self.push_char('#');
+                self.push_str(&variant.1.to_string());
+            }
         }
         self.dec_indent();
     }
@@ -547,10 +562,10 @@ impl HirPretty {
             self.push_char('?');
         }
 
-        if self.options.print_ids {
-            if let Some(hir_id) = path.res.hir_id() {
-                self.push_str(&format!("#{}", hir_id));
-            }
+        if self.options.print_ids
+            && let Some(hir_id) = path.res.hir_id()
+        {
+            self.push_str(&format!("#{}", hir_id));
         }
     }
 

@@ -19,6 +19,7 @@ mod stmt;
 #[derive(Debug)]
 pub struct LoweringContext {
     node_id_to_hir_id: HashMap<ast::NodeId, HirId>,
+    fn_node_id_to_hir_id: HashMap<ast::NodeId, HirId>,
     hir_id_allocator: HirIdAllocator,
     symbol_id_allocator: SymbolIdAllocator,
     symbol_tables: HashMap<ast::NodeId, Rc<RefCell<ast::symbols::SymbolTable>>>,
@@ -33,6 +34,7 @@ impl LoweringContext {
         Self {
             hir_id_allocator: HirIdAllocator::default(),
             node_id_to_hir_id: HashMap::default(),
+            fn_node_id_to_hir_id: HashMap::default(),
             symbol_id_allocator,
             symbol_tables,
             current_symbol_table: Default::default(),
@@ -54,7 +56,10 @@ impl LoweringContext {
                     .iter_mut()
                     .for_each(|symbol| {
                         if let Some(node_id) = symbol.node_id
-                            && let Some(hir_id) = self.node_id_to_hir_id.get(&node_id)
+                            && let Some(hir_id) = self
+                                .fn_node_id_to_hir_id
+                                .get(&node_id)
+                                .or_else(|| self.node_id_to_hir_id.get(&node_id))
                         {
                             symbol.hir_id = Some(*hir_id);
 
@@ -96,11 +101,27 @@ impl LoweringContext {
         R: hir::HirScope,
     {
         debug!("Entering scope for node_id: {:?}", node_id);
+        let previous_symbol_table = self.current_symbol_table.clone();
         if let Some(symbol_table) = self.symbol_tables.get(&node_id).cloned() {
             self.current_symbol_table = symbol_table;
         }
         let result = f(self);
+        self.current_symbol_table = previous_symbol_table;
         debug!("Leaving scope for node_id: {:?}", node_id);
+        result
+    }
+
+    pub(crate) fn with_new_scope<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut Self, Rc<RefCell<ast::symbols::SymbolTable>>) -> R,
+        R: hir::HirScope,
+    {
+        let previous_symbol_table = self.current_symbol_table.clone();
+        self.current_symbol_table = Rc::new(RefCell::new(ast::symbols::SymbolTable::new(
+            previous_symbol_table.clone(),
+        )));
+        let result = f(self, self.current_symbol_table.clone());
+        self.current_symbol_table = previous_symbol_table;
         result
     }
 

@@ -36,6 +36,10 @@ impl Ident {
         self.name = name.into();
     }
 
+    pub fn set_arity(&mut self, arity: usize) {
+        self.name = format!("{}/{}", self.name, arity).into();
+    }
+
     pub fn is_self(&self) -> bool {
         *self.name == *kw::_Self
     }
@@ -472,7 +476,7 @@ pub enum StmtKind {
     Expr(Box<Expr>),
     Let(Box<LetDeclaration>),
     FunctionDeclaration(Box<FunctionDeclaration>),
-    // TODO: We should deal with this in HIR instead.
+    // TODO: We should probably deal with this in HIR instead.
     FunctionDeclarations(Vec<FunctionDeclaration>),
     Return(Option<Box<Expr>>),
     EnumDeclaration(Box<EnumDeclaration>),

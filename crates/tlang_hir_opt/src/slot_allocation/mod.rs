@@ -66,8 +66,9 @@ impl<'hir> Visitor<'hir> for SlotAllocator {
         } else {
             // TODO: Builtin symbols do not have a HirId, we should handle/resolve these somehow.
             warn!(
-                "No symbols found for path '{}' on line {}. Available symbols: {:#?}",
+                "No symbols found for path '{}' (res.hir_id = {:?}) on line {}. Available symbols: {:#?}",
                 path,
+                path.res.hir_id(),
                 path.span.start,
                 symbol_table
                     .borrow()

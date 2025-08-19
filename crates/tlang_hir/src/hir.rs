@@ -181,6 +181,10 @@ impl Res {
         self.binding_kind
     }
 
+    pub fn set_binding_kind(&mut self, binding_kind: BindingKind) {
+        self.binding_kind = binding_kind;
+    }
+
     pub fn slot(self) -> Slot {
         self.slot
     }
@@ -617,11 +621,11 @@ pub struct FunctionDeclaration {
 }
 
 impl FunctionDeclaration {
-    pub fn new(hir_id: HirId, name: Expr, parameters: Vec<FunctionParameter>, body: Block) -> Self {
+    pub fn new(hir_id: HirId, name: Expr, params: Vec<FunctionParameter>, body: Block) -> Self {
         FunctionDeclaration {
             hir_id,
             name,
-            parameters,
+            parameters: params,
             return_type: Ty::default(),
             body,
             span: Span::default(),

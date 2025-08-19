@@ -15,13 +15,17 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
 
     fn enter_scope(&mut self, hir_id: hir::HirId, ctx: &mut Self::Context) {
         if ctx.symbols.contains_key(&hir_id) {
+            debug!("Entering scope for: {:?}", hir_id);
             ctx.current_scope = Some(hir_id);
             self.scopes.push(hir_id);
+        } else {
+            debug!("Scope skipped for: {:?}", hir_id);
         }
     }
 
     fn leave_scope(&mut self, hir_id: hir::HirId, ctx: &mut Self::Context) {
         if ctx.symbols.contains_key(&hir_id) {
+            debug!("Leaving scope for: {:?}", hir_id);
             debug_assert!(self.scopes.pop() == Some(hir_id), "Mismatched scope exit");
 
             ctx.current_scope = self.scopes.last().copied();
@@ -29,12 +33,11 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
     }
 
     fn visit_path(&mut self, path: &'hir mut hir::Path, ctx: &mut Self::Context) {
+        // TODO: Only visit paths which are not in declaration position (eg. function names).
         if path.res.hir_id().is_some() {
             debug!(
                 "Path '{}' on line {} already resolved to {:?}",
-                path,
-                path.span.start,
-                path.res.hir_id()
+                path, path.span.start, path.res
             );
 
             return;
@@ -53,6 +56,7 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
 
         let symbol_hir_id = symbol_table
             .borrow()
+            // TODO: Also match function names with explicit arity in their name
             .get_closest_by_name(&path.to_string(), path.span)
             .and_then(|s| s.hir_id);
 
@@ -69,10 +73,7 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
                 "No symbols found for path '{}' on line {}. Available symbols: {:#?}",
                 path,
                 path.span.start,
-                symbol_table
-                    .borrow()
-                    .get_all_declared_local_symbols()
-                    .collect::<Vec<_>>()
+                symbol_table.borrow().get_all_declared_symbols()
             );
         }
     }

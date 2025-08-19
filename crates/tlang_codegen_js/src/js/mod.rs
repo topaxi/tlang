@@ -1,6 +1,5 @@
 mod keywords;
 
-pub use keywords::*;
 
 pub fn safe_js_variable_name(name: &str) -> String {
     let mut name = name.to_string();

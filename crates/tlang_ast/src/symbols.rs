@@ -320,6 +320,10 @@ impl SymbolTable {
 
     pub fn mark_as_used(&mut self, id: SymbolId) {
         if let Some(symbol_info) = self.get_local_mut(|s| s.id == id) {
+            if symbol_info.used {
+                return;
+            }
+
             if symbol_info.is_any_fn() {
                 debug!(
                     "Marking {} `{}/{}` with {:?} as used",
