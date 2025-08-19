@@ -30,7 +30,7 @@ fn test_function_definition_on_struct() {
 
             this.field = undefined;
         }
-        Test.new = function Test__new() {
+        Test.$new = function Test__new() {
             return Test({
                 field: 0,
             });
@@ -71,7 +71,7 @@ fn test_variadic_function_definition_on_struct() {
 
             this.field = undefined;
         }
-        Test.new = function Test__new() {
+        Test.$new = function Test__new() {
             return Test({
                 field: 0,
             });
