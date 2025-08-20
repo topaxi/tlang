@@ -1,9 +1,7 @@
-use std::collections::HashSet;
 use std::env;
 use std::fs;
 use std::process;
 
-use tlang_ast::symbols::SymbolType;
 use tlang_ast_lowering::lower_to_hir;
 use tlang_hir_opt::HirOptimizer;
 use tlang_interpreter::Interpreter;
@@ -65,7 +63,7 @@ fn main() {
     );
 
     let mut optimizer = HirOptimizer::default();
-    optimizer.optimize_hir(&mut module, &mut meta.into());
+    optimizer.optimize_hir(&mut module, meta.into());
 
     let mut interp = Interpreter::default();
     interp.eval(&module);
