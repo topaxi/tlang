@@ -24,16 +24,6 @@ macro_rules! analyze {
     }};
 }
 
-struct PathVisitor {
-    paths: Vec<node::Path>,
-}
-
-impl<'ast> tlang_ast::Visitor<'ast> for PathVisitor {
-    fn visit_path(&mut self, path: &'ast node::Path) {
-        self.paths.push(path.clone());
-    }
-}
-
 #[test]
 fn test_analyze_variable_declaration() {
     let (analyzer, ast) = analyze!("let a = 1;");

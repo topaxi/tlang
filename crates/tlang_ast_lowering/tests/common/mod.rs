@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use tlang_ast as ast;
 use tlang_hir::hir;
 
