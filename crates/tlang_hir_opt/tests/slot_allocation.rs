@@ -115,13 +115,21 @@ fn test_variadic_fn_res() {
     assert_eq!(
         collect_slots(&mut hir),
         vec![
+            // fac/1 definition on line 1
             ("fac/1".to_string(), hir::Slot::Local(0)),
             ("n".to_string(), hir::Slot::Local(1)),
             ("fac/2".to_string(), hir::Slot::Upvar(1, 1)),
+            // fac/2 definition on line 2
             ("fac/2".to_string(), hir::Slot::Local(1)),
+            // first match, returns acc
+            ("acc".to_string(), hir::Slot::Local(1)),
+            // second match, calls fac(n - 1, n * acc)
+            ("n".to_string(), hir::Slot::Local(1)),
             ("n".to_string(), hir::Slot::Local(1)),
             ("acc".to_string(), hir::Slot::Local(2)),
             ("fac/2".to_string(), hir::Slot::Local(0)),
+            // TODO: Where is this coming from?
+            //("fac".to_string(), hir::Slot::Local(1)),
         ]
     );
 

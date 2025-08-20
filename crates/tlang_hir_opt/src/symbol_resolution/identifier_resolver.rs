@@ -54,10 +54,29 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
                 )
             });
 
+        let path_string = path.to_string();
         let symbol_info = symbol_table
             .borrow()
             // TODO: Also match function names with explicit arity in their name
-            .get_closest_by_name(&path.to_string(), path.span);
+            .get_closest_by_name(&path_string, path.span)
+            .or_else(|| {
+                if path_string.contains("/") {
+                    let (name, arity) = path_string
+                        .rsplit_once('/')
+                        .expect("Path should contain a '/' for arity");
+                    let arity = arity
+                        .parse::<usize>()
+                        .expect("Arity should be a valid usize");
+
+                    symbol_table
+                        .borrow()
+                        .get_by_name_and_arity(name, arity)
+                        .first()
+                        .cloned()
+                } else {
+                    None
+                }
+            });
 
         if let Some(symbol_info) = symbol_info
             && let Some(hir_id) = symbol_info.hir_id
