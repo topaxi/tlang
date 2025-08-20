@@ -1,10 +1,14 @@
+use std::collections::HashMap;
+
 use tlang_ast::symbols::SymbolType;
 use tlang_ast_lowering::lower_to_hir;
+use tlang_hir::visit::{walk_pat, walk_stmt};
 use tlang_hir::{Visitor, hir};
 use tlang_hir_opt::hir_opt::HirOptimizer;
 use tlang_hir_pretty::HirPrettyOptions;
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
+use tlang_span::HirId;
 
 #[ctor::ctor]
 fn before_all() {
@@ -44,21 +48,56 @@ pub fn pretty_print(module: &hir::Module) -> String {
     prettier.output().to_string()
 }
 
+pub fn collect_declarations(node: &mut hir::Module) -> HashMap<HirId, String> {
+    let mut collector = DeclarationCollector::default();
+    collector.collect(node);
+    collector.declarations
+}
+
+#[derive(Default)]
+struct DeclarationCollector {
+    declarations: HashMap<HirId, String>,
+}
+
+impl DeclarationCollector {
+    fn collect(&mut self, module: &mut hir::Module) {
+        self.visit_module(module, &mut ());
+    }
+}
+
+impl<'hir> Visitor<'hir> for DeclarationCollector {
+    fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut Self::Context) {
+        match &stmt.kind {
+            hir::StmtKind::FunctionDeclaration(decl) => {
+                self.declarations.insert(decl.hir_id, decl.name());
+
+                walk_stmt(self, stmt, ctx);
+            }
+            _ => walk_stmt(self, stmt, ctx),
+        }
+    }
+    fn visit_pat(&mut self, pat: &'hir mut hir::Pat, ctx: &mut Self::Context) {
+        match &pat.kind {
+            hir::PatKind::Identifier(hir_id, ident) => {
+                self.declarations.insert(*hir_id, ident.to_string());
+            }
+            _ => walk_pat(self, pat, ctx),
+        }
+    }
+}
+
 pub fn collect_paths(node: &mut hir::Module) -> Vec<hir::Path> {
-    let mut collector = PathCollector::new();
+    let mut collector = PathCollector::default();
     collector.collect(node);
     collector.paths
 }
 
+#[derive(Default)]
 struct PathCollector {
     paths: Vec<hir::Path>,
 }
 
 impl PathCollector {
-    fn new() -> Self {
-        Self { paths: Vec::new() }
-    }
-
     fn collect(&mut self, module: &mut hir::Module) {
         self.visit_module(module, &mut ());
     }

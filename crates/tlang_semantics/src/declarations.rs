@@ -320,22 +320,8 @@ impl DeclarationAnalyzer {
         self.pop_symbol_table();
     }
 
-    /// TODO: This is a temporary solution. We need to find a better way to handle this.
-    #[allow(clippy::only_used_in_recursion)]
-    fn fn_identifier_to_string(&self, identifier: &Expr) -> String {
-        match identifier.kind {
-            ExprKind::Path(ref path) => path.to_string(),
-            ExprKind::FieldExpression(ref expr) => {
-                let base_name = self.fn_identifier_to_string(&expr.base);
-
-                format!("{base_name}.{}", expr.field)
-            }
-            _ => panic!("Expected identifier, found {:?}", identifier.kind),
-        }
-    }
-
     fn collect_function_declaration(&mut self, declaration: &FunctionDeclaration) {
-        let name_as_str = self.fn_identifier_to_string(&declaration.name);
+        let name_as_str = declaration.name();
 
         self.declare_symbol(
             declaration.id,
@@ -371,7 +357,7 @@ impl DeclarationAnalyzer {
 
     fn collect_function_expression(&mut self, decl: &FunctionDeclaration) {
         self.push_symbol_table(decl.id);
-        let name_as_str = self.fn_identifier_to_string(&decl.name);
+        let name_as_str = decl.name();
 
         if name_as_str != "anonymous" {
             self.declare_symbol(

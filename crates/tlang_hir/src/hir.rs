@@ -129,12 +129,20 @@ pub struct Res {
 }
 
 impl Res {
-    pub fn new(hir_id: HirId, binding_kind: BindingKind, slot_index: usize) -> Self {
+    fn new(hir_id: HirId, binding_kind: BindingKind) -> Self {
         Res {
             hir_id: Some(hir_id),
             binding_kind,
-            slot: Slot::Local(slot_index),
+            slot: Slot::None,
         }
+    }
+
+    pub fn new_local(hir_id: HirId) -> Self {
+        Res::new(hir_id, BindingKind::Local)
+    }
+
+    pub fn new_fn(hir_id: HirId) -> Self {
+        Res::new(hir_id, BindingKind::Fn)
     }
 
     pub fn new_upvar(hir_id: HirId, slot_index: usize, scope_index: usize) -> Self {

@@ -1,3 +1,5 @@
+#![feature(if_let_guard)]
+
 pub mod keyword;
 pub(crate) mod macros;
 pub mod node;

@@ -108,6 +108,19 @@ pub struct FunctionDeclaration {
     pub span: Span,
 }
 
+impl FunctionDeclaration {
+    /// # Panics
+    pub fn name(&self) -> String {
+        match &self.name.kind {
+            ExprKind::Path(path) => path.to_string(),
+            ExprKind::FieldExpression(expr) if let Some(path) = expr.base.path() => {
+                format!("{}.{}", path, expr.field)
+            }
+            _ => panic!("Expected identifier, found {:?}", self.name.kind),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Block {
@@ -207,6 +220,14 @@ impl Expr {
 
     pub fn is_wildcard(&self) -> bool {
         matches!(self.kind, ExprKind::Wildcard)
+    }
+
+    pub fn path(&self) -> Option<&Path> {
+        if let ExprKind::Path(path) = &self.kind {
+            Some(path)
+        } else {
+            None
+        }
     }
 }
 
