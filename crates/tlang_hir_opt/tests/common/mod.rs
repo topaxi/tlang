@@ -73,6 +73,18 @@ impl<'hir> Visitor<'hir> for DeclarationCollector {
 
                 walk_stmt(self, stmt, ctx);
             }
+            hir::StmtKind::EnumDeclaration(decl) => {
+                self.declarations.insert(decl.hir_id, decl.name.to_string());
+
+                for variant in &decl.variants {
+                    self.declarations.insert(
+                        variant.hir_id,
+                        decl.name.to_string() + "::" + variant.name.as_str(),
+                    );
+                }
+
+                walk_stmt(self, stmt, ctx);
+            }
             _ => walk_stmt(self, stmt, ctx),
         }
     }

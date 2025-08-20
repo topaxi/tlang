@@ -145,6 +145,14 @@ impl Res {
         Res::new(hir_id, BindingKind::Fn)
     }
 
+    pub fn new_enum(hir_id: HirId) -> Self {
+        Res::new(hir_id, BindingKind::Enum)
+    }
+
+    pub fn new_enum_variant(hir_id: HirId) -> Self {
+        Res::new(hir_id, BindingKind::Variant)
+    }
+
     pub fn new_upvar(hir_id: HirId, slot_index: usize, scope_index: usize) -> Self {
         debug_assert!(scope_index <= ScopeIndex::MAX as usize);
 

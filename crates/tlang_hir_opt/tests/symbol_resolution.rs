@@ -85,3 +85,45 @@ fn test_symbol_resolution_with_same_scope_shadowing() {
         ]
     );
 }
+
+#[test]
+fn test_enum_resolution() {
+    let mut hir = compile(
+        r#"
+            enum Color {
+                Red,
+                Green,
+                Blue,
+            }
+
+            fn main() {
+                let c = Color::Red;
+                c
+            }
+        "#,
+    );
+
+    assert_eq!(
+        collect_declarations(&mut hir),
+        HashMap::from([
+            (HirId::new(2), "Color".to_string()),
+            (HirId::new(3), "Color::Red".to_string()),
+            (HirId::new(4), "Color::Green".to_string()),
+            (HirId::new(5), "Color::Blue".to_string()),
+            (HirId::new(6), "main".to_string()),
+            (HirId::new(10), "c".to_string()),
+        ])
+    );
+
+    assert_eq!(
+        collect_res(&mut hir),
+        vec![
+            ("main".to_string(), hir::Res::new_fn(HirId::new(6))),
+            (
+                "Color::Red".to_string(),
+                hir::Res::new_enum_variant(HirId::new(3))
+            ),
+            ("c".to_string(), hir::Res::new_local(HirId::new(10))),
+        ]
+    );
+}
