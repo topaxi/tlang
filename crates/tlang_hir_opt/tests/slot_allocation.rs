@@ -1,7 +1,7 @@
 mod common;
 
-use pretty_assertions::{assert_eq, assert_matches};
-use tlang_hir::hir::{self, HirScope};
+use pretty_assertions::assert_eq;
+use tlang_hir::hir;
 
 use self::common::collect_paths;
 
