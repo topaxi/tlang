@@ -3,15 +3,15 @@ source: crates/tlang_parser/tests/parser_fn.rs
 expression: "parse!\n(indoc!\n{\"\n        fn filter_map([], f) { [] }\n        fn filter_map([x, ...xs], f) if let y = f(x) { [y, ...filter_map(xs, f)] }\n        fn filter_map([x, ...xs], f) { rec filter_map(xs, f) }\n    \"})"
 ---
 Module(
-  id: 1,
+  id: 2,
   statements: [
     Stmt(
-      id: 44,
+      id: 45,
       kind: FunctionDeclarations([
         FunctionDeclaration(
-          id: 8,
+          id: 9,
           name: Expr(
-            id: 2,
+            id: 3,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -58,7 +58,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: 3,
+                id: 4,
                 kind: List([]),
                 leading_comments: [],
                 trailing_comments: [],
@@ -87,7 +87,7 @@ Module(
             ),
             FunctionParameter(
               pattern: Pat(
-                id: 4,
+                id: 5,
                 kind: Identifier(Ident(
                   name: "f",
                   span: Span(
@@ -130,10 +130,10 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: 7,
+            id: 8,
             statements: [],
             expression: Some(Expr(
-              id: 6,
+              id: 7,
               kind: List([]),
               leading_comments: [],
               trailing_comments: [],
@@ -173,9 +173,9 @@ Module(
           ),
         ),
         FunctionDeclaration(
-          id: 29,
+          id: 30,
           name: Expr(
-            id: 9,
+            id: 10,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -222,10 +222,10 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: 13,
+                id: 14,
                 kind: List([
                   Pat(
-                    id: 10,
+                    id: 11,
                     kind: Identifier(Ident(
                       name: "x",
                       span: Span(
@@ -253,9 +253,9 @@ Module(
                     ),
                   ),
                   Pat(
-                    id: 11,
+                    id: 12,
                     kind: Rest(Pat(
-                      id: 12,
+                      id: 13,
                       kind: Identifier(Ident(
                         name: "xs",
                         span: Span(
@@ -323,7 +323,7 @@ Module(
             ),
             FunctionParameter(
               pattern: Pat(
-                id: 14,
+                id: 15,
                 kind: Identifier(Ident(
                   name: "f",
                   span: Span(
@@ -364,9 +364,9 @@ Module(
             ),
           ],
           guard: Some(Expr(
-            id: 19,
+            id: 20,
             kind: Let(Pat(
-              id: 15,
+              id: 16,
               kind: Identifier(Ident(
                 name: "y",
                 span: Span(
@@ -393,10 +393,10 @@ Module(
                 ),
               ),
             ), Expr(
-              id: 18,
+              id: 19,
               kind: Call(CallExpression(
                 callee: Expr(
-                  id: 16,
+                  id: 17,
                   kind: Path(Path(
                     segments: [
                       Ident(
@@ -442,7 +442,7 @@ Module(
                 ),
                 arguments: [
                   Expr(
-                    id: 17,
+                    id: 18,
                     kind: Path(Path(
                       segments: [
                         Ident(
@@ -516,13 +516,13 @@ Module(
           )),
           return_type_annotation: None,
           body: Block(
-            id: 28,
+            id: 29,
             statements: [],
             expression: Some(Expr(
-              id: 27,
+              id: 28,
               kind: List([
                 Expr(
-                  id: 21,
+                  id: 22,
                   kind: Path(Path(
                     segments: [
                       Ident(
@@ -567,12 +567,12 @@ Module(
                   ),
                 ),
                 Expr(
-                  id: 22,
+                  id: 23,
                   kind: UnaryOp(Spread, Expr(
-                    id: 26,
+                    id: 27,
                     kind: Call(CallExpression(
                       callee: Expr(
-                        id: 23,
+                        id: 24,
                         kind: Path(Path(
                           segments: [
                             Ident(
@@ -618,7 +618,7 @@ Module(
                       ),
                       arguments: [
                         Expr(
-                          id: 24,
+                          id: 25,
                           kind: Path(Path(
                             segments: [
                               Ident(
@@ -663,7 +663,7 @@ Module(
                           ),
                         ),
                         Expr(
-                          id: 25,
+                          id: 26,
                           kind: Path(Path(
                             segments: [
                               Ident(
@@ -774,9 +774,9 @@ Module(
           ),
         ),
         FunctionDeclaration(
-          id: 43,
+          id: 44,
           name: Expr(
-            id: 30,
+            id: 31,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -823,10 +823,10 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: 34,
+                id: 35,
                 kind: List([
                   Pat(
-                    id: 31,
+                    id: 32,
                     kind: Identifier(Ident(
                       name: "x",
                       span: Span(
@@ -854,9 +854,9 @@ Module(
                     ),
                   ),
                   Pat(
-                    id: 32,
+                    id: 33,
                     kind: Rest(Pat(
-                      id: 33,
+                      id: 34,
                       kind: Identifier(Ident(
                         name: "xs",
                         span: Span(
@@ -924,7 +924,7 @@ Module(
             ),
             FunctionParameter(
               pattern: Pat(
-                id: 35,
+                id: 36,
                 kind: Identifier(Ident(
                   name: "f",
                   span: Span(
@@ -967,13 +967,13 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: 42,
+            id: 43,
             statements: [],
             expression: Some(Expr(
-              id: 41,
+              id: 42,
               kind: RecursiveCall(CallExpression(
                 callee: Expr(
-                  id: 37,
+                  id: 38,
                   kind: Path(Path(
                     segments: [
                       Ident(
@@ -1019,7 +1019,7 @@ Module(
                 ),
                 arguments: [
                   Expr(
-                    id: 38,
+                    id: 39,
                     kind: Path(Path(
                       segments: [
                         Ident(
@@ -1064,7 +1064,7 @@ Module(
                     ),
                   ),
                   Expr(
-                    id: 39,
+                    id: 40,
                     kind: Path(Path(
                       segments: [
                         Ident(

@@ -44,11 +44,8 @@ fn test_should_error_on_undefined_symbol() {
     assert_eq!(
         diagnostics,
         vec![Diagnostic::error(
-            "Use of undeclared variable `a`".into(),
-            Span::new(
-                LineColumn { line: 0, column: 0 },
-                LineColumn { line: 0, column: 1 }
-            ),
+            "Use of undeclared variable `a`",
+            Span::new((0, 0), (0, 1)),
         )]
     );
 }
@@ -60,11 +57,8 @@ fn test_should_error_on_undefined_symbol_in_variable_declaration() {
     assert_eq!(
         diagnostics[..1],
         vec![Diagnostic::error(
-            "Use of undeclared variable `b`".into(),
-            Span::new(
-                LineColumn { line: 0, column: 8 },
-                LineColumn { line: 0, column: 9 }
-            ),
+            "Use of undeclared variable `b`",
+            Span::new((0, 8), (0, 9)),
         )]
     );
 }
@@ -80,18 +74,12 @@ fn test_should_error_on_undefined_functions() {
         diagnostics,
         vec![
             Diagnostic::error(
-                "Use of undeclared function `b` with arity 0".into(),
-                Span::new(
-                    LineColumn { line: 0, column: 0 },
-                    LineColumn { line: 0, column: 1 }
-                ),
+                "Use of undeclared function `b` with arity 0",
+                Span::new((0, 0), (0, 1)),
             ),
             Diagnostic::error(
-                "Use of undeclared function `b` with arity 1".into(),
-                Span::new(
-                    LineColumn { line: 1, column: 1 },
-                    LineColumn { line: 1, column: 2 }
-                ),
+                "Use of undeclared function `b` with arity 1",
+                Span::new((1, 1), (1, 2)),
             )
         ]
     );
@@ -104,11 +92,8 @@ fn test_should_error_on_self_referencing_symbol() {
     assert_eq!(
         diagnostics[..1],
         vec![Diagnostic::error(
-            "Use of undeclared variable `a`".into(),
-            Span::new(
-                LineColumn { line: 0, column: 8 },
-                LineColumn { line: 0, column: 9 }
-            ),
+            "Use of undeclared variable `a`",
+            Span::new((0, 8), (0, 9)),
         )]
     );
 }
@@ -129,15 +114,12 @@ fn test_should_allow_shadowing_of_single_variable() {
         program_symbols.borrow().get_by_name("a"),
         vec![
             SymbolInfo {
-                node_id: Some(NodeId::new(2)),
+                node_id: Some(NodeId::new(3)),
                 hir_id: None,
                 id: SymbolId::new(1),
                 name: "a".into(),
                 symbol_type: SymbolType::Variable,
-                defined_at: Span::new(
-                    LineColumn { line: 0, column: 4 },
-                    LineColumn { line: 0, column: 5 }
-                ),
+                defined_at: Span::new((0, 4), (0, 5)),
                 scope_start: LineColumn {
                     line: 0,
                     column: 10
@@ -148,15 +130,12 @@ fn test_should_allow_shadowing_of_single_variable() {
                 used: false,
             },
             SymbolInfo {
-                node_id: Some(NodeId::new(5)),
+                node_id: Some(NodeId::new(6)),
                 hir_id: None,
                 id: SymbolId::new(2),
                 name: "a".into(),
                 symbol_type: SymbolType::Variable,
-                defined_at: Span::new(
-                    LineColumn { line: 1, column: 5 },
-                    LineColumn { line: 1, column: 6 }
-                ),
+                defined_at: Span::new((1, 5), (1, 6)),
                 scope_start: LineColumn {
                     line: 1,
                     column: 11
@@ -190,15 +169,12 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
             .find(|s| s.id == SymbolId::new(1))
             .cloned(),
         Some(SymbolInfo {
-            node_id: Some(NodeId::new(2)),
+            node_id: Some(NodeId::new(3)),
             hir_id: None,
             id: SymbolId::new(1),
             name: "a".into(),
             symbol_type: SymbolType::Variable,
-            defined_at: Span::new(
-                LineColumn { line: 0, column: 4 },
-                LineColumn { line: 0, column: 5 }
-            ),
+            defined_at: Span::new((0, 4), (0, 5)),
             scope_start: LineColumn {
                 line: 0,
                 column: 10
@@ -217,15 +193,12 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
             .find(|s| s.id == SymbolId::new(2))
             .cloned(),
         Some(SymbolInfo {
-            node_id: Some(NodeId::new(5)),
+            node_id: Some(NodeId::new(6)),
             hir_id: None,
             id: SymbolId::new(2),
             name: "a".into(),
             symbol_type: SymbolType::Variable,
-            defined_at: Span::new(
-                LineColumn { line: 1, column: 5 },
-                LineColumn { line: 1, column: 6 }
-            ),
+            defined_at: Span::new((1, 5), (1, 6)),
             scope_start: LineColumn {
                 line: 1,
                 column: 15
@@ -274,20 +247,20 @@ fn should_not_allow_using_variables_from_outer_function_scope_before_declaration
         let c = 1;
     "});
 
-    assert_eq!(diagnostics, vec![
-        Diagnostic::error(
-            "Use of undeclared variable `c`, did you mean the variable `c`?",
-            Span::new((1, 5), (1, 6)),
-        ),
-        Diagnostic::warn(
-            "Unused function `add/2`",
-            Span::new((0, 3), (0, 6)),
-        ),
-        Diagnostic::warn(
-            "Unused variable `c`, if this is intentional, prefix the name with an underscore: `_c`".into(),
-            Span::new((4, 5), (4, 6))
-        ),
-    ]);
+    assert_eq!(
+        diagnostics,
+        vec![
+            Diagnostic::error(
+                "Use of undeclared variable `c`, did you mean the variable `c`?",
+                Span::new((1, 5), (1, 6)),
+            ),
+            Diagnostic::warn("Unused function `add/2`", Span::new((0, 3), (0, 6)),),
+            Diagnostic::warn(
+                "Unused variable `c`, if this is intentional, prefix the name with an underscore: `_c`",
+                Span::new((4, 5), (4, 6))
+            ),
+        ]
+    );
 }
 
 #[test]
@@ -310,11 +283,11 @@ fn should_warn_about_unused_variables() {
         vec![
             Diagnostic::warn(
                 "Unused variable `a`, if this is intentional, prefix the name with an underscore: `_a`".into(),
-                Span::new(LineColumn { line: 0, column: 4 }, LineColumn { line: 0, column: 5 }),
+                Span::new((0, 4), (0, 5)),
             ),
             Diagnostic::warn(
                 "Unused variable `b`, if this is intentional, prefix the name with an underscore: `_b`".into(),
-                Span::new(LineColumn { line: 1, column: 5 }, LineColumn { line: 1, column: 6 }),
+                Span::new((1, 5), (1, 6)),
             ),
         ],
     );
@@ -332,19 +305,19 @@ fn should_warn_about_unused_function_and_parameters() {
         vec![
             Diagnostic::warn(
                 "Unused parameter `a`, if this is intentional, prefix the name with an underscore: `_a`".into(),
-                Span::new(LineColumn { line: 0, column: 7 }, LineColumn { line: 0, column: 8 }),
+                Span::new((0, 7), (0, 8)),
             ),
             Diagnostic::warn(
                 "Unused parameter `b`, if this is intentional, prefix the name with an underscore: `_b`".into(),
-                Span::new(LineColumn { line: 0, column: 10 }, LineColumn { line: 0, column: 11 }),
+                Span::new((0, 10), (0, 11)),
             ),
             Diagnostic::warn(
                 "Unused variable `c`, if this is intentional, prefix the name with an underscore: `_c`".into(),
-                Span::new(LineColumn { line: 1, column: 9 }, LineColumn { line: 1, column: 10 }),
+                Span::new((1, 9), (1, 10)),
             ),
             Diagnostic::warn(
                 "Unused function `add/2`".into(),
-                Span::new(LineColumn { line: 0, column: 3 }, LineColumn { line: 0, column: 6 }),
+                Span::new((0, 3), (0, 6)),
             ),
         ]
     );

@@ -124,8 +124,7 @@ impl Tlang {
             return self.build.parse_result.as_ref().unwrap().as_ref();
         }
 
-        let mut parser = Parser::from_source(&self.source);
-        parser.set_recoverable(true);
+        let mut parser = Parser::from_source(&self.source).set_recoverable(true);
 
         self.build.parse_result = Some(parser.parse());
         self.build.parse_result.as_ref().unwrap().as_ref()
@@ -166,8 +165,7 @@ impl Tlang {
                 self.analyzer.symbol_tables().clone(),
             );
             let mut optimizer = HirOptimizer::default();
-            let mut optimizer_context = meta.into();
-            optimizer.optimize_hir(&mut module, &mut optimizer_context);
+            optimizer.optimize_hir(&mut module, meta.into());
             self.build.hir = Some(module);
         }
     }

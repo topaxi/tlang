@@ -3,10 +3,10 @@ source: crates/tlang_parser/tests/parser_struct.rs
 expression: "parse! (\"struct Foo { x: Int, y: Int }\")"
 ---
 Module(
-  id: 1,
+  id: 2,
   statements: [
     Stmt(
-      id: 6,
+      id: 7,
       kind: StructDeclaration(StructDeclaration(
         name: Ident(
           name: "Foo",
@@ -23,7 +23,7 @@ Module(
         ),
         fields: [
           StructField(
-            id: 3,
+            id: 4,
             name: Ident(
               name: "x",
               span: Span(
@@ -38,7 +38,7 @@ Module(
               ),
             ),
             ty: Ty(
-              id: 2,
+              id: 3,
               name: Path(
                 segments: [
                   Ident(
@@ -83,7 +83,7 @@ Module(
             ),
           ),
           StructField(
-            id: 5,
+            id: 6,
             name: Ident(
               name: "y",
               span: Span(
@@ -98,7 +98,7 @@ Module(
               ),
             ),
             ty: Ty(
-              id: 4,
+              id: 5,
               name: Path(
                 segments: [
                   Ident(

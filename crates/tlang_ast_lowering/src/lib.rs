@@ -23,6 +23,7 @@ pub struct LoweringContext {
     hir_id_allocator: HirIdAllocator,
     symbol_id_allocator: SymbolIdAllocator,
     symbol_tables: HashMap<ast::NodeId, Rc<RefCell<ast::symbols::SymbolTable>>>,
+    new_symbol_tables: HashMap<HirId, Rc<RefCell<ast::symbols::SymbolTable>>>,
     current_symbol_table: Rc<RefCell<ast::symbols::SymbolTable>>,
 }
 
@@ -37,6 +38,7 @@ impl LoweringContext {
             fn_node_id_to_hir_id: HashMap::default(),
             symbol_id_allocator,
             symbol_tables,
+            new_symbol_tables: HashMap::default(),
             current_symbol_table: Default::default(),
         }
     }
@@ -44,7 +46,7 @@ impl LoweringContext {
     pub fn symbol_tables(&self) -> HashMap<HirId, Rc<RefCell<ast::symbols::SymbolTable>>> {
         debug!("Translating symbol tables to HirIds");
 
-        let mut symbol_tables = HashMap::new();
+        let mut symbol_tables = self.new_symbol_tables.clone();
 
         for (node_id, symbol_table) in &self.symbol_tables {
             if let Some(hir_id) = self.node_id_to_hir_id.get(node_id) {
@@ -101,13 +103,24 @@ impl LoweringContext {
         R: hir::HirScope,
     {
         debug!("Entering scope for node_id: {:?}", node_id);
+
         let previous_symbol_table = self.current_symbol_table.clone();
         if let Some(symbol_table) = self.symbol_tables.get(&node_id).cloned() {
             self.current_symbol_table = symbol_table;
+            // Reparent the current symbol table to the previous one, in case we created a new
+            // scope while lowering.
+            self.current_symbol_table
+                .borrow_mut()
+                .set_parent(previous_symbol_table.clone());
         }
+
         let result = f(self);
+
+        if self.symbol_tables.contains_key(&node_id) {
+            debug!("Leaving scope for node_id: {:?}", node_id);
+        }
         self.current_symbol_table = previous_symbol_table;
-        debug!("Leaving scope for node_id: {:?}", node_id);
+
         result
     }
 
@@ -163,38 +176,36 @@ impl LoweringContext {
             *hir_id
         } else {
             let hir_id = self.unique_id();
+            debug!("Lowering {:?} to {:?}", id, hir_id);
             self.node_id_to_hir_id.insert(id, hir_id);
             hir_id
         }
     }
 
     pub fn lower_module(&mut self, module: &ast::node::Module) -> hir::Module {
-        self.with_scope(module.id, |this| this.lower_module_in_current_scope(module))
-    }
-
-    pub fn lower_module_in_current_scope(&mut self, module: &ast::node::Module) -> hir::Module {
         debug!(
             "Lowering module with {} statements",
             module.statements.len()
         );
 
-        let hir_id = self.lower_node_id(module.id);
+        self.with_scope(module.id, |this| {
+            let hir_id = this.lower_node_id(module.id);
 
-        hir::Module {
-            hir_id,
-            block: hir::Block::new(
+            hir::Module {
                 hir_id,
-                self.lower_stmts(&module.statements),
-                None,
-                module.span,
-            ),
-            span: module.span,
-        }
+                block: hir::Block::new(
+                    this.unique_id(),
+                    this.lower_stmts(&module.statements),
+                    None,
+                    module.span,
+                ),
+                span: module.span,
+            }
+        })
     }
 
+    #[inline(always)]
     fn lower_stmts(&mut self, stmts: &[ast::node::Stmt]) -> Vec<hir::Stmt> {
-        debug!("Lowering {} statements", stmts.len());
-
         stmts
             .iter()
             .flat_map(|stmt| self.lower_stmt(stmt))
@@ -382,7 +393,14 @@ pub fn lower_to_hir(
     symbol_id_allocator: SymbolIdAllocator,
     symbol_tables: HashMap<tlang_ast::NodeId, Rc<RefCell<tlang_ast::symbols::SymbolTable>>>,
 ) -> hir::LowerResult {
-    let mut ctx = LoweringContext::new(symbol_id_allocator, symbol_tables);
+    lower(
+        &mut LoweringContext::new(symbol_id_allocator, symbol_tables),
+        tlang_ast,
+    )
+}
+
+pub fn lower(ctx: &mut LoweringContext, tlang_ast: &ast::node::Module) -> hir::LowerResult {
+    let root_symbol_table = ctx.lower_node_id(tlang_span::NodeId::new(1));
     let module = ctx.lower_module(tlang_ast);
     let symbol_tables = ctx.symbol_tables();
     let symbol_id_allocator = ctx.symbol_id_allocator;
@@ -391,6 +409,7 @@ pub fn lower_to_hir(
     (
         module,
         hir::LowerResultMeta {
+            root_symbol_table,
             symbol_tables,
             hir_id_allocator,
             symbol_id_allocator,

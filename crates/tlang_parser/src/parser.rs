@@ -41,17 +41,26 @@ impl<'src> Parser<'src> {
         }
     }
 
-    pub fn set_recoverable(&mut self, recoverable: bool) -> &mut Self {
-        self.recoverable = recoverable;
-        self
-    }
-
     pub fn recoverable(&self) -> bool {
         self.recoverable
     }
 
-    pub fn get_errors(&self) -> &[ParseIssue] {
+    pub fn set_recoverable(mut self, recoverable: bool) -> Self {
+        self.recoverable = recoverable;
+        self
+    }
+
+    pub fn errors(&self) -> &[ParseIssue] {
         &self.errors
+    }
+
+    pub fn node_id_allocator(&self) -> &NodeIdAllocator {
+        &self.node_id_allocator
+    }
+
+    pub fn set_node_id_allocator(mut self, allocator: NodeIdAllocator) -> Self {
+        self.node_id_allocator = allocator;
+        self
     }
 
     fn unique_id(&mut self) -> NodeId {

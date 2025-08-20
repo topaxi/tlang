@@ -16,16 +16,17 @@ impl<'hir> Visitor<'hir> for SlotAllocator {
 
     fn enter_scope(&mut self, hir_id: hir::HirId, ctx: &mut Self::Context) {
         if ctx.symbols.contains_key(&hir_id) {
-            ctx.current_scope = Some(hir_id);
+            ctx.current_scope = hir_id;
             self.scopes.push(hir_id);
         }
     }
 
     fn leave_scope(&mut self, hir_id: hir::HirId, ctx: &mut Self::Context) {
         if ctx.symbols.contains_key(&hir_id) {
-            debug_assert!(self.scopes.pop() == Some(hir_id), "Mismatched scope exit");
+            let left_scope = self.scopes.pop();
+            debug_assert!(left_scope == Some(hir_id), "Mismatched scope exit");
 
-            ctx.current_scope = self.scopes.last().copied();
+            ctx.current_scope = self.scopes.last().copied().unwrap();
         }
     }
 
@@ -89,6 +90,10 @@ impl<'hir> Visitor<'hir> for SlotAllocator {
 }
 
 impl HirPass for SlotAllocator {
+    fn init_context(&mut self, ctx: &mut HirOptContext) {
+        self.scopes.push(ctx.current_scope);
+    }
+
     fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
         self.visit_module(module, ctx);
 

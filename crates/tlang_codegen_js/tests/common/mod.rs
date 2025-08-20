@@ -67,8 +67,7 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
 
             if options.optimize {
                 let mut optimizer = HirOptimizer::default();
-                let mut optimizer_context = meta.into();
-                optimizer.optimize_hir(&mut module, &mut optimizer_context);
+                optimizer.optimize_hir(&mut module, meta.into());
             }
 
             let mut codegen = CodegenJS::default();

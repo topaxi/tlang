@@ -44,23 +44,7 @@ fn main() {
         }
     };
     let mut analyzer = SemanticAnalyzer::default();
-
-    let mut module_names = HashSet::new();
-    let builtin_module_symbols = inventory::iter::<NativeFnDef>
-        .into_iter()
-        .map(|def| def.module())
-        .filter(|module_name| module_names.insert(module_name.to_string()))
-        .map(|module_name| (module_name, SymbolType::Module))
-        .collect::<Vec<_>>();
-
-    let builtin_fn_symbols = inventory::iter::<NativeFnDef>
-        .into_iter()
-        .map(|def| (def.name(), SymbolType::Function(def.arity() as u16)))
-        .collect::<Vec<_>>();
-
-    analyzer.add_builtin_symbols(&builtin_module_symbols);
-    analyzer.add_builtin_symbols(&builtin_fn_symbols);
-    analyzer.add_builtin_symbols(&[("math::pi", SymbolType::Variable)]);
+    analyzer.add_builtin_symbols(&Interpreter::builtin_symbols());
 
     match analyzer.analyze(&ast) {
         Ok(_) => {}
@@ -81,8 +65,7 @@ fn main() {
     );
 
     let mut optimizer = HirOptimizer::default();
-    let mut optimizer_context = meta.into();
-    optimizer.optimize_hir(&mut module, &mut optimizer_context);
+    optimizer.optimize_hir(&mut module, &mut meta.into());
 
     let mut interp = Interpreter::default();
     interp.eval(&module);

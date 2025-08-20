@@ -256,9 +256,9 @@ fn test_enum_res() {
         collect_slots(&mut hir),
         vec![
             ("Foo".to_string(), hir::Slot::Local(0)),
-            ("Foo::Bar".to_string(), hir::Slot::Upvar(1, 1)),
+            ("Foo::Bar".to_string(), hir::Slot::Upvar(1, 2)),
             ("x".to_string(), hir::Slot::Local(1)),
-            ("Foo::Baz".to_string(), hir::Slot::Upvar(2, 1)),
+            ("Foo::Baz".to_string(), hir::Slot::Upvar(2, 2)),
             ("x".to_string(), hir::Slot::Local(1)),
             ("foo".to_string(), hir::Slot::Local(5)),
             ("Foo::Bar".to_string(), hir::Slot::Upvar(1, 1)),

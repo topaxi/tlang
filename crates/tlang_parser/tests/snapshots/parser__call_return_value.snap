@@ -3,18 +3,18 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse! (\"foo()();\")"
 ---
 Module(
-  id: 1,
+  id: 2,
   statements: [
     Stmt(
-      id: 2,
+      id: 3,
       kind: Expr(Expr(
-        id: 5,
+        id: 6,
         kind: Call(CallExpression(
           callee: Expr(
-            id: 4,
+            id: 5,
             kind: Call(CallExpression(
               callee: Expr(
-                id: 3,
+                id: 4,
                 kind: Path(Path(
                   segments: [
                     Ident(

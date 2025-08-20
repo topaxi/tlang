@@ -3,15 +3,15 @@ source: crates/tlang_parser/tests/parser_fn.rs
 expression: "parse!\n(indoc!\n{\"\n        fn sum([]) { 0 }\n        fn sum([x, ...xs]) { x + sum(xs) }\n    \"})"
 ---
 Module(
-  id: 1,
+  id: 2,
   statements: [
     Stmt(
-      id: 21,
+      id: 22,
       kind: FunctionDeclarations([
         FunctionDeclaration(
-          id: 7,
+          id: 8,
           name: Expr(
-            id: 2,
+            id: 3,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -58,7 +58,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: 3,
+                id: 4,
                 kind: List([]),
                 leading_comments: [],
                 trailing_comments: [],
@@ -89,10 +89,10 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: 6,
+            id: 7,
             statements: [],
             expression: Some(Expr(
-              id: 5,
+              id: 6,
               kind: Literal(UnsignedInteger(0)),
               leading_comments: [],
               trailing_comments: [],
@@ -132,9 +132,9 @@ Module(
           ),
         ),
         FunctionDeclaration(
-          id: 20,
+          id: 21,
           name: Expr(
-            id: 8,
+            id: 9,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -181,10 +181,10 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: 12,
+                id: 13,
                 kind: List([
                   Pat(
-                    id: 9,
+                    id: 10,
                     kind: Identifier(Ident(
                       name: "x",
                       span: Span(
@@ -212,9 +212,9 @@ Module(
                     ),
                   ),
                   Pat(
-                    id: 10,
+                    id: 11,
                     kind: Rest(Pat(
-                      id: 11,
+                      id: 12,
                       kind: Identifier(Ident(
                         name: "xs",
                         span: Span(
@@ -284,14 +284,14 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: 19,
+            id: 20,
             statements: [],
             expression: Some(Expr(
-              id: 18,
+              id: 19,
               kind: BinaryOp(BinaryOpExpression(
                 op: Add,
                 lhs: Expr(
-                  id: 14,
+                  id: 15,
                   kind: Path(Path(
                     segments: [
                       Ident(
@@ -336,10 +336,10 @@ Module(
                   ),
                 ),
                 rhs: Expr(
-                  id: 17,
+                  id: 18,
                   kind: Call(CallExpression(
                     callee: Expr(
-                      id: 15,
+                      id: 16,
                       kind: Path(Path(
                         segments: [
                           Ident(
@@ -385,7 +385,7 @@ Module(
                     ),
                     arguments: [
                       Expr(
-                        id: 16,
+                        id: 17,
                         kind: Path(Path(
                           segments: [
                             Ident(

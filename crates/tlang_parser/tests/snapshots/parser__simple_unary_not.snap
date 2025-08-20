@@ -3,14 +3,14 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse! (\"!true;\")"
 ---
 Module(
-  id: 1,
+  id: 2,
   statements: [
     Stmt(
-      id: 2,
+      id: 3,
       kind: Expr(Expr(
-        id: 3,
+        id: 4,
         kind: UnaryOp(Not, Expr(
-          id: 4,
+          id: 5,
           kind: Literal(Boolean(true)),
           leading_comments: [],
           trailing_comments: [],

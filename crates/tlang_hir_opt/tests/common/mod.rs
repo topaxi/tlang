@@ -35,8 +35,7 @@ pub fn compile(source: &str) -> hir::LowerResult {
 
 pub fn compile_and_optimize(source: &str, optimizer: &mut HirOptimizer) -> hir::Module {
     let (mut module, meta) = compile(source);
-    let mut optimizer_context = meta.into();
-    optimizer.optimize_hir(&mut module, &mut optimizer_context);
+    optimizer.optimize_hir(&mut module, meta.into());
     module
 }
 

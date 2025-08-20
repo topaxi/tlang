@@ -25,6 +25,10 @@ impl Default for SymbolResolution {
 }
 
 impl HirPass for SymbolResolution {
+    fn init_context(&mut self, ctx: &mut HirOptContext) {
+        self.0.init_context(ctx);
+    }
+
     fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
         self.0.optimize_hir(module, ctx)
     }

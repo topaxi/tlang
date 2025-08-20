@@ -14,14 +14,14 @@ pub struct Id<T> {
 
 impl<T> Id<T> {
     /// # Panics
-    pub fn new(id: usize) -> Self {
+    pub const fn new(id: usize) -> Self {
         Id {
             inner: NonZeroUsize::new(id).expect("Id cannot be zero"),
             _marker: PhantomData,
         }
     }
 
-    pub fn next(self) -> Self {
+    pub const fn next(self) -> Self {
         Id::new(self.inner.get().saturating_add(1))
     }
 }
@@ -44,13 +44,16 @@ pub struct IdAllocator<T: Copy> {
 }
 
 impl<T: Copy> IdAllocator<T> {
-    pub fn new() -> Self {
+    /// Creates a new `IdAllocator` starting from the given `start` value.
+    /// Must be greater than zero.
+    /// # Panics
+    pub const fn new(start: usize) -> Self {
         IdAllocator {
-            next_id: Id::new(1),
+            next_id: Id::new(start),
         }
     }
 
-    pub fn next_id(&mut self) -> Id<T> {
+    pub const fn next_id(&mut self) -> Id<T> {
         let id = self.next_id;
         self.next_id = self.next_id.next();
         id
@@ -59,6 +62,6 @@ impl<T: Copy> IdAllocator<T> {
 
 impl<T: Copy> Default for IdAllocator<T> {
     fn default() -> Self {
-        Self::new()
+        Self::new(1)
     }
 }

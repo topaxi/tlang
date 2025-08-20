@@ -3,13 +3,13 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse!\n(r\"\n        // this is a third comment\n        let y = /* comment before expr */ 2 /* comment after expr */;\n        // trailing comment\n        [1,2] // trailing comment\n        |> foo // trailing comment\n        //|> bar\n        |> baz;\n        \")"
 ---
 Module(
-  id: 1,
+  id: 2,
   statements: [
     Stmt(
-      id: 4,
+      id: 5,
       kind: Let(LetDeclaration(
         pattern: Pat(
-          id: 2,
+          id: 3,
           kind: Identifier(Ident(
             name: "y",
             span: Span(
@@ -37,7 +37,7 @@ Module(
           ),
         ),
         expression: Expr(
-          id: 3,
+          id: 4,
           kind: Literal(UnsignedInteger(2)),
           leading_comments: [
             Token(
@@ -110,20 +110,20 @@ Module(
       trailing_comments: [],
     ),
     Stmt(
-      id: 5,
+      id: 6,
       kind: Expr(Expr(
-        id: 12,
+        id: 13,
         kind: BinaryOp(BinaryOpExpression(
           op: Pipeline,
           lhs: Expr(
-            id: 10,
+            id: 11,
             kind: BinaryOp(BinaryOpExpression(
               op: Pipeline,
               lhs: Expr(
-                id: 8,
+                id: 9,
                 kind: List([
                   Expr(
-                    id: 6,
+                    id: 7,
                     kind: Literal(UnsignedInteger(1)),
                     leading_comments: [],
                     trailing_comments: [],
@@ -139,7 +139,7 @@ Module(
                     ),
                   ),
                   Expr(
-                    id: 7,
+                    id: 8,
                     kind: Literal(UnsignedInteger(2)),
                     leading_comments: [],
                     trailing_comments: [],
@@ -183,7 +183,7 @@ Module(
                 ),
               ),
               rhs: Expr(
-                id: 9,
+                id: 10,
                 kind: Path(Path(
                   segments: [
                     Ident(
@@ -269,7 +269,7 @@ Module(
             ),
           ),
           rhs: Expr(
-            id: 11,
+            id: 12,
             kind: Path(Path(
               segments: [
                 Ident(

@@ -173,6 +173,10 @@ impl SymbolTable {
         self.parent.clone()
     }
 
+    pub fn set_parent(&mut self, parent: Rc<RefCell<SymbolTable>>) {
+        self.parent = Some(parent);
+    }
+
     pub fn get_slot(&self, predicate: impl Fn(&SymbolInfo) -> bool) -> Option<(usize, usize)> {
         let mut table = Some(Rc::new(RefCell::new(self.clone())));
         let mut scope_index = 0;

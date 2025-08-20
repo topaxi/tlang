@@ -16,19 +16,24 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
     fn enter_scope(&mut self, hir_id: hir::HirId, ctx: &mut Self::Context) {
         if ctx.symbols.contains_key(&hir_id) {
             debug!("Entering scope for: {:?}", hir_id);
-            ctx.current_scope = Some(hir_id);
+            ctx.current_scope = hir_id;
             self.scopes.push(hir_id);
         } else {
-            debug!("Scope skipped for: {:?}", hir_id);
+            debug!(
+                "Scope skipped for: {:?}, current scope: {:?}",
+                hir_id, ctx.current_scope
+            );
         }
     }
 
     fn leave_scope(&mut self, hir_id: hir::HirId, ctx: &mut Self::Context) {
         if ctx.symbols.contains_key(&hir_id) {
-            debug!("Leaving scope for: {:?}", hir_id);
-            debug_assert!(self.scopes.pop() == Some(hir_id), "Mismatched scope exit");
+            let left_scope = self.scopes.pop();
 
-            ctx.current_scope = self.scopes.last().copied();
+            debug!("Leaving scope for: {:?}", hir_id);
+            debug_assert!(left_scope == Some(hir_id), "Mismatched scope exit");
+
+            ctx.current_scope = self.scopes.last().copied().unwrap();
         }
     }
 
@@ -101,6 +106,10 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
 }
 
 impl HirPass for IdentifierResolver {
+    fn init_context(&mut self, ctx: &mut HirOptContext) {
+        self.enter_scope(ctx.current_scope, ctx);
+    }
+
     fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
         self.visit_module(module, ctx);
 

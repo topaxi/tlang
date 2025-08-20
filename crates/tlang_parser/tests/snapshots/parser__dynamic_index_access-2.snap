@@ -3,13 +3,13 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse! (\"let x = foo[1][2];\")"
 ---
 Module(
-  id: 1,
+  id: 2,
   statements: [
     Stmt(
-      id: 8,
+      id: 9,
       kind: Let(LetDeclaration(
         pattern: Pat(
-          id: 2,
+          id: 3,
           kind: Identifier(Ident(
             name: "x",
             span: Span(
@@ -37,13 +37,13 @@ Module(
           ),
         ),
         expression: Expr(
-          id: 7,
+          id: 8,
           kind: IndexExpression(IndexAccessExpression(
             base: Expr(
-              id: 5,
+              id: 6,
               kind: IndexExpression(IndexAccessExpression(
                 base: Expr(
-                  id: 3,
+                  id: 4,
                   kind: Path(Path(
                     segments: [
                       Ident(
@@ -88,7 +88,7 @@ Module(
                   ),
                 ),
                 index: Expr(
-                  id: 4,
+                  id: 5,
                   kind: Literal(UnsignedInteger(1)),
                   leading_comments: [],
                   trailing_comments: [],
@@ -118,7 +118,7 @@ Module(
               ),
             ),
             index: Expr(
-              id: 6,
+              id: 7,
               kind: Literal(UnsignedInteger(2)),
               leading_comments: [],
               trailing_comments: [],

@@ -3,17 +3,17 @@ source: crates/tlang_parser/tests/parser_if_let.rs
 expression: "parse! (indoc! {\"\n        if let x = 1 {\n            x\n        }\n    \"})"
 ---
 Module(
-  id: 1,
+  id: 2,
   statements: [
     Stmt(
-      id: 2,
+      id: 3,
       kind: Expr(Expr(
-        id: 9,
+        id: 10,
         kind: IfElse(IfElseExpression(
           condition: Expr(
-            id: 5,
+            id: 6,
             kind: Let(Pat(
-              id: 3,
+              id: 4,
               kind: Identifier(Ident(
                 name: "x",
                 span: Span(
@@ -40,7 +40,7 @@ Module(
                 ),
               ),
             ), Expr(
-              id: 4,
+              id: 5,
               kind: Literal(UnsignedInteger(1)),
               leading_comments: [],
               trailing_comments: [],
@@ -69,10 +69,10 @@ Module(
             ),
           ),
           then_branch: Block(
-            id: 8,
+            id: 9,
             statements: [],
             expression: Some(Expr(
-              id: 7,
+              id: 8,
               kind: Path(Path(
                 segments: [
                   Ident(

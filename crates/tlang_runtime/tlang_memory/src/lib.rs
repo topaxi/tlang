@@ -48,7 +48,7 @@ impl NativeFnDef {
         }
     }
 
-    pub fn name(&self) -> String {
+    pub fn name(&'static self) -> String {
         if self.binding_name.is_empty() {
             let module_name = self.module();
 
@@ -62,15 +62,17 @@ impl NativeFnDef {
         }
     }
 
-    pub fn module(&self) -> &str {
+    pub fn module(&'static self) -> &'static str {
         self.module_path.split("::").last().unwrap_or_default()
     }
 
-    pub const fn arity(&self) -> usize {
+    pub const fn arity(&'static self) -> usize {
         self.arity
     }
 
-    pub const fn fn_ptr(&self) -> fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn {
+    pub const fn fn_ptr(
+        &'static self,
+    ) -> fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn {
         self.function
     }
 }

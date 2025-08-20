@@ -10,20 +10,19 @@ use tlang_span::{HirId, HirIdAllocator};
 pub struct HirOptContext {
     pub symbols: HashMap<HirId, Rc<RefCell<SymbolTable>>>,
     pub hir_id_allocator: HirIdAllocator,
-    pub current_scope: Option<HirId>,
+    pub current_scope: HirId,
 }
 
 impl HirOptContext {
     pub fn current_symbol_table(&self) -> Option<Rc<RefCell<SymbolTable>>> {
-        self.current_scope
-            .and_then(|scope| self.symbols.get(&scope).cloned())
+        self.symbols.get(&self.current_scope).cloned()
     }
 }
 
 impl From<hir::LowerResultMeta> for HirOptContext {
     fn from(lower_result_meta: hir::LowerResultMeta) -> Self {
         HirOptContext {
-            current_scope: None,
+            current_scope: lower_result_meta.root_symbol_table,
             symbols: lower_result_meta.symbol_tables,
             hir_id_allocator: lower_result_meta.hir_id_allocator,
         }
@@ -34,6 +33,9 @@ pub trait HirPass {
     fn name(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
+
+    #[allow(unused_variables)]
+    fn init_context(&mut self, ctx: &mut HirOptContext) {}
 
     fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool;
 }
@@ -57,6 +59,14 @@ impl HirOptGroup {
 impl HirPass for HirOptGroup {
     fn name(&self) -> &'static str {
         self.name
+    }
+
+    fn init_context(&mut self, ctx: &mut HirOptContext) {
+        for pass in &mut self.passes {
+            debug!("Initializing context for pass: {}", pass.name());
+
+            pass.init_context(ctx);
+        }
     }
 
     fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
@@ -105,7 +115,8 @@ impl HirOptimizer {
         self.group.passes.push(pass);
     }
 
-    pub fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
-        self.group.optimize_hir(module, ctx)
+    pub fn optimize_hir(&mut self, module: &mut hir::Module, mut ctx: HirOptContext) -> bool {
+        self.group.init_context(&mut ctx);
+        self.group.optimize_hir(module, &mut ctx)
     }
 }

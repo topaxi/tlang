@@ -666,12 +666,32 @@ impl InterpreterState {
                 Some(TlangObjectKind::Closure(s)) => {
                     let fn_decl = self.closures.get(&s.id).unwrap();
 
-                    format!("fn {}({:?})", fn_decl.name(), s.id)
+                    format!(
+                        "fn {}#{}({})",
+                        fn_decl.name(),
+                        s.id,
+                        fn_decl
+                            .parameters
+                            .iter()
+                            .map(|p| p.name.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                    )
                 }
                 Some(TlangObjectKind::Fn(id)) => {
                     let fn_decl = self.fn_decls.get(id).unwrap();
 
-                    format!("fn {}({:?})", fn_decl.name(), id)
+                    format!(
+                        "fn {}#{}({})",
+                        fn_decl.name(),
+                        id,
+                        fn_decl
+                            .parameters
+                            .iter()
+                            .map(|p| p.name.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                    )
                 }
                 Some(TlangObjectKind::NativeFn) => "fn(native)".to_string(),
             },

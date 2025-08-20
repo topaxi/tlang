@@ -3,31 +3,31 @@ source: crates/tlang_parser/tests/parser_pipeline.rs
 expression: "parse!\n(indoc!\n{\"\n        [1,2,3]\n        |> map(fn (x) { x ** 2 })\n        |> filter(fn (x) { x % 2 == 0 })\n        |> foldl(fn (acc, x) { acc + x }, 0)\n        |> log();\n    \"})"
 ---
 Module(
-  id: 1,
+  id: 2,
   statements: [
     Stmt(
-      id: 2,
+      id: 3,
       kind: Expr(Expr(
-        id: 49,
+        id: 50,
         kind: BinaryOp(BinaryOpExpression(
           op: Pipeline,
           lhs: Expr(
-            id: 46,
+            id: 47,
             kind: BinaryOp(BinaryOpExpression(
               op: Pipeline,
               lhs: Expr(
-                id: 32,
+                id: 33,
                 kind: BinaryOp(BinaryOpExpression(
                   op: Pipeline,
                   lhs: Expr(
-                    id: 18,
+                    id: 19,
                     kind: BinaryOp(BinaryOpExpression(
                       op: Pipeline,
                       lhs: Expr(
-                        id: 6,
+                        id: 7,
                         kind: List([
                           Expr(
-                            id: 3,
+                            id: 4,
                             kind: Literal(UnsignedInteger(1)),
                             leading_comments: [],
                             trailing_comments: [],
@@ -43,7 +43,7 @@ Module(
                             ),
                           ),
                           Expr(
-                            id: 4,
+                            id: 5,
                             kind: Literal(UnsignedInteger(2)),
                             leading_comments: [],
                             trailing_comments: [],
@@ -59,7 +59,7 @@ Module(
                             ),
                           ),
                           Expr(
-                            id: 5,
+                            id: 6,
                             kind: Literal(UnsignedInteger(3)),
                             leading_comments: [],
                             trailing_comments: [],
@@ -89,10 +89,10 @@ Module(
                         ),
                       ),
                       rhs: Expr(
-                        id: 17,
+                        id: 18,
                         kind: Call(CallExpression(
                           callee: Expr(
-                            id: 7,
+                            id: 8,
                             kind: Path(Path(
                               segments: [
                                 Ident(
@@ -138,11 +138,11 @@ Module(
                           ),
                           arguments: [
                             Expr(
-                              id: 15,
+                              id: 16,
                               kind: FunctionExpression(FunctionDeclaration(
-                                id: 16,
+                                id: 17,
                                 name: Expr(
-                                  id: 8,
+                                  id: 9,
                                   kind: Path(Path(
                                     segments: [
                                       Ident(
@@ -189,7 +189,7 @@ Module(
                                 parameters: [
                                   FunctionParameter(
                                     pattern: Pat(
-                                      id: 9,
+                                      id: 10,
                                       kind: Identifier(Ident(
                                         name: "x",
                                         span: Span(
@@ -232,14 +232,14 @@ Module(
                                 guard: None,
                                 return_type_annotation: None,
                                 body: Block(
-                                  id: 14,
+                                  id: 15,
                                   statements: [],
                                   expression: Some(Expr(
-                                    id: 13,
+                                    id: 14,
                                     kind: BinaryOp(BinaryOpExpression(
                                       op: Exponentiation,
                                       lhs: Expr(
-                                        id: 11,
+                                        id: 12,
                                         kind: Path(Path(
                                           segments: [
                                             Ident(
@@ -284,7 +284,7 @@ Module(
                                         ),
                                       ),
                                       rhs: Expr(
-                                        id: 12,
+                                        id: 13,
                                         kind: Literal(UnsignedInteger(2)),
                                         leading_comments: [],
                                         trailing_comments: [],
@@ -380,10 +380,10 @@ Module(
                     ),
                   ),
                   rhs: Expr(
-                    id: 31,
+                    id: 32,
                     kind: Call(CallExpression(
                       callee: Expr(
-                        id: 19,
+                        id: 20,
                         kind: Path(Path(
                           segments: [
                             Ident(
@@ -429,11 +429,11 @@ Module(
                       ),
                       arguments: [
                         Expr(
-                          id: 29,
+                          id: 30,
                           kind: FunctionExpression(FunctionDeclaration(
-                            id: 30,
+                            id: 31,
                             name: Expr(
-                              id: 20,
+                              id: 21,
                               kind: Path(Path(
                                 segments: [
                                   Ident(
@@ -480,7 +480,7 @@ Module(
                             parameters: [
                               FunctionParameter(
                                 pattern: Pat(
-                                  id: 21,
+                                  id: 22,
                                   kind: Identifier(Ident(
                                     name: "x",
                                     span: Span(
@@ -523,18 +523,18 @@ Module(
                             guard: None,
                             return_type_annotation: None,
                             body: Block(
-                              id: 28,
+                              id: 29,
                               statements: [],
                               expression: Some(Expr(
-                                id: 27,
+                                id: 28,
                                 kind: BinaryOp(BinaryOpExpression(
                                   op: Equal,
                                   lhs: Expr(
-                                    id: 25,
+                                    id: 26,
                                     kind: BinaryOp(BinaryOpExpression(
                                       op: Modulo,
                                       lhs: Expr(
-                                        id: 23,
+                                        id: 24,
                                         kind: Path(Path(
                                           segments: [
                                             Ident(
@@ -579,7 +579,7 @@ Module(
                                         ),
                                       ),
                                       rhs: Expr(
-                                        id: 24,
+                                        id: 25,
                                         kind: Literal(UnsignedInteger(2)),
                                         leading_comments: [],
                                         trailing_comments: [],
@@ -609,7 +609,7 @@ Module(
                                     ),
                                   ),
                                   rhs: Expr(
-                                    id: 26,
+                                    id: 27,
                                     kind: Literal(UnsignedInteger(0)),
                                     leading_comments: [],
                                     trailing_comments: [],
@@ -705,10 +705,10 @@ Module(
                 ),
               ),
               rhs: Expr(
-                id: 45,
+                id: 46,
                 kind: Call(CallExpression(
                   callee: Expr(
-                    id: 33,
+                    id: 34,
                     kind: Path(Path(
                       segments: [
                         Ident(
@@ -754,11 +754,11 @@ Module(
                   ),
                   arguments: [
                     Expr(
-                      id: 42,
+                      id: 43,
                       kind: FunctionExpression(FunctionDeclaration(
-                        id: 43,
+                        id: 44,
                         name: Expr(
-                          id: 34,
+                          id: 35,
                           kind: Path(Path(
                             segments: [
                               Ident(
@@ -805,7 +805,7 @@ Module(
                         parameters: [
                           FunctionParameter(
                             pattern: Pat(
-                              id: 35,
+                              id: 36,
                               kind: Identifier(Ident(
                                 name: "acc",
                                 span: Span(
@@ -846,7 +846,7 @@ Module(
                           ),
                           FunctionParameter(
                             pattern: Pat(
-                              id: 36,
+                              id: 37,
                               kind: Identifier(Ident(
                                 name: "x",
                                 span: Span(
@@ -889,14 +889,14 @@ Module(
                         guard: None,
                         return_type_annotation: None,
                         body: Block(
-                          id: 41,
+                          id: 42,
                           statements: [],
                           expression: Some(Expr(
-                            id: 40,
+                            id: 41,
                             kind: BinaryOp(BinaryOpExpression(
                               op: Add,
                               lhs: Expr(
-                                id: 38,
+                                id: 39,
                                 kind: Path(Path(
                                   segments: [
                                     Ident(
@@ -941,7 +941,7 @@ Module(
                                 ),
                               ),
                               rhs: Expr(
-                                id: 39,
+                                id: 40,
                                 kind: Path(Path(
                                   segments: [
                                     Ident(
@@ -1037,7 +1037,7 @@ Module(
                       ),
                     ),
                     Expr(
-                      id: 44,
+                      id: 45,
                       kind: Literal(UnsignedInteger(0)),
                       leading_comments: [],
                       trailing_comments: [],
@@ -1082,10 +1082,10 @@ Module(
             ),
           ),
           rhs: Expr(
-            id: 48,
+            id: 49,
             kind: Call(CallExpression(
               callee: Expr(
-                id: 47,
+                id: 48,
                 kind: Path(Path(
                   segments: [
                     Ident(

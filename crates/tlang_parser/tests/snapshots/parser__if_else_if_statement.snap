@@ -3,15 +3,15 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse! (\"if true { 1; } else if false { 2; }\")"
 ---
 Module(
-  id: 1,
+  id: 2,
   statements: [
     Stmt(
-      id: 2,
+      id: 3,
       kind: Expr(Expr(
-        id: 11,
+        id: 12,
         kind: IfElse(IfElseExpression(
           condition: Expr(
-            id: 3,
+            id: 4,
             kind: Literal(Boolean(true)),
             leading_comments: [],
             trailing_comments: [],
@@ -27,12 +27,12 @@ Module(
             ),
           ),
           then_branch: Block(
-            id: 6,
+            id: 7,
             statements: [
               Stmt(
-                id: 4,
+                id: 5,
                 kind: Expr(Expr(
-                  id: 5,
+                  id: 6,
                   kind: Literal(UnsignedInteger(1)),
                   leading_comments: [],
                   trailing_comments: [],
@@ -76,7 +76,7 @@ Module(
           else_branches: [
             ElseClause(
               condition: Some(Expr(
-                id: 7,
+                id: 8,
                 kind: Literal(Boolean(false)),
                 leading_comments: [],
                 trailing_comments: [],
@@ -92,12 +92,12 @@ Module(
                 ),
               )),
               consequence: Block(
-                id: 10,
+                id: 11,
                 statements: [
                   Stmt(
-                    id: 8,
+                    id: 9,
                     kind: Expr(Expr(
-                      id: 9,
+                      id: 10,
                       kind: Literal(UnsignedInteger(2)),
                       leading_comments: [],
                       trailing_comments: [],

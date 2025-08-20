@@ -3,10 +3,10 @@ source: crates/tlang_parser/tests/parser_enum.rs
 expression: "parse!\n(indoc!\n{\"\n        enum Tree {\n            Leaf(value),\n            Node { left, right },\n        }\n\n        fn maximum_depth(Tree::Leaf(_)) { 1 }\n        fn maximum_depth(Tree::Node { left, right }) { 1 + max(maximum_depth(left), maximum_depth(right)) }\n\n        fn main() {\n            let x = Tree::Node {\n                left: Tree::Leaf(1),\n                right: Tree::Node {\n                    left: Tree::Leaf(2),\n                    right: Tree::Leaf(3),\n                },\n            };\n        }\n    \"})"
 ---
 Module(
-  id: 1,
+  id: 2,
   statements: [
     Stmt(
-      id: 10,
+      id: 11,
       kind: EnumDeclaration(EnumDeclaration(
         name: Ident(
           name: "Tree",
@@ -23,7 +23,7 @@ Module(
         ),
         variants: [
           EnumVariant(
-            id: 4,
+            id: 5,
             name: Ident(
               name: "Leaf",
               span: Span(
@@ -39,7 +39,7 @@ Module(
             ),
             parameters: [
               StructField(
-                id: 3,
+                id: 4,
                 name: Ident(
                   name: "0",
                   span: Span(
@@ -54,7 +54,7 @@ Module(
                   ),
                 ),
                 ty: Ty(
-                  id: 2,
+                  id: 3,
                   name: Path(
                     segments: [
                       Ident(
@@ -111,7 +111,7 @@ Module(
             ),
           ),
           EnumVariant(
-            id: 9,
+            id: 10,
             name: Ident(
               name: "Node",
               span: Span(
@@ -127,7 +127,7 @@ Module(
             ),
             parameters: [
               StructField(
-                id: 6,
+                id: 7,
                 name: Ident(
                   name: "left",
                   span: Span(
@@ -142,7 +142,7 @@ Module(
                   ),
                 ),
                 ty: Ty(
-                  id: 5,
+                  id: 6,
                   name: Path(
                     segments: [
                       Ident(
@@ -187,7 +187,7 @@ Module(
                 ),
               ),
               StructField(
-                id: 8,
+                id: 9,
                 name: Ident(
                   name: "right",
                   span: Span(
@@ -202,7 +202,7 @@ Module(
                   ),
                 ),
                 ty: Ty(
-                  id: 7,
+                  id: 8,
                   name: Path(
                     segments: [
                       Ident(
@@ -274,12 +274,12 @@ Module(
       trailing_comments: [],
     ),
     Stmt(
-      id: 36,
+      id: 37,
       kind: FunctionDeclarations([
         FunctionDeclaration(
-          id: 17,
+          id: 18,
           name: Expr(
-            id: 11,
+            id: 12,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -326,7 +326,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: 13,
+                id: 14,
                 kind: Enum(EnumPattern(
                   path: Path(
                     segments: [
@@ -385,7 +385,7 @@ Module(
                         ),
                       ),
                     ), Pat(
-                      id: 12,
+                      id: 13,
                       kind: Wildcard,
                       leading_comments: [],
                       trailing_comments: [],
@@ -431,10 +431,10 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: 16,
+            id: 17,
             statements: [],
             expression: Some(Expr(
-              id: 15,
+              id: 16,
               kind: Literal(UnsignedInteger(1)),
               leading_comments: [],
               trailing_comments: [],
@@ -474,9 +474,9 @@ Module(
           ),
         ),
         FunctionDeclaration(
-          id: 34,
+          id: 35,
           name: Expr(
-            id: 18,
+            id: 19,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -523,7 +523,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: 21,
+                id: 22,
                 kind: Enum(EnumPattern(
                   path: Path(
                     segments: [
@@ -582,7 +582,7 @@ Module(
                         ),
                       ),
                     ), Pat(
-                      id: 19,
+                      id: 20,
                       kind: Identifier(Ident(
                         name: "left",
                         span: Span(
@@ -622,7 +622,7 @@ Module(
                         ),
                       ),
                     ), Pat(
-                      id: 20,
+                      id: 21,
                       kind: Identifier(Ident(
                         name: "right",
                         span: Span(
@@ -680,14 +680,14 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: 33,
+            id: 34,
             statements: [],
             expression: Some(Expr(
-              id: 32,
+              id: 33,
               kind: BinaryOp(BinaryOpExpression(
                 op: Add,
                 lhs: Expr(
-                  id: 23,
+                  id: 24,
                   kind: Literal(UnsignedInteger(1)),
                   leading_comments: [],
                   trailing_comments: [],
@@ -703,10 +703,10 @@ Module(
                   ),
                 ),
                 rhs: Expr(
-                  id: 31,
+                  id: 32,
                   kind: Call(CallExpression(
                     callee: Expr(
-                      id: 24,
+                      id: 25,
                       kind: Path(Path(
                         segments: [
                           Ident(
@@ -752,10 +752,10 @@ Module(
                     ),
                     arguments: [
                       Expr(
-                        id: 27,
+                        id: 28,
                         kind: Call(CallExpression(
                           callee: Expr(
-                            id: 25,
+                            id: 26,
                             kind: Path(Path(
                               segments: [
                                 Ident(
@@ -801,7 +801,7 @@ Module(
                           ),
                           arguments: [
                             Expr(
-                              id: 26,
+                              id: 27,
                               kind: Path(Path(
                                 segments: [
                                   Ident(
@@ -861,10 +861,10 @@ Module(
                         ),
                       ),
                       Expr(
-                        id: 30,
+                        id: 31,
                         kind: Call(CallExpression(
                           callee: Expr(
-                            id: 28,
+                            id: 29,
                             kind: Path(Path(
                               segments: [
                                 Ident(
@@ -910,7 +910,7 @@ Module(
                           ),
                           arguments: [
                             Expr(
-                              id: 29,
+                              id: 30,
                               kind: Path(Path(
                                 segments: [
                                   Ident(
@@ -1037,11 +1037,11 @@ Module(
       trailing_comments: [],
     ),
     Stmt(
-      id: 61,
+      id: 62,
       kind: FunctionDeclaration(FunctionDeclaration(
-        id: 60,
+        id: 61,
         name: Expr(
-          id: 37,
+          id: 38,
           kind: Path(Path(
             segments: [
               Ident(
@@ -1089,13 +1089,13 @@ Module(
         guard: None,
         return_type_annotation: None,
         body: Block(
-          id: 59,
+          id: 60,
           statements: [
             Stmt(
-              id: 58,
+              id: 59,
               kind: Let(LetDeclaration(
                 pattern: Pat(
-                  id: 38,
+                  id: 39,
                   kind: Identifier(Ident(
                     name: "x",
                     span: Span(
@@ -1123,10 +1123,10 @@ Module(
                   ),
                 ),
                 expression: Expr(
-                  id: 57,
+                  id: 58,
                   kind: Call(CallExpression(
                     callee: Expr(
-                      id: 39,
+                      id: 40,
                       kind: Path(Path(
                         segments: [
                           Ident(
@@ -1185,10 +1185,10 @@ Module(
                     ),
                     arguments: [
                       Expr(
-                        id: 56,
+                        id: 57,
                         kind: Dict([
                           (Expr(
-                            id: 40,
+                            id: 41,
                             kind: Path(Path(
                               segments: [
                                 Ident(
@@ -1232,10 +1232,10 @@ Module(
                               ),
                             ),
                           ), Expr(
-                            id: 43,
+                            id: 44,
                             kind: Call(CallExpression(
                               callee: Expr(
-                                id: 41,
+                                id: 42,
                                 kind: Path(Path(
                                   segments: [
                                     Ident(
@@ -1294,7 +1294,7 @@ Module(
                               ),
                               arguments: [
                                 Expr(
-                                  id: 42,
+                                  id: 43,
                                   kind: Literal(UnsignedInteger(1)),
                                   leading_comments: [],
                                   trailing_comments: [],
@@ -1325,7 +1325,7 @@ Module(
                             ),
                           )),
                           (Expr(
-                            id: 44,
+                            id: 45,
                             kind: Path(Path(
                               segments: [
                                 Ident(
@@ -1369,10 +1369,10 @@ Module(
                               ),
                             ),
                           ), Expr(
-                            id: 55,
+                            id: 56,
                             kind: Call(CallExpression(
                               callee: Expr(
-                                id: 45,
+                                id: 46,
                                 kind: Path(Path(
                                   segments: [
                                     Ident(
@@ -1431,10 +1431,10 @@ Module(
                               ),
                               arguments: [
                                 Expr(
-                                  id: 54,
+                                  id: 55,
                                   kind: Dict([
                                     (Expr(
-                                      id: 46,
+                                      id: 47,
                                       kind: Path(Path(
                                         segments: [
                                           Ident(
@@ -1478,10 +1478,10 @@ Module(
                                         ),
                                       ),
                                     ), Expr(
-                                      id: 49,
+                                      id: 50,
                                       kind: Call(CallExpression(
                                         callee: Expr(
-                                          id: 47,
+                                          id: 48,
                                           kind: Path(Path(
                                             segments: [
                                               Ident(
@@ -1540,7 +1540,7 @@ Module(
                                         ),
                                         arguments: [
                                           Expr(
-                                            id: 48,
+                                            id: 49,
                                             kind: Literal(UnsignedInteger(2)),
                                             leading_comments: [],
                                             trailing_comments: [],
@@ -1571,7 +1571,7 @@ Module(
                                       ),
                                     )),
                                     (Expr(
-                                      id: 50,
+                                      id: 51,
                                       kind: Path(Path(
                                         segments: [
                                           Ident(
@@ -1615,10 +1615,10 @@ Module(
                                         ),
                                       ),
                                     ), Expr(
-                                      id: 53,
+                                      id: 54,
                                       kind: Call(CallExpression(
                                         callee: Expr(
-                                          id: 51,
+                                          id: 52,
                                           kind: Path(Path(
                                             segments: [
                                               Ident(
@@ -1677,7 +1677,7 @@ Module(
                                         ),
                                         arguments: [
                                           Expr(
-                                            id: 52,
+                                            id: 53,
                                             kind: Literal(UnsignedInteger(3)),
                                             leading_comments: [],
                                             trailing_comments: [],

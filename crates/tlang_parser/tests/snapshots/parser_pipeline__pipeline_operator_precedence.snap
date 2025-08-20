@@ -3,20 +3,20 @@ source: crates/tlang_parser/tests/parser_pipeline.rs
 expression: "parse! (\"1 + 2 |> foo();\")"
 ---
 Module(
-  id: 1,
+  id: 2,
   statements: [
     Stmt(
-      id: 2,
+      id: 3,
       kind: Expr(Expr(
-        id: 8,
+        id: 9,
         kind: BinaryOp(BinaryOpExpression(
           op: Pipeline,
           lhs: Expr(
-            id: 5,
+            id: 6,
             kind: BinaryOp(BinaryOpExpression(
               op: Add,
               lhs: Expr(
-                id: 3,
+                id: 4,
                 kind: Literal(UnsignedInteger(1)),
                 leading_comments: [],
                 trailing_comments: [],
@@ -32,7 +32,7 @@ Module(
                 ),
               ),
               rhs: Expr(
-                id: 4,
+                id: 5,
                 kind: Literal(UnsignedInteger(2)),
                 leading_comments: [],
                 trailing_comments: [],
@@ -62,10 +62,10 @@ Module(
             ),
           ),
           rhs: Expr(
-            id: 7,
+            id: 8,
             kind: Call(CallExpression(
               callee: Expr(
-                id: 6,
+                id: 7,
                 kind: Path(Path(
                   segments: [
                     Ident(

@@ -3,15 +3,15 @@ source: crates/tlang_parser/tests/parser_fn.rs
 expression: "parse!\n(indoc!\n{\"\n        fn foo(1) { 1 }\n        // comment\n        fn foo(n) { n * 2 }\n    \"})"
 ---
 Module(
-  id: 1,
+  id: 2,
   statements: [
     Stmt(
-      id: 16,
+      id: 17,
       kind: FunctionDeclarations([
         FunctionDeclaration(
-          id: 7,
+          id: 8,
           name: Expr(
-            id: 2,
+            id: 3,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -58,7 +58,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: 3,
+                id: 4,
                 kind: Literal(UnsignedInteger(1)),
                 leading_comments: [],
                 trailing_comments: [],
@@ -89,10 +89,10 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: 6,
+            id: 7,
             statements: [],
             expression: Some(Expr(
-              id: 5,
+              id: 6,
               kind: Literal(UnsignedInteger(1)),
               leading_comments: [],
               trailing_comments: [],
@@ -132,9 +132,9 @@ Module(
           ),
         ),
         FunctionDeclaration(
-          id: 15,
+          id: 16,
           name: Expr(
-            id: 8,
+            id: 9,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -181,7 +181,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: 9,
+                id: 10,
                 kind: Identifier(Ident(
                   name: "n",
                   span: Span(
@@ -224,14 +224,14 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: 14,
+            id: 15,
             statements: [],
             expression: Some(Expr(
-              id: 13,
+              id: 14,
               kind: BinaryOp(BinaryOpExpression(
                 op: Multiply,
                 lhs: Expr(
-                  id: 11,
+                  id: 12,
                   kind: Path(Path(
                     segments: [
                       Ident(
@@ -276,7 +276,7 @@ Module(
                   ),
                 ),
                 rhs: Expr(
-                  id: 12,
+                  id: 13,
                   kind: Literal(UnsignedInteger(2)),
                   leading_comments: [],
                   trailing_comments: [],

@@ -3,17 +3,17 @@ source: crates/tlang_parser/tests/parser_if_let.rs
 expression: "parse!\n(indoc!\n{\"\n        if let Option::Some(y) = x; {\n            y\n        }\n    \"})"
 ---
 Module(
-  id: 1,
+  id: 2,
   statements: [
     Stmt(
-      id: 2,
+      id: 3,
       kind: Expr(Expr(
-        id: 10,
+        id: 11,
         kind: IfElse(IfElseExpression(
           condition: Expr(
-            id: 6,
+            id: 7,
             kind: Let(Pat(
-              id: 4,
+              id: 5,
               kind: Enum(EnumPattern(
                 path: Path(
                   segments: [
@@ -72,7 +72,7 @@ Module(
                       ),
                     ),
                   ), Pat(
-                    id: 3,
+                    id: 4,
                     kind: Identifier(Ident(
                       name: "y",
                       span: Span(
@@ -114,7 +114,7 @@ Module(
                 ),
               ),
             ), Expr(
-              id: 5,
+              id: 6,
               kind: Path(Path(
                 segments: [
                   Ident(
@@ -172,10 +172,10 @@ Module(
             ),
           ),
           then_branch: Block(
-            id: 9,
+            id: 10,
             statements: [],
             expression: Some(Expr(
-              id: 8,
+              id: 9,
               kind: Path(Path(
                 segments: [
                   Ident(

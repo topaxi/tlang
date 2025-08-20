@@ -1,6 +1,6 @@
 #![feature(if_let_guard)]
 #![feature(box_patterns)]
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use log::debug;
@@ -65,6 +65,48 @@ impl Default for Interpreter {
 }
 
 impl Interpreter {
+    fn builtin_module_symbols() -> Vec<(&'static str, tlang_ast::symbols::SymbolType)> {
+        let mut module_names = HashSet::new();
+
+        inventory::iter::<NativeFnDef>
+            .into_iter()
+            .map(|def| def.module())
+            .filter(|module_name| module_names.insert(module_name.to_string()))
+            .map(|module_name| (module_name, tlang_ast::symbols::SymbolType::Module))
+            .collect()
+    }
+
+    fn builtin_fn_symbols() -> Vec<(String, tlang_ast::symbols::SymbolType)> {
+        inventory::iter::<NativeFnDef>
+            .into_iter()
+            .map(|def| {
+                (
+                    def.name(),
+                    tlang_ast::symbols::SymbolType::Function(def.arity() as u16),
+                )
+            })
+            .collect::<Vec<_>>()
+    }
+
+    fn builtin_const_symbols() -> &'static [(&'static str, tlang_ast::symbols::SymbolType)] {
+        &[("math::pi", tlang_ast::symbols::SymbolType::Variable)]
+    }
+
+    pub fn builtin_symbols() -> Vec<(String, tlang_ast::symbols::SymbolType)> {
+        let mut symbols: Vec<(String, tlang_ast::symbols::SymbolType)> =
+            Self::builtin_module_symbols()
+                .iter()
+                .map(|(name, ty)| (name.to_string(), *ty))
+                .collect();
+        symbols.extend(Self::builtin_fn_symbols());
+        symbols.extend(
+            Self::builtin_const_symbols()
+                .iter()
+                .map(|(name, ty)| (name.to_string(), *ty)),
+        );
+        symbols
+    }
+
     /// # Panics
     pub fn new() -> Self {
         let mut interpreter = Self {
@@ -1620,6 +1662,7 @@ mod tests {
     use super::*;
     use indoc::indoc;
     use pretty_assertions::{assert_eq, assert_matches};
+    use tlang_hir_opt::HirOptimizer;
 
     #[ctor::ctor]
     fn before_all() {
@@ -1627,33 +1670,68 @@ mod tests {
     }
 
     struct TestInterpreter {
-        lowering_context: tlang_ast_lowering::LoweringContext,
+        node_id_allocator: tlang_span::NodeIdAllocator,
+        semantic_analyzer: tlang_semantics::SemanticAnalyzer,
         interpreter: Interpreter,
     }
 
     impl TestInterpreter {
         fn new() -> Self {
+            let mut semantic_analyzer = tlang_semantics::SemanticAnalyzer::default();
+            semantic_analyzer.add_builtin_symbols(&Interpreter::builtin_symbols());
+            let interpreter = Interpreter::new();
+
             TestInterpreter {
-                lowering_context: tlang_ast_lowering::LoweringContext::new(
-                    Default::default(),
-                    Default::default(),
-                ),
-                interpreter: Interpreter::new(),
+                node_id_allocator: tlang_span::NodeIdAllocator::default(),
+                semantic_analyzer,
+                interpreter,
             }
         }
 
+        fn parse_src(&mut self, src: &str) -> tlang_ast::node::Module {
+            let mut parser = tlang_parser::Parser::from_source(src)
+                .set_node_id_allocator(self.node_id_allocator);
+            let module = parser.parse().unwrap();
+
+            self.node_id_allocator = *parser.node_id_allocator();
+
+            module
+        }
+
+        fn analyze(&mut self, module: &tlang_ast::node::Module) {
+            self.semantic_analyzer
+                .analyze_as_root_module(module)
+                .unwrap();
+        }
+
+        fn lower(&mut self, module: &tlang_ast::node::Module) -> hir::Module {
+            let mut lowering_context = tlang_ast_lowering::LoweringContext::new(
+                self.semantic_analyzer.symbol_id_allocator(),
+                self.semantic_analyzer.symbol_tables().clone(),
+            );
+            let (mut module, meta) = tlang_ast_lowering::lower(&mut lowering_context, module);
+
+            let mut optimizer = HirOptimizer::default();
+            debug!("LowerResultMeta = {:?}", meta);
+            optimizer.optimize_hir(&mut module, meta.into());
+
+            module
+        }
+
+        fn parse(&mut self, src: &str) -> hir::Module {
+            let ast = self.parse_src(src);
+            self.analyze(&ast);
+            self.lower(&ast)
+        }
+
         fn eval_root(&mut self, src: &str) -> TlangValue {
-            let mut parser = tlang_parser::Parser::from_source(src);
-            let ast = parser.parse().unwrap();
-            let hir = self.lowering_context.lower_module_in_current_scope(&ast);
+            let hir = self.parse(src);
             self.interpreter.eval(&hir)
         }
 
         fn eval(&mut self, src: &str) -> TlangValue {
             let block = format!("{{ {src} }};");
-            let mut parser = tlang_parser::Parser::from_source(&block);
-            let ast = parser.parse().unwrap();
-            let hir = self.lowering_context.lower_module_in_current_scope(&ast);
+            let hir = self.parse(&block);
 
             match &hir.block.stmts[0].kind {
                 hir::StmtKind::Expr(expr) => self.interpreter.eval_expr(expr).unwrap_value(),

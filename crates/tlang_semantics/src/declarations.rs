@@ -1,3 +1,4 @@
+use log::debug;
 use std::rc::Rc;
 use std::{cell::RefCell, collections::HashMap};
 use tlang_ast::NodeId;
@@ -31,10 +32,12 @@ impl Default for DeclarationAnalyzer {
 
 impl DeclarationAnalyzer {
     pub fn new() -> Self {
+        let root_symbol_table = Rc::new(RefCell::new(SymbolTable::default()));
+
         DeclarationAnalyzer {
-            symbol_id_allocator: Default::default(),
-            symbol_tables: HashMap::new(),
-            symbol_table_stack: vec![Rc::new(RefCell::new(SymbolTable::default()))],
+            symbol_id_allocator: SymbolIdAllocator::default(),
+            symbol_tables: HashMap::from([(NodeId::new(1), root_symbol_table.clone())]),
+            symbol_table_stack: vec![root_symbol_table],
             symbol_type_context: vec![],
         }
     }
@@ -52,7 +55,7 @@ impl DeclarationAnalyzer {
         self.symbol_id_allocator.next_id()
     }
 
-    fn root_symbol_table(&self) -> &Rc<RefCell<SymbolTable>> {
+    pub fn root_symbol_table(&self) -> &Rc<RefCell<SymbolTable>> {
         &self.symbol_table_stack[0]
     }
 
@@ -61,16 +64,19 @@ impl DeclarationAnalyzer {
     }
 
     fn push_symbol_table(&mut self, node_id: NodeId) -> Rc<RefCell<SymbolTable>> {
-        let parent = Rc::clone(self.current_symbol_table());
+        debug!("Entering new scope for node: {}", node_id);
+
+        let parent = self.current_symbol_table().clone();
         let new_symbol_table = Rc::new(RefCell::new(SymbolTable::new(parent)));
-        self.symbol_tables
-            .insert(node_id, Rc::clone(&new_symbol_table));
-        self.symbol_table_stack.push(Rc::clone(&new_symbol_table));
+        self.symbol_tables.insert(node_id, new_symbol_table.clone());
+        self.symbol_table_stack.push(new_symbol_table.clone());
 
         new_symbol_table
     }
 
     fn pop_symbol_table(&mut self) -> Rc<RefCell<SymbolTable>> {
+        debug!("Leaving scope");
+
         self.symbol_table_stack.pop().unwrap()
     }
 
@@ -88,6 +94,8 @@ impl DeclarationAnalyzer {
             SymbolInfo::new(id, name, symbol_type, defined_at, scope_start).with_node_id(node_id);
         let symbol_table = self.current_symbol_table();
 
+        debug!("Declaring symbol: {:#?}", symbol_info);
+
         symbol_table.borrow_mut().insert(symbol_info);
     }
 
@@ -104,8 +112,8 @@ impl DeclarationAnalyzer {
         }
     }
 
-    pub fn analyze(&mut self, module: &Module) {
-        self.collect_module_declarations(module);
+    pub fn analyze(&mut self, module: &Module, is_root: bool) {
+        self.collect_module_declarations(module, is_root);
 
         // After collecting all declarations, we should be left with the root symbol table on the
         // symbol table stack.
@@ -310,14 +318,18 @@ impl DeclarationAnalyzer {
         }
     }
 
-    fn collect_module_declarations(&mut self, module: &Module) {
-        self.push_symbol_table(module.id);
+    fn collect_module_declarations(&mut self, module: &Module, is_root: bool) {
+        if !is_root {
+            self.push_symbol_table(module.id);
+        }
 
         for stmt in &module.statements {
             self.collect_declarations_stmt(stmt);
         }
 
-        self.pop_symbol_table();
+        if !is_root {
+            self.pop_symbol_table();
+        }
     }
 
     fn collect_function_declaration(&mut self, declaration: &FunctionDeclaration) {

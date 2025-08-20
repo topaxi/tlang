@@ -49,6 +49,10 @@ impl SemanticAnalyzer {
         self.symbol_tables().get(&id).cloned()
     }
 
+    pub fn root_symbol_table(&self) -> Rc<RefCell<SymbolTable>> {
+        self.declaration_analyzer.root_symbol_table().clone()
+    }
+
     pub fn symbol_id_allocator(&self) -> SymbolIdAllocator {
         self.declaration_analyzer.symbol_id_allocator()
     }
@@ -70,15 +74,17 @@ impl SemanticAnalyzer {
     }
 
     fn current_symbol_table(&self) -> Rc<RefCell<SymbolTable>> {
-        Rc::clone(self.symbol_table_stack.last().unwrap())
+        self.symbol_table_stack.last().cloned().unwrap()
     }
 
     fn push_symbol_table(&mut self, symbol_table: &Rc<RefCell<SymbolTable>>) {
-        self.symbol_table_stack.push(Rc::clone(symbol_table));
+        self.symbol_table_stack.push(symbol_table.clone());
     }
 
     fn pop_symbol_table(&mut self) -> Rc<RefCell<SymbolTable>> {
-        self.symbol_table_stack.pop().unwrap()
+        let symbol_table = self.symbol_table_stack.pop().unwrap();
+        self.report_unused_symbols(&symbol_table);
+        symbol_table
     }
 
     pub fn add_builtin_symbols<'a, S, I>(&mut self, symbols: I)
@@ -90,9 +96,27 @@ impl SemanticAnalyzer {
     }
 
     pub fn analyze(&mut self, module: &Module) -> Result<(), Vec<Diagnostic>> {
-        self.collect_declarations(module);
+        self.analyze_root_module(module, false)
+    }
+
+    pub fn analyze_as_root_module(&mut self, module: &Module) -> Result<(), Vec<Diagnostic>> {
+        self.analyze_root_module(module, true)
+    }
+
+    fn analyze_root_module(
+        &mut self,
+        module: &Module,
+        is_root: bool,
+    ) -> Result<(), Vec<Diagnostic>> {
+        self.collect_declarations(module, is_root);
+
+        self.symbol_table_stack.clear();
+        self.push_symbol_table(&self.root_symbol_table());
+
         // self.collect_initializations(ast);
         self.analyze_module(module);
+
+        self.pop_symbol_table();
 
         if self.get_errors().is_empty() {
             Ok(())
@@ -101,8 +125,8 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn collect_declarations(&mut self, module: &Module) {
-        self.declaration_analyzer.analyze(module);
+    fn collect_declarations(&mut self, module: &Module, is_root: bool) {
+        self.declaration_analyzer.analyze(module, is_root);
     }
 
     fn mark_as_used_by_name(&mut self, name: &str, span: Span) {
@@ -210,8 +234,7 @@ impl SemanticAnalyzer {
 
         self.analyze_optional_expr(&block.expression);
 
-        if let Some(symbol_table) = &self.get_symbol_table(block.id) {
-            self.report_unused_symbols(symbol_table);
+        if self.get_symbol_table(block.id).is_some() {
             self.pop_symbol_table();
         }
     }
@@ -242,8 +265,7 @@ impl SemanticAnalyzer {
             }
         }
 
-        if let Some(symbol_table) = &self.get_symbol_table(stmt.id) {
-            self.report_unused_symbols(symbol_table);
+        if self.get_symbol_table(stmt.id).is_some() {
             self.pop_symbol_table();
         }
     }
@@ -267,8 +289,7 @@ impl SemanticAnalyzer {
 
         self.analyze_block(&decl.body);
 
-        if let Some(symbol_table) = &self.get_symbol_table(decl.id) {
-            self.report_unused_symbols(symbol_table);
+        if self.get_symbol_table(decl.id).is_some() {
             self.pop_symbol_table();
         }
     }
@@ -408,8 +429,7 @@ impl SemanticAnalyzer {
                     self.analyze_pat(&arm.pattern);
                     self.analyze_expr(&arm.expression, false);
 
-                    if let Some(symbol_table) = &self.get_symbol_table(arm.id) {
-                        self.report_unused_symbols(symbol_table);
+                    if self.get_symbol_table(arm.id).is_some() {
                         self.pop_symbol_table();
                     }
                 }
@@ -421,8 +441,7 @@ impl SemanticAnalyzer {
             ExprKind::None | ExprKind::Continue | ExprKind::Literal(_) | ExprKind::Wildcard => {}
         }
 
-        if let Some(symbol_table) = &self.get_symbol_table(expr.id) {
-            self.report_unused_symbols(symbol_table);
+        if self.get_symbol_table(expr.id).is_some() {
             self.pop_symbol_table();
         }
     }
@@ -455,8 +474,7 @@ impl SemanticAnalyzer {
             self.analyze_stmt(stmt);
         }
 
-        if let Some(symbol_table) = &self.get_symbol_table(module.id) {
-            self.report_unused_symbols(symbol_table);
+        if self.get_symbol_table(module.id).is_some() {
             self.pop_symbol_table();
         }
     }

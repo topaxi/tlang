@@ -3,13 +3,13 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse! (\"let x = match 1 { Foo([bar]) => bar };\")"
 ---
 Module(
-  id: 1,
+  id: 2,
   statements: [
     Stmt(
-      id: 10,
+      id: 11,
       kind: Let(LetDeclaration(
         pattern: Pat(
-          id: 2,
+          id: 3,
           kind: Identifier(Ident(
             name: "x",
             span: Span(
@@ -37,10 +37,10 @@ Module(
           ),
         ),
         expression: Expr(
-          id: 9,
+          id: 10,
           kind: Match(MatchExpression(
             expression: Expr(
-              id: 3,
+              id: 4,
               kind: Literal(UnsignedInteger(1)),
               leading_comments: [],
               trailing_comments: [],
@@ -57,9 +57,9 @@ Module(
             ),
             arms: [
               MatchArm(
-                id: 8,
+                id: 9,
                 pattern: Pat(
-                  id: 6,
+                  id: 7,
                   kind: Enum(EnumPattern(
                     path: Path(
                       segments: [
@@ -105,10 +105,10 @@ Module(
                           ),
                         ),
                       ), Pat(
-                        id: 5,
+                        id: 6,
                         kind: List([
                           Pat(
-                            id: 4,
+                            id: 5,
                             kind: Identifier(Ident(
                               name: "bar",
                               span: Span(
@@ -166,7 +166,7 @@ Module(
                 ),
                 guard: None,
                 expression: Expr(
-                  id: 7,
+                  id: 8,
                   kind: Path(Path(
                     segments: [
                       Ident(

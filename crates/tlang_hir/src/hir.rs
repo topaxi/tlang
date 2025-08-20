@@ -777,6 +777,7 @@ pub enum BinaryOpKind {
 
 #[derive(Debug)]
 pub struct LowerResultMeta {
+    pub root_symbol_table: HirId,
     pub symbol_tables: HashMap<HirId, Rc<RefCell<tlang_ast::symbols::SymbolTable>>>,
     pub hir_id_allocator: HirIdAllocator,
     pub symbol_id_allocator: SymbolIdAllocator,

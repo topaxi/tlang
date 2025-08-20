@@ -3,15 +3,15 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse! (\"foo(bar(1), 2);\")"
 ---
 Module(
-  id: 1,
+  id: 2,
   statements: [
     Stmt(
-      id: 2,
+      id: 3,
       kind: Expr(Expr(
-        id: 8,
+        id: 9,
         kind: Call(CallExpression(
           callee: Expr(
-            id: 3,
+            id: 4,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -57,10 +57,10 @@ Module(
           ),
           arguments: [
             Expr(
-              id: 6,
+              id: 7,
               kind: Call(CallExpression(
                 callee: Expr(
-                  id: 4,
+                  id: 5,
                   kind: Path(Path(
                     segments: [
                       Ident(
@@ -106,7 +106,7 @@ Module(
                 ),
                 arguments: [
                   Expr(
-                    id: 5,
+                    id: 6,
                     kind: Literal(UnsignedInteger(1)),
                     leading_comments: [],
                     trailing_comments: [],
@@ -137,7 +137,7 @@ Module(
               ),
             ),
             Expr(
-              id: 7,
+              id: 8,
               kind: Literal(UnsignedInteger(2)),
               leading_comments: [],
               trailing_comments: [],

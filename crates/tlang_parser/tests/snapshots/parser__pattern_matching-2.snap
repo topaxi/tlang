@@ -3,15 +3,15 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse!\n(r\"\n        match foo; {\n            [] => Ok(bar),\n            [bar, ...baz] => Ok(qux),\n            _ => Err(error),\n        }\n        \")"
 ---
 Module(
-  id: 1,
+  id: 2,
   statements: [
     Stmt(
-      id: 2,
+      id: 3,
       kind: Expr(Expr(
-        id: 22,
+        id: 23,
         kind: Match(MatchExpression(
           expression: Expr(
-            id: 3,
+            id: 4,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -57,9 +57,9 @@ Module(
           ),
           arms: [
             MatchArm(
-              id: 8,
+              id: 9,
               pattern: Pat(
-                id: 4,
+                id: 5,
                 kind: List([]),
                 leading_comments: [],
                 trailing_comments: [],
@@ -76,10 +76,10 @@ Module(
               ),
               guard: None,
               expression: Expr(
-                id: 7,
+                id: 8,
                 kind: Call(CallExpression(
                   callee: Expr(
-                    id: 5,
+                    id: 6,
                     kind: Path(Path(
                       segments: [
                         Ident(
@@ -125,7 +125,7 @@ Module(
                   ),
                   arguments: [
                     Expr(
-                      id: 6,
+                      id: 7,
                       kind: Path(Path(
                         segments: [
                           Ident(
@@ -186,12 +186,12 @@ Module(
               ),
             ),
             MatchArm(
-              id: 16,
+              id: 17,
               pattern: Pat(
-                id: 12,
+                id: 13,
                 kind: List([
                   Pat(
-                    id: 9,
+                    id: 10,
                     kind: Identifier(Ident(
                       name: "bar",
                       span: Span(
@@ -219,9 +219,9 @@ Module(
                     ),
                   ),
                   Pat(
-                    id: 10,
+                    id: 11,
                     kind: Rest(Pat(
-                      id: 11,
+                      id: 12,
                       kind: Identifier(Ident(
                         name: "baz",
                         span: Span(
@@ -277,10 +277,10 @@ Module(
               ),
               guard: None,
               expression: Expr(
-                id: 15,
+                id: 16,
                 kind: Call(CallExpression(
                   callee: Expr(
-                    id: 13,
+                    id: 14,
                     kind: Path(Path(
                       segments: [
                         Ident(
@@ -326,7 +326,7 @@ Module(
                   ),
                   arguments: [
                     Expr(
-                      id: 14,
+                      id: 15,
                       kind: Path(Path(
                         segments: [
                           Ident(
@@ -387,9 +387,9 @@ Module(
               ),
             ),
             MatchArm(
-              id: 21,
+              id: 22,
               pattern: Pat(
-                id: 17,
+                id: 18,
                 kind: Wildcard,
                 leading_comments: [],
                 trailing_comments: [],
@@ -406,10 +406,10 @@ Module(
               ),
               guard: None,
               expression: Expr(
-                id: 20,
+                id: 21,
                 kind: Call(CallExpression(
                   callee: Expr(
-                    id: 18,
+                    id: 19,
                     kind: Path(Path(
                       segments: [
                         Ident(
@@ -455,7 +455,7 @@ Module(
                   ),
                   arguments: [
                     Expr(
-                      id: 19,
+                      id: 20,
                       kind: Path(Path(
                         segments: [
                           Ident(

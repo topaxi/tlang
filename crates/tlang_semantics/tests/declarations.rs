@@ -2,7 +2,7 @@ use indoc::indoc;
 use pretty_assertions::assert_eq;
 use tlang_ast::{
     NodeId,
-    node::{self, ExprKind, StmtKind},
+    node::{ExprKind, StmtKind},
     symbols::{SymbolId, SymbolInfo, SymbolType},
 };
 use tlang_parser::Parser;
@@ -37,7 +37,7 @@ fn test_analyze_variable_declaration() {
     assert_eq!(
         symbol_info,
         vec![SymbolInfo {
-            node_id: Some(NodeId::new(2)),
+            node_id: Some(NodeId::new(3)),
             hir_id: None,
             id: SymbolId::new(2),
             name: "a".into(),
@@ -74,13 +74,13 @@ fn test_block_scope() {
 
     let program_symbols = analyzer
         .get_symbol_table(ast.id)
-        .clone()
-        .expect("Program to have a symbol_table");
+        .expect("Program to have a symbol_table")
+        .clone();
 
     assert_eq!(
         program_symbols.borrow().get_by_name("a"),
         vec![SymbolInfo {
-            node_id: Some(NodeId::new(2)),
+            node_id: Some(NodeId::new(3)),
             hir_id: None,
             id: SymbolId::new(2),
             name: "a".into(),
@@ -124,7 +124,7 @@ fn test_block_scope() {
     assert_eq!(
         block1_symbols.borrow().get_by_name("a"),
         vec![SymbolInfo {
-            node_id: Some(NodeId::new(2)),
+            node_id: Some(NodeId::new(3)),
             hir_id: None,
             id: SymbolId::new(2),
             name: "a".into(),
@@ -152,7 +152,7 @@ fn test_block_scope() {
     assert_eq!(
         block1_symbols.borrow().get_by_name("b"),
         vec![SymbolInfo {
-            node_id: Some(NodeId::new(7)),
+            node_id: Some(NodeId::new(8)),
             hir_id: None,
             id: SymbolId::new(3),
             name: "b".into(),
@@ -198,7 +198,7 @@ fn test_block_scope() {
     assert_eq!(
         block2_symbols.borrow().get_by_name("a"),
         vec![SymbolInfo {
-            node_id: Some(NodeId::new(2)),
+            node_id: Some(NodeId::new(3)),
             hir_id: None,
             id: SymbolId::new(2),
             name: "a".into(),
@@ -226,7 +226,7 @@ fn test_block_scope() {
     assert_eq!(
         block2_symbols.borrow().get_by_name("b"),
         vec![SymbolInfo {
-            node_id: Some(NodeId::new(7)),
+            node_id: Some(NodeId::new(8)),
             hir_id: None,
             id: SymbolId::new(3),
             name: "b".into(),
@@ -254,7 +254,7 @@ fn test_block_scope() {
     assert_eq!(
         block2_symbols.borrow().get_by_name("c"),
         vec![SymbolInfo {
-            node_id: Some(NodeId::new(12)),
+            node_id: Some(NodeId::new(13)),
             hir_id: None,
             id: SymbolId::new(4),
             name: "c".into(),
@@ -297,7 +297,7 @@ fn test_should_collect_function_definitions() {
     assert_eq!(
         program_symbols.borrow().get_by_name("add"),
         vec![SymbolInfo {
-            node_id: Some(NodeId::new(10)),
+            node_id: Some(NodeId::new(11)),
             hir_id: None,
             id: SymbolId::new(2),
             name: "add".into(),
@@ -331,7 +331,7 @@ fn test_should_collect_list_destructuring_symbols_in_function_arguments() {
     assert_eq!(
         program_symbols.borrow().get_by_name("add"),
         vec![SymbolInfo {
-            node_id: Some(NodeId::new(11)),
+            node_id: Some(NodeId::new(12)),
             hir_id: None,
             id: SymbolId::new(2),
             name: "add".into(),
@@ -365,7 +365,7 @@ fn test_should_collect_list_destructuring_with_rest_symbols_in_function_argument
     assert_eq!(
         program_symbols.borrow().get_by_name("sum"),
         vec![SymbolInfo {
-            node_id: Some(NodeId::new(14)),
+            node_id: Some(NodeId::new(15)),
             hir_id: None,
             id: SymbolId::new(2),
             name: "sum".into(),
@@ -399,7 +399,7 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
         program_symbols.borrow().get_by_name("factorial"),
         vec![
             SymbolInfo {
-                node_id: Some(NodeId::new(8)),
+                node_id: Some(NodeId::new(9)),
                 hir_id: None,
                 id: SymbolId::new(2),
                 name: "factorial".into(),
@@ -421,7 +421,7 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
                 used: false,
             },
             SymbolInfo {
-                node_id: Some(NodeId::new(23)),
+                node_id: Some(NodeId::new(24)),
                 hir_id: None,
                 id: SymbolId::new(5),
                 name: "factorial".into(),
@@ -467,7 +467,7 @@ fn should_collect_function_arguments_with_enum_extraction() {
         program_symbols.borrow().get_by_name("unwrap"),
         vec![
             SymbolInfo {
-                node_id: Some(NodeId::new(14)),
+                node_id: Some(NodeId::new(15)),
                 hir_id: None,
                 id: SymbolId::new(5),
                 name: "unwrap".into(),
@@ -489,7 +489,7 @@ fn should_collect_function_arguments_with_enum_extraction() {
                 used: false
             },
             SymbolInfo {
-                node_id: Some(NodeId::new(21)),
+                node_id: Some(NodeId::new(22)),
                 hir_id: None,
                 id: SymbolId::new(7),
                 name: "unwrap".into(),
@@ -532,7 +532,7 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
         program_symbols.borrow().get_by_name("used_fn"),
         vec![
             SymbolInfo {
-                node_id: Some(NodeId::new(4)),
+                node_id: Some(NodeId::new(5)),
                 hir_id: None,
                 id: SymbolId::new(2),
                 name: "used_fn".into(),
@@ -554,7 +554,7 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
                 used: true,
             },
             SymbolInfo {
-                node_id: Some(NodeId::new(8)),
+                node_id: Some(NodeId::new(9)),
                 hir_id: None,
                 id: SymbolId::new(4),
                 name: "used_fn".into(),
