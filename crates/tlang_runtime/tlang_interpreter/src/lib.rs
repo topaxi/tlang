@@ -88,7 +88,7 @@ impl Interpreter {
             .collect::<Vec<_>>()
     }
 
-    fn builtin_const_symbols() -> &'static [(&'static str, tlang_ast::symbols::SymbolType)] {
+    const fn builtin_const_symbols() -> &'static [(&'static str, tlang_ast::symbols::SymbolType)] {
         &[("math::pi", tlang_ast::symbols::SymbolType::Variable)]
     }
 
