@@ -149,18 +149,18 @@ impl Interpreter {
         self.state.panic(message)
     }
 
-    pub fn create_native_fn<F>(&mut self, f: F) -> TlangValue
+    pub fn create_native_fn<F>(&mut self, name: &str, f: F) -> TlangValue
     where
         F: Fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn + 'static,
     {
-        self.state.new_native_fn(f)
+        self.state.new_native_fn(name, f)
     }
 
     pub fn define_native_fn<F>(&mut self, name: &str, f: F) -> TlangValue
     where
         F: Fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn + 'static,
     {
-        let fn_object = self.create_native_fn(f);
+        let fn_object = self.create_native_fn(name, f);
 
         debug!("Defining global native function: {name}");
 
@@ -785,7 +785,7 @@ impl Interpreter {
         };
         let variants = decl.variants.clone();
 
-        self.create_native_fn(move |state, args| {
+        self.create_native_fn(&(name.clone() + "/*"), move |state, args| {
             let variant = variants.iter().find_map(|(arity, hir_id)| {
                 if *arity == args.len() {
                     Some(*hir_id)
@@ -960,6 +960,12 @@ impl Interpreter {
             let fn_hir_id = match tail_call.callee {
                 TlangValue::Object(obj) => match self.get_object_by_id(obj) {
                     TlangObjectKind::Fn(hir_id) => *hir_id,
+                    TlangObjectKind::NativeFn => {
+                        self.panic(format!(
+                            "`{:?}` is a native function, cannot tail call",
+                            self.state.stringify(tail_call.callee)
+                        ));
+                    }
                     _ => self.panic(format!(
                         "`{:?}` is not a function",
                         self.state.stringify(tail_call.callee)
@@ -1026,7 +1032,7 @@ impl Interpreter {
             call_expr.arguments
         );
 
-        let fn_object = self.create_native_fn(move |_, args| {
+        let fn_object = self.create_native_fn("anonymous", move |_, args| {
             let mut applied_args = applied_args.clone();
             // For each arg in args, replace a hole (Nil) from the already applied args
             for arg in args {

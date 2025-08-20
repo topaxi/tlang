@@ -14,7 +14,7 @@ pub fn define_option_shape(state: &mut InterpreterState) {
 
     method_map.insert(
         "is_some".to_string(),
-        state.new_native_method(|state, this, _args| {
+        state.new_native_method("Option::is_some", |state, this, _args| {
             let this = state.get_enum(this).unwrap();
 
             NativeFnReturn::Return(TlangValue::from(this.variant == 0))
@@ -23,7 +23,7 @@ pub fn define_option_shape(state: &mut InterpreterState) {
 
     method_map.insert(
         "is_none".to_string(),
-        state.new_native_method(|state, this, _args| {
+        state.new_native_method("Option::is_none", |state, this, _args| {
             let this = state.get_enum(this).unwrap();
 
             NativeFnReturn::Return(TlangValue::from(this.variant == 1))
@@ -32,7 +32,7 @@ pub fn define_option_shape(state: &mut InterpreterState) {
 
     method_map.insert(
         "unwrap".to_string(),
-        state.new_native_method(|state, this, _args| {
+        state.new_native_method("Option::unwrap", |state, this, _args| {
             let this = state.get_enum(this).unwrap();
 
             if this.variant == 1 {
