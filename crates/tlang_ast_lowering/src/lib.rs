@@ -162,6 +162,29 @@ impl LoweringContext {
         self.scope().borrow_mut().insert(symbol_info);
     }
 
+    pub(crate) fn define_symbol_after(
+        &mut self,
+        hir_id: HirId,
+        name: &str,
+        symbol_type: ast::symbols::SymbolType,
+        scope_start: LineColumn,
+        predicate: impl Fn(&ast::symbols::SymbolInfo) -> bool,
+    ) {
+        let symbol_info = ast::symbols::SymbolInfo::new(
+            self.symbol_id_allocator.next_id(),
+            name,
+            symbol_type,
+            Default::default(),
+            scope_start,
+        )
+        .with_hir_id(hir_id)
+        .as_temp();
+
+        self.scope()
+            .borrow_mut()
+            .insert_after(symbol_info, predicate);
+    }
+
     #[inline(always)]
     pub(crate) fn expr(&mut self, span: tlang_span::Span, kind: hir::ExprKind) -> hir::Expr {
         hir::Expr {

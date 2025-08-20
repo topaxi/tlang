@@ -16,6 +16,8 @@ impl<'hir> Visitor<'hir> for SlotAllocator {
 
     fn enter_scope(&mut self, hir_id: hir::HirId, ctx: &mut Self::Context) {
         if ctx.symbols.contains_key(&hir_id) {
+            debug!("Entering scope for: {:?}", hir_id);
+
             ctx.current_scope = hir_id;
             self.scopes.push(hir_id);
         }
@@ -23,6 +25,8 @@ impl<'hir> Visitor<'hir> for SlotAllocator {
 
     fn leave_scope(&mut self, hir_id: hir::HirId, ctx: &mut Self::Context) {
         if ctx.symbols.contains_key(&hir_id) {
+            debug!("Leaving scope for: {:?}", hir_id);
+
             let left_scope = self.scopes.pop();
             debug_assert!(left_scope == Some(hir_id), "Mismatched scope exit");
 
@@ -70,20 +74,18 @@ impl<'hir> Visitor<'hir> for SlotAllocator {
             .get_slot(|s| s.hir_id == path.res.hir_id());
 
         if let Some(slot) = slot {
-            debug!("Assigning path '{}' to slot {:?}", path, slot);
+            debug!("Assigning path '{}' to slot {:?}", path, slot,);
 
             path.res.set_slot(slot.into());
         } else {
             // TODO: Builtin symbols do not have a HirId, we should handle/resolve these somehow.
             warn!(
-                "No symbols found for path '{}' (res.hir_id = {:?}) on line {}. Available symbols: {:#?}",
+                "No symbols found for path '{}' (res.hir_id = {:?}) on line {}.\nCurrent scope: {:?}\nAvailable symbols: {:#?}",
                 path,
                 path.res.hir_id(),
                 path.span.start,
-                symbol_table
-                    .borrow()
-                    .get_all_declared_local_symbols()
-                    .collect::<Vec<_>>()
+                ctx.current_scope,
+                symbol_table.borrow().get_all_declared_symbols()
             );
         }
     }

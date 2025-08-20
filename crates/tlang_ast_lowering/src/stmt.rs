@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use log::debug;
 use tlang_ast as ast;
 use tlang_ast::node::{FunctionDeclaration, Ident, LetDeclaration};
+use tlang_ast::symbols::SymbolType;
 use tlang_hir::hir;
 
 use crate::LoweringContext;
@@ -183,6 +184,15 @@ impl LoweringContext {
                 variants: fn_variant_ids,
             };
 
+            let last_decl_id = decls.last().map(|d| d.id);
+            self.define_symbol_after(
+                dyn_fn_decl.hir_id,
+                &first_declaration.name(),
+                SymbolType::Variable, // TODO, add symbol type for dyn dispatch functions
+                first_declaration.span.start,
+                |symbol| symbol.node_id == last_decl_id,
+            );
+
             grouped_decls.push(hir::Stmt {
                 hir_id: self.unique_id(),
                 kind: hir::StmtKind::DynFunctionDeclaration(Box::new(dyn_fn_decl)),
@@ -303,6 +313,22 @@ impl LoweringContext {
                 })
                 .collect::<Vec<_>>();
 
+            this.define_symbol(
+                hir_id,
+                &first_declaration.name(),
+                SymbolType::FunctionSelfRef(params.len() as u16),
+                first_declaration.span.start,
+            );
+
+            for param in &params {
+                this.define_symbol(
+                    param.hir_id,
+                    param.name.as_str(),
+                    SymbolType::Parameter,
+                    param.span.start,
+                );
+            }
+
             let match_value = if params.len() > 1 {
                 let argument_list = hir::ExprKind::List(
                     params
@@ -387,6 +413,11 @@ impl LoweringContext {
         );
 
         self.with_scope(decl.id, |this| {
+            // Remove the first declaration within the current scope, as in the AST
+            // this was the function refering to itself, but we are here in a match arm
+            // now.
+            this.current_symbol_table.borrow_mut().shift();
+
             // Mapping argument pattern and signature guard into a match arm
             let pat = if decl.parameters.len() > 1 {
                 let params = decl

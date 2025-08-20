@@ -121,15 +121,69 @@ fn test_variadic_fn_res() {
             ("fac/2".to_string(), hir::Slot::Upvar(1, 1)),
             // fac/2 definition on line 2
             ("fac/2".to_string(), hir::Slot::Local(1)),
-            // first match, returns acc
-            ("acc".to_string(), hir::Slot::Local(1)),
-            // second match, calls fac(n - 1, n * acc)
-            ("n".to_string(), hir::Slot::Local(1)),
+            // match [n, acc]
             ("n".to_string(), hir::Slot::Local(1)),
             ("acc".to_string(), hir::Slot::Local(2)),
-            ("fac/2".to_string(), hir::Slot::Local(0)),
-            // TODO: Where is this coming from?
-            //("fac".to_string(), hir::Slot::Local(1)),
+            // first match returns acc
+            ("acc".to_string(), hir::Slot::Local(0)),
+            // second match, calls fac(n - 1, n * acc)
+            ("n".to_string(), hir::Slot::Local(0)),
+            ("n".to_string(), hir::Slot::Local(0)),
+            ("acc".to_string(), hir::Slot::Local(1)),
+            ("fac/2".to_string(), hir::Slot::Upvar(0, 1)),
+            // the dynamic dispatch definition
+            ("fac".to_string(), hir::Slot::Local(3)),
+        ]
+    );
+
+    //match hir.block.stmts[0].kind {
+    //    hir::StmtKind::FunctionDeclaration(ref fn_decl) => {
+    //        assert_eq!(fn_decl.locals(), 2);
+    //        assert_eq!(fn_decl.upvars(), 1);
+    //    }
+    //    _ => unreachable!(),
+    //}
+
+    //match hir.block.stmts[1].kind {
+    //    hir::StmtKind::FunctionDeclaration(ref fn_decl) => {
+    //        assert_eq!(fn_decl.locals(), 3);
+    //        assert_eq!(fn_decl.upvars(), 0);
+    //    }
+    //    _ => unreachable!(),
+    //}
+}
+
+#[test]
+fn test_variadic_fn_res_with_list_pat() {
+    let mut hir = compile(
+        r#"
+            fn rs(str) { rs(str, "") }
+            fn rs("", acc) { acc }
+            fn rs([x, ...xs], acc) { rec rs(xs, x + acc) }
+        "#,
+    );
+
+    assert_eq!(
+        collect_slots(&mut hir),
+        vec![
+            // rs/1 definition on line 1
+            ("rs/1".to_string(), hir::Slot::Local(0)),
+            ("str".to_string(), hir::Slot::Local(1)),
+            ("rs/2".to_string(), hir::Slot::Upvar(1, 1)),
+            // rs/2 definition on line 2
+            ("rs/2".to_string(), hir::Slot::Local(1)),
+            // match [str, acc]
+            ("str".to_string(), hir::Slot::Local(1)),
+            ("acc".to_string(), hir::Slot::Local(2)),
+            // first match returns acc
+            ("acc".to_string(), hir::Slot::Local(0)),
+            // second match, calls rs(xs, x + acc)
+            ("xs".to_string(), hir::Slot::Local(1)),
+            ("x".to_string(), hir::Slot::Local(0)),
+            ("acc".to_string(), hir::Slot::Local(2)),
+            ("rs/2".to_string(), hir::Slot::Upvar(0, 1)),
+            // the dynamic dispatch definition
+            ("rs".to_string(), hir::Slot::Local(3)),
         ]
     );
 
@@ -246,7 +300,7 @@ fn test_enum_res() {
             fn Foo.qux(Foo::Bar(x)) { x }
             fn Foo.qux(Foo::Baz(x)) { x }
 
-            fn foo() {
+            fn bar() {
                 Foo::Bar(1).qux()
             }
         "#,
@@ -256,11 +310,12 @@ fn test_enum_res() {
         collect_slots(&mut hir),
         vec![
             ("Foo".to_string(), hir::Slot::Local(0)),
+            ("foo".to_string(), hir::Slot::Local(1)),
             ("Foo::Bar".to_string(), hir::Slot::Upvar(1, 2)),
-            ("x".to_string(), hir::Slot::Local(1)),
+            ("x".to_string(), hir::Slot::Local(0)),
             ("Foo::Baz".to_string(), hir::Slot::Upvar(2, 2)),
-            ("x".to_string(), hir::Slot::Local(1)),
-            ("foo".to_string(), hir::Slot::Local(5)),
+            ("x".to_string(), hir::Slot::Local(0)),
+            ("bar".to_string(), hir::Slot::Local(5)),
             ("Foo::Bar".to_string(), hir::Slot::Upvar(1, 1)),
         ]
     );

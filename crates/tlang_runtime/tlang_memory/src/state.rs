@@ -236,7 +236,7 @@ impl Resolver for InterpreterState {
             .or_else(|| self.globals.get(&path.to_string()).copied());
 
         debug!(
-            "Resolved path: {} ({:?}), got: {:?}",
+            "Resolved path: \"{}\" ({:?}), got: {:?}",
             path,
             path.res,
             value.map(|v| self.stringify(v))
@@ -592,7 +592,7 @@ impl InterpreterState {
         match value {
             TlangValue::Object(id) => match self.get_object_by_id(id) {
                 None => value.to_string(),
-                Some(TlangObjectKind::String(s)) => s.clone(),
+                Some(TlangObjectKind::String(s)) => format!("{:?}", s),
                 Some(TlangObjectKind::Struct(s)) => {
                     if s.shape() == self.builtin_shapes.list {
                         return self.stringify_struct_as_list(s);

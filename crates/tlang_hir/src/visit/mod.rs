@@ -166,6 +166,7 @@ pub fn walk_expr<'hir, V: Visitor<'hir>>(
         }
         hir::ExprKind::Break(_) => {}
         hir::ExprKind::FunctionExpression(decl) => {
+            visitor.enter_scope(decl.hir_id, ctx);
             visitor.visit_expr(&mut decl.name, ctx);
 
             for param in &mut decl.parameters {
@@ -174,6 +175,7 @@ pub fn walk_expr<'hir, V: Visitor<'hir>>(
             }
 
             visitor.visit_block(&mut decl.body, ctx);
+            visitor.leave_scope(decl.hir_id, ctx);
         }
         hir::ExprKind::Call(call_expr) | hir::ExprKind::TailCall(call_expr) => {
             for arg in &mut call_expr.arguments {

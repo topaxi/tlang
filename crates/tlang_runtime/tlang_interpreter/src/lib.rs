@@ -358,7 +358,7 @@ impl Interpreter {
             hir::ExprKind::Path(path) => {
                 EvalResult::Value(self.resolve_value(path).unwrap_or_else(|| {
                     self.panic(format!(
-                        "Could not resolve path: {} ({:?})\nCurrent scope: {}",
+                        "Could not resolve path \"{}\" ({:?})\nCurrent scope: {}",
                         path,
                         path.res,
                         self.state.debug_stringify_scope_stack()
@@ -806,7 +806,7 @@ impl Interpreter {
 
         match &decl.name.kind {
             hir::ExprKind::Path(_path) => {
-                //self.push_value(dyn_fn_object);
+                self.push_value(dyn_fn_object);
             }
             hir::ExprKind::FieldAccess(expr, ident) => {
                 let path = match &expr.kind {
@@ -960,9 +960,15 @@ impl Interpreter {
             let fn_hir_id = match tail_call.callee {
                 TlangValue::Object(obj) => match self.get_object_by_id(obj) {
                     TlangObjectKind::Fn(hir_id) => *hir_id,
-                    _ => self.panic(format!("`{:?}` is not a function", tail_call.callee)),
+                    _ => self.panic(format!(
+                        "`{:?}` is not a function",
+                        self.state.stringify(tail_call.callee)
+                    )),
                 },
-                _ => self.panic(format!("`{:?}` is not a function", tail_call.callee)),
+                _ => self.panic(format!(
+                    "`{:?}` is not a function",
+                    self.state.stringify(tail_call.callee)
+                )),
             };
 
             // Optimized for self referencial tail calls, if we are calling the same function,

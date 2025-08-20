@@ -371,15 +371,13 @@ impl DeclarationAnalyzer {
         self.push_symbol_table(decl.id);
         let name_as_str = decl.name();
 
-        if name_as_str != "anonymous" {
-            self.declare_symbol(
-                decl.id,
-                &name_as_str,
-                SymbolType::Function(decl.parameters.len() as u16),
-                decl.name.span,
-                decl.name.span.end,
-            );
-        }
+        self.declare_symbol(
+            decl.id,
+            &name_as_str,
+            SymbolType::FunctionSelfRef(decl.parameters.len() as u16),
+            decl.name.span,
+            decl.name.span.end,
+        );
 
         self.collect_declarations_from_fn(decl);
         self.pop_symbol_table();

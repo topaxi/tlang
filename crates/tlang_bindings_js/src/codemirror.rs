@@ -47,12 +47,12 @@ pub fn from_tlang_diagnostic(src: &str, diagnostic: &Diagnostic) -> CodemirrorDi
         line_column_to_offset(
             src,
             diagnostic.span().start.line,
-            diagnostic.span().start.column - 1,
+            diagnostic.span().start.column.saturating_sub(1),
         ),
         line_column_to_offset(
             src,
             diagnostic.span().end.line,
-            diagnostic.span().end.column - 1,
+            diagnostic.span().end.column.saturating_sub(1),
         ),
     )
 }

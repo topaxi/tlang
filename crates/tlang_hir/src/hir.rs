@@ -173,6 +173,7 @@ impl Res {
                 | BindingKind::Param
                 | BindingKind::Closure
                 | BindingKind::Field
+                | BindingKind::Variant // variants can be used as values
                 | BindingKind::Unknown
         )
     }

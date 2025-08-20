@@ -317,16 +317,31 @@ impl SymbolTable {
         has_fn
     }
 
+    pub fn shift(&mut self) {
+        // TODO: Maybe we shouldn't remove symbols...
+        //       This is used to remove the fn self binding from the table when within an
+        //       match arm (during lowering).
+        self.symbols.remove(0);
+    }
+
     pub fn insert(&mut self, symbol_info: SymbolInfo) {
         debug!("Inserting symbol: {:?}", symbol_info);
 
         self.symbols.push(symbol_info);
     }
 
-    pub fn insert_beginning(&mut self, symbol_info: SymbolInfo) {
-        debug!("Inserting symbol at beginning: {:?}", symbol_info);
+    pub fn insert_after(
+        &mut self,
+        symbol_info: SymbolInfo,
+        predicate: impl Fn(&SymbolInfo) -> bool,
+    ) {
+        debug!("Inserting symbol after predicate: {:?}", symbol_info);
 
-        self.symbols.insert(0, symbol_info);
+        if let Some(index) = self.symbols.iter().position(&predicate) {
+            self.symbols.insert(index + 1, symbol_info);
+        } else {
+            self.symbols.push(symbol_info);
+        }
     }
 
     pub fn mark_as_used(&mut self, id: SymbolId) {
