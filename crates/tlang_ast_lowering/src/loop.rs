@@ -12,16 +12,19 @@ impl LoweringContext {
 
     pub(crate) fn lower_for_loop(&mut self, for_loop: &ast::node::ForLoop) -> hir::ExprKind {
         let block = self.with_scope(for_loop.id, |this| {
-            let hir_id = this.unique_id();
+            let iterator_binding_hir_id = this.unique_id();
             let iterator_binding_name = Ident::new("iterator$$", Default::default());
             this.define_symbol(
-                hir_id,
+                iterator_binding_hir_id,
                 iterator_binding_name.as_str(),
                 SymbolType::Variable,
                 Default::default(),
             );
             let iterator_binding_pat = hir::Pat {
-                kind: hir::PatKind::Identifier(hir_id, Box::new(iterator_binding_name.clone())),
+                kind: hir::PatKind::Identifier(
+                    iterator_binding_hir_id,
+                    Box::new(iterator_binding_name.clone()),
+                ),
                 span: Default::default(),
             };
 
@@ -74,7 +77,16 @@ impl LoweringContext {
             );
 
             let loop_block = this.with_scope(for_loop.block.id, |this| {
-                this.lower_for_loop_body(for_loop, iterator_binding_name, &accumulator_binding_name)
+                let mut iterator_binding_path = hir::Path::new(
+                    vec![hir::PathSegment::new(iterator_binding_name)],
+                    Default::default(),
+                );
+
+                iterator_binding_path
+                    .res
+                    .set_hir_id(iterator_binding_hir_id);
+
+                this.lower_for_loop_body(for_loop, iterator_binding_path, &accumulator_binding_name)
             });
 
             let loop_expr = this.expr(
@@ -112,21 +124,17 @@ impl LoweringContext {
     fn lower_for_loop_body(
         &mut self,
         for_loop: &ast::node::ForLoop,
-        iterator_binding_name: Ident,
+        iterator_binding_path: hir::Path,
         accumulator_binding_name: &Ident,
     ) -> hir::Block {
-        let iterator_binding = self.expr(
+        let iterator_binding_expr = self.expr(
             Default::default(),
-            hir::ExprKind::Path(Box::new(hir::Path::new(
-                vec![hir::PathSegment::new(iterator_binding_name)],
-                Default::default(),
-            ))),
+            hir::ExprKind::Path(Box::new(iterator_binding_path)),
         );
-
         let iterator_next_field = self.expr(
             Default::default(),
             hir::ExprKind::FieldAccess(
-                Box::new(iterator_binding),
+                Box::new(iterator_binding_expr),
                 Ident::new("next", Default::default()),
             ),
         );

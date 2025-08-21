@@ -89,7 +89,10 @@ impl Interpreter {
     }
 
     const fn builtin_const_symbols() -> &'static [(&'static str, tlang_ast::symbols::SymbolType)] {
-        &[("math::pi", tlang_ast::symbols::SymbolType::Variable)]
+        &[
+            ("Option::None", tlang_ast::symbols::SymbolType::EnumVariant),
+            ("math::pi", tlang_ast::symbols::SymbolType::Variable),
+        ]
     }
 
     pub fn builtin_symbols() -> Vec<(String, tlang_ast::symbols::SymbolType)> {

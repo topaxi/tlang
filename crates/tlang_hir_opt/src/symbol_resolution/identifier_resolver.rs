@@ -61,6 +61,8 @@ impl IdentifierResolver {
             });
 
         if let Some(symbol_info) = symbol_info {
+            path.res.set_binding_kind(symbol_info.symbol_type.into());
+
             if let Some(hir_id) = symbol_info.hir_id {
                 debug!(
                     "Resolved path '{}' on line {} to {:?}",
@@ -68,7 +70,6 @@ impl IdentifierResolver {
                 );
 
                 path.res.set_hir_id(hir_id);
-                path.res.set_binding_kind(symbol_info.symbol_type.into());
             } else if symbol_info.is_builtin() {
                 debug!(
                     "Path '{}' on line {} is a builtin symbol, skipping resolution.",
