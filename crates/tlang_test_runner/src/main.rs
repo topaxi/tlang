@@ -19,7 +19,7 @@ impl Backend {
     }
 
     fn values() -> impl Iterator<Item = Backend> {
-        vec![Backend::Interpreter, Backend::JavaScript].into_iter()
+        [Backend::Interpreter, Backend::JavaScript].into_iter()
     }
 }
 

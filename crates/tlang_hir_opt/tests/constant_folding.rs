@@ -108,7 +108,7 @@ fn constant_folding_mutable_variable() {
             (i = (i + 1));
         };
         i
-    };
+    }
     println(loop_test());
     "###);
 }

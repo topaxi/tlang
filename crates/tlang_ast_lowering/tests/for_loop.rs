@@ -31,7 +31,7 @@ fn test_lower_for_loop_on_list_simple() {
                 }
             }
         }
-    };
+    }
     "###);
 }
 
@@ -67,7 +67,7 @@ fn test_lower_for_loop_on_list_with_accumulator() {
             }
         };
         log(sum);
-    };
+    }
     "###);
 }
 
@@ -110,6 +110,6 @@ fn test_lower_for_loop_on_list_with_accumulator_pat() {
             }
         };
         log(even_odd);
-    };
+    }
     "###);
 }

@@ -69,8 +69,7 @@ impl SlotAllocator {
 
             path.res.set_slot(slot.into());
         } else {
-            // TODO: Builtin symbols do not have a HirId, we should handle/resolve these somehow.
-            warn!(
+            debug!(
                 "No symbols found for path '{}' (res.hir_id = {:?}) on line {}.\nCurrent scope: {:?}\nAvailable symbols: {:#?}",
                 path,
                 path.res.hir_id(),

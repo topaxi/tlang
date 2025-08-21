@@ -169,12 +169,19 @@ impl HirPretty {
 
         match &stmt.kind {
             hir::StmtKind::EnumDeclaration(decl) => self.print_enum_declaration(decl),
-            hir::StmtKind::Expr(expr) => self.print_expr(expr),
+            hir::StmtKind::Expr(expr) => {
+                self.print_expr(expr);
+                self.push_char(';');
+            }
             hir::StmtKind::FunctionDeclaration(decl) => self.print_function_declaration(decl),
             hir::StmtKind::DynFunctionDeclaration(decl) => {
                 self.print_dyn_function_declaration(decl);
+                self.push_char(';');
             }
-            hir::StmtKind::Let(pat, expr, ty) => self.print_variable_declaration(pat, expr, ty),
+            hir::StmtKind::Let(pat, expr, ty) => {
+                self.print_variable_declaration(pat, expr, ty);
+                self.push_char(';');
+            }
             hir::StmtKind::Return(expr) => {
                 self.push_str("return");
 
@@ -182,11 +189,12 @@ impl HirPretty {
                     self.push_str(" ");
                     self.print_expr(expr);
                 }
+
+                self.push_char(';');
             }
             hir::StmtKind::StructDeclaration(decl) => self.print_struct_declaration(decl),
         }
 
-        self.push_char(';');
         self.push_newline();
         self.print_comments(&stmt.trailing_comments);
     }
@@ -232,14 +240,20 @@ impl HirPretty {
     fn print_struct_declaration(&mut self, decl: &hir::StructDeclaration) {
         self.push_str("struct ");
         self.print_ident(&decl.name);
-        self.push_str(" {");
-        self.push_newline();
-        self.inc_indent();
-        for field in &decl.fields {
-            self.print_struct_field(field);
+        if self.options.print_ids {
+            self.push_char('#');
+            self.push_str(&decl.hir_id.to_string());
         }
-        self.dec_indent();
-        self.push_indent();
+        self.push_str(" {");
+        if !decl.fields.is_empty() {
+            self.push_newline();
+            self.inc_indent();
+            for field in &decl.fields {
+                self.print_struct_field(field);
+            }
+            self.dec_indent();
+            self.push_indent();
+        }
         self.push_char('}');
         self.push_newline();
     }
