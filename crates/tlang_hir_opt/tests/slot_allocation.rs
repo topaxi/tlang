@@ -82,8 +82,6 @@ fn test_self_referal_reserves_local_slot() {
     );
     let paths = collect_paths(&mut hir);
 
-    println!("paths: {:#?}", paths);
-
     // path 0 is the function declaration name `foo`
 
     // path 1 is the `a` in the call expression, it points to the a fn param (hir 2)

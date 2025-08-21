@@ -815,9 +815,12 @@ impl Interpreter {
     fn eval_dyn_fn_decl(&mut self, decl: &hir::DynFunctionDeclaration) {
         let dyn_fn_object = self.create_dyn_fn_object(decl);
 
+        self.push_value(dyn_fn_object);
+
         match &decl.name.kind {
-            hir::ExprKind::Path(_path) => {
-                self.push_value(dyn_fn_object);
+            hir::ExprKind::Path(path) => {
+                // Used for static struct method resolution, for now..
+                self.state.set_global(path.to_string(), dyn_fn_object);
             }
             hir::ExprKind::FieldAccess(expr, ident) => {
                 let path = match &expr.kind {
