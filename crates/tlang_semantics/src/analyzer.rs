@@ -137,7 +137,12 @@ impl SemanticAnalyzer {
     }
 
     fn collect_declarations(&mut self, module: &Module, is_root: bool) {
-        self.declaration_context = Some(self.declaration_analyzer.analyze(module, is_root));
+        // If we already have a context with builtin symbols, reuse it
+        if let Some(ref mut ctx) = self.declaration_context {
+            self.declaration_analyzer.analyze_with_context(module, is_root, ctx);
+        } else {
+            self.declaration_context = Some(self.declaration_analyzer.analyze(module, is_root));
+        }
     }
 
     fn mark_as_used_by_name(&mut self, name: &str, span: Span) {

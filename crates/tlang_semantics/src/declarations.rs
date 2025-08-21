@@ -123,12 +123,16 @@ impl DeclarationAnalyzer {
 
     pub fn analyze(&mut self, module: &Module, is_root: bool) -> DeclarationContext {
         let mut ctx = DeclarationContext::new();
-        
+        self.analyze_with_context(module, is_root, &mut ctx);
+        ctx
+    }
+
+    pub fn analyze_with_context(&mut self, module: &Module, is_root: bool, ctx: &mut DeclarationContext) {
         if !is_root {
             ctx.push_symbol_table(module.id);
         }
 
-        self.visit_module(module, &mut ctx);
+        self.visit_module(module, ctx);
 
         if !is_root {
             ctx.pop_symbol_table();
@@ -137,8 +141,6 @@ impl DeclarationAnalyzer {
         // After collecting all declarations, we should be left with the root symbol table on the
         // symbol table stack.
         debug_assert_eq!(ctx.symbol_table_stack.len(), 1);
-
-        ctx
     }
 }
 
@@ -159,6 +161,14 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
 
     fn visit_stmt(&mut self, stmt: &'ast Stmt, ctx: &mut Self::Context) {
         match &stmt.kind {
+            StmtKind::FunctionDeclaration(decl) => {
+                self.visit_fn_decl(decl, ctx);
+            }
+            StmtKind::FunctionDeclarations(decls) => {
+                for decl in decls {
+                    self.visit_fn_decl(decl, ctx);
+                }
+            }
             StmtKind::EnumDeclaration(decl) => {
                 ctx.declare_symbol(
                     stmt.id,
@@ -195,7 +205,15 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
             _ => {}
         }
         
-        walk_stmt(self, stmt, ctx);
+        // For other statement types, use the default walker
+        if !matches!(&stmt.kind, 
+                    StmtKind::FunctionDeclaration(_) | 
+                    StmtKind::FunctionDeclarations(_) | 
+                    StmtKind::EnumDeclaration(_) | 
+                    StmtKind::StructDeclaration(_) | 
+                    StmtKind::Let(_)) {
+            walk_stmt(self, stmt, ctx);
+        }
     }
 
     fn visit_fn_decl(&mut self, declaration: &'ast FunctionDeclaration, ctx: &mut Self::Context) {
