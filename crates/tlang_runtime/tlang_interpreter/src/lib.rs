@@ -90,7 +90,10 @@ impl Interpreter {
 
     const fn builtin_const_symbols() -> &'static [(&'static str, tlang_ast::symbols::SymbolType)] {
         &[
-            ("Option::None", tlang_ast::symbols::SymbolType::EnumVariant),
+            (
+                "Option::None",
+                tlang_ast::symbols::SymbolType::EnumVariant(0),
+            ),
             ("math::pi", tlang_ast::symbols::SymbolType::Variable),
         ]
     }
@@ -1681,6 +1684,7 @@ mod tests {
     use indoc::indoc;
     use pretty_assertions::{assert_eq, assert_matches};
     use tlang_hir_opt::HirOptimizer;
+    use tlang_span::Span;
 
     #[ctor::ctor]
     fn before_all() {
@@ -1695,6 +1699,7 @@ mod tests {
         node_id_allocator: tlang_span::NodeIdAllocator,
         semantic_analyzer: tlang_semantics::SemanticAnalyzer,
         interpreter: Interpreter,
+        last_span: Span,
     }
 
     impl TestInterpreter {
@@ -1707,14 +1712,17 @@ mod tests {
                 node_id_allocator: tlang_span::NodeIdAllocator::default(),
                 semantic_analyzer,
                 interpreter,
+                last_span: Span::default(),
             }
         }
 
         fn parse_src(&mut self, src: &str) -> tlang_ast::node::Module {
             let mut parser = tlang_parser::Parser::from_source(src)
+                .with_line_offset(self.last_span.end.line + 1)
                 .set_node_id_allocator(self.node_id_allocator);
             let module = parser.parse().unwrap();
 
+            self.last_span = module.span;
             self.node_id_allocator = *parser.node_id_allocator();
 
             module
@@ -2001,16 +2009,21 @@ mod tests {
     #[test]
     fn test_enum_declaration_and_use() {
         let mut interpreter = interpreter(indoc! {"
-            enum Values {
-                One,
-                Two,
-                Three,
-            }
-        "});
+        enum Values {
+            One,
+            Two,
+            Three,
+        }
+    "});
 
-        assert_matches!(interpreter.eval("Values::One"), TlangValue::U64(0));
-        assert_matches!(interpreter.eval("Values::Two"), TlangValue::U64(1));
-        assert_matches!(interpreter.eval("Values::Three"), TlangValue::U64(2));
+        assert_matches!(
+            [
+                interpreter.eval("Values::One"),
+                interpreter.eval("Values::Two"),
+                interpreter.eval("Values::Three")
+            ],
+            [TlangValue::U64(0), TlangValue::U64(1), TlangValue::U64(2)]
+        );
     }
 
     #[test]

@@ -19,7 +19,7 @@ pub enum SymbolType {
     FunctionSelfRef(u16),
     Parameter,
     Enum,
-    EnumVariant,
+    EnumVariant(u16),
     Struct,
 }
 
@@ -40,7 +40,7 @@ impl Display for SymbolType {
             SymbolType::Function(_) | SymbolType::FunctionSelfRef(_) => write!(f, "function"),
             SymbolType::Parameter => write!(f, "parameter"),
             SymbolType::Enum => write!(f, "enum"),
-            SymbolType::EnumVariant => write!(f, "enum variant"),
+            SymbolType::EnumVariant(_) => write!(f, "enum variant"),
             SymbolType::Struct => write!(f, "struct"),
         }
     }
@@ -188,6 +188,10 @@ impl SymbolTable {
                 .iter()
                 // Builtins are currently not slotted and are looked up by name.
                 .filter(|s| !s.builtin)
+                // Enum and struct definitions do not generate a slot
+                .filter(|s| !matches!(s.symbol_type, SymbolType::Enum | SymbolType::Struct))
+                // And tagged enum variant definitions do not generate a slot
+                .filter(|s| !matches!(s.symbol_type, SymbolType::EnumVariant(len) if len > 0))
                 .position(&predicate)
             {
                 return Some((index, scope_index));

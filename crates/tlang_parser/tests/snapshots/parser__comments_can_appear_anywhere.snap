@@ -357,12 +357,12 @@ Module(
   ],
   span: Span(
     start: LineColumn(
-      line: 0,
-      column: 0,
+      line: 1,
+      column: 9,
     ),
     end: LineColumn(
-      line: 0,
-      column: 0,
+      line: 7,
+      column: 16,
     ),
   ),
 )

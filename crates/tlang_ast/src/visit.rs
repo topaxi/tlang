@@ -384,6 +384,7 @@ mod tests {
         let module = node::Module::new(
             NodeId::new(1),
             vec![node::Stmt::new(NodeId::new(2), node::StmtKind::None)],
+            Span::default(),
         );
         let mut visitor = TestVisitor { visited: vec![] };
         walk_module(&mut visitor, &module);

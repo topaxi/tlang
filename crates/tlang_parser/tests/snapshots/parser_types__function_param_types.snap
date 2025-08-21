@@ -362,7 +362,7 @@ Module(
     ),
     end: LineColumn(
       line: 0,
-      column: 0,
+      column: 35,
     ),
   ),
 )

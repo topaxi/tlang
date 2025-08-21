@@ -575,11 +575,11 @@ pub struct Module {
 }
 
 impl Module {
-    pub fn new(id: NodeId, statements: Vec<Stmt>) -> Self {
+    pub fn new(id: NodeId, statements: Vec<Stmt>, span: Span) -> Self {
         Module {
             id,
             statements,
-            span: Span::default(),
+            span,
         }
     }
 }

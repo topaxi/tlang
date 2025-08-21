@@ -32,6 +32,10 @@ impl Lexer<'_> {
         }
     }
 
+    pub fn set_line_offset(&mut self, line: u32) {
+        self.current_line = line;
+    }
+
     pub fn current_line(&self) -> u32 {
         self.current_line
     }

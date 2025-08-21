@@ -33,6 +33,24 @@ impl SlotAllocator {
             return;
         }
 
+        if path.res.binding_kind() == hir::BindingKind::Enum {
+            debug!(
+                "Path '{}' on line {} is an enum definition, skipping slot assignment.",
+                path, path.span.start,
+            );
+
+            return;
+        }
+
+        if path.res.binding_kind() == hir::BindingKind::Struct {
+            debug!(
+                "Path '{}' on line {} is a struct definition, skipping slot assignment.",
+                path, path.span.start,
+            );
+
+            return;
+        }
+
         if path.res.hir_id().is_none() {
             warn!(
                 "Unable to assign slot for path '{}' on line {}, as it has not been resolved",

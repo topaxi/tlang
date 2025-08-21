@@ -41,6 +41,11 @@ impl<'src> Parser<'src> {
         }
     }
 
+    pub fn with_line_offset(mut self, line_offset: u32) -> Self {
+        self.lexer.set_line_offset(line_offset);
+        self
+    }
+
     pub fn recoverable(&self) -> bool {
         self.recoverable
     }
@@ -531,7 +536,12 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_module(&mut self) -> Module {
-        Module::new(self.unique_id(), self.parse_statements(false).0)
+        let mut span = self.create_span_from_current_token();
+        let module_id = self.unique_id();
+        let statements = self.parse_statements(false).0;
+        self.end_span_from_previous_token(&mut span);
+
+        Module::new(module_id, statements, span)
     }
 
     fn parse_block(&mut self) -> Block {

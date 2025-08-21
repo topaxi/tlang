@@ -156,7 +156,7 @@ impl DeclarationAnalyzer {
                     self.declare_symbol(
                         element.id,
                         &(decl.name.to_string() + "::" + element.name.as_str()),
-                        SymbolType::EnumVariant,
+                        SymbolType::EnumVariant(element.parameters.len() as u16),
                         element.span,
                         element.span.end,
                     );

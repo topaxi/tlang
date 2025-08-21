@@ -1126,8 +1126,8 @@ Module(
       column: 0,
     ),
     end: LineColumn(
-      line: 0,
-      column: 0,
+      line: 2,
+      column: 47,
     ),
   ),
 )

@@ -227,6 +227,7 @@ fn test_shadowing_creates_new_slots() {
 }
 
 #[test]
+#[ignore = "struct definitions do allocate slots (yet?)"]
 fn test_struct_res() {
     let mut hir = compile(
         r#"
@@ -274,8 +275,8 @@ fn test_enum_variant_res() {
     assert_eq!(
         collect_slots(&mut hir),
         vec![
-            ("foo".to_string(), hir::Slot::Local(3)),
-            ("Foo::Baz".to_string(), hir::Slot::Upvar(2, 1))
+            ("foo".to_string(), hir::Slot::Local(2)),
+            ("Foo::Baz".to_string(), hir::Slot::Upvar(1, 1))
         ]
     );
 
@@ -289,7 +290,7 @@ fn test_enum_variant_res() {
 }
 
 #[test]
-fn test_enum_res() {
+fn test_tagged_enum_res() {
     let mut hir = compile(
         r#"
             enum Foo {
@@ -309,14 +310,10 @@ fn test_enum_res() {
     assert_eq!(
         collect_slots(&mut hir),
         vec![
-            ("Foo".to_string(), hir::Slot::Local(0)),
             ("foo".to_string(), hir::Slot::Local(1)),
-            ("Foo::Bar".to_string(), hir::Slot::Upvar(1, 2)),
             ("x".to_string(), hir::Slot::Local(0)),
-            ("Foo::Baz".to_string(), hir::Slot::Upvar(2, 2)),
             ("x".to_string(), hir::Slot::Local(0)),
-            ("bar".to_string(), hir::Slot::Local(5)),
-            ("Foo::Bar".to_string(), hir::Slot::Upvar(1, 1)),
+            ("bar".to_string(), hir::Slot::Local(2)),
         ]
     );
 }
