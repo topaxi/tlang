@@ -217,7 +217,7 @@ impl LoweringContext {
             let accumulator_path_expr = for_loop.acc.as_ref().map(|_| {
                 Box::new(this.expr(
                     Default::default(),
-                    hir::ExprKind::Path(Box::new(accumulator_binding_path.clone())),
+                    hir::ExprKind::Path(Box::new(accumulator_binding_path)),
                 ))
             });
 
