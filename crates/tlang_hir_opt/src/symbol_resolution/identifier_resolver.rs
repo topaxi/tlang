@@ -1,4 +1,5 @@
 use log::{debug, warn};
+use tlang_hir::visit::walk_expr;
 use tlang_hir::{Visitor, hir};
 use tlang_span::HirId;
 
@@ -10,34 +11,8 @@ pub struct IdentifierResolver {
     scopes: Vec<HirId>,
 }
 
-impl<'hir> Visitor<'hir> for IdentifierResolver {
-    type Context = HirOptContext;
-
-    fn enter_scope(&mut self, hir_id: hir::HirId, ctx: &mut Self::Context) {
-        if ctx.symbols.contains_key(&hir_id) {
-            debug!("Entering scope for: {:?}", hir_id);
-            ctx.current_scope = hir_id;
-            self.scopes.push(hir_id);
-        } else {
-            debug!(
-                "Scope skipped for: {:?}, current scope: {:?}",
-                hir_id, ctx.current_scope
-            );
-        }
-    }
-
-    fn leave_scope(&mut self, hir_id: hir::HirId, ctx: &mut Self::Context) {
-        if ctx.symbols.contains_key(&hir_id) {
-            let left_scope = self.scopes.pop();
-
-            debug!("Leaving scope for: {:?}", hir_id);
-            debug_assert!(left_scope == Some(hir_id), "Mismatched scope exit");
-
-            ctx.current_scope = self.scopes.last().copied().unwrap();
-        }
-    }
-
-    fn visit_path(&mut self, path: &'hir mut hir::Path, ctx: &mut Self::Context) {
+impl IdentifierResolver {
+    fn resolve_path(&mut self, path: &mut hir::Path, ctx: &mut HirOptContext) {
         debug!("Resolving path: '{}' on line {}", path, path.span.start);
 
         // TODO: Only visit paths which are not in declaration position (eg. function names).
@@ -85,18 +60,31 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
                 }
             });
 
-        if let Some(symbol_info) = symbol_info
-            && let Some(hir_id) = symbol_info.hir_id
-        {
-            debug!(
-                "Resolved path '{}' on line {} to {:?}",
-                path, path.span.start, hir_id
-            );
+        if let Some(symbol_info) = symbol_info {
+            if let Some(hir_id) = symbol_info.hir_id {
+                debug!(
+                    "Resolved path '{}' on line {} to {:?}",
+                    path, path.span.start, hir_id
+                );
 
-            path.res.set_hir_id(hir_id);
-            path.res.set_binding_kind(symbol_info.symbol_type.into());
+                path.res.set_hir_id(hir_id);
+                path.res.set_binding_kind(symbol_info.symbol_type.into());
+            } else if symbol_info.is_builtin() {
+                debug!(
+                    "Path '{}' on line {} is a builtin symbol, skipping resolution.",
+                    path, path.span.start
+                );
+
+                // TODO: We should probably have actual slots for the builtins and assign
+                // them in the slot allocator pass.
+                path.res.set_slot(hir::Slot::Builtin);
+            } else {
+                debug!(
+                    "Symbol '{}' on line {} has no HirId, skipping resolution.",
+                    path, path.span.start
+                );
+            }
         } else {
-            // TODO: Builtin symbols do not have a HirId, we should handle/resolve these somehow.
             warn!(
                 "No symbols found for path '{}' on line {}. Available symbols: {:#?}",
                 path,
@@ -104,6 +92,52 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
                 symbol_table.borrow().get_all_declared_symbols()
             );
         }
+    }
+}
+
+impl<'hir> Visitor<'hir> for IdentifierResolver {
+    type Context = HirOptContext;
+
+    fn enter_scope(&mut self, hir_id: hir::HirId, ctx: &mut Self::Context) {
+        if ctx.symbols.contains_key(&hir_id) {
+            debug!("Entering scope for: {:?}", hir_id);
+            ctx.current_scope = hir_id;
+            self.scopes.push(hir_id);
+        } else {
+            debug!(
+                "Scope skipped for: {:?}, current scope: {:?}",
+                hir_id, ctx.current_scope
+            );
+        }
+    }
+
+    fn leave_scope(&mut self, hir_id: hir::HirId, ctx: &mut Self::Context) {
+        if ctx.symbols.contains_key(&hir_id) {
+            let left_scope = self.scopes.pop();
+
+            debug!("Leaving scope for: {:?}", hir_id);
+            debug_assert!(left_scope == Some(hir_id), "Mismatched scope exit");
+
+            ctx.current_scope = self.scopes.last().copied().unwrap();
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
+        match &mut expr.kind {
+            hir::ExprKind::Dict(pairs) => {
+                for (key, value) in pairs.iter_mut() {
+                    if !key.is_path() {
+                        self.visit_expr(key, ctx);
+                    }
+                    self.visit_expr(value, ctx);
+                }
+            }
+            _ => walk_expr(self, expr, ctx),
+        }
+    }
+
+    fn visit_path(&mut self, path: &'hir mut hir::Path, ctx: &mut Self::Context) {
+        self.resolve_path(path, ctx);
     }
 }
 

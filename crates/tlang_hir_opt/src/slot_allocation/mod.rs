@@ -11,6 +11,59 @@ pub struct SlotAllocator {
     scopes: Vec<HirId>,
 }
 
+impl SlotAllocator {
+    fn assign_slot(&mut self, path: &mut hir::Path, ctx: &mut HirOptContext) {
+        let symbol_table = ctx
+            .current_symbol_table()
+            .unwrap_or_else(|| {
+                panic!(
+                    "No symbol table for current scope of {:?} while resolving {}.\nAvailable scopes: {:#?}",
+                    ctx.current_scope,
+                    path,
+                    ctx.symbols.keys()
+                )
+            });
+
+        if path.res.slot().is_builtin() {
+            debug!(
+                "Path '{}' on line {} is a builtin symbol, skipping slot assignment.",
+                path, path.span.start,
+            );
+
+            return;
+        }
+
+        if path.res.hir_id().is_none() {
+            warn!(
+                "Unable to assign slot for path '{}' on line {}, as it has not been resolved",
+                path, path.span.start,
+            );
+
+            return;
+        }
+
+        let slot = symbol_table
+            .borrow()
+            .get_slot(|s| s.hir_id == path.res.hir_id());
+
+        if let Some(slot) = slot {
+            debug!("Assigning path '{}' to slot {:?}", path, slot,);
+
+            path.res.set_slot(slot.into());
+        } else {
+            // TODO: Builtin symbols do not have a HirId, we should handle/resolve these somehow.
+            warn!(
+                "No symbols found for path '{}' (res.hir_id = {:?}) on line {}.\nCurrent scope: {:?}\nAvailable symbols: {:#?}",
+                path,
+                path.res.hir_id(),
+                path.span.start,
+                ctx.current_scope,
+                symbol_table.borrow().get_all_declared_symbols()
+            );
+        }
+    }
+}
+
 impl<'hir> Visitor<'hir> for SlotAllocator {
     type Context = HirOptContext;
 
@@ -49,45 +102,7 @@ impl<'hir> Visitor<'hir> for SlotAllocator {
     }
 
     fn visit_path(&mut self, path: &'hir mut hir::Path, ctx: &mut Self::Context) {
-        let symbol_table = ctx
-            .current_symbol_table()
-            .unwrap_or_else(|| {
-                panic!(
-                    "No symbol table for current scope of {:?} while resolving {}.\nAvailable scopes: {:#?}",
-                    ctx.current_scope,
-                    path,
-                    ctx.symbols.keys()
-                )
-            });
-
-        if path.res.hir_id().is_none() {
-            warn!(
-                "Unable to assign slot for path '{}' on line {}, as it has not been resolved",
-                path, path.span.start,
-            );
-
-            return;
-        }
-
-        let slot = symbol_table
-            .borrow()
-            .get_slot(|s| s.hir_id == path.res.hir_id());
-
-        if let Some(slot) = slot {
-            debug!("Assigning path '{}' to slot {:?}", path, slot,);
-
-            path.res.set_slot(slot.into());
-        } else {
-            // TODO: Builtin symbols do not have a HirId, we should handle/resolve these somehow.
-            warn!(
-                "No symbols found for path '{}' (res.hir_id = {:?}) on line {}.\nCurrent scope: {:?}\nAvailable symbols: {:#?}",
-                path,
-                path.res.hir_id(),
-                path.span.start,
-                ctx.current_scope,
-                symbol_table.borrow().get_all_declared_symbols()
-            );
-        }
+        self.assign_slot(path, ctx);
     }
 }
 

@@ -461,7 +461,10 @@ impl Interpreter {
         }
 
         if !value.is_object() {
-            self.panic(format!("Cannot access field `{ident}` on non-object"));
+            self.panic(format!(
+                "Cannot access field `{ident}` on non-object: {}",
+                self.state.stringify(value)
+            ));
         }
 
         todo!(

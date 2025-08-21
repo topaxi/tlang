@@ -95,6 +95,7 @@ pub type ScopeIndex = u16;
 pub enum Slot {
     Local(SlotIndex),
     Upvar(SlotIndex, ScopeIndex),
+    Builtin,
     #[default]
     None,
 }
@@ -108,6 +109,22 @@ impl Slot {
         debug_assert!(scope_index <= ScopeIndex::MAX as usize);
 
         Slot::Upvar(slot_index, scope_index as ScopeIndex)
+    }
+
+    pub fn is_local(self) -> bool {
+        matches!(self, Slot::Local(..))
+    }
+
+    pub fn is_upvar(self) -> bool {
+        matches!(self, Slot::Upvar(..))
+    }
+
+    pub fn is_builtin(self) -> bool {
+        matches!(self, Slot::Builtin)
+    }
+
+    pub fn is_none(self) -> bool {
+        matches!(self, Slot::None)
     }
 }
 
