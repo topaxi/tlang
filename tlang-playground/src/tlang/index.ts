@@ -2,7 +2,11 @@ import init, { getStandardLibrarySource, Tlang } from 'tlang_bindings_js';
 
 await init();
 
-export { Tlang, type CodemirrorDiagnostic } from 'tlang_bindings_js';
+export {
+  Tlang,
+  type CodemirrorDiagnostic,
+  type Runner,
+} from 'tlang_bindings_js';
 
 export const standardLibrarySource = getStandardLibrarySource();
 
@@ -13,7 +17,7 @@ export function getStandardLibraryCompiled(): string {
     return standardLibraryCompiled;
   }
 
-  const compiler = new Tlang(standardLibrarySource);
+  const compiler = new Tlang(standardLibrarySource, 'JavaScript');
 
   compiler.compileToJS();
   const output = compiler.getJavaScript();

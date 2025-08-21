@@ -22,7 +22,8 @@ import { compressSource, decompressSource } from './utils/lz';
 import {
   getStandardLibraryCompiled,
   Tlang,
-  CodemirrorDiagnostic,
+  type CodemirrorDiagnostic,
+  type Runner,
 } from './tlang';
 import { keyed } from 'lit/directives/keyed.js';
 import { live } from 'lit/directives/live.js';
@@ -96,9 +97,9 @@ function defaultExample() {
 function defaultRunner() {
   let params = getHashParams();
   if (params.has('runner')) {
-    return params.get('runner') as 'compiler' | 'interpreter';
+    return params.get('runner') as Runner;
   }
-  return 'interpreter';
+  return 'Interpreter';
 }
 
 function updateHashParam(key: string, value: string) {
@@ -121,7 +122,7 @@ function updateExampleHashparam(example: string) {
   window.location.hash = params.toString();
 }
 
-function updateRunnerHashparam(runner: 'compiler' | 'interpreter') {
+function updateRunnerHashparam(runner: Runner) {
   updateHashParam('runner', runner);
 }
 
@@ -129,7 +130,7 @@ async function updateDisplayHashparam(display: string) {
   updateHashParam('display', display);
 }
 
-const emptyTlang = new Tlang('');
+const emptyTlang = new Tlang('', 'Interpreter');
 
 @customElement('tlang-playground')
 export class TlangPlayground extends LitElement {
@@ -229,7 +230,7 @@ export class TlangPlayground extends LitElement {
   private display: OutputDisplay = defaultDisplay();
 
   private get availableDisplayOptions(): OutputDisplay[] {
-    if (this.runner === 'interpreter') {
+    if (this.runner === 'Interpreter') {
       return ['hir', 'ast'];
     } else {
       return ['javascript', 'hir', 'ast'];
@@ -241,7 +242,7 @@ export class TlangPlayground extends LitElement {
    */
   private tlang: Tlang = emptyTlang;
 
-  @state() runner: 'compiler' | 'interpreter' = defaultRunner();
+  @state() runner: Runner = defaultRunner();
 
   // The editor which the user can use to write code, as it's always rendered,
   // we cache the query selector.
@@ -319,7 +320,7 @@ export class TlangPlayground extends LitElement {
     let beforeOpenGroups = this.getConsoleOpenGroups();
 
     try {
-      if (this.runner === 'compiler') {
+      if (this.runner === 'JavaScript') {
         this.runCompiled();
       } else {
         this.runInterpreted();
@@ -396,8 +397,8 @@ export class TlangPlayground extends LitElement {
     };
   }
 
-  private createTlang(source: string) {
-    this.tlang = new Tlang(source);
+  private createTlang(source: string, runner: Runner) {
+    this.tlang = new Tlang(source, runner);
 
     this.tlang.defineFunction('log', this.tlangConsole.log);
 
@@ -411,8 +412,8 @@ export class TlangPlayground extends LitElement {
   protected override update(changedProperties: PropertyValueMap<this>): void {
     super.update(changedProperties);
 
-    if (changedProperties.has('source')) {
-      this.createTlang(this.source);
+    if (changedProperties.has('source') || changedProperties.has('runner')) {
+      this.createTlang(this.source, this.runner);
     }
   }
 
@@ -459,11 +460,11 @@ export class TlangPlayground extends LitElement {
 
   private handleRunnerChange(event: Event) {
     const target = event.target as HTMLSelectElement;
-    this.runner = target.value as 'compiler' | 'interpreter';
+    this.runner = target.value as Runner;
 
     // When using the interpreter, showing the javascript output does not make
     // sense.
-    if (this.runner === 'interpreter' && this.display === 'javascript') {
+    if (this.runner === 'Interpreter' && this.display === 'javascript') {
       this.display = 'hir';
     }
 
@@ -546,8 +547,8 @@ export class TlangPlayground extends LitElement {
               @change=${this.handleRunnerChange}
               .value=${live(this.runner)}
             >
-              <option value="interpreter">Interpreter</option>
-              <option value="compiler">Compiler (JS)</option>
+              <option value="Interpreter">Interpreter</option>
+              <option value="JavaScript">Compiler (JS)</option>
             </select>
             <t-button @click=${this.share}>Share</t-button>
             <select

@@ -61,6 +61,12 @@ pub struct BuildArtifacts {
 }
 
 #[wasm_bindgen]
+pub enum Runner {
+    JavaScript = "JavaScript",
+    Interpreter = "Interpreter",
+}
+
+#[wasm_bindgen]
 pub struct Tlang {
     source: String,
     build: BuildArtifacts,
@@ -72,10 +78,19 @@ pub struct Tlang {
 #[wasm_bindgen]
 impl Tlang {
     #[wasm_bindgen(constructor)]
-    pub fn new(source: String) -> Self {
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn new(source: String, runner: Runner) -> Self {
         let mut analyzer = SemanticAnalyzer::default();
 
-        analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());
+        match runner {
+            Runner::JavaScript => {
+                analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());
+            }
+            Runner::Interpreter => {
+                analyzer.add_builtin_symbols(&tlang_interpreter::Interpreter::builtin_symbols());
+            }
+            _ => {}
+        }
 
         Self {
             source,
