@@ -10,7 +10,7 @@ use tlang_ast::keyword::kw;
 use tlang_ast::node::{EnumPattern, FunctionDeclaration, Ident};
 use tlang_ast::symbols::SymbolIdAllocator;
 use tlang_hir::hir;
-use tlang_span::{HirId, HirIdAllocator, LineColumn};
+use tlang_span::{HirId, HirIdAllocator, LineColumn, NodeId};
 
 mod expr;
 mod r#loop;
@@ -18,11 +18,11 @@ mod stmt;
 
 #[derive(Debug)]
 pub struct LoweringContext {
-    node_id_to_hir_id: HashMap<ast::NodeId, HirId>,
-    fn_node_id_to_hir_id: HashMap<ast::NodeId, HirId>,
+    node_id_to_hir_id: HashMap<NodeId, HirId>,
+    fn_node_id_to_hir_id: HashMap<NodeId, HirId>,
     hir_id_allocator: HirIdAllocator,
     symbol_id_allocator: SymbolIdAllocator,
-    symbol_tables: HashMap<ast::NodeId, Rc<RefCell<ast::symbols::SymbolTable>>>,
+    symbol_tables: HashMap<NodeId, Rc<RefCell<ast::symbols::SymbolTable>>>,
     new_symbol_tables: HashMap<HirId, Rc<RefCell<ast::symbols::SymbolTable>>>,
     current_symbol_table: Rc<RefCell<ast::symbols::SymbolTable>>,
 }
@@ -31,7 +31,7 @@ impl LoweringContext {
     pub fn new(
         symbol_id_allocator: SymbolIdAllocator,
         root_symbol_table: Rc<RefCell<ast::symbols::SymbolTable>>,
-        symbol_tables: HashMap<ast::NodeId, Rc<RefCell<ast::symbols::SymbolTable>>>,
+        symbol_tables: HashMap<NodeId, Rc<RefCell<ast::symbols::SymbolTable>>>,
     ) -> Self {
         Self {
             hir_id_allocator: HirIdAllocator::default(),
@@ -99,7 +99,7 @@ impl LoweringContext {
         self.scope().borrow().has_multi_arity_fn(name, arity)
     }
 
-    pub(crate) fn with_scope<F, R>(&mut self, node_id: ast::NodeId, f: F) -> R
+    pub(crate) fn with_scope<F, R>(&mut self, node_id: NodeId, f: F) -> R
     where
         F: FnOnce(&mut Self) -> R,
         R: hir::HirScope,
@@ -219,7 +219,7 @@ impl LoweringContext {
         }
     }
 
-    fn lower_node_id(&mut self, id: ast::NodeId) -> HirId {
+    fn lower_node_id(&mut self, id: NodeId) -> HirId {
         if let Some(hir_id) = self.node_id_to_hir_id.get(&id) {
             *hir_id
         } else {
@@ -440,7 +440,7 @@ pub fn lower_to_hir(
     tlang_ast: &ast::node::Module,
     symbol_id_allocator: SymbolIdAllocator,
     root_symbol_table: Rc<RefCell<ast::symbols::SymbolTable>>,
-    symbol_tables: HashMap<tlang_ast::NodeId, Rc<RefCell<tlang_ast::symbols::SymbolTable>>>,
+    symbol_tables: HashMap<NodeId, Rc<RefCell<tlang_ast::symbols::SymbolTable>>>,
 ) -> hir::LowerResult {
     lower(
         &mut LoweringContext::new(symbol_id_allocator, root_symbol_table, symbol_tables),

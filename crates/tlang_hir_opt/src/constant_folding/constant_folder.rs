@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 use tlang_ast::{node::UnaryOp, token::Literal};
 use tlang_hir::{
-    hir::{self, BinaryOpKind, Expr, ExprKind, HirId},
+    hir::{self, BinaryOpKind, Expr, ExprKind},
     visit::{self, Visitor},
 };
+use tlang_span::HirId;
 
 use crate::hir_opt::{HirOptContext, HirPass};
 

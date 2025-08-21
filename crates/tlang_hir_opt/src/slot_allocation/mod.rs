@@ -90,7 +90,7 @@ impl SlotAllocator {
 impl<'hir> Visitor<'hir> for SlotAllocator {
     type Context = HirOptContext;
 
-    fn enter_scope(&mut self, hir_id: hir::HirId, ctx: &mut Self::Context) {
+    fn enter_scope(&mut self, hir_id: HirId, ctx: &mut Self::Context) {
         if ctx.symbols.contains_key(&hir_id) {
             debug!("Entering scope for: {:?}", hir_id);
 
@@ -99,7 +99,7 @@ impl<'hir> Visitor<'hir> for SlotAllocator {
         }
     }
 
-    fn leave_scope(&mut self, hir_id: hir::HirId, ctx: &mut Self::Context) {
+    fn leave_scope(&mut self, hir_id: HirId, ctx: &mut Self::Context) {
         if ctx.symbols.contains_key(&hir_id) {
             debug!("Leaving scope for: {:?}", hir_id);
 

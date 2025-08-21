@@ -1,6 +1,7 @@
 use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token::{Literal, Token, TokenKind};
 use tlang_hir::hir;
+use tlang_span::HirId;
 
 pub struct HirPrettyOptions {
     pub tab_indent: bool,
@@ -440,7 +441,7 @@ impl HirPretty {
         self.push_char(')');
     }
 
-    fn print_function_name(&mut self, name: &hir::Expr, hir_id: hir::HirId) {
+    fn print_function_name(&mut self, name: &hir::Expr, hir_id: HirId) {
         if let hir::ExprKind::Path(path) = &name.kind {
             self.push_string(path.to_string());
         } else {

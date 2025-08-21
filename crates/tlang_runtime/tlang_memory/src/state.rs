@@ -5,7 +5,8 @@ use std::rc::Rc;
 use log::debug;
 use slab::Slab;
 use smallvec::SmallVec;
-use tlang_hir::hir::{self, HirId};
+use tlang_hir::hir;
+use tlang_span::HirId;
 
 use crate::resolver::Resolver;
 use crate::scope::{Scope, ScopeStack};
@@ -278,11 +279,11 @@ impl InterpreterState {
         }
     }
 
-    pub fn get_fn_decl(&self, id: hir::HirId) -> Option<Rc<hir::FunctionDeclaration>> {
+    pub fn get_fn_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
         self.fn_decls.get(&id).cloned()
     }
 
-    pub fn set_fn_decl(&mut self, id: hir::HirId, decl: Rc<hir::FunctionDeclaration>) {
+    pub fn set_fn_decl(&mut self, id: HirId, decl: Rc<hir::FunctionDeclaration>) {
         self.fn_decls.insert(id, decl);
     }
 

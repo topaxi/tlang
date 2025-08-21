@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::hash::DefaultHasher;
 
-use tlang_hir::hir::HirId;
+use tlang_span::HirId;
 
 use crate::value::{TlangObjectId, TlangValue};
 

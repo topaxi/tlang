@@ -8,10 +8,7 @@ use serde::Serialize;
 use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::symbols::{SymbolIdAllocator, SymbolType};
 use tlang_ast::token::{Literal, Token};
-
-#[deprecated(note = "Use `tlang_span::HirId` instead")]
-pub use tlang_span::HirId;
-use tlang_span::{HirIdAllocator, Span};
+use tlang_span::{HirId, HirIdAllocator, Span};
 
 pub trait HirScope {
     // fn hir_id(&self) -> HirId;

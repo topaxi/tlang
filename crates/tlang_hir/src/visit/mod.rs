@@ -1,3 +1,5 @@
+use tlang_span::HirId;
+
 use crate::hir;
 
 pub trait Visitor<'hir>: Sized {
@@ -5,9 +7,9 @@ pub trait Visitor<'hir>: Sized {
     type Context = ();
 
     #[allow(unused_variables)]
-    fn enter_scope(&mut self, hir_id: hir::HirId, ctx: &mut Self::Context) {}
+    fn enter_scope(&mut self, hir_id: HirId, ctx: &mut Self::Context) {}
     #[allow(unused_variables)]
-    fn leave_scope(&mut self, hir_id: hir::HirId, ctx: &mut Self::Context) {}
+    fn leave_scope(&mut self, hir_id: HirId, ctx: &mut Self::Context) {}
 
     fn visit_module(&mut self, module: &'hir mut hir::Module, ctx: &mut Self::Context) {
         walk_module(self, module, ctx);

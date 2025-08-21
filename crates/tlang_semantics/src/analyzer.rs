@@ -2,14 +2,13 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use log::debug;
 use tlang_ast::{
-    NodeId,
     node::{
         BinaryOpKind, Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter,
         LetDeclaration, Module, Pat, PatKind, Path, Stmt, StmtKind, StructDeclaration,
     },
     symbols::{SymbolIdAllocator, SymbolInfo, SymbolTable, SymbolType},
 };
-use tlang_span::Span;
+use tlang_span::{NodeId, Span};
 
 use crate::{
     declarations::DeclarationAnalyzer,

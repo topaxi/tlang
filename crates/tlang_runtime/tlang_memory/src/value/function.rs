@@ -1,6 +1,6 @@
 use smallvec::SmallVec;
 
-use tlang_hir::hir::HirId;
+use tlang_span::HirId;
 
 use crate::InterpreterState;
 

@@ -99,7 +99,7 @@ impl IdentifierResolver {
 impl<'hir> Visitor<'hir> for IdentifierResolver {
     type Context = HirOptContext;
 
-    fn enter_scope(&mut self, hir_id: hir::HirId, ctx: &mut Self::Context) {
+    fn enter_scope(&mut self, hir_id: HirId, ctx: &mut Self::Context) {
         if ctx.symbols.contains_key(&hir_id) {
             debug!("Entering scope for: {:?}", hir_id);
             ctx.current_scope = hir_id;
@@ -112,7 +112,7 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
         }
     }
 
-    fn leave_scope(&mut self, hir_id: hir::HirId, ctx: &mut Self::Context) {
+    fn leave_scope(&mut self, hir_id: HirId, ctx: &mut Self::Context) {
         if ctx.symbols.contains_key(&hir_id) {
             let left_scope = self.scopes.pop();
 

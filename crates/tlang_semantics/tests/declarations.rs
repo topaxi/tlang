@@ -1,13 +1,12 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
 use tlang_ast::{
-    NodeId,
     node::{ExprKind, StmtKind},
     symbols::{SymbolId, SymbolInfo, SymbolType},
 };
 use tlang_parser::Parser;
 use tlang_semantics::analyzer::SemanticAnalyzer;
-use tlang_span::{LineColumn, Span};
+use tlang_span::{LineColumn, NodeId, Span};
 
 mod common;
 

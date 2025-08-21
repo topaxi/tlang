@@ -1,7 +1,6 @@
 use log::debug;
 use std::rc::Rc;
 use std::{cell::RefCell, collections::HashMap};
-use tlang_ast::NodeId;
 use tlang_ast::keyword::kw;
 use tlang_ast::node::MatchExpression;
 use tlang_ast::symbols::SymbolIdAllocator;
@@ -12,7 +11,7 @@ use tlang_ast::{
     },
     symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
 };
-use tlang_span::{LineColumn, Span};
+use tlang_span::{LineColumn, NodeId, Span};
 
 /**
  * The declaration analyzer is responsible for collecting all the declarations in a module.

@@ -1,4 +1,3 @@
-use tlang_ast::NodeId;
 use tlang_ast::keyword::{Keyword, kw};
 use tlang_ast::node::{
     self, Associativity, BinaryOpExpression, BinaryOpKind, Block, CallExpression, ElseClause,
@@ -9,7 +8,7 @@ use tlang_ast::node::{
 };
 use tlang_ast::token::{Literal, Token, TokenKind};
 use tlang_lexer::Lexer;
-use tlang_span::{NodeIdAllocator, Span};
+use tlang_span::{NodeId, NodeIdAllocator, Span};
 
 use crate::error::{ParseError, ParseIssue, ParseIssueKind};
 use crate::macros::expect_token_matches;

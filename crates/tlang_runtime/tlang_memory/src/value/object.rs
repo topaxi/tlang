@@ -1,6 +1,6 @@
 use std::ops::{Index, IndexMut};
 
-use tlang_hir::hir::HirId;
+use tlang_span::HirId;
 
 use crate::scope::ScopeStack;
 use crate::shape::{ShapeKey, Shaped};

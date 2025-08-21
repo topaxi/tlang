@@ -7,13 +7,14 @@ use log::debug;
 use smallvec::SmallVec;
 use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token;
-use tlang_hir::hir::{self, BindingKind, HirId};
+use tlang_hir::hir::{self, BindingKind};
 use tlang_memory::shape::{ShapeKey, Shaped, TlangEnumVariant, TlangShape};
 use tlang_memory::state::TailCall;
 use tlang_memory::value::TlangArithmetic;
 use tlang_memory::value::object::TlangEnum;
 use tlang_memory::{InterpreterState, NativeFnReturn, Resolver, scope};
 use tlang_memory::{prelude::*, state};
+use tlang_span::HirId;
 
 pub use tlang_memory::NativeFnDef;
 
