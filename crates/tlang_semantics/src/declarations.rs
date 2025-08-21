@@ -92,11 +92,10 @@ impl DeclarationAnalyzer {
         let id = self.unique_id();
         let symbol_info =
             SymbolInfo::new(id, name, symbol_type, defined_at, scope_start).with_node_id(node_id);
-        let symbol_table = self.current_symbol_table();
 
         debug!("Declaring symbol: {:#?}", symbol_info);
 
-        symbol_table.borrow_mut().insert(symbol_info);
+        self.current_symbol_table().borrow_mut().insert(symbol_info);
     }
 
     pub fn add_builtin_symbols<'a, S, I>(&mut self, symbols: I)

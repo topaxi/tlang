@@ -162,6 +162,7 @@ impl Tlang {
             let (mut module, meta) = tlang_ast_lowering::lower_to_hir(
                 ast,
                 self.analyzer.symbol_id_allocator(),
+                self.analyzer.root_symbol_table(),
                 self.analyzer.symbol_tables().clone(),
             );
             let mut optimizer = HirOptimizer::default();

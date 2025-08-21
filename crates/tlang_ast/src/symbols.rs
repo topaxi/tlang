@@ -310,9 +310,12 @@ impl SymbolTable {
         let has_fn = fn_symbols.len() > 1 && fn_symbols.iter().any(|s| *s as usize == arity);
 
         debug!(
-            "Checking if symbol table has function: {} with arity {}: {:?}",
-            name, arity, fn_symbols
+            "Checking if symbol table has function: {} with arity {}: {:?} -> {}",
+            name, arity, fn_symbols, has_fn
         );
+        if !has_fn {
+            debug!("Available symbols: {:#?}", symbols);
+        }
 
         has_fn
     }

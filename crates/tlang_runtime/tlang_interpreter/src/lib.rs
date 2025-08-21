@@ -1678,7 +1678,11 @@ mod tests {
 
     #[ctor::ctor]
     fn before_all() {
-        env_logger::init();
+        let _ = env_logger::builder()
+            .filter_level(log::LevelFilter::Warn)
+            .parse_default_env()
+            .is_test(true)
+            .try_init();
     }
 
     struct TestInterpreter {
@@ -1719,6 +1723,7 @@ mod tests {
         fn lower(&mut self, module: &tlang_ast::node::Module) -> hir::Module {
             let mut lowering_context = tlang_ast_lowering::LoweringContext::new(
                 self.semantic_analyzer.symbol_id_allocator(),
+                self.semantic_analyzer.root_symbol_table(),
                 self.semantic_analyzer.symbol_tables().clone(),
             );
             let (mut module, meta) = tlang_ast_lowering::lower(&mut lowering_context, module);

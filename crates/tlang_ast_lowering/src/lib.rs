@@ -30,6 +30,7 @@ pub struct LoweringContext {
 impl LoweringContext {
     pub fn new(
         symbol_id_allocator: SymbolIdAllocator,
+        root_symbol_table: Rc<RefCell<ast::symbols::SymbolTable>>,
         symbol_tables: HashMap<ast::NodeId, Rc<RefCell<ast::symbols::SymbolTable>>>,
     ) -> Self {
         Self {
@@ -39,7 +40,7 @@ impl LoweringContext {
             symbol_id_allocator,
             symbol_tables,
             new_symbol_tables: HashMap::default(),
-            current_symbol_table: Default::default(),
+            current_symbol_table: root_symbol_table,
         }
     }
 
@@ -57,23 +58,24 @@ impl LoweringContext {
                     .get_all_local_symbols_mut()
                     .iter_mut()
                     .for_each(|symbol| {
-                        if let Some(node_id) = symbol.node_id
-                            && let Some(hir_id) = self
+                        if let Some(node_id) = symbol.node_id {
+                            if let Some(hir_id) = self
                                 .fn_node_id_to_hir_id
                                 .get(&node_id)
                                 .or_else(|| self.node_id_to_hir_id.get(&node_id))
-                        {
-                            symbol.hir_id = Some(*hir_id);
+                            {
+                                symbol.hir_id = Some(*hir_id);
 
-                            debug!(
-                                "Assigning {:?} to symbol {} on line {} from {:?}",
-                                hir_id, symbol.name, symbol.defined_at.start, node_id
-                            );
-                        } else {
-                            warn!(
-                                "Unable to map {:?} to HirId for symbol {}",
-                                node_id, symbol.name
-                            );
+                                debug!(
+                                    "Assigning {:?} to symbol {} on line {} from {:?}",
+                                    hir_id, symbol.name, symbol.defined_at.start, node_id
+                                );
+                            } else {
+                                warn!(
+                                    "Unable to map {:?} to HirId for symbol {}",
+                                    node_id, symbol.name
+                                );
+                            }
                         }
                     });
 
@@ -414,10 +416,11 @@ impl LoweringContext {
 pub fn lower_to_hir(
     tlang_ast: &ast::node::Module,
     symbol_id_allocator: SymbolIdAllocator,
+    root_symbol_table: Rc<RefCell<ast::symbols::SymbolTable>>,
     symbol_tables: HashMap<tlang_ast::NodeId, Rc<RefCell<tlang_ast::symbols::SymbolTable>>>,
 ) -> hir::LowerResult {
     lower(
-        &mut LoweringContext::new(symbol_id_allocator, symbol_tables),
+        &mut LoweringContext::new(symbol_id_allocator, root_symbol_table, symbol_tables),
         tlang_ast,
     )
 }

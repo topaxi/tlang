@@ -29,6 +29,7 @@ pub fn compile(source: &str) -> hir::LowerResult {
     lower_to_hir(
         &ast,
         semantic_analyzer.symbol_id_allocator(),
+        semantic_analyzer.root_symbol_table(),
         semantic_analyzer.symbol_tables().clone(),
     )
 }

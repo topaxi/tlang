@@ -106,7 +106,7 @@ impl LoweringContext {
             .any(|decl| decl.parameters.len() != first_declaration.parameters.len());
         let all_param_names = get_param_names(decls);
 
-        let stmts = if has_variadic_arguments {
+        if has_variadic_arguments {
             // Group by arguments length and emit a function for each variant.
             // Not using a hashmap here, as the amount of fn decls should be farily small.
             // Therefore we just sort the declarations and start with short argument lists
@@ -216,23 +216,7 @@ impl LoweringContext {
                 leading_comments,
                 trailing_comments: node.trailing_comments.clone(),
             }]
-        };
-
-        // TODO: Dedup function declarations in symbol table, as we merge them here.
-        // Deduping symbols in symbol table as the symbol table is being reused for slot indexing
-        let mut symbols = self
-            .current_symbol_table
-            .borrow_mut()
-            .get_all_local_symbols()
-            .iter()
-            .filter(|symbol| decls.iter().any(|decl| Some(decl.id) == symbol.node_id))
-            .cloned()
-            .collect::<Vec<_>>();
-
-        symbols.sort_by_key(|symbol| symbol.symbol_type.arity());
-        // TODO
-
-        stmts
+        }
     }
 
     fn lower_enum_decl(

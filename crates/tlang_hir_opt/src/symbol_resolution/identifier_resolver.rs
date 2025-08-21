@@ -38,6 +38,8 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
     }
 
     fn visit_path(&mut self, path: &'hir mut hir::Path, ctx: &mut Self::Context) {
+        debug!("Resolving path: '{}' on line {}", path, path.span.start);
+
         // TODO: Only visit paths which are not in declaration position (eg. function names).
         if path.res.hir_id().is_some() {
             debug!(

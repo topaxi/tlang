@@ -10,7 +10,10 @@ use tlang_semantics::SemanticAnalyzer;
 use tlang_semantics::diagnostic::Diagnostic;
 
 fn main() {
-    env_logger::init();
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Warn)
+        .parse_default_env()
+        .init();
 
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
@@ -59,6 +62,7 @@ fn main() {
     let (mut module, meta) = lower_to_hir(
         &ast,
         analyzer.symbol_id_allocator(),
+        analyzer.root_symbol_table(),
         analyzer.symbol_tables().clone(),
     );
 

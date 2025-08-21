@@ -8,6 +8,7 @@ tlang_ast = { path = "../tlang_ast" }
 tlang_parser = { path = "../tlang_parser" }
 tlang_ast_lowering = { path = "../tlang_ast_lowering" }
 tlang_hir = { path = "../tlang_hir", features = ["serde"] }
+tlang_hir_opt = { path = "../tlang_hir_opt" }
 tlang_codegen_js = { path = "../tlang_codegen_js" }
 tlang_semantics = { path = "../tlang_semantics" }
 tlang_interpreter = { path = "../tlang_runtime/tlang_interpreter" }

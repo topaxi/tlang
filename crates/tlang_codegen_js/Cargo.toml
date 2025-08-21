@@ -13,6 +13,7 @@ tlang_semantics = { path = "../tlang_semantics" }
 [dev-dependencies]
 tlang_ast_lowering = { path = "../tlang_ast_lowering" }
 ctor = { workspace = true }
+log = { workspace = true }
 env_logger = { workspace = true }
 indoc = { workspace = true }
 pretty_assertions = { workspace = true }

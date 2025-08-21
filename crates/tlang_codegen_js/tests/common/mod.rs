@@ -6,7 +6,11 @@ use tlang_semantics::SemanticAnalyzer;
 
 #[ctor::ctor]
 fn before_all() {
-    env_logger::init();
+    let _ = env_logger::builder()
+        .filter_level(log::LevelFilter::Warn)
+        .parse_default_env()
+        .is_test(true)
+        .try_init();
 }
 
 pub struct CodegenOptions<'a> {
@@ -62,6 +66,7 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
             let (mut module, meta) = tlang_ast_lowering::lower_to_hir(
                 &ast,
                 semantic_analyzer.symbol_id_allocator(),
+                semantic_analyzer.root_symbol_table(),
                 semantic_analyzer.symbol_tables().clone(),
             );
 
