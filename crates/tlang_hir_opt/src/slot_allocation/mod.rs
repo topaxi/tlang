@@ -76,7 +76,13 @@ impl SlotAllocator {
                 path.res.hir_id(),
                 path.span.start,
                 ctx.current_scope,
-                symbol_table.borrow().get_all_declared_symbols()
+                symbol_table
+                    .borrow()
+                    .get_all_declared_symbols()
+                    .iter()
+                    // built-in symbols are not assigned slots (yet?)
+                    .filter(|s| !s.builtin && s.hir_id.is_some())
+                    .collect::<Vec<_>>(),
             );
         }
     }

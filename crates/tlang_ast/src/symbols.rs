@@ -182,6 +182,8 @@ impl SymbolTable {
         let mut scope_index = 0;
 
         while let Some(t) = table {
+            let mut set = HashSet::new();
+
             if let Some(index) = t
                 .borrow()
                 .symbols
@@ -192,6 +194,10 @@ impl SymbolTable {
                 .filter(|s| !matches!(s.symbol_type, SymbolType::Enum | SymbolType::Struct))
                 // And tagged enum variant definitions do not generate a slot
                 .filter(|s| !matches!(s.symbol_type, SymbolType::EnumVariant(len) if len > 0))
+                // Filter out duplicate symbols, as fn definitions might have multiple symbols
+                // attached to them. The lowering result should properly assign the same HirId to
+                // each fn symbol representing the same fn.
+                .filter(|s| s.hir_id.is_none() || set.insert(s.hir_id))
                 .position(&predicate)
             {
                 return Some((index, scope_index));

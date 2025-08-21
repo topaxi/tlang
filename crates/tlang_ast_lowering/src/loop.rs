@@ -79,7 +79,7 @@ impl LoweringContext {
                 })),
             );
 
-            let loop_block = this.with_scope(for_loop.block.id, |this| {
+            let loop_block = this.with_new_scope(|this, _scope| {
                 let mut iterator_binding_path = hir::Path::new(
                     vec![hir::PathSegment::new(iterator_binding_name)],
                     Default::default(),
@@ -98,7 +98,13 @@ impl LoweringContext {
                     .res
                     .set_hir_id(accumulator_binding_hir_id);
 
-                this.lower_for_loop_body(for_loop, iterator_binding_path, accumulator_binding_path)
+                let block = this.lower_for_loop_body(
+                    for_loop,
+                    iterator_binding_path,
+                    accumulator_binding_path,
+                );
+
+                (block.hir_id, block)
             });
 
             let loop_expr = this.expr(
@@ -182,9 +188,8 @@ impl LoweringContext {
             vec![]
         };
 
-        let loop_arm = self.with_new_scope(|this, _scope| {
+        let loop_arm = self.with_scope(for_loop.block.id, |this| {
             let for_loop_pat = this.lower_pat(&for_loop.pat);
-
             let loop_body = this.lower_block_in_current_scope(&for_loop.block);
 
             hir::MatchArm {
@@ -215,7 +220,8 @@ impl LoweringContext {
                     hir::ExprKind::Path(Box::new(accumulator_binding_path.clone())),
                 ))
             });
-            hir::MatchArm {
+
+            let arm = hir::MatchArm {
                 pat: hir::Pat {
                     kind: hir::PatKind::Enum(
                         Box::new(hir::Path::new(
@@ -241,7 +247,9 @@ impl LoweringContext {
                 ),
                 leading_comments: vec![],
                 trailing_comments: vec![],
-            }
+            };
+
+            (arm.block.hir_id, arm)
         });
 
         let match_expr = self.expr(

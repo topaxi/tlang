@@ -212,7 +212,6 @@ impl DeclarationAnalyzer {
             }
             ExprKind::ForLoop(for_loop) => {
                 self.push_symbol_table(for_loop.id);
-                self.collect_pattern(&for_loop.pat, for_loop.pat.span.end);
                 self.collect_declarations_expr(&for_loop.iter);
 
                 if let Some((pat, expr)) = &for_loop.acc {
@@ -220,7 +219,10 @@ impl DeclarationAnalyzer {
                     self.collect_declarations_expr(expr);
                 }
 
-                self.collect_declarations_block(&for_loop.block);
+                self.push_symbol_table(for_loop.block.id);
+                self.collect_pattern(&for_loop.pat, for_loop.pat.span.end);
+                self.collect_declarations_block_scopeless(&for_loop.block);
+                self.pop_symbol_table();
                 self.pop_symbol_table();
 
                 if let Some(else_block) = &for_loop.else_block {

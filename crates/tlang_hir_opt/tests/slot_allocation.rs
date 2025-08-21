@@ -132,7 +132,7 @@ fn test_variadic_fn_res() {
             ("acc".to_string(), hir::Slot::Local(1)),
             ("fac/2".to_string(), hir::Slot::Upvar(0, 1)),
             // the dynamic dispatch definition
-            ("fac".to_string(), hir::Slot::Local(3)),
+            ("fac".to_string(), hir::Slot::Local(2)),
         ]
     );
 
@@ -183,7 +183,7 @@ fn test_variadic_fn_res_with_list_pat() {
             ("acc".to_string(), hir::Slot::Local(2)),
             ("rs/2".to_string(), hir::Slot::Upvar(0, 1)),
             // the dynamic dispatch definition
-            ("rs".to_string(), hir::Slot::Local(3)),
+            ("rs".to_string(), hir::Slot::Local(2)),
         ]
     );
 
@@ -310,10 +310,10 @@ fn test_tagged_enum_res() {
     assert_eq!(
         collect_slots(&mut hir),
         vec![
-            ("foo".to_string(), hir::Slot::Local(1)),
+            ("foo".to_string(), hir::Slot::Local(1)), // the argument name of Foo.qux
             ("x".to_string(), hir::Slot::Local(0)),
             ("x".to_string(), hir::Slot::Local(0)),
-            ("bar".to_string(), hir::Slot::Local(2)),
+            ("bar".to_string(), hir::Slot::Local(1)),
         ]
     );
 }

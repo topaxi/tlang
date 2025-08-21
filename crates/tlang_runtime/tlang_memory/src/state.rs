@@ -668,7 +668,7 @@ impl InterpreterState {
         match value {
             TlangValue::Object(id) => match self.get_object_by_id(id) {
                 None => value.to_string(),
-                Some(TlangObjectKind::String(s)) => format!("{:?}", s),
+                Some(TlangObjectKind::String(s)) => s.to_string(),
                 Some(TlangObjectKind::Struct(s)) => self.stringify_struct(s),
                 Some(TlangObjectKind::Enum(e)) => self.stringify_enum(e),
                 Some(TlangObjectKind::Slice(s)) => {

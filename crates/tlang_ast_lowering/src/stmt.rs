@@ -279,9 +279,8 @@ impl LoweringContext {
         let mut span = decls[0].span;
         span.end = decls.last().unwrap().span.end;
 
-        self.with_new_scope(|this, scope| {
+        self.with_new_scope(|this, _scope| {
             let hir_id = this.unique_id();
-            this.new_symbol_tables.insert(hir_id, scope.clone());
             let first_declaration = &decls[0];
             let fn_name = this.lower_expr(&first_declaration.name);
 
@@ -398,7 +397,10 @@ impl LoweringContext {
                 tlang_span::Span::default(),
             );
 
-            hir::FunctionDeclaration::new(hir_id, fn_name, params, body)
+            (
+                hir_id,
+                hir::FunctionDeclaration::new(hir_id, fn_name, params, body),
+            )
         })
     }
 

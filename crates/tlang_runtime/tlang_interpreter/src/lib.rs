@@ -90,10 +90,12 @@ impl Interpreter {
 
     const fn builtin_const_symbols() -> &'static [(&'static str, tlang_ast::symbols::SymbolType)] {
         &[
+            ("Option", tlang_ast::symbols::SymbolType::Enum),
             (
                 "Option::None",
                 tlang_ast::symbols::SymbolType::EnumVariant(0),
             ),
+            ("Result", tlang_ast::symbols::SymbolType::Enum),
             ("math::pi", tlang_ast::symbols::SymbolType::Variable),
         ]
     }
@@ -2029,12 +2031,12 @@ mod tests {
     #[test]
     fn test_tagged_enum_declaration_and_use() {
         let mut interpreter = interpreter(indoc! {"
-            enum Option {
+            enum MyOption {
                 None,
                 Some(Int),
             }
-            let some = Option::Some(10);
-            let none = Option::None;
+            let some = MyOption::Some(10);
+            let none = MyOption::None;
         "});
 
         let some_value = interpreter.eval("some");
