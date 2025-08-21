@@ -3,13 +3,13 @@ source: crates/tlang_parser/tests/parser_dict.rs
 expression: "parse! (r\"let x = { foo, bar };\")"
 ---
 Module(
-  id: NodeId(1),
+  id: 2,
   statements: [
     Stmt(
-      id: NodeId(6),
+      id: 7,
       kind: Let(LetDeclaration(
         pattern: Pat(
-          id: NodeId(2),
+          id: 3,
           kind: Identifier(Ident(
             name: "x",
             span: Span(
@@ -37,10 +37,10 @@ Module(
           ),
         ),
         expression: Expr(
-          id: NodeId(5),
+          id: 6,
           kind: Dict([
             (Expr(
-              id: NodeId(3),
+              id: 4,
               kind: Path(Path(
                 segments: [
                   Ident(
@@ -57,6 +57,9 @@ Module(
                     ),
                   ),
                 ],
+                res: Res(
+                  node_id: None,
+                ),
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -81,7 +84,7 @@ Module(
                 ),
               ),
             ), Expr(
-              id: NodeId(3),
+              id: 4,
               kind: Path(Path(
                 segments: [
                   Ident(
@@ -98,6 +101,9 @@ Module(
                     ),
                   ),
                 ],
+                res: Res(
+                  node_id: None,
+                ),
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -123,7 +129,7 @@ Module(
               ),
             )),
             (Expr(
-              id: NodeId(4),
+              id: 5,
               kind: Path(Path(
                 segments: [
                   Ident(
@@ -140,6 +146,9 @@ Module(
                     ),
                   ),
                 ],
+                res: Res(
+                  node_id: None,
+                ),
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -164,7 +173,7 @@ Module(
                 ),
               ),
             ), Expr(
-              id: NodeId(4),
+              id: 5,
               kind: Path(Path(
                 segments: [
                   Ident(
@@ -181,6 +190,9 @@ Module(
                     ),
                   ),
                 ],
+                res: Res(
+                  node_id: None,
+                ),
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -242,7 +254,7 @@ Module(
     ),
     end: LineColumn(
       line: 0,
-      column: 0,
+      column: 21,
     ),
   ),
 )

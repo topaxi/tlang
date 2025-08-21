@@ -22,16 +22,16 @@ fn test_lower_for_loop_on_list_simple() {
             let iterator$$: unknown = [1, 2, 3].iter();
             loop {
                 match iterator$$.next() {
-                    Option::Some? { 0: i } => {
-                        log?(i);
+                    Option::Some { 0: i } => {
+                        log(i);
                     },
-                    Option::None? => {
+                    Option::None => {
                         break
                     },
                 }
             }
         }
-    };
+    }
     "###);
 }
 
@@ -57,17 +57,17 @@ fn test_lower_for_loop_on_list_with_accumulator() {
             loop {
                 let acc: unknown = accumulator$$;
                 (accumulator$$ = match iterator$$.next() {
-                    Option::Some? { 0: i } => {
+                    Option::Some { 0: i } => {
                         (acc + i)
                     },
-                    Option::None? => {
+                    Option::None => {
                         break accumulator$$
                     },
                 })
             }
         };
-        log?(sum);
-    };
+        log(sum);
+    }
     "###);
 }
 
@@ -96,20 +96,20 @@ fn test_lower_for_loop_on_list_with_accumulator_pat() {
             loop {
                 let [even, odd]: unknown = accumulator$$;
                 (accumulator$$ = match iterator$$.next() {
-                    Option::Some? { 0: n } => {
+                    Option::Some { 0: n } => {
                         if ((n % 2) == 0) {
                             [[...even, n], odd]
                         } else {
                             [even, [...odd, n]]
                         }
                     },
-                    Option::None? => {
+                    Option::None => {
                         break accumulator$$
                     },
                 })
             }
         };
-        log?(even_odd);
-    };
+        log(even_odd);
+    }
     "###);
 }

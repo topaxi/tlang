@@ -1,6 +1,8 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
 
+use self::common::CodegenOptions;
+
 mod common;
 
 #[ignore = "TODO"]
@@ -37,13 +39,16 @@ fn test_codegen_let_pattern_declaration_dupe() {
 
 #[test]
 fn test_codegen_pattern_match_expressions() {
-    let output = compile!(indoc! {"
-        let x = 42;
-        let y = match (x) {
-            42 => 1,
-            _ => 0,
-        };
-    "});
+    let output = compile!(
+        indoc! {"
+            let x = 42;
+            let y = match (x) {
+                42 => 1,
+                _ => 0,
+            };
+        "},
+        CodegenOptions::default().optimize(false)
+    );
     let expected_output = indoc! {"
         let x = 42;
         let $tmp$0;if (x === 42) {
@@ -59,13 +64,16 @@ fn test_codegen_pattern_match_expressions() {
 
 #[test]
 fn test_codegen_pattern_match_blocks() {
-    let output = compile!(indoc! {"
-        let x = 42;
-        let y = match (x) {
-            42 => { 1 },
-            _ => { 0 },
-        };
-    "});
+    let output = compile!(
+        indoc! {"
+            let x = 42;
+            let y = match (x) {
+                42 => { 1 },
+                _ => { 0 },
+            };
+        "},
+        CodegenOptions::default().optimize(false)
+    );
     let expected_output = indoc! {"
         let x = 42;
         let $tmp$0;if (x === 42) {

@@ -1,3 +1,4 @@
+use tlang_ast::NodeId;
 use tlang_ast::keyword::{Keyword, kw};
 use tlang_ast::node::{
     self, Associativity, BinaryOpExpression, BinaryOpKind, Block, CallExpression, ElseClause,
@@ -6,10 +7,9 @@ use tlang_ast::node::{
     LetDeclaration, MatchArm, MatchExpression, Module, OperatorInfo, Pat, Path, Stmt, StmtKind,
     StructDeclaration, StructField, Ty, UnaryOp,
 };
-use tlang_ast::node_id::NodeId;
-use tlang_ast::span::Span;
 use tlang_ast::token::{Literal, Token, TokenKind};
 use tlang_lexer::Lexer;
+use tlang_span::{NodeIdAllocator, Span};
 
 use crate::error::{ParseError, ParseIssue, ParseIssueKind};
 use crate::macros::expect_token_matches;
@@ -23,7 +23,7 @@ pub struct Parser<'src> {
 
     recoverable: bool,
 
-    unique_id: NodeId,
+    node_id_allocator: NodeIdAllocator,
 
     errors: Vec<ParseIssue>,
 }
@@ -35,14 +35,14 @@ impl<'src> Parser<'src> {
             previous_span: Span::default(),
             current_token: Token::default(),
             next_token: Token::default(),
-            unique_id: NodeId::new(0),
+            node_id_allocator: NodeIdAllocator::default(),
             errors: Vec::new(),
             recoverable: false,
         }
     }
 
-    pub fn set_recoverable(&mut self, recoverable: bool) -> &mut Self {
-        self.recoverable = recoverable;
+    pub fn with_line_offset(mut self, line_offset: u32) -> Self {
+        self.lexer.set_line_offset(line_offset);
         self
     }
 
@@ -50,13 +50,26 @@ impl<'src> Parser<'src> {
         self.recoverable
     }
 
-    pub fn get_errors(&self) -> &[ParseIssue] {
+    pub fn set_recoverable(mut self, recoverable: bool) -> Self {
+        self.recoverable = recoverable;
+        self
+    }
+
+    pub fn errors(&self) -> &[ParseIssue] {
         &self.errors
     }
 
+    pub fn node_id_allocator(&self) -> &NodeIdAllocator {
+        &self.node_id_allocator
+    }
+
+    pub fn set_node_id_allocator(mut self, allocator: NodeIdAllocator) -> Self {
+        self.node_id_allocator = allocator;
+        self
+    }
+
     fn unique_id(&mut self) -> NodeId {
-        self.unique_id = self.unique_id.next();
-        self.unique_id
+        self.node_id_allocator.next_id()
     }
 
     pub fn from_source(source: &'src str) -> Parser<'src> {
@@ -523,7 +536,12 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_module(&mut self) -> Module {
-        Module::new(self.unique_id(), self.parse_statements(false).0)
+        let mut span = self.create_span_from_current_token();
+        let module_id = self.unique_id();
+        let statements = self.parse_statements(false).0;
+        self.end_span_from_previous_token(&mut span);
+
+        Module::new(module_id, statements, span)
     }
 
     fn parse_block(&mut self) -> Block {
@@ -1214,7 +1232,9 @@ impl<'src> Parser<'src> {
                 body,
                 return_type_annotation: return_type,
                 span,
-                ..Default::default()
+                guard: None,
+                leading_comments: vec![],
+                trailing_comments: vec![],
             }))
         )
         .with_span(span)
@@ -1358,8 +1378,8 @@ impl<'src> Parser<'src> {
                 body,
                 return_type_annotation: return_type,
                 leading_comments: comments,
+                trailing_comments: vec![],
                 span,
-                ..Default::default()
             });
         }
 
@@ -1713,9 +1733,12 @@ impl<'src> Parser<'src> {
             None
         };
 
+        let loop_id = self.unique_id();
+
         node::expr!(
             self.unique_id(),
             ForLoop(Box::new(node::ForLoop {
+                id: loop_id,
                 pat,
                 iter,
                 acc,

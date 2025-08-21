@@ -3,19 +3,19 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse! (\"if (1 + 2) { 3 + 4; } else { 5 + 6; }\")"
 ---
 Module(
-  id: NodeId(1),
+  id: 2,
   statements: [
     Stmt(
-      id: NodeId(2),
+      id: 3,
       kind: Expr(Expr(
-        id: NodeId(16),
+        id: 17,
         kind: IfElse(IfElseExpression(
           condition: Expr(
-            id: NodeId(5),
+            id: 6,
             kind: BinaryOp(BinaryOpExpression(
               op: Add,
               lhs: Expr(
-                id: NodeId(3),
+                id: 4,
                 kind: Literal(UnsignedInteger(1)),
                 leading_comments: [],
                 trailing_comments: [],
@@ -31,7 +31,7 @@ Module(
                 ),
               ),
               rhs: Expr(
-                id: NodeId(4),
+                id: 5,
                 kind: Literal(UnsignedInteger(2)),
                 leading_comments: [],
                 trailing_comments: [],
@@ -61,16 +61,16 @@ Module(
             ),
           ),
           then_branch: Block(
-            id: NodeId(10),
+            id: 11,
             statements: [
               Stmt(
-                id: NodeId(6),
+                id: 7,
                 kind: Expr(Expr(
-                  id: NodeId(9),
+                  id: 10,
                   kind: BinaryOp(BinaryOpExpression(
                     op: Add,
                     lhs: Expr(
-                      id: NodeId(7),
+                      id: 8,
                       kind: Literal(UnsignedInteger(3)),
                       leading_comments: [],
                       trailing_comments: [],
@@ -86,7 +86,7 @@ Module(
                       ),
                     ),
                     rhs: Expr(
-                      id: NodeId(8),
+                      id: 9,
                       kind: Literal(UnsignedInteger(4)),
                       leading_comments: [],
                       trailing_comments: [],
@@ -145,16 +145,16 @@ Module(
             ElseClause(
               condition: None,
               consequence: Block(
-                id: NodeId(15),
+                id: 16,
                 statements: [
                   Stmt(
-                    id: NodeId(11),
+                    id: 12,
                     kind: Expr(Expr(
-                      id: NodeId(14),
+                      id: 15,
                       kind: BinaryOp(BinaryOpExpression(
                         op: Add,
                         lhs: Expr(
-                          id: NodeId(12),
+                          id: 13,
                           kind: Literal(UnsignedInteger(5)),
                           leading_comments: [],
                           trailing_comments: [],
@@ -170,7 +170,7 @@ Module(
                           ),
                         ),
                         rhs: Expr(
-                          id: NodeId(13),
+                          id: 14,
                           kind: Literal(UnsignedInteger(6)),
                           leading_comments: [],
                           trailing_comments: [],
@@ -262,7 +262,7 @@ Module(
     ),
     end: LineColumn(
       line: 0,
-      column: 0,
+      column: 37,
     ),
   ),
 )

@@ -219,6 +219,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "console_log"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be8aed40e4edbf4d3b4431ab260b63fdc40f5780a4766824329ea0f1eefe3c0f"
+dependencies = [
+ "log",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
 name = "cpufeatures"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -939,8 +950,10 @@ name = "tlang_ast"
 version = "0.1.0"
 dependencies = [
  "indoc",
+ "log",
  "pretty_assertions",
  "serde",
+ "tlang_span",
 ]
 
 [[package]]
@@ -954,6 +967,7 @@ dependencies = [
  "tlang_hir",
  "tlang_hir_pretty",
  "tlang_parser",
+ "tlang_span",
 ]
 
 [[package]]
@@ -961,8 +975,10 @@ name = "tlang_bindings_js"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
+ "console_log",
  "inventory",
  "js-sys",
+ "log",
  "ron 0.10.1",
  "serde",
  "serde-wasm-bindgen",
@@ -993,6 +1009,7 @@ dependencies = [
  "tlang_ast_lowering",
  "tlang_codegen_js",
  "tlang_hir",
+ "tlang_hir_opt",
  "tlang_interpreter",
  "tlang_parser",
  "tlang_semantics",
@@ -1005,10 +1022,12 @@ dependencies = [
  "ctor",
  "env_logger",
  "indoc",
+ "log",
  "pretty_assertions",
  "tlang_ast",
  "tlang_ast_lowering",
  "tlang_hir",
+ "tlang_hir_opt",
  "tlang_parser",
  "tlang_semantics",
 ]
@@ -1017,24 +1036,30 @@ dependencies = [
 name = "tlang_hir"
 version = "0.1.0"
 dependencies = [
+ "log",
  "pretty_assertions",
  "serde",
  "tlang_ast",
+ "tlang_span",
 ]
 
 [[package]]
 name = "tlang_hir_opt"
 version = "0.1.0"
 dependencies = [
+ "ctor",
  "env_logger",
  "insta",
  "log",
+ "pretty_assertions",
  "serde",
  "tlang_ast",
  "tlang_ast_lowering",
  "tlang_hir",
  "tlang_hir_pretty",
  "tlang_parser",
+ "tlang_semantics",
+ "tlang_span",
 ]
 
 [[package]]
@@ -1065,6 +1090,7 @@ dependencies = [
  "tlang_memory",
  "tlang_parser",
  "tlang_semantics",
+ "tlang_span",
  "tlang_stdlib",
 ]
 
@@ -1074,6 +1100,7 @@ version = "0.1.0"
 dependencies = [
  "pretty_assertions",
  "tlang_ast",
+ "tlang_span",
 ]
 
 [[package]]
@@ -1095,6 +1122,7 @@ dependencies = [
  "smallvec",
  "tlang_ast",
  "tlang_hir",
+ "tlang_span",
 ]
 
 [[package]]
@@ -1110,17 +1138,29 @@ dependencies = [
  "serde",
  "tlang_ast",
  "tlang_lexer",
+ "tlang_span",
 ]
 
 [[package]]
 name = "tlang_semantics"
 version = "0.1.0"
 dependencies = [
+ "ctor",
+ "env_logger",
  "indoc",
+ "log",
  "pretty_assertions",
  "serde",
  "tlang_ast",
  "tlang_parser",
+ "tlang_span",
+]
+
+[[package]]
+name = "tlang_span"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

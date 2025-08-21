@@ -1,6 +1,8 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
 
+use self::common::CodegenOptions;
+
 mod common;
 
 #[test]
@@ -12,14 +14,17 @@ fn test_codegen_variable_declaration() {
 
 #[test]
 fn test_codegen_variable_declaration_with_expression() {
-    let output = compile!("let x = 42 + 1;");
+    let output = compile!("let x = 42 + 1;", CodegenOptions::default().optimize(false));
     let expected_output = "let x = 42 + 1;\n";
     assert_eq!(output, expected_output);
 }
 
 #[test]
 fn test_variable_shadowing() {
-    let output = compile!("let x = 42; let x = 43; x;");
+    let output = compile!(
+        "let x = 42; let x = 43; x;",
+        CodegenOptions::default().optimize(false)
+    );
     let expected_output = "let x = 42;\nlet x$0 = 43;\nx$0;\n";
     assert_eq!(output, expected_output);
 }

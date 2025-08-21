@@ -1,18 +1,19 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
+use log::debug;
 use tlang_ast::{
+    NodeId,
     node::{
         BinaryOpKind, Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter,
         LetDeclaration, Module, Pat, PatKind, Path, Stmt, StmtKind, StructDeclaration,
     },
-    node_id::NodeId,
-    span::Span,
-    symbols::{SymbolId, SymbolInfo, SymbolTable, SymbolType},
+    symbols::{SymbolIdAllocator, SymbolInfo, SymbolTable, SymbolType},
 };
+use tlang_span::Span;
 
 use crate::{
     declarations::DeclarationAnalyzer,
-    diagnostic::{Diagnostic, Severity},
+    diagnostic::{self, Diagnostic},
 };
 
 pub struct SemanticAnalyzer {
@@ -39,13 +40,21 @@ impl SemanticAnalyzer {
     }
 
     #[inline(always)]
-    fn symbol_tables(&self) -> &HashMap<NodeId, Rc<RefCell<SymbolTable>>> {
+    pub fn symbol_tables(&self) -> &HashMap<NodeId, Rc<RefCell<SymbolTable>>> {
         self.declaration_analyzer.symbol_tables()
     }
 
     #[inline(always)]
     pub fn get_symbol_table(&self, id: NodeId) -> Option<Rc<RefCell<SymbolTable>>> {
         self.symbol_tables().get(&id).cloned()
+    }
+
+    pub fn root_symbol_table(&self) -> Rc<RefCell<SymbolTable>> {
+        self.declaration_analyzer.root_symbol_table().clone()
+    }
+
+    pub fn symbol_id_allocator(&self) -> SymbolIdAllocator {
+        self.declaration_analyzer.symbol_id_allocator()
     }
 
     pub fn get_diagnostics(&self) -> &[Diagnostic] {
@@ -65,25 +74,49 @@ impl SemanticAnalyzer {
     }
 
     fn current_symbol_table(&self) -> Rc<RefCell<SymbolTable>> {
-        Rc::clone(self.symbol_table_stack.last().unwrap())
+        self.symbol_table_stack.last().cloned().unwrap()
     }
 
     fn push_symbol_table(&mut self, symbol_table: &Rc<RefCell<SymbolTable>>) {
-        self.symbol_table_stack.push(Rc::clone(symbol_table));
+        self.symbol_table_stack.push(symbol_table.clone());
     }
 
     fn pop_symbol_table(&mut self) -> Rc<RefCell<SymbolTable>> {
-        self.symbol_table_stack.pop().unwrap()
+        let symbol_table = self.symbol_table_stack.pop().unwrap();
+        self.report_unused_symbols(&symbol_table);
+        symbol_table
     }
 
-    pub fn add_builtin_symbols(&mut self, symbols: &[(&str, SymbolType)]) {
+    pub fn add_builtin_symbols<'a, S, I>(&mut self, symbols: I)
+    where
+        S: AsRef<str> + 'a,
+        I: IntoIterator<Item = &'a (S, SymbolType)>,
+    {
         self.declaration_analyzer.add_builtin_symbols(symbols);
     }
 
     pub fn analyze(&mut self, module: &Module) -> Result<(), Vec<Diagnostic>> {
-        self.collect_declarations(module);
+        self.analyze_root_module(module, false)
+    }
+
+    pub fn analyze_as_root_module(&mut self, module: &Module) -> Result<(), Vec<Diagnostic>> {
+        self.analyze_root_module(module, true)
+    }
+
+    fn analyze_root_module(
+        &mut self,
+        module: &Module,
+        is_root: bool,
+    ) -> Result<(), Vec<Diagnostic>> {
+        self.collect_declarations(module, is_root);
+
+        self.symbol_table_stack.clear();
+        self.push_symbol_table(&self.root_symbol_table());
+
         // self.collect_initializations(ast);
         self.analyze_module(module);
+
+        self.pop_symbol_table();
 
         if self.get_errors().is_empty() {
             Ok(())
@@ -92,26 +125,21 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn collect_declarations(&mut self, module: &Module) {
-        self.declaration_analyzer.analyze(module);
+    fn collect_declarations(&mut self, module: &Module, is_root: bool) {
+        self.declaration_analyzer.analyze(module, is_root);
     }
 
     fn mark_as_used_by_name(&mut self, name: &str, span: Span) {
-        let symbol_info = self.current_symbol_table().borrow().get_by_name(name);
-
-        if symbol_info.is_empty() {
-            self.report_undeclared_variable(name, span);
-
-            return;
-        }
-
-        for symbol in &symbol_info {
-            // TODO: This only marks the by it's name, not by it's id. Maybe we should
-            //       mark it in the collection pass? Or keep track of the current id in
-            //       case the name is being shadowed?
+        let symbol_info = self
+            .current_symbol_table()
+            .borrow()
+            .get_closest_by_name(name, span);
+        if let Some(symbol_info) = symbol_info {
             self.current_symbol_table()
                 .borrow_mut()
-                .mark_as_used(symbol.id);
+                .mark_as_used(symbol_info.id);
+        } else {
+            self.report_undeclared_variable(name, span);
         }
     }
 
@@ -119,16 +147,8 @@ impl SemanticAnalyzer {
         let symbol_info_ids: Vec<_> = self
             .current_symbol_table()
             .borrow()
-            .get_by_name(name)
+            .get_by_name_and_arity(name, arity)
             .iter()
-            .filter(|s| {
-                if let SymbolType::Function(a) = s.symbol_type {
-                    a as usize == arity
-                } else {
-                    // Not a function, so we don't care about arity
-                    true
-                }
-            })
             .map(|s| s.id)
             .collect();
 
@@ -139,9 +159,9 @@ impl SemanticAnalyzer {
         }
 
         for symbol_id in symbol_info_ids {
-            // TODO: This only marks the by it's name, not by it's id. Maybe we should
-            //       mark it in the collection pass? Or keep track of the current id in
-            //       case the name is being shadowed?
+            // TODO: This only marks the fn by it's name and arity, not by it's id.
+            //       Maybe we should mark it in the collection pass?
+            //       Or keep track of the current id in case the name is being shadowed?
             self.current_symbol_table()
                 .borrow_mut()
                 .mark_as_used(symbol_id);
@@ -151,23 +171,23 @@ impl SemanticAnalyzer {
     fn report_undeclared_variable(&mut self, name: &str, span: Span) {
         let did_you_mean = did_you_mean(
             name,
-            &self.current_symbol_table().borrow().get_all_symbols(),
+            &self
+                .current_symbol_table()
+                .borrow()
+                .get_all_declared_symbols(),
         );
 
         if let Some(suggestion) = did_you_mean {
-            self.diagnostics.push(Diagnostic::new(
-                format!(
-                    "Use of undeclared variable `{}`, did you mean the {} `{}`?",
-                    name, suggestion.symbol_type, suggestion.name
-                ),
-                Severity::Error,
+            self.diagnostics.push(diagnostic::error_at!(
                 span,
+                "Use of undeclared variable `{name}`, did you mean the {} `{}`?",
+                suggestion.symbol_type,
+                suggestion.name,
             ));
         } else {
-            self.diagnostics.push(Diagnostic::new(
-                format!("Use of undeclared variable `{name}`"),
-                Severity::Error,
+            self.diagnostics.push(diagnostic::error_at!(
                 span,
+                "Use of undeclared variable `{name}`",
             ));
         }
     }
@@ -175,23 +195,23 @@ impl SemanticAnalyzer {
     fn report_undeclared_function(&mut self, name: &str, arity: usize, span: Span) {
         let did_you_mean = did_you_mean(
             name,
-            &self.current_symbol_table().borrow().get_all_symbols(),
+            &self
+                .current_symbol_table()
+                .borrow()
+                .get_all_declared_symbols(),
         );
 
         if let Some(suggestion) = did_you_mean {
-            self.diagnostics.push(Diagnostic::new(
-                format!(
-                    "Use of undeclared function `{}` with arity {}, did you mean the {} `{}`?",
-                    name, arity, suggestion.symbol_type, suggestion.name
-                ),
-                Severity::Error,
+            self.diagnostics.push(diagnostic::error_at!(
                 span,
+                "Use of undeclared function `{name}` with arity {arity}, did you mean the {} `{}`?",
+                suggestion.symbol_type,
+                suggestion.name
             ));
         } else {
-            self.diagnostics.push(Diagnostic::new(
-                format!("Use of undeclared function `{name}` with arity {arity}"),
-                Severity::Error,
+            self.diagnostics.push(diagnostic::error_at!(
                 span,
+                "Use of undeclared function `{name}` with arity {arity}",
             ));
         }
     }
@@ -214,8 +234,7 @@ impl SemanticAnalyzer {
 
         self.analyze_optional_expr(&block.expression);
 
-        if let Some(symbol_table) = &self.get_symbol_table(block.id) {
-            self.report_unused_symbols(symbol_table);
+        if self.get_symbol_table(block.id).is_some() {
             self.pop_symbol_table();
         }
     }
@@ -246,8 +265,7 @@ impl SemanticAnalyzer {
             }
         }
 
-        if let Some(symbol_table) = &self.get_symbol_table(stmt.id) {
-            self.report_unused_symbols(symbol_table);
+        if self.get_symbol_table(stmt.id).is_some() {
             self.pop_symbol_table();
         }
     }
@@ -271,13 +289,14 @@ impl SemanticAnalyzer {
 
         self.analyze_block(&decl.body);
 
-        if let Some(symbol_table) = &self.get_symbol_table(decl.id) {
-            self.report_unused_symbols(symbol_table);
+        if self.get_symbol_table(decl.id).is_some() {
             self.pop_symbol_table();
         }
     }
 
     fn analyze_path(&mut self, path: &Path, span: Span) {
+        debug!("Analyzing path: {}", path);
+
         let mut path_str = String::new();
 
         for segment in &path.segments {
@@ -288,6 +307,11 @@ impl SemanticAnalyzer {
     }
 
     fn analyze_path_with_known_arity(&mut self, path: &Path, arity: usize, span: Span) {
+        debug!(
+            "Analyzing path with known arity: {}, arity: {}",
+            path, arity
+        );
+
         let mut path_str = String::new();
 
         for segment in path.segments.iter().take(path.segments.len() - 1) {
@@ -311,15 +335,19 @@ impl SemanticAnalyzer {
             }
             ExprKind::Block(block) | ExprKind::Loop(block) => self.analyze_block(block),
             ExprKind::ForLoop(for_loop) => {
+                let symbol_table = self.get_symbol_table(for_loop.id).unwrap();
+                self.push_symbol_table(&symbol_table);
+
                 self.analyze_expr(&for_loop.iter, false);
-                self.analyze_pat(&for_loop.pat);
 
                 if let Some((pat, expr)) = &for_loop.acc {
                     self.analyze_pat(pat);
                     self.analyze_expr(expr, false);
                 }
 
+                self.analyze_pat(&for_loop.pat);
                 self.analyze_block(&for_loop.block);
+                self.pop_symbol_table();
 
                 if let Some(else_block) = &for_loop.else_block {
                     self.analyze_block(else_block);
@@ -405,8 +433,7 @@ impl SemanticAnalyzer {
                     self.analyze_pat(&arm.pattern);
                     self.analyze_expr(&arm.expression, false);
 
-                    if let Some(symbol_table) = &self.get_symbol_table(arm.id) {
-                        self.report_unused_symbols(symbol_table);
+                    if self.get_symbol_table(arm.id).is_some() {
                         self.pop_symbol_table();
                     }
                 }
@@ -418,8 +445,7 @@ impl SemanticAnalyzer {
             ExprKind::None | ExprKind::Continue | ExprKind::Literal(_) | ExprKind::Wildcard => {}
         }
 
-        if let Some(symbol_table) = &self.get_symbol_table(expr.id) {
-            self.report_unused_symbols(symbol_table);
+        if self.get_symbol_table(expr.id).is_some() {
             self.pop_symbol_table();
         }
     }
@@ -452,8 +478,7 @@ impl SemanticAnalyzer {
             self.analyze_stmt(stmt);
         }
 
-        if let Some(symbol_table) = &self.get_symbol_table(module.id) {
-            self.report_unused_symbols(symbol_table);
+        if self.get_symbol_table(module.id).is_some() {
             self.pop_symbol_table();
         }
     }
@@ -461,12 +486,12 @@ impl SemanticAnalyzer {
     fn report_unused_symbols(&mut self, symbol_table: &Rc<RefCell<SymbolTable>>) {
         let symbol_table = symbol_table.borrow();
         let unused_symbols = symbol_table
-            .get_all_local_symbols()
-            .iter()
-            // Internal symbols are currently represented with id 0 and internal symbols are not
-            // reported as unused.
-            .filter(|symbol| symbol.id != SymbolId::new(0))
+            .get_all_declared_local_symbols()
             .filter(|symbol| !symbol.used)
+            .filter(|symbol| !symbol.is_builtin())
+            // Do not report the binding introduced within function bodies to reference to
+            // themselves.
+            .filter(|symbol| !symbol.is_fn_self_binding())
             .filter(|symbol| !symbol.name.starts_with('_'))
             // TODO: We currently do not track member methods, as we do not have any type
             //       information yet.
@@ -474,14 +499,21 @@ impl SemanticAnalyzer {
             .collect::<Vec<_>>();
 
         for unused_symbol in &unused_symbols {
-            self.diagnostics.push(Diagnostic::new(
-                    format!(
-                        "Unused {} `{}`, if this is intentional, prefix the name with an underscore: `_{}`",
-                        unused_symbol.symbol_type, unused_symbol.name, unused_symbol.name
-                    ),
-                    Severity::Warning,
-                    unused_symbol.defined_at
+            if unused_symbol.is_any_fn() {
+                self.diagnostics.push(diagnostic::warn_at!(
+                    unused_symbol.defined_at,
+                    "Unused {} `{}/{}`",
+                    unused_symbol.symbol_type,
+                    unused_symbol.name,
+                    unused_symbol.symbol_type.arity().unwrap(),
                 ));
+            } else {
+                self.diagnostics.push(diagnostic::warn_at!(
+                    unused_symbol.defined_at,
+                    "Unused {} `{}`, if this is intentional, prefix the name with an underscore: `_{}`",
+                    unused_symbol.symbol_type, unused_symbol.name, unused_symbol.name
+                ));
+            }
         }
     }
 
@@ -491,27 +523,32 @@ impl SemanticAnalyzer {
         // When declaring a variable, we can only reference symbols that were declared before.
         // This includes our own variable name.
         // E.g. `let a = a;` is not allowed. But `let a = 1; let a = a;` is.
-        // By removing the symbol from the table while analyzing the expression, we can check
-        // whether the expression references any symbols that were not declared before.
+        // By marking the symbol as undeclared from the table while analyzing the expression,
+        // we can check whether the expression references any symbols that were not declared before.
         let pattern_symbols = decl
             .pattern
             .get_all_node_ids()
             .iter()
             .filter_map(|id| {
                 self.current_symbol_table()
-                    .borrow()
-                    .get_local_by_node_id(*id)
-                    .map(|symbol_info| symbol_info.id)
+                    .borrow_mut()
+                    .get_local(|s| s.node_id == Some(*id))
+                    .map(|s| s.id)
             })
-            .filter_map(|id| self.current_symbol_table().borrow_mut().remove(id))
             .collect::<Vec<_>>();
+
+        for symbol_id in &pattern_symbols {
+            self.current_symbol_table()
+                .borrow_mut()
+                .set_declared(*symbol_id, false);
+        }
 
         self.analyze_expr(&decl.expression, false);
 
-        for symbol in pattern_symbols {
+        for symbol_id in &pattern_symbols {
             self.current_symbol_table()
                 .borrow_mut()
-                .insert_beginning(symbol);
+                .set_declared(*symbol_id, true);
         }
     }
 }

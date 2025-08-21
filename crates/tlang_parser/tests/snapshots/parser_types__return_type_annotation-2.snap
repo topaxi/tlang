@@ -3,14 +3,14 @@ source: crates/tlang_parser/tests/parser_types.rs
 expression: "parse! (\"fn foo() -> Option<i64> { 1 }\")"
 ---
 Module(
-  id: NodeId(1),
+  id: 2,
   statements: [
     Stmt(
-      id: NodeId(9),
+      id: 10,
       kind: FunctionDeclaration(FunctionDeclaration(
-        id: NodeId(8),
+        id: 9,
         name: Expr(
-          id: NodeId(2),
+          id: 3,
           kind: Path(Path(
             segments: [
               Ident(
@@ -27,6 +27,9 @@ Module(
                 ),
               ),
             ],
+            res: Res(
+              node_id: None,
+            ),
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -54,7 +57,7 @@ Module(
         parameters: [],
         guard: None,
         return_type_annotation: Some(Ty(
-          id: NodeId(4),
+          id: 5,
           name: Path(
             segments: [
               Ident(
@@ -71,6 +74,9 @@ Module(
                 ),
               ),
             ],
+            res: Res(
+              node_id: None,
+            ),
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -84,7 +90,7 @@ Module(
           ),
           parameters: [
             Ty(
-              id: NodeId(3),
+              id: 4,
               name: Path(
                 segments: [
                   Ident(
@@ -101,6 +107,9 @@ Module(
                     ),
                   ),
                 ],
+                res: Res(
+                  node_id: None,
+                ),
                 span: Span(
                   start: LineColumn(
                     line: 0,
@@ -137,10 +146,10 @@ Module(
           ),
         )),
         body: Block(
-          id: NodeId(7),
+          id: 8,
           statements: [],
           expression: Some(Expr(
-            id: NodeId(6),
+            id: 7,
             kind: Literal(UnsignedInteger(1)),
             leading_comments: [],
             trailing_comments: [],
@@ -200,7 +209,7 @@ Module(
     ),
     end: LineColumn(
       line: 0,
-      column: 0,
+      column: 29,
     ),
   ),
 )

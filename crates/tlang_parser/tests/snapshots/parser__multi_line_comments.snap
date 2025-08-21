@@ -3,13 +3,13 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse! (\"/* this is a comment */\\nlet x = 1;\")"
 ---
 Module(
-  id: NodeId(1),
+  id: 2,
   statements: [
     Stmt(
-      id: NodeId(4),
+      id: 5,
       kind: Let(LetDeclaration(
         pattern: Pat(
-          id: NodeId(2),
+          id: 3,
           kind: Identifier(Ident(
             name: "x",
             span: Span(
@@ -37,7 +37,7 @@ Module(
           ),
         ),
         expression: Expr(
-          id: NodeId(3),
+          id: 4,
           kind: Literal(UnsignedInteger(1)),
           leading_comments: [],
           trailing_comments: [],
@@ -88,8 +88,8 @@ Module(
       column: 0,
     ),
     end: LineColumn(
-      line: 0,
-      column: 0,
+      line: 1,
+      column: 11,
     ),
   ),
 )

@@ -3,12 +3,12 @@ source: crates/tlang_parser/tests/parser.rs
 expression: "parse! (r#\"\"foo\";\"#)"
 ---
 Module(
-  id: NodeId(1),
+  id: 2,
   statements: [
     Stmt(
-      id: NodeId(2),
+      id: 3,
       kind: Expr(Expr(
-        id: NodeId(3),
+        id: 4,
         kind: Literal(String("foo")),
         leading_comments: [],
         trailing_comments: [],
@@ -44,7 +44,7 @@ Module(
     ),
     end: LineColumn(
       line: 0,
-      column: 0,
+      column: 6,
     ),
   ),
 )

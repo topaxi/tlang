@@ -1,13 +1,21 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fmt::Display;
-use std::num::NonZero;
+use std::rc::Rc;
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 use tlang_ast::node::{Ident, UnaryOp};
-use tlang_ast::span::Span;
+use tlang_ast::symbols::{SymbolIdAllocator, SymbolType};
 use tlang_ast::token::{Literal, Token};
 
+#[deprecated(note = "Use `tlang_span::HirId` instead")]
+pub use tlang_span::HirId;
+use tlang_span::{HirIdAllocator, Span};
+
 pub trait HirScope {
+    // fn hir_id(&self) -> HirId;
+
     fn locals(&self) -> usize;
     fn upvars(&self) -> usize;
 
@@ -15,22 +23,7 @@ pub trait HirScope {
     fn set_upvars(&mut self, upvars: usize);
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
-pub struct HirId(NonZero<usize>);
-
-impl HirId {
-    /// # Panics
-    pub fn new(id: usize) -> Self {
-        HirId(NonZero::new(id).expect("HirId must be non-zero"))
-    }
-
-    pub fn next(self) -> Self {
-        HirId(self.0.saturating_add(1))
-    }
-}
-
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct HirScopeData {
     // How many slots to allocate for local variables.
@@ -57,77 +50,199 @@ impl HirScope for HirScopeData {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
+pub struct BindingIdTag;
+
+pub type BindingId = tlang_span::id::Id<BindingIdTag>;
+pub type BindingIdAllocator = tlang_span::id::IdAllocator<BindingIdTag>;
+
+#[derive(Debug, Default, Eq, PartialEq, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-pub enum DefKind {
+pub enum BindingKind {
+    Local,
+    Upvar,
+    Temp,
     Struct,
     Enum,
     Variant,
     Fn,
+    Param,
     Field,
     Closure,
+    #[default]
+    Unknown,
+}
+
+impl From<SymbolType> for BindingKind {
+    fn from(symbol_type: SymbolType) -> Self {
+        match symbol_type {
+            SymbolType::Variable => BindingKind::Local,
+            SymbolType::Struct => BindingKind::Struct,
+            SymbolType::Enum => BindingKind::Enum,
+            SymbolType::EnumVariant(_) => BindingKind::Variant,
+            SymbolType::Function(_) | SymbolType::FunctionSelfRef(_) => BindingKind::Fn,
+            SymbolType::Parameter => BindingKind::Param,
+            SymbolType::Module => todo!(),
+        }
+    }
+}
+
+pub type SlotIndex = usize;
+pub type ScopeIndex = u16;
+
+#[derive(Debug, Default, Eq, PartialEq, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub enum Slot {
+    Local(SlotIndex),
+    Upvar(SlotIndex, ScopeIndex),
+    Builtin,
+    #[default]
+    None,
+}
+
+impl Slot {
+    pub fn new_local(slot_index: usize) -> Self {
+        Slot::Local(slot_index)
+    }
+
+    pub fn new_upvar(slot_index: usize, scope_index: usize) -> Self {
+        debug_assert!(scope_index <= ScopeIndex::MAX as usize);
+
+        Slot::Upvar(slot_index, scope_index as ScopeIndex)
+    }
+
+    pub fn is_local(self) -> bool {
+        matches!(self, Slot::Local(..))
+    }
+
+    pub fn is_upvar(self) -> bool {
+        matches!(self, Slot::Upvar(..))
+    }
+
+    pub fn is_builtin(self) -> bool {
+        matches!(self, Slot::Builtin)
+    }
+
+    pub fn is_none(self) -> bool {
+        matches!(self, Slot::None)
+    }
+}
+
+impl From<(usize, usize)> for Slot {
+    fn from(slot_data: (usize, usize)) -> Self {
+        match slot_data {
+            (slot_index, 0) => Slot::new_local(slot_index),
+            (slot_index, scope_index) => Slot::new_upvar(slot_index, scope_index),
+        }
+    }
 }
 
 #[derive(Debug, Default, Eq, PartialEq, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-pub enum Res {
-    #[default]
-    Unknown,
-    Def(DefKind, HirId, usize),
-    Local(HirId, usize),
-    Upvar(HirId, usize, usize),
+pub struct Res {
+    hir_id: Option<HirId>,
+    binding_kind: BindingKind,
+    slot: Slot,
 }
 
 impl Res {
+    fn new(hir_id: HirId, binding_kind: BindingKind) -> Self {
+        Res {
+            hir_id: Some(hir_id),
+            binding_kind,
+            slot: Slot::None,
+        }
+    }
+
+    pub fn new_local(hir_id: HirId) -> Self {
+        Res::new(hir_id, BindingKind::Local)
+    }
+
+    pub fn new_fn(hir_id: HirId) -> Self {
+        Res::new(hir_id, BindingKind::Fn)
+    }
+
+    pub fn new_enum(hir_id: HirId) -> Self {
+        Res::new(hir_id, BindingKind::Enum)
+    }
+
+    pub fn new_enum_variant(hir_id: HirId) -> Self {
+        Res::new(hir_id, BindingKind::Variant)
+    }
+
+    pub fn new_upvar(hir_id: HirId, slot_index: usize, scope_index: usize) -> Self {
+        debug_assert!(scope_index <= ScopeIndex::MAX as usize);
+
+        Res {
+            hir_id: Some(hir_id),
+            binding_kind: BindingKind::Upvar,
+            slot: Slot::Upvar(slot_index, scope_index as ScopeIndex),
+        }
+    }
+
     pub fn is_value(self) -> bool {
         matches!(
-            self,
-            Res::Local(..)
-                | Res::Upvar(..)
-                | Res::Def(DefKind::Fn, ..)
-                | Res::Def(DefKind::Closure, ..)
-                | Res::Unknown
+            self.binding_kind,
+            BindingKind::Local
+                | BindingKind::Upvar
+                | BindingKind::Temp
+                | BindingKind::Fn
+                | BindingKind::Param
+                | BindingKind::Closure
+                | BindingKind::Field
+                | BindingKind::Variant // variants can be used as values
+                | BindingKind::Unknown
         )
     }
 
     pub fn is_unknown(self) -> bool {
-        matches!(self, Res::Unknown)
+        matches!(self.binding_kind, BindingKind::Unknown)
     }
 
     pub fn is_def(self) -> bool {
-        matches!(self, Res::Def(..))
+        matches!(
+            self.binding_kind,
+            BindingKind::Struct | BindingKind::Enum | BindingKind::Fn
+        )
     }
 
     pub fn is_struct_def(self) -> bool {
-        matches!(self, Res::Def(DefKind::Struct, ..))
+        matches!(self.binding_kind, BindingKind::Struct)
     }
 
     pub fn is_enum_def(self) -> bool {
-        matches!(self, Res::Def(DefKind::Enum, ..))
+        matches!(self.binding_kind, BindingKind::Enum)
     }
 
     pub fn is_enum_variant_def(self) -> bool {
-        matches!(self, Res::Def(DefKind::Variant, ..))
+        matches!(self.binding_kind, BindingKind::Variant)
     }
 
     pub fn hir_id(self) -> Option<HirId> {
-        match self {
-            Res::Def(_, hir_id, ..) | Res::Local(hir_id, ..) | Res::Upvar(hir_id, ..) => {
-                Some(hir_id)
-            }
-            _ => None,
-        }
+        self.hir_id
     }
 
-    pub fn slot_index(self) -> Option<usize> {
-        match self {
-            Res::Def(.., index) | Res::Local(.., index) | Res::Upvar(_, _, index) => Some(index),
-            Res::Unknown => None,
-        }
+    pub fn set_hir_id(&mut self, hir_id: HirId) {
+        self.hir_id = Some(hir_id);
+    }
+
+    pub fn binding_kind(self) -> BindingKind {
+        self.binding_kind
+    }
+
+    pub fn set_binding_kind(&mut self, binding_kind: BindingKind) {
+        self.binding_kind = binding_kind;
+    }
+
+    pub fn slot(self) -> Slot {
+        self.slot
+    }
+
+    pub fn set_slot(&mut self, slot: Slot) {
+        self.slot = slot;
     }
 }
 
-/// HIR representation of a path.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Path {
@@ -152,13 +267,17 @@ impl Path {
     pub fn new(segments: Vec<PathSegment>, span: Span) -> Self {
         Self {
             segments,
-            res: Res::Unknown,
+            res: Res::default(),
             span,
         }
     }
 
-    pub fn with_res(mut self, res: Res) -> Self {
+    pub fn set_res(&mut self, res: Res) {
         self.res = res;
+    }
+
+    pub fn with_res(mut self, res: Res) -> Self {
+        self.set_res(res);
         self
     }
 
@@ -213,9 +332,10 @@ impl PathSegment {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Module {
+    pub hir_id: HirId,
     pub block: Block,
     pub span: Span,
 }
@@ -238,9 +358,10 @@ impl HirScope for Module {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Block {
+    pub hir_id: HirId,
     pub stmts: Vec<Stmt>,
     pub expr: Option<Expr>,
     scope: HirScopeData,
@@ -248,8 +369,9 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn new(stmts: Vec<Stmt>, expr: Option<Expr>, span: Span) -> Self {
+    pub fn new(hir_id: HirId, stmts: Vec<Stmt>, expr: Option<Expr>, span: Span) -> Self {
         Block {
+            hir_id,
             stmts,
             expr,
             scope: Default::default(),
@@ -548,13 +670,13 @@ pub struct FunctionDeclaration {
 }
 
 impl FunctionDeclaration {
-    pub fn new_empty_fn(hir_id: HirId, name: Expr, parameters: Vec<FunctionParameter>) -> Self {
+    pub fn new(hir_id: HirId, name: Expr, params: Vec<FunctionParameter>, body: Block) -> Self {
         FunctionDeclaration {
             hir_id,
             name,
-            parameters,
+            parameters: params,
             return_type: Ty::default(),
-            body: Block::default(),
+            body,
             span: Span::default(),
         }
     }
@@ -670,3 +792,13 @@ pub enum BinaryOpKind {
     BitwiseOr,
     BitwiseXor,
 }
+
+#[derive(Debug)]
+pub struct LowerResultMeta {
+    pub root_symbol_table: HirId,
+    pub symbol_tables: HashMap<HirId, Rc<RefCell<tlang_ast::symbols::SymbolTable>>>,
+    pub hir_id_allocator: HirIdAllocator,
+    pub symbol_id_allocator: SymbolIdAllocator,
+}
+
+pub type LowerResult = (Module, LowerResultMeta);

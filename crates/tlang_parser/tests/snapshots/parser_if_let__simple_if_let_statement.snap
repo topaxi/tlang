@@ -1,19 +1,19 @@
 ---
 source: crates/tlang_parser/tests/parser_if_let.rs
-expression: "parse! (indoc! { \"\n        if let x = 1 {\n            x\n        }\n    \" })"
+expression: "parse! (indoc! {\"\n        if let x = 1 {\n            x\n        }\n    \"})"
 ---
 Module(
-  id: NodeId(1),
+  id: 2,
   statements: [
     Stmt(
-      id: NodeId(2),
+      id: 3,
       kind: Expr(Expr(
-        id: NodeId(9),
+        id: 10,
         kind: IfElse(IfElseExpression(
           condition: Expr(
-            id: NodeId(5),
+            id: 6,
             kind: Let(Pat(
-              id: NodeId(3),
+              id: 4,
               kind: Identifier(Ident(
                 name: "x",
                 span: Span(
@@ -40,7 +40,7 @@ Module(
                 ),
               ),
             ), Expr(
-              id: NodeId(4),
+              id: 5,
               kind: Literal(UnsignedInteger(1)),
               leading_comments: [],
               trailing_comments: [],
@@ -69,10 +69,10 @@ Module(
             ),
           ),
           then_branch: Block(
-            id: NodeId(8),
+            id: 9,
             statements: [],
             expression: Some(Expr(
-              id: NodeId(7),
+              id: 8,
               kind: Path(Path(
                 segments: [
                   Ident(
@@ -89,6 +89,9 @@ Module(
                     ),
                   ),
                 ],
+                res: Res(
+                  node_id: None,
+                ),
                 span: Span(
                   start: LineColumn(
                     line: 1,
@@ -159,8 +162,8 @@ Module(
       column: 0,
     ),
     end: LineColumn(
-      line: 0,
-      column: 0,
+      line: 2,
+      column: 2,
     ),
   ),
 )

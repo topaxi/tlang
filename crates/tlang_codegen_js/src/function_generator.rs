@@ -2,6 +2,7 @@ use tlang_hir::hir;
 
 use crate::expr_generator::expr_can_render_as_js_expr;
 use crate::generator::{BlockContext, CodegenJS, FunctionContext};
+use crate::js;
 
 impl CodegenJS {
     fn generate_function_param(&mut self, param: &hir::FunctionParameter, is_self: bool) {
@@ -52,14 +53,21 @@ impl CodegenJS {
         match &name.kind {
             hir::ExprKind::Path(path) if path.segments.len() > 1 => {
                 self.push_indent();
-                self.push_str(&path.join("."));
+                self.push_str(
+                    &path
+                        .segments
+                        .iter()
+                        .map(|s| js::safe_js_variable_name(s.ident.as_str()))
+                        .collect::<Vec<_>>()
+                        .join("."),
+                );
                 self.push_str(" = ");
             }
             hir::ExprKind::FieldAccess(base, field) => {
                 self.push_indent();
                 self.push_str(&fn_identifier_to_string(base));
                 self.push_str(".prototype.");
-                self.push_str(field.as_str());
+                self.push_str(&js::safe_js_variable_name(field.as_str()));
                 self.push_str(" = ");
             }
             _ => self.push_indent(),
@@ -407,8 +415,8 @@ fn is_function_body_tail_recursive(function_name: &str, node: &hir::Expr) -> boo
 
 pub(crate) fn fn_identifier_to_string(expr: &hir::Expr) -> String {
     match &expr.kind {
-        hir::ExprKind::Path(path) => path.join("__"),
-        hir::ExprKind::FieldAccess(_base, field) => field.to_string(),
+        hir::ExprKind::Path(path) => js::safe_js_variable_name(&path.join("__")),
+        hir::ExprKind::FieldAccess(_base, field) => js::safe_js_variable_name(&field.to_string()),
         _ => unreachable!(),
     }
 }

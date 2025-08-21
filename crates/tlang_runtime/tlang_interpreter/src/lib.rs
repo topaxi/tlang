@@ -1,13 +1,13 @@
 #![feature(if_let_guard)]
 #![feature(box_patterns)]
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use log::debug;
 use smallvec::SmallVec;
 use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token;
-use tlang_hir::hir::{self, DefKind, HirId, Res};
+use tlang_hir::hir::{self, BindingKind, HirId};
 use tlang_memory::shape::{ShapeKey, Shaped, TlangEnumVariant, TlangShape};
 use tlang_memory::state::TailCall;
 use tlang_memory::value::TlangArithmetic;
@@ -65,6 +65,56 @@ impl Default for Interpreter {
 }
 
 impl Interpreter {
+    fn builtin_module_symbols() -> Vec<(&'static str, tlang_ast::symbols::SymbolType)> {
+        let mut module_names = HashSet::new();
+
+        inventory::iter::<NativeFnDef>
+            .into_iter()
+            .map(|def| def.module())
+            .filter(|module_name| module_names.insert(module_name.to_string()))
+            .map(|module_name| (module_name, tlang_ast::symbols::SymbolType::Module))
+            .collect()
+    }
+
+    fn builtin_fn_symbols() -> Vec<(String, tlang_ast::symbols::SymbolType)> {
+        inventory::iter::<NativeFnDef>
+            .into_iter()
+            .map(|def| {
+                (
+                    def.name(),
+                    tlang_ast::symbols::SymbolType::Function(def.arity() as u16),
+                )
+            })
+            .collect::<Vec<_>>()
+    }
+
+    const fn builtin_const_symbols() -> &'static [(&'static str, tlang_ast::symbols::SymbolType)] {
+        &[
+            ("Option", tlang_ast::symbols::SymbolType::Enum),
+            (
+                "Option::None",
+                tlang_ast::symbols::SymbolType::EnumVariant(0),
+            ),
+            ("Result", tlang_ast::symbols::SymbolType::Enum),
+            ("math::pi", tlang_ast::symbols::SymbolType::Variable),
+        ]
+    }
+
+    pub fn builtin_symbols() -> Vec<(String, tlang_ast::symbols::SymbolType)> {
+        let mut symbols: Vec<(String, tlang_ast::symbols::SymbolType)> =
+            Self::builtin_module_symbols()
+                .iter()
+                .map(|(name, ty)| (name.to_string(), *ty))
+                .collect();
+        symbols.extend(Self::builtin_fn_symbols());
+        symbols.extend(
+            Self::builtin_const_symbols()
+                .iter()
+                .map(|(name, ty)| (name.to_string(), *ty)),
+        );
+        symbols
+    }
+
     /// # Panics
     pub fn new() -> Self {
         let mut interpreter = Self {
@@ -107,18 +157,18 @@ impl Interpreter {
         self.state.panic(message)
     }
 
-    pub fn create_native_fn<F>(&mut self, f: F) -> TlangValue
+    pub fn create_native_fn<F>(&mut self, name: &str, f: F) -> TlangValue
     where
         F: Fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn + 'static,
     {
-        self.state.new_native_fn(f)
+        self.state.new_native_fn(name, f)
     }
 
     pub fn define_native_fn<F>(&mut self, name: &str, f: F) -> TlangValue
     where
         F: Fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn + 'static,
     {
-        let fn_object = self.create_native_fn(f);
+        let fn_object = self.create_native_fn(name, f);
 
         debug!("Defining global native function: {name}");
 
@@ -316,7 +366,7 @@ impl Interpreter {
             hir::ExprKind::Path(path) => {
                 EvalResult::Value(self.resolve_value(path).unwrap_or_else(|| {
                     self.panic(format!(
-                        "Could not resolve path: {} ({:?})\nCurrent scope: {}",
+                        "Could not resolve path \"{}\" ({:?})\nCurrent scope: {}",
                         path,
                         path.res,
                         self.state.debug_stringify_scope_stack()
@@ -419,7 +469,10 @@ impl Interpreter {
         }
 
         if !value.is_object() {
-            self.panic(format!("Cannot access field `{ident}` on non-object"));
+            self.panic(format!(
+                "Cannot access field `{ident}` on non-object: {}",
+                self.state.stringify(value)
+            ));
         }
 
         todo!(
@@ -697,8 +750,8 @@ impl Interpreter {
                 self.state
                     .set_global(path.to_string() + ident.as_str(), fn_object);
 
-                match &path.res {
-                    Res::Def(DefKind::Struct, ..) => {
+                match &path.res.binding_kind() {
+                    BindingKind::Struct => {
                         let struct_decl = self.state.get_struct_decl(path).unwrap();
 
                         self.state.set_struct_method(
@@ -707,7 +760,7 @@ impl Interpreter {
                             TlangStructMethod::HirId(decl.hir_id),
                         );
                     }
-                    Res::Def(DefKind::Enum, ..) => {
+                    BindingKind::Enum => {
                         let enum_decl = self.state.get_enum_decl(path).unwrap();
 
                         self.state.set_enum_method(
@@ -716,7 +769,7 @@ impl Interpreter {
                             TlangStructMethod::HirId(decl.hir_id),
                         );
                     }
-                    Res::Unknown => {
+                    BindingKind::Unknown => {
                         self.panic(format!(
                             "Could not define method {ident} on unresolved path: {path:?}"
                         ));
@@ -743,7 +796,7 @@ impl Interpreter {
         };
         let variants = decl.variants.clone();
 
-        self.create_native_fn(move |state, args| {
+        self.create_native_fn(&(name.clone() + "/*"), move |state, args| {
             let variant = variants.iter().find_map(|(arity, hir_id)| {
                 if *arity == args.len() {
                     Some(*hir_id)
@@ -762,9 +815,12 @@ impl Interpreter {
     fn eval_dyn_fn_decl(&mut self, decl: &hir::DynFunctionDeclaration) {
         let dyn_fn_object = self.create_dyn_fn_object(decl);
 
+        self.push_value(dyn_fn_object);
+
         match &decl.name.kind {
-            hir::ExprKind::Path(_path) => {
-                //self.push_value(dyn_fn_object);
+            hir::ExprKind::Path(path) => {
+                // Used for static struct method resolution, for now..
+                self.state.set_global(path.to_string(), dyn_fn_object);
             }
             hir::ExprKind::FieldAccess(expr, ident) => {
                 let path = match &expr.kind {
@@ -918,9 +974,21 @@ impl Interpreter {
             let fn_hir_id = match tail_call.callee {
                 TlangValue::Object(obj) => match self.get_object_by_id(obj) {
                     TlangObjectKind::Fn(hir_id) => *hir_id,
-                    _ => self.panic(format!("`{:?}` is not a function", tail_call.callee)),
+                    TlangObjectKind::NativeFn => {
+                        self.panic(format!(
+                            "`{:?}` is a native function, cannot tail call",
+                            self.state.stringify(tail_call.callee)
+                        ));
+                    }
+                    _ => self.panic(format!(
+                        "`{:?}` is not a function",
+                        self.state.stringify(tail_call.callee)
+                    )),
                 },
-                _ => self.panic(format!("`{:?}` is not a function", tail_call.callee)),
+                _ => self.panic(format!(
+                    "`{:?}` is not a function",
+                    self.state.stringify(tail_call.callee)
+                )),
             };
 
             // Optimized for self referencial tail calls, if we are calling the same function,
@@ -978,7 +1046,7 @@ impl Interpreter {
             call_expr.arguments
         );
 
-        let fn_object = self.create_native_fn(move |_, args| {
+        let fn_object = self.create_native_fn("anonymous", move |_, args| {
             let mut applied_args = applied_args.clone();
             // For each arg in args, replace a hole (Nil) from the already applied args
             for arg in args {
@@ -1043,9 +1111,9 @@ impl Interpreter {
             }
             hir::ExprKind::Path(path) => {
                 self.panic(format!(
-                    "Function `{}` not found\nCurrent scope: {:?}",
+                    "Function `{}` not found\nCurrent scope: {}",
                     path,
-                    self.state.current_scope().borrow()
+                    self.state.debug_stringify_scope_stack()
                 ));
             }
             hir::ExprKind::FieldAccess(expr, ident) => {
@@ -1620,37 +1688,86 @@ mod tests {
     use super::*;
     use indoc::indoc;
     use pretty_assertions::{assert_eq, assert_matches};
+    use tlang_hir_opt::HirOptimizer;
+    use tlang_span::Span;
 
     #[ctor::ctor]
     fn before_all() {
-        env_logger::init();
+        let _ = env_logger::builder()
+            .filter_level(log::LevelFilter::Warn)
+            .parse_default_env()
+            .is_test(true)
+            .try_init();
     }
 
     struct TestInterpreter {
-        lowering_context: tlang_ast_lowering::LoweringContext,
+        node_id_allocator: tlang_span::NodeIdAllocator,
+        semantic_analyzer: tlang_semantics::SemanticAnalyzer,
         interpreter: Interpreter,
+        last_span: Span,
     }
 
     impl TestInterpreter {
         fn new() -> Self {
+            let mut semantic_analyzer = tlang_semantics::SemanticAnalyzer::default();
+            semantic_analyzer.add_builtin_symbols(&Interpreter::builtin_symbols());
+            let interpreter = Interpreter::new();
+
             TestInterpreter {
-                lowering_context: tlang_ast_lowering::LoweringContext::default(),
-                interpreter: Interpreter::new(),
+                node_id_allocator: tlang_span::NodeIdAllocator::default(),
+                semantic_analyzer,
+                interpreter,
+                last_span: Span::default(),
             }
         }
 
+        fn parse_src(&mut self, src: &str) -> tlang_ast::node::Module {
+            let mut parser = tlang_parser::Parser::from_source(src)
+                .with_line_offset(self.last_span.end.line + 1)
+                .set_node_id_allocator(self.node_id_allocator);
+            let module = parser.parse().unwrap();
+
+            self.last_span = module.span;
+            self.node_id_allocator = *parser.node_id_allocator();
+
+            module
+        }
+
+        fn analyze(&mut self, module: &tlang_ast::node::Module) {
+            self.semantic_analyzer
+                .analyze_as_root_module(module)
+                .unwrap();
+        }
+
+        fn lower(&mut self, module: &tlang_ast::node::Module) -> hir::Module {
+            let mut lowering_context = tlang_ast_lowering::LoweringContext::new(
+                self.semantic_analyzer.symbol_id_allocator(),
+                self.semantic_analyzer.root_symbol_table(),
+                self.semantic_analyzer.symbol_tables().clone(),
+            );
+            let (mut module, meta) = tlang_ast_lowering::lower(&mut lowering_context, module);
+
+            let mut optimizer = HirOptimizer::default();
+            debug!("LowerResultMeta = {:?}", meta);
+            optimizer.optimize_hir(&mut module, meta.into());
+
+            module
+        }
+
+        fn parse(&mut self, src: &str) -> hir::Module {
+            let ast = self.parse_src(src);
+            self.analyze(&ast);
+            self.lower(&ast)
+        }
+
         fn eval_root(&mut self, src: &str) -> TlangValue {
-            let mut parser = tlang_parser::Parser::from_source(src);
-            let ast = parser.parse().unwrap();
-            let hir = self.lowering_context.lower_module_in_current_scope(&ast);
+            let hir = self.parse(src);
             self.interpreter.eval(&hir)
         }
 
         fn eval(&mut self, src: &str) -> TlangValue {
             let block = format!("{{ {src} }};");
-            let mut parser = tlang_parser::Parser::from_source(&block);
-            let ast = parser.parse().unwrap();
-            let hir = self.lowering_context.lower_module_in_current_scope(&ast);
+            let hir = self.parse(&block);
 
             match &hir.block.stmts[0].kind {
                 hir::StmtKind::Expr(expr) => self.interpreter.eval_expr(expr).unwrap_value(),
@@ -1897,27 +2014,32 @@ mod tests {
     #[test]
     fn test_enum_declaration_and_use() {
         let mut interpreter = interpreter(indoc! {"
-            enum Values {
-                One,
-                Two,
-                Three,
-            }
-        "});
+        enum Values {
+            One,
+            Two,
+            Three,
+        }
+    "});
 
-        assert_matches!(interpreter.eval("Values::One"), TlangValue::U64(0));
-        assert_matches!(interpreter.eval("Values::Two"), TlangValue::U64(1));
-        assert_matches!(interpreter.eval("Values::Three"), TlangValue::U64(2));
+        assert_matches!(
+            [
+                interpreter.eval("Values::One"),
+                interpreter.eval("Values::Two"),
+                interpreter.eval("Values::Three")
+            ],
+            [TlangValue::U64(0), TlangValue::U64(1), TlangValue::U64(2)]
+        );
     }
 
     #[test]
     fn test_tagged_enum_declaration_and_use() {
         let mut interpreter = interpreter(indoc! {"
-            enum Option {
+            enum MyOption {
                 None,
                 Some(Int),
             }
-            let some = Option::Some(10);
-            let none = Option::None;
+            let some = MyOption::Some(10);
+            let none = MyOption::None;
         "});
 
         let some_value = interpreter.eval("some");

@@ -1,17 +1,17 @@
 ---
 source: crates/tlang_parser/tests/parser_fn.rs
-expression: "parse!\n(indoc!\n{\n    \"\n        fn foo(1) { 1 }\n        // comment\n        fn foo(n) { n * 2 }\n    \"\n})"
+expression: "parse!\n(indoc!\n{\"\n        fn foo(1) { 1 }\n        // comment\n        fn foo(n) { n * 2 }\n    \"})"
 ---
 Module(
-  id: NodeId(1),
+  id: 2,
   statements: [
     Stmt(
-      id: NodeId(16),
+      id: 17,
       kind: FunctionDeclarations([
         FunctionDeclaration(
-          id: NodeId(7),
+          id: 8,
           name: Expr(
-            id: NodeId(2),
+            id: 3,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -28,6 +28,9 @@ Module(
                   ),
                 ),
               ],
+              res: Res(
+                node_id: None,
+              ),
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -55,7 +58,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: NodeId(3),
+                id: 4,
                 kind: Literal(UnsignedInteger(1)),
                 leading_comments: [],
                 trailing_comments: [],
@@ -86,10 +89,10 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: NodeId(6),
+            id: 7,
             statements: [],
             expression: Some(Expr(
-              id: NodeId(5),
+              id: 6,
               kind: Literal(UnsignedInteger(1)),
               leading_comments: [],
               trailing_comments: [],
@@ -129,9 +132,9 @@ Module(
           ),
         ),
         FunctionDeclaration(
-          id: NodeId(15),
+          id: 16,
           name: Expr(
-            id: NodeId(8),
+            id: 9,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -148,6 +151,9 @@ Module(
                   ),
                 ),
               ],
+              res: Res(
+                node_id: None,
+              ),
               span: Span(
                 start: LineColumn(
                   line: 2,
@@ -175,7 +181,7 @@ Module(
           parameters: [
             FunctionParameter(
               pattern: Pat(
-                id: NodeId(9),
+                id: 10,
                 kind: Identifier(Ident(
                   name: "n",
                   span: Span(
@@ -218,14 +224,14 @@ Module(
           guard: None,
           return_type_annotation: None,
           body: Block(
-            id: NodeId(14),
+            id: 15,
             statements: [],
             expression: Some(Expr(
-              id: NodeId(13),
+              id: 14,
               kind: BinaryOp(BinaryOpExpression(
                 op: Multiply,
                 lhs: Expr(
-                  id: NodeId(11),
+                  id: 12,
                   kind: Path(Path(
                     segments: [
                       Ident(
@@ -242,6 +248,9 @@ Module(
                         ),
                       ),
                     ],
+                    res: Res(
+                      node_id: None,
+                    ),
                     span: Span(
                       start: LineColumn(
                         line: 2,
@@ -267,7 +276,7 @@ Module(
                   ),
                 ),
                 rhs: Expr(
-                  id: NodeId(12),
+                  id: 13,
                   kind: Literal(UnsignedInteger(2)),
                   leading_comments: [],
                   trailing_comments: [],
@@ -355,8 +364,8 @@ Module(
       column: 0,
     ),
     end: LineColumn(
-      line: 0,
-      column: 0,
+      line: 2,
+      column: 20,
     ),
   ),
 )

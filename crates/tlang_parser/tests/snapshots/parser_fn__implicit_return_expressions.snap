@@ -3,14 +3,14 @@ source: crates/tlang_parser/tests/parser_fn.rs
 expression: "parse! (\"fn foo() { let x = 1; x }\")"
 ---
 Module(
-  id: NodeId(1),
+  id: 2,
   statements: [
     Stmt(
-      id: NodeId(10),
+      id: 11,
       kind: FunctionDeclaration(FunctionDeclaration(
-        id: NodeId(9),
+        id: 10,
         name: Expr(
-          id: NodeId(2),
+          id: 3,
           kind: Path(Path(
             segments: [
               Ident(
@@ -27,6 +27,9 @@ Module(
                 ),
               ),
             ],
+            res: Res(
+              node_id: None,
+            ),
             span: Span(
               start: LineColumn(
                 line: 0,
@@ -55,13 +58,13 @@ Module(
         guard: None,
         return_type_annotation: None,
         body: Block(
-          id: NodeId(8),
+          id: 9,
           statements: [
             Stmt(
-              id: NodeId(5),
+              id: 6,
               kind: Let(LetDeclaration(
                 pattern: Pat(
-                  id: NodeId(3),
+                  id: 4,
                   kind: Identifier(Ident(
                     name: "x",
                     span: Span(
@@ -89,7 +92,7 @@ Module(
                   ),
                 ),
                 expression: Expr(
-                  id: NodeId(4),
+                  id: 5,
                   kind: Literal(UnsignedInteger(1)),
                   leading_comments: [],
                   trailing_comments: [],
@@ -121,7 +124,7 @@ Module(
             ),
           ],
           expression: Some(Expr(
-            id: NodeId(7),
+            id: 8,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -138,6 +141,9 @@ Module(
                   ),
                 ),
               ],
+              res: Res(
+                node_id: None,
+              ),
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -207,7 +213,7 @@ Module(
     ),
     end: LineColumn(
       line: 0,
-      column: 0,
+      column: 25,
     ),
   ),
 )

@@ -21,7 +21,7 @@ pub fn define_list_shape(state: &mut InterpreterState) {
 
     method_map.insert(
         "iter".to_string(),
-        state.new_native_method(|state, this, _args| {
+        state.new_native_method("List::iter", |state, this, _args| {
             NativeFnReturn::Return(state.new_object(TlangObjectKind::Struct(TlangStruct::new(
                 state.builtin_shapes.list_iterator,
                 vec![this, TlangValue::from(0)],
@@ -31,7 +31,7 @@ pub fn define_list_shape(state: &mut InterpreterState) {
 
     method_map.insert(
         "slice".to_string(),
-        state.new_native_method(|state, this, args| {
+        state.new_native_method("List::slice", |state, this, args| {
             let list = state.get_struct(this).unwrap();
 
             let start = args[0].as_usize();
@@ -56,7 +56,7 @@ fn define_list_iterator_shape(state: &mut InterpreterState) {
 
     method_map.insert(
         "next".to_string(),
-        state.new_native_method(|state, this, _args| {
+        state.new_native_method("Iterator::next", |state, this, _args| {
             let iter = state.get_struct(this).unwrap();
             let list = state.get_struct(iter[0]).unwrap();
             let index = iter[1].as_usize();

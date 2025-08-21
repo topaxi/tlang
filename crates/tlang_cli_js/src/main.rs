@@ -7,6 +7,8 @@ use std::{
 use clap::{ArgMatches, arg, command};
 use tlang_ast_lowering::lower_to_hir;
 use tlang_codegen_js::generator::CodegenJS;
+use tlang_hir::hir;
+use tlang_hir_opt::HirOptimizer;
 use tlang_parser::error::ParseIssue;
 use tlang_semantics::{SemanticAnalyzer, diagnostic::Diagnostic};
 
@@ -76,7 +78,7 @@ fn get_args() -> Args {
 }
 
 fn compile_standard_library() -> Result<String, ParserError> {
-    let mut js = compile(&CodegenJS::get_standard_library_source())?;
+    let mut js = compile_to_js(&CodegenJS::get_standard_library_source())?;
 
     js.push_str("\nfunction panic(msg) { throw new Error(msg); }\n");
 
@@ -108,9 +110,9 @@ fn main() {
         }
 
         let output = match args.output_type {
-            OutputType::Ast => compile_to_ast(&source),
-            OutputType::Hir => compile_to_hir(&source),
-            OutputType::Js => compile(&source),
+            OutputType::Ast => compile_to_ast_string(&source),
+            OutputType::Hir => compile_to_hir_string(&source),
+            OutputType::Js => compile_to_js(&source),
         };
 
         let output = match output {
@@ -165,31 +167,44 @@ impl From<Vec<Diagnostic>> for ParserError {
     }
 }
 
-fn compile_to_ast(source: &str) -> Result<String, ParserError> {
+fn compile_to_ast_string(source: &str) -> Result<String, ParserError> {
     let mut parser = tlang_parser::Parser::from_source(source);
     let ast = parser.parse()?;
+
     Ok(ron::ser::to_string_pretty(&ast, ron::ser::PrettyConfig::default()).unwrap())
 }
 
-fn compile_to_hir(source: &str) -> Result<String, ParserError> {
+fn compile_to_hir(source: &str) -> Result<hir::Module, ParserError> {
     let mut parser = tlang_parser::Parser::from_source(source);
     let ast = parser.parse()?;
-    let hir = lower_to_hir(&ast);
-    Ok(ron::ser::to_string_pretty(&hir, ron::ser::PrettyConfig::default()).unwrap())
-}
 
-fn compile(source: &str) -> Result<String, ParserError> {
-    let mut parser = tlang_parser::Parser::from_source(source);
-    let ast = parser.parse()?;
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());
-    match semantic_analyzer.analyze(&ast) {
-        Ok(()) => {
-            let mut generator = CodegenJS::default();
-            let hir = lower_to_hir(&ast);
-            generator.generate_code(&hir);
-            Ok(generator.get_output().to_string())
-        }
-        Err(diagnostics) => Err(diagnostics.into()),
-    }
+    semantic_analyzer.analyze(&ast)?;
+
+    let (mut module, meta) = lower_to_hir(
+        &ast,
+        semantic_analyzer.symbol_id_allocator(),
+        semantic_analyzer.root_symbol_table(),
+        semantic_analyzer.symbol_tables().clone(),
+    );
+
+    let mut optimizer = HirOptimizer::default();
+    optimizer.optimize_hir(&mut module, meta.into());
+
+    Ok(module)
+}
+
+fn compile_to_hir_string(source: &str) -> Result<String, ParserError> {
+    let module = compile_to_hir(source)?;
+
+    Ok(ron::ser::to_string_pretty(&module, ron::ser::PrettyConfig::default()).unwrap())
+}
+
+fn compile_to_js(source: &str) -> Result<String, ParserError> {
+    let module = compile_to_hir(source)?;
+
+    let mut generator = CodegenJS::default();
+    generator.generate_code(&module);
+    Ok(generator.get_output().to_string())
 }

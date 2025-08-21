@@ -1,115 +1,217 @@
 #![feature(box_patterns)]
 #![feature(if_let_guard)]
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
-use log::debug;
+use log::{debug, warn};
 use tlang_ast as ast;
 use tlang_ast::keyword::kw;
 use tlang_ast::node::{EnumPattern, FunctionDeclaration, Ident};
-use tlang_hir::hir::{self, HirId};
-
-use self::scope::Scope;
+use tlang_ast::symbols::SymbolIdAllocator;
+use tlang_hir::hir;
+use tlang_span::{HirId, HirIdAllocator, LineColumn};
 
 mod expr;
 mod r#loop;
-mod scope;
 mod stmt;
 
-// TODO: Add scopes and variable resolutions. There should be two kinds of bindings, one for a
-// whole block (declarations) and one for variable definitions (from definition forward).
-// See: https://github.com/rust-lang/rust/blob/de7cef75be8fab7a7e1b4d5bb01b51b4bac925c3/compiler/rustc_resolve/src/lib.rs#L408
+#[derive(Debug)]
 pub struct LoweringContext {
-    unique_id: HirId,
-    node_id_to_hir_id: HashMap<ast::node_id::NodeId, HirId>,
-    scopes: Vec<Scope>,
+    node_id_to_hir_id: HashMap<ast::NodeId, HirId>,
+    fn_node_id_to_hir_id: HashMap<ast::NodeId, HirId>,
+    hir_id_allocator: HirIdAllocator,
+    symbol_id_allocator: SymbolIdAllocator,
+    symbol_tables: HashMap<ast::NodeId, Rc<RefCell<ast::symbols::SymbolTable>>>,
+    new_symbol_tables: HashMap<HirId, Rc<RefCell<ast::symbols::SymbolTable>>>,
+    current_symbol_table: Rc<RefCell<ast::symbols::SymbolTable>>,
 }
 
 impl LoweringContext {
-    pub fn new() -> Self {
+    pub fn new(
+        symbol_id_allocator: SymbolIdAllocator,
+        root_symbol_table: Rc<RefCell<ast::symbols::SymbolTable>>,
+        symbol_tables: HashMap<ast::NodeId, Rc<RefCell<ast::symbols::SymbolTable>>>,
+    ) -> Self {
         Self {
-            unique_id: HirId::new(1),
+            hir_id_allocator: HirIdAllocator::default(),
             node_id_to_hir_id: HashMap::default(),
-            scopes: vec![Scope::default()],
+            fn_node_id_to_hir_id: HashMap::default(),
+            symbol_id_allocator,
+            symbol_tables,
+            new_symbol_tables: HashMap::default(),
+            current_symbol_table: root_symbol_table,
         }
+    }
+
+    pub fn symbol_tables(&self) -> HashMap<HirId, Rc<RefCell<ast::symbols::SymbolTable>>> {
+        debug!("Translating symbol tables to HirIds");
+
+        let mut symbol_tables = self.new_symbol_tables.clone();
+
+        for (node_id, symbol_table) in &self.symbol_tables {
+            if let Some(hir_id) = self.node_id_to_hir_id.get(node_id) {
+                let symbol_table = symbol_table.clone();
+
+                symbol_table
+                    .borrow_mut()
+                    .get_all_local_symbols_mut()
+                    .iter_mut()
+                    .for_each(|symbol| {
+                        if let Some(node_id) = symbol.node_id {
+                            if let Some(hir_id) = self
+                                .fn_node_id_to_hir_id
+                                .get(&node_id)
+                                .or_else(|| self.node_id_to_hir_id.get(&node_id))
+                            {
+                                symbol.hir_id = Some(*hir_id);
+
+                                debug!(
+                                    "Assigning {:?} to symbol {} on line {} from {:?}",
+                                    hir_id, symbol.name, symbol.defined_at.start, node_id
+                                );
+                            } else {
+                                warn!(
+                                    "Unable to map {:?} to HirId for symbol {}",
+                                    node_id, symbol.name
+                                );
+                            }
+                        }
+                    });
+
+                symbol_tables.insert(*hir_id, symbol_table);
+            } else {
+                warn!("No HirId found for NodeId: {:?}", node_id);
+            }
+        }
+
+        debug!("NodeId to HirId mapping: {:#?}", self.node_id_to_hir_id);
+
+        symbol_tables
     }
 
     #[inline(always)]
-    pub(crate) fn scope(&mut self) -> &mut Scope {
-        self.scopes.last_mut().unwrap()
+    pub(crate) fn scope(&self) -> Rc<RefCell<ast::symbols::SymbolTable>> {
+        self.current_symbol_table.clone()
     }
 
-    fn has_binding(&self, name: &str) -> bool {
-        self.scopes
-            .iter()
-            .rev()
-            .any(|scope| scope.lookup(name).is_some())
+    fn has_multi_arity_fn(&self, name: &str, arity: usize) -> bool {
+        self.scope().borrow().has_multi_arity_fn(name, arity)
     }
 
-    pub(crate) fn lookup_name(&mut self, name: &str) -> String {
-        self.lookup(name)
-            .map_or(name.to_string(), |binding| binding.name().to_string())
-    }
-
-    pub(crate) fn lookup<'a>(&'a mut self, name: &'a str) -> Option<scope::Binding> {
-        let (scope_index, binding) = self
-            .scopes
-            .iter()
-            .enumerate()
-            .rev()
-            .find_map(|(i, scope)| scope.lookup(name).map(|binding| (i, binding.clone())))
-            .or_else(|| {
-                Some((
-                    usize::MAX,
-                    self.scopes
-                        .iter()
-                        .rev()
-                        .find_map(|scope| scope.lookup_definition(name))?
-                        .clone(),
-                ))
-            })?;
-
-        if scope_index < self.scopes.len() - 1 {
-            let relative_scope_index = self.scopes.len() - 1 - scope_index;
-            let slot_index = binding.res().slot_index().unwrap();
-            let original_hir_id = binding
-                .res()
-                .hir_id()
-                .expect("Upvar source binding should have a valid HirId");
-
-            return Some(self.scopes.last_mut().unwrap().def_upvar(
-                binding.name(),
-                original_hir_id,
-                relative_scope_index,
-                slot_index,
-            ));
-        }
-
-        Some(binding)
-    }
-
-    pub(crate) fn with_new_scope<F, R>(&mut self, f: F) -> R
+    pub(crate) fn with_scope<F, R>(&mut self, node_id: ast::NodeId, f: F) -> R
     where
         F: FnOnce(&mut Self) -> R,
         R: hir::HirScope,
     {
-        debug!("Entering new scope");
-        self.scopes.push(Scope::new());
-        let mut result = f(self);
-        result.set_locals(self.scope().locals());
-        result.set_upvars(self.scope().upvars());
-        debug!("Leaving scope");
-        self.scopes.pop();
+        debug!("Entering scope for node_id: {:?}", node_id);
+
+        let previous_symbol_table = self.current_symbol_table.clone();
+        if let Some(symbol_table) = self.symbol_tables.get(&node_id).cloned() {
+            self.current_symbol_table = symbol_table;
+            // Reparent the current symbol table to the previous one, in case we created a new
+            // scope while lowering.
+            self.current_symbol_table
+                .borrow_mut()
+                .set_parent(previous_symbol_table.clone());
+        }
+
+        let result = f(self);
+
+        if self.symbol_tables.contains_key(&node_id) {
+            debug!("Leaving scope for node_id: {:?}", node_id);
+        }
+        self.current_symbol_table = previous_symbol_table;
+
+        result
+    }
+
+    pub(crate) fn with_new_scope<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut Self, Rc<RefCell<ast::symbols::SymbolTable>>) -> (HirId, R),
+        R: hir::HirScope,
+    {
+        let previous_symbol_table = self.current_symbol_table.clone();
+        self.current_symbol_table = Rc::new(RefCell::new(ast::symbols::SymbolTable::new(
+            previous_symbol_table.clone(),
+        )));
+        let (hir_id, result) = f(self, self.current_symbol_table.clone());
+        self.new_symbol_tables
+            .insert(hir_id, self.current_symbol_table.clone());
+        self.current_symbol_table = previous_symbol_table;
         result
     }
 
     fn unique_id(&mut self) -> HirId {
-        let id = self.unique_id;
-        self.unique_id = self.unique_id.next();
-        id
+        self.hir_id_allocator.next_id()
+    }
+
+    pub(crate) fn define_symbol(
+        &mut self,
+        hir_id: HirId,
+        name: &str,
+        symbol_type: ast::symbols::SymbolType,
+        scope_start: LineColumn,
+    ) {
+        let symbol_info = ast::symbols::SymbolInfo::new(
+            self.symbol_id_allocator.next_id(),
+            name,
+            symbol_type,
+            Default::default(),
+            scope_start,
+        )
+        .with_hir_id(hir_id)
+        .as_temp();
+
+        self.scope().borrow_mut().insert(symbol_info);
+    }
+
+    pub(crate) fn define_symbol_at(
+        &mut self,
+        index: usize,
+        hir_id: HirId,
+        name: &str,
+        symbol_type: ast::symbols::SymbolType,
+        scope_start: LineColumn,
+    ) {
+        let symbol_info = ast::symbols::SymbolInfo::new(
+            self.symbol_id_allocator.next_id(),
+            name,
+            symbol_type,
+            Default::default(),
+            scope_start,
+        )
+        .with_hir_id(hir_id)
+        .as_temp();
+
+        self.scope().borrow_mut().insert_at(index, symbol_info);
+    }
+
+    pub(crate) fn define_symbol_after(
+        &mut self,
+        hir_id: HirId,
+        name: &str,
+        symbol_type: ast::symbols::SymbolType,
+        scope_start: LineColumn,
+        predicate: impl Fn(&ast::symbols::SymbolInfo) -> bool,
+    ) {
+        let symbol_info = ast::symbols::SymbolInfo::new(
+            self.symbol_id_allocator.next_id(),
+            name,
+            symbol_type,
+            Default::default(),
+            scope_start,
+        )
+        .with_hir_id(hir_id)
+        .as_temp();
+
+        self.scope()
+            .borrow_mut()
+            .insert_after(symbol_info, predicate);
     }
 
     #[inline(always)]
-    pub(crate) fn expr(&mut self, span: ast::span::Span, kind: hir::ExprKind) -> hir::Expr {
+    pub(crate) fn expr(&mut self, span: tlang_span::Span, kind: hir::ExprKind) -> hir::Expr {
         hir::Expr {
             hir_id: self.unique_id(),
             kind,
@@ -117,57 +219,56 @@ impl LoweringContext {
         }
     }
 
-    fn lower_node_id(&mut self, id: ast::node_id::NodeId) -> HirId {
-        debug_assert!(id != ast::node_id::NodeId::new(0));
-
+    fn lower_node_id(&mut self, id: ast::NodeId) -> HirId {
         if let Some(hir_id) = self.node_id_to_hir_id.get(&id) {
             *hir_id
         } else {
             let hir_id = self.unique_id();
+            debug!("Lowering {:?} to {:?}", id, hir_id);
             self.node_id_to_hir_id.insert(id, hir_id);
             hir_id
         }
     }
 
     pub fn lower_module(&mut self, module: &ast::node::Module) -> hir::Module {
-        self.with_new_scope(|this| this.lower_module_in_current_scope(module))
-    }
-
-    pub fn lower_module_in_current_scope(&mut self, module: &ast::node::Module) -> hir::Module {
         debug!(
             "Lowering module with {} statements",
             module.statements.len()
         );
 
-        hir::Module {
-            block: self.lower_block_in_current_scope(&module.statements, None, module.span),
-            span: module.span,
-        }
+        self.with_scope(module.id, |this| {
+            let hir_id = this.lower_node_id(module.id);
+
+            hir::Module {
+                hir_id,
+                block: hir::Block::new(
+                    this.unique_id(),
+                    this.lower_stmts(&module.statements),
+                    None,
+                    module.span,
+                ),
+                span: module.span,
+            }
+        })
     }
 
-    fn lower_block(
-        &mut self,
-        stmts: &[ast::node::Stmt],
-        expr: Option<&ast::node::Expr>,
-        span: ast::span::Span,
-    ) -> hir::Block {
-        self.with_new_scope(|this| this.lower_block_in_current_scope(stmts, expr, span))
-    }
-
-    fn lower_block_in_current_scope(
-        &mut self,
-        stmts: &[ast::node::Stmt],
-        expr: Option<&ast::node::Expr>,
-        span: ast::span::Span,
-    ) -> hir::Block {
-        debug!("Lowering block with {} statements", stmts.len());
-
-        let stmts = stmts
+    #[inline(always)]
+    fn lower_stmts(&mut self, stmts: &[ast::node::Stmt]) -> Vec<hir::Stmt> {
+        stmts
             .iter()
             .flat_map(|stmt| self.lower_stmt(stmt))
-            .collect();
-        let expr = expr.as_ref().map(|expr| self.lower_expr(expr));
-        hir::Block::new(stmts, expr, span)
+            .collect()
+    }
+
+    fn lower_block(&mut self, block: &ast::node::Block) -> hir::Block {
+        self.with_scope(block.id, |this| this.lower_block_in_current_scope(block))
+    }
+
+    fn lower_block_in_current_scope(&mut self, block: &ast::node::Block) -> hir::Block {
+        let hir_id = self.lower_node_id(block.id);
+        let stmts = self.lower_stmts(&block.statements);
+        let expr = block.expression.as_ref().map(|expr| self.lower_expr(expr));
+        hir::Block::new(hir_id, stmts, expr, block.span)
     }
 
     fn lower_fn_param_pat(&mut self, node: &ast::node::FunctionParameter) -> Ident {
@@ -184,57 +285,22 @@ impl LoweringContext {
         }
     }
 
-    fn create_fn_param(
-        &mut self,
-        hir_id: HirId,
-        name: Ident,
-        ty: hir::Ty,
-        span: ast::span::Span,
-    ) -> hir::FunctionParameter {
-        self.scope().def_local(name.as_str(), hir_id);
-
-        hir::FunctionParameter {
-            hir_id,
-            name,
-            type_annotation: ty,
-            span,
-        }
-    }
-
     fn lower_fn_param(&mut self, node: &ast::node::FunctionParameter) -> hir::FunctionParameter {
         let hir_id = self.lower_node_id(node.pattern.id);
         let name = self.lower_fn_param_pat(node);
         let ty = self.lower_ty(node.type_annotation.as_ref());
 
-        self.create_fn_param(hir_id, name, ty, node.span)
-    }
-
-    fn def_fn_local(&mut self, name_expr: &ast::node::Expr, hir_id: HirId, arity: Option<usize>) {
-        let mut fn_name = match &name_expr.kind {
-            ast::node::ExprKind::Path(path) => path.to_string(),
-            ast::node::ExprKind::FieldExpression(fe) => {
-                let ast::node::ExprKind::Path(path) = &fe.base.kind else {
-                    unreachable!("FieldExpression base should be a path");
-                };
-
-                path.join_with(fe.field.as_str())
-            }
-            _ => unreachable!(),
-        };
-
-        if let Some(arity) = arity {
-            fn_name += &format!("$${arity}");
+        hir::FunctionParameter {
+            hir_id,
+            name,
+            type_annotation: ty,
+            span: node.span,
         }
-
-        self.scope().def_fn_local(fn_name.as_str(), hir_id);
     }
 
     fn lower_fn_decl(&mut self, decl: &FunctionDeclaration) -> hir::FunctionDeclaration {
-        self.with_new_scope(|this| {
+        self.with_scope(decl.id, |this| {
             let hir_id = this.lower_node_id(decl.id);
-
-            this.def_fn_local(&decl.name, hir_id, None);
-
             let name = this.lower_expr(&decl.name);
 
             let parameters = decl
@@ -242,11 +308,7 @@ impl LoweringContext {
                 .iter()
                 .map(|param| this.lower_fn_param(param))
                 .collect();
-            let body = this.lower_block_in_current_scope(
-                &decl.body.statements,
-                decl.body.expression.as_ref(),
-                decl.body.span,
-            );
+            let body = this.lower_block_in_current_scope(&decl.body);
             let return_type = this.lower_ty(decl.return_type_annotation.as_ref());
 
             hir::FunctionDeclaration {
@@ -261,16 +323,11 @@ impl LoweringContext {
     }
 
     fn lower_path(&mut self, path: &ast::node::Path) -> hir::Path {
-        let res = self
-            .lookup(&path.to_string())
-            .map_or(hir::Res::Unknown, |binding| binding.res());
-
         if path.segments.len() == 1 {
             let segment = path.segments.first().unwrap();
-            let segment =
-                hir::PathSegment::from_str(&self.lookup_name(segment.as_str()), segment.span);
+            let segment = hir::PathSegment::from_str(segment.as_str(), segment.span);
 
-            return hir::Path::new(vec![segment], path.span).with_res(res);
+            return hir::Path::new(vec![segment], path.span);
         }
 
         let segments = path
@@ -279,7 +336,7 @@ impl LoweringContext {
             .map(|seg| self.lower_path_segment(seg))
             .collect();
 
-        hir::Path::new(segments, path.span).with_res(res)
+        hir::Path::new(segments, path.span)
     }
 
     fn lower_path_segment(&mut self, seg: &Ident) -> hir::PathSegment {
@@ -312,8 +369,6 @@ impl LoweringContext {
             },
             ast::node::PatKind::Identifier(box ident) => {
                 let hir_id = self.lower_node_id(node.id);
-
-                self.scope().def_local(ident.as_str(), hir_id);
                 // TODO: As mentioned above, create_unique_binding was supposed to help with
                 // resolving shadowed variables by giving them unique names. Due to some
                 // regressions as this was a too generic solution, this is disabled. As a first
@@ -375,19 +430,38 @@ impl LoweringContext {
         } else {
             hir::Ty {
                 kind: hir::TyKind::Unknown,
-                span: ast::span::Span::default(),
+                span: tlang_span::Span::default(),
             }
         }
     }
 }
 
-impl Default for LoweringContext {
-    fn default() -> Self {
-        Self::new()
-    }
+pub fn lower_to_hir(
+    tlang_ast: &ast::node::Module,
+    symbol_id_allocator: SymbolIdAllocator,
+    root_symbol_table: Rc<RefCell<ast::symbols::SymbolTable>>,
+    symbol_tables: HashMap<tlang_ast::NodeId, Rc<RefCell<tlang_ast::symbols::SymbolTable>>>,
+) -> hir::LowerResult {
+    lower(
+        &mut LoweringContext::new(symbol_id_allocator, root_symbol_table, symbol_tables),
+        tlang_ast,
+    )
 }
 
-pub fn lower_to_hir(tlang_ast: &ast::node::Module) -> hir::Module {
-    let mut ctx = LoweringContext::new();
-    ctx.lower_module(tlang_ast)
+pub fn lower(ctx: &mut LoweringContext, tlang_ast: &ast::node::Module) -> hir::LowerResult {
+    let root_symbol_table = ctx.lower_node_id(tlang_span::NodeId::new(1));
+    let module = ctx.lower_module(tlang_ast);
+    let symbol_tables = ctx.symbol_tables();
+    let symbol_id_allocator = ctx.symbol_id_allocator;
+    let hir_id_allocator = ctx.hir_id_allocator;
+
+    (
+        module,
+        hir::LowerResultMeta {
+            root_symbol_table,
+            symbol_tables,
+            hir_id_allocator,
+            symbol_id_allocator,
+        },
+    )
 }

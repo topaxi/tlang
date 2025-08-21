@@ -8,11 +8,11 @@ mod common;
 
 #[test]
 fn test_codegen_not_expression() {
-    let output = compile!("not true;");
+    let output = compile!("not true;", CodegenOptions::default().optimize(false));
     let expected_output = "!true;\n";
     assert_eq!(output, expected_output);
 
-    let output = compile!("!true;");
+    let output = compile!("!true;", CodegenOptions::default().optimize(false));
     let expected_output = "!true;\n";
     assert_eq!(output, expected_output);
 }
@@ -43,7 +43,7 @@ fn test_codegen_function_expression() {
     let output = compile!("fn main() { let foo = fn() { 1 + 2 }; }");
     let expected_output = indoc! {"
         function main() {
-            let foo = () => 1 + 2;
+            let foo = () => 3;
         }
     "};
     assert_eq!(output, expected_output);
@@ -70,14 +70,20 @@ fn test_codegen_functions_with_explicit_return_statements() {
 
 #[test]
 fn test_codegen_parenthesis_expression() {
-    let output = compile!("let x = (42 + 1) * 2;");
+    let output = compile!(
+        "let x = (42 + 1) * 2;",
+        CodegenOptions::default().optimize(false)
+    );
     let expected_output = "let x = (42 + 1) * 2;\n";
     assert_eq!(output, expected_output);
 }
 
 #[test]
 fn test_codegen_operator_precedence() {
-    let output = compile!("let result = 1 + 2 * 3;");
+    let output = compile!(
+        "let result = 1 + 2 * 3;",
+        CodegenOptions::default().optimize(false)
+    );
     let expected_output = "let result = 1 + 2 * 3;\n";
     assert_eq!(output, expected_output);
 }
@@ -96,7 +102,10 @@ fn test_block_expression() {
 
 #[test]
 fn test_block_expression_with_statements() {
-    let output = compile!("let one = { let x = 1; x };");
+    let output = compile!(
+        "let one = { let x = 1; x };",
+        CodegenOptions::default().optimize(false)
+    );
     let expected_output = indoc! {"
         let $tmp$0;{
             let x = 1;
@@ -139,7 +148,7 @@ fn test_if_else_if() {
 fn test_if_else_as_expression_as_fn_completion() {
     let output = compile!(
         "fn main() { if true { 1 } else { 2 } }",
-        CodegenOptions::default().set_render_ternary(false)
+        CodegenOptions::default().render_ternary(false)
     );
     let expected_output = indoc! {"
         function main() {
@@ -157,7 +166,7 @@ fn test_if_else_as_expression_as_fn_completion() {
 fn test_if_else_as_expression() {
     let output = compile!(
         "fn main() { let result = if true { 1 } else { 2 }; }",
-        CodegenOptions::default().set_render_ternary(false)
+        CodegenOptions::default().render_ternary(false)
     );
     let expected_output = indoc! {"
         function main() {
@@ -186,7 +195,7 @@ fn test_if_else_as_expression_nested() {
             };
         }
     "},
-        CodegenOptions::default().set_render_ternary(false)
+        CodegenOptions::default().render_ternary(false)
     );
     let expected_output = indoc! {"
         function main() {
@@ -457,12 +466,15 @@ fn test_declare_methods_on_struct() {
 
 #[test]
 fn test_and_or_as_keywords() {
-    let output = compile!(indoc! {"
-        fn main() {
-            let x = true and false;
-            let y = true or false;
-        }
-    "});
+    let output = compile!(
+        indoc! {"
+            fn main() {
+                let x = true and false;
+                let y = true or false;
+            }
+        "},
+        CodegenOptions::default().optimize(false)
+    );
     let expected_output = indoc! {"
         function main() {
             let x = true && false;
@@ -492,13 +504,16 @@ fn test_dict_literal() {
 
 #[test]
 fn test_dict_literal_shorthand() {
-    let output = compile!(indoc! {"
-        fn main() {
-            let a = 1;
-            let b = 2;
-            let x = { a, b };
-        }
-    "});
+    let output = compile!(
+        indoc! {"
+            fn main() {
+                let a = 1;
+                let b = 2;
+                let x = { a, b };
+            }
+        "},
+        CodegenOptions::default().optimize(false)
+    );
     let expected_output = indoc! {"
         function main() {
             let a = 1;

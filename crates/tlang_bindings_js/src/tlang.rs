@@ -22,6 +22,7 @@ pub struct JsHirPrettyOptions {
     pub tab_indent: Option<bool>,
     pub indent_size: Option<usize>,
     pub mark_unresolved: Option<bool>,
+    pub print_ids: Option<bool>,
     pub comments: Option<bool>,
 }
 
@@ -39,6 +40,10 @@ impl JsHirPrettyOptions {
 
         if let Some(mark_unresolved) = self.mark_unresolved {
             options.mark_unresolved = mark_unresolved;
+        }
+
+        if let Some(print_ids) = self.print_ids {
+            options.print_ids = print_ids;
         }
 
         if let Some(comments) = self.comments {
@@ -119,8 +124,7 @@ impl Tlang {
             return self.build.parse_result.as_ref().unwrap().as_ref();
         }
 
-        let mut parser = Parser::from_source(&self.source);
-        parser.set_recoverable(true);
+        let mut parser = Parser::from_source(&self.source).set_recoverable(true);
 
         self.build.parse_result = Some(parser.parse());
         self.build.parse_result.as_ref().unwrap().as_ref()
@@ -155,10 +159,15 @@ impl Tlang {
         }
 
         if let Some(ast) = self.ast() {
-            let mut hir = tlang_ast_lowering::lower_to_hir(ast);
+            let (mut module, meta) = tlang_ast_lowering::lower_to_hir(
+                ast,
+                self.analyzer.symbol_id_allocator(),
+                self.analyzer.root_symbol_table(),
+                self.analyzer.symbol_tables().clone(),
+            );
             let mut optimizer = HirOptimizer::default();
-            optimizer.optimize_module(&mut hir);
-            self.build.hir = Some(hir);
+            optimizer.optimize_hir(&mut module, meta.into());
+            self.build.hir = Some(module);
         }
     }
 

@@ -5,9 +5,15 @@ use std::process;
 use tlang_ast_lowering::lower_to_hir;
 use tlang_hir_opt::HirOptimizer;
 use tlang_interpreter::Interpreter;
+pub use tlang_memory::NativeFnDef;
+use tlang_semantics::SemanticAnalyzer;
+use tlang_semantics::diagnostic::Diagnostic;
 
 fn main() {
-    env_logger::init();
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Warn)
+        .parse_default_env()
+        .init();
 
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
@@ -38,11 +44,31 @@ fn main() {
             process::exit(1);
         }
     };
-    let mut hir = lower_to_hir(&ast);
+    let mut analyzer = SemanticAnalyzer::default();
+    analyzer.add_builtin_symbols(&Interpreter::builtin_symbols());
+
+    match analyzer.analyze(&ast) {
+        Ok(_) => {}
+        Err(diagnostics) => {
+            for diagnostic in &diagnostics {
+                eprintln!("{}", diagnostic);
+            }
+
+            if diagnostics.iter().any(Diagnostic::is_error) {
+                process::exit(1);
+            }
+        }
+    }
+    let (mut module, meta) = lower_to_hir(
+        &ast,
+        analyzer.symbol_id_allocator(),
+        analyzer.root_symbol_table(),
+        analyzer.symbol_tables().clone(),
+    );
 
     let mut optimizer = HirOptimizer::default();
-    optimizer.optimize_module(&mut hir);
+    optimizer.optimize_hir(&mut module, meta.into());
 
     let mut interp = Interpreter::default();
-    interp.eval(&hir);
+    interp.eval(&module);
 }

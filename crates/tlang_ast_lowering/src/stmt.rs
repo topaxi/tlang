@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use log::debug;
 use tlang_ast as ast;
 use tlang_ast::node::{FunctionDeclaration, Ident, LetDeclaration};
+use tlang_ast::symbols::SymbolType;
 use tlang_hir::hir;
 
 use crate::LoweringContext;
@@ -37,10 +38,6 @@ impl LoweringContext {
                 }]
             }
             ast::node::StmtKind::FunctionDeclaration(box decl) => {
-                let hir_id = self.lower_node_id(decl.id);
-
-                self.def_fn_local(&decl.name, hir_id, None);
-
                 let decl = self.lower_fn_decl(decl);
 
                 vec![hir::Stmt {
@@ -77,9 +74,6 @@ impl LoweringContext {
                         .collect(),
                 };
 
-                self.scope()
-                    .def_struct_local(decl.name.as_str(), decl.hir_id);
-
                 vec![hir::Stmt {
                     hir_id: self.lower_node_id(node.id),
                     kind: hir::StmtKind::StructDeclaration(Box::new(decl)),
@@ -102,6 +96,10 @@ impl LoweringContext {
         node: &ast::node::Stmt,
         decls: &[FunctionDeclaration],
     ) -> Vec<hir::Stmt> {
+        for decl in decls {
+            self.lower_node_id(decl.id);
+        }
+
         let first_declaration = decls.first().unwrap();
         let has_variadic_arguments = decls
             .iter()
@@ -116,69 +114,67 @@ impl LoweringContext {
             // Currently the easiest way is to split up
             // ast::node::SmtKind::FunctionDeclarations by argument length and create a
             // new unique name for each declaration.
-            let mut fn_variant_ids = decls
+            let mut fn_variants = decls
                 .iter()
-                .map(|decl| (decl.parameters.len(), self.lower_node_id(decl.id)))
+                .map(|decl| decl.parameters.len())
                 .collect::<Vec<_>>();
-            fn_variant_ids.sort_by_key(|(arg_len, _)| *arg_len);
-            fn_variant_ids.dedup_by_key(|(arg_len, _)| *arg_len);
+            fn_variants.sort();
+            fn_variants.dedup();
 
-            for (arg_len, hir_id) in &fn_variant_ids {
-                self.def_fn_local(&first_declaration.name, *hir_id, Some(*arg_len));
-            }
+            let mut fn_variant_ids = vec![];
 
-            let mut grouped_decls = vec![];
-            for (i, (arg_len, _hir_id)) in fn_variant_ids.iter().enumerate() {
-                let decls = decls
-                    .iter()
-                    .filter(|decl| decl.parameters.len() == *arg_len)
-                    .cloned()
-                    .map(|mut decl| {
-                        match &mut decl.name.kind {
-                            ast::node::ExprKind::Path(path) => {
-                                let ident = path.segments.last_mut().unwrap();
-                                ident.set_name(&format!("{}$${}", ident.as_str(), arg_len));
-                            }
-                            ast::node::ExprKind::FieldExpression(fe) => {
-                                let ident = &mut fe.field;
-                                ident.set_name(&format!("{}$${}", ident.as_str(), arg_len));
-                            }
-                            _ => unreachable!(),
-                        };
-                        decl
-                    })
-                    .collect::<Vec<_>>();
+            let mut grouped_decls: Vec<hir::Stmt> = fn_variants
+                .iter()
+                .enumerate()
+                .map(|(i, arity)| {
+                    let decls = decls
+                        .iter()
+                        .filter(|decl| decl.parameters.len() == *arity)
+                        .cloned()
+                        .map(|mut decl| {
+                            match &mut decl.name.kind {
+                                ast::node::ExprKind::Path(path) => {
+                                    path.segments.last_mut().unwrap().set_arity(*arity);
+                                }
+                                ast::node::ExprKind::FieldExpression(fe) => {
+                                    fe.field.set_arity(*arity);
+                                }
+                                _ => unreachable!(),
+                            };
+                            decl
+                        })
+                        .collect::<Vec<_>>();
 
-                let mut leading_comments = decls
-                    .iter()
-                    .flat_map(|d| d.leading_comments.clone())
-                    .collect::<Vec<_>>();
+                    let mut leading_comments = decls
+                        .iter()
+                        .flat_map(|d| d.leading_comments.clone())
+                        .collect::<Vec<_>>();
 
-                if i == 0 {
-                    leading_comments.extend(node.leading_comments.clone());
-                }
-
-                let decl = self.lower_fn_decl_matching(
-                    &decls,
-                    &all_param_names,
                     if i == 0 {
-                        node.leading_comments.as_slice()
-                    } else {
-                        &[]
-                    },
-                );
+                        leading_comments.extend(node.leading_comments.clone());
+                    }
 
-                grouped_decls.push(hir::Stmt {
-                    // TODO: Hope this will not mess with us in the future, we generate
-                    // more statements than initially in the AST, so we are not able to
-                    // lower the original node id here.
-                    hir_id: self.unique_id(),
-                    kind: hir::StmtKind::FunctionDeclaration(Box::new(decl)),
-                    span: node.span,
-                    leading_comments,
-                    trailing_comments: vec![],
-                });
-            }
+                    let decl = self.lower_fn_decl_matching(
+                        &decls,
+                        &all_param_names,
+                        if i == 0 {
+                            node.leading_comments.as_slice()
+                        } else {
+                            &[]
+                        },
+                    );
+
+                    fn_variant_ids.push((*arity, decl.hir_id));
+
+                    hir::Stmt {
+                        hir_id: self.unique_id(),
+                        kind: hir::StmtKind::FunctionDeclaration(Box::new(decl)),
+                        span: node.span,
+                        leading_comments,
+                        trailing_comments: vec![],
+                    }
+                })
+                .collect();
 
             let fn_name = self.lower_expr(&first_declaration.name);
 
@@ -187,6 +183,15 @@ impl LoweringContext {
                 name: fn_name,
                 variants: fn_variant_ids,
             };
+
+            let last_decl_id = decls.last().map(|d| d.id);
+            self.define_symbol_after(
+                dyn_fn_decl.hir_id,
+                &first_declaration.name(),
+                SymbolType::Variable, // TODO, add symbol type for dyn dispatch functions
+                first_declaration.span.start,
+                |symbol| symbol.node_id == last_decl_id,
+            );
 
             grouped_decls.push(hir::Stmt {
                 hir_id: self.unique_id(),
@@ -200,10 +205,6 @@ impl LoweringContext {
         } else {
             let mut leading_comments = node.leading_comments.clone();
             leading_comments.extend(decls.iter().flat_map(|d| d.leading_comments.clone()));
-
-            let hir_id = self.lower_node_id(first_declaration.id);
-
-            self.def_fn_local(&first_declaration.name, hir_id, None);
 
             let hir_fn_decl =
                 self.lower_fn_decl_matching(decls, &all_param_names, &node.leading_comments);
@@ -242,25 +243,6 @@ impl LoweringContext {
                 .collect::<Vec<_>>(),
         };
 
-        self.scope().def_enum_local(decl.name.as_str(), decl.hir_id);
-
-        for variant in &decl.variants {
-            // Variants with no params are values, they need a slot in the current scope.
-            if variant.parameters.is_empty() {
-                self.scope().def_untagged_enum_variant_local(
-                    decl.name.as_str(),
-                    variant.name.as_str(),
-                    variant.hir_id,
-                );
-            } else {
-                self.scope().def_tagged_enum_variant_local(
-                    decl.name.as_str(),
-                    variant.name.as_str(),
-                    variant.hir_id,
-                );
-            }
-        }
-
         hir::Stmt {
             hir_id: self.lower_node_id(node.id),
             kind: hir::StmtKind::EnumDeclaration(Box::new(decl)),
@@ -288,14 +270,23 @@ impl LoweringContext {
             return self.lower_fn_decl(&decls[0]);
         }
 
-        self.with_new_scope(|this| {
-            let mut span = decls[0].span;
-            span.end = decls.last().unwrap().span.end;
+        debug!(
+            "Lowering multiple function declarations with the same name: {:?} {:?}",
+            decls[0].name,
+            decls.iter().map(|d| d.id).collect::<Vec<_>>()
+        );
 
+        let mut span = decls[0].span;
+        span.end = decls.last().unwrap().span.end;
+
+        self.with_new_scope(|this, _scope| {
+            let hir_id = this.unique_id();
             let first_declaration = &decls[0];
-            let hir_id = this.lower_node_id(first_declaration.id);
+            let fn_name = this.lower_expr(&first_declaration.name);
 
-            this.def_fn_local(&first_declaration.name, hir_id, None);
+            for decl in decls {
+                this.fn_node_id_to_hir_id.insert(decl.id, hir_id);
+            }
 
             let param_names = get_param_names(decls)
                 .iter()
@@ -311,29 +302,77 @@ impl LoweringContext {
                 })
                 .collect::<Vec<_>>();
 
+            let params = param_names
+                .iter()
+                .map(|ident| hir::FunctionParameter {
+                    hir_id: this.unique_id(),
+                    name: ident.clone(),
+                    type_annotation: hir::Ty::default(),
+                    span: ident.span,
+                })
+                .collect::<Vec<_>>();
+
+            this.define_symbol(
+                hir_id,
+                &first_declaration.name(),
+                SymbolType::FunctionSelfRef(params.len() as u16),
+                first_declaration.span.start,
+            );
+
+            for param in &params {
+                this.define_symbol(
+                    param.hir_id,
+                    param.name.as_str(),
+                    SymbolType::Parameter,
+                    param.span.start,
+                );
+            }
+
+            let match_value = if params.len() > 1 {
+                let argument_list = hir::ExprKind::List(
+                    params
+                        .iter()
+                        .map(|param| {
+                            let mut path = hir::Path::new(
+                                vec![hir::PathSegment {
+                                    ident: param.name.clone(),
+                                }],
+                                span,
+                            );
+
+                            path.res.set_hir_id(param.hir_id);
+                            path.res.set_binding_kind(hir::BindingKind::Param);
+
+                            this.expr(span, hir::ExprKind::Path(Box::new(path)))
+                        })
+                        .collect(),
+                );
+
+                this.expr(tlang_span::Span::default(), argument_list)
+            } else {
+                let first_param = params.first().unwrap();
+                let ident = first_param.name.clone();
+                let mut path = hir::Path::new(vec![hir::PathSegment { ident }], span);
+
+                path.res.set_hir_id(first_param.hir_id);
+                path.res.set_binding_kind(hir::BindingKind::Param);
+
+                this.expr(
+                    tlang_span::Span::default(),
+                    hir::ExprKind::Path(Box::new(path)),
+                )
+            };
+
             // Create hir::FunctionDeclaration with an empty block, and fill out the
             // parameters, for each parameter/argument we reuse the existing plain
             // identifier if it exists, otherwise we create a new one which will be reused
             // in a match expression in the resulting block.
-            let mut hir_fn_decl = hir::FunctionDeclaration::new_empty_fn(
-                hir_id,
-                this.lower_expr(&first_declaration.name),
-                param_names
-                    .iter()
-                    .map(|ident| {
-                        let hir_id = this.unique_id();
-
-                        this.create_fn_param(hir_id, ident.clone(), hir::Ty::default(), ident.span)
-                    })
-                    .collect(),
-            );
-
             let mut idents = HashMap::new();
             let match_arms = decls
                 .iter()
                 .enumerate()
                 .map(|(i, decl)| {
-                    let mut match_arm = this.lower_fn_decl_to_match_arm(decl, hir_id, &mut idents);
+                    let mut match_arm = this.lower_fn_decl_to_match_arm(decl, &mut idents);
 
                     if i == 0 {
                         match_arm.leading_comments = leading_comments
@@ -347,72 +386,55 @@ impl LoweringContext {
                 })
                 .collect();
 
-            let match_value = if param_names.len() > 1 {
-                let argument_list = hir::ExprKind::List(
-                    param_names
-                        .iter()
-                        .map(|ident| {
-                            let res = this.lookup(ident.as_str()).unwrap().res();
-                            let path = hir::Path::new(
-                                vec![hir::PathSegment {
-                                    ident: ident.clone(),
-                                }],
-                                span,
-                            )
-                            .with_res(res);
+            let body = hir::Block::new(
+                this.unique_id(),
+                vec![],
+                Some(hir::Expr {
+                    hir_id: this.unique_id(),
+                    kind: hir::ExprKind::Match(Box::new(match_value), match_arms),
+                    span: tlang_span::Span::default(),
+                }),
+                tlang_span::Span::default(),
+            );
 
-                            this.expr(span, hir::ExprKind::Path(Box::new(path)))
-                        })
-                        .collect(),
-                );
-
-                this.expr(ast::span::Span::default(), argument_list)
-            } else {
-                let ident = param_names.first().unwrap().clone();
-                let res = this.lookup(ident.as_str()).unwrap().res();
-                let path = hir::Path::new(vec![hir::PathSegment { ident }], span).with_res(res);
-
-                this.expr(
-                    ast::span::Span::default(),
-                    hir::ExprKind::Path(Box::new(path)),
-                )
-            };
-
-            hir_fn_decl.body.expr = Some(hir::Expr {
-                hir_id: this.unique_id(),
-                kind: hir::ExprKind::Match(Box::new(match_value), match_arms),
-                span: ast::span::Span::default(),
-            });
-
-            hir_fn_decl
+            (
+                hir_id,
+                hir::FunctionDeclaration::new(hir_id, fn_name, params, body),
+            )
         })
     }
 
     fn lower_fn_decl_to_match_arm(
         &mut self,
         decl: &FunctionDeclaration,
-        hir_id: hir::HirId,
         idents: &mut HashMap<String, String>,
     ) -> hir::MatchArm {
-        self.with_new_scope(|this| {
-            // All declarations with the same amount of arguments refer to the same
-            // function now, we map this in our symbol_id_to_hir_id table.
-            this.node_id_to_hir_id.insert(decl.id, hir_id);
+        debug!(
+            "Lowering function declaration to match arm: {:?} {:?}",
+            decl.id, decl.name
+        );
+
+        self.with_scope(decl.id, |this| {
+            // Remove the first declaration within the current scope, as in the AST
+            // this was the function refering to itself, but we are here in a match arm
+            // now.
+            this.current_symbol_table.borrow_mut().shift();
 
             // Mapping argument pattern and signature guard into a match arm
             let pat = if decl.parameters.len() > 1 {
+                let params = decl
+                    .parameters
+                    .iter()
+                    // We lose type information of each declaration here, as we
+                    // lower a whole FunctionParameter into a pattern. They
+                    // should probably match for each declaration and we might want
+                    // to verify this now or earlier in the pipeline.
+                    // Ignored for now as types are basically a NOOP everywhere.
+                    .map(|param| this.lower_pat_with_idents(&param.pattern, idents))
+                    .collect();
+
                 hir::Pat {
-                    kind: hir::PatKind::List(
-                        decl.parameters
-                            .iter()
-                            // We lose type information of each declaration here, as we
-                            // lower a whole FunctionParameter into a pattern. They
-                            // should probably match for each declaration and we might want
-                            // to verify this now or earlier in the pipeline.
-                            // Ignored for now as types are basically a NOOP everywhere.
-                            .map(|param| this.lower_pat_with_idents(&param.pattern, idents))
-                            .collect(),
-                    ),
+                    kind: hir::PatKind::List(params),
                     span: decl.span,
                 }
             } else {
@@ -420,12 +442,8 @@ impl LoweringContext {
             };
 
             let guard = decl.guard.as_ref().map(|expr| this.lower_expr(expr));
-
-            let body = this.lower_block_in_current_scope(
-                &decl.body.statements,
-                decl.body.expression.as_ref(),
-                decl.body.span,
-            );
+            let mut body = this.lower_block_in_current_scope(&decl.body);
+            body.hir_id = this.lower_node_id(decl.id);
 
             hir::MatchArm {
                 pat,

@@ -19,7 +19,7 @@ pub fn define_result_shape(state: &mut InterpreterState) {
 
     method_map.insert(
         "is_ok".to_string(),
-        state.new_native_method(|state, this, _args| {
+        state.new_native_method("Result::is_ok", |state, this, _args| {
             let this = state.get_enum(this).unwrap();
 
             NativeFnReturn::Return(TlangValue::from(this.variant == 0))
@@ -28,7 +28,7 @@ pub fn define_result_shape(state: &mut InterpreterState) {
 
     method_map.insert(
         "is_err".to_string(),
-        state.new_native_method(|state, this, _args| {
+        state.new_native_method("Result::is_err", |state, this, _args| {
             let this = state.get_enum(this).unwrap();
 
             NativeFnReturn::Return(TlangValue::from(this.variant == 1))
@@ -37,7 +37,7 @@ pub fn define_result_shape(state: &mut InterpreterState) {
 
     method_map.insert(
         "unwrap".to_string(),
-        state.new_native_method(|state, this, _args| {
+        state.new_native_method("Result::unwrap", |state, this, _args| {
             let this = state.get_enum(this).unwrap();
 
             if this.variant == 1 {

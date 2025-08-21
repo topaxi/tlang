@@ -1,14 +1,13 @@
 #[cfg(feature = "serde")]
 use serde::Serialize;
 use std::fmt::Display;
+use tlang_span::Spanned;
+
+use tlang_span::{NodeId, Span};
 
 use crate::keyword::kw;
-use crate::node_id::NodeId;
+use crate::token::Literal;
 use crate::token::Token;
-use crate::{
-    span::{Span, Spanned},
-    token::Literal,
-};
 
 pub use crate::macros::*;
 
@@ -35,6 +34,10 @@ impl Ident {
 
     pub fn set_name(&mut self, name: &str) {
         self.name = name.into();
+    }
+
+    pub fn set_arity(&mut self, arity: usize) {
+        self.name = format!("{}/{}", self.name, arity).into();
     }
 
     pub fn is_self(&self) -> bool {
@@ -91,7 +94,7 @@ impl FunctionParameter {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct FunctionDeclaration {
     pub id: NodeId,
@@ -105,7 +108,20 @@ pub struct FunctionDeclaration {
     pub span: Span,
 }
 
-#[derive(Debug, Default, Clone)]
+impl FunctionDeclaration {
+    /// # Panics
+    pub fn name(&self) -> String {
+        match &self.name.kind {
+            ExprKind::Path(path) => path.to_string(),
+            ExprKind::FieldExpression(expr) if let Some(path) = expr.base.path() => {
+                format!("{}.{}", path, expr.field)
+            }
+            _ => panic!("Expected identifier, found {:?}", self.name.kind),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Block {
     pub id: NodeId,
@@ -120,7 +136,7 @@ impl Block {
             id,
             statements,
             expression,
-            ..Default::default()
+            span: Span::default(),
         }
     }
 
@@ -176,7 +192,7 @@ pub struct IfElseExpression {
     pub else_branches: Vec<ElseClause>,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Expr {
     pub id: NodeId,
@@ -191,7 +207,9 @@ impl Expr {
         Expr {
             id,
             kind,
-            ..Default::default()
+            leading_comments: vec![],
+            trailing_comments: vec![],
+            span: Span::default(),
         }
     }
 
@@ -202,6 +220,14 @@ impl Expr {
 
     pub fn is_wildcard(&self) -> bool {
         matches!(self.kind, ExprKind::Wildcard)
+    }
+
+    pub fn path(&self) -> Option<&Path> {
+        if let ExprKind::Path(path) = &self.kind {
+            Some(path)
+        } else {
+            None
+        }
     }
 }
 
@@ -238,6 +264,7 @@ pub struct RangeExpression {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ForLoop {
+    pub id: NodeId,
     pub pat: Pat,
     pub iter: Expr,
     pub acc: Option<(Pat, Expr)>,
@@ -275,11 +302,18 @@ pub enum ExprKind {
     Wildcard,
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct Res {
+    pub node_id: Option<NodeId>,
+}
+
 /// AST representation of a path.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Path {
     pub segments: Vec<Ident>,
+    pub res: Res,
     pub span: Span,
 }
 
@@ -293,6 +327,7 @@ impl Path {
     pub fn new(segments: Vec<Ident>) -> Self {
         Path {
             segments,
+            res: Res::default(),
             span: Span::default(),
         }
     }
@@ -302,6 +337,7 @@ impl Path {
 
         Path {
             segments: vec![ident],
+            res: Res::default(),
             span,
         }
     }
@@ -328,7 +364,7 @@ impl Path {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Pat {
     pub id: NodeId,
@@ -343,7 +379,9 @@ impl Pat {
         Pat {
             id,
             kind,
-            ..Default::default()
+            leading_comments: vec![],
+            trailing_comments: vec![],
+            span: Span::default(),
         }
     }
 
@@ -424,7 +462,7 @@ pub struct EnumDeclaration {
     pub variants: Vec<EnumVariant>,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Stmt {
     pub id: NodeId,
@@ -439,7 +477,9 @@ impl Stmt {
         Stmt {
             id,
             kind,
-            ..Default::default()
+            span: Span::default(),
+            leading_comments: vec![],
+            trailing_comments: vec![],
         }
     }
 
@@ -457,7 +497,7 @@ pub enum StmtKind {
     Expr(Box<Expr>),
     Let(Box<LetDeclaration>),
     FunctionDeclaration(Box<FunctionDeclaration>),
-    // TODO: We should deal with this in HIR instead.
+    // TODO: We should probably deal with this in HIR instead.
     FunctionDeclarations(Vec<FunctionDeclaration>),
     Return(Option<Box<Expr>>),
     EnumDeclaration(Box<EnumDeclaration>),
@@ -526,7 +566,7 @@ pub struct MatchArm {
     pub expression: Expr,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Module {
     pub id: NodeId,
@@ -535,11 +575,11 @@ pub struct Module {
 }
 
 impl Module {
-    pub fn new(id: NodeId, statements: Vec<Stmt>) -> Self {
+    pub fn new(id: NodeId, statements: Vec<Stmt>, span: Span) -> Self {
         Module {
             id,
             statements,
-            span: Span::default(),
+            span,
         }
     }
 }

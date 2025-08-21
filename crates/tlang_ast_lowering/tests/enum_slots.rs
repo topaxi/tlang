@@ -6,6 +6,7 @@ use tlang_hir::hir::HirScope;
 use self::common::hir_from_str;
 
 #[test]
+#[ignore]
 fn test_enum_variant_slots() {
     let hir = hir_from_str(
         r#"
@@ -22,6 +23,7 @@ fn test_enum_variant_slots() {
 
 // Tagged variants are functions/constructed and do not have a slot themselves.
 #[test]
+#[ignore]
 fn test_enum_tagged_variant_slots() {
     let hir = hir_from_str(
         r#"

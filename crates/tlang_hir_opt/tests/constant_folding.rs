@@ -2,13 +2,20 @@ use insta::assert_snapshot;
 
 mod common;
 
+fn optimizer() -> tlang_hir_opt::HirOptimizer {
+    tlang_hir_opt::HirOptimizer::new(vec![
+        Box::new(tlang_hir_opt::symbol_resolution::SymbolResolution::default()),
+        Box::new(tlang_hir_opt::constant_folding::ConstantFolding::default()),
+    ])
+}
+
 #[test]
 fn simple_binary_constant_folding() {
     let source = r#"
         let x: unknown = 1 + 2;
         println(x);
     "#;
-    let hir = common::compile_and_optimize(source);
+    let hir = common::compile_and_optimize(source, &mut optimizer());
     assert_snapshot!(common::pretty_print(&hir), @r###"
     let x: unknown = 3;
     println(3);
@@ -21,7 +28,7 @@ fn multiplication_constant_folding() {
         let x: unknown = 2 * 3;
         println(x);
     "#;
-    let hir = common::compile_and_optimize(source);
+    let hir = common::compile_and_optimize(source, &mut optimizer());
     assert_snapshot!(common::pretty_print(&hir), @r###"
     let x: unknown = 6;
     println(6);
@@ -36,7 +43,7 @@ fn chained_operations() {
         let z: unknown = y - 4;
         println(z);
     "#;
-    let hir = common::compile_and_optimize(source);
+    let hir = common::compile_and_optimize(source, &mut optimizer());
     assert_snapshot!(common::pretty_print(&hir), @r###"
     let x: unknown = 3;
     let y: unknown = 9;
@@ -51,7 +58,7 @@ fn mixed_operations() {
         let x: unknown = (1 + 2) * 3;
         println(x);
     "#;
-    let hir = common::compile_and_optimize(source);
+    let hir = common::compile_and_optimize(source, &mut optimizer());
     assert_snapshot!(common::pretty_print(&hir), @r###"
     let x: unknown = 9;
     println(9);
@@ -65,7 +72,7 @@ fn chained_constant_folding() {
         let y: unknown = x * 3;
         println(y);
     "#;
-    let hir = common::compile_and_optimize(source);
+    let hir = common::compile_and_optimize(source, &mut optimizer());
     assert_snapshot!(common::pretty_print(&hir), @r###"
     let x: unknown = 3;
     let y: unknown = 9;
@@ -75,8 +82,6 @@ fn chained_constant_folding() {
 
 #[test]
 fn constant_folding_mutable_variable() {
-    let _ = env_logger::builder().is_test(true).try_init();
-
     let source = r#"
         fn loop_test() {
             let i = 0;
@@ -89,10 +94,10 @@ fn constant_folding_mutable_variable() {
             }
             i
         }
-        loop_test() |> log();
+        loop_test() |> println();
     "#;
 
-    let hir = common::compile_and_optimize(source);
+    let hir = common::compile_and_optimize(source, &mut optimizer());
     assert_snapshot!(common::pretty_print(&hir), @r###"
     fn loop_test() -> unknown {
         let i: unknown = 0;
@@ -103,8 +108,8 @@ fn constant_folding_mutable_variable() {
             (i = (i + 1));
         };
         i
-    };
-    log(loop_test());
+    }
+    println(loop_test());
     "###);
 }
 
@@ -116,7 +121,7 @@ fn constant_folding_booleans() {
         let c: unknown = !true;
         println(a, b, c);
     "#;
-    let hir = common::compile_and_optimize(source);
+    let hir = common::compile_and_optimize(source, &mut optimizer());
     assert_snapshot!(common::pretty_print(&hir), @r###"
     let a: unknown = false;
     let b: unknown = true;

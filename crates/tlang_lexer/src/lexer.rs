@@ -1,8 +1,8 @@
 use tlang_ast::{
     keyword::{Keyword, is_keyword},
-    span::{LineColumn, Span},
     token::{Literal, Token, TokenKind},
 };
+use tlang_span::{LineColumn, Span};
 
 #[derive(Debug, Clone)]
 pub struct Lexer<'src> {
@@ -30,6 +30,10 @@ impl Lexer<'_> {
             next_char,
             chars,
         }
+    }
+
+    pub fn set_line_offset(&mut self, line: u32) {
+        self.current_line = line;
     }
 
     pub fn current_line(&self) -> u32 {

@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use tlang_ast::{node::UnaryOp, token::Literal};
 use tlang_hir::{
-    hir::{BinaryOpKind, Expr, ExprKind, HirId, Module},
+    hir::{self, BinaryOpKind, Expr, ExprKind, HirId},
     visit::{self, Visitor},
 };
 
-use crate::hir_opt::HirPass;
+use crate::hir_opt::{HirOptContext, HirPass};
 
 pub struct ConstantFolder {
     folded_exprs: HashMap<HirId, Literal>,
@@ -87,8 +87,8 @@ impl ConstantFolder {
 }
 
 impl<'hir> Visitor<'hir> for ConstantFolder {
-    fn visit_expr(&mut self, expr: &'hir mut Expr) {
-        visit::walk_expr(self, expr);
+    fn visit_expr(&mut self, expr: &'hir mut Expr, ctx: &mut Self::Context) {
+        visit::walk_expr(self, expr, ctx);
 
         if let Some(lit) = self.try_eval_expr(expr)
             && self.folded_exprs.get(&expr.hir_id) != Some(&lit)
@@ -101,9 +101,9 @@ impl<'hir> Visitor<'hir> for ConstantFolder {
 }
 
 impl HirPass for ConstantFolder {
-    fn optimize_module(&mut self, module: &mut Module) -> bool {
+    fn optimize_hir(&mut self, module: &mut hir::Module, _ctx: &mut HirOptContext) -> bool {
         self.changed = false;
-        self.visit_module(module);
+        self.visit_module(module, &mut ());
         self.changed
     }
 }

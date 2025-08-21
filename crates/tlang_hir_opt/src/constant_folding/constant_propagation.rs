@@ -1,11 +1,12 @@
+use log::debug;
 use std::collections::{HashMap, HashSet};
 use tlang_ast::token::Literal;
 use tlang_hir::{
-    hir::{BinaryOpKind, Expr, ExprKind, HirId, Module, Pat, PatKind, Stmt, StmtKind},
+    hir::{self, BinaryOpKind, Expr, ExprKind, HirId, Module, Pat, PatKind, Stmt, StmtKind},
     visit::{self, Visitor},
 };
 
-use crate::hir_opt::HirPass;
+use crate::hir_opt::{HirOptContext, HirPass};
 
 #[derive(Default)]
 pub struct AssignmentCollector {
@@ -15,13 +16,13 @@ pub struct AssignmentCollector {
 impl AssignmentCollector {
     pub fn collect(module: &mut Module) -> HashSet<HirId> {
         let mut collector = Self::default();
-        collector.visit_module(module);
+        collector.visit_module(module, &mut ());
         collector.reassigned_variables
     }
 }
 
 impl<'hir> Visitor<'hir> for AssignmentCollector {
-    fn visit_expr(&mut self, expr: &'hir mut Expr) {
+    fn visit_expr(&mut self, expr: &'hir mut Expr, ctx: &mut Self::Context) {
         if let ExprKind::Binary(BinaryOpKind::Assign, lhs, _rhs) = &mut expr.kind
             && let ExprKind::Path(lhs_path) = &lhs.kind
             && let Some(resolved_hir_id) = lhs_path.res.hir_id()
@@ -29,7 +30,7 @@ impl<'hir> Visitor<'hir> for AssignmentCollector {
             self.reassigned_variables.insert(resolved_hir_id);
         }
 
-        visit::walk_expr(self, expr);
+        visit::walk_expr(self, expr, ctx);
     }
 }
 
@@ -55,11 +56,9 @@ impl ConstantPropagator {
     }
 }
 
-// Implement the Visitor trait for the propagator.
 impl<'hir> Visitor<'hir> for ConstantPropagator {
-    fn visit_stmt(&mut self, stmt: &'hir mut Stmt) {
+    fn visit_stmt(&mut self, stmt: &'hir mut Stmt, ctx: &mut Self::Context) {
         match &mut stmt.kind {
-            // Handle 'let' statements.
             StmtKind::Let(
                 box Pat {
                     kind: PatKind::Identifier(hir_id, _ident),
@@ -68,7 +67,7 @@ impl<'hir> Visitor<'hir> for ConstantPropagator {
                 expr,
                 ..,
             ) => {
-                self.visit_expr(expr);
+                self.visit_expr(expr, ctx);
 
                 if !self.reassigned_variables.contains(hir_id) {
                     match &expr.kind {
@@ -79,15 +78,16 @@ impl<'hir> Visitor<'hir> for ConstantPropagator {
                     }
                 }
             }
-            _ => visit::walk_stmt(self, stmt),
+            _ => visit::walk_stmt(self, stmt, ctx),
         }
     }
 
-    fn visit_expr(&mut self, expr: &'hir mut Expr) {
+    fn visit_expr(&mut self, expr: &'hir mut Expr, ctx: &mut Self::Context) {
         if let ExprKind::Path(path) = &expr.kind {
             if let Some(resolved_hir_id) = path.res.hir_id()
                 && let Some(lit) = self.constants.get(&resolved_hir_id)
             {
+                debug!("Constant propagating: {:?} -> {:?}", resolved_hir_id, lit);
                 expr.kind = ExprKind::Literal(Box::new(lit.clone()));
                 self.changed = true;
                 return;
@@ -95,17 +95,17 @@ impl<'hir> Visitor<'hir> for ConstantPropagator {
             return;
         }
 
-        visit::walk_expr(self, expr);
+        visit::walk_expr(self, expr, ctx);
     }
 }
 
 impl HirPass for ConstantPropagator {
-    fn optimize_module(&mut self, module: &mut Module) -> bool {
+    fn optimize_hir(&mut self, module: &mut hir::Module, _ctx: &mut HirOptContext) -> bool {
         self.constants.clear();
         self.reassigned_variables = AssignmentCollector::collect(module);
 
         self.changed = false;
-        self.visit_module(module);
+        self.visit_module(module, &mut ());
         self.changed
     }
 }

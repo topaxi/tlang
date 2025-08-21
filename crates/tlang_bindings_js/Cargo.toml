@@ -17,6 +17,7 @@ crate-type = [
 console_error_panic_hook = "0.1"
 wasm-bindgen = "=0.2.100"
 js-sys = "=0.3.77"
+console_log = { version = "1", features = ["color"] }
 tlang_ast = { path = "../tlang_ast", features = ["serde"] }
 tlang_ast_lowering = { path = "../tlang_ast_lowering" }
 tlang_hir = { path = "../tlang_hir", features = ["serde"] }
@@ -29,6 +30,7 @@ tlang_interpreter = { path = "../tlang_runtime/tlang_interpreter" }
 tlang_macros = { path = "../tlang_macros" }
 tlang_codegen_js = { path = "../tlang_codegen_js" }
 inventory = { workspace = true }
+log = { workspace = true }
 ron = { workspace = true }
 serde = { workspace = true }
 serde-wasm-bindgen = "0.6"

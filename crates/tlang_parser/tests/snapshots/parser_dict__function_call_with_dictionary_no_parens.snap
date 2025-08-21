@@ -3,15 +3,15 @@ source: crates/tlang_parser/tests/parser_dict.rs
 expression: "parse! (r\"foo { foo: 1, bar: 2 };\")"
 ---
 Module(
-  id: NodeId(1),
+  id: 2,
   statements: [
     Stmt(
-      id: NodeId(2),
+      id: 3,
       kind: Expr(Expr(
-        id: NodeId(9),
+        id: 10,
         kind: Call(CallExpression(
           callee: Expr(
-            id: NodeId(3),
+            id: 4,
             kind: Path(Path(
               segments: [
                 Ident(
@@ -28,6 +28,9 @@ Module(
                   ),
                 ),
               ],
+              res: Res(
+                node_id: None,
+              ),
               span: Span(
                 start: LineColumn(
                   line: 0,
@@ -54,10 +57,10 @@ Module(
           ),
           arguments: [
             Expr(
-              id: NodeId(8),
+              id: 9,
               kind: Dict([
                 (Expr(
-                  id: NodeId(4),
+                  id: 5,
                   kind: Path(Path(
                     segments: [
                       Ident(
@@ -74,6 +77,9 @@ Module(
                         ),
                       ),
                     ],
+                    res: Res(
+                      node_id: None,
+                    ),
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -98,7 +104,7 @@ Module(
                     ),
                   ),
                 ), Expr(
-                  id: NodeId(5),
+                  id: 6,
                   kind: Literal(UnsignedInteger(1)),
                   leading_comments: [],
                   trailing_comments: [],
@@ -114,7 +120,7 @@ Module(
                   ),
                 )),
                 (Expr(
-                  id: NodeId(6),
+                  id: 7,
                   kind: Path(Path(
                     segments: [
                       Ident(
@@ -131,6 +137,9 @@ Module(
                         ),
                       ),
                     ],
+                    res: Res(
+                      node_id: None,
+                    ),
                     span: Span(
                       start: LineColumn(
                         line: 0,
@@ -155,7 +164,7 @@ Module(
                     ),
                   ),
                 ), Expr(
-                  id: NodeId(7),
+                  id: 8,
                   kind: Literal(UnsignedInteger(2)),
                   leading_comments: [],
                   trailing_comments: [],
@@ -220,7 +229,7 @@ Module(
     ),
     end: LineColumn(
       line: 0,
-      column: 0,
+      column: 23,
     ),
   ),
 )

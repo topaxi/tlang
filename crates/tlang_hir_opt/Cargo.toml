@@ -6,15 +6,19 @@ edition.workspace = true
 [dependencies]
 tlang_hir = { path = "../tlang_hir" }
 tlang_ast = { path = "../tlang_ast" }
+tlang_span = { path = "../tlang_span" }
 log = { workspace = true }
 
 [dev-dependencies]
 tlang_parser = { path = "../tlang_parser" }
 tlang_ast_lowering = { path = "../tlang_ast_lowering" }
 tlang_hir_pretty = { path = "../tlang_hir_pretty" }
+tlang_semantics = { path = "../tlang_semantics" }
 insta = { workspace = true }
 serde = { workspace = true }
 env_logger = { workspace = true }
+ctor = { workspace = true }
+pretty_assertions = { workspace = true }
 
 [lints]
 workspace = true
