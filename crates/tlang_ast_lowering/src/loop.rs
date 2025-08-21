@@ -1,6 +1,6 @@
-use tlang_ast as ast;
 use tlang_ast::node::Ident;
 use tlang_ast::symbols::SymbolType;
+use tlang_ast::{self as ast, NodeId};
 use tlang_hir::hir;
 
 use crate::LoweringContext;
@@ -10,8 +10,12 @@ impl LoweringContext {
         hir::ExprKind::Loop(Box::new(self.lower_block(loop_expr)))
     }
 
-    pub(crate) fn lower_for_loop(&mut self, for_loop: &ast::node::ForLoop) -> hir::ExprKind {
-        let block = self.with_scope(for_loop.id, |this| {
+    pub(crate) fn lower_for_loop(
+        &mut self,
+        node_id: NodeId,
+        for_loop: &ast::node::ForLoop,
+    ) -> hir::ExprKind {
+        let block = self.with_scope(node_id, |this| {
             let iterator_binding_hir_id = this.unique_id();
             let iterator_binding_name = Ident::new("iterator$$", Default::default());
             this.define_symbol_at(
@@ -79,7 +83,7 @@ impl LoweringContext {
                 })),
             );
 
-            let loop_block = this.with_new_scope(|this, _scope| {
+            let loop_block = this.with_scope(for_loop.id, |this| {
                 let mut iterator_binding_path = hir::Path::new(
                     vec![hir::PathSegment::new(iterator_binding_name)],
                     Default::default(),
@@ -98,13 +102,7 @@ impl LoweringContext {
                     .res
                     .set_hir_id(accumulator_binding_hir_id);
 
-                let block = this.lower_for_loop_body(
-                    for_loop,
-                    iterator_binding_path,
-                    accumulator_binding_path,
-                );
-
-                (block.hir_id, block)
+                this.lower_for_loop_body(for_loop, iterator_binding_path, accumulator_binding_path)
             });
 
             let loop_expr = this.expr(

@@ -211,9 +211,12 @@ impl DeclarationAnalyzer {
                 self.collect_declarations_block(block);
             }
             ExprKind::ForLoop(for_loop) => {
-                self.push_symbol_table(for_loop.id);
+                // Using the expr.id here, as the whole expression will be lowered into a block
+                // expression, refering to this expr.id.
+                self.push_symbol_table(expr.id);
                 self.collect_declarations_expr(&for_loop.iter);
 
+                self.push_symbol_table(for_loop.id);
                 if let Some((pat, expr)) = &for_loop.acc {
                     self.collect_pattern(pat, expr.span.end);
                     self.collect_declarations_expr(expr);
@@ -222,6 +225,7 @@ impl DeclarationAnalyzer {
                 self.push_symbol_table(for_loop.block.id);
                 self.collect_pattern(&for_loop.pat, for_loop.pat.span.end);
                 self.collect_declarations_block_scopeless(&for_loop.block);
+                self.pop_symbol_table();
                 self.pop_symbol_table();
                 self.pop_symbol_table();
 

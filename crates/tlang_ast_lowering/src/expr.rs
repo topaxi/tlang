@@ -21,7 +21,7 @@ impl LoweringContext {
                 hir::ExprKind::Block(Box::new(self.lower_block(block)))
             }
             ast::node::ExprKind::Loop(block) => self.lower_loop(block),
-            ast::node::ExprKind::ForLoop(for_loop) => self.lower_for_loop(for_loop),
+            ast::node::ExprKind::ForLoop(for_loop) => self.lower_for_loop(node.id, for_loop),
             ast::node::ExprKind::Break(expr) => {
                 hir::ExprKind::Break(expr.as_ref().map(|expr| Box::new(self.lower_expr(expr))))
             }
