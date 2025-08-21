@@ -11,12 +11,13 @@ use tlang_ast::{
 use tlang_span::{NodeId, Span};
 
 use crate::{
-    declarations::DeclarationAnalyzer,
+    declarations::{DeclarationAnalyzer, DeclarationContext},
     diagnostic::{self, Diagnostic},
 };
 
 pub struct SemanticAnalyzer {
     declaration_analyzer: DeclarationAnalyzer,
+    declaration_context: Option<DeclarationContext>,
     symbol_table_stack: Vec<Rc<RefCell<SymbolTable>>>,
     diagnostics: Vec<Diagnostic>,
     struct_declarations: HashMap<String, StructDeclaration>,
@@ -32,6 +33,7 @@ impl SemanticAnalyzer {
     pub fn new(declaration_analyzer: DeclarationAnalyzer) -> Self {
         SemanticAnalyzer {
             declaration_analyzer,
+            declaration_context: None,
             symbol_table_stack: vec![],
             diagnostics: vec![],
             struct_declarations: HashMap::new(),
@@ -40,7 +42,8 @@ impl SemanticAnalyzer {
 
     #[inline(always)]
     pub fn symbol_tables(&self) -> &HashMap<NodeId, Rc<RefCell<SymbolTable>>> {
-        self.declaration_analyzer.symbol_tables()
+        let ctx = self.declaration_context.as_ref().expect("Declaration analysis must be run first");
+        self.declaration_analyzer.symbol_tables(ctx)
     }
 
     #[inline(always)]
@@ -49,11 +52,13 @@ impl SemanticAnalyzer {
     }
 
     pub fn root_symbol_table(&self) -> Rc<RefCell<SymbolTable>> {
-        self.declaration_analyzer.root_symbol_table().clone()
+        let ctx = self.declaration_context.as_ref().expect("Declaration analysis must be run first");
+        self.declaration_analyzer.root_symbol_table(ctx).clone()
     }
 
     pub fn symbol_id_allocator(&self) -> SymbolIdAllocator {
-        self.declaration_analyzer.symbol_id_allocator()
+        let ctx = self.declaration_context.as_ref().expect("Declaration analysis must be run first");
+        self.declaration_analyzer.symbol_id_allocator(ctx)
     }
 
     pub fn get_diagnostics(&self) -> &[Diagnostic] {
@@ -91,7 +96,14 @@ impl SemanticAnalyzer {
         S: AsRef<str> + 'a,
         I: IntoIterator<Item = &'a (S, SymbolType)>,
     {
-        self.declaration_analyzer.add_builtin_symbols(symbols);
+        // Initialize context if it doesn't exist
+        if self.declaration_context.is_none() {
+            self.declaration_context = Some(DeclarationContext::new());
+        }
+        
+        if let Some(ref mut ctx) = self.declaration_context {
+            self.declaration_analyzer.add_builtin_symbols(ctx, symbols);
+        }
     }
 
     pub fn analyze(&mut self, module: &Module) -> Result<(), Vec<Diagnostic>> {
@@ -125,7 +137,7 @@ impl SemanticAnalyzer {
     }
 
     fn collect_declarations(&mut self, module: &Module, is_root: bool) {
-        self.declaration_analyzer.analyze(module, is_root);
+        self.declaration_context = Some(self.declaration_analyzer.analyze(module, is_root));
     }
 
     fn mark_as_used_by_name(&mut self, name: &str, span: Span) {
