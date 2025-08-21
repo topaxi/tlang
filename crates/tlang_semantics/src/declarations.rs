@@ -211,7 +211,7 @@ impl DeclarationAnalyzer {
                 self.collect_declarations_block(block);
             }
             ExprKind::ForLoop(for_loop) => {
-                self.push_symbol_table(expr.id);
+                self.push_symbol_table(for_loop.id);
                 self.collect_pattern(&for_loop.pat, for_loop.pat.span.end);
                 self.collect_declarations_expr(&for_loop.iter);
 

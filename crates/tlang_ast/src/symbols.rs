@@ -333,6 +333,12 @@ impl SymbolTable {
         self.symbols.push(symbol_info);
     }
 
+    pub fn insert_at(&mut self, index: usize, symbol_info: SymbolInfo) {
+        debug!("Inserting symbol at index {}: {:?}", index, symbol_info);
+
+        self.symbols.insert(index, symbol_info);
+    }
+
     pub fn insert_after(
         &mut self,
         symbol_info: SymbolInfo,

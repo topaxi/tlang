@@ -14,7 +14,8 @@ impl LoweringContext {
         let block = self.with_scope(for_loop.id, |this| {
             let iterator_binding_hir_id = this.unique_id();
             let iterator_binding_name = Ident::new("iterator$$", Default::default());
-            this.define_symbol(
+            this.define_symbol_at(
+                0,
                 iterator_binding_hir_id,
                 iterator_binding_name.as_str(),
                 SymbolType::Variable,
@@ -28,21 +29,23 @@ impl LoweringContext {
                 span: Default::default(),
             };
 
+            let accumulator_binding_hir_id = this.unique_id();
             let accumulator_binding_name = Ident::new("accumulator$$", Default::default());
             let accumulator_initializer = if let Some((_pat, expr)) = &for_loop.acc {
-                let hir_id = this.unique_id();
-                this.define_symbol(
-                    hir_id,
+                this.define_symbol_after(
+                    accumulator_binding_hir_id,
                     accumulator_binding_name.as_str(),
                     SymbolType::Variable,
                     Default::default(),
+                    |s| s.hir_id == Some(iterator_binding_hir_id),
                 );
+
                 let accumulator_declaration = hir::Stmt::new(
-                    hir_id,
+                    this.unique_id(),
                     hir::StmtKind::Let(
                         Box::new(hir::Pat {
                             kind: hir::PatKind::Identifier(
-                                hir_id,
+                                accumulator_binding_hir_id,
                                 Box::new(accumulator_binding_name.clone()),
                             ),
                             span: Default::default(),
@@ -86,7 +89,16 @@ impl LoweringContext {
                     .res
                     .set_hir_id(iterator_binding_hir_id);
 
-                this.lower_for_loop_body(for_loop, iterator_binding_path, &accumulator_binding_name)
+                let mut accumulator_binding_path = hir::Path::new(
+                    vec![hir::PathSegment::new(accumulator_binding_name.clone())],
+                    Default::default(),
+                );
+
+                accumulator_binding_path
+                    .res
+                    .set_hir_id(accumulator_binding_hir_id);
+
+                this.lower_for_loop_body(for_loop, iterator_binding_path, accumulator_binding_path)
             });
 
             let loop_expr = this.expr(
@@ -105,7 +117,7 @@ impl LoweringContext {
             );
 
             let mut init_loop_block = hir::Block::new(
-                this.unique_id(),
+                this.lower_node_id(for_loop.id),
                 vec![iterator_binding_stmt],
                 Some(loop_expr),
                 for_loop.iter.span,
@@ -125,7 +137,7 @@ impl LoweringContext {
         &mut self,
         for_loop: &ast::node::ForLoop,
         iterator_binding_path: hir::Path,
-        accumulator_binding_name: &Ident,
+        accumulator_binding_path: hir::Path,
     ) -> hir::Block {
         let iterator_binding_expr = self.expr(
             Default::default(),
@@ -151,10 +163,7 @@ impl LoweringContext {
 
         let accumulator_path_expr = self.expr(
             Default::default(),
-            hir::ExprKind::Path(Box::new(hir::Path::new(
-                vec![hir::PathSegment::new(accumulator_binding_name.clone())],
-                Default::default(),
-            ))),
+            hir::ExprKind::Path(Box::new(accumulator_binding_path.clone())),
         );
 
         let loop_statements = if let Some((pat, _)) = &for_loop.acc {
@@ -173,8 +182,7 @@ impl LoweringContext {
             vec![]
         };
 
-        // TODO, node id is wrong
-        let loop_arm = self.with_scope(for_loop.id, |this| {
+        let loop_arm = self.with_new_scope(|this, _scope| {
             let for_loop_pat = this.lower_pat(&for_loop.pat);
 
             let loop_body = this.lower_block_in_current_scope(&for_loop.block);
@@ -200,15 +208,11 @@ impl LoweringContext {
             }
         });
 
-        // TODO, node id is wrong
-        let break_arm = self.with_scope(for_loop.id, |this| {
+        let break_arm = self.with_new_scope(|this, _scope| {
             let accumulator_path_expr = for_loop.acc.as_ref().map(|_| {
                 Box::new(this.expr(
                     Default::default(),
-                    hir::ExprKind::Path(Box::new(hir::Path::new(
-                        vec![hir::PathSegment::new(accumulator_binding_name.clone())],
-                        Default::default(),
-                    ))),
+                    hir::ExprKind::Path(Box::new(accumulator_binding_path.clone())),
                 ))
             });
             hir::MatchArm {
