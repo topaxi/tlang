@@ -335,15 +335,19 @@ impl SemanticAnalyzer {
             }
             ExprKind::Block(block) | ExprKind::Loop(block) => self.analyze_block(block),
             ExprKind::ForLoop(for_loop) => {
+                let symbol_table = self.get_symbol_table(for_loop.id).unwrap();
+                self.push_symbol_table(&symbol_table);
+
                 self.analyze_expr(&for_loop.iter, false);
-                self.analyze_pat(&for_loop.pat);
 
                 if let Some((pat, expr)) = &for_loop.acc {
                     self.analyze_pat(pat);
                     self.analyze_expr(expr, false);
                 }
 
+                self.analyze_pat(&for_loop.pat);
                 self.analyze_block(&for_loop.block);
+                self.pop_symbol_table();
 
                 if let Some(else_block) = &for_loop.else_block {
                     self.analyze_block(else_block);
