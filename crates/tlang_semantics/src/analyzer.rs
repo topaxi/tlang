@@ -25,7 +25,6 @@ pub struct SemanticAnalysisContext {
     pub symbol_table_stack: Vec<Rc<RefCell<SymbolTable>>>,
     pub diagnostics: Vec<Diagnostic>,
     pub struct_declarations: HashMap<String, StructDeclaration>,
-    pub in_pipeline_rhs: bool,  // Track if we're analyzing the RHS of a pipeline
 }
 
 impl SemanticAnalysisContext {
@@ -35,7 +34,6 @@ impl SemanticAnalysisContext {
             symbol_table_stack: vec![],
             diagnostics: vec![],
             struct_declarations: HashMap::new(),
-            in_pipeline_rhs: false,
         }
     }
 
@@ -324,7 +322,7 @@ impl SemanticAnalyzer {
                 .set_declared(*symbol_id, false);
         }
 
-        self.visit_expr(&decl.expression, ctx);
+        self.visit_expr_with_pipeline_context(&decl.expression, ctx, false);
 
         for symbol_id in &pattern_symbols {
             ctx.current_symbol_table()
@@ -368,6 +366,137 @@ impl SemanticAnalyzer {
     }
 }
 
+
+impl SemanticAnalyzer {
+    fn visit_expr_with_pipeline_context(&mut self, expr: &Expr, ctx: &mut SemanticAnalysisContext, parent_pipeline: bool) {
+        match &expr.kind {
+            ExprKind::BinaryOp(binary_expr) => {
+                self.visit_expr_with_pipeline_context(&binary_expr.lhs, ctx, false);
+                self.visit_expr_with_pipeline_context(&binary_expr.rhs, ctx, binary_expr.op == BinaryOpKind::Pipeline);
+            }
+            ExprKind::Block(block) | ExprKind::Loop(block) => {
+                self.enter_scope(block.id, ctx);
+                self.visit_block(&block.statements, &block.expression, ctx);
+                self.leave_scope(block.id, ctx);
+            }
+            ExprKind::ForLoop(for_loop) => {
+                // Using the expression.id here, as the whole expression will be lowered into a block
+                // expression, referring to this expression.id.
+                self.enter_scope(expr.id, ctx);
+                self.visit_expr_with_pipeline_context(&for_loop.iter, ctx, false);
+
+                self.enter_scope(for_loop.id, ctx);
+                if let Some((pat, expr)) = &for_loop.acc {
+                    self.visit_pat(pat, ctx);
+                    self.visit_expr_with_pipeline_context(expr, ctx, false);
+                }
+
+                self.enter_scope(for_loop.block.id, ctx);
+                self.visit_pat(&for_loop.pat, ctx);
+                self.visit_block(&for_loop.block.statements, &for_loop.block.expression, ctx);
+                self.leave_scope(for_loop.block.id, ctx);
+                self.leave_scope(for_loop.id, ctx);
+                self.leave_scope(expr.id, ctx);
+
+                if let Some(else_block) = &for_loop.else_block {
+                    self.enter_scope(else_block.id, ctx);
+                    self.visit_block(&else_block.statements, &else_block.expression, ctx);
+                    self.leave_scope(else_block.id, ctx);
+                }
+            }
+            ExprKind::UnaryOp(_, node) => {
+                self.visit_expr_with_pipeline_context(node, ctx, false);
+            }
+            ExprKind::Break(expr) => {
+                if let Some(expr) = expr {
+                    self.visit_expr_with_pipeline_context(expr, ctx, false);
+                }
+            }
+            ExprKind::Call(call_expr) | ExprKind::RecursiveCall(call_expr) => {
+                for argument in &call_expr.arguments {
+                    self.visit_expr_with_pipeline_context(argument, ctx, false);
+                }
+
+                if let ExprKind::Path(path) = &call_expr.callee.kind {
+                    let arity = if parent_pipeline {
+                        call_expr.arguments.len() + 1  // +1 for the pipeline operator
+                    } else {
+                        call_expr.arguments.len()
+                    };
+                    self.analyze_path_with_known_arity(ctx, path, arity, call_expr.callee.span);
+                } else {
+                    self.visit_expr_with_pipeline_context(&call_expr.callee, ctx, false);
+                }
+            }
+            ExprKind::Cast(expr, _) => {
+                self.visit_expr_with_pipeline_context(expr, ctx, false);
+            }
+            ExprKind::IfElse(if_else_expr) => {
+                self.visit_expr_with_pipeline_context(&if_else_expr.condition, ctx, false);
+                
+                self.enter_scope(if_else_expr.then_branch.id, ctx);
+                self.visit_block(&if_else_expr.then_branch.statements, &if_else_expr.then_branch.expression, ctx);
+                self.leave_scope(if_else_expr.then_branch.id, ctx);
+
+                for else_branch in &if_else_expr.else_branches {
+                    self.visit_else_clause(else_branch, ctx);
+                }
+            }
+            ExprKind::Let(pat, expr) => {
+                self.visit_pat(pat, ctx);
+                self.visit_expr_with_pipeline_context(expr, ctx, false);
+            }
+            ExprKind::List(values) => {
+                for value in values {
+                    self.visit_expr_with_pipeline_context(value, ctx, false);
+                }
+            }
+            ExprKind::Dict(kvs) => {
+                for (_key, value) in kvs {
+                    // TODO: Keys are currently not properly analyzed
+                    // self.visit_expr_with_pipeline_context(key, ctx, false);
+                    self.visit_expr_with_pipeline_context(value, ctx, false);
+                }
+            }
+            ExprKind::IndexExpression(index_expr) => {
+                self.visit_expr_with_pipeline_context(&index_expr.index, ctx, false);
+                self.visit_expr_with_pipeline_context(&index_expr.base, ctx, false);
+            }
+            ExprKind::FieldExpression(field_expr) => {
+                self.visit_expr_with_pipeline_context(&field_expr.base, ctx, false);
+                // TODO: We are checking for unused variables, this should be refactored into
+                //       it's own pass. Skipping analyzing field of variable as we do not have
+                //       any type information yet.
+                // self.visit_ident(&field_expr.field, ctx);
+            }
+            ExprKind::FunctionExpression(decl) => {
+                self.visit_fn_decl(decl, ctx);
+            }
+            ExprKind::Path(path) => {
+                self.analyze_path(ctx, path, expr.span);
+            }
+            ExprKind::Match(match_expr) => {
+                self.visit_expr_with_pipeline_context(&match_expr.expression, ctx, false);
+
+                for arm in &match_expr.arms {
+                    self.enter_scope(arm.id, ctx);
+                    self.visit_pat(&arm.pattern, ctx);
+                    if let Some(ref guard) = arm.guard {
+                        self.visit_expr_with_pipeline_context(guard, ctx, false);
+                    }
+                    self.visit_expr_with_pipeline_context(&arm.expression, ctx, false);
+                    self.leave_scope(arm.id, ctx);
+                }
+            }
+            ExprKind::Range(range_expr) => {
+                self.visit_expr_with_pipeline_context(&range_expr.start, ctx, false);
+                self.visit_expr_with_pipeline_context(&range_expr.end, ctx, false);
+            }
+            ExprKind::None | ExprKind::Continue | ExprKind::Literal(_) | ExprKind::Wildcard => {}
+        }
+    }
+}
+
 impl<'ast> Visitor<'ast> for SemanticAnalyzer {
     type Context = SemanticAnalysisContext;
 
@@ -389,10 +518,24 @@ impl<'ast> Visitor<'ast> for SemanticAnalyzer {
         walk_module(self, module, ctx);
     }
 
+    fn visit_block(
+        &mut self,
+        statements: &'ast [Stmt],
+        expression: &'ast Option<Expr>,
+        ctx: &mut Self::Context,
+    ) {
+        for statement in statements {
+            self.visit_stmt(statement, ctx);
+        }
+        if let Some(expression) = expression {
+            self.visit_expr_with_pipeline_context(expression, ctx, false);
+        }
+    }
+
     fn visit_stmt(&mut self, stmt: &'ast Stmt, ctx: &mut Self::Context) {
         match &stmt.kind {
             StmtKind::None => {}
-            StmtKind::Expr(expr) => self.visit_expr(expr, ctx),
+            StmtKind::Expr(expr) => self.visit_expr_with_pipeline_context(expr, ctx, false),
             StmtKind::Let(decl) => self.analyze_variable_declaration(decl, ctx),
             StmtKind::FunctionDeclaration(decl) => self.visit_fn_decl(decl, ctx),
             StmtKind::FunctionDeclarations(decls) => {
@@ -400,7 +543,7 @@ impl<'ast> Visitor<'ast> for SemanticAnalyzer {
                     self.visit_fn_decl(decl, ctx);
                 }
             }
-            StmtKind::Return(Some(expr)) => self.visit_expr(expr, ctx),
+            StmtKind::Return(Some(expr)) => self.visit_expr_with_pipeline_context(expr, ctx, false),
             StmtKind::Return(_) => {}
             StmtKind::EnumDeclaration(_decl) => {
                 // TODO
@@ -423,7 +566,7 @@ impl<'ast> Visitor<'ast> for SemanticAnalyzer {
 
         // Handle guard
         if let Some(guard) = &decl.guard {
-            self.visit_expr(guard, ctx);
+            self.visit_expr_with_pipeline_context(guard, ctx, false);
         }
 
         // Handle body
@@ -438,140 +581,7 @@ impl<'ast> Visitor<'ast> for SemanticAnalyzer {
     }
 
     fn visit_expr(&mut self, expr: &'ast Expr, ctx: &mut Self::Context) {
-        match &expr.kind {
-            ExprKind::BinaryOp(binary_expr) => {
-                self.visit_expr(&binary_expr.lhs, ctx);
-                
-                // Handle pipeline operator special case
-                if binary_expr.op == BinaryOpKind::Pipeline {
-                    let old_pipeline_state = ctx.in_pipeline_rhs;
-                    ctx.in_pipeline_rhs = true;
-                    self.visit_expr(&binary_expr.rhs, ctx);
-                    ctx.in_pipeline_rhs = old_pipeline_state;
-                } else {
-                    self.visit_expr(&binary_expr.rhs, ctx);
-                }
-            }
-            ExprKind::Block(block) | ExprKind::Loop(block) => {
-                self.enter_scope(block.id, ctx);
-                self.visit_block(&block.statements, &block.expression, ctx);
-                self.leave_scope(block.id, ctx);
-            }
-            ExprKind::ForLoop(for_loop) => {
-                // Using the expression.id here, as the whole expression will be lowered into a block
-                // expression, referring to this expression.id.
-                self.enter_scope(expr.id, ctx);
-                self.visit_expr(&for_loop.iter, ctx);
-
-                self.enter_scope(for_loop.id, ctx);
-                if let Some((pat, expr)) = &for_loop.acc {
-                    self.visit_pat(pat, ctx);
-                    self.visit_expr(expr, ctx);
-                }
-
-                self.enter_scope(for_loop.block.id, ctx);
-                self.visit_pat(&for_loop.pat, ctx);
-                self.visit_block(&for_loop.block.statements, &for_loop.block.expression, ctx);
-                self.leave_scope(for_loop.block.id, ctx);
-                self.leave_scope(for_loop.id, ctx);
-                self.leave_scope(expr.id, ctx);
-
-                if let Some(else_block) = &for_loop.else_block {
-                    self.enter_scope(else_block.id, ctx);
-                    self.visit_block(&else_block.statements, &else_block.expression, ctx);
-                    self.leave_scope(else_block.id, ctx);
-                }
-            }
-            ExprKind::UnaryOp(_, node) => {
-                self.visit_expr(node, ctx);
-            }
-            ExprKind::Break(expr) => {
-                if let Some(expr) = expr {
-                    self.visit_expr(expr, ctx);
-                }
-            }
-            ExprKind::Call(call_expr) | ExprKind::RecursiveCall(call_expr) => {
-                for argument in &call_expr.arguments {
-                    self.visit_expr(argument, ctx);
-                }
-
-                if let ExprKind::Path(path) = &call_expr.callee.kind {
-                    let arity = if ctx.in_pipeline_rhs {
-                        call_expr.arguments.len() + 1  // +1 for the pipeline operator
-                    } else {
-                        call_expr.arguments.len()
-                    };
-                    self.analyze_path_with_known_arity(ctx, path, arity, call_expr.callee.span);
-                } else {
-                    self.visit_expr(&call_expr.callee, ctx);
-                }
-            }
-            ExprKind::Cast(expr, _) => {
-                self.visit_expr(expr, ctx);
-            }
-            ExprKind::IfElse(if_else_expr) => {
-                self.visit_expr(&if_else_expr.condition, ctx);
-                
-                self.enter_scope(if_else_expr.then_branch.id, ctx);
-                self.visit_block(&if_else_expr.then_branch.statements, &if_else_expr.then_branch.expression, ctx);
-                self.leave_scope(if_else_expr.then_branch.id, ctx);
-
-                for else_branch in &if_else_expr.else_branches {
-                    self.visit_else_clause(else_branch, ctx);
-                }
-            }
-            ExprKind::Let(pat, expr) => {
-                self.visit_pat(pat, ctx);
-                self.visit_expr(expr, ctx);
-            }
-            ExprKind::List(values) => {
-                for value in values {
-                    self.visit_expr(value, ctx);
-                }
-            }
-            ExprKind::Dict(kvs) => {
-                for (_key, value) in kvs {
-                    // TODO: Keys are currently not properly analyzed
-                    // self.visit_expr(key, ctx);
-                    self.visit_expr(value, ctx);
-                }
-            }
-            ExprKind::IndexExpression(index_expr) => {
-                self.visit_expr(&index_expr.index, ctx);
-                self.visit_expr(&index_expr.base, ctx);
-            }
-            ExprKind::FieldExpression(field_expr) => {
-                self.visit_expr(&field_expr.base, ctx);
-                // TODO: We are checking for unused variables, this should be refactored into
-                //       it's own pass. Skipping analyzing field of variable as we do not have
-                //       any type information yet.
-                // self.visit_ident(&field_expr.field, ctx);
-            }
-            ExprKind::FunctionExpression(decl) => {
-                self.visit_fn_decl(decl, ctx);
-            }
-            ExprKind::Path(path) => {
-                self.analyze_path(ctx, path, expr.span);
-            }
-            ExprKind::Match(match_expr) => {
-                self.visit_expr(&match_expr.expression, ctx);
-
-                for arm in &match_expr.arms {
-                    self.enter_scope(arm.id, ctx);
-                    self.visit_pat(&arm.pattern, ctx);
-                    if let Some(ref guard) = arm.guard {
-                        self.visit_expr(guard, ctx);
-                    }
-                    self.visit_expr(&arm.expression, ctx);
-                    self.leave_scope(arm.id, ctx);
-                }
-            }
-            ExprKind::Range(range_expr) => {
-                self.visit_expr(&range_expr.start, ctx);
-                self.visit_expr(&range_expr.end, ctx);
-            }
-            ExprKind::None | ExprKind::Continue | ExprKind::Literal(_) | ExprKind::Wildcard => {}
-        }
+        self.visit_expr_with_pipeline_context(expr, ctx, false);
     }
 
     fn visit_pat(&mut self, pat: &'ast Pat, ctx: &mut Self::Context) {
