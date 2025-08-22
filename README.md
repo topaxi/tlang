@@ -9,6 +9,17 @@ Try tlang in your browser at the [interactive playground](https://topaxi.github.
 ### Quick Example
 
 ```tlang
+// Define recursive list functions with pattern matching
+fn map([], _) { [] }
+fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
+
+fn filter([], _) { [] }
+fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
+fn filter([_, ...xs], f) { rec filter(xs, f) }
+
+fn foldl([], acc, _) { acc }
+fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+
 // Calculate sum of squares of even numbers
 [0,1,2,3,4,5,6,7,8,9]
 |> map(fn (x) { x ** 2 })
@@ -16,6 +27,8 @@ Try tlang in your browser at the [interactive playground](https://topaxi.github.
 |> foldl(0, fn (acc, x) { acc + x })
 |> log();  // Output: 120
 ```
+
+**Note**: When compiling to JavaScript, standard library functions like `map`, `filter`, and `foldl` are automatically available. When using the interpreter, you need to define them yourself (as shown above).
 
 ## Features
 
@@ -232,4 +245,4 @@ This project follows semantic commit conventions. Use prefixes like:
 
 ## License
 
-[Add your license information here]
+See the repository for license information.
