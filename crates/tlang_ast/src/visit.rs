@@ -64,12 +64,14 @@ pub trait Visitor<'ast>: Sized {
             walk_expr(self, condition, ctx);
         }
 
+        self.enter_scope(clause.consequence.id, ctx);
         walk_block(
             self,
             &clause.consequence.statements,
             &clause.consequence.expression,
             ctx,
         );
+        self.leave_scope(clause.consequence.id, ctx);
     }
 
     fn visit_fn_param(&mut self, parameter: &'ast node::FunctionParameter, ctx: &mut Self::Context) {
@@ -102,9 +104,11 @@ pub trait Visitor<'ast>: Sized {
 }
 
 pub fn walk_module<'ast, V: Visitor<'ast>>(visitor: &mut V, module: &'ast node::Module, ctx: &mut V::Context) {
+    visitor.enter_scope(module.id, ctx);
     for statement in &module.statements {
         visitor.visit_stmt(statement, ctx);
     }
+    visitor.leave_scope(module.id, ctx);
 }
 
 pub fn walk_path<'ast, V: Visitor<'ast>>(visitor: &mut V, path: &'ast node::Path, ctx: &mut V::Context) {
@@ -225,6 +229,8 @@ pub fn walk_fn_decl<'ast, V: Visitor<'ast>>(
     declaration: &'ast node::FunctionDeclaration,
     ctx: &mut V::Context,
 ) {
+    visitor.visit_expr(&declaration.name, ctx);
+    visitor.enter_scope(declaration.id, ctx);
     for parameter in &declaration.parameters {
         visitor.visit_fn_param(parameter, ctx);
     }
@@ -235,13 +241,16 @@ pub fn walk_fn_decl<'ast, V: Visitor<'ast>>(
         visitor.visit_fn_ret_ty(return_type_annotation, ctx);
     }
     visitor.visit_fn_body(&declaration.body, ctx);
+    visitor.leave_scope(declaration.id, ctx);
 }
 
 pub fn walk_expr<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'ast node::Expr, ctx: &mut V::Context) {
     match &expression.kind {
         node::ExprKind::None => {}
         node::ExprKind::Block(block) | node::ExprKind::Loop(block) => {
+            visitor.enter_scope(block.id, ctx);
             visitor.visit_block(&block.statements, &block.expression, ctx);
+            visitor.leave_scope(block.id, ctx);
         }
         node::ExprKind::Break(Some(expr)) => {
             visitor.visit_expr(expr, ctx);
@@ -255,7 +264,9 @@ pub fn walk_expr<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'ast node
 
             visitor.visit_pat(&for_loop.pat, ctx);
             visitor.visit_expr(&for_loop.iter, ctx);
+            visitor.enter_scope(for_loop.block.id, ctx);
             visitor.visit_block(&for_loop.block.statements, &for_loop.block.expression, ctx);
+            visitor.leave_scope(for_loop.block.id, ctx);
         }
         node::ExprKind::BinaryOp(binary_op_expression) => {
             visitor.visit_expr(&binary_op_expression.lhs, ctx);
@@ -299,11 +310,13 @@ pub fn walk_expr<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'ast node
         }
         node::ExprKind::IfElse(if_else_expr) => {
             visitor.visit_expr(&if_else_expr.condition, ctx);
+            visitor.enter_scope(if_else_expr.then_branch.id, ctx);
             visitor.visit_block(
                 &if_else_expr.then_branch.statements,
                 &if_else_expr.then_branch.expression,
                 ctx,
             );
+            visitor.leave_scope(if_else_expr.then_branch.id, ctx);
 
             for else_branch in &if_else_expr.else_branches {
                 visitor.visit_else_clause(else_branch, ctx);
@@ -313,8 +326,10 @@ pub fn walk_expr<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'ast node
             visitor.visit_expr(&match_expr.expression, ctx);
 
             for arm in &match_expr.arms {
+                visitor.enter_scope(arm.id, ctx);
                 visitor.visit_pat(&arm.pattern, ctx);
                 visitor.visit_expr(&arm.expression, ctx);
+                visitor.leave_scope(arm.id, ctx);
             }
         }
         node::ExprKind::Path(path) => {
@@ -482,6 +497,8 @@ mod tests {
         assert_eq!(
             visitor.visited,
             vec![
+                "visit_expression",
+                "visit_identifier",
                 "visit_function_parameter",
                 "visit_pattern",
                 "visit_identifier",
