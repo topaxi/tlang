@@ -45,13 +45,21 @@ pub trait Visitor<'ast>: Sized {
         walk_enum_decl(self, decl, ctx);
     }
 
-    fn visit_fn_decls(&mut self, declarations: &'ast [node::FunctionDeclaration], ctx: &mut Self::Context) {
+    fn visit_fn_decls(
+        &mut self,
+        declarations: &'ast [node::FunctionDeclaration],
+        ctx: &mut Self::Context,
+    ) {
         for declaration in declarations {
-            walk_fn_decl(self, declaration, ctx);
+            self.visit_fn_decl(declaration, ctx);
         }
     }
 
-    fn visit_fn_decl(&mut self, declaration: &'ast node::FunctionDeclaration, ctx: &mut Self::Context) {
+    fn visit_fn_decl(
+        &mut self,
+        declaration: &'ast node::FunctionDeclaration,
+        ctx: &mut Self::Context,
+    ) {
         walk_fn_decl(self, declaration, ctx);
     }
 
@@ -74,7 +82,11 @@ pub trait Visitor<'ast>: Sized {
         self.leave_scope(clause.consequence.id, ctx);
     }
 
-    fn visit_fn_param(&mut self, parameter: &'ast node::FunctionParameter, ctx: &mut Self::Context) {
+    fn visit_fn_param(
+        &mut self,
+        parameter: &'ast node::FunctionParameter,
+        ctx: &mut Self::Context,
+    ) {
         walk_fn_param(self, parameter, ctx);
     }
 
@@ -103,7 +115,11 @@ pub trait Visitor<'ast>: Sized {
     }
 }
 
-pub fn walk_module<'ast, V: Visitor<'ast>>(visitor: &mut V, module: &'ast node::Module, ctx: &mut V::Context) {
+pub fn walk_module<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    module: &'ast node::Module,
+    ctx: &mut V::Context,
+) {
     visitor.enter_scope(module.id, ctx);
     for statement in &module.statements {
         visitor.visit_stmt(statement, ctx);
@@ -111,13 +127,21 @@ pub fn walk_module<'ast, V: Visitor<'ast>>(visitor: &mut V, module: &'ast node::
     visitor.leave_scope(module.id, ctx);
 }
 
-pub fn walk_path<'ast, V: Visitor<'ast>>(visitor: &mut V, path: &'ast node::Path, ctx: &mut V::Context) {
+pub fn walk_path<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    path: &'ast node::Path,
+    ctx: &mut V::Context,
+) {
     for segment in &path.segments {
         visitor.visit_ident(segment, ctx);
     }
 }
 
-pub fn walk_pat<'ast, V: Visitor<'ast>>(visitor: &mut V, pattern: &'ast node::Pat, ctx: &mut V::Context) {
+pub fn walk_pat<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    pattern: &'ast node::Pat,
+    ctx: &mut V::Context,
+) {
     match &pattern.kind {
         node::PatKind::Identifier(ident_pattern) => visitor.visit_ident(ident_pattern, ctx),
         node::PatKind::Rest(pattern) => visitor.visit_pat(pattern, ctx),
@@ -161,7 +185,11 @@ pub fn walk_block<'ast, V: Visitor<'ast>>(
     }
 }
 
-pub fn walk_stmt<'ast, V: Visitor<'ast>>(visitor: &mut V, statement: &'ast node::Stmt, ctx: &mut V::Context) {
+pub fn walk_stmt<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    statement: &'ast node::Stmt,
+    ctx: &mut V::Context,
+) {
     match &statement.kind {
         node::StmtKind::None => {}
         node::StmtKind::Expr(expr) => {
@@ -191,7 +219,11 @@ pub fn walk_stmt<'ast, V: Visitor<'ast>>(visitor: &mut V, statement: &'ast node:
     }
 }
 
-pub fn walk_enum_decl<'ast, V: Visitor<'ast>>(visitor: &mut V, decl: &'ast node::EnumDeclaration, ctx: &mut V::Context) {
+pub fn walk_enum_decl<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    decl: &'ast node::EnumDeclaration,
+    ctx: &mut V::Context,
+) {
     visitor.visit_ident(&decl.name, ctx);
 
     for variant in &decl.variants {
@@ -199,7 +231,11 @@ pub fn walk_enum_decl<'ast, V: Visitor<'ast>>(visitor: &mut V, decl: &'ast node:
     }
 }
 
-pub fn walk_variant<'ast, V: Visitor<'ast>>(visitor: &mut V, variant: &'ast node::EnumVariant, ctx: &mut V::Context) {
+pub fn walk_variant<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    variant: &'ast node::EnumVariant,
+    ctx: &mut V::Context,
+) {
     visitor.visit_ident(&variant.name, ctx);
 
     for node::StructField { name, ty, .. } in &variant.parameters {
@@ -220,7 +256,11 @@ pub fn walk_fn_param<'ast, V: Visitor<'ast>>(
     }
 }
 
-pub fn walk_fn_body<'ast, V: Visitor<'ast>>(visitor: &mut V, body: &'ast node::Block, ctx: &mut V::Context) {
+pub fn walk_fn_body<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    body: &'ast node::Block,
+    ctx: &mut V::Context,
+) {
     visitor.visit_block(&body.statements, &body.expression, ctx);
 }
 
@@ -244,7 +284,11 @@ pub fn walk_fn_decl<'ast, V: Visitor<'ast>>(
     visitor.leave_scope(declaration.id, ctx);
 }
 
-pub fn walk_expr<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'ast node::Expr, ctx: &mut V::Context) {
+pub fn walk_expr<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    expression: &'ast node::Expr,
+    ctx: &mut V::Context,
+) {
     match &expression.kind {
         node::ExprKind::None => {}
         node::ExprKind::Block(block) | node::ExprKind::Loop(block) => {
@@ -398,7 +442,11 @@ mod tests {
             self.visited.push("visit_statement");
             walk_stmt(self, statement, ctx);
         }
-        fn visit_fn_decl(&mut self, declaration: &'ast node::FunctionDeclaration, ctx: &mut Self::Context) {
+        fn visit_fn_decl(
+            &mut self,
+            declaration: &'ast node::FunctionDeclaration,
+            ctx: &mut Self::Context,
+        ) {
             self.visited.push("visit_function_declaration");
             walk_fn_decl(self, declaration, ctx);
         }
@@ -410,7 +458,11 @@ mod tests {
             self.visited.push("visit_pattern");
             walk_pat(self, pattern, ctx);
         }
-        fn visit_fn_param(&mut self, parameter: &'ast node::FunctionParameter, ctx: &mut Self::Context) {
+        fn visit_fn_param(
+            &mut self,
+            parameter: &'ast node::FunctionParameter,
+            ctx: &mut Self::Context,
+        ) {
             self.visited.push("visit_function_parameter");
             walk_fn_param(self, parameter, ctx);
         }

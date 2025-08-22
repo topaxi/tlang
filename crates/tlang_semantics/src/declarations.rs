@@ -3,7 +3,7 @@ use std::rc::Rc;
 use std::{cell::RefCell, collections::HashMap};
 use tlang_ast::keyword::kw;
 use tlang_ast::symbols::SymbolIdAllocator;
-use tlang_ast::visit::{Visitor, walk_stmt, walk_expr};
+use tlang_ast::visit::{Visitor, walk_expr, walk_stmt};
 use tlang_ast::{
     node::{
         Expr, ExprKind, FunctionDeclaration, FunctionParameter, Module, Pat, PatKind, Stmt,
@@ -63,6 +63,12 @@ impl DeclarationContext {
     }
 }
 
+impl Default for DeclarationContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /**
  * The declaration analyzer is responsible for collecting all the declarations in a module.
  */
@@ -91,7 +97,12 @@ impl DeclarationAnalyzer {
         ctx
     }
 
-    pub fn analyze_with_context(&mut self, module: &Module, is_root: bool, ctx: &mut DeclarationContext) {
+    pub fn analyze_with_context(
+        &mut self,
+        module: &Module,
+        is_root: bool,
+        ctx: &mut DeclarationContext,
+    ) {
         // Initialize symbol table stack with root table
         self.symbol_table_stack = vec![ctx.root_symbol_table().clone()];
 
@@ -114,7 +125,11 @@ impl DeclarationAnalyzer {
         self.symbol_table_stack.last().unwrap()
     }
 
-    fn push_symbol_table(&mut self, node_id: NodeId, ctx: &mut DeclarationContext) -> Rc<RefCell<SymbolTable>> {
+    fn push_symbol_table(
+        &mut self,
+        node_id: NodeId,
+        ctx: &mut DeclarationContext,
+    ) -> Rc<RefCell<SymbolTable>> {
         debug!("Entering new scope for node: {}", node_id);
 
         let parent = self.current_symbol_table().clone();
@@ -218,14 +233,16 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
             }
             _ => {}
         }
-        
+
         // For other statement types, use the default walker
-        if !matches!(&stmt.kind, 
-                    StmtKind::FunctionDeclaration(_) | 
-                    StmtKind::FunctionDeclarations(_) | 
-                    StmtKind::EnumDeclaration(_) | 
-                    StmtKind::StructDeclaration(_) | 
-                    StmtKind::Let(_)) {
+        if !matches!(
+            &stmt.kind,
+            StmtKind::FunctionDeclaration(_)
+                | StmtKind::FunctionDeclarations(_)
+                | StmtKind::EnumDeclaration(_)
+                | StmtKind::StructDeclaration(_)
+                | StmtKind::Let(_)
+        ) {
             walk_stmt(self, stmt, ctx);
         }
     }
@@ -267,8 +284,12 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
         if let Some(ref guard) = declaration.guard {
             self.visit_expr(guard, ctx);
         }
-        
-        self.visit_block(&declaration.body.statements, &declaration.body.expression, ctx);
+
+        self.visit_block(
+            &declaration.body.statements,
+            &declaration.body.expression,
+            ctx,
+        );
 
         // Leave function scope
         self.leave_scope(declaration.id, ctx);
@@ -303,7 +324,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                 if let Some(ref guard) = decl.guard {
                     self.visit_expr(guard, ctx);
                 }
-                
+
                 self.visit_block(&decl.body.statements, &decl.body.expression, ctx);
                 self.leave_scope(decl.id, ctx);
             }
@@ -328,7 +349,12 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
 }
 
 impl DeclarationAnalyzer {
-    fn collect_pattern(&mut self, pattern: &Pat, scope_start: LineColumn, ctx: &mut DeclarationContext) {
+    fn collect_pattern(
+        &mut self,
+        pattern: &Pat,
+        scope_start: LineColumn,
+        ctx: &mut DeclarationContext,
+    ) {
         match &pattern.kind {
             PatKind::Identifier(ident) => {
                 self.declare_symbol(
@@ -376,7 +402,10 @@ impl DeclarationAnalyzer {
 // Provide public API methods that maintain compatibility with the original interface
 impl DeclarationAnalyzer {
     /// Get symbol tables from the analysis context
-    pub fn symbol_tables<'a>(&self, ctx: &'a DeclarationContext) -> &'a HashMap<NodeId, Rc<RefCell<SymbolTable>>> {
+    pub fn symbol_tables<'a>(
+        &self,
+        ctx: &'a DeclarationContext,
+    ) -> &'a HashMap<NodeId, Rc<RefCell<SymbolTable>>> {
         ctx.symbol_tables()
     }
 
@@ -386,7 +415,10 @@ impl DeclarationAnalyzer {
     }
 
     /// Get the root symbol table from the analysis context
-    pub fn root_symbol_table<'a>(&self, ctx: &'a DeclarationContext) -> &'a Rc<RefCell<SymbolTable>> {
+    pub fn root_symbol_table<'a>(
+        &self,
+        ctx: &'a DeclarationContext,
+    ) -> &'a Rc<RefCell<SymbolTable>> {
         ctx.root_symbol_table()
     }
 
