@@ -51,7 +51,7 @@ pub trait Visitor<'ast>: Sized {
         ctx: &mut Self::Context,
     ) {
         for declaration in declarations {
-            walk_fn_decl(self, declaration, ctx);
+            self.visit_fn_decl(declaration, ctx);
         }
     }
 

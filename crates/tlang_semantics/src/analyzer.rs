@@ -7,7 +7,7 @@ use tlang_ast::{
         Path, Stmt, StmtKind, StructDeclaration,
     },
     symbols::{SymbolIdAllocator, SymbolInfo, SymbolTable, SymbolType},
-    visit::Visitor,
+    visit::{Visitor, walk_expr, walk_pat, walk_stmt},
 };
 use tlang_span::{NodeId, Span};
 
@@ -41,7 +41,6 @@ impl SemanticAnalysisContext {
 pub struct SemanticAnalyzer {
     declaration_analyzer: DeclarationAnalyzer,
     context: Option<SemanticAnalysisContext>,
-    // Analysis-specific state (similar to DeclarationAnalyzer)
     symbol_table_stack: Vec<Rc<RefCell<SymbolTable>>>,
     diagnostics: Vec<Diagnostic>,
     in_pipeline_rhs: bool, // Track if we're analyzing the RHS of a pipeline
@@ -392,10 +391,7 @@ impl SemanticAnalyzer {
                     self.visit_expr(&call_expr.callee, ctx);
                 }
             }
-            _ => {
-                // For non-call expressions, just visit normally
-                self.visit_expr(expr, ctx);
-            }
+            _ => self.visit_expr(expr, ctx),
         }
     }
 }
@@ -416,84 +412,45 @@ impl<'ast> Visitor<'ast> for SemanticAnalyzer {
         }
     }
 
-    fn visit_block(
-        &mut self,
-        statements: &'ast [Stmt],
-        expression: &'ast Option<Expr>,
-        ctx: &mut Self::Context,
-    ) {
-        for statement in statements {
-            self.visit_stmt(statement, ctx);
-        }
-        if let Some(expression) = expression {
-            self.visit_expr(expression, ctx);
-        }
-    }
-
     fn visit_stmt(&mut self, stmt: &'ast Stmt, ctx: &mut Self::Context) {
         match &stmt.kind {
             StmtKind::Let(decl) => {
                 self.analyze_variable_declaration(decl, ctx);
             }
-            StmtKind::StructDeclaration(decl) => {
-                ctx.struct_declarations
-                    .insert(decl.name.to_string(), *decl.clone());
-                self.visit_struct_decl(decl, ctx);
-            }
-            StmtKind::EnumDeclaration(decl) => {
-                self.visit_enum_decl(decl, ctx);
-            }
-            StmtKind::FunctionDeclaration(decl) => {
-                self.visit_fn_decl(decl, ctx);
-            }
-            StmtKind::FunctionDeclarations(decls) => {
-                self.visit_fn_decls(decls, ctx);
-            }
-            _ => {
-                // Use default walker for all other statement types
-                use tlang_ast::visit::walk_stmt;
-                walk_stmt(self, stmt, ctx);
-            }
+            _ => walk_stmt(self, stmt, ctx),
         }
+    }
+
+    fn visit_struct_decl(
+        &mut self,
+        decl: &'ast tlang_ast::node::StructDeclaration,
+        ctx: &mut Self::Context,
+    ) {
+        ctx.struct_declarations
+            .insert(decl.name.to_string(), decl.clone());
     }
 
     fn visit_fn_decl(&mut self, decl: &'ast FunctionDeclaration, ctx: &mut Self::Context) {
         // Don't visit the function name expression as that would mark it as used
         // The function declaration itself is handled by the declaration analyzer
 
-        // Enter function scope
         self.enter_scope(decl.id, ctx);
 
-        // Handle parameters
         for parameter in &decl.parameters {
             self.visit_fn_param(parameter, ctx);
         }
 
-        // Handle guard
         if let Some(guard) = &decl.guard {
             self.visit_expr(guard, ctx);
         }
 
-        // Handle return type annotation
         if let Some(return_type_annotation) = &decl.return_type_annotation {
             self.visit_fn_ret_ty(return_type_annotation, ctx);
         }
 
-        // Handle body
         self.visit_fn_body(&decl.body, ctx);
 
-        // Leave function scope
         self.leave_scope(decl.id, ctx);
-    }
-
-    fn visit_fn_decls(
-        &mut self,
-        declarations: &'ast [FunctionDeclaration],
-        ctx: &mut Self::Context,
-    ) {
-        for declaration in declarations {
-            self.visit_fn_decl(declaration, ctx);
-        }
     }
 
     fn visit_expr(&mut self, expr: &'ast Expr, ctx: &mut Self::Context) {
@@ -539,11 +496,7 @@ impl<'ast> Visitor<'ast> for SemanticAnalyzer {
                 //       any type information yet.
                 // Don't analyze the field name as it's not a variable reference
             }
-            _ => {
-                // For all other expressions, use the default walker
-                use tlang_ast::visit::walk_expr;
-                walk_expr(self, expr, ctx);
-            }
+            _ => walk_expr(self, expr, ctx),
         }
     }
 
@@ -558,11 +511,7 @@ impl<'ast> Visitor<'ast> for SemanticAnalyzer {
                     self.visit_pat(pat, ctx);
                 }
             }
-            _ => {
-                // For all other pattern types, use the default walker
-                use tlang_ast::visit::walk_pat;
-                walk_pat(self, pat, ctx);
-            }
+            _ => walk_pat(self, pat, ctx),
         }
     }
 }
