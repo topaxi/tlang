@@ -257,16 +257,29 @@ pub fn walk_expr<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'ast node
         }
         node::ExprKind::Break(_) => {}
         node::ExprKind::ForLoop(for_loop) => {
+            // Using the expression.id here, as the whole expression will be lowered into a block
+            // expression, referring to this expression.id.
+            visitor.enter_scope(expression.id, ctx);
+            visitor.visit_expr(&for_loop.iter, ctx);
+
+            visitor.enter_scope(for_loop.id, ctx);
             if let Some((pat, expr)) = &for_loop.acc {
                 visitor.visit_pat(pat, ctx);
                 visitor.visit_expr(expr, ctx);
             }
 
-            visitor.visit_pat(&for_loop.pat, ctx);
-            visitor.visit_expr(&for_loop.iter, ctx);
             visitor.enter_scope(for_loop.block.id, ctx);
+            visitor.visit_pat(&for_loop.pat, ctx);
             visitor.visit_block(&for_loop.block.statements, &for_loop.block.expression, ctx);
             visitor.leave_scope(for_loop.block.id, ctx);
+            visitor.leave_scope(for_loop.id, ctx);
+            visitor.leave_scope(expression.id, ctx);
+
+            if let Some(else_block) = &for_loop.else_block {
+                visitor.enter_scope(else_block.id, ctx);
+                visitor.visit_block(&else_block.statements, &else_block.expression, ctx);
+                visitor.leave_scope(else_block.id, ctx);
+            }
         }
         node::ExprKind::BinaryOp(binary_op_expression) => {
             visitor.visit_expr(&binary_op_expression.lhs, ctx);
@@ -328,6 +341,9 @@ pub fn walk_expr<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'ast node
             for arm in &match_expr.arms {
                 visitor.enter_scope(arm.id, ctx);
                 visitor.visit_pat(&arm.pattern, ctx);
+                if let Some(ref guard) = arm.guard {
+                    visitor.visit_expr(guard, ctx);
+                }
                 visitor.visit_expr(&arm.expression, ctx);
                 visitor.leave_scope(arm.id, ctx);
             }
