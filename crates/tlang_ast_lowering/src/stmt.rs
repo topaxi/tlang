@@ -483,21 +483,18 @@ fn get_param_names(decls: &[FunctionDeclaration]) -> Vec<Option<Ident>> {
             }
         });
 
-        if arg_name.is_some()
+        if let Some(arg_name) = arg_name
             && decls
                 .iter()
                 .all(|d| match &d.parameters.get(i).map(|p| &p.pattern.kind) {
-                    Some(ast::node::PatKind::Identifier(ident)) => {
-                        Some(ident.to_string()) == arg_name
-                    }
+                    Some(ast::node::PatKind::Identifier(ident)) => ident.to_string() == arg_name,
                     Some(ast::node::PatKind::Enum(enum_pattern)) => {
-                        Some(get_enum_name(&enum_pattern.path).to_lowercase()) == arg_name
+                        get_enum_name(&enum_pattern.path).to_lowercase() == arg_name
                     }
                     _ => true,
                 })
         {
-            #[allow(clippy::unnecessary_unwrap)]
-            argument_names.push(Some(Ident::new(&arg_name.unwrap(), Default::default())));
+            argument_names.push(Some(Ident::new(&arg_name, Default::default())));
         } else {
             argument_names.push(None);
         };
