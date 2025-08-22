@@ -20,13 +20,16 @@ use tlang_span::{LineColumn, NodeId, Span};
 pub struct DeclarationContext {
     symbol_id_allocator: SymbolIdAllocator,
     symbol_tables: HashMap<NodeId, Rc<RefCell<SymbolTable>>>,
+    root_symbol_table: Rc<RefCell<SymbolTable>>,
 }
 
 impl DeclarationContext {
     pub fn new() -> Self {
+        let root_symbol_table = Rc::new(RefCell::new(SymbolTable::default()));
         DeclarationContext {
             symbol_id_allocator: SymbolIdAllocator::default(),
-            symbol_tables: HashMap::from([(NodeId::new(1), Rc::new(RefCell::new(SymbolTable::default())))]),
+            symbol_tables: HashMap::from([(NodeId::new(1), root_symbol_table.clone())]),
+            root_symbol_table,
         }
     }
 
@@ -38,6 +41,10 @@ impl DeclarationContext {
         self.symbol_id_allocator
     }
 
+    pub fn root_symbol_table(&self) -> &Rc<RefCell<SymbolTable>> {
+        &self.root_symbol_table
+    }
+
     fn unique_id(&mut self) -> SymbolId {
         self.symbol_id_allocator.next_id()
     }
@@ -47,12 +54,11 @@ impl DeclarationContext {
         S: AsRef<str> + 'a,
         I: IntoIterator<Item = &'a (S, SymbolType)>,
     {
-        let root_symbol_table = self.symbol_tables.get(&NodeId::new(1)).unwrap().clone();
         for (name, symbol_type) in symbols {
             let symbol_info =
                 SymbolInfo::new_builtin(self.unique_id(), name.as_ref(), *symbol_type);
 
-            root_symbol_table.borrow_mut().insert(symbol_info);
+            self.root_symbol_table.borrow_mut().insert(symbol_info);
         }
     }
 }
@@ -87,8 +93,7 @@ impl DeclarationAnalyzer {
 
     pub fn analyze_with_context(&mut self, module: &Module, is_root: bool, ctx: &mut DeclarationContext) {
         // Initialize symbol table stack with root table
-        let root_symbol_table = ctx.symbol_tables.get(&NodeId::new(1)).unwrap().clone();
-        self.symbol_table_stack = vec![root_symbol_table];
+        self.symbol_table_stack = vec![ctx.root_symbol_table().clone()];
 
         if !is_root {
             self.push_symbol_table(module.id, ctx);
@@ -441,7 +446,7 @@ impl DeclarationAnalyzer {
 
     /// Get the root symbol table from the analysis context
     pub fn root_symbol_table<'a>(&self, ctx: &'a DeclarationContext) -> &'a Rc<RefCell<SymbolTable>> {
-        ctx.symbol_tables().get(&NodeId::new(1)).unwrap()
+        ctx.root_symbol_table()
     }
 
     /// Add builtin symbols to the analysis context - delegate to context method
