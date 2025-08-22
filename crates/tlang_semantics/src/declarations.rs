@@ -276,40 +276,14 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
 
     fn visit_expr(&mut self, expr: &'ast Expr, ctx: &mut Self::Context) {
         match &expr.kind {
-            ExprKind::Block(block) | ExprKind::Loop(block) => {
-                self.enter_scope(block.id, ctx);
-                self.visit_block(&block.statements, &block.expression, ctx);
-                self.leave_scope(block.id, ctx);
-            }
-            ExprKind::ForLoop(for_loop) => {
-                // Using the expr.id here, as the whole expression will be lowered into a block
-                // expression, refering to this expr.id.
-                self.enter_scope(expr.id, ctx);
-                self.visit_expr(&for_loop.iter, ctx);
-
-                self.enter_scope(for_loop.id, ctx);
-                if let Some((pat, expr)) = &for_loop.acc {
-                    self.collect_pattern(pat, expr.span.end, ctx);
-                    self.visit_expr(expr, ctx);
-                }
-
-                self.enter_scope(for_loop.block.id, ctx);
-                self.collect_pattern(&for_loop.pat, for_loop.pat.span.end, ctx);
-                self.visit_block(&for_loop.block.statements, &for_loop.block.expression, ctx);
-                self.leave_scope(for_loop.block.id, ctx);
-                self.leave_scope(for_loop.id, ctx);
-                self.leave_scope(expr.id, ctx);
-
-                if let Some(else_block) = &for_loop.else_block {
-                    self.enter_scope(else_block.id, ctx);
-                    self.visit_block(&else_block.statements, &else_block.expression, ctx);
-                    self.leave_scope(else_block.id, ctx);
-                }
+            ExprKind::Let(pattern, expr) => {
+                self.visit_expr(expr, ctx);
+                self.collect_pattern(pattern, expr.span.end, ctx);
             }
             ExprKind::FunctionExpression(decl) => {
-                self.enter_scope(decl.id, ctx);
+                // Declare the function self-reference symbol first
                 let name_as_str = decl.name();
-
+                self.enter_scope(decl.id, ctx);
                 self.declare_symbol(
                     ctx,
                     decl.id,
@@ -319,14 +293,13 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                     decl.name.span.end,
                 );
 
-                // Handle parameters
+                // Use default function declaration walker for the rest
                 self.symbol_type_context.push(SymbolType::Parameter);
                 for param in &decl.parameters {
                     self.visit_fn_param(param, ctx);
                 }
                 self.symbol_type_context.pop();
 
-                // Handle guard and body
                 if let Some(ref guard) = decl.guard {
                     self.visit_expr(guard, ctx);
                 }
@@ -334,47 +307,9 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                 self.visit_block(&decl.body.statements, &decl.body.expression, ctx);
                 self.leave_scope(decl.id, ctx);
             }
-            ExprKind::Let(pattern, expr) => {
-                self.visit_expr(expr, ctx);
-                self.collect_pattern(pattern, expr.span.end, ctx);
-            }
-            ExprKind::Match(expr) => {
-                self.visit_expr(&expr.expression, ctx);
-
-                for arm in &expr.arms {
-                    self.enter_scope(arm.id, ctx);
-                    self.collect_pattern(&arm.pattern, arm.pattern.span.end, ctx);
-                    if let Some(ref guard) = arm.guard {
-                        self.visit_expr(guard, ctx);
-                    }
-
-                    match &arm.expression.kind {
-                        ExprKind::Block(block) => self.visit_block(&block.statements, &block.expression, ctx),
-                        _ => self.visit_expr(&arm.expression, ctx),
-                    }
-
-                    self.leave_scope(arm.id, ctx);
-                }
-            }
-            ExprKind::IfElse(if_else_expr) => {
-                self.visit_expr(&if_else_expr.condition, ctx);
-                
-                self.enter_scope(if_else_expr.then_branch.id, ctx);
-                self.visit_block(&if_else_expr.then_branch.statements, &if_else_expr.then_branch.expression, ctx);
-                self.leave_scope(if_else_expr.then_branch.id, ctx);
-
-                for else_branch in &if_else_expr.else_branches {
-                    if let Some(ref condition) = else_branch.condition {
-                        self.visit_expr(condition, ctx);
-                    }
-                    
-                    self.enter_scope(else_branch.consequence.id, ctx);
-                    self.visit_block(&else_branch.consequence.statements, &else_branch.consequence.expression, ctx);
-                    self.leave_scope(else_branch.consequence.id, ctx);
-                }
-            }
             _ => {
-                // For all other expressions, use the default walker
+                // For all other expressions, use the default walker which includes
+                // proper scope management for ForLoop, Match, IfElse, Block, etc.
                 walk_expr(self, expr, ctx);
             }
         }
@@ -383,6 +318,12 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
     fn visit_fn_param(&mut self, parameter: &'ast FunctionParameter, ctx: &mut Self::Context) {
         self.collect_pattern(&parameter.pattern, parameter.span.end, ctx);
         // Don't visit type annotation as it doesn't contain declarations
+    }
+
+    fn visit_pat(&mut self, pattern: &'ast Pat, ctx: &mut Self::Context) {
+        // Override to use collect_pattern instead of the default walker
+        // This ensures that when the default walkers call visit_pat, we collect patterns correctly
+        self.collect_pattern(pattern, pattern.span.end, ctx);
     }
 }
 
