@@ -46,6 +46,56 @@ Always reference these instructions first and fallback to search or bash command
 - **CLI compiler**: `./target/release/tlang_cli_js input.tlang --output-type js`
 - **Interpreter**: `./target/release/tlangdi input.tlang`
 
+## Commit Message Guidelines
+
+### Semantic Commit Messages
+Use semantic commit messages following the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+#### Commit Types
+- **feat**: A new feature for the tlang language or tooling
+- **fix**: A bug fix in the compiler, interpreter, or tooling
+- **docs**: Documentation only changes (README, copilot instructions, code comments)
+- **style**: Code style changes (formatting, missing semicolons, etc.) that don't affect functionality
+- **refactor**: Code restructuring that doesn't fix bugs or add features
+- **test**: Adding missing tests or correcting existing tests
+- **chore**: Changes to build process, dependencies, or development tools
+- **perf**: Performance improvements
+- **ci**: Changes to CI configuration files and scripts
+
+#### Examples for tlang Project
+```bash
+feat(parser): add support for optional function parameters
+fix(codegen): resolve tail call optimization bug in nested functions  
+docs: update installation instructions for wasm-bindgen
+test(interpreter): add tests for enum pattern matching
+refactor(hir): simplify expression lowering logic
+chore(deps): update wasm-bindgen to latest version
+perf(optimizer): improve dead code elimination algorithm
+ci: add semantic commit message validation
+```
+
+#### Scope Guidelines
+Common scopes for tlang:
+- **parser**: Changes to parsing logic
+- **lexer**: Tokenization and lexical analysis
+- **ast**: Abstract syntax tree definitions
+- **semantics**: Semantic analysis and type checking
+- **hir**: High-level intermediate representation
+- **codegen**: Code generation (JavaScript output)
+- **interpreter**: Direct execution interpreter
+- **bindings**: WebAssembly bindings for browser
+- **cli**: Command-line tools
+- **playground**: Web-based playground
+- **deps**: Dependency updates
+
 ## Validation
 
 ### Mandatory Testing After Changes
@@ -61,6 +111,8 @@ ALWAYS manually validate any code changes through complete end-to-end scenarios:
    cargo clippy --fix --allow-dirty --tests --all-features  # Fix Rust linting issues in tests
    cargo fmt                                                # Format Rust code
    ```
+   
+   **Remember to use semantic commit messages** (see Commit Message Guidelines above) when committing your changes.
 
 1. **Test Rust build and core functionality:**
    ```bash
@@ -106,6 +158,8 @@ cargo fmt                                                # Format Rust code
 npm run lint        # ~4s - ESLint and Stylelint
 npm run typecheck   # ~0.3s - TypeScript check
 ```
+
+**Use semantic commit messages** (see Commit Message Guidelines above) for all commits to maintain consistent project history.
 
 ## Project Structure
 
