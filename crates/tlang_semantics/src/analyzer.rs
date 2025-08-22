@@ -3,8 +3,8 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use log::debug;
 use tlang_ast::{
     node::{
-        BinaryOpKind, Expr, ExprKind, FunctionDeclaration,
-        LetDeclaration, Module, Pat, PatKind, Path, Stmt, StmtKind, StructDeclaration,
+        BinaryOpKind, Expr, ExprKind, FunctionDeclaration, LetDeclaration, Module, Pat, PatKind,
+        Path, Stmt, StmtKind, StructDeclaration,
     },
     symbols::{SymbolIdAllocator, SymbolInfo, SymbolTable, SymbolType},
     visit::Visitor,
@@ -44,7 +44,7 @@ pub struct SemanticAnalyzer {
     // Analysis-specific state (similar to DeclarationAnalyzer)
     symbol_table_stack: Vec<Rc<RefCell<SymbolTable>>>,
     diagnostics: Vec<Diagnostic>,
-    in_pipeline_rhs: bool,  // Track if we're analyzing the RHS of a pipeline
+    in_pipeline_rhs: bool, // Track if we're analyzing the RHS of a pipeline
 }
 
 impl Default for SemanticAnalyzer {
@@ -123,7 +123,7 @@ impl SemanticAnalyzer {
             let declaration_context = DeclarationContext::new();
             self.context = Some(SemanticAnalysisContext::new(declaration_context));
         }
-        
+
         if let Some(ref mut ctx) = self.context {
             ctx.declaration_context.add_builtin_symbols(symbols);
         }
@@ -145,7 +145,11 @@ impl SemanticAnalyzer {
         // First run declaration analysis to collect all declarations
         let declaration_context = if let Some(ref mut existing_ctx) = self.context {
             // Reuse existing context with builtin symbols
-            self.declaration_analyzer.analyze_with_context(module, is_root, &mut existing_ctx.declaration_context);
+            self.declaration_analyzer.analyze_with_context(
+                module,
+                is_root,
+                &mut existing_ctx.declaration_context,
+            );
             std::mem::take(&mut existing_ctx.declaration_context)
         } else {
             // Create new context
@@ -157,7 +161,7 @@ impl SemanticAnalyzer {
         self.symbol_table_stack.clear();
         self.diagnostics.clear();
         self.in_pipeline_rhs = false;
-        
+
         // Initialize symbol table stack with root table
         let root_table = context.declaration_context.root_symbol_table().clone();
         self.push_symbol_table(&root_table);
@@ -179,7 +183,7 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn mark_as_used_by_name(&mut self, _ctx: &mut SemanticAnalysisContext, name: &str, span: Span) {
+    fn mark_as_used_by_name(&mut self, name: &str, span: Span) {
         let symbol_info = self
             .current_symbol_table()
             .borrow()
@@ -193,7 +197,7 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn mark_as_used_by_name_and_arity(&mut self, _ctx: &mut SemanticAnalysisContext, name: &str, arity: usize, span: Span) {
+    fn mark_as_used_by_name_and_arity(&mut self, name: &str, arity: usize, span: Span) {
         let symbol_info_ids: Vec<_> = self
             .current_symbol_table()
             .borrow()
@@ -265,19 +269,19 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn analyze_path(&mut self, ctx: &mut SemanticAnalysisContext, path: &Path, span: Span) {
+    fn analyze_path(&mut self, path: &Path, span: Span) {
         debug!("Analyzing path: {}", path);
 
         let mut path_str = String::new();
 
         for segment in &path.segments {
             path_str.push_str(segment.as_str());
-            self.mark_as_used_by_name(ctx, &path_str, span);
+            self.mark_as_used_by_name(&path_str, span);
             path_str.push_str("::");
         }
     }
 
-    fn analyze_path_with_known_arity(&mut self, ctx: &mut SemanticAnalysisContext, path: &Path, arity: usize, span: Span) {
+    fn analyze_path_with_known_arity(&mut self, path: &Path, arity: usize, span: Span) {
         debug!(
             "Analyzing path with known arity: {}, arity: {}",
             path, arity
@@ -287,14 +291,18 @@ impl SemanticAnalyzer {
 
         for segment in path.segments.iter().take(path.segments.len() - 1) {
             path_str.push_str(segment.as_str());
-            self.mark_as_used_by_name(ctx, &path_str, span);
+            self.mark_as_used_by_name(&path_str, span);
             path_str.push_str("::");
         }
 
-        self.mark_as_used_by_name_and_arity(ctx, &path.to_string(), arity, span);
+        self.mark_as_used_by_name_and_arity(&path.to_string(), arity, span);
     }
 
-    fn analyze_variable_declaration(&mut self, decl: &LetDeclaration, ctx: &mut SemanticAnalysisContext) {
+    fn analyze_variable_declaration(
+        &mut self,
+        decl: &LetDeclaration,
+        ctx: &mut SemanticAnalysisContext,
+    ) {
         self.visit_pat(&decl.pattern, ctx);
 
         // When declaring a variable, we can only reference symbols that were declared before.
@@ -329,7 +337,11 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn report_unused_symbols(&mut self, symbol_table: &Rc<RefCell<SymbolTable>>, _ctx: &mut SemanticAnalysisContext) {
+    fn report_unused_symbols(
+        &mut self,
+        symbol_table: &Rc<RefCell<SymbolTable>>,
+        _ctx: &mut SemanticAnalysisContext,
+    ) {
         let symbol_table = symbol_table.borrow();
         let unused_symbols = symbol_table
             .get_all_declared_local_symbols()
@@ -374,8 +386,8 @@ impl SemanticAnalyzer {
                 }
 
                 if let ExprKind::Path(path) = &call_expr.callee.kind {
-                    let arity = call_expr.arguments.len() + 1;  // +1 for the pipeline operator
-                    self.analyze_path_with_known_arity(ctx, path, arity, call_expr.callee.span);
+                    let arity = call_expr.arguments.len() + 1; // +1 for the pipeline operator
+                    self.analyze_path_with_known_arity(path, arity, call_expr.callee.span);
                 } else {
                     self.visit_expr(&call_expr.callee, ctx);
                 }
@@ -387,7 +399,6 @@ impl SemanticAnalyzer {
         }
     }
 }
-
 
 impl<'ast> Visitor<'ast> for SemanticAnalyzer {
     type Context = SemanticAnalysisContext;
@@ -404,8 +415,6 @@ impl<'ast> Visitor<'ast> for SemanticAnalyzer {
             self.report_unused_symbols(&symbol_table, ctx);
         }
     }
-
-
 
     fn visit_block(
         &mut self,
@@ -445,7 +454,7 @@ impl<'ast> Visitor<'ast> for SemanticAnalyzer {
     fn visit_fn_decl(&mut self, decl: &'ast FunctionDeclaration, ctx: &mut Self::Context) {
         // Don't visit the function name expression as that would mark it as used
         // The function declaration itself is handled by the declaration analyzer
-        
+
         // Enter function scope
         self.enter_scope(decl.id, ctx);
 
@@ -471,15 +480,11 @@ impl<'ast> Visitor<'ast> for SemanticAnalyzer {
         self.leave_scope(decl.id, ctx);
     }
 
-
-
-
-
     fn visit_expr(&mut self, expr: &'ast Expr, ctx: &mut Self::Context) {
         match &expr.kind {
             ExprKind::BinaryOp(binary_expr) => {
                 self.visit_expr(&binary_expr.lhs, ctx);
-                
+
                 // Set pipeline context for RHS if this is a pipeline operator
                 if binary_expr.op == BinaryOpKind::Pipeline {
                     // For pipeline operators, we need to handle the RHS specially
@@ -495,14 +500,14 @@ impl<'ast> Visitor<'ast> for SemanticAnalyzer {
                 }
 
                 if let ExprKind::Path(path) = &call_expr.callee.kind {
-                    let arity = call_expr.arguments.len();  // Normal arity for non-pipeline calls
-                    self.analyze_path_with_known_arity(ctx, path, arity, call_expr.callee.span);
+                    let arity = call_expr.arguments.len(); // Normal arity for non-pipeline calls
+                    self.analyze_path_with_known_arity(path, arity, call_expr.callee.span);
                 } else {
                     self.visit_expr(&call_expr.callee, ctx);
                 }
             }
             ExprKind::Path(path) => {
-                self.analyze_path(ctx, path, expr.span);
+                self.analyze_path(path, expr.span);
             }
             ExprKind::Dict(kvs) => {
                 for (_key, value) in kvs {
@@ -529,7 +534,7 @@ impl<'ast> Visitor<'ast> for SemanticAnalyzer {
     fn visit_pat(&mut self, pat: &'ast Pat, ctx: &mut Self::Context) {
         match &pat.kind {
             PatKind::Enum(enum_pattern) => {
-                self.analyze_path(ctx, &enum_pattern.path, pat.span);
+                self.analyze_path(&enum_pattern.path, pat.span);
 
                 for (_ident, pat) in &enum_pattern.elements {
                     // Don't analyze the field name as it's not a variable reference,
