@@ -3,7 +3,7 @@ use std::rc::Rc;
 use std::{cell::RefCell, collections::HashMap};
 use tlang_ast::keyword::kw;
 use tlang_ast::symbols::SymbolIdAllocator;
-use tlang_ast::visit::{Visitor, walk_module, walk_stmt, walk_expr};
+use tlang_ast::visit::{Visitor, walk_stmt, walk_expr};
 use tlang_ast::{
     node::{
         Expr, ExprKind, FunctionDeclaration, FunctionParameter, Module, Pat, PatKind, Stmt,
@@ -156,7 +156,11 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
     }
 
     fn visit_module(&mut self, module: &'ast Module, ctx: &mut Self::Context) {
-        walk_module(self, module, ctx);
+        // Don't use walk_module as it includes scope management that conflicts
+        // with our explicit scope management in analyze_with_context
+        for statement in &module.statements {
+            self.visit_stmt(statement, ctx);
+        }
     }
 
     fn visit_stmt(&mut self, stmt: &'ast Stmt, ctx: &mut Self::Context) {
