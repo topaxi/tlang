@@ -443,6 +443,14 @@ impl<'ast> Visitor<'ast> for SemanticAnalyzer {
             StmtKind::EnumDeclaration(decl) => {
                 self.visit_enum_decl(decl, ctx);
             }
+            StmtKind::FunctionDeclaration(decl) => {
+                self.visit_fn_decl(decl, ctx);
+            }
+            StmtKind::FunctionDeclarations(decls) => {
+                for decl in decls {
+                    self.visit_fn_decl(decl, ctx);
+                }
+            }
             _ => {
                 // Use default walker for all other statement types
                 use tlang_ast::visit::walk_stmt;
