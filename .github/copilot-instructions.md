@@ -35,7 +35,7 @@ Always reference these instructions first and fallback to search or bash command
 
 ### Build Commands (NEVER CANCEL - Set timeout to 60+ minutes)
 - **Rust tests**: `cargo nextest run --profile=ci` -- takes ~55s. NEVER CANCEL. Set timeout to 30+ minutes.
-- **Full test suite**: `make test` -- takes ~64s. NEVER CANCEL. Set timeout to 30+ minutes.
+- **Integration tests**: `make test` -- takes ~64s. Tests built compiler/interpreter with both backends. Requires Node.js 24.0.2 (see package.json volta). NEVER CANCEL. Set timeout to 30+ minutes.
 - **WebAssembly bindings test**: `make test-bindings-js` -- takes ~21s. NEVER CANCEL. Set timeout to 30+ minutes.
 - **Build playground**: `npm run build` -- takes ~13s. NEVER CANCEL. Set timeout to 30+ minutes.
 - **Build interpreter**: `cargo build --release --features=binary --bin tlangdi` -- takes ~30s. NEVER CANCEL. Set timeout to 60+ minutes.
@@ -54,7 +54,7 @@ ALWAYS manually validate any code changes through complete end-to-end scenarios:
 1. **Test Rust build and core functionality:**
    ```bash
    cargo nextest run --profile=ci  # NEVER CANCEL - takes ~55s
-   make test                       # NEVER CANCEL - takes ~64s (may have known failing JS tests)
+   make test                       # NEVER CANCEL - takes ~64s (integration tests with interpreter + JS backends, requires Node.js 24.0.2)
    ```
 
 2. **Test WebAssembly bindings:**
@@ -137,7 +137,7 @@ tsconfig.json
 ```
 
 ### Understanding Test Failures
-- The `make test` command runs tests with both interpreter and JavaScript backends
+- The `make test` command runs integration tests with both interpreter and JavaScript backends
 - Some JavaScript backend tests may fail (known issue with Option/Result unwrap calls)
 - Interpreter tests should always pass
 - Focus on ensuring your changes don't break existing interpreter functionality
