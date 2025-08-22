@@ -905,6 +905,72 @@ impl<'src> Parser<'src> {
         }
     }
 
+    fn parse_signed_numeric_literal(&mut self) -> Expr {
+        let invert = matches!(self.advance().kind, TokenKind::Minus);
+        let literal = self.advance().take_literal().unwrap();
+
+        if invert {
+            node::expr!(self.unique_id(), Literal(Box::new(literal.invert_sign())))
+        } else {
+            node::expr!(self.unique_id(), Literal(Box::new(literal)))
+        }
+    }
+
+    fn parse_parenthesized_expression(&mut self) -> Expr {
+        self.advance();
+        let expression = self.parse_expression();
+        self.consume_token(TokenKind::RParen);
+        expression
+    }
+
+    fn parse_recursive_call(&mut self) -> Expr {
+        self.advance();
+        let expr = self.parse_expression();
+        let call_expr = match expr.kind {
+            ExprKind::Call(call) => call,
+            _ => self.panic_unexpected_expr("call expression", Some(expr)),
+        };
+
+        node::expr!(self.unique_id(), RecursiveCall(call_expr)).with_span(expr.span)
+    }
+
+    fn parse_wildcard(&mut self) -> Expr {
+        self.advance();
+        node::expr!(self.unique_id(), Wildcard)
+    }
+
+    fn parse_literal_expression(&mut self) -> Expr {
+        let literal = self.advance().take_literal().unwrap();
+        node::expr!(self.unique_id(), Literal(Box::new(literal)))
+    }
+
+    fn parse_self_expression(&mut self) -> Expr {
+        let identifier_span = self.create_span_from_current_token();
+
+        self.advance();
+
+        let mut path = Path::from_ident(Ident::new(kw::_Self, identifier_span));
+        let mut span = path.span;
+
+        while matches!(self.current_token_kind(), TokenKind::PathSeparator) {
+            self.advance();
+            path.push(self.parse_identifier());
+        }
+
+        self.end_span_from_previous_token(&mut span);
+
+        let mut expr = node::expr!(self.unique_id(), Path(Box::new(path))).with_span(span);
+
+        if matches!(
+            self.current_token_kind(),
+            TokenKind::LParen | TokenKind::LBrace
+        ) {
+            expr = self.parse_call_expression(expr);
+        }
+
+        expr
+    }
+
     fn parse_primary_expression(&mut self) -> Expr {
         debug!("Parsing primary expression {:?}", self.current_token);
 
@@ -944,25 +1010,13 @@ impl<'src> Parser<'src> {
                     TokenKind::Literal(Literal::UnsignedInteger(_) | Literal::Float(_))
                 ) =>
             {
-                let invert = matches!(self.advance().kind, TokenKind::Minus);
-                let literal = self.advance().take_literal().unwrap();
-
-                if invert {
-                    node::expr!(self.unique_id(), Literal(Box::new(literal.invert_sign())))
-                } else {
-                    node::expr!(self.unique_id(), Literal(Box::new(literal)))
-                }
+                self.parse_signed_numeric_literal()
             }
 
             TokenKind::Minus | TokenKind::ExclamationMark | TokenKind::Keyword(Keyword::Not) => {
                 self.parse_unary_expression()
             }
-            TokenKind::LParen => {
-                self.advance();
-                let expression = self.parse_expression();
-                self.consume_token(TokenKind::RParen);
-                expression
-            }
+            TokenKind::LParen => self.parse_parenthesized_expression(),
             TokenKind::LBrace => self.parse_block_or_dict(),
             TokenKind::LBracket => self.parse_list_expression(),
             TokenKind::Keyword(Keyword::If) => self.parse_if_else_expression(),
@@ -970,53 +1024,11 @@ impl<'src> Parser<'src> {
             TokenKind::Keyword(Keyword::Loop) => self.parse_loop(),
             TokenKind::Keyword(Keyword::For) => self.parse_for_loop(),
             TokenKind::Keyword(Keyword::Break) => self.parse_break_expr(),
-            TokenKind::Keyword(Keyword::Rec) => {
-                self.advance();
-                let expr = self.parse_expression();
-                let call_expr = match expr.kind {
-                    ExprKind::Call(call) => call,
-                    _ => self.panic_unexpected_expr("call expression", Some(expr)),
-                };
-
-                node::expr!(self.unique_id(), RecursiveCall(call_expr)).with_span(expr.span)
-            }
+            TokenKind::Keyword(Keyword::Rec) => self.parse_recursive_call(),
             TokenKind::Keyword(Keyword::Match) => self.parse_match_expression(),
-            TokenKind::Keyword(Keyword::Underscore) => {
-                self.advance();
-                node::expr!(self.unique_id(), Wildcard)
-            }
-            TokenKind::Literal(_) => {
-                let literal = self.advance().take_literal().unwrap();
-                node::expr!(self.unique_id(), Literal(Box::new(literal)))
-            }
-            // TODO: Mostly copied from Identifier further below, `self` might be easier to just be
-            //       an identifier.
-            TokenKind::Keyword(Keyword::_Self) => {
-                let identifier_span = self.create_span_from_current_token();
-
-                self.advance();
-
-                let mut path = Path::from_ident(Ident::new(kw::_Self, identifier_span));
-                let mut span = path.span;
-
-                while matches!(self.current_token_kind(), TokenKind::PathSeparator) {
-                    self.advance();
-                    path.push(self.parse_identifier());
-                }
-
-                self.end_span_from_previous_token(&mut span);
-
-                let mut expr = node::expr!(self.unique_id(), Path(Box::new(path))).with_span(span);
-
-                if matches!(
-                    self.current_token_kind(),
-                    TokenKind::LParen | TokenKind::LBrace
-                ) {
-                    expr = self.parse_call_expression(expr);
-                }
-
-                expr
-            }
+            TokenKind::Keyword(Keyword::Underscore) => self.parse_wildcard(),
+            TokenKind::Literal(_) => self.parse_literal_expression(),
+            TokenKind::Keyword(Keyword::_Self) => self.parse_self_expression(),
             TokenKind::Identifier(_) => self.parse_identifier_expr(),
             _ => {
                 self.panic_unexpected_token("primary expression", self.current_token.clone());

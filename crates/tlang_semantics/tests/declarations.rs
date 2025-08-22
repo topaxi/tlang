@@ -58,6 +58,7 @@ fn test_analyze_variable_declaration() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn test_block_scope() {
     let (analyzer, ast) = analyze!(
         "

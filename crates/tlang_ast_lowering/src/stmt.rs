@@ -260,6 +260,143 @@ impl LoweringContext {
         }
     }
 
+    fn setup_function_declaration_metadata(
+        &mut self,
+        decls: &[FunctionDeclaration],
+        all_param_names: &[Option<Ident>],
+    ) -> (
+        tlang_span::HirId,
+        hir::Expr,
+        Vec<hir::FunctionParameter>,
+        tlang_span::Span,
+    ) {
+        let mut span = decls[0].span;
+        span.end = decls.last().unwrap().span.end;
+
+        let hir_id = self.unique_id();
+        let first_declaration = &decls[0];
+        let fn_name = self.lower_expr(&first_declaration.name);
+
+        for decl in decls {
+            self.fn_node_id_to_hir_id.insert(decl.id, hir_id);
+        }
+
+        let param_names = get_param_names(decls)
+            .iter()
+            .enumerate()
+            .map(|(i, param_name)| {
+                if let Some(param_name) = param_name {
+                    param_name.clone()
+                } else if let Some(Some(ident)) = all_param_names.get(i) {
+                    ident.clone()
+                } else {
+                    Ident::new(&format!("arg{i}"), Default::default())
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let params = param_names
+            .iter()
+            .map(|ident| hir::FunctionParameter {
+                hir_id: self.unique_id(),
+                name: ident.clone(),
+                type_annotation: hir::Ty::default(),
+                span: ident.span,
+            })
+            .collect::<Vec<_>>();
+
+        (hir_id, fn_name, params, span)
+    }
+
+    fn define_function_symbols(
+        &mut self,
+        hir_id: tlang_span::HirId,
+        first_declaration: &FunctionDeclaration,
+        params: &[hir::FunctionParameter],
+    ) {
+        self.define_symbol(
+            hir_id,
+            &first_declaration.name(),
+            SymbolType::FunctionSelfRef(params.len() as u16),
+            first_declaration.span.start,
+        );
+
+        for param in params {
+            self.define_symbol(
+                param.hir_id,
+                param.name.as_str(),
+                SymbolType::Parameter,
+                param.span.start,
+            );
+        }
+    }
+
+    fn create_match_value(
+        &mut self,
+        params: &[hir::FunctionParameter],
+        span: tlang_span::Span,
+    ) -> hir::Expr {
+        if params.len() > 1 {
+            let argument_list = hir::ExprKind::List(
+                params
+                    .iter()
+                    .map(|param| {
+                        let mut path = hir::Path::new(
+                            vec![hir::PathSegment {
+                                ident: param.name.clone(),
+                            }],
+                            span,
+                        );
+
+                        path.res.set_hir_id(param.hir_id);
+                        path.res.set_binding_kind(hir::BindingKind::Param);
+
+                        self.expr(span, hir::ExprKind::Path(Box::new(path)))
+                    })
+                    .collect(),
+            );
+
+            self.expr(tlang_span::Span::default(), argument_list)
+        } else {
+            let first_param = params.first().unwrap();
+            let ident = first_param.name.clone();
+            let mut path = hir::Path::new(vec![hir::PathSegment { ident }], span);
+
+            path.res.set_hir_id(first_param.hir_id);
+            path.res.set_binding_kind(hir::BindingKind::Param);
+
+            self.expr(
+                tlang_span::Span::default(),
+                hir::ExprKind::Path(Box::new(path)),
+            )
+        }
+    }
+
+    fn create_match_arms(
+        &mut self,
+        decls: &[FunctionDeclaration],
+        leading_comments: &[ast::token::Token],
+    ) -> Vec<hir::MatchArm> {
+        let mut idents = HashMap::new();
+        decls
+            .iter()
+            .enumerate()
+            .map(|(i, decl)| {
+                let mut match_arm = self.lower_fn_decl_to_match_arm(decl, &mut idents);
+
+                if i == 0 {
+                    match_arm.leading_comments = leading_comments
+                        .iter()
+                        .cloned()
+                        .chain(match_arm.leading_comments.clone())
+                        .collect();
+                }
+
+                match_arm
+            })
+            .collect()
+    }
+
     fn lower_fn_decl_matching(
         &mut self,
         decls: &[FunctionDeclaration],
@@ -276,115 +413,15 @@ impl LoweringContext {
             decls.iter().map(|d| d.id).collect::<Vec<_>>()
         );
 
-        let mut span = decls[0].span;
-        span.end = decls.last().unwrap().span.end;
-
         self.with_new_scope(|this, _scope| {
-            let hir_id = this.unique_id();
-            let first_declaration = &decls[0];
-            let fn_name = this.lower_expr(&first_declaration.name);
+            let (hir_id, fn_name, params, span) =
+                this.setup_function_declaration_metadata(decls, all_param_names);
 
-            for decl in decls {
-                this.fn_node_id_to_hir_id.insert(decl.id, hir_id);
-            }
+            this.define_function_symbols(hir_id, &decls[0], &params);
 
-            let param_names = get_param_names(decls)
-                .iter()
-                .enumerate()
-                .map(|(i, param_name)| {
-                    if let Some(param_name) = param_name {
-                        param_name.clone()
-                    } else if let Some(Some(ident)) = all_param_names.get(i) {
-                        ident.clone()
-                    } else {
-                        Ident::new(&format!("arg{i}"), Default::default())
-                    }
-                })
-                .collect::<Vec<_>>();
+            let match_value = this.create_match_value(&params, span);
 
-            let params = param_names
-                .iter()
-                .map(|ident| hir::FunctionParameter {
-                    hir_id: this.unique_id(),
-                    name: ident.clone(),
-                    type_annotation: hir::Ty::default(),
-                    span: ident.span,
-                })
-                .collect::<Vec<_>>();
-
-            this.define_symbol(
-                hir_id,
-                &first_declaration.name(),
-                SymbolType::FunctionSelfRef(params.len() as u16),
-                first_declaration.span.start,
-            );
-
-            for param in &params {
-                this.define_symbol(
-                    param.hir_id,
-                    param.name.as_str(),
-                    SymbolType::Parameter,
-                    param.span.start,
-                );
-            }
-
-            let match_value = if params.len() > 1 {
-                let argument_list = hir::ExprKind::List(
-                    params
-                        .iter()
-                        .map(|param| {
-                            let mut path = hir::Path::new(
-                                vec![hir::PathSegment {
-                                    ident: param.name.clone(),
-                                }],
-                                span,
-                            );
-
-                            path.res.set_hir_id(param.hir_id);
-                            path.res.set_binding_kind(hir::BindingKind::Param);
-
-                            this.expr(span, hir::ExprKind::Path(Box::new(path)))
-                        })
-                        .collect(),
-                );
-
-                this.expr(tlang_span::Span::default(), argument_list)
-            } else {
-                let first_param = params.first().unwrap();
-                let ident = first_param.name.clone();
-                let mut path = hir::Path::new(vec![hir::PathSegment { ident }], span);
-
-                path.res.set_hir_id(first_param.hir_id);
-                path.res.set_binding_kind(hir::BindingKind::Param);
-
-                this.expr(
-                    tlang_span::Span::default(),
-                    hir::ExprKind::Path(Box::new(path)),
-                )
-            };
-
-            // Create hir::FunctionDeclaration with an empty block, and fill out the
-            // parameters, for each parameter/argument we reuse the existing plain
-            // identifier if it exists, otherwise we create a new one which will be reused
-            // in a match expression in the resulting block.
-            let mut idents = HashMap::new();
-            let match_arms = decls
-                .iter()
-                .enumerate()
-                .map(|(i, decl)| {
-                    let mut match_arm = this.lower_fn_decl_to_match_arm(decl, &mut idents);
-
-                    if i == 0 {
-                        match_arm.leading_comments = leading_comments
-                            .iter()
-                            .cloned()
-                            .chain(match_arm.leading_comments.clone())
-                            .collect();
-                    }
-
-                    match_arm
-                })
-                .collect();
+            let match_arms = this.create_match_arms(decls, leading_comments);
 
             let body = hir::Block::new(
                 this.unique_id(),

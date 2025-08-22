@@ -76,6 +76,8 @@ impl SemanticAnalyzer {
     }
 
     #[inline(always)]
+    /// # Panics
+    /// Panics if analysis has not been run first.
     pub fn symbol_tables(&self) -> &HashMap<NodeId, Rc<RefCell<SymbolTable>>> {
         let ctx = self.context.as_ref().expect("Analysis must be run first");
         ctx.declaration_context.symbol_tables()
@@ -86,11 +88,15 @@ impl SemanticAnalyzer {
         self.symbol_tables().get(&id).cloned()
     }
 
+    /// # Panics
+    /// Panics if analysis has not been run first.
     pub fn root_symbol_table(&self) -> Rc<RefCell<SymbolTable>> {
         let ctx = self.context.as_ref().expect("Analysis must be run first");
         ctx.declaration_context.root_symbol_table().clone()
     }
 
+    /// # Panics
+    /// Panics if analysis has not been run first.
     pub fn symbol_id_allocator(&self) -> SymbolIdAllocator {
         let ctx = self.context.as_ref().expect("Analysis must be run first");
         ctx.declaration_context.symbol_id_allocator()

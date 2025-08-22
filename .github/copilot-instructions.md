@@ -51,6 +51,17 @@ Always reference these instructions first and fallback to search or bash command
 ### Mandatory Testing After Changes
 ALWAYS manually validate any code changes through complete end-to-end scenarios:
 
+0. **Run linting and formatting before any commits:**
+   ```bash
+   # First install required Rust components if not already installed
+   rustup component add clippy rustfmt
+   
+   # Run Rust linting and formatting before any commits
+   cargo clippy --fix --allow-dirty --lib --all-features    # Fix Rust linting issues automatically
+   cargo clippy --fix --allow-dirty --tests --all-features  # Fix Rust linting issues in tests
+   cargo fmt                                                # Format Rust code
+   ```
+
 1. **Test Rust build and core functionality:**
    ```bash
    cargo nextest run --profile=ci  # NEVER CANCEL - takes ~55s
@@ -83,6 +94,15 @@ ALWAYS manually validate any code changes through complete end-to-end scenarios:
 ### Required Linting and Validation
 ALWAYS run these before completing changes or CI will fail:
 ```bash
+# First install required Rust components if not already installed
+rustup component add clippy rustfmt
+
+# Run Rust linting and formatting before any commits
+cargo clippy --fix --allow-dirty --lib --all-features    # Fix Rust linting issues automatically
+cargo clippy --fix --allow-dirty --tests --all-features  # Fix Rust linting issues in tests
+cargo fmt                                                # Format Rust code
+
+# Run JavaScript/TypeScript linting and validation
 npm run lint        # ~4s - ESLint and Stylelint
 npm run typecheck   # ~0.3s - TypeScript check
 ```

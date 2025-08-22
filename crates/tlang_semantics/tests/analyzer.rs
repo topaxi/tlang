@@ -222,7 +222,7 @@ fn test_should_error_on_unused_identifier_in_function_definition() {
     assert_eq!(
         diagnostics[..1],
         vec![Diagnostic::error(
-            "Use of undeclared variable `c`, did you mean the parameter `a`?".into(),
+            "Use of undeclared variable `c`, did you mean the parameter `a`?",
             Span::new(
                 LineColumn {
                     line: 1,
@@ -282,11 +282,11 @@ fn should_warn_about_unused_variables() {
         diagnostics,
         vec![
             Diagnostic::warn(
-                "Unused variable `a`, if this is intentional, prefix the name with an underscore: `_a`".into(),
+                "Unused variable `a`, if this is intentional, prefix the name with an underscore: `_a`",
                 Span::new((0, 4), (0, 5)),
             ),
             Diagnostic::warn(
-                "Unused variable `b`, if this is intentional, prefix the name with an underscore: `_b`".into(),
+                "Unused variable `b`, if this is intentional, prefix the name with an underscore: `_b`",
                 Span::new((1, 5), (1, 6)),
             ),
         ],
@@ -304,21 +304,18 @@ fn should_warn_about_unused_function_and_parameters() {
         diagnostics,
         vec![
             Diagnostic::warn(
-                "Unused parameter `a`, if this is intentional, prefix the name with an underscore: `_a`".into(),
+                "Unused parameter `a`, if this is intentional, prefix the name with an underscore: `_a`",
                 Span::new((0, 7), (0, 8)),
             ),
             Diagnostic::warn(
-                "Unused parameter `b`, if this is intentional, prefix the name with an underscore: `_b`".into(),
+                "Unused parameter `b`, if this is intentional, prefix the name with an underscore: `_b`",
                 Span::new((0, 10), (0, 11)),
             ),
             Diagnostic::warn(
-                "Unused variable `c`, if this is intentional, prefix the name with an underscore: `_c`".into(),
+                "Unused variable `c`, if this is intentional, prefix the name with an underscore: `_c`",
                 Span::new((1, 9), (1, 10)),
             ),
-            Diagnostic::warn(
-                "Unused function `add/2`".into(),
-                Span::new((0, 3), (0, 6)),
-            ),
+            Diagnostic::warn("Unused function `add/2`", Span::new((0, 3), (0, 6)),),
         ]
     );
 }
