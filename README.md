@@ -1,6 +1,6 @@
 # tlang - A Functional Programming Language
 
-tlang is a functional programming language implemented in Rust that compiles to JavaScript. It was created as a learning project to explore parsing techniques and simple code generation, but has evolved into a feature-rich language with modern functional programming capabilities.
+tlang is a functional programming language implemented in Rust that compiles to JavaScript. It serves as an ongoing experimentation and learning project to explore parsing techniques, code generation, and functional programming language design concepts.
 
 ## Getting Started
 
@@ -121,12 +121,12 @@ some_x.unwrap() |> log();   // 10
 
 3. **Required Rust Tools**:
    ```bash
-   cargo install cargo-nextest        # ~3m 10s installation time
-   cargo install wasm-pack           # ~1m 30s installation time
+   cargo install cargo-nextest
+   cargo install wasm-pack
    
    # Install exact wasm-bindgen-cli version (critical - version must match Cargo.toml)
    WASM_BINDGEN_VERSION=$(grep -oP 'wasm-bindgen = "=\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
-   cargo install wasm-bindgen-cli --version $WASM_BINDGEN_VERSION  # ~1m 30s
+   cargo install wasm-bindgen-cli --version $WASM_BINDGEN_VERSION
    ```
 
 4. **WebAssembly Optimization (binaryen)**:
@@ -138,7 +138,7 @@ some_x.unwrap() |> log();   // 10
 
 5. **Node.js Dependencies**:
    ```bash
-   npm ci  # ~12s installation time
+   npm ci
    ```
 
 ### Building the Project
@@ -146,22 +146,22 @@ some_x.unwrap() |> log();   // 10
 ⚠️ **Important**: Build commands can take 30+ minutes. Never cancel build operations.
 
 ```bash
-# Build and test Rust components (55s)
+# Build and test Rust components
 cargo nextest run --profile=ci
 
-# Run integration tests with both backends (64s)
+# Run integration tests with both backends
 make test
 
-# Test WebAssembly bindings (21s)
+# Test WebAssembly bindings
 make test-bindings-js
 
-# Build CLI compiler (21s)
+# Build CLI compiler
 cargo build --release --bin tlang_cli_js
 
-# Build interpreter (30s)
+# Build interpreter
 cargo build --release --features=binary --bin tlangdi
 
-# Build playground (13s)
+# Build playground
 npm run build
 ```
 
@@ -181,8 +181,8 @@ cargo clippy --fix --allow-dirty --tests --all-features
 cargo fmt
 
 # JavaScript/TypeScript linting
-npm run lint        # ~4s
-npm run typecheck   # ~0.3s
+npm run lint
+npm run typecheck
 ```
 
 ## Usage
