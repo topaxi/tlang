@@ -204,7 +204,7 @@ impl CodegenJS {
         let has_block_completions =
             self.current_context() == BlockContext::Expression && match_args_have_completions(arms);
         let mut has_let = false;
-        
+
         if has_block_completions {
             // TODO: We could probably reuse existing completion vars here.
             if let Some("return") = self.current_completion_variable() {
@@ -337,7 +337,13 @@ impl CodegenJS {
         }
     }
 
-    fn generate_match_arms(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm], match_value_binding: &str, let_guard_var: &str) {
+    fn generate_match_arms(
+        &mut self,
+        expr: &hir::Expr,
+        arms: &[hir::MatchArm],
+        match_value_binding: &str,
+        let_guard_var: &str,
+    ) {
         for (
             i,
             hir::MatchArm {

@@ -28,7 +28,11 @@ impl LoweringContext {
             ),
             span: Default::default(),
         };
-        (iterator_binding_hir_id, iterator_binding_name, iterator_binding_pat)
+        (
+            iterator_binding_hir_id,
+            iterator_binding_name,
+            iterator_binding_pat,
+        )
     }
 
     fn create_accumulator_binding(
@@ -67,7 +71,11 @@ impl LoweringContext {
         } else {
             None
         };
-        (accumulator_binding_hir_id, accumulator_binding_name, accumulator_initializer)
+        (
+            accumulator_binding_hir_id,
+            accumulator_binding_name,
+            accumulator_initializer,
+        )
     }
 
     fn create_iterator_value(&mut self, for_loop: &ast::node::ForLoop) -> hir::Expr {
@@ -75,10 +83,7 @@ impl LoweringContext {
         let iter_expr = self.lower_expr(&for_loop.iter);
         let iterator_binding_call = self.expr(
             for_loop.iter.span,
-            hir::ExprKind::FieldAccess(
-                Box::new(iter_expr),
-                Ident::new("iter", Default::default()),
-            ),
+            hir::ExprKind::FieldAccess(Box::new(iter_expr), Ident::new("iter", Default::default())),
         );
         self.expr(
             for_loop.iter.span,
@@ -90,17 +95,13 @@ impl LoweringContext {
         )
     }
 
-
-
-
-
     pub(crate) fn lower_for_loop(
         &mut self,
         node_id: NodeId,
         for_loop: &ast::node::ForLoop,
     ) -> hir::ExprKind {
         let block = self.with_scope(node_id, |this| {
-            let (iterator_binding_hir_id, iterator_binding_name, iterator_binding_pat) = 
+            let (iterator_binding_hir_id, iterator_binding_name, iterator_binding_pat) =
                 this.create_iterator_binding();
 
             let (accumulator_binding_hir_id, accumulator_binding_name, accumulator_initializer) =
@@ -113,13 +114,17 @@ impl LoweringContext {
                     vec![hir::PathSegment::new(iterator_binding_name.clone())],
                     Default::default(),
                 );
-                iterator_binding_path.res.set_hir_id(iterator_binding_hir_id);
+                iterator_binding_path
+                    .res
+                    .set_hir_id(iterator_binding_hir_id);
 
                 let mut accumulator_binding_path = hir::Path::new(
                     vec![hir::PathSegment::new(accumulator_binding_name.clone())],
                     Default::default(),
                 );
-                accumulator_binding_path.res.set_hir_id(accumulator_binding_hir_id);
+                accumulator_binding_path
+                    .res
+                    .set_hir_id(accumulator_binding_hir_id);
 
                 this.lower_for_loop_body(for_loop, iterator_binding_path, accumulator_binding_path)
             });
@@ -180,7 +185,11 @@ impl LoweringContext {
         )
     }
 
-    fn create_loop_statements(&mut self, for_loop: &ast::node::ForLoop, accumulator_path_expr: &hir::Expr) -> Vec<hir::Stmt> {
+    fn create_loop_statements(
+        &mut self,
+        for_loop: &ast::node::ForLoop,
+        accumulator_path_expr: &hir::Expr,
+    ) -> Vec<hir::Stmt> {
         if let Some((pat, _)) = &for_loop.acc {
             let hir_id = self.unique_id();
             let accumulator_reassignment = hir::Stmt::new(
@@ -241,7 +250,7 @@ impl LoweringContext {
         let loop_statements = self.create_loop_statements(for_loop, &accumulator_path_expr);
 
         let loop_arm = self.create_loop_arm(for_loop);
-        
+
         let break_arm = self.with_new_scope(|this, _scope| {
             let accumulator_path_expr = for_loop.acc.as_ref().map(|_| {
                 Box::new(this.expr(

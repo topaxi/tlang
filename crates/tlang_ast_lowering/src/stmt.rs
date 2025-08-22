@@ -264,7 +264,12 @@ impl LoweringContext {
         &mut self,
         decls: &[FunctionDeclaration],
         all_param_names: &[Option<Ident>],
-    ) -> (tlang_span::HirId, hir::Expr, Vec<hir::FunctionParameter>, tlang_span::Span) {
+    ) -> (
+        tlang_span::HirId,
+        hir::Expr,
+        Vec<hir::FunctionParameter>,
+        tlang_span::Span,
+    ) {
         let mut span = decls[0].span;
         span.end = decls.last().unwrap().span.end;
 
@@ -326,7 +331,11 @@ impl LoweringContext {
         }
     }
 
-    fn create_match_value(&mut self, params: &[hir::FunctionParameter], span: tlang_span::Span) -> hir::Expr {
+    fn create_match_value(
+        &mut self,
+        params: &[hir::FunctionParameter],
+        span: tlang_span::Span,
+    ) -> hir::Expr {
         if params.len() > 1 {
             let argument_list = hir::ExprKind::List(
                 params
@@ -405,7 +414,7 @@ impl LoweringContext {
         );
 
         self.with_new_scope(|this, _scope| {
-            let (hir_id, fn_name, params, span) = 
+            let (hir_id, fn_name, params, span) =
                 this.setup_function_declaration_metadata(decls, all_param_names);
 
             this.define_function_symbols(hir_id, &decls[0], &params);

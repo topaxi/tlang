@@ -315,10 +315,7 @@ fn should_warn_about_unused_function_and_parameters() {
                 "Unused variable `c`, if this is intentional, prefix the name with an underscore: `_c`",
                 Span::new((1, 9), (1, 10)),
             ),
-            Diagnostic::warn(
-                "Unused function `add/2`",
-                Span::new((0, 3), (0, 6)),
-            ),
+            Diagnostic::warn("Unused function `add/2`", Span::new((0, 3), (0, 6)),),
         ]
     );
 }
