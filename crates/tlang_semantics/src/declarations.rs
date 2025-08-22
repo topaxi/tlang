@@ -63,6 +63,12 @@ impl DeclarationContext {
     }
 }
 
+impl Default for DeclarationContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /**
  * The declaration analyzer is responsible for collecting all the declarations in a module.
  */
