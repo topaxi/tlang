@@ -90,64 +90,9 @@ impl LoweringContext {
         )
     }
 
-    fn create_loop_paths(
-        &mut self,
-        iterator_binding_name: Ident,
-        accumulator_binding_name: Ident,
-        iterator_binding_hir_id: tlang_span::HirId,
-        accumulator_binding_hir_id: tlang_span::HirId,
-    ) -> (hir::Path, hir::Path) {
-        let mut iterator_binding_path = hir::Path::new(
-            vec![hir::PathSegment::new(iterator_binding_name)],
-            Default::default(),
-        );
-        iterator_binding_path.res.set_hir_id(iterator_binding_hir_id);
 
-        let mut accumulator_binding_path = hir::Path::new(
-            vec![hir::PathSegment::new(accumulator_binding_name)],
-            Default::default(),
-        );
-        accumulator_binding_path.res.set_hir_id(accumulator_binding_hir_id);
 
-        (iterator_binding_path, accumulator_binding_path)
-    }
 
-    fn create_final_block(
-        &mut self,
-        for_loop: &ast::node::ForLoop,
-        iterator_binding_pat: hir::Pat,
-        iterator_binding_value: hir::Expr,
-        loop_block: hir::Block,
-        accumulator_initializer: Option<hir::Stmt>,
-    ) -> hir::Block {
-        let loop_expr = self.expr(
-            for_loop.block.span,
-            hir::ExprKind::Loop(Box::new(loop_block)),
-        );
-
-        let iterator_binding_stmt = hir::Stmt::new(
-            self.unique_id(),
-            hir::StmtKind::Let(
-                Box::new(iterator_binding_pat),
-                Box::new(iterator_binding_value),
-                Default::default(),
-            ),
-            Default::default(),
-        );
-
-        let mut init_loop_block = hir::Block::new(
-            self.lower_node_id(for_loop.id),
-            vec![iterator_binding_stmt],
-            Some(loop_expr),
-            for_loop.iter.span,
-        );
-
-        if let Some(stmt) = accumulator_initializer {
-            init_loop_block.stmts.push(stmt);
-        }
-
-        init_loop_block
-    }
 
     pub(crate) fn lower_for_loop(
         &mut self,
@@ -164,23 +109,48 @@ impl LoweringContext {
             let iterator_binding_value = this.create_iterator_value(for_loop);
 
             let loop_block = this.with_scope(for_loop.id, |this| {
-                let (iterator_binding_path, accumulator_binding_path) = this.create_loop_paths(
-                    iterator_binding_name.clone(),
-                    accumulator_binding_name.clone(),
-                    iterator_binding_hir_id,
-                    accumulator_binding_hir_id,
+                let mut iterator_binding_path = hir::Path::new(
+                    vec![hir::PathSegment::new(iterator_binding_name.clone())],
+                    Default::default(),
                 );
+                iterator_binding_path.res.set_hir_id(iterator_binding_hir_id);
+
+                let mut accumulator_binding_path = hir::Path::new(
+                    vec![hir::PathSegment::new(accumulator_binding_name.clone())],
+                    Default::default(),
+                );
+                accumulator_binding_path.res.set_hir_id(accumulator_binding_hir_id);
 
                 this.lower_for_loop_body(for_loop, iterator_binding_path, accumulator_binding_path)
             });
 
-            this.create_final_block(
-                for_loop,
-                iterator_binding_pat,
-                iterator_binding_value,
-                loop_block,
-                accumulator_initializer,
-            )
+            let loop_expr = this.expr(
+                for_loop.block.span,
+                hir::ExprKind::Loop(Box::new(loop_block)),
+            );
+
+            let iterator_binding_stmt = hir::Stmt::new(
+                this.unique_id(),
+                hir::StmtKind::Let(
+                    Box::new(iterator_binding_pat),
+                    Box::new(iterator_binding_value),
+                    Default::default(),
+                ),
+                Default::default(),
+            );
+
+            let mut init_loop_block = hir::Block::new(
+                this.lower_node_id(for_loop.id),
+                vec![iterator_binding_stmt],
+                Some(loop_expr),
+                for_loop.iter.span,
+            );
+
+            if let Some(stmt) = accumulator_initializer {
+                init_loop_block.stmts.push(stmt);
+            }
+
+            init_loop_block
         });
 
         hir::ExprKind::Block(Box::new(block))
