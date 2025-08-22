@@ -13,3 +13,7 @@ tsconfig.tsbuildinfo
 *_benchmark.txt
 benchmark_report.md
 .benchmark-main-worktree/
+
+# Binaryen downloaded files
+binaryen-version_*
+binaryen-version_*.tar.gz
