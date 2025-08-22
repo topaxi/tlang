@@ -3,11 +3,11 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use log::debug;
 use tlang_ast::{
     node::{
-        BinaryOpKind, Expr, ExprKind, FunctionDeclaration, FunctionParameter,
+        BinaryOpKind, Expr, ExprKind, FunctionDeclaration,
         LetDeclaration, Module, Pat, PatKind, Path, Stmt, StmtKind, StructDeclaration,
     },
     symbols::{SymbolIdAllocator, SymbolInfo, SymbolTable, SymbolType},
-    visit::{Visitor, walk_module},
+    visit::Visitor,
 };
 use tlang_span::{NodeId, Span};
 
@@ -179,7 +179,7 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn mark_as_used_by_name(&mut self, ctx: &mut SemanticAnalysisContext, name: &str, span: Span) {
+    fn mark_as_used_by_name(&mut self, _ctx: &mut SemanticAnalysisContext, name: &str, span: Span) {
         let symbol_info = self
             .current_symbol_table()
             .borrow()
@@ -189,11 +189,11 @@ impl SemanticAnalyzer {
                 .borrow_mut()
                 .mark_as_used(symbol_info.id);
         } else {
-            self.report_undeclared_variable(ctx, name, span);
+            self.report_undeclared_variable(name, span);
         }
     }
 
-    fn mark_as_used_by_name_and_arity(&mut self, ctx: &mut SemanticAnalysisContext, name: &str, arity: usize, span: Span) {
+    fn mark_as_used_by_name_and_arity(&mut self, _ctx: &mut SemanticAnalysisContext, name: &str, arity: usize, span: Span) {
         let symbol_info_ids: Vec<_> = self
             .current_symbol_table()
             .borrow()
@@ -203,7 +203,7 @@ impl SemanticAnalyzer {
             .collect();
 
         if symbol_info_ids.is_empty() {
-            self.report_undeclared_function(ctx, name, arity, span);
+            self.report_undeclared_function(name, arity, span);
             return;
         }
 
@@ -217,7 +217,7 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn report_undeclared_variable(&mut self, _ctx: &mut SemanticAnalysisContext, name: &str, span: Span) {
+    fn report_undeclared_variable(&mut self, name: &str, span: Span) {
         let did_you_mean = did_you_mean(
             name,
             &self
@@ -241,7 +241,7 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn report_undeclared_function(&mut self, _ctx: &mut SemanticAnalysisContext, name: &str, arity: usize, span: Span) {
+    fn report_undeclared_function(&mut self, name: &str, arity: usize, span: Span) {
         let did_you_mean = did_you_mean(
             name,
             &self
@@ -405,10 +405,7 @@ impl<'ast> Visitor<'ast> for SemanticAnalyzer {
         }
     }
 
-    fn visit_module(&mut self, module: &'ast Module, ctx: &mut Self::Context) {
-        // Use default walker for module
-        walk_module(self, module, ctx);
-    }
+
 
     fn visit_block(
         &mut self,
@@ -426,28 +423,29 @@ impl<'ast> Visitor<'ast> for SemanticAnalyzer {
 
     fn visit_stmt(&mut self, stmt: &'ast Stmt, ctx: &mut Self::Context) {
         match &stmt.kind {
-            StmtKind::None => {}
-            StmtKind::Expr(expr) => self.visit_expr(expr, ctx),
-            StmtKind::Let(decl) => self.analyze_variable_declaration(decl, ctx),
-            StmtKind::FunctionDeclaration(decl) => self.visit_fn_decl(decl, ctx),
-            StmtKind::FunctionDeclarations(decls) => {
-                for decl in decls {
-                    self.visit_fn_decl(decl, ctx);
-                }
-            }
-            StmtKind::Return(Some(expr)) => self.visit_expr(expr, ctx),
-            StmtKind::Return(_) => {}
-            StmtKind::EnumDeclaration(_decl) => {
-                // TODO
+            StmtKind::Let(decl) => {
+                self.analyze_variable_declaration(decl, ctx);
             }
             StmtKind::StructDeclaration(decl) => {
                 ctx.struct_declarations
                     .insert(decl.name.to_string(), *decl.clone());
+                self.visit_struct_decl(decl, ctx);
+            }
+            StmtKind::EnumDeclaration(decl) => {
+                self.visit_enum_decl(decl, ctx);
+            }
+            _ => {
+                // Use default walker for all other statement types
+                use tlang_ast::visit::walk_stmt;
+                walk_stmt(self, stmt, ctx);
             }
         }
     }
 
     fn visit_fn_decl(&mut self, decl: &'ast FunctionDeclaration, ctx: &mut Self::Context) {
+        // Don't visit the function name expression as that would mark it as used
+        // The function declaration itself is handled by the declaration analyzer
+        
         // Enter function scope
         self.enter_scope(decl.id, ctx);
 
@@ -461,6 +459,11 @@ impl<'ast> Visitor<'ast> for SemanticAnalyzer {
             self.visit_expr(guard, ctx);
         }
 
+        // Handle return type annotation
+        if let Some(return_type_annotation) = &decl.return_type_annotation {
+            self.visit_fn_ret_ty(return_type_annotation, ctx);
+        }
+
         // Handle body
         self.visit_fn_body(&decl.body, ctx);
 
@@ -468,9 +471,9 @@ impl<'ast> Visitor<'ast> for SemanticAnalyzer {
         self.leave_scope(decl.id, ctx);
     }
 
-    fn visit_fn_param(&mut self, parameter: &'ast FunctionParameter, ctx: &mut Self::Context) {
-        self.visit_pat(&parameter.pattern, ctx);
-    }
+
+
+
 
     fn visit_expr(&mut self, expr: &'ast Expr, ctx: &mut Self::Context) {
         match &expr.kind {
@@ -501,10 +504,6 @@ impl<'ast> Visitor<'ast> for SemanticAnalyzer {
             ExprKind::Path(path) => {
                 self.analyze_path(ctx, path, expr.span);
             }
-            ExprKind::Let(pat, expr) => {
-                self.visit_pat(pat, ctx);
-                self.visit_expr(expr, ctx);
-            }
             ExprKind::Dict(kvs) => {
                 for (_key, value) in kvs {
                     // TODO: Keys are currently not properly analyzed
@@ -529,20 +528,20 @@ impl<'ast> Visitor<'ast> for SemanticAnalyzer {
 
     fn visit_pat(&mut self, pat: &'ast Pat, ctx: &mut Self::Context) {
         match &pat.kind {
-            PatKind::List(patterns) => {
-                for pattern in patterns {
-                    self.visit_pat(pattern, ctx);
-                }
-            }
-            PatKind::Rest(pattern) => self.visit_pat(pattern, ctx),
             PatKind::Enum(enum_pattern) => {
                 self.analyze_path(ctx, &enum_pattern.path, pat.span);
 
                 for (_ident, pat) in &enum_pattern.elements {
+                    // Don't analyze the field name as it's not a variable reference,
+                    // just visit the pattern
                     self.visit_pat(pat, ctx);
                 }
             }
-            _ => {}
+            _ => {
+                // For all other pattern types, use the default walker
+                use tlang_ast::visit::walk_pat;
+                walk_pat(self, pat, ctx);
+            }
         }
     }
 }
