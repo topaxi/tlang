@@ -447,9 +447,7 @@ impl<'ast> Visitor<'ast> for SemanticAnalyzer {
                 self.visit_fn_decl(decl, ctx);
             }
             StmtKind::FunctionDeclarations(decls) => {
-                for decl in decls {
-                    self.visit_fn_decl(decl, ctx);
-                }
+                self.visit_fn_decls(decls, ctx);
             }
             _ => {
                 // Use default walker for all other statement types
@@ -486,6 +484,16 @@ impl<'ast> Visitor<'ast> for SemanticAnalyzer {
 
         // Leave function scope
         self.leave_scope(decl.id, ctx);
+    }
+
+    fn visit_fn_decls(
+        &mut self,
+        declarations: &'ast [FunctionDeclaration],
+        ctx: &mut Self::Context,
+    ) {
+        for declaration in declarations {
+            self.visit_fn_decl(declaration, ctx);
+        }
     }
 
     fn visit_expr(&mut self, expr: &'ast Expr, ctx: &mut Self::Context) {
