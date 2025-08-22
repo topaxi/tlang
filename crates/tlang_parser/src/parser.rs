@@ -905,6 +905,7 @@ impl<'src> Parser<'src> {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn parse_primary_expression(&mut self) -> Expr {
         debug!("Parsing primary expression {:?}", self.current_token);
 

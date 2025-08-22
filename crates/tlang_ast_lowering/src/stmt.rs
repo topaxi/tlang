@@ -260,6 +260,7 @@ impl LoweringContext {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn lower_fn_decl_matching(
         &mut self,
         decls: &[FunctionDeclaration],

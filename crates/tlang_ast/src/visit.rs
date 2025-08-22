@@ -284,6 +284,7 @@ pub fn walk_fn_decl<'ast, V: Visitor<'ast>>(
     visitor.leave_scope(declaration.id, ctx);
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn walk_expr<'ast, V: Visitor<'ast>>(
     visitor: &mut V,
     expression: &'ast node::Expr,

@@ -199,6 +199,7 @@ impl CodegenJS {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     pub(crate) fn generate_match_expression(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) {
         // TODO: A lot here is copied from the if statement generator.
         let mut lhs = self.replace_statement_buffer(String::new());

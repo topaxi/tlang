@@ -11,6 +11,7 @@ impl LoweringContext {
         hir::ExprKind::Loop(Box::new(self.lower_block(loop_expr)))
     }
 
+    #[allow(clippy::too_many_lines)]
     pub(crate) fn lower_for_loop(
         &mut self,
         node_id: NodeId,
@@ -138,6 +139,7 @@ impl LoweringContext {
         hir::ExprKind::Block(Box::new(block))
     }
 
+    #[allow(clippy::too_many_lines)]
     fn lower_for_loop_body(
         &mut self,
         for_loop: &ast::node::ForLoop,
