@@ -284,7 +284,162 @@ pub fn walk_fn_decl<'ast, V: Visitor<'ast>>(
     visitor.leave_scope(declaration.id, ctx);
 }
 
-#[allow(clippy::too_many_lines)]
+fn walk_block_or_loop<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    block: &'ast node::Block,
+    ctx: &mut V::Context,
+) {
+    visitor.enter_scope(block.id, ctx);
+    visitor.visit_block(&block.statements, &block.expression, ctx);
+    visitor.leave_scope(block.id, ctx);
+}
+
+fn walk_for_loop<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    expression: &'ast node::Expr,
+    for_loop: &'ast node::ForLoop,
+    ctx: &mut V::Context,
+) {
+    // Using the expression.id here, as the whole expression will be lowered into a block
+    // expression, referring to this expression.id.
+    visitor.enter_scope(expression.id, ctx);
+    visitor.visit_expr(&for_loop.iter, ctx);
+
+    visitor.enter_scope(for_loop.id, ctx);
+    if let Some((pat, expr)) = &for_loop.acc {
+        visitor.visit_pat(pat, ctx);
+        visitor.visit_expr(expr, ctx);
+    }
+
+    visitor.enter_scope(for_loop.block.id, ctx);
+    visitor.visit_pat(&for_loop.pat, ctx);
+    visitor.visit_block(&for_loop.block.statements, &for_loop.block.expression, ctx);
+    visitor.leave_scope(for_loop.block.id, ctx);
+    visitor.leave_scope(for_loop.id, ctx);
+    visitor.leave_scope(expression.id, ctx);
+
+    if let Some(else_block) = &for_loop.else_block {
+        visitor.enter_scope(else_block.id, ctx);
+        visitor.visit_block(&else_block.statements, &else_block.expression, ctx);
+        visitor.leave_scope(else_block.id, ctx);
+    }
+}
+
+fn walk_binary_op<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    binary_op_expression: &'ast node::BinaryOpExpression,
+    ctx: &mut V::Context,
+) {
+    visitor.visit_expr(&binary_op_expression.lhs, ctx);
+    visitor.visit_expr(&binary_op_expression.rhs, ctx);
+}
+
+fn walk_call<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    call_expr: &'ast node::CallExpression,
+    ctx: &mut V::Context,
+) {
+    for argument in &call_expr.arguments {
+        visitor.visit_expr(argument, ctx);
+    }
+    visitor.visit_expr(&call_expr.callee, ctx);
+}
+
+fn walk_dict<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    kvs: &'ast [(node::Expr, node::Expr)],
+    ctx: &mut V::Context,
+) {
+    for (key, value) in kvs {
+        visitor.visit_expr(key, ctx);
+        visitor.visit_expr(value, ctx);
+    }
+}
+
+fn walk_field_expression<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    field_expr: &'ast node::FieldAccessExpression,
+    ctx: &mut V::Context,
+) {
+    visitor.visit_expr(&field_expr.base, ctx);
+    visitor.visit_ident(&field_expr.field, ctx);
+}
+
+fn walk_index_expression<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    index_expr: &'ast node::IndexAccessExpression,
+    ctx: &mut V::Context,
+) {
+    visitor.visit_expr(&index_expr.base, ctx);
+    visitor.visit_expr(&index_expr.index, ctx);
+}
+
+fn walk_let_expression<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    pattern: &'ast node::Pat,
+    expr: &'ast node::Expr,
+    ctx: &mut V::Context,
+) {
+    visitor.visit_pat(pattern, ctx);
+    visitor.visit_expr(expr, ctx);
+}
+
+fn walk_list<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    exprs: &'ast [node::Expr],
+    ctx: &mut V::Context,
+) {
+    for expr in exprs {
+        visitor.visit_expr(expr, ctx);
+    }
+}
+
+fn walk_if_else<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    if_else_expr: &'ast node::IfElseExpression,
+    ctx: &mut V::Context,
+) {
+    visitor.visit_expr(&if_else_expr.condition, ctx);
+    visitor.enter_scope(if_else_expr.then_branch.id, ctx);
+    visitor.visit_block(
+        &if_else_expr.then_branch.statements,
+        &if_else_expr.then_branch.expression,
+        ctx,
+    );
+    visitor.leave_scope(if_else_expr.then_branch.id, ctx);
+
+    for else_branch in &if_else_expr.else_branches {
+        visitor.visit_else_clause(else_branch, ctx);
+    }
+}
+
+fn walk_match<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    match_expr: &'ast node::MatchExpression,
+    ctx: &mut V::Context,
+) {
+    visitor.visit_expr(&match_expr.expression, ctx);
+
+    for arm in &match_expr.arms {
+        visitor.enter_scope(arm.id, ctx);
+        visitor.visit_pat(&arm.pattern, ctx);
+        if let Some(ref guard) = arm.guard {
+            visitor.visit_expr(guard, ctx);
+        }
+        visitor.visit_expr(&arm.expression, ctx);
+        visitor.leave_scope(arm.id, ctx);
+    }
+}
+
+fn walk_range<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    range_expr: &'ast node::RangeExpression,
+    ctx: &mut V::Context,
+) {
+    visitor.visit_expr(&range_expr.start, ctx);
+    visitor.visit_expr(&range_expr.end, ctx);
+}
+
 pub fn walk_expr<'ast, V: Visitor<'ast>>(
     visitor: &mut V,
     expression: &'ast node::Expr,
@@ -293,112 +448,54 @@ pub fn walk_expr<'ast, V: Visitor<'ast>>(
     match &expression.kind {
         node::ExprKind::None => {}
         node::ExprKind::Block(block) | node::ExprKind::Loop(block) => {
-            visitor.enter_scope(block.id, ctx);
-            visitor.visit_block(&block.statements, &block.expression, ctx);
-            visitor.leave_scope(block.id, ctx);
+            walk_block_or_loop(visitor, block, ctx);
         }
         node::ExprKind::Break(Some(expr)) => {
             visitor.visit_expr(expr, ctx);
         }
         node::ExprKind::Break(_) => {}
         node::ExprKind::ForLoop(for_loop) => {
-            // Using the expression.id here, as the whole expression will be lowered into a block
-            // expression, referring to this expression.id.
-            visitor.enter_scope(expression.id, ctx);
-            visitor.visit_expr(&for_loop.iter, ctx);
-
-            visitor.enter_scope(for_loop.id, ctx);
-            if let Some((pat, expr)) = &for_loop.acc {
-                visitor.visit_pat(pat, ctx);
-                visitor.visit_expr(expr, ctx);
-            }
-
-            visitor.enter_scope(for_loop.block.id, ctx);
-            visitor.visit_pat(&for_loop.pat, ctx);
-            visitor.visit_block(&for_loop.block.statements, &for_loop.block.expression, ctx);
-            visitor.leave_scope(for_loop.block.id, ctx);
-            visitor.leave_scope(for_loop.id, ctx);
-            visitor.leave_scope(expression.id, ctx);
-
-            if let Some(else_block) = &for_loop.else_block {
-                visitor.enter_scope(else_block.id, ctx);
-                visitor.visit_block(&else_block.statements, &else_block.expression, ctx);
-                visitor.leave_scope(else_block.id, ctx);
-            }
+            walk_for_loop(visitor, expression, for_loop, ctx);
         }
         node::ExprKind::BinaryOp(binary_op_expression) => {
-            visitor.visit_expr(&binary_op_expression.lhs, ctx);
-            visitor.visit_expr(&binary_op_expression.rhs, ctx);
+            walk_binary_op(visitor, binary_op_expression, ctx);
         }
         node::ExprKind::UnaryOp(_, expression) => {
             visitor.visit_expr(expression, ctx);
         }
         node::ExprKind::FieldExpression(field_expr) => {
-            visitor.visit_expr(&field_expr.base, ctx);
-            visitor.visit_ident(&field_expr.field, ctx);
+            walk_field_expression(visitor, field_expr, ctx);
         }
         node::ExprKind::Call(call_expr) | node::ExprKind::RecursiveCall(call_expr) => {
-            for argument in &call_expr.arguments {
-                visitor.visit_expr(argument, ctx);
-            }
-            visitor.visit_expr(&call_expr.callee, ctx);
+            walk_call(visitor, call_expr, ctx);
         }
         node::ExprKind::Dict(kvs) => {
-            for (key, value) in kvs {
-                visitor.visit_expr(key, ctx);
-                visitor.visit_expr(value, ctx);
-            }
+            walk_dict(visitor, kvs, ctx);
         }
         node::ExprKind::FunctionExpression(decl) => {
             visitor.visit_fn_decl(decl, ctx);
         }
         node::ExprKind::IndexExpression(index_expr) => {
-            visitor.visit_expr(&index_expr.base, ctx);
-            visitor.visit_expr(&index_expr.index, ctx);
+            walk_index_expression(visitor, index_expr, ctx);
         }
         node::ExprKind::Let(pattern, expr) => {
-            visitor.visit_pat(pattern, ctx);
-            visitor.visit_expr(expr, ctx);
+            walk_let_expression(visitor, pattern, expr, ctx);
         }
         node::ExprKind::Literal(_) => {}
         node::ExprKind::List(exprs) => {
-            for expr in exprs {
-                visitor.visit_expr(expr, ctx);
-            }
+            walk_list(visitor, exprs, ctx);
         }
         node::ExprKind::IfElse(if_else_expr) => {
-            visitor.visit_expr(&if_else_expr.condition, ctx);
-            visitor.enter_scope(if_else_expr.then_branch.id, ctx);
-            visitor.visit_block(
-                &if_else_expr.then_branch.statements,
-                &if_else_expr.then_branch.expression,
-                ctx,
-            );
-            visitor.leave_scope(if_else_expr.then_branch.id, ctx);
-
-            for else_branch in &if_else_expr.else_branches {
-                visitor.visit_else_clause(else_branch, ctx);
-            }
+            walk_if_else(visitor, if_else_expr, ctx);
         }
         node::ExprKind::Match(match_expr) => {
-            visitor.visit_expr(&match_expr.expression, ctx);
-
-            for arm in &match_expr.arms {
-                visitor.enter_scope(arm.id, ctx);
-                visitor.visit_pat(&arm.pattern, ctx);
-                if let Some(ref guard) = arm.guard {
-                    visitor.visit_expr(guard, ctx);
-                }
-                visitor.visit_expr(&arm.expression, ctx);
-                visitor.leave_scope(arm.id, ctx);
-            }
+            walk_match(visitor, match_expr, ctx);
         }
         node::ExprKind::Path(path) => {
             visitor.visit_path(path, ctx);
         }
         node::ExprKind::Range(range_expr) => {
-            visitor.visit_expr(&range_expr.start, ctx);
-            visitor.visit_expr(&range_expr.end, ctx);
+            walk_range(visitor, range_expr, ctx);
         }
         node::ExprKind::Wildcard => {}
         node::ExprKind::Continue => {}
