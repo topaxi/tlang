@@ -141,7 +141,6 @@ tsconfig.json
 - Common failure causes:
   1. **Node.js version mismatch**: Ensure you're using Node.js 24.0.2 (specified in package.json volta config)
   2. **Stacktrace/line number differences**: When only stacktraces or line numbers differ, update the expected output instead of treating as real failure
-- Some JavaScript backend tests may fail (known issue with Option/Result unwrap calls)
 - Interpreter tests should always pass
 - Use CI results as authoritative - if tests pass on CI, local failures are likely environment issues
 - Focus on ensuring your changes don't break existing interpreter functionality
