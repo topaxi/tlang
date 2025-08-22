@@ -143,8 +143,6 @@ some_x.unwrap() |> log();   // 10
 
 ### Building the Project
 
-⚠️ **Important**: Build commands can take 30+ minutes. Never cancel build operations.
-
 ```bash
 # Build and test Rust components
 cargo nextest run --profile=ci
@@ -164,8 +162,6 @@ cargo build --release --features=binary --bin tlangdi
 # Build playground
 npm run build
 ```
-
-**Note**: For development, you can use `cargo build` (without `--release`) for faster builds, but the binaries will be in `target/debug/` instead of `target/release/`.
 
 ### Code Quality
 
@@ -225,11 +221,21 @@ The playground provides:
   - `tlang_lexer` - Tokenization and lexical analysis
   - `tlang_parser` - Parse tree generation
   - `tlang_ast` - Abstract syntax tree definitions
+  - `tlang_ast_lowering` - AST to HIR transformation
   - `tlang_semantics` - Semantic analysis and type checking
   - `tlang_hir` - High-level intermediate representation
+  - `tlang_hir_opt` - HIR optimizations
+  - `tlang_hir_pretty` - HIR pretty printing
   - `tlang_codegen_js` - JavaScript code generation
-  - `tlang_interpreter` - Direct execution interpreter
-  - `tlang_bindings_js` - WebAssembly bindings
+  - `tlang_bindings_js` - WebAssembly bindings for browser
+  - `tlang_cli_js` - Command-line compiler tool
+  - `tlang_macros` - Procedural macros
+  - `tlang_span` - Source location tracking
+  - `tlang_test_runner` - Integration test runner
+  - `tlang_runtime/` - Runtime components:
+    - `tlang_interpreter` - Direct execution interpreter
+    - `tlang_memory` - Memory management
+    - `tlang_stdlib` - Standard library
 - **`tests/`** - Integration tests organized by feature
 - **`tlang-playground/`** - Web-based playground (Vite + TypeScript + Lit)
 - **`packages/`** - Shared TypeScript packages
