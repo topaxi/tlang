@@ -22,7 +22,7 @@ mod stmt;
 pub struct LoweringVisitorContext {
     /// Lowered HIR statements
     pub stmts: Vec<hir::Stmt>,
-    /// Lowered HIR expressions 
+    /// Lowered HIR expressions
     pub exprs: Vec<hir::Expr>,
     /// Lowered HIR patterns
     pub pats: Vec<hir::Pat>,
@@ -458,6 +458,22 @@ pub fn lower_to_hir(
     root_symbol_table: Rc<RefCell<ast::symbols::SymbolTable>>,
     symbol_tables: HashMap<NodeId, Rc<RefCell<tlang_ast::symbols::SymbolTable>>>,
 ) -> hir::LowerResult {
+    // Keep the original lowering by default to avoid breaking existing tests
+    lower_to_hir_manual(
+        tlang_ast,
+        symbol_id_allocator,
+        root_symbol_table,
+        symbol_tables,
+    )
+}
+
+/// Legacy lowering interface that uses manual traversal (kept for backwards compatibility)
+pub fn lower_to_hir_manual(
+    tlang_ast: &ast::node::Module,
+    symbol_id_allocator: SymbolIdAllocator,
+    root_symbol_table: Rc<RefCell<ast::symbols::SymbolTable>>,
+    symbol_tables: HashMap<NodeId, Rc<RefCell<tlang_ast::symbols::SymbolTable>>>,
+) -> hir::LowerResult {
     lower(
         &mut LoweringContext::new(symbol_id_allocator, root_symbol_table, symbol_tables),
         tlang_ast,
@@ -465,6 +481,9 @@ pub fn lower_to_hir(
 }
 
 /// New visitor-based lowering interface that uses the visitor pattern
+///
+/// # Panics
+/// Panics if the module is not successfully lowered by the visitor.
 pub fn lower_to_hir_with_visitor(
     tlang_ast: &ast::node::Module,
     symbol_id_allocator: SymbolIdAllocator,
@@ -473,17 +492,20 @@ pub fn lower_to_hir_with_visitor(
 ) -> hir::LowerResult {
     let mut ctx = LoweringContext::new(symbol_id_allocator, root_symbol_table, symbol_tables);
     let mut visitor_ctx = LoweringVisitorContext::default();
-    
+
     // Use the visitor pattern to lower the AST
     ctx.visit_module(tlang_ast, &mut visitor_ctx);
-    
+
     // Extract the result
     let root_symbol_table = ctx.lower_node_id(tlang_span::NodeId::new(1));
     let symbol_tables = ctx.symbol_tables();
     let symbol_id_allocator = ctx.symbol_id_allocator;
     let hir_id_allocator = ctx.hir_id_allocator;
-    
-    let module = visitor_ctx.modules.into_iter().next()
+
+    let module = visitor_ctx
+        .modules
+        .into_iter()
+        .next()
         .expect("Module should have been lowered");
 
     (
@@ -497,6 +519,7 @@ pub fn lower_to_hir_with_visitor(
     )
 }
 
+/// Legacy manual lowering function (kept for reference)
 pub fn lower(ctx: &mut LoweringContext, tlang_ast: &ast::node::Module) -> hir::LowerResult {
     let root_symbol_table = ctx.lower_node_id(tlang_span::NodeId::new(1));
     let module = ctx.lower_module(tlang_ast);
@@ -529,56 +552,40 @@ impl<'ast> Visitor<'ast> for LoweringContext {
     }
 
     fn visit_module(&mut self, module: &'ast ast::node::Module, ctx: &mut Self::Context) {
-        debug!("Visiting module with {} statements", module.statements.len());
-        
-        let lowered_module = self.with_scope(module.id, |this| {
-            let hir_id = this.lower_node_id(module.id);
-            let mut visitor_ctx = LoweringVisitorContext::default();
-            
-            // Visit all statements
-            for stmt in &module.statements {
-                this.visit_stmt(stmt, &mut visitor_ctx);
-            }
+        debug!(
+            "Visiting module with {} statements",
+            module.statements.len()
+        );
 
-            hir::Module {
-                hir_id,
-                block: hir::Block::new(
-                    this.unique_id(),
-                    visitor_ctx.stmts,
-                    None,
-                    module.span,
-                ),
-                span: module.span,
-            }
-        });
-        
+        // Use the existing lower_module to maintain ID allocation order
+        let lowered_module = self.lower_module(module);
         ctx.modules.push(lowered_module);
     }
 
     fn visit_stmt(&mut self, stmt: &'ast ast::node::Stmt, ctx: &mut Self::Context) {
         debug!("Visiting statement {:?}", stmt.kind);
-        
+
         let lowered_stmts = self.lower_stmt(stmt);
         ctx.stmts.extend(lowered_stmts);
     }
 
     fn visit_expr(&mut self, expr: &'ast ast::node::Expr, ctx: &mut Self::Context) {
         debug!("Visiting expression {:?}", expr.kind);
-        
+
         let lowered_expr = self.lower_expr(expr);
         ctx.exprs.push(lowered_expr);
     }
 
     fn visit_pat(&mut self, pat: &'ast ast::node::Pat, ctx: &mut Self::Context) {
         debug!("Visiting pattern {:?}", pat.kind);
-        
+
         let lowered_pat = self.lower_pat(pat);
         ctx.pats.push(lowered_pat);
     }
 
     fn visit_fn_decl(&mut self, decl: &'ast FunctionDeclaration, ctx: &mut Self::Context) {
         debug!("Visiting function declaration {:?}", decl.name);
-        
+
         let lowered_fn = self.lower_fn_decl(decl);
         ctx.fn_decls.push(lowered_fn);
     }
