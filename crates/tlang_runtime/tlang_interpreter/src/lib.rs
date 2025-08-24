@@ -7,7 +7,6 @@ use log::debug;
 use smallvec::SmallVec;
 use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token;
-use tlang_symbols::SymbolType;
 use tlang_hir::hir::{self, BindingKind};
 use tlang_memory::shape::{ShapeKey, Shaped, TlangEnumVariant, TlangShape};
 use tlang_memory::state::TailCall;
@@ -16,6 +15,7 @@ use tlang_memory::value::object::TlangEnum;
 use tlang_memory::{InterpreterState, NativeFnReturn, Resolver, scope};
 use tlang_memory::{prelude::*, state};
 use tlang_span::HirId;
+use tlang_symbols::SymbolType;
 
 pub use tlang_memory::NativeFnDef;
 
@@ -81,12 +81,7 @@ impl Interpreter {
     fn builtin_fn_symbols() -> Vec<(String, SymbolType)> {
         inventory::iter::<NativeFnDef>
             .into_iter()
-            .map(|def| {
-                (
-                    def.name(),
-                    SymbolType::Function(def.arity() as u16),
-                )
-            })
+            .map(|def| (def.name(), SymbolType::Function(def.arity() as u16)))
             .collect::<Vec<_>>()
     }
 
@@ -103,11 +98,10 @@ impl Interpreter {
     }
 
     pub fn builtin_symbols() -> Vec<(String, SymbolType)> {
-        let mut symbols: Vec<(String, SymbolType)> =
-            Self::builtin_module_symbols()
-                .iter()
-                .map(|(name, ty)| (name.to_string(), *ty))
-                .collect();
+        let mut symbols: Vec<(String, SymbolType)> = Self::builtin_module_symbols()
+            .iter()
+            .map(|(name, ty)| (name.to_string(), *ty))
+            .collect();
         symbols.extend(Self::builtin_fn_symbols());
         symbols.extend(
             Self::builtin_const_symbols()

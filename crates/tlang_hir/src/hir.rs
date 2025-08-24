@@ -7,8 +7,8 @@ use std::rc::Rc;
 use serde::Serialize;
 use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token::{Literal, Token};
-use tlang_symbols::{SymbolIdAllocator, SymbolType};
 use tlang_span::{HirId, HirIdAllocator, Span};
+use tlang_symbols::{SymbolIdAllocator, SymbolType};
 
 pub trait HirScope {
     // fn hir_id(&self) -> HirId;

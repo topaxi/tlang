@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use log::debug;
-use tlang_symbols::SymbolTable;
 use tlang_hir::hir;
 use tlang_span::{HirId, HirIdAllocator};
+use tlang_symbols::SymbolTable;
 
 pub struct HirOptContext {
     pub symbols: HashMap<HirId, Rc<RefCell<SymbolTable>>>,
