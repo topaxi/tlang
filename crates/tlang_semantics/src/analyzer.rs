@@ -6,10 +6,10 @@ use tlang_ast::{
         BinaryOpKind, Expr, ExprKind, FunctionDeclaration, LetDeclaration, Module, Pat, PatKind,
         Path, Stmt, StmtKind, StructDeclaration,
     },
-    symbols::{SymbolIdAllocator, SymbolInfo, SymbolTable, SymbolType},
     visit::{Visitor, walk_expr, walk_pat, walk_stmt},
 };
 use tlang_span::{NodeId, Span};
+use tlang_symbols::{SymbolIdAllocator, SymbolInfo, SymbolTable, SymbolType};
 
 use crate::{
     declarations::{DeclarationAnalyzer, DeclarationContext},

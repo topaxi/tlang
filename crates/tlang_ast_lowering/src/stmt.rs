@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use log::debug;
 use tlang_ast as ast;
 use tlang_ast::node::{FunctionDeclaration, Ident, LetDeclaration};
-use tlang_ast::symbols::SymbolType;
 use tlang_hir::hir;
+use tlang_symbols::SymbolType;
 
 use crate::LoweringContext;
 

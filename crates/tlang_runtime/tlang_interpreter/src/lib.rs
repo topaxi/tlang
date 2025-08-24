@@ -87,13 +87,10 @@ impl Interpreter {
 
     const fn builtin_const_symbols() -> &'static [(&'static str, SymbolType)] {
         &[
-            ("Option", tlang_ast::symbols::SymbolType::Enum),
-            (
-                "Option::None",
-                tlang_ast::symbols::SymbolType::EnumVariant(0),
-            ),
-            ("Result", tlang_ast::symbols::SymbolType::Enum),
-            ("math::pi", tlang_ast::symbols::SymbolType::Variable),
+            ("Option", SymbolType::Enum),
+            ("Option::None", SymbolType::EnumVariant(0)),
+            ("Result", SymbolType::Enum),
+            ("math::pi", SymbolType::Variable),
         ]
     }
 
