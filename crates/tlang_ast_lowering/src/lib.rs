@@ -452,39 +452,11 @@ impl LoweringContext {
     }
 }
 
-pub fn lower_to_hir(
-    tlang_ast: &ast::node::Module,
-    symbol_id_allocator: SymbolIdAllocator,
-    root_symbol_table: Rc<RefCell<ast::symbols::SymbolTable>>,
-    symbol_tables: HashMap<NodeId, Rc<RefCell<tlang_ast::symbols::SymbolTable>>>,
-) -> hir::LowerResult {
-    // Keep the original lowering by default to avoid breaking existing tests
-    lower_to_hir_manual(
-        tlang_ast,
-        symbol_id_allocator,
-        root_symbol_table,
-        symbol_tables,
-    )
-}
-
-/// Legacy lowering interface that uses manual traversal (kept for backwards compatibility)
-pub fn lower_to_hir_manual(
-    tlang_ast: &ast::node::Module,
-    symbol_id_allocator: SymbolIdAllocator,
-    root_symbol_table: Rc<RefCell<ast::symbols::SymbolTable>>,
-    symbol_tables: HashMap<NodeId, Rc<RefCell<tlang_ast::symbols::SymbolTable>>>,
-) -> hir::LowerResult {
-    lower(
-        &mut LoweringContext::new(symbol_id_allocator, root_symbol_table, symbol_tables),
-        tlang_ast,
-    )
-}
-
-/// New visitor-based lowering interface that uses the visitor pattern
+/// Lower an AST module to HIR using the visitor pattern.
 ///
 /// # Panics
 /// Panics if the module is not successfully lowered by the visitor.
-pub fn lower_to_hir_with_visitor(
+pub fn lower_to_hir(
     tlang_ast: &ast::node::Module,
     symbol_id_allocator: SymbolIdAllocator,
     root_symbol_table: Rc<RefCell<ast::symbols::SymbolTable>>,
@@ -507,25 +479,6 @@ pub fn lower_to_hir_with_visitor(
         .into_iter()
         .next()
         .expect("Module should have been lowered");
-
-    (
-        module,
-        hir::LowerResultMeta {
-            root_symbol_table,
-            symbol_tables,
-            hir_id_allocator,
-            symbol_id_allocator,
-        },
-    )
-}
-
-/// Legacy manual lowering function (kept for reference)
-pub fn lower(ctx: &mut LoweringContext, tlang_ast: &ast::node::Module) -> hir::LowerResult {
-    let root_symbol_table = ctx.lower_node_id(tlang_span::NodeId::new(1));
-    let module = ctx.lower_module(tlang_ast);
-    let symbol_tables = ctx.symbol_tables();
-    let symbol_id_allocator = ctx.symbol_id_allocator;
-    let hir_id_allocator = ctx.hir_id_allocator;
 
     (
         module,

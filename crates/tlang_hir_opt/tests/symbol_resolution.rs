@@ -39,17 +39,17 @@ fn test_simple_symbol_resolution() {
     assert_eq!(
         collect_declarations(&mut hir),
         HashMap::from([
-            (HirId::new(4), "main".to_string()),
-            (HirId::new(8), "x".to_string()),
+            (HirId::new(3), "main".to_string()),
+            (HirId::new(7), "x".to_string()),
         ])
     );
 
     assert_eq!(
         collect_res(&mut hir),
         vec![
-            ("main".to_string(), hir::Res::new_fn(HirId::new(4))),
-            ("x".to_string(), hir::Res::new_local(HirId::new(8))),
-            ("x".to_string(), hir::Res::new_local(HirId::new(8))),
+            ("main".to_string(), hir::Res::new_fn(HirId::new(3))),
+            ("x".to_string(), hir::Res::new_local(HirId::new(7))),
+            ("x".to_string(), hir::Res::new_local(HirId::new(7))),
         ]
     );
 }
@@ -69,19 +69,19 @@ fn test_symbol_resolution_with_same_scope_shadowing() {
     assert_eq!(
         collect_declarations(&mut hir),
         HashMap::from([
-            (HirId::new(4), "main".to_string()),
-            (HirId::new(8), "x".to_string()),
-            (HirId::new(13), "x".to_string()),
+            (HirId::new(3), "main".to_string()),
+            (HirId::new(7), "x".to_string()),
+            (HirId::new(12), "x".to_string()),
         ])
     );
 
     assert_eq!(
         collect_res(&mut hir),
         vec![
-            ("main".to_string(), hir::Res::new_fn(HirId::new(4))),
-            ("x".to_string(), hir::Res::new_local(HirId::new(8))),
-            ("x".to_string(), hir::Res::new_local(HirId::new(13))),
-            ("x".to_string(), hir::Res::new_local(HirId::new(13))),
+            ("main".to_string(), hir::Res::new_fn(HirId::new(3))),
+            ("x".to_string(), hir::Res::new_local(HirId::new(7))),
+            ("x".to_string(), hir::Res::new_local(HirId::new(12))),
+            ("x".to_string(), hir::Res::new_local(HirId::new(12))),
         ]
     );
 }
@@ -106,24 +106,24 @@ fn test_enum_resolution() {
     assert_eq!(
         collect_declarations(&mut hir),
         HashMap::from([
-            (HirId::new(4), "Color".to_string()),
-            (HirId::new(5), "Color::Red".to_string()),
-            (HirId::new(6), "Color::Green".to_string()),
-            (HirId::new(7), "Color::Blue".to_string()),
-            (HirId::new(8), "main".to_string()),
-            (HirId::new(12), "c".to_string()),
+            (HirId::new(3), "Color".to_string()),
+            (HirId::new(4), "Color::Red".to_string()),
+            (HirId::new(5), "Color::Green".to_string()),
+            (HirId::new(6), "Color::Blue".to_string()),
+            (HirId::new(7), "main".to_string()),
+            (HirId::new(11), "c".to_string()),
         ])
     );
 
     assert_eq!(
         collect_res(&mut hir),
         vec![
-            ("main".to_string(), hir::Res::new_fn(HirId::new(8))),
+            ("main".to_string(), hir::Res::new_fn(HirId::new(7))),
             (
                 "Color::Red".to_string(),
-                hir::Res::new_enum_variant(HirId::new(5))
+                hir::Res::new_enum_variant(HirId::new(4))
             ),
-            ("c".to_string(), hir::Res::new_local(HirId::new(12))),
+            ("c".to_string(), hir::Res::new_local(HirId::new(11))),
         ]
     );
 }
