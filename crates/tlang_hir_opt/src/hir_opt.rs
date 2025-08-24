@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use log::debug;
-use tlang_ast::symbols::SymbolTable;
+use tlang_symbols::SymbolTable;
 use tlang_hir::hir;
 use tlang_span::{HirId, HirIdAllocator};
 

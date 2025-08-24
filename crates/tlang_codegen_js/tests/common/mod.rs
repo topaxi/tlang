@@ -1,4 +1,4 @@
-use tlang_ast::symbols::SymbolType;
+use tlang_symbols::SymbolType;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_hir_opt::HirOptimizer;
 use tlang_parser::Parser;

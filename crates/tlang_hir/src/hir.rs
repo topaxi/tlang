@@ -6,8 +6,8 @@ use std::rc::Rc;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 use tlang_ast::node::{Ident, UnaryOp};
-use tlang_ast::symbols::{SymbolIdAllocator, SymbolType};
 use tlang_ast::token::{Literal, Token};
+use tlang_symbols::{SymbolIdAllocator, SymbolType};
 use tlang_span::{HirId, HirIdAllocator, Span};
 
 pub trait HirScope {

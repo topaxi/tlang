@@ -7,6 +7,7 @@ use log::debug;
 use smallvec::SmallVec;
 use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token;
+use tlang_symbols::SymbolType;
 use tlang_hir::hir::{self, BindingKind};
 use tlang_memory::shape::{ShapeKey, Shaped, TlangEnumVariant, TlangShape};
 use tlang_memory::state::TailCall;
@@ -66,30 +67,30 @@ impl Default for Interpreter {
 }
 
 impl Interpreter {
-    fn builtin_module_symbols() -> Vec<(&'static str, tlang_ast::symbols::SymbolType)> {
+    fn builtin_module_symbols() -> Vec<(&'static str, SymbolType)> {
         let mut module_names = HashSet::new();
 
         inventory::iter::<NativeFnDef>
             .into_iter()
             .map(|def| def.module())
             .filter(|module_name| module_names.insert(module_name.to_string()))
-            .map(|module_name| (module_name, tlang_ast::symbols::SymbolType::Module))
+            .map(|module_name| (module_name, SymbolType::Module))
             .collect()
     }
 
-    fn builtin_fn_symbols() -> Vec<(String, tlang_ast::symbols::SymbolType)> {
+    fn builtin_fn_symbols() -> Vec<(String, SymbolType)> {
         inventory::iter::<NativeFnDef>
             .into_iter()
             .map(|def| {
                 (
                     def.name(),
-                    tlang_ast::symbols::SymbolType::Function(def.arity() as u16),
+                    SymbolType::Function(def.arity() as u16),
                 )
             })
             .collect::<Vec<_>>()
     }
 
-    const fn builtin_const_symbols() -> &'static [(&'static str, tlang_ast::symbols::SymbolType)] {
+    const fn builtin_const_symbols() -> &'static [(&'static str, SymbolType)] {
         &[
             ("Option", tlang_ast::symbols::SymbolType::Enum),
             (
@@ -101,8 +102,8 @@ impl Interpreter {
         ]
     }
 
-    pub fn builtin_symbols() -> Vec<(String, tlang_ast::symbols::SymbolType)> {
-        let mut symbols: Vec<(String, tlang_ast::symbols::SymbolType)> =
+    pub fn builtin_symbols() -> Vec<(String, SymbolType)> {
+        let mut symbols: Vec<(String, SymbolType)> =
             Self::builtin_module_symbols()
                 .iter()
                 .map(|(name, ty)| (name.to_string(), *ty))

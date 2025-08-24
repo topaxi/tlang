@@ -25,6 +25,7 @@ tlang_hir_opt = { path = "../tlang_hir_opt" }
 tlang_hir_pretty = { path = "../tlang_hir_pretty" }
 tlang_parser = { path = "../tlang_parser", features = ["serde"] }
 tlang_semantics = { path = "../tlang_semantics", features = ["serde"] }
+tlang_symbols = { path = "../tlang_symbols", features = ["serde"] }
 tlang_memory = { path = "../tlang_runtime/tlang_memory" }
 tlang_interpreter = { path = "../tlang_runtime/tlang_interpreter" }
 tlang_macros = { path = "../tlang_macros" }

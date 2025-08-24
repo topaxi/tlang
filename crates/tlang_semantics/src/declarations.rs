@@ -2,7 +2,7 @@ use log::debug;
 use std::rc::Rc;
 use std::{cell::RefCell, collections::HashMap};
 use tlang_ast::keyword::kw;
-use tlang_ast::symbols::SymbolIdAllocator;
+use tlang_symbols::SymbolIdAllocator;
 use tlang_ast::visit::{Visitor, walk_expr, walk_stmt};
 use tlang_ast::{
     node::{

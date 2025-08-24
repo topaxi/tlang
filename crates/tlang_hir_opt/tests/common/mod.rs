@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use tlang_ast::symbols::SymbolType;
+use tlang_symbols::SymbolType;
 use tlang_ast_lowering::lower_to_hir;
 use tlang_hir::visit::{walk_pat, walk_stmt};
 use tlang_hir::{Visitor, hir};
