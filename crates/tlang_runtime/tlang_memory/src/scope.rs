@@ -22,7 +22,7 @@ impl ScopeStack {
         root_scope.borrow_mut().set_offset(0);
         scopes.push(root_scope);
 
-        Self { 
+        Self {
             scopes,
             memory: Vec::with_capacity(1000), // Start with reasonable capacity
         }
@@ -38,14 +38,11 @@ impl ScopeStack {
             meta.upvars()
         );
 
-        let new_scope = Rc::new(RefCell::new(Scope::new(
-            meta.locals(),
-            meta.upvars(),
-        )));
-        
+        let new_scope = Rc::new(RefCell::new(Scope::new(meta.locals(), meta.upvars())));
+
         // Set the offset for the new scope to the end of current memory
         new_scope.borrow_mut().set_offset(self.memory.len());
-        
+
         self.scopes.push(new_scope);
     }
 
@@ -80,7 +77,7 @@ impl ScopeStack {
     pub fn as_root(&self) -> Self {
         let mut scopes = Vec::with_capacity(10);
         scopes.push(self.root_scope());
-        Self { 
+        Self {
             scopes,
             memory: self.memory.clone(), // Share the same memory
         }
@@ -90,10 +87,10 @@ impl ScopeStack {
         let current_scope = self.current_scope();
         let mut scope_borrow = current_scope.borrow_mut();
         let offset = scope_borrow.offset();
-        
+
         // Truncate memory to remove values from current scope
         self.memory.truncate(offset);
-        
+
         // Clear the scope
         scope_borrow.clear();
     }
@@ -101,10 +98,10 @@ impl ScopeStack {
     pub fn push_value(&mut self, value: TlangValue) {
         let current_scope = self.current_scope();
         let mut scope_borrow = current_scope.borrow_mut();
-        
+
         // Add value to central memory
         self.memory.push(value);
-        
+
         // Update scope length
         scope_borrow.increment_length();
     }
@@ -114,7 +111,7 @@ impl ScopeStack {
         let scope_borrow = current_scope.borrow();
         let offset = scope_borrow.offset();
         let absolute_index = offset + index;
-        
+
         self.memory.get(absolute_index).copied()
     }
 
@@ -123,7 +120,7 @@ impl ScopeStack {
         let scope_borrow = current_scope.borrow();
         let offset = scope_borrow.offset();
         let absolute_index = offset + index;
-        
+
         if absolute_index < self.memory.len() {
             self.memory[absolute_index] = value;
         }
@@ -135,7 +132,7 @@ impl ScopeStack {
         let scope_borrow = scope.borrow();
         let offset = scope_borrow.offset();
         let absolute_index = offset + index;
-        
+
         self.memory.get(absolute_index).copied()
     }
 
@@ -145,7 +142,7 @@ impl ScopeStack {
         let scope_borrow = scope.borrow();
         let offset = scope_borrow.offset();
         let absolute_index = offset + index;
-        
+
         if absolute_index < self.memory.len() {
             self.memory[absolute_index] = value;
         }
@@ -184,7 +181,7 @@ impl ScopeStack {
         let scope_borrow = scope.borrow();
         let offset = scope_borrow.offset();
         let length = scope_borrow.length();
-        
+
         &self.memory[offset..offset + length]
     }
 }
