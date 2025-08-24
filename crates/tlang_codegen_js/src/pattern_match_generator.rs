@@ -200,29 +200,31 @@ impl CodegenJS {
     }
 
     fn setup_match_completion_variables(&mut self, arms: &[hir::MatchArm]) -> (String, bool) {
-        let mut lhs = self.replace_statement_buffer(String::new());
         let has_block_completions =
             self.current_context() == BlockContext::Expression && match_args_have_completions(arms);
-        let mut has_let = false;
 
         if has_block_completions {
-            // TODO: We could probably reuse existing completion vars here.
-            if let Some("return") = self.current_completion_variable() {
+            // Note: We check if we can reuse the existing completion variable ("return")
+            // instead of creating a new temporary variable each time.
+            if self.can_reuse_current_completion_variable() {
+                let _lhs = self.replace_statement_buffer(String::new());
                 self.push_completion_variable(Some("return"));
-                lhs = self.replace_statement_buffer_with_empty_string();
+                let lhs = self.replace_statement_buffer_with_empty_string();
+                (lhs, false)
             } else {
+                let lhs = self.replace_statement_buffer(String::new());
                 let completion_tmp_var = self.current_scope().declare_tmp_variable();
                 self.push_indent();
                 self.push_str("let ");
                 self.push_str(&completion_tmp_var);
                 self.push_completion_variable(Some(&completion_tmp_var));
-                has_let = true;
+                (lhs, true)
             }
         } else {
+            let lhs = self.replace_statement_buffer(String::new());
             self.push_completion_variable(None);
+            (lhs, false)
         }
-
-        (lhs, has_let)
     }
 
     fn setup_match_context(&mut self, expr: &hir::Expr) {

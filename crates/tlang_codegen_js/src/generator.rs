@@ -337,6 +337,12 @@ impl CodegenJS {
         self.generate_expr(expr, None);
     }
 
+    /// Returns true if the current completion variable can be reused (i.e., it's "return").
+    /// This is a helper to check if we should reuse existing completion vars.
+    pub(crate) fn can_reuse_current_completion_variable(&self) -> bool {
+        matches!(self.current_completion_variable(), Some("return"))
+    }
+
     pub(crate) fn generate_comment(&mut self, comment: &Token) {
         match &comment.kind {
             TokenKind::SingleLineComment(comment) => {
