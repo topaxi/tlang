@@ -200,6 +200,7 @@ impl CodegenJS {
     }
 
     fn setup_match_completion_variables(&mut self, arms: &[hir::MatchArm]) -> (String, bool) {
+        let mut lhs = self.replace_statement_buffer_with_empty_string();
         let has_block_completions =
             self.current_context() == BlockContext::Expression && match_args_have_completions(arms);
 
@@ -207,12 +208,10 @@ impl CodegenJS {
             // Note: We check if we can reuse the existing completion variable ("return")
             // instead of creating a new temporary variable each time.
             if self.can_reuse_current_completion_variable() {
-                let _lhs = self.replace_statement_buffer(String::new());
                 self.push_completion_variable(Some("return"));
-                let lhs = self.replace_statement_buffer_with_empty_string();
+                lhs = self.replace_statement_buffer_with_empty_string();
                 (lhs, false)
             } else {
-                let lhs = self.replace_statement_buffer(String::new());
                 let completion_tmp_var = self.current_scope().declare_tmp_variable();
                 self.push_indent();
                 self.push_str("let ");
@@ -221,7 +220,6 @@ impl CodegenJS {
                 (lhs, true)
             }
         } else {
-            let lhs = self.replace_statement_buffer(String::new());
             self.push_completion_variable(None);
             (lhs, false)
         }
