@@ -1,4 +1,10 @@
-// TODO: Does this module belong in the ast crate?
+//! Symbol types and symbol table implementation.
+//!
+//! This module defines the core symbol management types used throughout the tlang compilation
+//! pipeline. It belongs in the AST crate because symbols are first identified during AST
+//! construction and these types provide the foundation for semantic analysis, HIR lowering,
+//! and code generation phases.
+
 use log::debug;
 #[cfg(feature = "serde")]
 use serde::Serialize;
