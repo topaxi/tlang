@@ -219,7 +219,7 @@ impl Interpreter {
 
     #[inline(always)]
     fn push_value(&mut self, value: TlangValue) {
-        self.state.current_scope().borrow_mut().push_value(value);
+        self.state.scope_stack.push_value(value);
     }
 
     #[inline(always)]

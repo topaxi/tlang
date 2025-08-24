@@ -10,15 +10,22 @@ use crate::value::TlangValue;
 #[derive(Debug, Clone)]
 pub struct ScopeStack {
     scopes: Vec<Rc<RefCell<Scope>>>,
+    // Central continuous memory for all scope values
+    memory: Vec<TlangValue>,
 }
 
 impl ScopeStack {
     pub fn new() -> Self {
         let mut scopes = Vec::with_capacity(10);
 
-        scopes.push(Rc::new(RefCell::new(Scope::default())));
+        let root_scope = Rc::new(RefCell::new(Scope::default()));
+        root_scope.borrow_mut().set_offset(0);
+        scopes.push(root_scope);
 
-        Self { scopes }
+        Self { 
+            scopes,
+            memory: Vec::with_capacity(1000), // Start with reasonable capacity
+        }
     }
 
     pub fn push<T>(&mut self, meta: &T)
@@ -31,14 +38,25 @@ impl ScopeStack {
             meta.upvars()
         );
 
-        self.scopes.push(Rc::new(RefCell::new(Scope::new(
+        let new_scope = Rc::new(RefCell::new(Scope::new(
             meta.locals(),
             meta.upvars(),
-        ))));
+        )));
+        
+        // Set the offset for the new scope to the end of current memory
+        new_scope.borrow_mut().set_offset(self.memory.len());
+        
+        self.scopes.push(new_scope);
     }
 
     pub fn pop(&mut self) {
-        self.scopes.pop();
+        if let Some(scope) = self.scopes.pop() {
+            // Truncate memory to remove the values from the popped scope
+            let scope_borrow = scope.borrow();
+            let new_len = scope_borrow.offset();
+            drop(scope_borrow); // Release the borrow before truncating
+            self.memory.truncate(new_len);
+        }
 
         debug!("Popping scope");
     }
@@ -62,31 +80,75 @@ impl ScopeStack {
     pub fn as_root(&self) -> Self {
         let mut scopes = Vec::with_capacity(10);
         scopes.push(self.root_scope());
-        Self { scopes }
+        Self { 
+            scopes,
+            memory: self.memory.clone(), // Share the same memory
+        }
     }
 
-    pub fn clear_current_scope(&self) {
-        self.current_scope().borrow_mut().clear();
+    pub fn clear_current_scope(&mut self) {
+        let current_scope = self.current_scope();
+        let mut scope_borrow = current_scope.borrow_mut();
+        let offset = scope_borrow.offset();
+        
+        // Truncate memory to remove values from current scope
+        self.memory.truncate(offset);
+        
+        // Clear the scope
+        scope_borrow.clear();
+    }
+
+    pub fn push_value(&mut self, value: TlangValue) {
+        let current_scope = self.current_scope();
+        let mut scope_borrow = current_scope.borrow_mut();
+        
+        // Add value to central memory
+        self.memory.push(value);
+        
+        // Update scope length
+        scope_borrow.increment_length();
     }
 
     fn get_local(&self, index: usize) -> Option<TlangValue> {
-        self.current_scope().borrow().get(index)
+        let current_scope = self.current_scope();
+        let scope_borrow = current_scope.borrow();
+        let offset = scope_borrow.offset();
+        let absolute_index = offset + index;
+        
+        self.memory.get(absolute_index).copied()
     }
 
-    fn set_local(&self, index: usize, value: TlangValue) {
-        self.current_scope().borrow_mut().set(index, value);
+    fn set_local(&mut self, index: usize, value: TlangValue) {
+        let current_scope = self.current_scope();
+        let scope_borrow = current_scope.borrow();
+        let offset = scope_borrow.offset();
+        let absolute_index = offset + index;
+        
+        if absolute_index < self.memory.len() {
+            self.memory[absolute_index] = value;
+        }
     }
 
     fn get_upvar(&self, relative_scope_index: u16, index: usize) -> Option<TlangValue> {
         let scope_index = self.scope_index(relative_scope_index);
-
-        self.scopes[scope_index].borrow().get(index)
+        let scope = &self.scopes[scope_index];
+        let scope_borrow = scope.borrow();
+        let offset = scope_borrow.offset();
+        let absolute_index = offset + index;
+        
+        self.memory.get(absolute_index).copied()
     }
 
-    fn set_upvar(&self, relative_scope_index: u16, index: usize, value: TlangValue) {
+    fn set_upvar(&mut self, relative_scope_index: u16, index: usize, value: TlangValue) {
         let scope_index = self.scope_index(relative_scope_index);
-
-        self.scopes[scope_index].borrow_mut().set(index, value);
+        let scope = &self.scopes[scope_index];
+        let scope_borrow = scope.borrow();
+        let offset = scope_borrow.offset();
+        let absolute_index = offset + index;
+        
+        if absolute_index < self.memory.len() {
+            self.memory[absolute_index] = value;
+        }
     }
 
     fn scope_index(&self, relative_scope_index: ScopeIndex) -> usize {
@@ -104,7 +166,7 @@ impl ScopeStack {
     }
 
     /// # Panics
-    pub fn update_value(&self, res: &hir::Res, value: TlangValue) {
+    pub fn update_value(&mut self, res: &hir::Res, value: TlangValue) {
         match res.slot() {
             hir::Slot::Local(index) => self.set_local(index, value),
             hir::Slot::Upvar(index, relative_scope_index) => {
@@ -116,6 +178,14 @@ impl ScopeStack {
 
     pub fn iter(&self) -> impl Iterator<Item = Rc<RefCell<Scope>>> {
         self.scopes.iter().cloned()
+    }
+
+    pub fn get_scope_locals(&self, scope: &Rc<RefCell<Scope>>) -> &[TlangValue] {
+        let scope_borrow = scope.borrow();
+        let offset = scope_borrow.offset();
+        let length = scope_borrow.length();
+        
+        &self.memory[offset..offset + length]
     }
 }
 
@@ -133,34 +203,37 @@ impl Resolver for ScopeStack {
 
 #[derive(Debug, Default)]
 pub struct Scope {
-    // Value bindings in user code, this includes references to user defined functions.
-    locals: Vec<TlangValue>,
+    // Offset into the central memory vector where this scope's locals start
+    offset: usize,
+    // Number of local values in this scope
+    length: usize,
 }
 
 impl Scope {
-    pub fn new(locals: usize, _upvars: usize) -> Self {
+    pub fn new(_locals: usize, _upvars: usize) -> Self {
         Self {
-            locals: Vec::with_capacity(locals),
+            offset: 0, // Will be set when the scope is actually created
+            length: 0, // Starts empty, grows as values are pushed
         }
     }
 
-    pub fn push_value(&mut self, value: TlangValue) {
-        self.locals.push(value);
+    pub fn set_offset(&mut self, offset: usize) {
+        self.offset = offset;
     }
 
-    pub fn get(&self, index: usize) -> Option<TlangValue> {
-        self.locals.get(index).copied()
+    pub fn offset(&self) -> usize {
+        self.offset
     }
 
-    pub fn set(&mut self, index: usize, value: TlangValue) {
-        self.locals[index] = value;
+    pub fn length(&self) -> usize {
+        self.length
     }
 
-    pub fn get_locals(&self) -> &[TlangValue] {
-        &self.locals
+    pub fn increment_length(&mut self) {
+        self.length += 1;
     }
 
-    pub(crate) fn clear(&mut self) {
-        self.locals.clear();
+    pub fn clear(&mut self) {
+        self.length = 0;
     }
 }

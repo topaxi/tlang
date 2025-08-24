@@ -368,6 +368,10 @@ impl InterpreterState {
         self.scope_stack.current_scope()
     }
 
+    pub fn push_value(&mut self, value: TlangValue) {
+        self.scope_stack.push_value(value);
+    }
+
     pub fn set_global(&mut self, name: String, value: TlangValue) {
         self.globals.insert(name, value);
     }
@@ -580,7 +584,7 @@ impl InterpreterState {
         let mut out = "[\n".to_string();
         for scope in self.scope_stack.iter() {
             out.push_str("  {\n");
-            for entry in scope.borrow().get_locals() {
+            for entry in self.scope_stack.get_scope_locals(&scope) {
                 out.push_str("    ");
                 out.push_str(self.stringify(*entry).as_str());
                 out.push_str(",\n");
