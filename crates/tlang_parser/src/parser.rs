@@ -565,8 +565,8 @@ impl<'src> Parser<'src> {
         self.consume_keyword_token(Keyword::Let);
         let pattern = self.parse_pattern();
         self.consume_token(TokenKind::EqualSign);
-        // Use higher precedence (12) to prevent {} from being parsed as function call
-        let value = self.parse_expression_with_precedence(12, Associativity::Left);
+        // Use precedence 3 to prevent {} from being parsed as function call (precedence 2)
+        let value = self.parse_expression_with_precedence(3, Associativity::Left);
         node::expr!(self.unique_id(), Let(Box::new(pattern), Box::new(value)))
     }
 
@@ -827,8 +827,8 @@ impl<'src> Parser<'src> {
         let condition = if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Let)) {
             self.parse_let_expression()
         } else {
-            // Use higher precedence (12) to prevent {} from being parsed as function call
-            self.parse_expression_with_precedence(12, Associativity::Left)
+            // Use precedence 3 to prevent {} from being parsed as function call (precedence 2)
+            self.parse_expression_with_precedence(3, Associativity::Left)
         };
 
         // TODO: Reevaluate whether we want `foo {}` to be a `foo({})` call expression.
@@ -1068,8 +1068,8 @@ impl<'src> Parser<'src> {
 
     fn parse_match_expression(&mut self) -> Expr {
         self.consume_keyword_token(Keyword::Match);
-        // Use higher precedence (12) to prevent {} from being parsed as function call
-        let expression = self.parse_expression_with_precedence(12, Associativity::Left);
+        // Use precedence 3 to prevent {} from being parsed as function call (precedence 2)
+        let expression = self.parse_expression_with_precedence(3, Associativity::Left);
 
         // TODO: Reevaluate whether we want `foo {}` to be a `foo({})` call expression.
         //       As this collides with `if let` statements.
@@ -1647,9 +1647,9 @@ impl<'src> Parser<'src> {
                 }
                 TokenKind::LBrace => {
                     // Function call with dictionary syntax: foo {}
-                    // Give this high precedence (11) so it binds tightly
-                    let call_precedence = 11;
-                    if precedence >= call_precedence {
+                    // Give this low precedence (2) so it doesn't interfere with operators
+                    let call_precedence = 2;
+                    if precedence > call_precedence {
                         break;
                     }
                     lhs = self.parse_call_expression(lhs);
@@ -1725,8 +1725,8 @@ impl<'src> Parser<'src> {
         self.advance();
         let pat = self.parse_pattern();
         self.consume_token(TokenKind::Keyword(Keyword::In));
-        // Use higher precedence (12) to prevent {} from being parsed as function call
-        let iter = self.parse_expression_with_precedence(12, Associativity::Left);
+        // Use precedence 3 to prevent {} from being parsed as function call (precedence 2)
+        let iter = self.parse_expression_with_precedence(3, Associativity::Left);
         if matches!(self.current_token_kind(), TokenKind::Semicolon) {
             self.advance();
         }
@@ -1734,8 +1734,8 @@ impl<'src> Parser<'src> {
             self.advance();
             let pat = self.parse_pattern();
             self.consume_token(TokenKind::EqualSign);
-            // Use higher precedence (12) to prevent {} from being parsed as function call
-            let expr = self.parse_expression_with_precedence(12, Associativity::Left);
+            // Use precedence 3 to prevent {} from being parsed as function call (precedence 2)
+            let expr = self.parse_expression_with_precedence(3, Associativity::Left);
             if matches!(self.current_token_kind(), TokenKind::Semicolon) {
                 self.advance();
             }
