@@ -279,24 +279,6 @@ impl Interpreter {
         result
     }
 
-    #[inline(always)]
-    fn with_closure_scope<F, R>(
-        &mut self,
-        scopes: Vec<scope::Scope>,
-        captured_memory: Vec<TlangValue>,
-        f: F,
-    ) -> R
-    where
-        F: FnOnce(&mut Self) -> R,
-    {
-        let old_scopes = std::mem::replace(&mut self.state.scope_stack.scopes, scopes);
-        let old_memory = std::mem::replace(&mut self.state.scope_stack.memory, captured_memory);
-        let result = f(self);
-        self.state.scope_stack.scopes = old_scopes;
-        self.state.scope_stack.memory = old_memory;
-        result
-    }
-
     pub fn eval(&mut self, input: &hir::Module) -> TlangValue {
         self.eval_block_inner(&input.block).unwrap_value()
     }
@@ -936,14 +918,10 @@ impl Interpreter {
             TlangObjectKind::Closure(closure) => {
                 let closure_decl = self.get_closure_decl(closure.id).unwrap();
 
-                self.with_closure_scope(
-                    closure.scope_stack.clone(),
-                    closure.captured_memory.clone(),
-                    |this| {
-                        this.eval_fn_call(&closure_decl, callee, args)
-                            .unwrap_value()
-                    },
-                )
+                self.with_scope(closure.scope_stack.clone(), |this| {
+                    this.eval_fn_call(&closure_decl, callee, args)
+                        .unwrap_value()
+                })
             }
             TlangObjectKind::Fn(hir_id) => {
                 let fn_decl = self

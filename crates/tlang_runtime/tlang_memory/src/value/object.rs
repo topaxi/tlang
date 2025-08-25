@@ -11,8 +11,6 @@ pub struct TlangClosure {
     pub id: HirId,
     // Closures hold a reference to the scope stack at the time of creation.
     pub scope_stack: Vec<crate::scope::Scope>,
-    // Captured local memory for upvar access (excluding global scope)
-    pub captured_memory: Vec<TlangValue>,
 }
 
 #[derive(Debug, PartialEq)]
