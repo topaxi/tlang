@@ -40,16 +40,11 @@ impl ScopeStack {
         let locals_count = meta.locals();
         let mut new_scope = Scope::new(locals_count);
 
-        // Local scopes (non-global) start at the logical end of the current scope
+        // Local scopes (non-global) start at the current end of memory vector
         // Global scope (index 0) uses separate global_memory
         if !self.scopes.is_empty() {
-            // Calculate the logical start position based on current scope's usage
-            let current_scope = self.current_scope();
-            let logical_start = current_scope.start() + current_scope.vars_pushed();
-            new_scope.set_start(logical_start);
-            
-            eprintln!("DEBUG push scope: logical_start={} (current.start={} + current.vars_pushed={}), memory.len()={}", 
-                logical_start, current_scope.start(), current_scope.vars_pushed(), self.memory.len());
+            // Set the start position for the new local scope
+            new_scope.set_start(self.memory.len());
 
             // Reserve capacity for the exact number of locals (avoid reallocations)
             self.memory.reserve(locals_count);
@@ -114,17 +109,11 @@ impl ScopeStack {
         // Handle global scope (index 0) separately
         if scope_index == 0 {
             // Global scope uses global_memory and can grow freely
-            eprintln!("DEBUG push_value (global): pushing {:?} to index {}", value, self.global_memory.len());
             self.global_memory.push(value);
         } else {
             // Local scopes: simply push to the memory vector
             // The vector boundaries are managed by scope start positions
-            let old_len = self.memory.len();
             self.memory.push(value);
-            eprintln!("DEBUG push_value (local): pushing {:?} to memory index {}", value, old_len);
-            
-            // Track that we've pushed a variable to the current scope
-            self.scopes[scope_index].increment_vars_pushed();
         }
     }
 
@@ -133,18 +122,13 @@ impl ScopeStack {
 
         if scope_index == 0 {
             // Global scope uses global_memory
-            let value = self.global_memory.get(index).copied();
-            eprintln!("DEBUG get_local (global): index={}, value={:?}", index, value.map(|v| format!("{:?}", v)));
-            value
+            self.global_memory.get(index).copied()
         } else {
             // Local scopes use memory vector with start position
             let current_scope = self.current_scope();
             let start = current_scope.start();
             let absolute_index = start + index;
-            let value = self.memory.get(absolute_index).copied();
-            eprintln!("DEBUG get_local (local): index={}, start={}, absolute_index={}, memory.len()={}, value={:?}", 
-                index, start, absolute_index, self.memory.len(), value.map(|v| format!("{:?}", v)));
-            value
+            self.memory.get(absolute_index).copied()
         }
     }
 
@@ -279,15 +263,12 @@ impl Resolver for ScopeStack {
 pub struct Scope {
     // Starting position of this scope in the memory vector
     start: usize,
-    // Number of variables that have been pushed to this scope
-    vars_pushed: usize,
 }
 
 impl Scope {
     pub fn new(_locals: usize) -> Self {
         Self {
             start: 0, // Will be set when the scope is actually created
-            vars_pushed: 0,
         }
     }
 
@@ -297,13 +278,5 @@ impl Scope {
 
     pub fn start(&self) -> usize {
         self.start
-    }
-    
-    pub fn vars_pushed(&self) -> usize {
-        self.vars_pushed
-    }
-    
-    pub fn increment_vars_pushed(&mut self) {
-        self.vars_pushed += 1;
     }
 }

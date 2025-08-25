@@ -1353,13 +1353,32 @@ impl Interpreter {
     fn eval_let_stmt(&mut self, pat: &hir::Pat, expr: &hir::Expr, _ty: &hir::Ty) -> EvalResult {
         let value = eval_value!(self.eval_expr(expr));
 
-        if !self.eval_pat(pat, value) {
-            // We'd probably want to do it more like Rust via a if let statement, and have the
-            // normal let statement be only valid for identifiers.
-            self.panic(format!(
-                "Pattern did not match value {:?}",
-                self.state.stringify(value)
-            ));
+        // Handle let bindings specially - use slot-based assignment instead of push_value
+        // This is necessary because let bindings need to go to pre-assigned positions,
+        // unlike function parameters which are assigned sequentially
+        match &pat.kind {
+            hir::PatKind::Identifier(hir_id, _ident) => {
+                // For let bindings with identifier patterns, we need to use slot-based assignment
+                // Try to find the resolution information for this identifier
+                
+                // For now, fall back to the original pattern matching approach
+                // TODO: Implement proper slot-based assignment using hir_id resolution
+                if !self.eval_pat(pat, value) {
+                    self.panic(format!(
+                        "Pattern did not match value {:?}",
+                        self.state.stringify(value)
+                    ));
+                }
+            }
+            _ => {
+                // For non-identifier patterns, use the existing pattern matching
+                if !self.eval_pat(pat, value) {
+                    self.panic(format!(
+                        "Pattern did not match value {:?}",
+                        self.state.stringify(value)
+                    ));
+                }
+            }
         }
 
         EvalResult::Void

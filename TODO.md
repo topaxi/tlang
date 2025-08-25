@@ -13,11 +13,15 @@
 - **Rust test**: `tlang_interpreter tests::test_simple_closure`
 - **Integration test**: `tests/functions/closures/mutation.tlang`
 
-## Root Cause Analysis
+## Root Cause Analysis - COMPLETE
 
-### Found the Root Cause!
+### Variable Assignment Bug in Function Scopes
 
-The issue is NOT with closure memory management, but with **variable assignment of function call results within function scope**.
+The issue is NOT with closure memory management, but with **variable assignment of function call results within function scope** when memory truncation is disabled to preserve closures.
+
+**Root cause**: The memory management system has two incompatible requirements:
+1. **Closure preservation**: Memory cannot be truncated because closures need access to captured variables
+2. **Variable assignment**: The current system assumes memory is truncated and uses sequential assignment
 
 **Reproduction case:**
 ```tlang
@@ -33,59 +37,37 @@ fn test() {
 }
 ```
 
-**Root cause**: When assigning the result of a function call to a variable within a function scope, the function object is being stored instead of the computed return value.
+**Memory layout issue**: 
+- Variables should be stored at `scope.start() + variable_index`
+- But `push_value` stores at end of memory vector
+- When memory isn't truncated, these positions don't align
 
 **Impact**: This affects any code that assigns function call results to variables within functions, which is exactly what quicksort does with `let pivotIndex = random_int(len(list));`.
 
 **Global scope works fine**: The issue only affects assignments within function scope, not global scope.
 
-### Fix needed
+## Solution Plan
 
-The variable assignment mechanism within function scopes needs to be fixed to properly store function call return values instead of function objects.
+The fix requires implementing **slot-based variable assignment** for let bindings using the existing HIR resolution system:
 
-### 1. Simple Closures
+1. **Modify `eval_let_stmt`** to use slot-based assignment instead of `push_value`
+2. **Get slot information** from pattern `HirId` via HIR optimization metadata
+3. **Use `set_local`** with correct variable index instead of appending to memory
+4. **Keep `push_value`** for function parameters where sequential assignment is correct
 
-```rust
-fn make_adder(a: Int) {
-    return fn adder(b: Int) -> Int {
-        a + b
-    };
-}
-let add_5 = make_adder(5);
-add_5(10); // Should return 15
-```
+### Technical Implementation
 
-**Status**: FIXED
+Pattern identifiers have `HirId` that should map to slot information after HIR optimization. Need to:
+- Find how to resolve `HirId` → `Slot` mapping in interpreter
+- Implement targeted fix in `eval_let_stmt` for identifier patterns
+- Use existing `scope_stack.set_local(index, value)` mechanism
 
-### 2. Global Variable Mutation
+### Alternative Approach
 
-```rust
-let counter = 0;
-let increment = fn () {
-    counter = counter + 1;
-};
-increment(); // Should return 1
-```
-
-**Status**: FIXED
-
-### 3. Local Variable Mutation
-
-```rust
-fn counter_builder(init: usize) {
-   let count = init;
-   return fn () -> usize {
-       count = count + 1;
-       count
-   };
-}
-
-let counter = counter_builder(0);
-counter() |> log(); // Should log 1
-counter() |> log(); // Should log 2
-```
-
-**Status**: FIXED
+If slot resolution proves complex, implement **selective memory preservation**:
+- Re-enable truncation by default
+- Mark closure memory regions as "preserved" 
+- Only truncate non-preserved regions
 
 ## Technical Details
 
