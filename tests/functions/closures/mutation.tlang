@@ -1,0 +1,50 @@
+// Test that demonstrates closure memory mutation issues
+// This test should show that closures should be able to mutate captured variables
+
+let counter = 0;
+log(counter); // Should print 0
+
+let increment = fn () {
+   counter = counter + 1;
+};
+
+increment();
+log(counter); // Should print 1, but currently might print 0 due to memory cloning
+
+let add_value = fn (value) {
+   counter = counter + value;
+};
+
+add_value(5);
+log(counter); // Should print 6
+
+// Test with multiple captures
+let x = 10;
+let y = 20;
+
+let modify_both = fn () {
+   x = x * 2;
+   y = y + 10;
+};
+
+log(x); // Should print 10
+log(y); // Should print 20
+
+modify_both();
+
+log(x); // Should print 20
+log(y); // Should print 30
+
+fn counter_builder(init: usize) {
+   let count = init;
+
+   return fn () -> usize {
+      count = count + 1;
+      count
+   };
+}
+
+let my_counter = counter_builder(5);
+
+log(my_counter()); // Should print 6
+log(my_counter()); // Should print 7

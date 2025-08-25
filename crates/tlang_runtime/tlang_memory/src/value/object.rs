@@ -2,7 +2,6 @@ use std::ops::{Index, IndexMut};
 
 use tlang_span::HirId;
 
-use crate::scope::ScopeStack;
 use crate::shape::{ShapeKey, Shaped};
 
 use super::TlangValue;
@@ -11,7 +10,7 @@ use super::TlangValue;
 pub struct TlangClosure {
     pub id: HirId,
     // Closures hold a reference to the scope stack at the time of creation.
-    pub scope_stack: ScopeStack,
+    pub scope_stack: Vec<crate::scope::Scope>,
 }
 
 #[derive(Debug, PartialEq)]

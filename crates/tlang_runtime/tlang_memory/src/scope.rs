@@ -1,24 +1,30 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use log::debug;
 use tlang_hir::hir::{self, HirScope, ScopeIndex};
 
 use crate::resolver::Resolver;
 use crate::value::TlangValue;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ScopeStack {
-    scopes: Vec<Rc<RefCell<Scope>>>,
+    pub scopes: Vec<Scope>,
+    // Global scope memory - can grow independently without affecting other scopes
+    global_memory: Vec<TlangValue>,
+    // Central continuous memory for local scopes only (non-global)
+    memory: Vec<TlangValue>,
 }
 
 impl ScopeStack {
     pub fn new() -> Self {
         let mut scopes = Vec::with_capacity(10);
 
-        scopes.push(Rc::new(RefCell::new(Scope::default())));
+        let root_scope = Scope::default(); // Root scope starts at 0 by default
+        scopes.push(root_scope);
 
-        Self { scopes }
+        Self {
+            scopes,
+            global_memory: Vec::with_capacity(100), // Separate global memory
+            memory: Vec::with_capacity(1000), // Start with reasonable capacity for local scopes
+        }
     }
 
     pub fn push<T>(&mut self, meta: &T)
@@ -31,62 +37,157 @@ impl ScopeStack {
             meta.upvars()
         );
 
-        self.scopes.push(Rc::new(RefCell::new(Scope::new(
-            meta.locals(),
-            meta.upvars(),
-        ))));
+        let locals_count = meta.locals();
+        let mut new_scope = Scope::new(locals_count);
+
+        // Local scopes (non-global) start at the current end of memory vector
+        // Global scope (index 0) uses separate global_memory
+        if !self.scopes.is_empty() {
+            // Set the start position for the new local scope
+            new_scope.set_start(self.memory.len());
+
+            // Reserve capacity for the exact number of locals (avoid reallocations)
+            self.memory.reserve(locals_count);
+        }
+        // Global scope doesn't need start position setup as it uses global_memory directly
+
+        self.scopes.push(new_scope);
     }
 
     pub fn pop(&mut self) {
-        self.scopes.pop();
+        if let Some(_scope) = self.scopes.pop() {
+            // For local scopes, we don't physically truncate memory (to preserve closures)
+            // but we do need to ensure that the next scope starts at the correct position
+            if !self.scopes.is_empty() {
+                // Instead of truncating, we'll let the next scope start at the correct logical position
+                // The key insight is that we need to maintain correct scope boundaries
+                // even when memory is preserved for closures
+
+                // Note: We don't call self.memory.truncate(scope.start()) here to preserve closure memory
+                // The downside is that this can lead to memory leaks, but it's necessary for closures
+            }
+            // Global scope uses separate global_memory, no truncation needed for memory vector
+        }
 
         debug!("Popping scope");
     }
 
     /// # Panics
-    pub fn current_scope(&self) -> Rc<RefCell<Scope>> {
-        self.scopes
-            .last()
-            .cloned()
-            .expect("No current scope available")
+    pub fn current_scope(&self) -> &Scope {
+        self.scopes.last().expect("No current scope available")
+    }
+
+    /// # Panics  
+    pub fn current_scope_mut(&mut self) -> &mut Scope {
+        self.scopes.last_mut().expect("No current scope available")
     }
 
     /// # Panics
-    pub fn root_scope(&self) -> Rc<RefCell<Scope>> {
-        self.scopes
-            .first()
-            .cloned()
-            .expect("No root scope available")
+    pub fn root_scope(&self) -> &Scope {
+        self.scopes.first().expect("No root scope available")
     }
 
-    pub fn as_root(&self) -> Self {
-        let mut scopes = Vec::with_capacity(10);
-        scopes.push(self.root_scope());
-        Self { scopes }
+    pub fn clear_current_scope(&mut self) {
+        let scope_index = self.scopes.len() - 1;
+
+        if scope_index == 0 {
+            // Global scope: clear the global_memory vector
+            self.global_memory.clear();
+        } else {
+            // Local scopes: truncate memory back to this scope's start
+            let start = self.current_scope().start();
+            self.memory.truncate(start);
+        }
     }
 
-    pub fn clear_current_scope(&self) {
-        self.current_scope().borrow_mut().clear();
+    /// # Panics
+    ///
+    /// Panics if the scope has reached its pre-allocated capacity and is not the root scope.
+    pub fn push_value(&mut self, value: TlangValue) {
+        let scope_index = self.scopes.len() - 1;
+
+        // Handle global scope (index 0) separately
+        if scope_index == 0 {
+            // Global scope uses global_memory and can grow freely
+            self.global_memory.push(value);
+        } else {
+            // Local scopes: simply push to the memory vector
+            // The vector boundaries are managed by scope start positions
+            self.memory.push(value);
+        }
     }
 
     fn get_local(&self, index: usize) -> Option<TlangValue> {
-        self.current_scope().borrow().get(index)
+        let scope_index = self.scopes.len() - 1;
+
+        if scope_index == 0 {
+            // Global scope uses global_memory
+            self.global_memory.get(index).copied()
+        } else {
+            // Local scopes use memory vector with start position
+            let current_scope = self.current_scope();
+            let start = current_scope.start();
+            let absolute_index = start + index;
+            self.memory.get(absolute_index).copied()
+        }
     }
 
-    fn set_local(&self, index: usize, value: TlangValue) {
-        self.current_scope().borrow_mut().set(index, value);
+    pub fn set_local(&mut self, index: usize, value: TlangValue) {
+        let scope_index = self.scopes.len() - 1;
+
+        if scope_index == 0 {
+            // Global scope uses global_memory
+            // Extend global memory if needed
+            if index >= self.global_memory.len() {
+                self.global_memory.resize(index + 1, TlangValue::Nil);
+            }
+            self.global_memory[index] = value;
+        } else {
+            // Local scopes use memory vector with start position
+            let current_scope = self.current_scope();
+            let start = current_scope.start();
+            let absolute_index = start + index;
+
+            // Extend memory vector if needed to accommodate this slot
+            if absolute_index >= self.memory.len() {
+                self.memory.resize(absolute_index + 1, TlangValue::Nil);
+            }
+            self.memory[absolute_index] = value;
+        }
     }
 
     fn get_upvar(&self, relative_scope_index: u16, index: usize) -> Option<TlangValue> {
         let scope_index = self.scope_index(relative_scope_index);
 
-        self.scopes[scope_index].borrow().get(index)
+        if scope_index == 0 {
+            // Global scope uses global_memory
+            self.global_memory.get(index).copied()
+        } else {
+            // Local scopes use memory vector with start position
+            let scope = &self.scopes[scope_index];
+            let start = scope.start();
+            let absolute_index = start + index;
+            self.memory.get(absolute_index).copied()
+        }
     }
 
-    fn set_upvar(&self, relative_scope_index: u16, index: usize, value: TlangValue) {
+    fn set_upvar(&mut self, relative_scope_index: u16, index: usize, value: TlangValue) {
         let scope_index = self.scope_index(relative_scope_index);
 
-        self.scopes[scope_index].borrow_mut().set(index, value);
+        if scope_index == 0 {
+            // Global scope uses global_memory
+            if index < self.global_memory.len() {
+                self.global_memory[index] = value;
+            }
+        } else {
+            // Local scopes use memory vector with start position
+            let scope = &self.scopes[scope_index];
+            let start = scope.start();
+            let absolute_index = start + index;
+            if absolute_index < self.memory.len() {
+                self.memory[absolute_index] = value;
+            }
+        }
     }
 
     fn scope_index(&self, relative_scope_index: ScopeIndex) -> usize {
@@ -104,7 +205,7 @@ impl ScopeStack {
     }
 
     /// # Panics
-    pub fn update_value(&self, res: &hir::Res, value: TlangValue) {
+    pub fn update_value(&mut self, res: &hir::Res, value: TlangValue) {
         match res.slot() {
             hir::Slot::Local(index) => self.set_local(index, value),
             hir::Slot::Upvar(index, relative_scope_index) => {
@@ -114,8 +215,53 @@ impl ScopeStack {
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = Rc<RefCell<Scope>>> {
-        self.scopes.iter().cloned()
+    pub fn iter(&self) -> impl Iterator<Item = &Scope> {
+        self.scopes.iter()
+    }
+
+    /// Get the next variable index for let bindings in the current scope and increment it
+    pub fn allocate_let_binding_index(&mut self) -> usize {
+        let current_scope = self.scopes.last_mut().expect("No current scope");
+        current_scope.increment_var_index()
+    }
+
+    /// Initialize the variable index counter for function parameters
+    /// This should be called after function parameters are pushed to memory
+    pub fn init_var_index_after_params(&mut self, param_count: usize) {
+        let current_scope = self.scopes.last_mut().expect("No current scope");
+        current_scope.next_var_index = param_count;
+    }
+
+    pub fn get_scope_locals(&self, scope: &Scope) -> &[TlangValue] {
+        // Check if this is the global scope (first scope with start 0)
+        if scope.start() == 0 && !self.scopes.is_empty() && std::ptr::eq(scope, &self.scopes[0]) {
+            // Global scope uses global_memory - return entire vector
+            &self.global_memory[..]
+        } else {
+            // Local scopes: find the range for this scope
+            let start = scope.start();
+
+            // Find the end position by looking for the next scope's start or using vector length
+            let end = {
+                // Find this scope's index
+                let scope_index = self.scopes.iter().position(|s| std::ptr::eq(s, scope));
+
+                if let Some(idx) = scope_index {
+                    if idx == self.scopes.len() - 1 {
+                        // This is the current (last) scope - end is vector length
+                        self.memory.len()
+                    } else {
+                        // Not the last scope - end is next scope's start
+                        self.scopes[idx + 1].start()
+                    }
+                } else {
+                    // Fallback: assume this scope goes to the end
+                    self.memory.len()
+                }
+            };
+
+            &self.memory[start..end]
+        }
     }
 }
 
@@ -131,36 +277,39 @@ impl Resolver for ScopeStack {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Scope {
-    // Value bindings in user code, this includes references to user defined functions.
-    locals: Vec<TlangValue>,
+    // Starting position of this scope in the memory vector
+    start: usize,
+    // Track the next variable index for let bindings in this scope
+    // Function parameters are assigned sequentially starting from 0,
+    // then let bindings continue from there
+    next_var_index: usize,
 }
 
 impl Scope {
-    pub fn new(locals: usize, _upvars: usize) -> Self {
+    pub fn new(_locals: usize) -> Self {
         Self {
-            locals: Vec::with_capacity(locals),
+            start: 0, // Will be set when the scope is actually created
+            next_var_index: 0,
         }
     }
 
-    pub fn push_value(&mut self, value: TlangValue) {
-        self.locals.push(value);
+    pub fn set_start(&mut self, start: usize) {
+        self.start = start;
     }
 
-    pub fn get(&self, index: usize) -> Option<TlangValue> {
-        self.locals.get(index).copied()
+    pub fn start(&self) -> usize {
+        self.start
     }
 
-    pub fn set(&mut self, index: usize, value: TlangValue) {
-        self.locals[index] = value;
+    pub fn next_var_index(&self) -> usize {
+        self.next_var_index
     }
 
-    pub fn get_locals(&self) -> &[TlangValue] {
-        &self.locals
-    }
-
-    pub(crate) fn clear(&mut self) {
-        self.locals.clear();
+    pub fn increment_var_index(&mut self) -> usize {
+        let index = self.next_var_index;
+        self.next_var_index += 1;
+        index
     }
 }
