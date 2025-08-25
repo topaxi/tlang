@@ -36,3 +36,15 @@ fn test_fn_call_expression_with_dictionary_argument() {
     // Creation of the struct/dictionary could/should be infered from the function signature.
     assert_parser_snapshot!("bar(x: 1, y: 2)");
 }
+
+#[test]
+fn test_identifier_followed_by_empty_block() {
+    // This should demonstrate the current ambiguity issue
+    assert_parser_snapshot!(r"foo {};");
+}
+
+#[test]
+fn test_if_identifier_block() {
+    // This should parse as if condition followed by block
+    assert_parser_snapshot!(r"if foo {}");
+}
