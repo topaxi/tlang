@@ -4,7 +4,7 @@ use tlang_hir::hir::{self, HirScope, ScopeIndex};
 use crate::resolver::Resolver;
 use crate::value::TlangValue;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ScopeStack {
     pub scopes: Vec<Scope>,
     // Global scope memory - can grow independently without affecting other scopes
@@ -58,7 +58,7 @@ impl ScopeStack {
         if let Some(scope) = self.scopes.pop() {
             // For local scopes, truncate the memory vector back to this scope's start
             if !self.scopes.is_empty() {
-                self.memory.truncate(scope.start());
+                //self.memory.truncate(scope.start());
             }
             // Global scope uses separate global_memory, no truncation needed for memory vector
         }
@@ -83,7 +83,7 @@ impl ScopeStack {
 
     pub fn clear_current_scope(&mut self) {
         let scope_index = self.scopes.len() - 1;
-        
+
         if scope_index == 0 {
             // Global scope: clear the global_memory vector
             self.global_memory.clear();
@@ -216,12 +216,12 @@ impl ScopeStack {
         } else {
             // Local scopes: find the range for this scope
             let start = scope.start();
-            
+
             // Find the end position by looking for the next scope's start or using vector length
             let end = {
                 // Find this scope's index
                 let scope_index = self.scopes.iter().position(|s| std::ptr::eq(s, scope));
-                
+
                 if let Some(idx) = scope_index {
                     if idx == self.scopes.len() - 1 {
                         // This is the current (last) scope - end is vector length
@@ -235,7 +235,7 @@ impl ScopeStack {
                     self.memory.len()
                 }
             };
-            
+
             &self.memory[start..end]
         }
     }

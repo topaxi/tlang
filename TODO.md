@@ -4,7 +4,11 @@
 
 - **JavaScript tests**: Unrelated and can be ignored, we are only testing the interpreter
 
-### ❌ Remaining Issues
+### Remaining Issues
+
+- **Integration test**: `tests/functions/quicksort/quicksort.tlang`
+
+### Fixed Issues
 
 - **Rust test**: `tlang_interpreter tests::test_simple_closure`
 - **Integration test**: `tests/functions/closures/mutation.tlang`
@@ -23,7 +27,7 @@ let add_5 = make_adder(5);
 add_5(10); // Should return 15
 ```
 
-**Status**: TO BE TESTED
+**Status**: FIXED
 
 ### 2. Global Variable Mutation
 
@@ -35,7 +39,7 @@ let increment = fn () {
 increment(); // Should return 1
 ```
 
-**Status**: TO BE TESTED
+**Status**: FIXED
 
 ### 3. Local Variable Mutation
 
@@ -53,9 +57,28 @@ counter() |> log(); // Should log 1
 counter() |> log(); // Should log 2
 ```
 
-**Status**: TO BE TESTED
+**Status**: FIXED
 
 ## Technical Details
+
+### Current Memory "Layout"
+
+```rust
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Scope {
+    // Starting position of this scope in the memory vector
+    start: usize,
+}
+
+#[derive(Debug)]
+pub struct ScopeStack {
+    pub scopes: Vec<Scope>,
+    // Global scope memory - can grow independently without affecting other scopes
+    global_memory: Vec<TlangValue>,
+    // Central continuous memory for local scopes only (non-global)
+    memory: Vec<TlangValue>,
+}
+```
 
 ### Current Closure Structure
 
@@ -63,17 +86,9 @@ counter() |> log(); // Should log 2
 pub struct TlangClosure {
     pub id: HirId,
     // Scope metadata, stores start vector of each scope which existed during
-    // creation of closure.
+    // creation of closure. When calling a closure, the scope stack is restored
+    // and should point to the existing memory locations, given that scopes and
+    // memory is not cleaned up.
     pub scope_stack: Vec<Scope>,
 }
 ```
-
-### The Fundamental Problem
-
-- **Global variables**: Stored in `ScopeStack.global_memory`
-- **Local variables**: Stored in `ScopeStack.memory`
-- **Mutation requirement**: Local variables need shared mutable access like globals
-
-## Proposed Solutions
-
-TODO: Evaluate possible solutions
