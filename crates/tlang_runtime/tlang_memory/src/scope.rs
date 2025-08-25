@@ -35,10 +35,15 @@ impl ScopeStack {
             meta.upvars()
         );
 
-        let mut new_scope = Scope::new(meta.locals(), meta.upvars());
+        let locals_count = meta.locals();
+        let mut new_scope = Scope::new(locals_count);
 
         // Set the offset for the new scope to the end of current memory
         new_scope.set_offset(self.memory.len());
+
+        // Pre-allocate memory for the exact number of locals
+        self.memory
+            .resize(self.memory.len() + locals_count, TlangValue::Nil);
 
         self.scopes.push(new_scope);
     }
@@ -78,21 +83,39 @@ impl ScopeStack {
     }
 
     pub fn clear_current_scope(&mut self) {
-        let offset = self.current_scope().offset();
-
-        // Truncate memory to remove values from current scope
-        self.memory.truncate(offset);
-
-        // Clear the scope
-        self.current_scope_mut().clear();
+        // Reset the used counter in the current scope to 0
+        // This effectively clears the scope without deallocating memory
+        self.current_scope_mut().clear_used();
     }
 
+    /// # Panics
+    ///
+    /// Panics if the scope has reached its pre-allocated capacity.
     pub fn push_value(&mut self, value: TlangValue) {
-        // Add value to central memory
-        self.memory.push(value);
+        let (offset, used, length) = {
+            let current_scope = self.current_scope();
+            (
+                current_scope.offset(),
+                current_scope.used(),
+                current_scope.length(),
+            )
+        };
 
-        // Update scope length
-        self.current_scope_mut().increment_length();
+        let absolute_index = offset + used;
+
+        // Ensure we don't exceed pre-allocated memory for this scope
+        if used >= length {
+            panic!(
+                "Scope overflow: trying to push value to slot {} but scope only has {} pre-allocated slots",
+                used, length
+            );
+        }
+
+        // Assign value to the next available slot
+        self.memory[absolute_index] = value;
+
+        // Increment the used counter
+        self.current_scope_mut().increment_used();
     }
 
     fn get_local(&self, index: usize) -> Option<TlangValue> {
@@ -164,9 +187,9 @@ impl ScopeStack {
 
     pub fn get_scope_locals(&self, scope: &Scope) -> &[TlangValue] {
         let offset = scope.offset();
-        let length = scope.length();
+        let used = scope.used();
 
-        &self.memory[offset..offset + length]
+        &self.memory[offset..offset + used]
     }
 }
 
@@ -186,15 +209,18 @@ impl Resolver for ScopeStack {
 pub struct Scope {
     // Offset into the central memory vector where this scope's locals start
     offset: usize,
-    // Number of local values in this scope
+    // Total number of local slots pre-allocated for this scope
     length: usize,
+    // Current number of slots that have been assigned values
+    used: usize,
 }
 
 impl Scope {
-    pub fn new(_locals: usize, _upvars: usize) -> Self {
+    pub fn new(locals: usize) -> Self {
         Self {
-            offset: 0, // Will be set when the scope is actually created
-            length: 0, // Starts empty, grows as values are pushed
+            offset: 0,      // Will be set when the scope is actually created
+            length: locals, // Pre-allocated with exact locals count
+            used: 0,        // No slots have been used yet
         }
     }
 
@@ -210,11 +236,24 @@ impl Scope {
         self.length
     }
 
+    pub fn used(&self) -> usize {
+        self.used
+    }
+
+    pub fn increment_used(&mut self) {
+        self.used += 1;
+    }
+
     pub fn increment_length(&mut self) {
         self.length += 1;
     }
 
     pub fn clear(&mut self) {
         self.length = 0;
+        self.used = 0;
+    }
+
+    pub fn clear_used(&mut self) {
+        self.used = 0;
     }
 }

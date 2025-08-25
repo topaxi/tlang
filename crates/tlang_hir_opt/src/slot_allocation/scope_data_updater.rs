@@ -40,6 +40,16 @@ impl<'hir> Visitor<'hir> for ScopeDataUpdater {
                 module.hir_id, locals_count
             );
             module.set_locals(locals_count);
+        } else {
+            // Fallback: use current scope if module HIR ID doesn't have symbol table
+            if let Some(symbol_table) = ctx.symbols.get(&ctx.current_scope) {
+                let locals_count = symbol_table.borrow().locals();
+                debug!(
+                    "Using current scope {:?} for module {:?}, locals count: {}",
+                    ctx.current_scope, module.hir_id, locals_count
+                );
+                module.set_locals(locals_count);
+            }
         }
     }
 
