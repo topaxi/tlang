@@ -2,11 +2,11 @@
 
 ## Current Status
 
-- **JavaScript tests**: Unrelated and can be ignored, we are only testing the interpreter
-
 ### Remaining Issues
 
-- **None**: All core issues have been resolved ✅
+- **Variable resolution in nested scopes**: `tests/functions/binary_search/tail_rec.tlang` failing with "Could not resolve path 'mid'" 
+  - Root cause: Local(4) slot lookup failing in nested scope after HIR assigned it to function scope
+  - Multiple tests in interpreter backend failing due to this scoping issue
 
 ### Fixed Issues
 
@@ -17,6 +17,45 @@
 - **Memory allocation bug**: Fixed memory slot allocation to enable proper variable assignment ✅
 
 ## Root Cause Analysis - COMPLETE
+
+### Variable Scope Resolution Bug - IN PROGRESS 🔧
+
+**New issue discovered**: Variables declared with `let` in function scope can't be accessed from nested block scopes (if/else, loops).
+
+**Reproduction case**:
+```tlang
+fn binary_search(list, target, low, high) {
+    let mid = math::floor((low + high) / 2);  // Stored in function scope as Local(4)
+    let midValue = list[mid];                 
+    
+    if midValue == target; {                  // Creates new nested scope
+        mid                                   // FAILS: Local(4) lookup in nested scope
+    }
+    ...
+}
+```
+
+**Error**: `Could not resolve path "mid" (Res { slot: Local(4) })`
+
+**Analysis**: 
+1. HIR optimizer assigns `mid` to Local(4) in function scope  
+2. `let mid = ...` stores value correctly in function scope at slot 4
+3. `if` block creates new nested scope using `with_new_scope()`
+4. `mid` access tries Local(4) lookup in current (nested) scope instead of function scope
+5. Nested scope only has 4 values (indices 0-3), so slot 4 doesn't exist
+
+**Scope stack at error**:
+```
+0: Global scope (functions)
+1: Function scope (function + 6 parameters + `mid` variable)  <- Variable stored here
+2: Nested scope (if block with 4 values)                     <- Variable accessed from here, fails
+```
+
+**Core issue**: The variable resolution system doesn't properly distinguish between:
+- Local variables (should be accessible from nested scopes in same function)  
+- Block-scoped variables (should only be accessible within their block)
+
+**Solution needed**: Fix scope resolution to check parent scopes for Local slot lookups, or modify how nested blocks handle variable access.
 
 ### Variable Assignment Bug in Function Scopes - FIXED ✅
 

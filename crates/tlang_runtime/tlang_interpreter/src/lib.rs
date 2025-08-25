@@ -1357,32 +1357,11 @@ impl Interpreter {
     fn eval_let_stmt(&mut self, pat: &hir::Pat, expr: &hir::Expr, _ty: &hir::Ty) -> EvalResult {
         let value = eval_value!(self.eval_expr(expr));
 
-        // Handle let bindings differently based on scope type
-        match &pat.kind {
-            hir::PatKind::Identifier(_hir_id, _ident) => {
-                if self.state.is_global_scope() {
-                    // For global scope, use the original pattern matching with push_value
-                    if !self.eval_pat(pat, value) {
-                        self.panic(format!(
-                            "Pattern did not match value {:?}",
-                            self.state.stringify(value)
-                        ));
-                    }
-                } else {
-                    // For function scopes, use slot-based assignment
-                    // This ensures the value goes to the correct pre-assigned variable position
-                    let _index = self.state.set_let_binding(value);
-                }
-            }
-            _ => {
-                // For non-identifier patterns, use the existing pattern matching
-                if !self.eval_pat(pat, value) {
-                    self.panic(format!(
-                        "Pattern did not match value {:?}",
-                        self.state.stringify(value)
-                    ));
-                }
-            }
+        if !self.eval_pat(pat, value) {
+            self.panic(format!(
+                "Pattern did not match value {:?}",
+                self.state.stringify(value)
+            ));
         }
 
         EvalResult::Void
