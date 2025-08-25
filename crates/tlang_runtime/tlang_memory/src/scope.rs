@@ -17,8 +17,7 @@ impl ScopeStack {
     pub fn new() -> Self {
         let mut scopes = Vec::with_capacity(10);
 
-        let mut root_scope = Scope::default();
-        root_scope.set_offset(0);
+        let root_scope = Scope::default(); // Root scope starts at 0 by default
         scopes.push(root_scope);
 
         Self {
@@ -41,26 +40,27 @@ impl ScopeStack {
         let locals_count = meta.locals();
         let mut new_scope = Scope::new(locals_count);
 
-        // Local scopes (non-global) get offset in the local memory vector
+        // Local scopes (non-global) start at the current end of memory vector
         // Global scope (index 0) uses separate global_memory
         if !self.scopes.is_empty() {
-            // Set the offset for the new local scope to the end of current local memory
-            new_scope.set_offset(self.memory.len());
+            // Set the start position for the new local scope
+            new_scope.set_start(self.memory.len());
 
-            // Pre-allocate memory for the exact number of locals in local memory
-            self.memory
-                .resize(self.memory.len() + locals_count, TlangValue::Nil);
+            // Reserve capacity for the exact number of locals (avoid reallocations)
+            self.memory.reserve(locals_count);
         }
-        // Global scope doesn't need offset setup as it uses global_memory directly
+        // Global scope doesn't need start position setup as it uses global_memory directly
 
         self.scopes.push(new_scope);
     }
 
     pub fn pop(&mut self) {
         if let Some(scope) = self.scopes.pop() {
-            // Truncate memory to remove the values from the popped scope
-            let new_len = scope.offset();
-            self.memory.truncate(new_len);
+            // For local scopes, truncate the memory vector back to this scope's start
+            if !self.scopes.is_empty() {
+                self.memory.truncate(scope.start());
+            }
+            // Global scope uses separate global_memory, no truncation needed for memory vector
         }
 
         debug!("Popping scope");
@@ -82,9 +82,16 @@ impl ScopeStack {
     }
 
     pub fn clear_current_scope(&mut self) {
-        // Reset the used counter in the current scope to 0
-        // This effectively clears the scope without deallocating memory
-        self.current_scope_mut().clear_used();
+        let scope_index = self.scopes.len() - 1;
+        
+        if scope_index == 0 {
+            // Global scope: clear the global_memory vector
+            self.global_memory.clear();
+        } else {
+            // Local scopes: truncate memory back to this scope's start
+            let start = self.current_scope().start();
+            self.memory.truncate(start);
+        }
     }
 
     /// # Panics
@@ -92,47 +99,16 @@ impl ScopeStack {
     /// Panics if the scope has reached its pre-allocated capacity and is not the root scope.
     pub fn push_value(&mut self, value: TlangValue) {
         let scope_index = self.scopes.len() - 1;
-        let (offset, used, length) = {
-            let current_scope = self.current_scope();
-            (
-                current_scope.offset(),
-                current_scope.used(),
-                current_scope.length(),
-            )
-        };
 
         // Handle global scope (index 0) separately
         if scope_index == 0 {
             // Global scope uses global_memory and can grow freely
-            if used >= self.global_memory.len() {
-                self.global_memory.push(value);
-            } else {
-                self.global_memory[used] = value;
-            }
+            self.global_memory.push(value);
         } else {
-            // Local scopes use the continuous memory vector
-            let absolute_index = offset + used;
-
-            if used >= length {
-                // Non-root scopes should not exceed their pre-allocated capacity
-                log::warn!(
-                    "Local scope exceeded pre-allocated capacity: used={}, allocated={}. \
-                     This indicates HIR scope analysis failed to track all local variables correctly. \
-                     This is a memory safety violation - scope boundaries are corrupted.",
-                    used,
-                    length
-                );
-                // For now, allow growth but this is unsafe
-                self.memory.push(value);
-                self.current_scope_mut().increment_length();
-            } else {
-                // Assign value to the next available slot
-                self.memory[absolute_index] = value;
-            }
+            // Local scopes: simply push to the memory vector
+            // The vector boundaries are managed by scope start positions
+            self.memory.push(value);
         }
-
-        // Increment the used counter
-        self.current_scope_mut().increment_used();
     }
 
     fn get_local(&self, index: usize) -> Option<TlangValue> {
@@ -142,10 +118,10 @@ impl ScopeStack {
             // Global scope uses global_memory
             self.global_memory.get(index).copied()
         } else {
-            // Local scopes use memory vector with offset
+            // Local scopes use memory vector with start position
             let current_scope = self.current_scope();
-            let offset = current_scope.offset();
-            let absolute_index = offset + index;
+            let start = current_scope.start();
+            let absolute_index = start + index;
             self.memory.get(absolute_index).copied()
         }
     }
@@ -159,10 +135,10 @@ impl ScopeStack {
                 self.global_memory[index] = value;
             }
         } else {
-            // Local scopes use memory vector with offset
+            // Local scopes use memory vector with start position
             let current_scope = self.current_scope();
-            let offset = current_scope.offset();
-            let absolute_index = offset + index;
+            let start = current_scope.start();
+            let absolute_index = start + index;
             if absolute_index < self.memory.len() {
                 self.memory[absolute_index] = value;
             }
@@ -176,10 +152,10 @@ impl ScopeStack {
             // Global scope uses global_memory
             self.global_memory.get(index).copied()
         } else {
-            // Local scopes use memory vector with offset
+            // Local scopes use memory vector with start position
             let scope = &self.scopes[scope_index];
-            let offset = scope.offset();
-            let absolute_index = offset + index;
+            let start = scope.start();
+            let absolute_index = start + index;
             self.memory.get(absolute_index).copied()
         }
     }
@@ -193,10 +169,10 @@ impl ScopeStack {
                 self.global_memory[index] = value;
             }
         } else {
-            // Local scopes use memory vector with offset
+            // Local scopes use memory vector with start position
             let scope = &self.scopes[scope_index];
-            let offset = scope.offset();
-            let absolute_index = offset + index;
+            let start = scope.start();
+            let absolute_index = start + index;
             if absolute_index < self.memory.len() {
                 self.memory[absolute_index] = value;
             }
@@ -233,16 +209,34 @@ impl ScopeStack {
     }
 
     pub fn get_scope_locals(&self, scope: &Scope) -> &[TlangValue] {
-        // Check if this is the global scope (first scope with offset 0)
-        if scope.offset() == 0 && !self.scopes.is_empty() && std::ptr::eq(scope, &self.scopes[0]) {
-            // Global scope uses global_memory
-            let used = scope.used();
-            &self.global_memory[0..used.min(self.global_memory.len())]
+        // Check if this is the global scope (first scope with start 0)
+        if scope.start() == 0 && !self.scopes.is_empty() && std::ptr::eq(scope, &self.scopes[0]) {
+            // Global scope uses global_memory - return entire vector
+            &self.global_memory[..]
         } else {
-            // Local scopes use memory vector with offset
-            let offset = scope.offset();
-            let used = scope.used();
-            &self.memory[offset..offset + used]
+            // Local scopes: find the range for this scope
+            let start = scope.start();
+            
+            // Find the end position by looking for the next scope's start or using vector length
+            let end = {
+                // Find this scope's index
+                let scope_index = self.scopes.iter().position(|s| std::ptr::eq(s, scope));
+                
+                if let Some(idx) = scope_index {
+                    if idx == self.scopes.len() - 1 {
+                        // This is the current (last) scope - end is vector length
+                        self.memory.len()
+                    } else {
+                        // Not the last scope - end is next scope's start
+                        self.scopes[idx + 1].start()
+                    }
+                } else {
+                    // Fallback: assume this scope goes to the end
+                    self.memory.len()
+                }
+            };
+            
+            &self.memory[start..end]
         }
     }
 }
@@ -261,53 +255,22 @@ impl Resolver for ScopeStack {
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Scope {
-    // Offset into the central memory vector where this scope's locals start
-    offset: usize,
-    // Total number of local slots pre-allocated for this scope
-    length: usize,
-    // Current number of slots that have been assigned values
-    used: usize,
+    // Starting position of this scope in the memory vector
+    start: usize,
 }
 
 impl Scope {
-    pub fn new(locals: usize) -> Self {
+    pub fn new(_locals: usize) -> Self {
         Self {
-            offset: 0,      // Will be set when the scope is actually created
-            length: locals, // Pre-allocated with exact locals count
-            used: 0,        // No slots have been used yet
+            start: 0, // Will be set when the scope is actually created
         }
     }
 
-    pub fn set_offset(&mut self, offset: usize) {
-        self.offset = offset;
+    pub fn set_start(&mut self, start: usize) {
+        self.start = start;
     }
 
-    pub fn offset(&self) -> usize {
-        self.offset
-    }
-
-    pub fn length(&self) -> usize {
-        self.length
-    }
-
-    pub fn used(&self) -> usize {
-        self.used
-    }
-
-    pub fn increment_used(&mut self) {
-        self.used += 1;
-    }
-
-    pub fn increment_length(&mut self) {
-        self.length += 1;
-    }
-
-    pub fn clear(&mut self) {
-        self.length = 0;
-        self.used = 0;
-    }
-
-    pub fn clear_used(&mut self) {
-        self.used = 0;
+    pub fn start(&self) -> usize {
+        self.start
     }
 }
