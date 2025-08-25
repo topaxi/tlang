@@ -13,6 +13,9 @@ Always reference these instructions first and fallback to search or bash command
    ```bash
    # Rust nightly is required (set by rust-toolchain.toml)
    rustup target add wasm32-unknown-unknown
+   
+   # Install required Rust components for testing and formatting
+   rustup component add clippy rustfmt
    cargo install cargo-nextest        # ~3m 10s installation time
    cargo install wasm-pack           # ~1m 30s installation time
    
@@ -103,8 +106,8 @@ ALWAYS manually validate any code changes through complete end-to-end scenarios:
 
 0. **Run linting and formatting before any commits:**
    ```bash
-   # First install required Rust components if not already installed
-   rustup component add clippy rustfmt
+   # Ensure required Rust components are installed (should be done in bootstrap step 1)
+   # rustup component add clippy rustfmt
    
    # Run Rust linting and formatting before any commits
    cargo clippy --fix --allow-dirty --lib --all-features    # Fix Rust linting issues automatically
@@ -146,8 +149,8 @@ ALWAYS manually validate any code changes through complete end-to-end scenarios:
 ### Required Linting and Validation
 ALWAYS run these before completing changes or CI will fail:
 ```bash
-# First install required Rust components if not already installed
-rustup component add clippy rustfmt
+# Ensure required Rust components are installed (should be done in bootstrap step 1)
+# rustup component add clippy rustfmt
 
 # Run Rust linting and formatting before any commits
 cargo clippy --fix --allow-dirty --lib --all-features    # Fix Rust linting issues automatically
