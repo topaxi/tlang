@@ -6,13 +6,11 @@ use crate::shape::{ShapeKey, Shaped};
 
 use super::TlangValue;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TlangClosure {
     pub id: HirId,
     // Closures hold a reference to the scope stack at the time of creation.
     pub scope_stack: Vec<crate::scope::Scope>,
-    // Captured variable values to ensure they're preserved
-    pub captured_memory: Vec<TlangValue>,
 }
 
 #[derive(Debug, PartialEq)]
