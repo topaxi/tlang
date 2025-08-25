@@ -103,11 +103,25 @@ impl ScopeStack {
 
         let absolute_index = offset + used;
 
-        // Allow dynamic growth for all scopes for now until HIR scope data is fully working
+        // Only allow dynamic growth in the root scope
         if used >= length {
-            // Dynamically grow the scope
-            self.memory.push(value);
-            self.current_scope_mut().increment_length();
+            if self.scopes.len() == 1 {
+                // Root scope can grow dynamically
+                self.memory.push(value);
+                self.current_scope_mut().increment_length();
+            } else {
+                // Non-root scopes should not exceed their pre-allocated capacity
+                // For now, emit a warning and allow growth until HIR optimization is fully reliable
+                log::warn!(
+                    "Scope exceeded pre-allocated capacity: used={}, allocated={}. \
+                     This indicates HIR scope analysis failed to track all local variables correctly. \
+                     Allowing dynamic growth for now.",
+                    used,
+                    length
+                );
+                self.memory.push(value);
+                self.current_scope_mut().increment_length();
+            }
         } else {
             // Assign value to the next available slot
             self.memory[absolute_index] = value;
