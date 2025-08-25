@@ -1,5 +1,4 @@
 use log::{debug, warn};
-use tlang_hir::hir::HirScope;
 use tlang_hir::visit::walk_expr;
 use tlang_hir::{Visitor, hir};
 use tlang_span::HirId;
@@ -10,8 +9,6 @@ use crate::hir_opt::HirOptContext;
 #[derive(Debug, Default)]
 pub struct SlotAllocator {
     scopes: Vec<HirId>,
-    // Track the count of locals allocated per scope to update HIR nodes
-    scope_locals_count: std::collections::HashMap<HirId, usize>,
 }
 
 impl SlotAllocator {
@@ -106,21 +103,6 @@ impl<'hir> Visitor<'hir> for SlotAllocator {
         if ctx.symbols.contains_key(&hir_id) {
             debug!("Leaving scope for: {:?}", hir_id);
 
-            // Count how many local slots were allocated in this scope
-            if let Some(symbol_table) = ctx.symbols.get(&hir_id) {
-                let locals_count = symbol_table
-                    .borrow()
-                    .get_all_declared_local_symbols()
-                    // Only count symbols that actually get slots (same filtering as get_slot)
-                    .filter(|s| !s.builtin)
-                    .filter(|s| !matches!(s.symbol_type, tlang_ast::symbols::SymbolType::Enum | tlang_ast::symbols::SymbolType::Struct))
-                    .filter(|s| !matches!(s.symbol_type, tlang_ast::symbols::SymbolType::EnumVariant(len) if len > 0))
-                    .count();
-
-                debug!("Scope {:?} has {} local slots", hir_id, locals_count);
-                self.scope_locals_count.insert(hir_id, locals_count);
-            }
-
             let left_scope = self.scopes.pop();
             debug_assert!(left_scope == Some(hir_id), "Mismatched scope exit");
 
@@ -139,61 +121,6 @@ impl<'hir> Visitor<'hir> for SlotAllocator {
             }
         } else {
             walk_expr(self, expr, ctx);
-        }
-    }
-
-    fn visit_block(&mut self, block: &'hir mut hir::Block, ctx: &mut Self::Context) {
-        // First walk the block normally (this will call enter_scope/leave_scope)
-        tlang_hir::visit::walk_block(self, block, ctx);
-
-        // After walking, update the block's scope data if we tracked locals for this scope
-        if let Some(&locals_count) = self.scope_locals_count.get(&block.hir_id) {
-            debug!(
-                "Setting block {:?} locals count to {}",
-                block.hir_id, locals_count
-            );
-            block.set_locals(locals_count);
-        }
-    }
-
-    fn visit_module(&mut self, module: &'hir mut hir::Module, ctx: &mut Self::Context) {
-        // First walk the module normally
-        tlang_hir::visit::walk_module(self, module, ctx);
-
-        // After walking, update the module's scope data if we tracked locals for this scope
-        if let Some(&locals_count) = self.scope_locals_count.get(&module.hir_id) {
-            debug!(
-                "Setting module {:?} locals count to {}",
-                module.hir_id, locals_count
-            );
-            module.set_locals(locals_count);
-        }
-    }
-
-    fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut Self::Context) {
-        // Handle function declarations specially to update their scope data
-        match &mut stmt.kind {
-            hir::StmtKind::FunctionDeclaration(decl) => {
-                let function_hir_id = decl.hir_id;
-
-                // First process the statement normally
-                tlang_hir::visit::walk_stmt(self, stmt, ctx);
-
-                // After walking, update the function's scope data if we tracked locals for this scope
-                if let Some(&locals_count) = self.scope_locals_count.get(&function_hir_id) {
-                    debug!(
-                        "Setting function {:?} locals count to {}",
-                        function_hir_id, locals_count
-                    );
-                    if let hir::StmtKind::FunctionDeclaration(decl) = &mut stmt.kind {
-                        decl.set_locals(locals_count);
-                    }
-                }
-            }
-            _ => {
-                // For other statements, use the default walking
-                tlang_hir::visit::walk_stmt(self, stmt, ctx);
-            }
         }
     }
 
