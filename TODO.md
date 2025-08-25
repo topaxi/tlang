@@ -6,13 +6,14 @@
 
 ### Remaining Issues
 
-- **None**: The core variable assignment bug has been resolved
+- **None**: All core issues have been resolved ✅
 
 ### Fixed Issues
 
 - **Rust test**: `tlang_interpreter tests::test_simple_closure` ✅
 - **Integration test**: `tests/functions/closures/mutation.tlang` ✅  
 - **Variable assignment bug**: Let bindings in function scopes now work correctly ✅
+- **Loop variable access bug**: Variables declared in function scope and accessed in nested scopes (like loops) now work correctly ✅
 
 ## Root Cause Analysis - COMPLETE
 
@@ -49,7 +50,7 @@ fn test() {
 
 ## Solution Implemented ✅
 
-Implemented **slot-based variable assignment** for let bindings using a scope-aware approach:
+Implemented **slot-based variable assignment** for let bindings using a scope-aware approach, and **fixed memory allocation** for function scopes:
 
 ### Technical Implementation
 
@@ -63,6 +64,22 @@ Implemented **slot-based variable assignment** for let bindings using a scope-aw
    - `InterpreterState::set_let_binding(value)` - Slot-based assignment for let bindings
    - `InterpreterState::is_global_scope()` - Detects global vs function scope
 4. **Preserved existing behavior** for function parameters and pattern matching
+5. **Fixed memory allocation** for function scopes by actually extending the memory vector instead of just reserving capacity
+
+### Memory Allocation Fix
+
+The critical fix was in `ScopeStack::push()` - changed from:
+```rust
+self.memory.reserve(locals_count);  // Only reserves capacity, doesn't add elements
+```
+
+To:
+```rust
+self.memory.reserve(locals_count);  // Reserve capacity first for efficiency
+self.memory.extend(std::iter::repeat(TlangValue::Nil).take(locals_count));  // Actually create the slots
+```
+
+This ensures that when variables are stored at `scope.start() + index`, the memory vector has enough elements to accommodate the write operations.
 
 ### Key Changes Made
 
@@ -87,9 +104,11 @@ Implemented **slot-based variable assignment** for let bindings using a scope-aw
 - ✅ **Closure test passes**: `test_simple_closure` now passes
 - ✅ **Integration tests**: Many tests now pass that were failing before
 - ✅ **Quicksort JavaScript backend**: Test now passes (interpreter has unrelated index access limitations)
+- ✅ **Loop variable access**: Variables declared in function scope and accessed in nested loop scopes now work correctly
+- ✅ **Simple loop test**: `tests/loops/simple_loop.tlang` now passes correctly
 
 ## Notes
 
-- The remaining loop-related test failures in Rust tests are unrelated to this variable assignment fix
-- Some interpreter integration tests still fail due to unrelated unimplemented features (like array indexing)
-- The core variable assignment issue that was breaking quicksort and other function scope code is fully resolved
+- All loop-related test failures have been resolved
+- The remaining unrelated test failures in integration tests are due to other unimplemented features (like array indexing)
+- The core variable assignment and memory allocation issues that were breaking quicksort and loop code are fully resolved

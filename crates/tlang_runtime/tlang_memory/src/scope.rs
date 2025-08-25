@@ -46,8 +46,11 @@ impl ScopeStack {
             // Set the start position for the new local scope
             new_scope.set_start(self.memory.len());
 
-            // Reserve capacity for the exact number of locals (avoid reallocations)
+            // Actually extend the memory vector to create slots for the new scope's locals
+            // Reserve capacity first for efficiency, then extend with default values
             self.memory.reserve(locals_count);
+            self.memory
+                .extend(std::iter::repeat_n(TlangValue::Nil, locals_count));
         }
         // Global scope doesn't need start position setup as it uses global_memory directly
 
@@ -62,7 +65,7 @@ impl ScopeStack {
                 // Instead of truncating, we'll let the next scope start at the correct logical position
                 // The key insight is that we need to maintain correct scope boundaries
                 // even when memory is preserved for closures
-                
+
                 // Note: We don't call self.memory.truncate(scope.start()) here to preserve closure memory
                 // The downside is that this can lead to memory leaks, but it's necessary for closures
             }

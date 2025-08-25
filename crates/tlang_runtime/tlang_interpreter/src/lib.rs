@@ -1372,7 +1372,6 @@ impl Interpreter {
                     // For function scopes, use slot-based assignment
                     // This ensures the value goes to the correct pre-assigned variable position
                     let _index = self.state.set_let_binding(value);
-                    debug!("Let binding assigned to slot index: {}", _index);
                 }
             }
             _ => {
