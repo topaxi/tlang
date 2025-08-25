@@ -397,7 +397,7 @@ impl InterpreterState {
 
         self.new_object(TlangObjectKind::Closure(TlangClosure {
             id: decl.hir_id,
-            scope_stack: self.scope_stack.clone(),
+            scope_stack: self.scope_stack.scopes.clone(),
         }))
     }
 

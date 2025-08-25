@@ -6,7 +6,7 @@ use crate::value::TlangValue;
 
 #[derive(Debug, Clone)]
 pub struct ScopeStack {
-    scopes: Vec<Scope>,
+    pub scopes: Vec<Scope>,
     // Global scope memory - can grow independently without affecting other scopes
     global_memory: Vec<TlangValue>,
     // Central continuous memory for local scopes only (non-global)
@@ -79,16 +79,6 @@ impl ScopeStack {
     /// # Panics
     pub fn root_scope(&self) -> &Scope {
         self.scopes.first().expect("No root scope available")
-    }
-
-    pub fn as_root(&self) -> Self {
-        let mut scopes = Vec::with_capacity(10);
-        scopes.push(*self.root_scope());
-        Self {
-            scopes,
-            global_memory: self.global_memory.clone(), // Share the same global memory
-            memory: self.memory.clone(),               // Share the same local memory
-        }
     }
 
     pub fn clear_current_scope(&mut self) {

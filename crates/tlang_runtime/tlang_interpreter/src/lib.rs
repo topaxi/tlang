@@ -264,18 +264,18 @@ impl Interpreter {
     where
         F: FnOnce(&mut Self) -> R,
     {
-        let root_scope = self.state.scope_stack.as_root();
+        let root_scope = vec![*self.state.scope_stack.root_scope()];
         self.with_scope(root_scope, f)
     }
 
     #[inline(always)]
-    fn with_scope<F, R>(&mut self, scope_stack: scope::ScopeStack, f: F) -> R
+    fn with_scope<F, R>(&mut self, scopes: Vec<scope::Scope>, f: F) -> R
     where
         F: FnOnce(&mut Self) -> R,
     {
-        let old_scope = std::mem::replace(&mut self.state.scope_stack, scope_stack);
+        let old_scopes = std::mem::replace(&mut self.state.scope_stack.scopes, scopes);
         let result = f(self);
-        self.state.scope_stack = old_scope;
+        self.state.scope_stack.scopes = old_scopes;
         result
     }
 
