@@ -34,3 +34,17 @@ modify_both();
 
 log(x); // Should print 20
 log(y); // Should print 30
+
+fn counter_builder(init: usize) {
+   let count = init;
+
+   return fn () -> usize {
+      count = count + 1;
+      count
+   };
+}
+
+let my_counter = counter_builder(5);
+
+log(my_counter()); // Should print 6
+log(my_counter()); // Should print 7
