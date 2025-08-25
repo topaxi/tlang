@@ -99,8 +99,7 @@ impl Default for HirOptimizer {
         Self::new(vec![
             Box::new(crate::symbol_resolution::SymbolResolution::default()),
             Box::new(crate::constant_folding::ConstantFolding::default()),
-            Box::new(crate::slot_allocation::SlotAllocator::default()),
-            Box::new(crate::scope_data_update::ScopeDataUpdater),
+            Box::new(crate::slot_allocation::SlotAllocation::default()),
         ])
     }
 }
