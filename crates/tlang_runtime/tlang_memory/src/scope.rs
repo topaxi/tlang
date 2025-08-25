@@ -46,11 +46,8 @@ impl ScopeStack {
             // Set the start position for the new local scope
             new_scope.set_start(self.memory.len());
 
-            // Actually extend the memory vector to create slots for the new scope's locals
-            // Reserve capacity first for efficiency, then extend with default values
+            // Reserve capacity for the exact number of locals (avoid reallocations)
             self.memory.reserve(locals_count);
-            self.memory
-                .extend(std::iter::repeat_n(TlangValue::Nil, locals_count));
         }
         // Global scope doesn't need start position setup as it uses global_memory directly
 
@@ -140,17 +137,22 @@ impl ScopeStack {
 
         if scope_index == 0 {
             // Global scope uses global_memory
-            if index < self.global_memory.len() {
-                self.global_memory[index] = value;
+            // Extend global memory if needed
+            if index >= self.global_memory.len() {
+                self.global_memory.resize(index + 1, TlangValue::Nil);
             }
+            self.global_memory[index] = value;
         } else {
             // Local scopes use memory vector with start position
             let current_scope = self.current_scope();
             let start = current_scope.start();
             let absolute_index = start + index;
-            if absolute_index < self.memory.len() {
-                self.memory[absolute_index] = value;
+
+            // Extend memory vector if needed to accommodate this slot
+            if absolute_index >= self.memory.len() {
+                self.memory.resize(absolute_index + 1, TlangValue::Nil);
             }
+            self.memory[absolute_index] = value;
         }
     }
 
