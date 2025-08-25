@@ -1,0 +1,47 @@
+// Simple Calculator Example
+// Demonstrates: enums, pattern matching, recursion, and basic arithmetic
+
+enum Expr {
+    Number(int),
+    Add(Expr, Expr),
+    Multiply(Expr, Expr),
+}
+
+// evaluate(Expr) -> int
+fn evaluate(Expr::Number(n)) { n }
+fn evaluate(Expr::Add(left, right)) { evaluate(left) + evaluate(right) }
+fn evaluate(Expr::Multiply(left, right)) { evaluate(left) * evaluate(right) }
+
+// print_expr_results(Expr[], int) -> ()
+fn print_expr_results([], _) { }
+fn print_expr_results([expr, ...rest], index) {
+    log(evaluate(expr));
+    print_expr_results(rest, index + 1);
+}
+
+log("=== Simple Calculator Demo ===");
+
+let examples = [
+    Expr::Number(42),
+    Expr::Add(Expr::Number(10), Expr::Number(5)),
+    Expr::Multiply(Expr::Number(3), Expr::Number(7)),
+    Expr::Add(
+        Expr::Multiply(Expr::Number(2), Expr::Number(3)),
+        Expr::Number(4)
+    )
+];
+
+log("Testing basic expressions:");
+print_expr_results(examples, 1);
+
+// Test more complex nested expression
+let complex_expr = Expr::Add(
+    Expr::Multiply(
+        Expr::Add(Expr::Number(2), Expr::Number(3)),
+        Expr::Number(4)
+    ),
+    Expr::Multiply(Expr::Number(5), Expr::Number(6))
+);
+
+log("Complex expression result:");
+complex_expr |> evaluate() |> log();
