@@ -80,6 +80,34 @@ impl<'hir> Visitor<'hir> for ScopeDataUpdater {
             }
         }
     }
+
+    fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
+        // Handle function expressions (lambda functions) specially to update their scope data
+        match &mut expr.kind {
+            hir::ExprKind::FunctionExpression(decl) => {
+                let function_hir_id = decl.hir_id;
+
+                // First process the expression normally
+                tlang_hir::visit::walk_expr(self, expr, ctx);
+
+                // Update the function expression's scope data with locals count
+                if let Some(symbol_table) = ctx.symbols.get(&function_hir_id) {
+                    let locals_count = symbol_table.borrow().locals();
+                    debug!(
+                        "Setting lambda function {:?} locals count to {}",
+                        function_hir_id, locals_count
+                    );
+                    if let hir::ExprKind::FunctionExpression(decl) = &mut expr.kind {
+                        decl.set_locals(locals_count);
+                    }
+                }
+            }
+            _ => {
+                // For other expressions, use the default walking
+                tlang_hir::visit::walk_expr(self, expr, ctx);
+            }
+        }
+    }
 }
 
 impl HirPass for ScopeDataUpdater {
