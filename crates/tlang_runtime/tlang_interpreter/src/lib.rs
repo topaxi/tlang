@@ -280,8 +280,7 @@ impl Interpreter {
     }
 
     pub fn eval(&mut self, input: &hir::Module) -> TlangValue {
-        self.with_new_scope(input, |this| this.eval_block_inner(&input.block))
-            .unwrap_value()
+        self.eval_block_inner(&input.block).unwrap_value()
     }
 
     #[inline(always)]

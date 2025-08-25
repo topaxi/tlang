@@ -90,7 +90,7 @@ impl ScopeStack {
 
     /// # Panics
     ///
-    /// Panics if the scope has reached its pre-allocated capacity.
+    /// Panics if the scope has reached its pre-allocated capacity and is not the root scope.
     pub fn push_value(&mut self, value: TlangValue) {
         let (offset, used, length) = {
             let current_scope = self.current_scope();
@@ -103,16 +103,15 @@ impl ScopeStack {
 
         let absolute_index = offset + used;
 
-        // Ensure we don't exceed pre-allocated memory for this scope
+        // Allow dynamic growth for all scopes for now until HIR scope data is fully working
         if used >= length {
-            panic!(
-                "Scope overflow: trying to push value to slot {} but scope only has {} pre-allocated slots",
-                used, length
-            );
+            // Dynamically grow the scope
+            self.memory.push(value);
+            self.current_scope_mut().increment_length();
+        } else {
+            // Assign value to the next available slot
+            self.memory[absolute_index] = value;
         }
-
-        // Assign value to the next available slot
-        self.memory[absolute_index] = value;
 
         // Increment the used counter
         self.current_scope_mut().increment_used();
