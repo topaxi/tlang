@@ -55,7 +55,7 @@ impl ScopeStack {
     }
 
     pub fn pop(&mut self) {
-        if let Some(scope) = self.scopes.pop() {
+        if let Some(_scope) = self.scopes.pop() {
             // For local scopes, we don't physically truncate memory (to preserve closures)
             // but we do need to ensure that the next scope starts at the correct position
             if !self.scopes.is_empty() {
@@ -132,7 +132,7 @@ impl ScopeStack {
         }
     }
 
-    fn set_local(&mut self, index: usize, value: TlangValue) {
+    pub fn set_local(&mut self, index: usize, value: TlangValue) {
         let scope_index = self.scopes.len() - 1;
 
         if scope_index == 0 {
@@ -214,6 +214,19 @@ impl ScopeStack {
         self.scopes.iter()
     }
 
+    /// Get the next variable index for let bindings in the current scope and increment it
+    pub fn allocate_let_binding_index(&mut self) -> usize {
+        let current_scope = self.scopes.last_mut().expect("No current scope");
+        current_scope.increment_var_index()
+    }
+
+    /// Initialize the variable index counter for function parameters
+    /// This should be called after function parameters are pushed to memory
+    pub fn init_var_index_after_params(&mut self, param_count: usize) {
+        let current_scope = self.scopes.last_mut().expect("No current scope");
+        current_scope.next_var_index = param_count;
+    }
+
     pub fn get_scope_locals(&self, scope: &Scope) -> &[TlangValue] {
         // Check if this is the global scope (first scope with start 0)
         if scope.start() == 0 && !self.scopes.is_empty() && std::ptr::eq(scope, &self.scopes[0]) {
@@ -263,12 +276,17 @@ impl Resolver for ScopeStack {
 pub struct Scope {
     // Starting position of this scope in the memory vector
     start: usize,
+    // Track the next variable index for let bindings in this scope
+    // Function parameters are assigned sequentially starting from 0,
+    // then let bindings continue from there
+    next_var_index: usize,
 }
 
 impl Scope {
     pub fn new(_locals: usize) -> Self {
         Self {
             start: 0, // Will be set when the scope is actually created
+            next_var_index: 0,
         }
     }
 
@@ -278,5 +296,15 @@ impl Scope {
 
     pub fn start(&self) -> usize {
         self.start
+    }
+
+    pub fn next_var_index(&self) -> usize {
+        self.next_var_index
+    }
+
+    pub fn increment_var_index(&mut self) -> usize {
+        let index = self.next_var_index;
+        self.next_var_index += 1;
+        index
     }
 }

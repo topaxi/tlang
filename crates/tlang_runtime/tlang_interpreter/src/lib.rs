@@ -1173,6 +1173,10 @@ impl Interpreter {
                 this.push_value(*arg);
             }
 
+            // Initialize variable index counter after function parameters (callee + args)
+            let param_count = 1 + args.len(); // callee + arguments
+            this.state.init_var_index_after_params(param_count);
+
             match this.eval_block_inner(&fn_decl.body) {
                 EvalResult::TailCall => this.tail_call(),
                 result => result,
@@ -1353,21 +1357,22 @@ impl Interpreter {
     fn eval_let_stmt(&mut self, pat: &hir::Pat, expr: &hir::Expr, _ty: &hir::Ty) -> EvalResult {
         let value = eval_value!(self.eval_expr(expr));
 
-        // Handle let bindings specially - use slot-based assignment instead of push_value
-        // This is necessary because let bindings need to go to pre-assigned positions,
-        // unlike function parameters which are assigned sequentially
+        // Handle let bindings differently based on scope type
         match &pat.kind {
-            hir::PatKind::Identifier(hir_id, _ident) => {
-                // For let bindings with identifier patterns, we need to use slot-based assignment
-                // Try to find the resolution information for this identifier
-                
-                // For now, fall back to the original pattern matching approach
-                // TODO: Implement proper slot-based assignment using hir_id resolution
-                if !self.eval_pat(pat, value) {
-                    self.panic(format!(
-                        "Pattern did not match value {:?}",
-                        self.state.stringify(value)
-                    ));
+            hir::PatKind::Identifier(_hir_id, _ident) => {
+                if self.state.is_global_scope() {
+                    // For global scope, use the original pattern matching with push_value
+                    if !self.eval_pat(pat, value) {
+                        self.panic(format!(
+                            "Pattern did not match value {:?}",
+                            self.state.stringify(value)
+                        ));
+                    }
+                } else {
+                    // For function scopes, use slot-based assignment
+                    // This ensures the value goes to the correct pre-assigned variable position
+                    let _index = self.state.set_let_binding(value);
+                    debug!("Let binding assigned to slot index: {}", _index);
                 }
             }
             _ => {

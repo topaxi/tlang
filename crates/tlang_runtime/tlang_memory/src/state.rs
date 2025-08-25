@@ -371,6 +371,23 @@ impl InterpreterState {
         self.scope_stack.push_value(value);
     }
 
+    /// Allocate a variable index for let bindings and set the value at that position
+    pub fn set_let_binding(&mut self, value: TlangValue) -> usize {
+        let index = self.scope_stack.allocate_let_binding_index();
+        self.scope_stack.set_local(index, value);
+        index
+    }
+
+    /// Initialize variable index counter after function parameters are pushed
+    pub fn init_var_index_after_params(&mut self, param_count: usize) {
+        self.scope_stack.init_var_index_after_params(param_count);
+    }
+
+    /// Check if we're currently in the global scope
+    pub fn is_global_scope(&self) -> bool {
+        self.scope_stack.scopes.len() == 1
+    }
+
     pub fn set_global(&mut self, name: String, value: TlangValue) {
         self.globals.insert(name, value);
     }
