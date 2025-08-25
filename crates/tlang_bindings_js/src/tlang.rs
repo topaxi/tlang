@@ -7,6 +7,7 @@ use tlang_hir_pretty::{HirPretty, HirPrettyOptions};
 use tlang_parser::Parser;
 use tlang_parser::error::{ParseError, ParseIssue};
 use tlang_semantics::SemanticAnalyzer;
+use tlang_symbols::SymbolType;
 use wasm_bindgen::prelude::*;
 
 use crate::codemirror;
@@ -131,7 +132,7 @@ impl Tlang {
 
         self.interpreter.define_js_fn(name, f);
         self.analyzer
-            .add_builtin_symbols(&[(name, tlang_ast::symbols::SymbolType::Function(arity))]);
+            .add_builtin_symbols(&[(name, SymbolType::Function(arity))]);
     }
 
     fn parse(&mut self) -> Result<&ast::Module, &ParseError> {

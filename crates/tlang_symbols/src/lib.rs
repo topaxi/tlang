@@ -1,4 +1,9 @@
-// TODO: Does this module belong in the ast crate?
+//! Symbol types and symbol table implementation.
+//!
+//! This crate defines the core symbol management types used throughout the tlang compilation
+//! pipeline. By separating symbols into their own crate, we achieve better separation of
+//! concerns and allow later compilation phases to avoid depending on the entire AST crate.
+
 use log::debug;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -7,7 +12,7 @@ use std::collections::HashSet;
 use std::fmt::Display;
 use std::rc::Rc;
 
-use tlang_span::{HirId, LineColumn, NodeId, Span};
+pub use tlang_span::{HirId, LineColumn, NodeId, Span};
 
 #[derive(Debug, Default, PartialEq, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]

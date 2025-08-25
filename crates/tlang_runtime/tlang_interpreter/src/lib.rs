@@ -15,6 +15,7 @@ use tlang_memory::value::object::TlangEnum;
 use tlang_memory::{InterpreterState, NativeFnReturn, Resolver, scope};
 use tlang_memory::{prelude::*, state};
 use tlang_span::HirId;
+use tlang_symbols::SymbolType;
 
 pub use tlang_memory::NativeFnDef;
 
@@ -66,47 +67,38 @@ impl Default for Interpreter {
 }
 
 impl Interpreter {
-    fn builtin_module_symbols() -> Vec<(&'static str, tlang_ast::symbols::SymbolType)> {
+    fn builtin_module_symbols() -> Vec<(&'static str, SymbolType)> {
         let mut module_names = HashSet::new();
 
         inventory::iter::<NativeFnDef>
             .into_iter()
             .map(|def| def.module())
             .filter(|module_name| module_names.insert(module_name.to_string()))
-            .map(|module_name| (module_name, tlang_ast::symbols::SymbolType::Module))
+            .map(|module_name| (module_name, SymbolType::Module))
             .collect()
     }
 
-    fn builtin_fn_symbols() -> Vec<(String, tlang_ast::symbols::SymbolType)> {
+    fn builtin_fn_symbols() -> Vec<(String, SymbolType)> {
         inventory::iter::<NativeFnDef>
             .into_iter()
-            .map(|def| {
-                (
-                    def.name(),
-                    tlang_ast::symbols::SymbolType::Function(def.arity() as u16),
-                )
-            })
+            .map(|def| (def.name(), SymbolType::Function(def.arity() as u16)))
             .collect::<Vec<_>>()
     }
 
-    const fn builtin_const_symbols() -> &'static [(&'static str, tlang_ast::symbols::SymbolType)] {
+    const fn builtin_const_symbols() -> &'static [(&'static str, SymbolType)] {
         &[
-            ("Option", tlang_ast::symbols::SymbolType::Enum),
-            (
-                "Option::None",
-                tlang_ast::symbols::SymbolType::EnumVariant(0),
-            ),
-            ("Result", tlang_ast::symbols::SymbolType::Enum),
-            ("math::pi", tlang_ast::symbols::SymbolType::Variable),
+            ("Option", SymbolType::Enum),
+            ("Option::None", SymbolType::EnumVariant(0)),
+            ("Result", SymbolType::Enum),
+            ("math::pi", SymbolType::Variable),
         ]
     }
 
-    pub fn builtin_symbols() -> Vec<(String, tlang_ast::symbols::SymbolType)> {
-        let mut symbols: Vec<(String, tlang_ast::symbols::SymbolType)> =
-            Self::builtin_module_symbols()
-                .iter()
-                .map(|(name, ty)| (name.to_string(), *ty))
-                .collect();
+    pub fn builtin_symbols() -> Vec<(String, SymbolType)> {
+        let mut symbols: Vec<(String, SymbolType)> = Self::builtin_module_symbols()
+            .iter()
+            .map(|(name, ty)| (name.to_string(), *ty))
+            .collect();
         symbols.extend(Self::builtin_fn_symbols());
         symbols.extend(
             Self::builtin_const_symbols()
