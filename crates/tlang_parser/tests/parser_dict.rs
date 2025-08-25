@@ -48,3 +48,21 @@ fn test_if_identifier_block() {
     // This should parse as if condition followed by block
     assert_parser_snapshot!(r"if foo {}");
 }
+
+#[test]
+fn test_if_let_identifier_block() {
+    // This should parse correctly: if let x = foo followed by block
+    assert_parser_snapshot!(r"if let x = foo {}");
+}
+
+#[test]
+fn test_for_identifier_block() {
+    // This should parse correctly: for x in foo followed by block
+    assert_parser_snapshot!(r"for x in foo {}");
+}
+
+#[test]
+fn test_match_identifier_block() {
+    // This should parse correctly: match foo followed by block
+    assert_parser_snapshot!(r"match foo { _ => 1 }");
+}

@@ -565,7 +565,8 @@ impl<'src> Parser<'src> {
         self.consume_keyword_token(Keyword::Let);
         let pattern = self.parse_pattern();
         self.consume_token(TokenKind::EqualSign);
-        let value = self.parse_expression();
+        // Use higher precedence (12) to prevent {} from being parsed as function call
+        let value = self.parse_expression_with_precedence(12, Associativity::Left);
         node::expr!(self.unique_id(), Let(Box::new(pattern), Box::new(value)))
     }
 
@@ -826,7 +827,8 @@ impl<'src> Parser<'src> {
         let condition = if matches!(self.current_token_kind(), TokenKind::Keyword(Keyword::Let)) {
             self.parse_let_expression()
         } else {
-            self.parse_expression()
+            // Use higher precedence (12) to prevent {} from being parsed as function call
+            self.parse_expression_with_precedence(12, Associativity::Left)
         };
 
         // TODO: Reevaluate whether we want `foo {}` to be a `foo({})` call expression.
@@ -961,10 +963,7 @@ impl<'src> Parser<'src> {
 
         let mut expr = node::expr!(self.unique_id(), Path(Box::new(path))).with_span(span);
 
-        if matches!(
-            self.current_token_kind(),
-            TokenKind::LParen | TokenKind::LBrace
-        ) {
+        if matches!(self.current_token_kind(), TokenKind::LParen) {
             expr = self.parse_call_expression(expr);
         }
 
@@ -1060,10 +1059,7 @@ impl<'src> Parser<'src> {
 
         let mut expr = node::expr!(self.unique_id(), Path(Box::new(path))).with_span(span);
 
-        if matches!(
-            self.current_token_kind(),
-            TokenKind::LParen | TokenKind::LBrace
-        ) {
+        if matches!(self.current_token_kind(), TokenKind::LParen) {
             expr = self.parse_call_expression(expr);
         }
 
@@ -1072,7 +1068,8 @@ impl<'src> Parser<'src> {
 
     fn parse_match_expression(&mut self) -> Expr {
         self.consume_keyword_token(Keyword::Match);
-        let expression = self.parse_expression();
+        // Use higher precedence (12) to prevent {} from being parsed as function call
+        let expression = self.parse_expression_with_precedence(12, Associativity::Left);
 
         // TODO: Reevaluate whether we want `foo {}` to be a `foo({})` call expression.
         //       As this collides with `if let` statements.
@@ -1648,6 +1645,15 @@ impl<'src> Parser<'src> {
                 TokenKind::LParen => {
                     lhs = self.parse_call_expression(lhs);
                 }
+                TokenKind::LBrace => {
+                    // Function call with dictionary syntax: foo {}
+                    // Give this high precedence (11) so it binds tightly
+                    let call_precedence = 11;
+                    if precedence >= call_precedence {
+                        break;
+                    }
+                    lhs = self.parse_call_expression(lhs);
+                }
                 token if Self::is_binary_op(token) => {
                     let operator = Self::map_binary_op(token);
                     let operator_info = Self::map_operator_info(&operator);
@@ -1719,7 +1725,8 @@ impl<'src> Parser<'src> {
         self.advance();
         let pat = self.parse_pattern();
         self.consume_token(TokenKind::Keyword(Keyword::In));
-        let iter = self.parse_expression();
+        // Use higher precedence (12) to prevent {} from being parsed as function call
+        let iter = self.parse_expression_with_precedence(12, Associativity::Left);
         if matches!(self.current_token_kind(), TokenKind::Semicolon) {
             self.advance();
         }
@@ -1727,7 +1734,8 @@ impl<'src> Parser<'src> {
             self.advance();
             let pat = self.parse_pattern();
             self.consume_token(TokenKind::EqualSign);
-            let expr = self.parse_expression();
+            // Use higher precedence (12) to prevent {} from being parsed as function call
+            let expr = self.parse_expression_with_precedence(12, Associativity::Left);
             if matches!(self.current_token_kind(), TokenKind::Semicolon) {
                 self.advance();
             }
