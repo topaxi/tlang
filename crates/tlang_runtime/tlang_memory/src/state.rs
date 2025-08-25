@@ -395,9 +395,19 @@ impl InterpreterState {
             .entry(decl.hir_id)
             .or_insert_with(|| decl.clone().into());
 
+        // Capture the current memory state for non-global scopes
+        let captured_memory = if self.scope_stack.scopes.len() > 1 {
+            // If there are local scopes, capture their memory
+            self.scope_stack.get_memory().clone()
+        } else {
+            // If only global scope, no local memory to capture
+            Vec::new()
+        };
+
         self.new_object(TlangObjectKind::Closure(TlangClosure {
             id: decl.hir_id,
             scope_stack: self.scope_stack.scopes.clone(),
+            captured_memory,
         }))
     }
 

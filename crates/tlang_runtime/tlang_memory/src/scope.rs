@@ -208,6 +208,14 @@ impl ScopeStack {
         self.scopes.iter()
     }
 
+    pub fn get_memory(&self) -> &Vec<TlangValue> {
+        &self.memory
+    }
+
+    pub fn set_memory(&mut self, memory: Vec<TlangValue>) {
+        self.memory = memory;
+    }
+
     pub fn get_scope_locals(&self, scope: &Scope) -> &[TlangValue] {
         // Check if this is the global scope (first scope with start 0)
         if scope.start() == 0 && !self.scopes.is_empty() && std::ptr::eq(scope, &self.scopes[0]) {

@@ -11,7 +11,7 @@ use tlang_hir::hir::{self, BindingKind};
 use tlang_memory::shape::{ShapeKey, Shaped, TlangEnumVariant, TlangShape};
 use tlang_memory::state::TailCall;
 use tlang_memory::value::TlangArithmetic;
-use tlang_memory::value::object::TlangEnum;
+use tlang_memory::value::object::{TlangEnum, TlangClosure};
 use tlang_memory::{InterpreterState, NativeFnReturn, Resolver, scope};
 use tlang_memory::{prelude::*, state};
 use tlang_span::HirId;
@@ -276,6 +276,25 @@ impl Interpreter {
         let old_scopes = std::mem::replace(&mut self.state.scope_stack.scopes, scopes);
         let result = f(self);
         self.state.scope_stack.scopes = old_scopes;
+        result
+    }
+
+    #[inline(always)]
+    fn with_closure_scope<F, R>(&mut self, closure: &TlangClosure, f: F) -> R
+    where
+        F: FnOnce(&mut Self) -> R,
+    {
+        let old_scopes = std::mem::replace(&mut self.state.scope_stack.scopes, closure.scope_stack.clone());
+        let old_memory = {
+            let current_memory = self.state.scope_stack.get_memory().clone();
+            self.state.scope_stack.set_memory(closure.captured_memory.clone());
+            current_memory
+        };
+        
+        let result = f(self);
+        
+        self.state.scope_stack.scopes = old_scopes;
+        self.state.scope_stack.set_memory(old_memory);
         result
     }
 
@@ -917,8 +936,9 @@ impl Interpreter {
         match self.get_object_by_id(id) {
             TlangObjectKind::Closure(closure) => {
                 let closure_decl = self.get_closure_decl(closure.id).unwrap();
+                let closure_data = closure.clone(); // Clone the closure data to avoid borrowing issues
 
-                self.with_scope(closure.scope_stack.clone(), |this| {
+                self.with_closure_scope(&closure_data, |this| {
                     this.eval_fn_call(&closure_decl, callee, args)
                         .unwrap_value()
                 })
