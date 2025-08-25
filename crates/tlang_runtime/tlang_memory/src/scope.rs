@@ -7,7 +7,9 @@ use crate::value::TlangValue;
 #[derive(Debug, Clone)]
 pub struct ScopeStack {
     scopes: Vec<Scope>,
-    // Central continuous memory for all scope values
+    // Global scope memory - can grow independently without affecting other scopes
+    global_memory: Vec<TlangValue>,
+    // Central continuous memory for local scopes only (non-global)
     memory: Vec<TlangValue>,
 }
 
@@ -21,7 +23,8 @@ impl ScopeStack {
 
         Self {
             scopes,
-            memory: Vec::with_capacity(1000), // Start with reasonable capacity
+            global_memory: Vec::with_capacity(100), // Separate global memory
+            memory: Vec::with_capacity(1000), // Start with reasonable capacity for local scopes
         }
     }
 
@@ -38,12 +41,17 @@ impl ScopeStack {
         let locals_count = meta.locals();
         let mut new_scope = Scope::new(locals_count);
 
-        // Set the offset for the new scope to the end of current memory
-        new_scope.set_offset(self.memory.len());
+        // Local scopes (non-global) get offset in the local memory vector
+        // Global scope (index 0) uses separate global_memory
+        if !self.scopes.is_empty() {
+            // Set the offset for the new local scope to the end of current local memory
+            new_scope.set_offset(self.memory.len());
 
-        // Pre-allocate memory for the exact number of locals
-        self.memory
-            .resize(self.memory.len() + locals_count, TlangValue::Nil);
+            // Pre-allocate memory for the exact number of locals in local memory
+            self.memory
+                .resize(self.memory.len() + locals_count, TlangValue::Nil);
+        }
+        // Global scope doesn't need offset setup as it uses global_memory directly
 
         self.scopes.push(new_scope);
     }
@@ -78,7 +86,8 @@ impl ScopeStack {
         scopes.push(*self.root_scope());
         Self {
             scopes,
-            memory: self.memory.clone(), // Share the same memory
+            global_memory: self.global_memory.clone(), // Share the same global memory
+            memory: self.memory.clone(),               // Share the same local memory
         }
     }
 
@@ -92,6 +101,7 @@ impl ScopeStack {
     ///
     /// Panics if the scope has reached its pre-allocated capacity and is not the root scope.
     pub fn push_value(&mut self, value: TlangValue) {
+        let scope_index = self.scopes.len() - 1;
         let (offset, used, length) = {
             let current_scope = self.current_scope();
             (
@@ -101,30 +111,34 @@ impl ScopeStack {
             )
         };
 
-        let absolute_index = offset + used;
-
-        // Only allow dynamic growth in the root scope
-        if used >= length {
-            if self.scopes.len() == 1 {
-                // Root scope can grow dynamically
-                self.memory.push(value);
-                self.current_scope_mut().increment_length();
+        // Handle global scope (index 0) separately
+        if scope_index == 0 {
+            // Global scope uses global_memory and can grow freely
+            if used >= self.global_memory.len() {
+                self.global_memory.push(value);
             } else {
+                self.global_memory[used] = value;
+            }
+        } else {
+            // Local scopes use the continuous memory vector
+            let absolute_index = offset + used;
+
+            if used >= length {
                 // Non-root scopes should not exceed their pre-allocated capacity
-                // For now, emit a warning and allow growth until HIR optimization is fully reliable
                 log::warn!(
-                    "Scope exceeded pre-allocated capacity: used={}, allocated={}. \
+                    "Local scope exceeded pre-allocated capacity: used={}, allocated={}. \
                      This indicates HIR scope analysis failed to track all local variables correctly. \
-                     Allowing dynamic growth for now.",
+                     This is a memory safety violation - scope boundaries are corrupted.",
                     used,
                     length
                 );
+                // For now, allow growth but this is unsafe
                 self.memory.push(value);
                 self.current_scope_mut().increment_length();
+            } else {
+                // Assign value to the next available slot
+                self.memory[absolute_index] = value;
             }
-        } else {
-            // Assign value to the next available slot
-            self.memory[absolute_index] = value;
         }
 
         // Increment the used counter
@@ -132,40 +146,70 @@ impl ScopeStack {
     }
 
     fn get_local(&self, index: usize) -> Option<TlangValue> {
-        let current_scope = self.current_scope();
-        let offset = current_scope.offset();
-        let absolute_index = offset + index;
+        let scope_index = self.scopes.len() - 1;
 
-        self.memory.get(absolute_index).copied()
+        if scope_index == 0 {
+            // Global scope uses global_memory
+            self.global_memory.get(index).copied()
+        } else {
+            // Local scopes use memory vector with offset
+            let current_scope = self.current_scope();
+            let offset = current_scope.offset();
+            let absolute_index = offset + index;
+            self.memory.get(absolute_index).copied()
+        }
     }
 
     fn set_local(&mut self, index: usize, value: TlangValue) {
-        let current_scope = self.current_scope();
-        let offset = current_scope.offset();
-        let absolute_index = offset + index;
+        let scope_index = self.scopes.len() - 1;
 
-        if absolute_index < self.memory.len() {
-            self.memory[absolute_index] = value;
+        if scope_index == 0 {
+            // Global scope uses global_memory
+            if index < self.global_memory.len() {
+                self.global_memory[index] = value;
+            }
+        } else {
+            // Local scopes use memory vector with offset
+            let current_scope = self.current_scope();
+            let offset = current_scope.offset();
+            let absolute_index = offset + index;
+            if absolute_index < self.memory.len() {
+                self.memory[absolute_index] = value;
+            }
         }
     }
 
     fn get_upvar(&self, relative_scope_index: u16, index: usize) -> Option<TlangValue> {
         let scope_index = self.scope_index(relative_scope_index);
-        let scope = &self.scopes[scope_index];
-        let offset = scope.offset();
-        let absolute_index = offset + index;
 
-        self.memory.get(absolute_index).copied()
+        if scope_index == 0 {
+            // Global scope uses global_memory
+            self.global_memory.get(index).copied()
+        } else {
+            // Local scopes use memory vector with offset
+            let scope = &self.scopes[scope_index];
+            let offset = scope.offset();
+            let absolute_index = offset + index;
+            self.memory.get(absolute_index).copied()
+        }
     }
 
     fn set_upvar(&mut self, relative_scope_index: u16, index: usize, value: TlangValue) {
         let scope_index = self.scope_index(relative_scope_index);
-        let scope = &self.scopes[scope_index];
-        let offset = scope.offset();
-        let absolute_index = offset + index;
 
-        if absolute_index < self.memory.len() {
-            self.memory[absolute_index] = value;
+        if scope_index == 0 {
+            // Global scope uses global_memory
+            if index < self.global_memory.len() {
+                self.global_memory[index] = value;
+            }
+        } else {
+            // Local scopes use memory vector with offset
+            let scope = &self.scopes[scope_index];
+            let offset = scope.offset();
+            let absolute_index = offset + index;
+            if absolute_index < self.memory.len() {
+                self.memory[absolute_index] = value;
+            }
         }
     }
 
@@ -199,10 +243,17 @@ impl ScopeStack {
     }
 
     pub fn get_scope_locals(&self, scope: &Scope) -> &[TlangValue] {
-        let offset = scope.offset();
-        let used = scope.used();
-
-        &self.memory[offset..offset + used]
+        // Check if this is the global scope (first scope with offset 0)
+        if scope.offset() == 0 && !self.scopes.is_empty() && std::ptr::eq(scope, &self.scopes[0]) {
+            // Global scope uses global_memory
+            let used = scope.used();
+            &self.global_memory[0..used.min(self.global_memory.len())]
+        } else {
+            // Local scopes use memory vector with offset
+            let offset = scope.offset();
+            let used = scope.used();
+            &self.memory[offset..offset + used]
+        }
     }
 }
 
