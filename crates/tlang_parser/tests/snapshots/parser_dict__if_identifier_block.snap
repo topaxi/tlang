@@ -1,0 +1,112 @@
+---
+source: crates/tlang_parser/tests/parser_dict.rs
+expression: "parse! (r\"if foo {}\")"
+---
+Module(
+  id: 2,
+  statements: [
+    Stmt(
+      id: 3,
+      kind: Expr(Expr(
+        id: 6,
+        kind: IfElse(IfElseExpression(
+          condition: Expr(
+            id: 4,
+            kind: Path(Path(
+              segments: [
+                Ident(
+                  name: "foo",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 3,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 6,
+                    ),
+                  ),
+                ),
+              ],
+              res: Res(
+                node_id: None,
+              ),
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 3,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 6,
+                ),
+              ),
+            )),
+            leading_comments: [],
+            trailing_comments: [],
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 3,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 6,
+              ),
+            ),
+          ),
+          then_branch: Block(
+            id: 5,
+            statements: [],
+            expression: None,
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 7,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 9,
+              ),
+            ),
+          ),
+          else_branches: [],
+        )),
+        leading_comments: [],
+        trailing_comments: [],
+        span: Span(
+          start: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+          end: LineColumn(
+            line: 0,
+            column: 9,
+          ),
+        ),
+      )),
+      span: Span(
+        start: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end: LineColumn(
+          line: 0,
+          column: 9,
+        ),
+      ),
+      leading_comments: [],
+      trailing_comments: [],
+    ),
+  ],
+  span: Span(
+    start: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end: LineColumn(
+      line: 0,
+      column: 9,
+    ),
+  ),
+)

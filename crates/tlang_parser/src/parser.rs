@@ -1414,7 +1414,8 @@ impl<'src> Parser<'src> {
 
         // Valid guard clauses are function calls, binary logical expressions and unary logical
         // expressions.
-        let expression = self.parse_expression();
+        // Use precedence 3 to prevent {} from being parsed as function calls (precedence 2)
+        let expression = self.parse_expression_with_precedence(3, Associativity::Left);
 
         match expression.kind {
             ExprKind::Call { .. } | ExprKind::BinaryOp { .. } | ExprKind::UnaryOp { .. } => (),
