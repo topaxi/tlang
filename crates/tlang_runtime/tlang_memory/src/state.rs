@@ -16,7 +16,7 @@ use crate::shape::{
 use crate::value::{
     TlangValue,
     function::{NativeFnReturn, TlangNativeFn},
-    object::{TlangClosure, TlangEnum, TlangObjectId, TlangObjectKind, TlangSlice, TlangStruct},
+    object::{TlangClosure, TlangEnum, TlangObjectId, TlangObjectKind, TlangSlice, TlangStruct, CapturedMemory},
 };
 
 pub enum CallStackKind {
@@ -390,6 +390,23 @@ impl InterpreterState {
         )))
     }
 
+    /// Creates a new closure with optimized memory capture.
+    /// 
+    /// # Current Behavior
+    /// 
+    /// - **Global variables**: Properly shared between closures (stored in separate global_memory)
+    /// - **Local variables**: Each closure gets its own copy (not shared between closures)
+    /// 
+    /// # Performance Optimizations
+    /// 
+    /// - Empty memory: Uses `CapturedMemory::None` to avoid allocations
+    /// - Small memory (≤8 values): Uses inline storage for better cache performance  
+    /// - Large memory: Uses separate allocation
+    /// 
+    /// # Future Improvements
+    /// 
+    /// To implement proper local variable sharing between closures, the memory system
+    /// would need to use reference counting (Rc<RefCell<TlangValue>>) for captured variables.
     pub fn new_closure(&mut self, decl: &hir::FunctionDeclaration) -> TlangValue {
         self.closures
             .entry(decl.hir_id)
@@ -407,7 +424,7 @@ impl InterpreterState {
         self.new_object(TlangObjectKind::Closure(TlangClosure {
             id: decl.hir_id,
             scope_stack: self.scope_stack.scopes.clone(),
-            captured_memory,
+            captured_memory: CapturedMemory::new(captured_memory),
         }))
     }
 

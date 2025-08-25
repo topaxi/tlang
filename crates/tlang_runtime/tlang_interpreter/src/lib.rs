@@ -287,7 +287,7 @@ impl Interpreter {
         let old_scopes = std::mem::replace(&mut self.state.scope_stack.scopes, closure.scope_stack.clone());
         let old_memory = {
             let current_memory = self.state.scope_stack.get_memory().clone();
-            self.state.scope_stack.set_memory(closure.captured_memory.clone());
+            self.state.scope_stack.set_memory(closure.captured_memory.as_vec());
             current_memory
         };
         

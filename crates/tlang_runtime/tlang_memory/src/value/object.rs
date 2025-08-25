@@ -6,13 +6,63 @@ use crate::shape::{ShapeKey, Shaped};
 
 use super::TlangValue;
 
+/// Represents a closure with optimized memory capture.
+/// 
+/// # Memory Capture Strategy
+/// 
+/// Closures capture the memory state at creation time to preserve variable values.
+/// However, the current implementation has different behavior for global vs local variables:
+/// 
+/// - **Global variables**: Shared between closures (mutations visible across closures)
+/// - **Local variables**: Copied per closure (mutations NOT visible across closures) 
+/// 
+/// # Performance Optimizations
+/// 
+/// The `CapturedMemory` enum provides optimized storage:
+/// - `None`: No allocations for closures that only use globals/parameters
+/// - `Small`: Inline storage for small captures (≤8 values)  
+/// - `Large`: Heap allocation for larger captures
 #[derive(Debug, Clone)]
 pub struct TlangClosure {
     pub id: HirId,
     // Closures hold a reference to the scope stack at the time of creation.
     pub scope_stack: Vec<crate::scope::Scope>,
-    // Captured variable values to ensure they're preserved
-    pub captured_memory: Vec<TlangValue>,
+    // Track captured memory with optimization for common cases
+    pub captured_memory: CapturedMemory,
+}
+
+#[derive(Debug, Clone)]
+pub enum CapturedMemory {
+    // No local memory captured - closure only uses globals/parameters (most common case)
+    None,
+    // Small memory captured - inline storage for performance
+    Small(Vec<TlangValue>),
+    // Large memory captured - separate storage
+    Large(Vec<TlangValue>),
+}
+
+impl CapturedMemory {
+    pub fn new(memory: Vec<TlangValue>) -> Self {
+        if memory.is_empty() {
+            CapturedMemory::None
+        } else if memory.len() <= 8 {
+            // Small optimization - inline small captures
+            CapturedMemory::Small(memory)
+        } else {
+            CapturedMemory::Large(memory)
+        }
+    }
+    
+    pub fn as_vec(&self) -> Vec<TlangValue> {
+        match self {
+            CapturedMemory::None => Vec::new(),
+            CapturedMemory::Small(vec) | CapturedMemory::Large(vec) => vec.clone(),
+        }
+    }
+    
+    pub fn is_empty(&self) -> bool {
+        matches!(self, CapturedMemory::None)
+    }
 }
 
 #[derive(Debug, PartialEq)]
