@@ -51,12 +51,9 @@ impl<'hir> tlang_hir::Visitor<'hir> for ScopeDataCollector {
     }
 
     fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut Self::Context) {
-        match &mut stmt.kind {
-            hir::StmtKind::FunctionDeclaration(decl) => {
-                self.scope_data
-                    .push((format!("fn_{}", decl.name()), decl.locals(), decl.upvars()));
-            }
-            _ => {}
+        if let hir::StmtKind::FunctionDeclaration(decl) = &mut stmt.kind {
+            self.scope_data
+                .push((format!("fn_{}", decl.name()), decl.locals(), decl.upvars()));
         }
         tlang_hir::visit::walk_stmt(self, stmt, ctx);
     }

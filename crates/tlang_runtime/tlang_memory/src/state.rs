@@ -395,9 +395,14 @@ impl InterpreterState {
             .entry(decl.hir_id)
             .or_insert_with(|| decl.clone().into());
 
+        // Capture the current local memory state (excluding global scope)
+        // This provides access to upvars from outer scopes
+        let captured_memory = self.scope_stack.memory.clone();
+
         self.new_object(TlangObjectKind::Closure(TlangClosure {
             id: decl.hir_id,
             scope_stack: self.scope_stack.scopes.clone(),
+            captured_memory,
         }))
     }
 
