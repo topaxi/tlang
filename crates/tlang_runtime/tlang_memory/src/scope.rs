@@ -1,6 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use log::debug;
 use tlang_hir::hir::{self, HirScope, ScopeIndex};
 
@@ -9,7 +6,7 @@ use crate::value::TlangValue;
 
 #[derive(Debug, Clone)]
 pub struct ScopeStack {
-    scopes: Vec<Rc<RefCell<Scope>>>,
+    scopes: Vec<Scope>,
     // Central continuous memory for all scope values
     memory: Vec<TlangValue>,
 }
@@ -18,8 +15,8 @@ impl ScopeStack {
     pub fn new() -> Self {
         let mut scopes = Vec::with_capacity(10);
 
-        let root_scope = Rc::new(RefCell::new(Scope::default()));
-        root_scope.borrow_mut().set_offset(0);
+        let mut root_scope = Scope::default();
+        root_scope.set_offset(0);
         scopes.push(root_scope);
 
         Self {
@@ -38,10 +35,10 @@ impl ScopeStack {
             meta.upvars()
         );
 
-        let new_scope = Rc::new(RefCell::new(Scope::new(meta.locals(), meta.upvars())));
+        let mut new_scope = Scope::new(meta.locals(), meta.upvars());
 
         // Set the offset for the new scope to the end of current memory
-        new_scope.borrow_mut().set_offset(self.memory.len());
+        new_scope.set_offset(self.memory.len());
 
         self.scopes.push(new_scope);
     }
@@ -49,9 +46,7 @@ impl ScopeStack {
     pub fn pop(&mut self) {
         if let Some(scope) = self.scopes.pop() {
             // Truncate memory to remove the values from the popped scope
-            let scope_borrow = scope.borrow();
-            let new_len = scope_borrow.offset();
-            drop(scope_borrow); // Release the borrow before truncating
+            let new_len = scope.offset();
             self.memory.truncate(new_len);
         }
 
@@ -59,24 +54,23 @@ impl ScopeStack {
     }
 
     /// # Panics
-    pub fn current_scope(&self) -> Rc<RefCell<Scope>> {
-        self.scopes
-            .last()
-            .cloned()
-            .expect("No current scope available")
+    pub fn current_scope(&self) -> &Scope {
+        self.scopes.last().expect("No current scope available")
+    }
+
+    /// # Panics  
+    pub fn current_scope_mut(&mut self) -> &mut Scope {
+        self.scopes.last_mut().expect("No current scope available")
     }
 
     /// # Panics
-    pub fn root_scope(&self) -> Rc<RefCell<Scope>> {
-        self.scopes
-            .first()
-            .cloned()
-            .expect("No root scope available")
+    pub fn root_scope(&self) -> &Scope {
+        self.scopes.first().expect("No root scope available")
     }
 
     pub fn as_root(&self) -> Self {
         let mut scopes = Vec::with_capacity(10);
-        scopes.push(self.root_scope());
+        scopes.push(*self.root_scope());
         Self {
             scopes,
             memory: self.memory.clone(), // Share the same memory
@@ -84,32 +78,26 @@ impl ScopeStack {
     }
 
     pub fn clear_current_scope(&mut self) {
-        let current_scope = self.current_scope();
-        let mut scope_borrow = current_scope.borrow_mut();
-        let offset = scope_borrow.offset();
+        let offset = self.current_scope().offset();
 
         // Truncate memory to remove values from current scope
         self.memory.truncate(offset);
 
         // Clear the scope
-        scope_borrow.clear();
+        self.current_scope_mut().clear();
     }
 
     pub fn push_value(&mut self, value: TlangValue) {
-        let current_scope = self.current_scope();
-        let mut scope_borrow = current_scope.borrow_mut();
-
         // Add value to central memory
         self.memory.push(value);
 
         // Update scope length
-        scope_borrow.increment_length();
+        self.current_scope_mut().increment_length();
     }
 
     fn get_local(&self, index: usize) -> Option<TlangValue> {
         let current_scope = self.current_scope();
-        let scope_borrow = current_scope.borrow();
-        let offset = scope_borrow.offset();
+        let offset = current_scope.offset();
         let absolute_index = offset + index;
 
         self.memory.get(absolute_index).copied()
@@ -117,8 +105,7 @@ impl ScopeStack {
 
     fn set_local(&mut self, index: usize, value: TlangValue) {
         let current_scope = self.current_scope();
-        let scope_borrow = current_scope.borrow();
-        let offset = scope_borrow.offset();
+        let offset = current_scope.offset();
         let absolute_index = offset + index;
 
         if absolute_index < self.memory.len() {
@@ -129,8 +116,7 @@ impl ScopeStack {
     fn get_upvar(&self, relative_scope_index: u16, index: usize) -> Option<TlangValue> {
         let scope_index = self.scope_index(relative_scope_index);
         let scope = &self.scopes[scope_index];
-        let scope_borrow = scope.borrow();
-        let offset = scope_borrow.offset();
+        let offset = scope.offset();
         let absolute_index = offset + index;
 
         self.memory.get(absolute_index).copied()
@@ -139,8 +125,7 @@ impl ScopeStack {
     fn set_upvar(&mut self, relative_scope_index: u16, index: usize, value: TlangValue) {
         let scope_index = self.scope_index(relative_scope_index);
         let scope = &self.scopes[scope_index];
-        let scope_borrow = scope.borrow();
-        let offset = scope_borrow.offset();
+        let offset = scope.offset();
         let absolute_index = offset + index;
 
         if absolute_index < self.memory.len() {
@@ -173,14 +158,13 @@ impl ScopeStack {
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = Rc<RefCell<Scope>>> {
-        self.scopes.iter().cloned()
+    pub fn iter(&self) -> impl Iterator<Item = &Scope> {
+        self.scopes.iter()
     }
 
-    pub fn get_scope_locals(&self, scope: &Rc<RefCell<Scope>>) -> &[TlangValue] {
-        let scope_borrow = scope.borrow();
-        let offset = scope_borrow.offset();
-        let length = scope_borrow.length();
+    pub fn get_scope_locals(&self, scope: &Scope) -> &[TlangValue] {
+        let offset = scope.offset();
+        let length = scope.length();
 
         &self.memory[offset..offset + length]
     }
@@ -198,7 +182,7 @@ impl Resolver for ScopeStack {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Scope {
     // Offset into the central memory vector where this scope's locals start
     offset: usize,

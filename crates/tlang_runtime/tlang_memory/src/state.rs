@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -364,7 +363,7 @@ impl InterpreterState {
         self.scope_stack.pop();
     }
 
-    pub fn current_scope(&self) -> Rc<RefCell<Scope>> {
+    pub fn current_scope(&self) -> &Scope {
         self.scope_stack.current_scope()
     }
 
@@ -584,7 +583,7 @@ impl InterpreterState {
         let mut out = "[\n".to_string();
         for scope in self.scope_stack.iter() {
             out.push_str("  {\n");
-            for entry in self.scope_stack.get_scope_locals(&scope) {
+            for entry in self.scope_stack.get_scope_locals(scope) {
                 out.push_str("    ");
                 out.push_str(self.stringify(*entry).as_str());
                 out.push_str(",\n");

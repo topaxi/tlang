@@ -1074,7 +1074,7 @@ impl Interpreter {
                     self.panic(format!(
                         "Struct `{}` not found\nCurrent scope: {:?}",
                         path,
-                        self.state.current_scope().borrow()
+                        self.state.current_scope()
                     ));
                 };
 
@@ -1085,7 +1085,7 @@ impl Interpreter {
                     self.panic(format!(
                         "Enum variant `{}` not found\nCurrent scope: {:?}",
                         path,
-                        self.state.current_scope().borrow()
+                        self.state.current_scope()
                     ));
                 };
 
