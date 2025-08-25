@@ -15,6 +15,34 @@
 
 ## Root Cause Analysis
 
+### Found the Root Cause!
+
+The issue is NOT with closure memory management, but with **variable assignment of function call results within function scope**.
+
+**Reproduction case:**
+```tlang
+fn random_int(max) { 42 }
+
+fn test() {
+  // This works fine:
+  random_int(5) |> log();  // → 42
+  
+  // This is broken:
+  let result = random_int(5);  // Stores fn random_int#4(max) instead of 42
+  result |> log();
+}
+```
+
+**Root cause**: When assigning the result of a function call to a variable within a function scope, the function object is being stored instead of the computed return value.
+
+**Impact**: This affects any code that assigns function call results to variables within functions, which is exactly what quicksort does with `let pivotIndex = random_int(len(list));`.
+
+**Global scope works fine**: The issue only affects assignments within function scope, not global scope.
+
+### Fix needed
+
+The variable assignment mechanism within function scopes needs to be fixed to properly store function call return values instead of function objects.
+
 ### 1. Simple Closures
 
 ```rust
