@@ -4,13 +4,13 @@
 //! pipeline. By separating symbols into their own crate, we achieve better separation of
 //! concerns and allow later compilation phases to avoid depending on the entire AST crate.
 
-pub use log::debug;
+use log::debug;
 #[cfg(feature = "serde")]
-pub use serde::Serialize;
-pub use std::cell::RefCell;
-pub use std::collections::HashSet;
-pub use std::fmt::Display;
-pub use std::rc::Rc;
+use serde::Serialize;
+use std::cell::RefCell;
+use std::collections::HashSet;
+use std::fmt::Display;
+use std::rc::Rc;
 
 pub use tlang_span::{HirId, LineColumn, NodeId, Span};
 
