@@ -1502,7 +1502,12 @@ impl Interpreter {
             hir::PatKind::Identifier(_id, ident) => {
                 debug!("eval_pat: {} = {}", ident, self.state.stringify(value));
 
-                self.push_value(value);
+                // Use slot-based assignment for function scopes to ensure proper variable positioning
+                if !self.state.is_global_scope() {
+                    let _index = self.state.set_let_binding(value);
+                } else {
+                    self.push_value(value);
+                }
 
                 true
             }
