@@ -24,8 +24,11 @@ Always reference these instructions first and fallback to search or bash command
    cargo install wasm-bindgen-cli --version $WASM_BINDGEN_VERSION  # ~1m 30s installation time
    ```
 
-2. **Install Node.js dependencies:**
+2. **Install Node.js dependencies (CRITICAL - Node.js version must be 24.0.2):**
    ```bash
+   # CRITICAL: Ensure Node.js version 24.0.2 is installed (required by package.json volta config)
+   # Tests will fail with incorrect Node.js versions due to stack trace differences in expected output
+   node --version  # Must show v24.0.2
    npm ci  # ~12s installation time
    ```
 
@@ -37,8 +40,10 @@ Always reference these instructions first and fallback to search or bash command
    ```
 
 ### Build Commands (NEVER CANCEL - Set timeout to 60+ minutes)
+**CRITICAL: Node.js version 24.0.2 is required for all tests to pass. Verify with `node --version` before running tests.**
+
 - **Rust tests**: `cargo nextest run --profile=ci` -- takes ~55s. NEVER CANCEL. Set timeout to 30+ minutes.
-- **Integration tests**: `make test` -- takes ~64s. Tests built compiler/interpreter with both backends. Requires Node.js 24.0.2 (see package.json volta). NEVER CANCEL. Set timeout to 30+ minutes.
+- **Integration tests**: `make test` -- takes ~64s. Tests built compiler/interpreter with both backends. **REQUIRES Node.js 24.0.2 exactly** (see package.json volta config). Test failures with different Node.js versions are due to stack trace differences in expected output. NEVER CANCEL. Set timeout to 30+ minutes.
 - **WebAssembly bindings test**: `make test-bindings-js` -- takes ~21s. NEVER CANCEL. Set timeout to 30+ minutes.
 - **Build playground**: `npm run build` -- takes ~13s. NEVER CANCEL. Set timeout to 30+ minutes.
 - **Build interpreter**: `cargo build --release --features=binary --bin tlangdi` -- takes ~30s. NEVER CANCEL. Set timeout to 60+ minutes.
@@ -120,7 +125,7 @@ ALWAYS manually validate any code changes through complete end-to-end scenarios:
 1. **Test Rust build and core functionality:**
    ```bash
    cargo nextest run --profile=ci  # NEVER CANCEL - takes ~55s
-   make test                       # NEVER CANCEL - takes ~64s (integration tests with interpreter + JS backends, requires Node.js 24.0.2)
+   make test                       # NEVER CANCEL - takes ~64s (integration tests with interpreter + JS backends, **REQUIRES Node.js 24.0.2 exactly**)
    ```
 
 2. **Test WebAssembly bindings:**
@@ -215,9 +220,10 @@ tsconfig.json
 
 ### Understanding Test Failures
 - The `make test` command runs integration tests with both interpreter and JavaScript backends
+- **CRITICAL**: Tests require Node.js 24.0.2 exactly (specified in package.json volta config). Test failures with different Node.js versions are due to stack trace differences in expected output files.
 - Common failure causes:
-  1. **Node.js version mismatch**: Ensure you're using Node.js 24.0.2 (specified in package.json volta config)
-  2. **Stacktrace/line number differences**: When only stacktraces or line numbers differ, update the expected output instead of treating as real failure
+  1. **Node.js version mismatch**: Ensure you're using Node.js 24.0.2 exactly. Use `node --version` to verify. Do NOT update expected output files if using wrong Node.js version.
+  2. **Stacktrace/line number differences**: When only stacktraces or line numbers differ, verify you're using the correct Node.js version first before updating expected output.
 - Interpreter tests should always pass
 - Use CI results as authoritative - if tests pass on CI, local failures are likely environment issues
 - Focus on ensuring your changes don't break existing interpreter functionality
@@ -256,7 +262,7 @@ fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
 - **Missing wasm target**: Run `rustup target add wasm32-unknown-unknown`
 - **Wrong wasm-bindgen version**: Reinstall with exact version from Cargo.toml
 - **Binaryen not found**: Download and add to PATH as shown above
-- **Node.js version**: Project requires Node.js 24.0.2 (see package.json volta config)
+- **Node.js version**: Project requires Node.js 24.0.2 exactly (see package.json volta config). Use `node --version` to verify. Test failures with wrong Node.js versions are due to stack trace format differences in expected output files.
 
 ### Known Limitations
 - Some JavaScript backend tests fail due to panic handling differences
