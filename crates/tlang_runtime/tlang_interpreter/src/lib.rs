@@ -1502,12 +1502,12 @@ impl Interpreter {
             hir::PatKind::Identifier(_id, ident) => {
                 debug!("eval_pat: {} = {}", ident, self.state.stringify(value));
 
-                // Use slot-based assignment only for direct function scopes
-                // Nested blocks (if/else, loops) should use sequential assignment
-                if self.state.is_function_scope() {
-                    let _index = self.state.set_let_binding(value);
-                } else {
+                // Use slot-based assignment for non-global scopes that have allocated slots
+                // If scope has 0 locals, use sequential assignment instead
+                if self.state.is_global_scope() || !self.state.current_scope_has_slots() {
                     self.push_value(value);
+                } else {
+                    let _index = self.state.set_let_binding(value);
                 }
 
                 true

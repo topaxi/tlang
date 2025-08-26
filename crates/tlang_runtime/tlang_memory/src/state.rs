@@ -388,13 +388,9 @@ impl InterpreterState {
         self.scope_stack.scopes.len() == 1
     }
 
-    /// Check if we're currently in a direct function scope (not a nested block)
-    pub fn is_function_scope(&self) -> bool {
-        // Function scope is typically the second scope (global = 1, function = 2)
-        // But we need to be more careful - let's check if we're not in global
-        // and not too deeply nested. For now, let's be conservative and only
-        // use slot-based assignment for the direct function scope.
-        self.scope_stack.scopes.len() == 2
+    /// Check if the current scope has allocated slots for variables
+    pub fn current_scope_has_slots(&self) -> bool {
+        self.scope_stack.current_scope_has_slots()
     }
 
     pub fn set_global(&mut self, name: String, value: TlangValue) {
