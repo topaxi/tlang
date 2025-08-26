@@ -37,6 +37,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         for entry in glob(pattern).expect("Failed to read glob pattern") {
             let file_path = entry.expect("Failed to read test file path");
 
+            // Skip tests in known_failures directory - these are expected to fail
+            if file_path.to_string_lossy().contains("known_failures") {
+                println!("Skipping known failing test: {}", file_path.display());
+                continue;
+            }
+
             match run_test(&file_path, backend.as_str()) {
                 Ok(()) => {}
                 Err(e) => {

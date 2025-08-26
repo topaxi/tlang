@@ -1,0 +1,103 @@
+// Advanced pattern matching demonstrations
+// Demonstrates: nested patterns, guards, complex enum matching
+
+// Define a more complex enum for expression trees
+enum Expr {
+    Num(int),
+    Add(Expr, Expr),
+    Mul(Expr, Expr),
+    Sub(Expr, Expr),
+}
+
+// Evaluate expression tree
+fn eval(expr) {
+    match expr {
+        Expr::Num(n) => n,
+        Expr::Add(left, right) => eval(left) + eval(right),
+        Expr::Mul(left, right) => eval(left) * eval(right),
+        Expr::Sub(left, right) => eval(left) - eval(right),
+    }
+}
+
+// Count nodes in expression tree
+fn count_nodes(expr) {
+    match expr {
+        Expr::Num(_) => 1,
+        Expr::Add(left, right) => 1 + count_nodes(left) + count_nodes(right),
+        Expr::Mul(left, right) => 1 + count_nodes(left) + count_nodes(right),
+        Expr::Sub(left, right) => 1 + count_nodes(left) + count_nodes(right),
+    }
+}
+
+// Check if expression contains only additions
+fn is_add_only(expr) {
+    match expr {
+        Expr::Num(_) => true,
+        Expr::Add(left, right) => is_add_only(left) && is_add_only(right),
+        _ => false,
+    }
+}
+
+// Simple list pattern matching with length checking
+fn list_length([]) { 0 }
+fn list_length([_, ...xs]) { 1 + list_length(xs) }
+
+fn describe_list(list) {
+    let len = list_length(list);
+    if len == 0 {
+        "empty"
+    } else if len == 1 {
+        "single"
+    } else if len == 2 {
+        "pair"
+    } else if len == 3 {
+        "triple"
+    } else {
+        "many"
+    }
+}
+
+// Pattern matching with conditions
+fn classify_number(n) if n < 0 { "negative" }
+fn classify_number(0) { "zero" }
+fn classify_number(n) if n > 0 && n < 10 { "small_positive" }
+fn classify_number(n) if n >= 10 && n < 100 { "medium" }
+fn classify_number(_) { "large" }
+
+log("=== Advanced Pattern Matching Demo ===");
+
+// Test expression evaluation
+log("Expression tree evaluation:");
+let expr1 = Expr::Add(Expr::Num(5), Expr::Num(3));    // 5 + 3
+let expr2 = Expr::Mul(Expr::Num(4), Expr::Num(7));    // 4 * 7
+let expr3 = Expr::Add(expr1, expr2);                   // (5 + 3) + (4 * 7)
+
+eval(expr1) |> log();  // 8
+eval(expr2) |> log();  // 28
+eval(expr3) |> log();  // 36
+
+log("Node counting:");
+count_nodes(expr1) |> log();  // 3
+count_nodes(expr2) |> log();  // 3
+count_nodes(expr3) |> log();  // 7
+
+log("Add-only checking:");
+is_add_only(expr1) |> log();  // true
+is_add_only(expr2) |> log();  // false
+is_add_only(expr3) |> log();  // false
+
+// Test list description
+log("List descriptions:");
+describe_list([]) |> log();           // "empty"
+describe_list([1]) |> log();          // "single"
+describe_list([1, 2]) |> log();       // "pair"
+describe_list([1, 2, 3]) |> log();    // "triple"
+describe_list([1, 2, 3, 4]) |> log(); // "many"
+
+// Test number classification
+log("Number classification:");
+classify_number(-5) |> log();   // "negative"
+classify_number(0) |> log();    // "zero"
+classify_number(7) |> log();    // "small_positive"
+classify_number(42) |> log();   // "medium"
+classify_number(150) |> log();  // "large"

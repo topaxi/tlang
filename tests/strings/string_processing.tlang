@@ -1,0 +1,76 @@
+// String processing and manipulation
+// Demonstrates: string operations, recursion, pattern matching on strings
+
+// Helper functions
+fn map([], _) { [] }
+fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
+
+fn filter([], _) { [] }
+fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
+fn filter([_, ...xs], f) { rec filter(xs, f) }
+
+fn length([]) { 0 }
+fn length([_, ...xs]) { 1 + length(xs) }
+
+// String reverse function
+fn reverse_string(str) { reverse_string_helper(str, "") }
+
+fn reverse_string_helper("", acc) { acc }
+fn reverse_string_helper([c, ...rest], acc) { 
+    rec reverse_string_helper(rest, c + acc) 
+}
+
+// Check if string is palindrome
+fn is_palindrome(str) { str == reverse_string(str) }
+
+// Count character occurrences
+fn count_char("", _) { 0 }
+fn count_char([c, ...rest], target) if c == target { 
+    1 + count_char(rest, target) 
+}
+fn count_char([_, ...rest], target) { 
+    rec count_char(rest, target) 
+}
+
+// Check if string contains only alphabetic characters
+fn is_alpha("") { true }
+fn is_alpha([c, ...rest]) {
+    let code = char_code(c);
+    let is_upper = code >= 65 && code <= 90;   // A-Z
+    let is_lower = code >= 97 && code <= 122;  // a-z
+    (is_upper || is_lower) && is_alpha(rest)
+}
+
+// Simulated char_code function (simplified)
+fn char_code("a") { 97 }
+fn char_code("b") { 98 }
+fn char_code("c") { 99 }
+fn char_code("A") { 65 }
+fn char_code("B") { 66 }
+fn char_code("C") { 67 }
+fn char_code("1") { 49 }
+fn char_code("2") { 50 }
+fn char_code(" ") { 32 }
+fn char_code(_) { 32 }  // Default for unknown chars
+
+log("=== String Processing Demo ===");
+
+// Test palindrome detection
+log("Palindrome tests:");
+let test_strings = ["racecar", "hello", "madam", "world", "level"];
+test_strings |> map(is_palindrome) |> log();
+
+// Test string reversal
+log("String reversal:");
+"hello" |> reverse_string() |> log();
+"world" |> reverse_string() |> log();
+
+// Test character counting
+log("Character counting:");
+count_char("hello", "l") |> log();  // Should be 2
+count_char("banana", "a") |> log(); // Should be 3
+
+// Test alphabetic checking
+log("Alphabetic string tests:");
+let alpha_test_strings = ["hello", "world123", "abc", "test"];
+alpha_test_strings |> map(is_alpha) |> log();

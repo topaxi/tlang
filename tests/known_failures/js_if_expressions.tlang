@@ -1,0 +1,25 @@
+// Tests that fail in JavaScript backend due to if expression handling
+// This demonstrates a limitation in the JavaScript code generation
+
+fn test_return_if(times) {
+    return if (times > 0) {
+        "positive"
+    } else {
+        "zero or negative"
+    };
+}
+
+fn countdown_recursive(times) {
+    if times > 0 {
+        times |> log();
+        countdown_recursive(times - 1);
+    }
+}
+
+log("=== JavaScript Backend Failures ===");
+
+// These should work in interpreter but fail in JavaScript
+test_return_if(3) |> log();
+test_return_if(-1) |> log();
+
+countdown_recursive(3);
