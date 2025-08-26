@@ -48,8 +48,14 @@ impl ScopeStack {
             );
         }
 
-        self.scopes
-            .push(Scope::new(self.memory.len(), meta.locals()));
+        let new_scope = Scope::new(self.memory.len(), meta.locals());
+        log::debug!(
+            "Creating scope with start={}, size={}, current_memory_len={}",
+            new_scope.start(),
+            new_scope.size(),
+            self.memory.len()
+        );
+        self.scopes.push(new_scope);
     }
 
     pub fn pop(&mut self) {
@@ -318,15 +324,16 @@ impl Scope {
 
     pub fn increment_var_index(&mut self) -> usize {
         let index = self.next_var_index;
-        // We should never exceed the scope size significantly, but allow some overflow
-        // for cases where HIR analysis doesn't account for all runtime variables
+        // If we're exceeding the pre-calculated scope size, expand it
+        // This handles cases where HIR analysis doesn't perfectly match runtime needs
         if index >= self.size {
-            log::warn!(
-                "Variable allocation exceeding HIR-calculated scope size: allocating index {} but scope size is {} (start: {}). This may indicate a mismatch between HIR analysis and interpreter needs.",
-                index,
+            log::debug!(
+                "Expanding scope size from {} to {} due to additional variable allocation at index {}",
                 self.size,
-                self.start
+                index + 1,
+                index
             );
+            self.size = index + 1;
         }
         self.next_var_index += 1;
         index
