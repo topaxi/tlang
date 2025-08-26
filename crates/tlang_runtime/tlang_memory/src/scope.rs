@@ -37,21 +37,17 @@ impl ScopeStack {
             meta.upvars()
         );
 
-        let locals_count = meta.locals();
-        let mut new_scope = Scope::new(locals_count);
-
         // Local scopes (non-global) start at the current end of memory vector
         // Global scope (index 0) uses separate global_memory
         if !self.scopes.is_empty() {
-            // Set the start position for the new local scope
-            new_scope.set_start(self.memory.len());
-
             // Reserve capacity for the exact number of locals (avoid reallocations)
-            self.memory.reserve(locals_count);
+            self.memory.reserve(meta.locals());
+        } else {
+            log::warn!("Pushing global scope - should only happen once at initialization");
         }
-        // Global scope doesn't need start position setup as it uses global_memory directly
 
-        self.scopes.push(new_scope);
+        self.scopes
+            .push(Scope::new(self.memory.len(), meta.locals()));
     }
 
     pub fn pop(&mut self) {
@@ -220,6 +216,8 @@ impl ScopeStack {
     }
 
     /// Get the next variable index for let bindings in the current scope and increment it
+    /// # Panics
+    /// Panics if there is no current scope
     pub fn allocate_let_binding_index(&mut self) -> usize {
         let current_scope = self.scopes.last_mut().expect("No current scope");
         current_scope.increment_var_index()
@@ -227,6 +225,8 @@ impl ScopeStack {
 
     /// Initialize the variable index counter for function parameters
     /// This should be called after function parameters are pushed to memory
+    /// # Panics
+    /// Panics if there is no current scope
     pub fn init_var_index_after_params(&mut self, param_count: usize) {
         let current_scope = self.scopes.last_mut().expect("No current scope");
         current_scope.next_var_index = param_count;
@@ -281,6 +281,8 @@ impl Resolver for ScopeStack {
 pub struct Scope {
     // Starting position of this scope in the memory vector
     start: usize,
+    // Number of local variables allocated for this scope
+    size: usize,
     // Track the next variable index for let bindings in this scope
     // Function parameters are assigned sequentially starting from 0,
     // then let bindings continue from there
@@ -288,27 +290,25 @@ pub struct Scope {
 }
 
 impl Scope {
-    pub fn new(_locals: usize) -> Self {
+    pub fn new(start: usize, size: usize) -> Self {
         Self {
-            start: 0, // Will be set when the scope is actually created
+            start,
+            size,
             next_var_index: 0,
         }
-    }
-
-    pub fn set_start(&mut self, start: usize) {
-        self.start = start;
     }
 
     pub fn start(&self) -> usize {
         self.start
     }
 
-    pub fn next_var_index(&self) -> usize {
-        self.next_var_index
+    pub fn size(&self) -> usize {
+        self.size
     }
 
     pub fn increment_var_index(&mut self) -> usize {
         let index = self.next_var_index;
+        debug_assert!(index <= self.size, "Exceeded scope variable capacity",);
         self.next_var_index += 1;
         index
     }
