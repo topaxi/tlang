@@ -37,16 +37,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         for entry in glob(pattern).expect("Failed to read glob pattern") {
             let file_path = entry.expect("Failed to read test file path");
 
-            // Skip tests in known_failures directory - these are expected to fail
-            if file_path.to_string_lossy().contains("known_failures") {
-                println!("Skipping known failing test: {}", file_path.display());
-                continue;
-            }
+            let is_known_failure = file_path.to_string_lossy().contains("known_failures");
 
             match run_test(&file_path, backend.as_str()) {
                 Ok(()) => {}
                 Err(e) => {
-                    errors.push(e);
+                    if is_known_failure {
+                        // Known failures don't count as real errors - just print the result
+                        println!(
+                            "Known failing test failed as expected: {}",
+                            file_path.display()
+                        );
+                    } else {
+                        // Only count non-known_failures as actual errors
+                        errors.push(e);
+                    }
                 }
             }
         }
