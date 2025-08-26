@@ -308,7 +308,13 @@ impl Scope {
 
     pub fn increment_var_index(&mut self) -> usize {
         let index = self.next_var_index;
-        debug_assert!(index <= self.size, "Exceeded scope variable capacity",);
+        debug_assert!(
+            index < self.size,
+            "Exceeded scope variable capacity: trying to allocate index {} but scope size is {} (start: {}). This suggests a mismatch between HIR analysis and interpreter variable allocation.",
+            index,
+            self.size,
+            self.start
+        );
         self.next_var_index += 1;
         index
     }
