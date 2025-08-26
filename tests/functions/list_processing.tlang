@@ -1,0 +1,49 @@
+// List Processing with Recursion
+// Demonstrates: recursion, list operations, functional programming patterns
+
+// map(a[], fn(a) -> b) -> b[]
+fn map([], _) { [] }
+fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
+
+// filter(a[], fn(a) -> bool) -> a[]
+fn filter([], _) { [] }
+fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
+fn filter([_, ...xs], f) { rec filter(xs, f) }
+
+// foldl(a[], b, fn(b, a) -> b) -> b
+fn foldl([], acc, _) { acc }
+fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+
+// range(int, int) -> int[]
+fn range(start, end) {
+    if start >= end {
+        []
+    } else {
+        [start, ...range(start + 1, end)]
+    }
+}
+
+log("=== List Processing Demo ===");
+
+// Generate test data
+let numbers = range(1, 11);  // [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+log("Original numbers:");
+numbers |> log();
+
+// Basic transformations
+log("Squared numbers:");
+numbers |> map(fn(x) { x * x }) |> log();
+
+log("Even numbers only:");
+numbers |> filter(fn(x) { x % 2 == 0 }) |> log();
+
+log("Sum of all numbers:");
+numbers |> foldl(0, fn(acc, x) { acc + x }) |> log();
+
+// Complex pipeline
+log("Process evens, square them, sum result:");
+let result = numbers
+|> filter(fn(x) { x % 2 == 0 })
+|> map(fn(x) { x * x })
+|> foldl(0, fn(acc, x) { acc + x });
+result |> log();

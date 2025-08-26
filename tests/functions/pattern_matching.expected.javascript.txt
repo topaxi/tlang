@@ -1,0 +1,28 @@
+=== Advanced Pattern Matching Demo ===
+Original list:
+[
+  64, 34, 25, 12,
+  22, 11, 90
+]
+Length:
+7
+Sum:
+258
+Sorted:
+[
+  11, 12, 22, 25,
+  34, 64, 90
+]
+Number classifications:
+negative
+zero
+single digit
+double digit
+large number
+Fibonacci numbers:
+0
+1
+1
+2
+3
+5
