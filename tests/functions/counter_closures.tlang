@@ -16,6 +16,8 @@ fn test_counter(counter_fn, times) {
     if times > 0 {
         counter_fn() |> log();
         test_counter(counter_fn, times - 1);
+    } else {
+        false
     }
 }
 
