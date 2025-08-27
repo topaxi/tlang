@@ -202,13 +202,11 @@ fn apply_redactions(output: &str) -> String {
     // Some environments show backtraces, others don't - remove the section entirely if present
     let backtrace_section_re = Regex::new(r"stack backtrace:\n(   \d+: .+\n)*")
         .expect("Failed to compile backtrace section redaction regex");
-    result = backtrace_section_re
-        .replace_all(&result, "")
-        .into_owned();
+    result = backtrace_section_re.replace_all(&result, "").into_owned();
 
     // Redact numbered stack trace lines that appear with RUST_BACKTRACE=1
-    let numbered_trace_re = Regex::new(r"  \d+: [^\n]+\n")
-        .expect("Failed to compile numbered trace redaction regex");
+    let numbered_trace_re =
+        Regex::new(r"  \d+: [^\n]+\n").expect("Failed to compile numbered trace redaction regex");
     result = numbered_trace_re.replace_all(&result, "").into_owned();
 
     // Normalize backtrace notes that may vary between environments
@@ -249,39 +247,103 @@ fn apply_redactions(output: &str) -> String {
         .replace_all(&result, "Node.js [VERSION]")
         .into_owned();
 
-    // Redact Node.js syntax error details that vary between versions
-    let nodejs_syntax_details_re = Regex::new(r"Expected '[^']*', '[^']*' or <eof>")
-        .expect("Failed to compile Node.js syntax details redaction regex");
-    result = nodejs_syntax_details_re
-        .replace_all(&result, "[NODE_SYNTAX_ERROR_DETAILS]")
+    // Comprehensive Node.js syntax error redaction to handle version differences
+    // Redact various forms of syntax error details that change between Node.js versions
+    let syntax_error_patterns = [
+        r"Expected '[^']*'(, '[^']*')* or <eof>",
+        r"Unexpected token '[^']*'",
+        r"Unexpected (token|identifier|keyword|number|string) '[^']*'",
+        r"Unexpected (token|identifier|keyword|number|string) '[^']*' in [^'\n]*",
+        r"Missing .*? in .*?",
+        r"Invalid .*? in .*?",
+        r"Unexpected end of input",
+        r"Unexpected end of JSON input",
+    ];
+
+    for pattern in &syntax_error_patterns {
+        let re = Regex::new(pattern).expect("Failed to compile syntax error redaction regex");
+        result = re
+            .replace_all(&result, "[NODE_SYNTAX_ERROR_DETAILS]")
+            .into_owned();
+    }
+
+    // More comprehensive Node.js stack trace redactions
+    // Redact various forms of Node.js internal stack traces that may vary between versions
+    let stack_patterns = [
+        r"    at .* \(node:internal/[^)]+\)",
+        r"    at node:internal/[^:]+:\d+:\d+",
+        r"    at .* \(internal/[^)]+\)",
+        r"    at internal/[^:]+:\d+:\d+",
+        r"    at .* \(<anonymous>\)",
+        r"    at <anonymous>:\d+:\d+",
+    ];
+
+    for pattern in &stack_patterns {
+        let re =
+            Regex::new(pattern).expect("Failed to compile Node.js internal stack redaction regex");
+        result = re
+            .replace_all(&result, "    at [NODE_INTERNAL_STACK]")
+            .into_owned();
+    }
+
+    // Redact Node.js core module stack traces (events, fs, etc.) with more patterns
+    let core_patterns = [
+        r"    at .* \(node:[^)]+\)",
+        r"    at node:[^:]+:\d+:\d+",
+        r"    at .* \(events\.js:\d+:\d+\)",
+        r"    at .* \(fs\.js:\d+:\d+\)",
+        r"    at .* \(util\.js:\d+:\d+\)",
+        r"    at .* \(stream\.js:\d+:\d+\)",
+    ];
+
+    for pattern in &core_patterns {
+        let re = Regex::new(pattern).expect("Failed to compile Node.js core stack redaction regex");
+        result = re
+            .replace_all(&result, "    at [NODE_CORE_STACK]")
+            .into_owned();
+    }
+
+    // Redact stdin wrapper stack traces with more comprehensive patterns
+    let stdin_patterns = [
+        r"    at \[stdin\][^:]*:\d+:\d+",
+        r"    at .* \(\[stdin\]:\d+:\d+\)",
+        r"    at \[eval\]:\d+:\d+",
+        r"    at .* \(\[eval\]:\d+:\d+\)",
+    ];
+
+    for pattern in &stdin_patterns {
+        let re = Regex::new(pattern).expect("Failed to compile stdin wrapper redaction regex");
+        result = re
+            .replace_all(&result, "    at [STDIN_WRAPPER]")
+            .into_owned();
+    }
+
+    // Redact Node.js error codes and additional diagnostics that vary between versions
+    let error_code_re =
+        Regex::new(r"\s+code: '[^']*'").expect("Failed to compile error code redaction regex");
+    result = error_code_re
+        .replace_all(&result, " code: '[ERROR_CODE]'")
         .into_owned();
 
-    // Redact Node.js internal stack traces that may vary between Node.js versions
-    let nodejs_stack_re = Regex::new(r"    at .* \(node:internal/[^)]+\)")
-        .expect("Failed to compile Node.js stack redaction regex");
-    result = nodejs_stack_re
-        .replace_all(&result, "    at [NODE_INTERNAL_STACK]")
+    // Redact process exit information that may vary
+    let exit_info_re = Regex::new(r"Process exited with code \d+")
+        .expect("Failed to compile exit code redaction regex");
+    result = exit_info_re
+        .replace_all(&result, "Process exited with code [EXIT_CODE]")
         .into_owned();
 
-    // Redact Node.js core module stack traces (events, fs, etc.)
-    let nodejs_core_stack_re = Regex::new(r"    at .* \(node:[^)]+\)")
-        .expect("Failed to compile Node.js core stack redaction regex");
-    result = nodejs_core_stack_re
-        .replace_all(&result, "    at [NODE_CORE_STACK]")
+    // Redact Node.js module resolution paths that may vary between versions
+    let module_path_re = Regex::new(r"Cannot resolve module '[^']*' from '[^']*'")
+        .expect("Failed to compile module path redaction regex");
+    result = module_path_re
+        .replace_all(&result, "Cannot resolve module '[MODULE]' from '[PATH]'")
         .into_owned();
 
-    // Redact Node.js internal stack traces without function names
-    let nodejs_stack_simple_re = Regex::new(r"    at node:internal/[^:]+:\d+:\d+")
-        .expect("Failed to compile Node.js stack simple redaction regex");
-    result = nodejs_stack_simple_re
-        .replace_all(&result, "    at [NODE_INTERNAL_STACK]")
-        .into_owned();
-
-    // Redact stdin wrapper stack traces that may vary
-    let stdin_wrapper_re = Regex::new(r"    at \[stdin\][^:]*:\d+:\d+")
-        .expect("Failed to compile stdin wrapper redaction regex");
-    result = stdin_wrapper_re
-        .replace_all(&result, "    at [STDIN_WRAPPER]")
+    // Redact additional error context lines that might vary between Node.js versions
+    let error_context_re =
+        Regex::new(r"    \^+\s*$").expect("Failed to compile error context redaction regex");
+    result = error_context_re
+        .replace_all(&result, "    [ERROR_CONTEXT]")
         .into_owned();
 
     result

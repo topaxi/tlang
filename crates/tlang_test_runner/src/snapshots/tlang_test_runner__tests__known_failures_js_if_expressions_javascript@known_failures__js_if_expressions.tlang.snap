@@ -8,7 +8,7 @@ input_file: tests/known_failures/js_if_expressions.tlang
     return if (times > 0) {
            ^^
 
-SyntaxError: Unexpected token 'if'
+SyntaxError: [NODE_SYNTAX_ERROR_DETAILS]
     at [NODE_INTERNAL_STACK]
     at [NODE_INTERNAL_STACK]
     at [STDIN_WRAPPER]

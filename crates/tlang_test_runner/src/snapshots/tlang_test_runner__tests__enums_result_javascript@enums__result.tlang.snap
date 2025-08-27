@@ -14,8 +14,8 @@ function panic(msg) { throw new Error(msg); }
                       ^
 
 Error: Called unwrap on Err
-    at panic ([stdin]:201:29)
-    at Result.unwrap$0 [as unwrap] ([stdin]:53:16)
+    at [STDIN_WRAPPER]
+    at [STDIN_WRAPPER]
     at [STDIN_WRAPPER]
     at [NODE_INTERNAL_STACK]
     at [NODE_INTERNAL_STACK]

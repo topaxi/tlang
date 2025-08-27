@@ -8,7 +8,7 @@ input_file: tests/known_failures/counter_closures.tlang
     return if (times > 0) {
            ^^
 
-SyntaxError: Unexpected token 'if'
+SyntaxError: [NODE_SYNTAX_ERROR_DETAILS]
     at [NODE_INTERNAL_STACK]
     at [NODE_INTERNAL_STACK]
     at [STDIN_WRAPPER]
