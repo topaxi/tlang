@@ -11,7 +11,7 @@ Always reference these instructions first and fallback to search or bash command
 **CRITICAL**: All build commands can take 30+ minutes. NEVER CANCEL builds or tests. Use timeouts of 60+ minutes for build commands and 30+ minutes for test commands.
 
 Run `make copilot-bootstrap` to install all necessary dependencies and tools.
-In case this fails, take the steps below.
+Prefer this command to install dependencies. In case this fails, take the steps below.
 
 1. **Install Rust toolchain and dependencies:**
 
