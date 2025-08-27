@@ -383,34 +383,27 @@ impl SemanticAnalyzer {
 
     fn validate_escape_sequences(&mut self, string_content: &str, span: Span) {
         let mut chars = string_content.chars().peekable();
-        
+
         while let Some(ch) = chars.next() {
-            if ch == '\\' {
-                if let Some(&next_ch) = chars.peek() {
-                    // Only warn about clearly invalid escape sequences
-                    // We check for letters that are commonly mistaken for escape sequences
-                    // but are not valid in tlang
-                    match next_ch {
-                        // Common invalid escape attempts
-                        'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm' |
-                        'o' | 'p' | 'q' | 's' | 'u' | 'v' | 'w' | 'x' | 'y' | 'z' |
-                        'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K' | 'L' | 'M' |
-                        'N' | 'O' | 'P' | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z' => {
-                            // But exclude 't' since it could be from \\test or similar
-                            if next_ch != 't' && next_ch != 'n' && next_ch != 'r' {
-                                self.diagnostics.push(diagnostic::warn_at!(
-                                    span,
-                                    "Unknown escape sequence '\\{}' in string literal",
-                                    next_ch
-                                ));
-                            }
-                            chars.next(); // consume the character after backslash
-                        }
-                        _ => {
-                            // Don't warn for backslash followed by non-letters (could be valid paths, etc.)
-                        }
+            if ch == '\\'
+                && let Some(&next_ch) = chars.peek()
+            {
+                // Check if this is a valid escape sequence
+                // Valid escape sequences in tlang: \", \', \\, \n, \t, \r, \0
+                match next_ch {
+                    '"' | '\'' | '\\' | 'n' | 't' | 'r' | '0' => {
+                        // Valid escape sequence, no warning needed
                     }
-                } 
+                    _ => {
+                        // Unknown escape sequence, emit warning
+                        self.diagnostics.push(diagnostic::warn_at!(
+                            span,
+                            "Unknown escape sequence '\\{}' in string literal",
+                            next_ch
+                        ));
+                    }
+                }
+                chars.next(); // consume the character after backslash
             }
         }
     }

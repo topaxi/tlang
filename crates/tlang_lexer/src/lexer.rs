@@ -110,7 +110,7 @@ impl Lexer<'_> {
 
     fn read_string_literal(&mut self, quote: char) -> Result<String, String> {
         let mut result = String::new();
-        
+
         while self.current_char != quote && self.current_char != '\0' {
             if self.current_char == '\\' {
                 self.advance(); // consume the backslash
@@ -134,7 +134,7 @@ impl Lexer<'_> {
                 self.advance();
             }
         }
-        
+
         if self.current_char == quote {
             self.advance(); // consume the closing quote
             Ok(result)
