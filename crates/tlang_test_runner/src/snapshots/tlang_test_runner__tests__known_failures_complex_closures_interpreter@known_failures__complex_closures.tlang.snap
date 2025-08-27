@@ -1,7 +1,7 @@
 ---
 source: crates/tlang_test_runner/src/main.rs
 description: Known failure - output may not match expected
-expression: output
+expression: apply_redactions(&output)
 input_file: tests/known_failures/complex_closures.tlang
 ---
 === Complex Closures Test ===
@@ -10,16 +10,7 @@ input_file: tests/known_failures/complex_closures.tlang
 thread 'main' panicked at crates/tlang_runtime/tlang_interpreter/src/lib.rs:698:22:
 not yet implemented: eval_object_binary_op: Add, "fn anonymous#13(operation)", "1"
 stack backtrace:
-   0: __rustc::rust_begin_unwind
-   1: core::panicking::panic_fmt
-   2: tlang_interpreter::Interpreter::eval_binary
-   3: tlang_interpreter::Interpreter::eval_binary
-   4: tlang_interpreter::Interpreter::eval_stmts
-   5: tlang_interpreter::Interpreter::eval_block
-   6: tlang_interpreter::Interpreter::eval_expr
-   7: tlang_interpreter::Interpreter::eval_fn_call
-   8: tlang_interpreter::Interpreter::eval_call_object
-   9: tlang_interpreter::Interpreter::eval_call
+[STACK_TRACE]
   10: tlang_interpreter::Interpreter::eval_call
   11: tlang_interpreter::Interpreter::eval_stmts
   12: tlang_interpreter::Interpreter::eval_fn_call
@@ -27,4 +18,4 @@ stack backtrace:
   14: tlang_interpreter::Interpreter::eval_call
   15: tlang_interpreter::Interpreter::eval_stmts
   16: tlangdi::main
-note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

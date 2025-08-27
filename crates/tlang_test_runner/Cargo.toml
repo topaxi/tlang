@@ -4,7 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 
 [dependencies]
-insta = { version = "1.43", features = ["glob"] }
+insta = { workspace = true, features = ["glob"] }
 regex = "1.11"
 
 [lints]

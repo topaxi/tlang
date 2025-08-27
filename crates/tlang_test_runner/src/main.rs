@@ -68,10 +68,10 @@ mod tests {
                             insta::with_settings!({
                                 description => "Known failure - output may not match expected",
                             }, {
-                                insta::assert_snapshot!(test_name, output);
+                                insta::assert_snapshot!(test_name, apply_redactions(&output));
                             });
                         } else {
-                            insta::assert_snapshot!(test_name, output);
+                            insta::assert_snapshot!(test_name, apply_redactions(&output));
                         }
                     }
                     Err(_) => {
@@ -179,4 +179,20 @@ fn normalize_output(output: &str) -> std::borrow::Cow<'_, str> {
     let re = Regex::new(r"thread '(\w+)' \(\d+\) panicked at").expect("Failed to compile regex");
 
     re.replace_all(output, "thread '$1' panicked at")
+}
+
+fn apply_redactions(output: &str) -> String {
+    let mut result = output.to_string();
+    
+    // Redact stack backtrace details that may vary between environments
+    let backtrace_re = Regex::new(r"stack backtrace:\n(   \d+: .+\n)*")
+        .expect("Failed to compile backtrace redaction regex");
+    result = backtrace_re.replace_all(&result, "stack backtrace:\n[STACK_TRACE]\n").into_owned();
+    
+    // Normalize backtrace notes that may vary between environments
+    let note_re = Regex::new(r"note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace\.")
+        .expect("Failed to compile backtrace note redaction regex");
+    result = note_re.replace_all(&result, "note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace").into_owned();
+    
+    result
 }
