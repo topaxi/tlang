@@ -1,4 +1,6 @@
-.PHONY: all clean test test-debug test-review test-accept test-bindings-js tlangdi-release-debug
+.PHONY: all clean test test-debug test-review test-accept test-bindings-js tlangdi-release-debug copilot
+
+WASM_BINDGEN_VERSION := $(shell grep -oP 'wasm-bindgen = "=\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
 
 all:
 	cargo +nightly make
@@ -31,3 +33,8 @@ test-bindings-js:
 
 tlangdi-release-debug:
 	RUSTFLAGS="-C force-frame-pointers=yes -C opt-level=0" cargo build --release --features=binary --bin tlangdi
+
+copilot-bootstrap:
+	rustup component add clippy rustfmt
+	cargo install cargo-nextest cargo-insta wasm-pack
+	cargo install wasm-bindgen-cli --version $(WASM_BINDGEN_VERSION)
