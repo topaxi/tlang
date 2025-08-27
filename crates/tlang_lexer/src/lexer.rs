@@ -108,12 +108,37 @@ impl Lexer<'_> {
         &self.source[start..self.position]
     }
 
-    fn read_string_literal(&mut self, quote: char) -> &str {
-        let start = self.position;
-        self.advance_while(|ch| ch != quote);
-        let string_literal = &self.source[start..self.position];
-        self.advance();
-        string_literal
+    fn read_string_literal(&mut self, quote: char) -> Result<String, String> {
+        let mut result = String::new();
+        
+        while self.current_char != quote && self.current_char != '\0' {
+            if self.current_char == '\\' {
+                self.advance(); // consume the backslash
+                match self.current_char {
+                    '"' => result.push('"'),
+                    '\'' => result.push('\''),
+                    '\\' => result.push('\\'),
+                    'n' => result.push('\n'),
+                    't' => result.push('\t'),
+                    'r' => result.push('\r'),
+                    '0' => result.push('\0'),
+                    ch => {
+                        return Err(format!("Unknown escape sequence '\\{}'", ch));
+                    }
+                }
+                self.advance();
+            } else {
+                result.push(self.current_char);
+                self.advance();
+            }
+        }
+        
+        if self.current_char == quote {
+            self.advance(); // consume the closing quote
+            Ok(result)
+        } else {
+            Err("Unterminated string literal".to_string())
+        }
     }
 
     fn line_column(&self) -> LineColumn {
@@ -336,12 +361,21 @@ impl Lexer<'_> {
             '"' | '\'' => {
                 let quote = ch;
                 self.advance();
-                let literal = self.read_string_literal(quote).into();
-
-                if quote == '"' {
-                    self.token(TokenKind::Literal(Literal::String(literal)), start)
-                } else {
-                    self.token(TokenKind::Literal(Literal::Char(literal)), start)
+                match self.read_string_literal(quote) {
+                    Ok(literal) => {
+                        let literal = literal.into();
+                        if quote == '"' {
+                            self.token(TokenKind::Literal(Literal::String(literal)), start)
+                        } else {
+                            self.token(TokenKind::Literal(Literal::Char(literal)), start)
+                        }
+                    }
+                    Err(_error) => {
+                        // For now, return an Unknown token for invalid escape sequences
+                        // In a more complete implementation, we'd want to report the error
+                        // through a diagnostic system, but this provides the minimum behavior
+                        self.token(TokenKind::Unknown, start)
+                    }
                 }
             }
             ch if Self::is_alphanumeric(ch) => match self.read_identifier() {
