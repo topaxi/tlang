@@ -184,6 +184,11 @@ fn normalize_output(output: &str) -> std::borrow::Cow<'_, str> {
 fn apply_redactions(output: &str) -> String {
     let mut result = output.to_string();
     
+    // Redact log timestamps that may vary between runs
+    let timestamp_re = Regex::new(r"\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z (WARN|ERROR|INFO|DEBUG)")
+        .expect("Failed to compile timestamp redaction regex");
+    result = timestamp_re.replace_all(&result, "[TIMESTAMP] $1").into_owned();
+    
     // Redact stack backtrace details that may vary between environments
     let backtrace_re = Regex::new(r"stack backtrace:\n(   \d+: .+\n)*")
         .expect("Failed to compile backtrace redaction regex");
