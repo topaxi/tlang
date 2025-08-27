@@ -21,8 +21,4 @@ Current scope: [INTERNAL_MEMORY_STATE]
 
 stack backtrace:
 [STACK_TRACE]
-  10: tlang_interpreter::Interpreter::eval_call
-  11: tlang_interpreter::Interpreter::eval_call
-  12: tlang_interpreter::Interpreter::eval_stmts
-  13: tlangdi::main
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

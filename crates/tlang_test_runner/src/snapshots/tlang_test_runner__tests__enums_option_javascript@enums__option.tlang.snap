@@ -16,13 +16,13 @@ function panic(msg) { throw new Error(msg); }
 Error: Called unwrap on None
     at panic ([stdin]:201:29)
     at Option.unwrap ([stdin]:26:16)
-    at [stdin]:210:20
-    at runScriptInThisContext (node:internal/vm:218:10)
-    at node:internal/process/execution:456:12
-    at [stdin]-wrapper:6:24
-    at runScriptInContext (node:internal/process/execution:454:60)
-    at evalFunction (node:internal/process/execution:286:30)
-    at evalTypeScript (node:internal/process/execution:298:3)
-    at node:internal/main/eval_stdin:51:5
+    at [STDIN_WRAPPER]
+    at [NODE_INTERNAL_STACK]
+    at [NODE_INTERNAL_STACK]
+    at [STDIN_WRAPPER]
+    at [NODE_INTERNAL_STACK]
+    at [NODE_INTERNAL_STACK]
+    at [NODE_INTERNAL_STACK]
+    at [NODE_INTERNAL_STACK]
 
-Node.js v24.0.2
+Node.js [VERSION]

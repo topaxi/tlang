@@ -7,16 +7,17 @@ input_file: tests/known_failures/unicode_strings.tlang
 [stdin]:213
     let newline_str = "line1
                       ^^^^^^
-Expected ';', '}' or <eof>
 
 SyntaxError: Invalid or unexpected token
-    at makeContextifyScript (node:internal/vm:194:14)
-    at compileScript (node:internal/process/execution:393:10)
-    at evalTypeScript (node:internal/process/execution:261:22)
-    at node:internal/main/eval_stdin:51:5
-    at Socket.<anonymous> (node:internal/process/execution:206:5)
-    at Socket.emit (node:events:519:35)
-    at endReadableNT (node:internal/streams/readable:1701:12)
-    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+    at [NODE_INTERNAL_STACK]
+    at [NODE_INTERNAL_STACK]
+    at [STDIN_WRAPPER]
+    at [NODE_INTERNAL_STACK]
+    at [NODE_INTERNAL_STACK]
+    at [NODE_INTERNAL_STACK]
+    at [NODE_INTERNAL_STACK]
+    at [NODE_CORE_STACK]
+    at [NODE_INTERNAL_STACK]
+    at [NODE_INTERNAL_STACK]
 
-Node.js v24.0.2
+Node.js [VERSION]
