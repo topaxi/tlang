@@ -1,5 +1,6 @@
 use crate::node;
-use tlang_span::NodeId;
+use crate::token::Literal;
+use tlang_span::{NodeId, Span};
 
 pub trait Visitor<'ast>: Sized {
     type Context;
@@ -65,6 +66,11 @@ pub trait Visitor<'ast>: Sized {
 
     fn visit_expr(&mut self, expression: &'ast node::Expr, ctx: &mut Self::Context) {
         walk_expr(self, expression, ctx);
+    }
+
+    #[allow(unused_variables)]
+    fn visit_literal(&mut self, literal: &'ast Literal, span: Span, ctx: &mut Self::Context) {
+        // Default implementation does nothing
     }
 
     fn visit_else_clause(&mut self, clause: &'ast node::ElseClause, ctx: &mut Self::Context) {
@@ -158,7 +164,9 @@ pub fn walk_pat<'ast, V: Visitor<'ast>>(
                 visitor.visit_pat(pat, ctx);
             }
         }
-        node::PatKind::Literal(_) => {}
+        node::PatKind::Literal(literal) => {
+            visitor.visit_literal(literal, pattern.span, ctx);
+        }
         node::PatKind::_Self => {}
         node::PatKind::Wildcard => {}
         node::PatKind::None => {}
@@ -481,7 +489,9 @@ pub fn walk_expr<'ast, V: Visitor<'ast>>(
         node::ExprKind::Let(pattern, expr) => {
             walk_let_expression(visitor, pattern, expr, ctx);
         }
-        node::ExprKind::Literal(_) => {}
+        node::ExprKind::Literal(literal) => {
+            visitor.visit_literal(literal, expression.span, ctx);
+        }
         node::ExprKind::List(exprs) => {
             walk_list(visitor, exprs, ctx);
         }

@@ -123,7 +123,9 @@ impl Lexer<'_> {
                     'r' => result.push('\r'),
                     '0' => result.push('\0'),
                     ch => {
-                        return Err(format!("Unknown escape sequence '\\{}'", ch));
+                        // For unknown escape sequences, leave them as literal characters
+                        result.push('\\');
+                        result.push(ch);
                     }
                 }
                 self.advance();
@@ -371,9 +373,7 @@ impl Lexer<'_> {
                         }
                     }
                     Err(_error) => {
-                        // For now, return an Unknown token for invalid escape sequences
-                        // In a more complete implementation, we'd want to report the error
-                        // through a diagnostic system, but this provides the minimum behavior
+                        // Only for unterminated strings, return an Unknown token
                         self.token(TokenKind::Unknown, start)
                     }
                 }

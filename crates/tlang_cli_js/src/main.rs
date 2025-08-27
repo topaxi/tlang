@@ -182,6 +182,13 @@ fn compile_to_hir(source: &str) -> Result<hir::Module, ParserError> {
     semantic_analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());
     semantic_analyzer.analyze(&ast)?;
 
+    // Display warnings (but don't fail compilation)
+    for diagnostic in semantic_analyzer.get_diagnostics() {
+        if diagnostic.is_warning() {
+            eprintln!("{}", diagnostic);
+        }
+    }
+
     let (mut module, meta) = lower_to_hir(
         &ast,
         semantic_analyzer.symbol_id_allocator(),

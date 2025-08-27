@@ -6,6 +6,7 @@ use tlang_ast::{
         BinaryOpKind, Expr, ExprKind, FunctionDeclaration, LetDeclaration, Module, Pat, PatKind,
         Path, Stmt, StmtKind, StructDeclaration,
     },
+    token::Literal,
     visit::{Visitor, walk_expr, walk_pat, walk_stmt},
 };
 use tlang_span::{NodeId, Span};
@@ -379,6 +380,40 @@ impl SemanticAnalyzer {
             }
         }
     }
+
+    fn validate_escape_sequences(&mut self, string_content: &str, span: Span) {
+        let mut chars = string_content.chars().peekable();
+        
+        while let Some(ch) = chars.next() {
+            if ch == '\\' {
+                if let Some(&next_ch) = chars.peek() {
+                    // Only warn about clearly invalid escape sequences
+                    // We check for letters that are commonly mistaken for escape sequences
+                    // but are not valid in tlang
+                    match next_ch {
+                        // Common invalid escape attempts
+                        'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm' |
+                        'o' | 'p' | 'q' | 's' | 'u' | 'v' | 'w' | 'x' | 'y' | 'z' |
+                        'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K' | 'L' | 'M' |
+                        'N' | 'O' | 'P' | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z' => {
+                            // But exclude 't' since it could be from \\test or similar
+                            if next_ch != 't' && next_ch != 'n' && next_ch != 'r' {
+                                self.diagnostics.push(diagnostic::warn_at!(
+                                    span,
+                                    "Unknown escape sequence '\\{}' in string literal",
+                                    next_ch
+                                ));
+                            }
+                            chars.next(); // consume the character after backslash
+                        }
+                        _ => {
+                            // Don't warn for backslash followed by non-letters (could be valid paths, etc.)
+                        }
+                    }
+                } 
+            }
+        }
+    }
 }
 
 impl SemanticAnalyzer {
@@ -518,6 +553,17 @@ impl<'ast> Visitor<'ast> for SemanticAnalyzer {
                 }
             }
             _ => walk_pat(self, pat, ctx),
+        }
+    }
+
+    fn visit_literal(&mut self, literal: &'ast Literal, span: Span, _ctx: &mut Self::Context) {
+        match literal {
+            Literal::String(string_content) | Literal::Char(string_content) => {
+                self.validate_escape_sequences(string_content, span);
+            }
+            _ => {
+                // No validation needed for other literal types
+            }
         }
     }
 }

@@ -361,11 +361,11 @@ fn test_char_escape_sequences() {
 fn test_invalid_escape_sequences() {
     let mut lexer = Lexer::new("\"Invalid: \\z\"");
     let token = lexer.next_token();
-    assert_eq!(token.kind, TokenKind::Unknown);
+    assert_eq!(token.kind, TokenKind::Literal(Literal::String("Invalid: \\z".into())));
 
     let mut lexer = Lexer::new("\"Another: \\x\"");
     let token = lexer.next_token();
-    assert_eq!(token.kind, TokenKind::Unknown);
+    assert_eq!(token.kind, TokenKind::Literal(Literal::String("Another: \\x".into())));
 }
 
 #[test]
