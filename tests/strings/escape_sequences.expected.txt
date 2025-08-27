@@ -1,0 +1,11 @@
+=== Escape Sequences Test ===
+Quote: "Hello"
+Path: C:\test
+Line1
+Line2
+Col1	Col2
+BeforeAfter
+Text End
+=== Char Escape Sequences ===
+'
+\
