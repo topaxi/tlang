@@ -199,5 +199,20 @@ fn apply_redactions(output: &str) -> String {
         .expect("Failed to compile backtrace note redaction regex");
     result = note_re.replace_all(&result, "note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace").into_owned();
     
+    // Redact internal compiler symbol dumps that contain varying identifiers
+    let symbol_dump_re = Regex::new(r"Available symbols: \[\n(.*?\n)*?\s*\]")
+        .expect("Failed to compile symbol dump redaction regex");
+    result = symbol_dump_re.replace_all(&result, "Available symbols: [INTERNAL_SYMBOL_TABLE]").into_owned();
+    
+    // Redact memory state dumps in panic messages that contain varying data structures
+    let memory_dump_re = Regex::new(r"Current scope: \[\n(.*?\n)*?\]")
+        .expect("Failed to compile memory dump redaction regex");
+    result = memory_dump_re.replace_all(&result, "Current scope: [INTERNAL_MEMORY_STATE]").into_owned();
+    
+    // Redact specific internal IDs that may vary between runs
+    let id_tag_re = Regex::new(r"(SymbolIdTag|NodeIdTag|HirIdTag)\(\d+\)")
+        .expect("Failed to compile ID tag redaction regex");
+    result = id_tag_re.replace_all(&result, "$1([ID])").into_owned();
+    
     result
 }
