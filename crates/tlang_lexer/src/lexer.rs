@@ -145,15 +145,17 @@ impl Lexer<'_> {
                                     }
                                     if self.current_char == '}' {
                                         result.push('}');
+                                        self.advance(); // consume the '}'
                                     }
-                                    // Don't advance here - let the main loop handle the current character
-                                    continue;
+                                    continue; // Skip the advance at the end since we already handled it
                                 }
                             }
                         } else {
                             // Not a valid Unicode escape, treat as literal
                             result.push('\\');
                             result.push('u');
+                            // Don't advance here - self.current_char is the character after 'u'
+                            // which will be handled by the main loop
                             continue; // Skip the advance at the end of the match
                         }
                     }
