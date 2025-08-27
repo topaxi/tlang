@@ -29,6 +29,9 @@ mod tests {
     // Test all .tlang files using insta's glob functionality
     #[test]
     fn test_all_tlang_files() {
+        // Verify Node.js version before running JavaScript tests
+        check_nodejs_version();
+        
         // Use absolute path to the tests directory
         let current_dir = std::env::current_dir().unwrap();
         let workspace_root = current_dir
@@ -105,6 +108,31 @@ mod tests {
 fn main() {
     println!("Test runner now uses insta snapshots. Run with 'cargo test' instead.");
     println!("Use 'cargo insta review' to review and accept snapshot changes.");
+}
+
+fn check_nodejs_version() {
+    const REQUIRED_VERSION: &str = "24.0.2";
+    
+    // Enforce the exact Node.js version specified in package.json instead of using redactions
+    // to normalize output differences between Node.js versions. This ensures consistent test
+    // results by requiring developers to use the exact Node.js version the project targets.
+    let output = Command::new("node")
+        .arg("--version")
+        .output()
+        .expect("Failed to execute 'node --version'. Make sure Node.js is installed.");
+    
+    let version_output = String::from_utf8_lossy(&output.stdout);
+    let version = version_output.trim().strip_prefix('v').unwrap_or(&version_output.trim());
+    
+    if version != REQUIRED_VERSION {
+        panic!(
+            "Node.js version {} is required (as specified in package.json), but found version {}. \
+             Please install Node.js {} or use a version manager like volta to switch to the required version.",
+            REQUIRED_VERSION, version, REQUIRED_VERSION
+        );
+    }
+    
+    println!("✓ Node.js version {} verified", REQUIRED_VERSION);
 }
 
 fn run_test_with_backend(file_path: &Path, backend: Backend) -> String {
@@ -239,112 +267,6 @@ fn apply_redactions(output: &str) -> String {
     let id_tag_re = Regex::new(r"(SymbolIdTag|NodeIdTag|HirIdTag)\(\d+\)")
         .expect("Failed to compile ID tag redaction regex");
     result = id_tag_re.replace_all(&result, "$1([ID])").into_owned();
-
-    // Redact Node.js version numbers that may vary between environments
-    let nodejs_version_re = Regex::new(r"Node\.js v\d+\.\d+\.\d+")
-        .expect("Failed to compile Node.js version redaction regex");
-    result = nodejs_version_re
-        .replace_all(&result, "Node.js [VERSION]")
-        .into_owned();
-
-    // Comprehensive Node.js syntax error redaction to handle version differences
-    // Redact various forms of syntax error details that change between Node.js versions
-    let syntax_error_patterns = [
-        r"Expected '[^']*'(, '[^']*')* or <eof>",
-        r"Unexpected token '[^']*'",
-        r"Unexpected (token|identifier|keyword|number|string) '[^']*'",
-        r"Unexpected (token|identifier|keyword|number|string) '[^']*' in [^'\n]*",
-        r"Missing .*? in .*?",
-        r"Invalid .*? in .*?",
-        r"Unexpected end of input",
-        r"Unexpected end of JSON input",
-    ];
-
-    for pattern in &syntax_error_patterns {
-        let re = Regex::new(pattern).expect("Failed to compile syntax error redaction regex");
-        result = re
-            .replace_all(&result, "[NODE_SYNTAX_ERROR_DETAILS]")
-            .into_owned();
-    }
-
-    // More comprehensive Node.js stack trace redactions
-    // Redact various forms of Node.js internal stack traces that may vary between versions
-    let stack_patterns = [
-        r"    at .* \(node:internal/[^)]+\)",
-        r"    at node:internal/[^:]+:\d+:\d+",
-        r"    at .* \(internal/[^)]+\)",
-        r"    at internal/[^:]+:\d+:\d+",
-        r"    at .* \(<anonymous>\)",
-        r"    at <anonymous>:\d+:\d+",
-    ];
-
-    for pattern in &stack_patterns {
-        let re =
-            Regex::new(pattern).expect("Failed to compile Node.js internal stack redaction regex");
-        result = re
-            .replace_all(&result, "    at [NODE_INTERNAL_STACK]")
-            .into_owned();
-    }
-
-    // Redact Node.js core module stack traces (events, fs, etc.) with more patterns
-    let core_patterns = [
-        r"    at .* \(node:[^)]+\)",
-        r"    at node:[^:]+:\d+:\d+",
-        r"    at .* \(events\.js:\d+:\d+\)",
-        r"    at .* \(fs\.js:\d+:\d+\)",
-        r"    at .* \(util\.js:\d+:\d+\)",
-        r"    at .* \(stream\.js:\d+:\d+\)",
-    ];
-
-    for pattern in &core_patterns {
-        let re = Regex::new(pattern).expect("Failed to compile Node.js core stack redaction regex");
-        result = re
-            .replace_all(&result, "    at [NODE_CORE_STACK]")
-            .into_owned();
-    }
-
-    // Redact stdin wrapper stack traces with more comprehensive patterns
-    let stdin_patterns = [
-        r"    at \[stdin\][^:]*:\d+:\d+",
-        r"    at .* \(\[stdin\]:\d+:\d+\)",
-        r"    at \[eval\]:\d+:\d+",
-        r"    at .* \(\[eval\]:\d+:\d+\)",
-    ];
-
-    for pattern in &stdin_patterns {
-        let re = Regex::new(pattern).expect("Failed to compile stdin wrapper redaction regex");
-        result = re
-            .replace_all(&result, "    at [STDIN_WRAPPER]")
-            .into_owned();
-    }
-
-    // Redact Node.js error codes and additional diagnostics that vary between versions
-    let error_code_re =
-        Regex::new(r"\s+code: '[^']*'").expect("Failed to compile error code redaction regex");
-    result = error_code_re
-        .replace_all(&result, " code: '[ERROR_CODE]'")
-        .into_owned();
-
-    // Redact process exit information that may vary
-    let exit_info_re = Regex::new(r"Process exited with code \d+")
-        .expect("Failed to compile exit code redaction regex");
-    result = exit_info_re
-        .replace_all(&result, "Process exited with code [EXIT_CODE]")
-        .into_owned();
-
-    // Redact Node.js module resolution paths that may vary between versions
-    let module_path_re = Regex::new(r"Cannot resolve module '[^']*' from '[^']*'")
-        .expect("Failed to compile module path redaction regex");
-    result = module_path_re
-        .replace_all(&result, "Cannot resolve module '[MODULE]' from '[PATH]'")
-        .into_owned();
-
-    // Redact additional error context lines that might vary between Node.js versions
-    let error_context_re =
-        Regex::new(r"    \^+\s*$").expect("Failed to compile error context redaction regex");
-    result = error_context_re
-        .replace_all(&result, "    [ERROR_CONTEXT]")
-        .into_owned();
 
     result
 }
