@@ -10,9 +10,6 @@ Always reference these instructions first and fallback to search or bash command
 
 **CRITICAL**: All build commands can take 30+ minutes. NEVER CANCEL builds or tests. Use timeouts of 60+ minutes for build commands and 30+ minutes for test commands.
 
-Run `make copilot-bootstrap` to install all necessary dependencies and tools.
-Prefer this command to install dependencies. In case this fails, take the steps below.
-
 1. **Install Rust toolchain and dependencies:**
 
    ```bash
@@ -21,13 +18,10 @@ Prefer this command to install dependencies. In case this fails, take the steps 
 
    # Install required Rust components for testing and formatting
    rustup component add clippy rustfmt
-   cargo install cargo-nextest        # ~3m 10s installation time
-   cargo install cargo-insta
-   cargo install wasm-pack           # ~1m 30s installation time
+   cargo install cargo-nextest cargo-insta wasm-pack
 
    # Install exact wasm-bindgen-cli version (CRITICAL - version must match Cargo.toml)
-   WASM_BINDGEN_VERSION=$(grep -oP 'wasm-bindgen = "=\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
-   cargo install wasm-bindgen-cli --version $WASM_BINDGEN_VERSION  # ~1m 30s installation time
+   cargo install wasm-bindgen-cli --version $(grep -oP 'wasm-bindgen = "=\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
    ```
 
 2. **Install Node.js dependencies (CRITICAL - Node.js version must be 24.0.2):**
