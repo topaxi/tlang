@@ -1,0 +1,18 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: output
+input_file: tests/operators/truthyness.tlang
+---
+Truthy values
+============
+[ [ true, true ], [ 1, true ], [ [ 1 ], true ], [ { a: 1 }, true ] ]
+
+Falsy values
+============
+[
+  [ undefined, false ],
+  [ false, false ],
+  [ 0, false ],
+  [ [], true ],
+  [ {}, true ]
+]

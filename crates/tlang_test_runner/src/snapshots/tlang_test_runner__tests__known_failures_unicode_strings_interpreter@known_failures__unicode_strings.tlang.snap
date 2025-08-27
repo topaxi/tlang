@@ -1,0 +1,13 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+description: Known failure - output may not match expected
+expression: output
+input_file: tests/known_failures/unicode_strings.tlang
+---
+=== Unicode and Special Characters Test ===
+Hello 🌍
+café
+line1
+line2
+col1	col2
+He said hello

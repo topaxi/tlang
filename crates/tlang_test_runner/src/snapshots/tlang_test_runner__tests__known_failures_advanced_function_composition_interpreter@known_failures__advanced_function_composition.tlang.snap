@@ -24,4 +24,14 @@ thread 'main' panicked at crates/tlang_runtime/tlang_memory/src/state.rs:328:9:
 Function `"anonymous"` expects 1 arguments, but got 0
   at root 141:1
 
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: tlang_memory::state::InterpreterState::panic
+   3: tlang_interpreter::Interpreter::eval_fn_call
+   4: tlang_interpreter::Interpreter::eval_call_object
+   5: tlang_interpreter::Interpreter::eval_call
+   6: tlang_interpreter::Interpreter::eval_call
+   7: tlang_interpreter::Interpreter::eval_stmts
+   8: tlangdi::main
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.

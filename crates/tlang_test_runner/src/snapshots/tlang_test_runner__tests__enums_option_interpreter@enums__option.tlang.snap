@@ -14,4 +14,15 @@ thread 'main' panicked at crates/tlang_runtime/tlang_memory/src/state.rs:328:9:
 Called unwrap on None
   at root 10:1
 
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: tlang_memory::state::InterpreterState::panic
+   3: tlang_memory::state::InterpreterState::new_native_method::{{closure}}
+   4: tlang_interpreter::Interpreter::exec_native_fn
+   5: tlang_interpreter::Interpreter::call_shape_method
+   6: tlang_interpreter::Interpreter::eval_call
+   7: tlang_interpreter::Interpreter::eval_call
+   8: tlang_interpreter::Interpreter::eval_stmts
+   9: tlangdi::main
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
