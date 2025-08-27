@@ -106,8 +106,10 @@ mod tests {
 }
 
 fn main() {
-    println!("Test runner now uses insta snapshots. Run with 'cargo test' instead.");
-    println!("Use 'cargo insta review' to review and accept snapshot changes.");
+    println!("Test runner now uses insta snapshots.");
+    println!("Recommended: Use 'make test' to run all tests.");
+    println!("Use 'make test-review' to review snapshot changes, and 'make test-accept' to accept them.");
+    println!("(Advanced: You can also use 'cargo test', 'cargo insta review', and 'cargo insta accept' directly.)");
 }
 
 fn check_nodejs_version() {
