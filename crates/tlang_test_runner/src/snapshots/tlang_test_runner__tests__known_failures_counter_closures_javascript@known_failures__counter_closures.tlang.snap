@@ -1,0 +1,23 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+description: Known failure - output may not match expected
+expression: output
+input_file: tests/known_failures/counter_closures.tlang
+---
+[stdin]:215
+    return if (times > 0) {
+           ^^
+
+SyntaxError: Unexpected token 'if'
+    at makeContextifyScript (node:internal/vm:185:14)
+    at node:internal/process/execution:107:22
+    at [stdin]-wrapper:6:24
+    at runScript (node:internal/process/execution:101:62)
+    at evalScript (node:internal/process/execution:133:3)
+    at node:internal/main/eval_stdin:32:5
+    at Socket.<anonymous> (node:internal/process/execution:234:5)
+    at Socket.emit (node:events:536:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21)
+
+Node.js v20.19.4

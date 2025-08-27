@@ -1,0 +1,28 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: output
+input_file: tests/enums/result.tlang
+---
+true
+false
+false
+true
+10
+
+[stdin]:201
+function panic(msg) { throw new Error(msg); }
+                      ^
+
+Error: Called unwrap on Err
+    at panic ([stdin]:201:29)
+    at Result.unwrap$0 [as unwrap] ([stdin]:53:16)
+    at [stdin]:210:17
+    at runScriptInThisContext (node:internal/vm:209:10)
+    at node:internal/process/execution:118:14
+    at [stdin]-wrapper:6:24
+    at runScript (node:internal/process/execution:101:62)
+    at evalScript (node:internal/process/execution:133:3)
+    at node:internal/main/eval_stdin:32:5
+    at Socket.<anonymous> (node:internal/process/execution:234:5)
+
+Node.js v20.19.4

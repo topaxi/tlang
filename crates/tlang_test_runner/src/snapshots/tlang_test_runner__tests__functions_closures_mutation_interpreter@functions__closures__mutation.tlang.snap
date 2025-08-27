@@ -1,0 +1,14 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: output
+input_file: tests/functions/closures/mutation.tlang
+---
+0
+1
+6
+10
+20
+20
+30
+6
+7

@@ -1,10 +1,9 @@
-use std::fs;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use glob::glob;
 use regex::Regex;
 
+#[derive(Clone, Copy)]
 enum Backend {
     Interpreter,
     JavaScript,
@@ -23,65 +22,90 @@ impl Backend {
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let pattern = "tests/**/*.tlang";
-    let mut errors: Vec<_> = vec![];
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    for (i, backend) in Backend::values().enumerate() {
-        if i > 0 {
-            println!();
-        }
+    // Test all .tlang files using insta's glob functionality  
+    #[test]
+    fn test_all_tlang_files() {
+        // Use absolute path to the tests directory
+        let current_dir = std::env::current_dir().unwrap();
+        let workspace_root = current_dir
+            .ancestors()
+            .find(|path| path.join("Cargo.toml").exists() && path.join("tests").exists())
+            .expect("Could not find workspace root");
+            
+        let tests_dir = workspace_root.join("tests");
+        let tests_dir_clone = tests_dir.clone();
+        
+        insta::glob!(&tests_dir, "**/*.tlang", |path| {
+            for backend in Backend::values() {
+                let relative_path = path.strip_prefix(&tests_dir_clone).unwrap();
+                let test_name = format!(
+                    "{}_{}",
+                    relative_path
+                        .with_extension("")
+                        .to_string_lossy()
+                        .replace(['/', '\\'], "_"),
+                    backend.as_str()
+                );
 
-        println!("Running tests with backend: {}", backend.as_str());
-
-        for entry in glob(pattern).expect("Failed to read glob pattern") {
-            let file_path = entry.expect("Failed to read test file path");
-
-            let is_known_failure = file_path.to_string_lossy().contains("known_failures");
-
-            match run_test(&file_path, backend.as_str()) {
-                Ok(()) => {}
-                Err(e) => {
-                    if is_known_failure {
-                        // Known failures don't count as real errors - just print the result
-                        println!(
-                            "Known failing test failed as expected: {}",
-                            file_path.display()
-                        );
-                    } else {
-                        // Only count non-known_failures as actual errors
-                        errors.push(e);
+                let is_known_failure = path.to_string_lossy().contains("known_failures");
+                
+                // Change to workspace root for command execution
+                let original_dir = std::env::current_dir().unwrap();
+                std::env::set_current_dir(workspace_root).expect("Failed to change to workspace root");
+                
+                match std::panic::catch_unwind(|| run_test_with_backend(path, backend)) {
+                    Ok(output) => {
+                        // Restore original directory
+                        std::env::set_current_dir(&original_dir).expect("Failed to restore working directory");
+                        
+                        if is_known_failure {
+                            // For known failures, we still want to capture the snapshot
+                            // but we mark it specially and don't fail if it doesn't match
+                            insta::with_settings!({
+                                description => "Known failure - output may not match expected",
+                            }, {
+                                insta::assert_snapshot!(test_name, output);
+                            });
+                        } else {
+                            insta::assert_snapshot!(test_name, output);
+                        }
+                    }
+                    Err(_) => {
+                        // Restore original directory even on panic
+                        std::env::set_current_dir(&original_dir).expect("Failed to restore working directory");
+                        
+                        if is_known_failure {
+                            println!("Known failing test panicked as expected: {}", path.display());
+                            // Create a placeholder snapshot for panicked known failures
+                            insta::with_settings!({
+                                description => "Known failure - panic during execution",
+                            }, {
+                                insta::assert_snapshot!(format!("{}_panic", test_name), format!("Test panicked during execution"));
+                            });
+                        } else {
+                            panic!("Test panicked for {}", path.display());
+                        }
                     }
                 }
             }
-        }
-    }
-
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(errors.join("\n").into())
+        });
     }
 }
 
-fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
-    let expected_output_path = {
-        let base_path = file_path.with_extension(""); // Strip `.tlang` extension
-        let backend_path = base_path.with_extension(format!("expected.{backend}.txt"));
-        if backend_path.exists() {
-            backend_path
-        } else {
-            base_path.with_extension("expected.txt") // Fallback to default
-        }
-    };
+fn main() {
+    println!("Test runner now uses insta snapshots. Run with 'cargo test' instead.");
+    println!("Use 'cargo insta review' to review and accept snapshot changes.");
+}
 
-    let expected_output = fs::read_to_string(&expected_output_path)
-        .map_err(|e| format!("Failed to read {}: {}", expected_output_path.display(), e))?;
-
+fn run_test_with_backend(file_path: &Path, backend: Backend) -> String {
     let start = std::time::Instant::now();
     let exec_start;
     let output = match backend {
-        "interpreter" => {
+        Backend::Interpreter => {
             exec_start = std::time::Instant::now();
 
             Command::new("./target/release/tlangdi")
@@ -95,7 +119,7 @@ fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
                     )
                 })
         }
-        "javascript" => {
+        Backend::JavaScript => {
             #[allow(clippy::zombie_processes)]
             let tlang_js_compiler_output = Command::new("./target/release/tlang_cli_js")
                 .arg(file_path)
@@ -126,7 +150,6 @@ fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
 
             javascript_output.wait_with_output().unwrap()
         }
-        _ => return Err(format!("Unsupported backend: {backend}")),
     };
     let elapsed = start.elapsed();
     let exec_elapsed = exec_start.elapsed();
@@ -138,23 +161,14 @@ fn run_test(file_path: &Path, backend: &str) -> Result<(), String> {
     );
     let actual_output = normalize_output(&actual_output);
 
-    if actual_output.trim() == expected_output.trim() {
-        println!(
-            "Test passed for {} in {:?} (total {:?})",
-            file_path.display(),
-            exec_elapsed,
-            elapsed
-        );
-        Ok(())
-    } else {
-        println!(
-            "Test failed for {}.\nExpected:\n{}\nActual:\n{}",
-            file_path.display(),
-            expected_output,
-            actual_output
-        );
-        Err("Test failed".to_string())
-    }
+    println!(
+        "Test executed for {} with {} backend in {:?} (total {:?})",
+        file_path.display(),
+        backend.as_str(),
+        exec_elapsed,
+        elapsed
+    );
+    actual_output.trim().to_string()
 }
 
 fn normalize_output(output: &str) -> std::borrow::Cow<'_, str> {

@@ -1,0 +1,11 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+description: Known failure - output may not match expected
+expression: output
+input_file: tests/known_failures/large_data_processing.tlang
+---
+thread 'main' panicked at crates/tlang_parser/src/parser.rs:120:9:
+Expected Semicolon on line 154, column 22, found Identifier("processing") instead
+size |> log();string processing
+                      ^
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
