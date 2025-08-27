@@ -19,6 +19,4 @@ Current scope: [INTERNAL_MEMORY_STATE]
   at function tree_depth:49:41
   at root 82:12
 
-stack backtrace:
-[STACK_TRACE]
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

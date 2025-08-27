@@ -24,6 +24,4 @@ thread 'main' panicked at crates/tlang_runtime/tlang_memory/src/state.rs:328:9:
 Function `"anonymous"` expects 1 arguments, but got 0
   at root 141:1
 
-stack backtrace:
-[STACK_TRACE]
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

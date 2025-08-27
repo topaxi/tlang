@@ -198,11 +198,12 @@ fn apply_redactions(output: &str) -> String {
         .replace_all(&result, "[TIMESTAMP] $1")
         .into_owned();
 
-    // Redact stack backtrace details that may vary between environments
-    let backtrace_re = Regex::new(r"stack backtrace:\n(   \d+: .+\n)*")
-        .expect("Failed to compile backtrace redaction regex");
-    result = backtrace_re
-        .replace_all(&result, "stack backtrace:\n[STACK_TRACE]\n")
+    // Redact the entire stack backtrace section (including header) that may or may not be present
+    // Some environments show backtraces, others don't - remove the section entirely if present
+    let backtrace_section_re = Regex::new(r"stack backtrace:\n(   \d+: .+\n)*")
+        .expect("Failed to compile backtrace section redaction regex");
+    result = backtrace_section_re
+        .replace_all(&result, "")
         .into_owned();
 
     // Redact numbered stack trace lines that appear with RUST_BACKTRACE=1
@@ -246,6 +247,13 @@ fn apply_redactions(output: &str) -> String {
         .expect("Failed to compile Node.js version redaction regex");
     result = nodejs_version_re
         .replace_all(&result, "Node.js [VERSION]")
+        .into_owned();
+
+    // Redact Node.js syntax error details that vary between versions
+    let nodejs_syntax_details_re = Regex::new(r"Expected '[^']*', '[^']*' or <eof>")
+        .expect("Failed to compile Node.js syntax details redaction regex");
+    result = nodejs_syntax_details_re
+        .replace_all(&result, "[NODE_SYNTAX_ERROR_DETAILS]")
         .into_owned();
 
     // Redact Node.js internal stack traces that may vary between Node.js versions
