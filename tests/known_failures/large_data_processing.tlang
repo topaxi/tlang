@@ -1,0 +1,158 @@
+// Tests large data processing that may cause memory or performance issues in JavaScript backend
+// Large lists, deep recursion, intensive computations
+
+// Generate large lists
+fn generate_large_list(size) {
+    fn helper(current, acc) {
+        if current <= 0 {
+            acc
+        } else {
+            helper(current - 1, [current, ...acc])
+        }
+    }
+    helper(size, [])
+}
+
+// Process large amounts of data
+fn process_large_dataset(data) {
+    data
+    |> map(fn(x) { x * x })
+    |> filter(fn(x) { x % 2 == 0 })
+    |> map(fn(x) { x + 1 })
+    |> filter(fn(x) { x % 3 == 0 })
+    |> foldl(0, fn(acc, x) { acc + x })
+}
+
+// Deep recursive computation
+fn deep_fibonacci(n) {
+    if n <= 1 {
+        n
+    } else {
+        deep_fibonacci(n - 1) + deep_fibonacci(n - 2)
+    }
+}
+
+// Intensive mathematical computation
+fn compute_primes_naive(limit) {
+    fn is_prime(n) {
+        if n < 2 {
+            false
+        } else {
+            fn check_divisors(d) {
+                if d * d > n {
+                    true
+                } else if n % d == 0 {
+                    false
+                } else {
+                    check_divisors(d + 1)
+                }
+            }
+            check_divisors(2)
+        }
+    }
+    
+    fn collect_primes(current, acc) {
+        if current > limit {
+            acc
+        } else if is_prime(current) {
+            collect_primes(current + 1, [current, ...acc])
+        } else {
+            collect_primes(current + 1, acc)
+        }
+    }
+    
+    collect_primes(2, [])
+}
+
+// Memory-intensive nested data structure
+fn create_large_nested_structure(depth, width) {
+    if depth <= 0 {
+        []
+    } else {
+        fn create_row(w) {
+            if w <= 0 {
+                []
+            } else {
+                [create_large_nested_structure(depth - 1, width), ...create_row(w - 1)]
+            }
+        }
+        create_row(width)
+    }
+}
+
+// Function that processes nested structures
+fn count_total_elements(structure) {
+    match structure {
+        [] => 0,
+        [head, ...tail] => {
+            let head_count = match head {
+                [] => 1,
+                _ => count_total_elements(head),
+            };
+            head_count + count_total_elements(tail)
+        },
+    }
+}
+
+// Large string processing
+fn create_large_string(size) {
+    fn helper(current, acc) {
+        if current <= 0 {
+            acc
+        } else {
+            let char_code = (current % 26) + 97; // a-z
+            let new_char = string::from_char_code(char_code);
+            helper(current - 1, acc + new_char)
+        }
+    }
+    helper(size, "")
+}
+
+// Helper functions for list processing
+fn map([], _) { [] }
+fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
+
+fn filter([], _) { [] }
+fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
+fn filter([_, ...xs], f) { filter(xs, f) }
+
+fn foldl([], acc, _) { acc }
+fn foldl([x, ...xs], acc, f) { foldl(xs, f(acc, x), f) }
+
+log("=== Large Data Processing Test ===");
+
+// Test with progressively larger datasets
+log("Processing small dataset...");
+let small_data = generate_large_list(100);
+process_large_dataset(small_data) |> log();
+
+log("Processing medium dataset...");
+let medium_data = generate_large_list(1000);
+process_large_dataset(medium_data) |> log();
+
+log("Processing large dataset...");
+let large_data = generate_large_list(5000);
+process_large_dataset(large_data) |> log();
+
+// Test deep recursion
+log("Computing deep fibonacci...");
+deep_fibonacci(30) |> log();
+
+// Test intensive computation
+log("Computing primes...");
+let primes = compute_primes_naive(100);
+primes |> foldl(0, fn(acc, _) { acc + 1 }) |> log(); // Count primes
+
+// Test large nested structures
+log("Creating large nested structure...");
+let nested = create_large_nested_structure(6, 5);
+count_total_elements(nested) |> log();
+
+// Test large string processing
+log("Processing large strings...");
+let large_string = create_large_string(10000);
+// Note: length() method may not be available, showing concept
+size |> log();string processing
+log("Processing large strings...");
+let large_string = create_large_string(10000);
+large_string.length() |> log();

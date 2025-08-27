@@ -1,0 +1,7 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+description: Known failure - output may not match expected
+expression: output
+input_file: tests/known_failures/large_data_processing.tlang
+---
+

@@ -1,0 +1,93 @@
+// Tests recursive data structures that may cause issues in JavaScript backend
+// Self-referential types and circular references
+
+enum LinkedList {
+    Empty,
+    Node(i32, LinkedList),
+}
+
+enum BinaryTree {
+    Empty,
+    Leaf(i32),
+    Node(i32, BinaryTree, BinaryTree),
+}
+
+// Create a linked list recursively
+fn create_list(n) {
+    if n <= 0 {
+        LinkedList::Empty
+    } else {
+        LinkedList::Node(n, create_list(n - 1))
+    }
+}
+
+// Create a deep binary tree
+fn create_balanced_tree(depth, value) {
+    if depth <= 0 {
+        BinaryTree::Leaf(value)
+    } else {
+        BinaryTree::Node(
+            value,
+            create_balanced_tree(depth - 1, value * 2),
+            create_balanced_tree(depth - 1, value * 2 + 1)
+        )
+    }
+}
+
+// Traverse deeply nested structures
+fn sum_list(list) {
+    match list {
+        LinkedList::Empty => 0,
+        LinkedList::Node(value, rest) => value + sum_list(rest),
+    }
+}
+
+fn tree_depth(tree) {
+    match tree {
+        BinaryTree::Empty => 0,
+        BinaryTree::Leaf(_) => 1,
+        BinaryTree::Node(_, left, right) => {
+            let left_depth = tree_depth(left);
+            let right_depth = tree_depth(right);
+            if left_depth > right_depth {
+                left_depth + 1
+            } else {
+                right_depth + 1
+            }
+        },
+    }
+}
+
+// Test with very deep structures that might cause stack overflow
+fn create_unbalanced_tree(depth) {
+    if depth <= 0 {
+        BinaryTree::Empty
+    } else {
+        BinaryTree::Node(
+            depth,
+            create_unbalanced_tree(depth - 1),
+            BinaryTree::Leaf(depth * 10)
+        )
+    }
+}
+
+log("=== Recursive Data Structures Test ===");
+
+// Create deep structures
+let deep_list = create_list(100);
+let balanced_tree = create_balanced_tree(8, 1);
+let unbalanced_tree = create_unbalanced_tree(50);
+
+// Test operations that might fail with deep recursion
+sum_list(deep_list) |> log();
+tree_depth(balanced_tree) |> log();
+tree_depth(unbalanced_tree) |> log();
+
+// Test circular-like patterns (not true circular references, but complex nesting)
+let complex_structure = BinaryTree::Node(
+    42,
+    BinaryTree::Node(1, create_balanced_tree(5, 10), BinaryTree::Empty),
+    BinaryTree::Node(2, BinaryTree::Empty, create_unbalanced_tree(10))
+);
+
+tree_depth(complex_structure) |> log();

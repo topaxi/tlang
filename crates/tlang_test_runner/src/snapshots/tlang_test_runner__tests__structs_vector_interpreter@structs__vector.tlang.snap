@@ -1,0 +1,8 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: output
+input_file: tests/structs/vector.tlang
+---
+Vector { x: 4, y: 6 }
+Vector { x: 6, y: 8 }
+5

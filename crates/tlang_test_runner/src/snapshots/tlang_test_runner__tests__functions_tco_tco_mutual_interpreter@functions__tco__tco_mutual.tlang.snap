@@ -1,0 +1,7 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: output
+input_file: tests/functions/tco/tco_mutual.tlang
+---
+true
+false

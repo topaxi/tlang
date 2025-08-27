@@ -1,0 +1,22 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: output
+input_file: tests/functions/higher_order.tlang
+---
+=== Higher-Order Functions Demo ===
+Function composition:
+[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+[6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+[3, 6, 9, 12, 15, 18, 21, 24, 27, 30]
+[18, 21, 24, 27, 30, 33, 36, 39, 42, 45]
+Currying and partial application:
+15
+28
+Apply twice:
+12
+Predicate filtering:
+[2, 4, 6, 8, 10]
+[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+[6, 7, 8, 9, 10]
+Complex function pipeline:
+224

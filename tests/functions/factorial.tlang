@@ -1,0 +1,57 @@
+// Factorial computation with different approaches
+// Demonstrates: recursion, tail call optimization, pattern matching
+
+// Helper function
+fn map([], _) { [] }
+fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
+
+// Traditional recursive factorial
+fn factorial(0) { 1 }
+fn factorial(n) { n * factorial(n - 1) }
+
+// Tail-recursive factorial with accumulator
+fn factorial_tail(n) { factorial_tail_helper(n, 1) }
+
+fn factorial_tail_helper(0, acc) { acc }
+fn factorial_tail_helper(n, acc) { 
+    rec factorial_tail_helper(n - 1, n * acc) 
+}
+
+// Iterative factorial using loops
+fn factorial_iter(n) {
+    let result = 1;
+    let i = 1;
+    
+    loop {
+        if i > n {
+            break;
+        }
+        result = result * i;
+        i = i + 1;
+    }
+    
+    result
+}
+
+log("=== Factorial Computation Demo ===");
+
+// Test different approaches
+let test_values = [0, 1, 5, 7, 10];
+
+log("Testing traditional recursive factorial:");
+test_values |> map(factorial) |> log();
+
+log("Testing tail-recursive factorial:");
+test_values |> map(factorial_tail) |> log();
+
+log("Testing iterative factorial:");
+test_values |> map(factorial_iter) |> log();
+
+// Verify they all produce the same results
+log("Verification: All methods should produce identical results");
+test_values |> map(fn(n) {
+    let r1 = factorial(n);
+    let r2 = factorial_tail(n);
+    let r3 = factorial_iter(n);
+    r1 == r2 && r2 == r3
+}) |> log();

@@ -1,0 +1,6 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: output
+input_file: tests/functions/fib/naive_impl.tlang
+---
+55

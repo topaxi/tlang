@@ -1,0 +1,7 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: output
+input_file: tests/functions/fold/fold.tlang
+---
+15
+120

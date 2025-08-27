@@ -8,6 +8,7 @@ tsconfig.tsbuildinfo
 /*.perf
 
 *.pending-snap
+*.snap.new
 
 # Benchmark output files
 *_benchmark.txt

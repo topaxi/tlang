@@ -1,0 +1,7 @@
+=== Unicode and Special Characters Test ===
+Hello 🌍
+café
+line1
+line2
+col1	col2
+He said hello

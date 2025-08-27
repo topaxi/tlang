@@ -1,0 +1,69 @@
+// Tests deeply nested pattern matching that may cause issues in JavaScript backend
+// Complex enum hierarchies and nested matching patterns
+
+enum TreeNode {
+    Leaf(i32),
+    Branch(TreeNode, TreeNode),
+    TriBranch(TreeNode, TreeNode, TreeNode),
+}
+
+enum Expression {
+    Number(i32),
+    Add(Expression, Expression),
+    Multiply(Expression, Expression),
+    Conditional(Expression, Expression, Expression),
+}
+
+// Deeply nested pattern matching function
+fn evaluate_expression(expr) {
+    match expr {
+        Expression::Number(n) => n,
+        Expression::Add(Expression::Number(a), Expression::Number(b)) => a + b,
+        Expression::Add(Expression::Multiply(Expression::Number(a), Expression::Number(b)), Expression::Number(c)) => (a * b) + c,
+        Expression::Add(left, right) => evaluate_expression(left) + evaluate_expression(right),
+        Expression::Multiply(Expression::Add(Expression::Number(a), Expression::Number(b)), Expression::Number(c)) => (a + b) * c,
+        Expression::Multiply(left, right) => evaluate_expression(left) * evaluate_expression(right),
+        Expression::Conditional(Expression::Number(0), false_expr, _) => evaluate_expression(false_expr),
+        Expression::Conditional(_, true_expr, _) => evaluate_expression(true_expr),
+    }
+}
+
+// Complex tree traversal with nested patterns
+fn count_leaves(tree) {
+    match tree {
+        TreeNode::Leaf(_) => 1,
+        TreeNode::Branch(TreeNode::Leaf(_), TreeNode::Leaf(_)) => 2,
+        TreeNode::Branch(TreeNode::Leaf(_), right) => 1 + count_leaves(right),
+        TreeNode::Branch(left, TreeNode::Leaf(_)) => count_leaves(left) + 1,
+        TreeNode::Branch(left, right) => count_leaves(left) + count_leaves(right),
+        TreeNode::TriBranch(TreeNode::Leaf(_), TreeNode::Leaf(_), TreeNode::Leaf(_)) => 3,
+        TreeNode::TriBranch(left, middle, right) => count_leaves(left) + count_leaves(middle) + count_leaves(right),
+    }
+}
+
+log("=== Nested Pattern Matching Test ===");
+
+// Create complex nested expressions
+let complex_expr = Expression::Add(
+    Expression::Multiply(
+        Expression::Add(Expression::Number(2), Expression::Number(3)),
+        Expression::Number(4)
+    ),
+    Expression::Conditional(
+        Expression::Number(1),
+        Expression::Number(10),
+        Expression::Number(0)
+    )
+);
+
+let tree = TreeNode::TriBranch(
+    TreeNode::Branch(TreeNode::Leaf(1), TreeNode::Leaf(2)),
+    TreeNode::Leaf(3),
+    TreeNode::Branch(
+        TreeNode::Branch(TreeNode::Leaf(4), TreeNode::Leaf(5)),
+        TreeNode::Leaf(6)
+    )
+);
+
+evaluate_expression(complex_expr) |> log();
+count_leaves(tree) |> log();
