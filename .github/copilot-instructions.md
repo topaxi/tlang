@@ -10,6 +10,21 @@ Always reference these instructions first and fallback to search or bash command
 
 **CRITICAL**: All build commands can take 30+ minutes. NEVER CANCEL builds or tests. Use timeouts of 60+ minutes for build commands and 30+ minutes for test commands.
 
+#### Automated GitHub Copilot Environment Setup
+
+The repository includes a custom GitHub Actions workflow (`.github/workflows/copilot-dev-environment.yml`) that automatically sets up the complete development environment for GitHub Copilot coding agents. This workflow:
+
+- Installs Rust nightly toolchain with wasm32-unknown-unknown target
+- Installs all required Rust tools (cargo-nextest, cargo-insta, wasm-pack, wasm-bindgen-cli)
+- Sets up exact Node.js version 24.0.2 as required by package.json
+- Downloads and configures binaryen for WebAssembly optimization
+- Verifies all tools are properly installed and working
+- Runs comprehensive build and test validation
+
+This automated setup ensures a consistent development environment and eliminates manual setup errors.
+
+#### Manual Bootstrap (if automated setup is not available)
+
 1. **Install Rust toolchain and dependencies:**
 
    ```bash

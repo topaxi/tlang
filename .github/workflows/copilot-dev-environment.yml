@@ -1,0 +1,185 @@
+---
+name: Setup Development Environment for GitHub Copilot
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  setup-dev-environment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      # Set up Rust toolchain first (nightly as specified in rust-toolchain.toml)
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: nightly
+          targets: wasm32-unknown-unknown
+          components: clippy, rustfmt
+
+      # Cache Cargo dependencies and build artifacts
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+            target/
+          key: >-
+            ${{ runner.os }}-cargo-dev-${{ hashFiles('**/Cargo.lock') }}-5
+          restore-keys: |
+            ${{ runner.os }}-cargo-dev-
+            ${{ runner.os }}-cargo-
+
+      # Install exact Node.js version as specified in package.json (24.0.2)
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.0.2'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      # Verify Node.js version matches package.json requirement
+      - name: Verify Node.js version
+        run: |
+          REQUIRED_VERSION=$(node -p "require('./package.json').engines.node")
+          ACTUAL_VERSION=$(node --version | sed 's/v//')
+          if [ "$ACTUAL_VERSION" != "$REQUIRED_VERSION" ]; then
+            echo "Error: Node.js version mismatch."
+            echo "Required: $REQUIRED_VERSION, Actual: $ACTUAL_VERSION"
+            exit 1
+          fi
+          echo "✅ Node.js version verified: $ACTUAL_VERSION"
+
+      # Install Rust tools required for development
+      - name: Install Rust development tools
+        run: |
+          # Install cargo-nextest for fast testing
+          cargo install cargo-nextest --locked
+
+          # Install cargo-insta for snapshot testing
+          cargo install cargo-insta --locked
+
+          # Install wasm-pack for WebAssembly builds
+          cargo install wasm-pack --locked
+
+          # Install exact wasm-bindgen-cli version matching Cargo.toml
+          WASM_BINDGEN_VERSION=$(grep -oP 'wasm-bindgen = "=\K[^"]+' \
+            crates/tlang_bindings_js/Cargo.toml)
+          cargo install wasm-bindgen-cli \
+            --version "$WASM_BINDGEN_VERSION" --locked
+
+          echo "✅ Rust development tools installed"
+
+      # Download and setup binaryen for WebAssembly optimization
+      - name: Setup binaryen
+        run: |
+          BINARYEN_VERSION="119"
+          wget -q \
+            "https://github.com/WebAssembly/binaryen/releases/download/version_${BINARYEN_VERSION}/binaryen-version_${BINARYEN_VERSION}-x86_64-linux.tar.gz"
+          tar xzf binaryen-version_${BINARYEN_VERSION}-x86_64-linux.tar.gz
+          echo "$(pwd)/binaryen-version_${BINARYEN_VERSION}/bin" >> $GITHUB_PATH
+          echo "✅ Binaryen installed and added to PATH"
+
+      # Install Node.js dependencies
+      - name: Install Node.js dependencies
+        run: |
+          npm ci
+          echo "✅ Node.js dependencies installed"
+
+      # Verify all tools are properly installed
+      - name: Verify installation
+        run: |
+          echo "=== Rust Toolchain ==="
+          rustup show
+          rustc -Vv
+          cargo -V
+
+          echo "=== Rust Development Tools ==="
+          cargo nextest --version
+          cargo insta --version
+          wasm-pack --version
+          wasm-bindgen --version
+
+          echo "=== WebAssembly Target ==="
+          rustup target list --installed | grep wasm32
+
+          echo "=== Node.js Environment ==="
+          node --version
+          npm --version
+
+          echo "=== Binaryen ==="
+          wasm-opt --version
+
+          echo "✅ Development environment setup complete!"
+
+      # Run a quick build test to ensure everything works
+      - name: Test build environment
+        run: |
+          echo "=== Testing Rust build ==="
+          cargo check --workspace
+
+          echo "=== Testing unit tests ==="
+          cargo nextest run --profile=ci
+
+          echo "=== Testing WebAssembly build ==="
+          wasm-pack build --dev --target web crates/tlang_bindings_js
+
+          echo "=== Testing playground build ==="
+          npm run build
+
+          echo "✅ All build tests passed!"
+
+      # Run integration tests to validate the complete setup
+      - name: Run integration tests
+        run: |
+          echo "=== Running integration tests ==="
+          make test
+
+          echo "=== Testing JS bindings ==="
+          make test-bindings-js
+
+          echo "✅ All integration tests passed!"
+
+      # Display summary of what was set up
+      - name: Development environment summary
+        run: |
+          echo "🎉 GitHub Copilot Development Environment Setup Complete!"
+          echo ""
+          echo "### Installed Tools:"
+          echo "- Rust $(rustc --version | cut -d' ' -f2) (nightly toolchain)"
+          echo "- Node.js $(node --version) (exact version from package.json)"
+          echo "- npm $(npm --version)"
+          echo "- cargo-nextest $(cargo nextest --version | cut -d' ' -f2)"
+          echo "- cargo-insta $(cargo insta --version | cut -d' ' -f2)"
+          echo "- wasm-pack $(wasm-pack --version | cut -d' ' -f2)"
+          echo "- wasm-bindgen $(wasm-bindgen --version | cut -d' ' -f2)"
+          echo "- binaryen wasm-opt $(wasm-opt --version | head -n1)"
+          echo ""
+          echo "### Available Commands:"
+          echo "- cargo nextest run --profile=ci  # Fast unit tests"
+          echo "- make test                       # Integration tests"
+          echo "- make test-bindings-js          # WebAssembly bindings tests"
+          echo "- npm run dev                     # Start development server"
+          echo "- npm run build                   # Build playground"
+          echo "- cargo build --release           # Build optimized binaries"
+          echo ""
+          echo "### Development Workflow:"
+          echo "1. Run 'cargo clippy --fix --allow-dirty --lib --all-features' for linting"
+          echo "2. Run 'cargo fmt' for formatting"
+          echo "3. Use semantic commit messages (feat, fix, docs, etc.)"
+          echo "4. Test changes with 'cargo nextest run' and 'make test'"
+          echo ""
+          echo "Ready for tlang development! 🚀"
