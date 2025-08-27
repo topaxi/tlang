@@ -42,6 +42,7 @@ jobs:
         run: |
           cargo install -f rustup-toolchain-install-master
           cargo install -f cargo-nextest
+          cargo install -f cargo-insta
           cargo install -f wasm-bindgen-cli --version $(grep -oP 'wasm-bindgen = "=\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
           cargo install -f wasm-pack
 
