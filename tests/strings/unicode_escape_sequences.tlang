@@ -1,0 +1,50 @@
+// Unicode escape sequences test
+// Demonstrates support for Unicode escape sequences in string and char literals
+
+fn test_unicode_escapes() {
+    // Test basic ASCII characters using Unicode escapes
+    let letter_a = "\u{41}";        // 'A' in hex
+    let letter_z = "\u{5A}";        // 'Z' in hex
+    let digit_0 = "\u{30}";         // '0' in hex
+    let space = "\u{20}";           // space character
+    
+    // Test Unicode symbols and emojis
+    let euro = "\u{20AC}";          // € symbol
+    let heart = "\u{2764}";         // ❤ symbol
+    let smiley = "\u{1F600}";       // 😀 emoji
+    
+    // Test with various hex digit lengths
+    let short = "\u{A}";            // newline (same as \n)
+    let medium = "\u{394}";         // Greek Delta Δ
+    let long = "\u{1F4A9}";         // 💩 emoji
+    
+    // Test char literals with Unicode escapes
+    let unicode_char = '\u{2603}';  // ☃ snowman
+    
+    // Test combined regular and Unicode escapes
+    let mixed = "Hello \u{1F30D}!\nWelcome to Unicode!";  // Hello 🌍!\nWelcome to Unicode!
+    
+    log("=== Unicode Escape Sequences Test ===");
+    letter_a |> log();
+    letter_z |> log();
+    digit_0 |> log();
+    space |> log();
+    
+    log("=== Unicode Symbols ===");
+    euro |> log();
+    heart |> log();
+    smiley |> log();
+    
+    log("=== Various Lengths ===");
+    short |> log();
+    medium |> log();
+    long |> log();
+    
+    log("=== Unicode Char ===");
+    unicode_char |> log();
+    
+    log("=== Mixed Escapes ===");
+    mixed |> log();
+}
+
+test_unicode_escapes();

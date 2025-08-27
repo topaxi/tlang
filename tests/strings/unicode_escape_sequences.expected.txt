@@ -1,0 +1,19 @@
+=== Unicode Escape Sequences Test ===
+A
+Z
+0
+ 
+=== Unicode Symbols ===
+€
+❤
+😀
+=== Various Lengths ===
+
+
+Δ
+💩
+=== Unicode Char ===
+☃
+=== Mixed Escapes ===
+Hello 🌍!
+Welcome to Unicode!

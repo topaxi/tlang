@@ -122,6 +122,41 @@ impl Lexer<'_> {
                     't' => result.push('\t'),
                     'r' => result.push('\r'),
                     '0' => result.push('\0'),
+                    'u' => {
+                        // Handle Unicode escape sequence \u{...}
+                        self.advance(); // consume 'u'
+                        if self.current_char == '{' {
+                            self.advance(); // consume '{'
+                            match self.read_unicode_escape() {
+                                Ok(unicode_char) => result.push(unicode_char),
+                                Err(_) => {
+                                    // Invalid Unicode escape, treat as literal characters
+                                    // We need to backtrack and treat the whole sequence as literal
+                                    result.push('\\');
+                                    result.push('u');
+                                    result.push('{');
+                                    // Continue reading characters as literals until we find '}' or end
+                                    while self.current_char != '}'
+                                        && self.current_char != '\0'
+                                        && self.current_char != quote
+                                    {
+                                        result.push(self.current_char);
+                                        self.advance();
+                                    }
+                                    if self.current_char == '}' {
+                                        result.push('}');
+                                    }
+                                    // Don't advance here - let the main loop handle the current character
+                                    continue;
+                                }
+                            }
+                        } else {
+                            // Not a valid Unicode escape, treat as literal
+                            result.push('\\');
+                            result.push('u');
+                            continue; // Skip the advance at the end of the match
+                        }
+                    }
                     ch => {
                         // For unknown escape sequences, leave them as literal characters
                         result.push('\\');
@@ -141,6 +176,37 @@ impl Lexer<'_> {
         } else {
             Err("Unterminated string literal".to_string())
         }
+    }
+
+    fn read_unicode_escape(&mut self) -> Result<char, String> {
+        let mut hex_digits = String::new();
+
+        // Read hex digits until we find '}' or run out of characters
+        while self.current_char != '}' && self.current_char != '\0' && hex_digits.len() < 6 {
+            if self.current_char.is_ascii_hexdigit() {
+                hex_digits.push(self.current_char);
+                self.advance();
+            } else {
+                // Invalid character, but don't fail - treat as literal
+                return Err("Invalid character in Unicode escape sequence".to_string());
+            }
+        }
+
+        if self.current_char != '}' {
+            // Unterminated or invalid Unicode escape, treat as literal
+            return Err("Unterminated Unicode escape sequence".to_string());
+        }
+
+        if hex_digits.is_empty() {
+            return Err("Empty Unicode escape sequence".to_string());
+        }
+
+        // Parse the hex value
+        let code_point = u32::from_str_radix(&hex_digits, 16)
+            .map_err(|_| "Invalid hexadecimal in Unicode escape sequence".to_string())?;
+
+        // Convert to char, checking for valid Unicode scalar value
+        char::from_u32(code_point).ok_or_else(|| "Invalid Unicode code point".to_string())
     }
 
     fn line_column(&self) -> LineColumn {
