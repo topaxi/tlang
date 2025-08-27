@@ -8,4 +8,6 @@ thread 'main' panicked at crates/tlang_parser/src/parser.rs:120:9:
 Expected Semicolon on line 154, column 22, found Identifier("processing") instead
 size |> log();string processing
                       ^
+stack backtrace:
+[STACK_TRACE]
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
