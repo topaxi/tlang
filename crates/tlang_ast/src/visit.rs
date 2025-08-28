@@ -68,8 +68,7 @@ pub trait Visitor<'ast>: Sized {
         walk_expr(self, expression, ctx);
     }
 
-    #[allow(unused_variables)]
-    fn visit_literal(&mut self, literal: &'ast Literal, span: Span, ctx: &mut Self::Context) {}
+    fn visit_literal(&mut self, _literal: &'ast Literal, _span: Span, _ctx: &mut Self::Context) {}
 
     fn visit_else_clause(&mut self, clause: &'ast node::ElseClause, ctx: &mut Self::Context) {
         if let Some(ref condition) = clause.condition {

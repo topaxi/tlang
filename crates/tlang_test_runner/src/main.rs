@@ -143,6 +143,7 @@ fn run_test_with_backend(file_path: &Path, backend: Backend) -> Result<String, S
             #[allow(clippy::zombie_processes)]
             let tlang_js_compiler_output = Command::new("./target/release/tlang_cli_js")
                 .arg(file_path)
+                .arg("--quiet-warnings")
                 .stdout(Stdio::piped())
                 .spawn()
                 .map_err(|err| {
