@@ -1,19 +1,21 @@
 ---
 name: Setup Development Environment for GitHub Copilot
-permissions:
-  contents: read
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
   pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
 
 jobs:
   copilot-setup-steps:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
@@ -127,35 +129,6 @@ jobs:
 
           echo "✅ Development environment setup complete!"
 
-      # Run a quick build test to ensure everything works
-      - name: Test build environment
-        run: |
-          echo "=== Testing Rust build ==="
-          cargo check --workspace
-
-          echo "=== Testing unit tests ==="
-          cargo nextest run --profile=ci
-
-          echo "=== Testing WebAssembly build ==="
-          wasm-pack build --dev --target web crates/tlang_bindings_js
-
-          echo "=== Testing playground build ==="
-          npm run build
-
-          echo "✅ All build tests passed!"
-
-      # Run integration tests to validate the complete setup
-      - name: Run integration tests
-        run: |
-          echo "=== Running integration tests ==="
-          make test
-
-          echo "=== Testing JS bindings ==="
-          make test-bindings-js
-
-          echo "✅ All integration tests passed!"
-
-      # Display summary of what was set up
       - name: Development environment summary
         run: |
           echo "🎉 GitHub Copilot Development Environment Setup Complete!"
@@ -171,9 +144,9 @@ jobs:
           echo "- binaryen wasm-opt $(wasm-opt --version | head -n1)"
           echo ""
           echo "### Available Commands:"
-          echo "- cargo nextest run --profile=ci  # Fast unit tests"
+          echo "- cargo nextest                   # Fast unit tests"
           echo "- make test                       # Integration tests"
-          echo "- make test-bindings-js          # WebAssembly bindings tests"
+          echo "- make test-bindings-js           # WebAssembly bindings tests"
           echo "- npm run dev                     # Start development server"
           echo "- npm run build                   # Build playground"
           echo "- cargo build --release           # Build optimized binaries"

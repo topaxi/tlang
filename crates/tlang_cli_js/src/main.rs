@@ -26,11 +26,13 @@ struct Args {
     output_type: OutputType,
     output_stdlib: bool,
     silent: bool,
+    quiet_warnings: bool,
 }
 
 fn validate_args(matches: &ArgMatches) -> Args {
     let silent = matches.get_flag("silent");
     let output_stdlib = matches.get_flag("output_stdlib");
+    let quiet_warnings = matches.get_flag("quiet_warnings");
 
     let input_file = if output_stdlib {
         None
@@ -62,6 +64,7 @@ fn validate_args(matches: &ArgMatches) -> Args {
         output_type,
         output_stdlib,
         silent,
+        quiet_warnings,
     }
 }
 
@@ -72,13 +75,14 @@ fn get_args() -> Args {
         .arg(arg!(output_stdlib: --"output-stdlib" "Flag to output the stdlib"))
         .arg(arg!(output_type: -t --"output-type" <OUTPUT_TYPE> "Output type, defaults to js"))
         .arg(arg!(silent: -s --"silent" "Flag to suppress output"))
+        .arg(arg!(quiet_warnings: -q --"quiet-warnings" "Flag to suppress warning output"))
         .get_matches();
 
     validate_args(&matches)
 }
 
 fn compile_standard_library() -> Result<String, ParserError> {
-    let mut js = compile_to_js(&CodegenJS::get_standard_library_source())?;
+    let mut js = compile_to_js(&CodegenJS::get_standard_library_source(), false)?;
 
     js.push_str("\nfunction panic(msg) { throw new Error(msg); }\n");
 
@@ -111,8 +115,8 @@ fn main() {
 
         let output = match args.output_type {
             OutputType::Ast => compile_to_ast_string(&source),
-            OutputType::Hir => compile_to_hir_string(&source),
-            OutputType::Js => compile_to_js(&source),
+            OutputType::Hir => compile_to_hir_string(&source, !args.quiet_warnings),
+            OutputType::Js => compile_to_js(&source, !args.quiet_warnings),
         };
 
         let output = match output {
@@ -174,13 +178,22 @@ fn compile_to_ast_string(source: &str) -> Result<String, ParserError> {
     Ok(ron::ser::to_string_pretty(&ast, ron::ser::PrettyConfig::default()).unwrap())
 }
 
-fn compile_to_hir(source: &str) -> Result<hir::Module, ParserError> {
+fn compile_to_hir(source: &str, show_warnings: bool) -> Result<hir::Module, ParserError> {
     let mut parser = tlang_parser::Parser::from_source(source);
     let ast = parser.parse()?;
 
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());
     semantic_analyzer.analyze(&ast)?;
+
+    // Display warnings (but don't fail compilation)
+    if show_warnings {
+        for diagnostic in semantic_analyzer.get_diagnostics() {
+            if diagnostic.is_warning() {
+                eprintln!("{}", diagnostic);
+            }
+        }
+    }
 
     let (mut module, meta) = lower_to_hir(
         &ast,
@@ -195,14 +208,14 @@ fn compile_to_hir(source: &str) -> Result<hir::Module, ParserError> {
     Ok(module)
 }
 
-fn compile_to_hir_string(source: &str) -> Result<String, ParserError> {
-    let module = compile_to_hir(source)?;
+fn compile_to_hir_string(source: &str, show_warnings: bool) -> Result<String, ParserError> {
+    let module = compile_to_hir(source, show_warnings)?;
 
     Ok(ron::ser::to_string_pretty(&module, ron::ser::PrettyConfig::default()).unwrap())
 }
 
-fn compile_to_js(source: &str) -> Result<String, ParserError> {
-    let module = compile_to_hir(source)?;
+fn compile_to_js(source: &str, show_warnings: bool) -> Result<String, ParserError> {
+    let module = compile_to_hir(source, show_warnings)?;
 
     let mut generator = CodegenJS::default();
     generator.generate_code(&module);

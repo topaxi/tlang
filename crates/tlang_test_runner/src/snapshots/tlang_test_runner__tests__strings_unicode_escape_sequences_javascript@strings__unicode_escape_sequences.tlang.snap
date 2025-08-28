@@ -1,0 +1,21 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: apply_redactions(&output)
+input_file: tests/strings/unicode_escape_sequences.tlang
+---
+=== Unicode Escape Sequences Test ===
+A
+Z
+0
+ 
+=== Unicode Symbols ===
+€
+😀
+=== Various Lengths ===
+A
+B
+C
+=== Unicode Char ===
+D
+=== Mixed Escapes ===
+Hello World! Unicode is great!
