@@ -8,6 +8,10 @@ fn test_unicode_escapes() {
     let digit_0 = "\u{30}";         // '0' in hex
     let space = "\u{20}";           // space character
     
+    // Test Unicode symbols and emojis
+    let euro = "\u{20AC}";          // € symbol
+    let smiley = "\u{1F600}";       // 😀 emoji
+    
     // Test with various hex digit lengths (ASCII only for JS compatibility)
     let short = "\u{41}";           // 'A' (single hex digit)
     let medium = "\u{42}";          // 'B' (basic ASCII)
@@ -24,6 +28,10 @@ fn test_unicode_escapes() {
     letter_z |> log();
     digit_0 |> log();
     space |> log();
+    
+    log("=== Unicode Symbols ===");
+    euro |> log();
+    smiley |> log();
     
     log("=== Various Lengths ===");
     short |> log();

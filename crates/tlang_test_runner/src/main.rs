@@ -64,84 +64,6 @@ impl Backend {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // Test all .tlang files using insta's glob functionality
-    #[test]
-    fn test_all_tlang_files() {
-        // Verify Node.js version before running JavaScript tests
-        check_nodejs_version();
-
-        // Use absolute path to the tests directory
-        let current_dir = std::env::current_dir().unwrap();
-        let workspace_root = current_dir
-            .ancestors()
-            .find(|path| path.join("Cargo.toml").exists() && path.join("tests").exists())
-            .expect("Could not find workspace root");
-
-        let tests_dir = workspace_root.join("tests");
-        let tests_dir_clone = tests_dir.clone();
-
-        insta::glob!(&tests_dir, "**/*.tlang", |path| {
-            for backend in Backend::values() {
-                let relative_path = path.strip_prefix(&tests_dir_clone).unwrap();
-                let test_name = format!(
-                    "{}_{}",
-                    relative_path
-                        .with_extension("")
-                        .to_string_lossy()
-                        .replace(['/', '\\'], "_"),
-                    backend.as_str()
-                );
-
-                let is_known_failure = path.to_string_lossy().contains("known_failures");
-
-                // Change to workspace root for command execution
-                let original_dir = std::env::current_dir().unwrap();
-                std::env::set_current_dir(workspace_root)
-                    .expect("Failed to change to workspace root");
-
-                let output_result = run_test_with_backend(path, backend);
-
-                // Restore original directory
-                std::env::set_current_dir(&original_dir)
-                    .expect("Failed to restore working directory");
-
-                match output_result {
-                    Ok(output) => {
-                        if is_known_failure {
-                            // For known failures, we still want to capture the snapshot
-                            // but we mark it specially and don't fail if it doesn't match
-                            insta::with_settings!({
-                                description => "Known failure - output may not match expected",
-                            }, {
-                                insta::assert_snapshot!(test_name, apply_redactions(&output));
-                            });
-                        } else {
-                            insta::assert_snapshot!(test_name, apply_redactions(&output));
-                        }
-                    }
-                    Err(error_msg) => {
-                        if is_known_failure {
-                            println!("Known failing test failed as expected: {}", path.display());
-                            // Create a snapshot for the error output
-                            insta::with_settings!({
-                                description => "Known failure - error during execution",
-                            }, {
-                                insta::assert_snapshot!(format!("{}_error", test_name), error_msg);
-                            });
-                        } else {
-                            panic!("Test failed for {}: {}", path.display(), error_msg);
-                        }
-                    }
-                }
-            }
-        });
-    }
-}
-
 fn main() {
     println!("Test runner now uses insta snapshots.");
     println!("Recommended: Use 'make test' to run all tests.");
@@ -186,7 +108,7 @@ fn check_nodejs_version() {
     let version = version_output
         .trim()
         .strip_prefix('v')
-        .unwrap_or(&version_output.trim());
+        .unwrap_or(version_output.trim());
 
     if version != required_version {
         panic!(
@@ -320,4 +242,82 @@ fn apply_redactions(output: &str) -> String {
     result = ID_TAG_RE.replace_all(&result, "$1([ID])").into_owned();
 
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Test all .tlang files using insta's glob functionality
+    #[test]
+    fn test_all_tlang_files() {
+        // Verify Node.js version before running JavaScript tests
+        check_nodejs_version();
+
+        // Use absolute path to the tests directory
+        let current_dir = std::env::current_dir().unwrap();
+        let workspace_root = current_dir
+            .ancestors()
+            .find(|path| path.join("Cargo.toml").exists() && path.join("tests").exists())
+            .expect("Could not find workspace root");
+
+        let tests_dir = workspace_root.join("tests");
+        let tests_dir_clone = tests_dir.clone();
+
+        insta::glob!(&tests_dir, "**/*.tlang", |path| {
+            for backend in Backend::values() {
+                let relative_path = path.strip_prefix(&tests_dir_clone).unwrap();
+                let test_name = format!(
+                    "{}_{}",
+                    relative_path
+                        .with_extension("")
+                        .to_string_lossy()
+                        .replace(['/', '\\'], "_"),
+                    backend.as_str()
+                );
+
+                let is_known_failure = path.to_string_lossy().contains("known_failures");
+
+                // Change to workspace root for command execution
+                let original_dir = std::env::current_dir().unwrap();
+                std::env::set_current_dir(workspace_root)
+                    .expect("Failed to change to workspace root");
+
+                let output_result = run_test_with_backend(path, backend);
+
+                // Restore original directory
+                std::env::set_current_dir(&original_dir)
+                    .expect("Failed to restore working directory");
+
+                match output_result {
+                    Ok(output) => {
+                        if is_known_failure {
+                            // For known failures, we still want to capture the snapshot
+                            // but we mark it specially and don't fail if it doesn't match
+                            insta::with_settings!({
+                                description => "Known failure - output may not match expected",
+                            }, {
+                                insta::assert_snapshot!(test_name, apply_redactions(&output));
+                            });
+                        } else {
+                            insta::assert_snapshot!(test_name, apply_redactions(&output));
+                        }
+                    }
+                    Err(error_msg) => {
+                        if is_known_failure {
+                            println!("Known failing test failed as expected: {}", path.display());
+                            // Create a snapshot for the error output
+                            insta::with_settings!({
+                                description => "Known failure - error during execution",
+                            }, {
+                                insta::assert_snapshot!(format!("{}_error", test_name), error_msg);
+                            });
+                        } else {
+                            panic!("Test failed for {}: {}", path.display(), error_msg);
+                        }
+                    }
+                }
+            }
+        });
+    }
 }
