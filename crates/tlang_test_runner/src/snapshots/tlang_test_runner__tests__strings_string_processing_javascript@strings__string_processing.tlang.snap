@@ -1,0 +1,16 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: output
+input_file: tests/strings/string_processing.tlang
+---
+=== String Processing Demo ===
+Palindrome tests:
+[ true, false, true, false, true ]
+String reversal:
+olleh
+dlrow
+Character counting:
+2
+3
+Alphabetic string tests:
+[ false, false, true, false ]

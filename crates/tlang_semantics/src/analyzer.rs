@@ -2,25 +2,49 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use log::debug;
 use tlang_ast::{
-    NodeId,
     node::{
-        BinaryOpKind, Block, Expr, ExprKind, FunctionDeclaration, FunctionParameter,
-        LetDeclaration, Module, Pat, PatKind, Path, Stmt, StmtKind, StructDeclaration,
+        BinaryOpKind, Expr, ExprKind, FunctionDeclaration, LetDeclaration, Module, Pat, PatKind,
+        Path, Stmt, StmtKind, StructDeclaration,
     },
-    symbols::{SymbolIdAllocator, SymbolInfo, SymbolTable, SymbolType},
+    token::Literal,
+    visit::{Visitor, walk_expr, walk_pat, walk_stmt},
 };
-use tlang_span::Span;
+use tlang_span::{NodeId, Span};
+use tlang_symbols::{SymbolIdAllocator, SymbolInfo, SymbolTable, SymbolType};
 
 use crate::{
-    declarations::DeclarationAnalyzer,
+    declarations::{DeclarationAnalyzer, DeclarationContext},
     diagnostic::{self, Diagnostic},
 };
 
+/**
+ * Context for semantic analysis, containing only shared state needed
+ * during the visitor traversal (similar to DeclarationContext).
+ */
+pub struct SemanticAnalysisContext {
+    pub declaration_context: DeclarationContext,
+    pub struct_declarations: HashMap<String, StructDeclaration>,
+}
+
+impl SemanticAnalysisContext {
+    pub fn new(declaration_context: DeclarationContext) -> Self {
+        SemanticAnalysisContext {
+            declaration_context,
+            struct_declarations: HashMap::new(),
+        }
+    }
+
+    pub fn get_symbol_table(&self, id: NodeId) -> Option<Rc<RefCell<SymbolTable>>> {
+        self.declaration_context.symbol_tables().get(&id).cloned()
+    }
+}
+
 pub struct SemanticAnalyzer {
     declaration_analyzer: DeclarationAnalyzer,
+    context: Option<SemanticAnalysisContext>,
     symbol_table_stack: Vec<Rc<RefCell<SymbolTable>>>,
     diagnostics: Vec<Diagnostic>,
-    struct_declarations: HashMap<String, StructDeclaration>,
+    in_pipeline_rhs: bool, // Track if we're analyzing the RHS of a pipeline
 }
 
 impl Default for SemanticAnalyzer {
@@ -33,15 +57,31 @@ impl SemanticAnalyzer {
     pub fn new(declaration_analyzer: DeclarationAnalyzer) -> Self {
         SemanticAnalyzer {
             declaration_analyzer,
+            context: None,
             symbol_table_stack: vec![],
             diagnostics: vec![],
-            struct_declarations: HashMap::new(),
+            in_pipeline_rhs: false,
         }
     }
 
+    fn current_symbol_table(&self) -> Rc<RefCell<SymbolTable>> {
+        self.symbol_table_stack.last().cloned().unwrap()
+    }
+
+    fn push_symbol_table(&mut self, symbol_table: &Rc<RefCell<SymbolTable>>) {
+        self.symbol_table_stack.push(symbol_table.clone());
+    }
+
+    fn pop_symbol_table(&mut self) -> Rc<RefCell<SymbolTable>> {
+        self.symbol_table_stack.pop().unwrap()
+    }
+
     #[inline(always)]
+    /// # Panics
+    /// Panics if analysis has not been run first.
     pub fn symbol_tables(&self) -> &HashMap<NodeId, Rc<RefCell<SymbolTable>>> {
-        self.declaration_analyzer.symbol_tables()
+        let ctx = self.context.as_ref().expect("Analysis must be run first");
+        ctx.declaration_context.symbol_tables()
     }
 
     #[inline(always)]
@@ -49,12 +89,18 @@ impl SemanticAnalyzer {
         self.symbol_tables().get(&id).cloned()
     }
 
+    /// # Panics
+    /// Panics if analysis has not been run first.
     pub fn root_symbol_table(&self) -> Rc<RefCell<SymbolTable>> {
-        self.declaration_analyzer.root_symbol_table().clone()
+        let ctx = self.context.as_ref().expect("Analysis must be run first");
+        ctx.declaration_context.root_symbol_table().clone()
     }
 
+    /// # Panics
+    /// Panics if analysis has not been run first.
     pub fn symbol_id_allocator(&self) -> SymbolIdAllocator {
-        self.declaration_analyzer.symbol_id_allocator()
+        let ctx = self.context.as_ref().expect("Analysis must be run first");
+        ctx.declaration_context.symbol_id_allocator()
     }
 
     pub fn get_diagnostics(&self) -> &[Diagnostic] {
@@ -70,21 +116,7 @@ impl SemanticAnalyzer {
     }
 
     pub fn get_struct_declaration(&self, name: &str) -> Option<&StructDeclaration> {
-        self.struct_declarations.get(name)
-    }
-
-    fn current_symbol_table(&self) -> Rc<RefCell<SymbolTable>> {
-        self.symbol_table_stack.last().cloned().unwrap()
-    }
-
-    fn push_symbol_table(&mut self, symbol_table: &Rc<RefCell<SymbolTable>>) {
-        self.symbol_table_stack.push(symbol_table.clone());
-    }
-
-    fn pop_symbol_table(&mut self) -> Rc<RefCell<SymbolTable>> {
-        let symbol_table = self.symbol_table_stack.pop().unwrap();
-        self.report_unused_symbols(&symbol_table);
-        symbol_table
+        self.context.as_ref()?.struct_declarations.get(name)
     }
 
     pub fn add_builtin_symbols<'a, S, I>(&mut self, symbols: I)
@@ -92,7 +124,15 @@ impl SemanticAnalyzer {
         S: AsRef<str> + 'a,
         I: IntoIterator<Item = &'a (S, SymbolType)>,
     {
-        self.declaration_analyzer.add_builtin_symbols(symbols);
+        // Initialize context if it doesn't exist
+        if self.context.is_none() {
+            let declaration_context = DeclarationContext::new();
+            self.context = Some(SemanticAnalysisContext::new(declaration_context));
+        }
+
+        if let Some(ref mut ctx) = self.context {
+            ctx.declaration_context.add_builtin_symbols(symbols);
+        }
     }
 
     pub fn analyze(&mut self, module: &Module) -> Result<(), Vec<Diagnostic>> {
@@ -108,25 +148,45 @@ impl SemanticAnalyzer {
         module: &Module,
         is_root: bool,
     ) -> Result<(), Vec<Diagnostic>> {
-        self.collect_declarations(module, is_root);
+        // First run declaration analysis to collect all declarations
+        let declaration_context = if let Some(ref mut existing_ctx) = self.context {
+            // Reuse existing context with builtin symbols
+            self.declaration_analyzer.analyze_with_context(
+                module,
+                is_root,
+                &mut existing_ctx.declaration_context,
+            );
+            std::mem::take(&mut existing_ctx.declaration_context)
+        } else {
+            // Create new context
+            self.declaration_analyzer.analyze(module, is_root)
+        };
 
+        // Create analysis context and reset analyzer state
+        let mut context = SemanticAnalysisContext::new(declaration_context);
         self.symbol_table_stack.clear();
-        self.push_symbol_table(&self.root_symbol_table());
+        self.diagnostics.clear();
+        self.in_pipeline_rhs = false;
 
-        // self.collect_initializations(ast);
-        self.analyze_module(module);
+        // Initialize symbol table stack with root table
+        let root_table = context.declaration_context.root_symbol_table().clone();
+        self.push_symbol_table(&root_table);
 
-        self.pop_symbol_table();
+        // Perform semantic analysis using visitor pattern
+        self.visit_module(module, &mut context);
+
+        // Pop root symbol table (with unused symbol reporting)
+        let root_table = self.pop_symbol_table();
+        self.report_unused_symbols(&root_table, &mut context);
+
+        // Store context
+        self.context = Some(context);
 
         if self.get_errors().is_empty() {
             Ok(())
         } else {
             Err(self.get_errors())
         }
-    }
-
-    fn collect_declarations(&mut self, module: &Module, is_root: bool) {
-        self.declaration_analyzer.analyze(module, is_root);
     }
 
     fn mark_as_used_by_name(&mut self, name: &str, span: Span) {
@@ -154,7 +214,6 @@ impl SemanticAnalyzer {
 
         if symbol_info_ids.is_empty() {
             self.report_undeclared_function(name, arity, span);
-
             return;
         }
 
@@ -216,84 +275,6 @@ impl SemanticAnalyzer {
         }
     }
 
-    #[inline(always)]
-    fn analyze_optional_expr(&mut self, expr: &Option<Expr>) {
-        if let Some(expr) = expr {
-            self.analyze_expr(expr, false);
-        }
-    }
-
-    fn analyze_block(&mut self, block: &Block) {
-        if let Some(symbol_table) = &self.get_symbol_table(block.id) {
-            self.push_symbol_table(symbol_table);
-        }
-
-        for stmt in &block.statements {
-            self.analyze_stmt(stmt);
-        }
-
-        self.analyze_optional_expr(&block.expression);
-
-        if self.get_symbol_table(block.id).is_some() {
-            self.pop_symbol_table();
-        }
-    }
-
-    fn analyze_stmt(&mut self, stmt: &Stmt) {
-        if let Some(symbol_table) = &self.get_symbol_table(stmt.id) {
-            self.push_symbol_table(symbol_table);
-        }
-
-        match &stmt.kind {
-            StmtKind::None => {}
-            StmtKind::Expr(expr) => self.analyze_expr(expr, false),
-            StmtKind::Let(decl) => self.analyze_variable_declaration(decl),
-            StmtKind::FunctionDeclaration(decl) => self.analyze_fn_decl(decl),
-            StmtKind::FunctionDeclarations(decls) => {
-                for decl in decls {
-                    self.analyze_fn_decl(decl);
-                }
-            }
-            StmtKind::Return(Some(expr)) => self.analyze_expr(expr, false),
-            StmtKind::Return(_) => {}
-            StmtKind::EnumDeclaration(_decl) => {
-                // TODO
-            }
-            StmtKind::StructDeclaration(decl) => {
-                self.struct_declarations
-                    .insert(decl.name.to_string(), *decl.clone());
-            }
-        }
-
-        if self.get_symbol_table(stmt.id).is_some() {
-            self.pop_symbol_table();
-        }
-    }
-
-    fn analyze_fn_param(&mut self, param: &FunctionParameter) {
-        self.analyze_pat(&param.pattern);
-    }
-
-    fn analyze_fn_decl(&mut self, decl: &FunctionDeclaration) {
-        if let Some(symbol_table) = &self.get_symbol_table(decl.id) {
-            self.push_symbol_table(symbol_table);
-        }
-
-        for parameter in &decl.parameters {
-            self.analyze_fn_param(parameter);
-        }
-
-        if let Some(guard) = &decl.guard {
-            self.analyze_expr(guard, false);
-        }
-
-        self.analyze_block(&decl.body);
-
-        if self.get_symbol_table(decl.id).is_some() {
-            self.pop_symbol_table();
-        }
-    }
-
     fn analyze_path(&mut self, path: &Path, span: Span) {
         debug!("Analyzing path: {}", path);
 
@@ -323,167 +304,50 @@ impl SemanticAnalyzer {
         self.mark_as_used_by_name_and_arity(&path.to_string(), arity, span);
     }
 
-    fn analyze_expr(&mut self, expr: &Expr, parent_pipeline: bool) {
-        if let Some(symbol_table) = &self.get_symbol_table(expr.id) {
-            self.push_symbol_table(symbol_table);
+    fn analyze_variable_declaration(
+        &mut self,
+        decl: &LetDeclaration,
+        ctx: &mut SemanticAnalysisContext,
+    ) {
+        self.visit_pat(&decl.pattern, ctx);
+
+        // When declaring a variable, we can only reference symbols that were declared before.
+        // This includes our own variable name.
+        // E.g. `let a = a;` is not allowed. But `let a = 1; let a = a;` is.
+        // By marking the symbol as undeclared from the table while analyzing the expression,
+        // we can check whether the expression references any symbols that were not declared before.
+        let pattern_symbols = decl
+            .pattern
+            .get_all_node_ids()
+            .iter()
+            .filter_map(|id| {
+                self.current_symbol_table()
+                    .borrow_mut()
+                    .get_local(|s| s.node_id == Some(*id))
+                    .map(|s| s.id)
+            })
+            .collect::<Vec<_>>();
+
+        for symbol_id in &pattern_symbols {
+            self.current_symbol_table()
+                .borrow_mut()
+                .set_declared(*symbol_id, false);
         }
 
-        match &expr.kind {
-            ExprKind::BinaryOp(expr) => {
-                self.analyze_expr(&expr.lhs, false);
-                self.analyze_expr(&expr.rhs, expr.op == BinaryOpKind::Pipeline);
-            }
-            ExprKind::Block(block) | ExprKind::Loop(block) => self.analyze_block(block),
-            ExprKind::ForLoop(for_loop) => {
-                let symbol_table = self.get_symbol_table(for_loop.id).unwrap();
-                self.push_symbol_table(&symbol_table);
+        self.visit_expr(&decl.expression, ctx);
 
-                self.analyze_expr(&for_loop.iter, false);
-
-                if let Some((pat, expr)) = &for_loop.acc {
-                    self.analyze_pat(pat);
-                    self.analyze_expr(expr, false);
-                }
-
-                self.analyze_pat(&for_loop.pat);
-                self.analyze_block(&for_loop.block);
-                self.pop_symbol_table();
-
-                if let Some(else_block) = &for_loop.else_block {
-                    self.analyze_block(else_block);
-                }
-            }
-            ExprKind::UnaryOp(_, node) => {
-                self.analyze_expr(node, false);
-            }
-            ExprKind::Break(expr) => {
-                if let Some(expr) = expr {
-                    self.analyze_expr(expr, false);
-                }
-            }
-            ExprKind::Call(expr) | ExprKind::RecursiveCall(expr) => {
-                for argument in &expr.arguments {
-                    self.analyze_expr(argument, false);
-                }
-
-                if let ExprKind::Path(path) = &expr.callee.kind {
-                    let arity = if parent_pipeline {
-                        expr.arguments.len() + 1 // +1 for the pipeline operator
-                    } else {
-                        expr.arguments.len()
-                    };
-                    self.analyze_path_with_known_arity(path, arity, expr.callee.span);
-                } else {
-                    self.analyze_expr(&expr.callee, false);
-                }
-            }
-            ExprKind::Cast(expr, _) => {
-                self.analyze_expr(expr, false);
-            }
-            ExprKind::IfElse(expr) => {
-                self.analyze_expr(&expr.condition, false);
-                self.analyze_block(&expr.then_branch);
-
-                for else_branch in &expr.else_branches {
-                    self.analyze_optional_expr(&else_branch.condition);
-                    self.analyze_block(&else_branch.consequence);
-                }
-            }
-            ExprKind::Let(pat, expr) => {
-                self.analyze_pat(pat);
-                self.analyze_expr(expr, false);
-            }
-            ExprKind::List(values) => {
-                for value in values {
-                    self.analyze_expr(value, false);
-                }
-            }
-            ExprKind::Dict(kvs) => {
-                for (_key, value) in kvs {
-                    // TODO: Keys are currently not properly analyzed
-                    // self.analyze_expr(key, false);
-                    self.analyze_expr(value, false);
-                }
-            }
-            ExprKind::IndexExpression(expr) => {
-                self.analyze_expr(&expr.index, false);
-                self.analyze_expr(&expr.base, false);
-            }
-            ExprKind::FieldExpression(expr) => {
-                self.analyze_expr(&expr.base, false);
-                // TODO: We are checking for unused variables, this should be refactored into
-                //       it's own pass. Skipping analyzing field of variable as we do not have
-                //       any type information yet.
-                // self.analyze_node(&expr.field);
-            }
-            ExprKind::FunctionExpression(decl) => {
-                self.analyze_fn_decl(decl);
-            }
-            ExprKind::Path(path) => {
-                self.analyze_path(path, expr.span);
-            }
-            ExprKind::Match(expr) => {
-                self.analyze_expr(&expr.expression, false);
-
-                for arm in &expr.arms {
-                    if let Some(symbol_table) = &self.get_symbol_table(arm.id) {
-                        self.push_symbol_table(symbol_table);
-                    }
-
-                    self.analyze_pat(&arm.pattern);
-                    self.analyze_expr(&arm.expression, false);
-
-                    if self.get_symbol_table(arm.id).is_some() {
-                        self.pop_symbol_table();
-                    }
-                }
-            }
-            ExprKind::Range(expr) => {
-                self.analyze_expr(&expr.start, false);
-                self.analyze_expr(&expr.end, false);
-            }
-            ExprKind::None | ExprKind::Continue | ExprKind::Literal(_) | ExprKind::Wildcard => {}
-        }
-
-        if self.get_symbol_table(expr.id).is_some() {
-            self.pop_symbol_table();
+        for symbol_id in &pattern_symbols {
+            self.current_symbol_table()
+                .borrow_mut()
+                .set_declared(*symbol_id, true);
         }
     }
 
-    fn analyze_pat(&mut self, pat: &Pat) {
-        match &pat.kind {
-            PatKind::List(patterns) => {
-                for pattern in patterns {
-                    self.analyze_pat(pattern);
-                }
-            }
-            PatKind::Rest(pattern) => self.analyze_pat(pattern),
-            PatKind::Enum(enum_pattern) => {
-                self.analyze_path(&enum_pattern.path, pat.span);
-
-                for (_ident, pat) in &enum_pattern.elements {
-                    self.analyze_pat(pat);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    fn analyze_module(&mut self, module: &Module) {
-        if let Some(symbol_table) = &self.get_symbol_table(module.id) {
-            self.push_symbol_table(symbol_table);
-        }
-
-        for stmt in &module.statements {
-            self.analyze_stmt(stmt);
-        }
-
-        if self.get_symbol_table(module.id).is_some() {
-            self.pop_symbol_table();
-        }
-    }
-
-    fn report_unused_symbols(&mut self, symbol_table: &Rc<RefCell<SymbolTable>>) {
+    fn report_unused_symbols(
+        &mut self,
+        symbol_table: &Rc<RefCell<SymbolTable>>,
+        _ctx: &mut SemanticAnalysisContext,
+    ) {
         let symbol_table = symbol_table.borrow();
         let unused_symbols = symbol_table
             .get_all_declared_local_symbols()
@@ -517,38 +381,240 @@ impl SemanticAnalyzer {
         }
     }
 
-    fn analyze_variable_declaration(&mut self, decl: &LetDeclaration) {
-        self.analyze_pat(&decl.pattern);
+    fn validate_escape_sequences(&mut self, string_content: &str, span: Span) {
+        let mut chars = string_content.chars().peekable();
 
-        // When declaring a variable, we can only reference symbols that were declared before.
-        // This includes our own variable name.
-        // E.g. `let a = a;` is not allowed. But `let a = 1; let a = a;` is.
-        // By marking the symbol as undeclared from the table while analyzing the expression,
-        // we can check whether the expression references any symbols that were not declared before.
-        let pattern_symbols = decl
-            .pattern
-            .get_all_node_ids()
-            .iter()
-            .filter_map(|id| {
-                self.current_symbol_table()
-                    .borrow_mut()
-                    .get_local(|s| s.node_id == Some(*id))
-                    .map(|s| s.id)
-            })
-            .collect::<Vec<_>>();
+        while let Some(ch) = chars.next() {
+            if ch == '\\'
+                && let Some(&next_ch) = chars.peek()
+            {
+                // Check if this is a valid escape sequence
+                // Valid escape sequences in tlang: \", \', \\, \n, \t, \r, \0, \u{...}
+                match next_ch {
+                    '"' | '\'' | '\\' | 'n' | 't' | 'r' | '0' => {
+                        // Valid escape sequence, no warning needed
+                        chars.next(); // consume the character after backslash
+                    }
+                    'u' => {
+                        // Check for Unicode escape sequence \u{...}
+                        chars.next(); // consume 'u'
+                        if let Some(&'{') = chars.peek() {
+                            chars.next(); // consume '{'
+                            let mut hex_digits = String::new();
+                            let mut found_closing_brace = false;
 
-        for symbol_id in &pattern_symbols {
-            self.current_symbol_table()
-                .borrow_mut()
-                .set_declared(*symbol_id, false);
+                            // Collect hex digits until we find '}'
+                            while let Some(&hex_ch) = chars.peek() {
+                                if hex_ch == '}' {
+                                    chars.next(); // consume '}'
+                                    found_closing_brace = true;
+                                    break;
+                                } else if hex_ch.is_ascii_hexdigit() && hex_digits.len() < 6 {
+                                    hex_digits.push(hex_ch);
+                                    chars.next();
+                                } else {
+                                    // Invalid character or too many digits
+                                    break;
+                                }
+                            }
+
+                            // Validate the Unicode escape sequence
+                            if !found_closing_brace {
+                                self.diagnostics.push(diagnostic::warn_at!(
+                                    span,
+                                    "Unterminated Unicode escape sequence in string literal",
+                                ));
+                            } else if hex_digits.is_empty() {
+                                self.diagnostics.push(diagnostic::warn_at!(
+                                    span,
+                                    "Empty Unicode escape sequence in string literal",
+                                ));
+                            } else if let Ok(code_point) = u32::from_str_radix(&hex_digits, 16) {
+                                if char::from_u32(code_point).is_none() {
+                                    self.diagnostics.push(diagnostic::warn_at!(
+                                        span,
+                                        "Invalid Unicode code point in string literal",
+                                    ));
+                                }
+                                // Valid Unicode escape sequence, no warning needed
+                            } else {
+                                self.diagnostics.push(diagnostic::warn_at!(
+                                    span,
+                                    "Invalid hexadecimal in Unicode escape sequence",
+                                ));
+                            }
+                        } else {
+                            // \u not followed by {, treat as unknown escape sequence
+                            self.diagnostics.push(diagnostic::warn_at!(
+                                span,
+                                "Unknown escape sequence '\\{}' in string literal",
+                                next_ch
+                            ));
+                        }
+                    }
+                    _ => {
+                        // Unknown escape sequence, emit warning
+                        self.diagnostics.push(diagnostic::warn_at!(
+                            span,
+                            "Unknown escape sequence '\\{}' in string literal",
+                            next_ch
+                        ));
+                        chars.next(); // consume the character after backslash
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl SemanticAnalyzer {
+    fn visit_expr_in_pipeline_context(&mut self, expr: &Expr, ctx: &mut SemanticAnalysisContext) {
+        match &expr.kind {
+            ExprKind::Call(call_expr) | ExprKind::RecursiveCall(call_expr) => {
+                // For direct calls in pipeline context, add +1 to arity
+                for argument in &call_expr.arguments {
+                    self.visit_expr(argument, ctx);
+                }
+
+                if let ExprKind::Path(path) = &call_expr.callee.kind {
+                    let arity = call_expr.arguments.len() + 1; // +1 for the pipeline operator
+                    self.analyze_path_with_known_arity(path, arity, call_expr.callee.span);
+                } else {
+                    self.visit_expr(&call_expr.callee, ctx);
+                }
+            }
+            _ => self.visit_expr(expr, ctx),
+        }
+    }
+}
+
+impl<'ast> Visitor<'ast> for SemanticAnalyzer {
+    type Context = SemanticAnalysisContext;
+
+    fn enter_scope(&mut self, node_id: NodeId, ctx: &mut Self::Context) {
+        if let Some(symbol_table) = ctx.get_symbol_table(node_id) {
+            self.push_symbol_table(&symbol_table);
+        }
+    }
+
+    fn leave_scope(&mut self, node_id: NodeId, ctx: &mut Self::Context) {
+        if ctx.get_symbol_table(node_id).is_some() {
+            let symbol_table = self.pop_symbol_table();
+            self.report_unused_symbols(&symbol_table, ctx);
+        }
+    }
+
+    fn visit_stmt(&mut self, stmt: &'ast Stmt, ctx: &mut Self::Context) {
+        match &stmt.kind {
+            StmtKind::Let(decl) => {
+                self.analyze_variable_declaration(decl, ctx);
+            }
+            _ => walk_stmt(self, stmt, ctx),
+        }
+    }
+
+    fn visit_struct_decl(
+        &mut self,
+        decl: &'ast tlang_ast::node::StructDeclaration,
+        ctx: &mut Self::Context,
+    ) {
+        ctx.struct_declarations
+            .insert(decl.name.to_string(), decl.clone());
+    }
+
+    fn visit_fn_decl(&mut self, decl: &'ast FunctionDeclaration, ctx: &mut Self::Context) {
+        // Don't visit the function name expression as that would mark it as used
+        // The function declaration itself is handled by the declaration analyzer
+
+        self.enter_scope(decl.id, ctx);
+
+        for parameter in &decl.parameters {
+            self.visit_fn_param(parameter, ctx);
         }
 
-        self.analyze_expr(&decl.expression, false);
+        if let Some(guard) = &decl.guard {
+            self.visit_expr(guard, ctx);
+        }
 
-        for symbol_id in &pattern_symbols {
-            self.current_symbol_table()
-                .borrow_mut()
-                .set_declared(*symbol_id, true);
+        if let Some(return_type_annotation) = &decl.return_type_annotation {
+            self.visit_fn_ret_ty(return_type_annotation, ctx);
+        }
+
+        self.visit_fn_body(&decl.body, ctx);
+
+        self.leave_scope(decl.id, ctx);
+    }
+
+    fn visit_expr(&mut self, expr: &'ast Expr, ctx: &mut Self::Context) {
+        match &expr.kind {
+            ExprKind::BinaryOp(binary_expr) => {
+                self.visit_expr(&binary_expr.lhs, ctx);
+
+                // Set pipeline context for RHS if this is a pipeline operator
+                if binary_expr.op == BinaryOpKind::Pipeline {
+                    // For pipeline operators, we need to handle the RHS specially
+                    // but only set the pipeline context for direct function calls
+                    self.visit_expr_in_pipeline_context(&binary_expr.rhs, ctx);
+                } else {
+                    self.visit_expr(&binary_expr.rhs, ctx);
+                }
+            }
+            ExprKind::Call(call_expr) | ExprKind::RecursiveCall(call_expr) => {
+                for argument in &call_expr.arguments {
+                    self.visit_expr(argument, ctx);
+                }
+
+                if let ExprKind::Path(path) = &call_expr.callee.kind {
+                    let arity = call_expr.arguments.len(); // Normal arity for non-pipeline calls
+                    self.analyze_path_with_known_arity(path, arity, call_expr.callee.span);
+                } else {
+                    self.visit_expr(&call_expr.callee, ctx);
+                }
+            }
+            ExprKind::Path(path) => {
+                self.analyze_path(path, expr.span);
+            }
+            ExprKind::Dict(kvs) => {
+                for (_key, value) in kvs {
+                    // TODO: Keys are currently not properly analyzed
+                    // Don't analyze keys as they are field names, not variable references
+                    self.visit_expr(value, ctx);
+                }
+            }
+            ExprKind::FieldExpression(field_expr) => {
+                self.visit_expr(&field_expr.base, ctx);
+                // TODO: We are checking for unused variables, this should be refactored into
+                //       it's own pass. Skipping analyzing field of variable as we do not have
+                //       any type information yet.
+                // Don't analyze the field name as it's not a variable reference
+            }
+            _ => walk_expr(self, expr, ctx),
+        }
+    }
+
+    fn visit_pat(&mut self, pat: &'ast Pat, ctx: &mut Self::Context) {
+        match &pat.kind {
+            PatKind::Enum(enum_pattern) => {
+                self.analyze_path(&enum_pattern.path, pat.span);
+
+                for (_ident, pat) in &enum_pattern.elements {
+                    // Don't analyze the field name as it's not a variable reference,
+                    // just visit the pattern
+                    self.visit_pat(pat, ctx);
+                }
+            }
+            _ => walk_pat(self, pat, ctx),
+        }
+    }
+
+    fn visit_literal(&mut self, literal: &'ast Literal, span: Span, _ctx: &mut Self::Context) {
+        match literal {
+            Literal::String(string_content) | Literal::Char(string_content) => {
+                self.validate_escape_sequences(string_content, span);
+            }
+            _ => {
+                // No validation needed for other literal types
+            }
         }
     }
 }

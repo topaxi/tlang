@@ -6,12 +6,9 @@ use std::rc::Rc;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 use tlang_ast::node::{Ident, UnaryOp};
-use tlang_ast::symbols::{SymbolIdAllocator, SymbolType};
 use tlang_ast::token::{Literal, Token};
-
-#[deprecated(note = "Use `tlang_span::HirId` instead")]
-pub use tlang_span::HirId;
-use tlang_span::{HirIdAllocator, Span};
+use tlang_span::{HirId, HirIdAllocator, Span};
+use tlang_symbols::{SymbolIdAllocator, SymbolTable, SymbolType};
 
 pub trait HirScope {
     // fn hir_id(&self) -> HirId;
@@ -796,7 +793,7 @@ pub enum BinaryOpKind {
 #[derive(Debug)]
 pub struct LowerResultMeta {
     pub root_symbol_table: HirId,
-    pub symbol_tables: HashMap<HirId, Rc<RefCell<tlang_ast::symbols::SymbolTable>>>,
+    pub symbol_tables: HashMap<HirId, Rc<RefCell<SymbolTable>>>,
     pub hir_id_allocator: HirIdAllocator,
     pub symbol_id_allocator: SymbolIdAllocator,
 }

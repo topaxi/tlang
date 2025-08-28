@@ -362,8 +362,9 @@ impl CodegenJS {
         let has_block_completions =
             self.current_context() == BlockContext::Expression && then_branch.has_completion();
         if has_block_completions {
-            // TODO: We could probably reuse existing completion vars here.
-            if let Some("return") = self.current_completion_variable() {
+            // Note: We check if we can reuse the existing completion variable ("return")
+            // instead of creating a new temporary variable each time.
+            if self.can_reuse_current_completion_variable() {
                 self.push_completion_variable(Some("return"));
                 lhs = self.replace_statement_buffer_with_empty_string();
                 self.push_indent();

@@ -1,0 +1,93 @@
+// Higher-order functions and function composition
+// Demonstrates: function composition, currying, function pipelines
+
+// Helper functions
+fn map([], _) { [] }
+fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
+
+fn filter([], _) { [] }
+fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
+fn filter([_, ...xs], f) { rec filter(xs, f) }
+
+fn foldl([], acc, _) { acc }
+fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+
+fn range(start, end) {
+    if start >= end {
+        []
+    } else {
+        [start, ...range(start + 1, end)]
+    }
+}
+
+// Function composition
+fn compose(f, g) { fn(x) { f(g(x)) } }
+
+// Currying examples
+fn add(a) { fn(b) { a + b } }
+fn multiply(a) { fn(b) { a * b } }
+
+fn add_then_multiply(add_val, mult_val) {
+    compose(multiply(mult_val), add(add_val))
+}
+
+// Partial application helpers
+fn partial_apply_2(func, arg1) {
+    fn(arg2) { func(arg1, arg2) }
+}
+
+fn apply_twice(func) {
+    fn(x) { func(func(x)) }
+}
+
+// Function predicates
+fn is_even(n) { n % 2 == 0 }
+fn is_positive(n) { n > 0 }
+fn greater_than(threshold) { fn(n) { n > threshold } }
+
+log("=== Higher-Order Functions Demo ===");
+
+// Test basic function composition
+log("Function composition:");
+let numbers = range(1, 11);
+numbers |> log();
+
+let add_five = add(5);
+let multiply_by_three = multiply(3);
+
+numbers |> map(add_five) |> log();           // Add 5 to each
+numbers |> map(multiply_by_three) |> log();  // Multiply each by 3
+
+let add_five_then_triple = compose(multiply_by_three, add_five);
+numbers |> map(add_five_then_triple) |> log(); // (n + 5) * 3
+
+// Test currying and partial application
+log("Currying and partial application:");
+let add_ten = add(10);
+add_ten(5) |> log();  // 15
+
+let mult_by_four = multiply(4);
+mult_by_four(7) |> log(); // 28
+
+// Test apply_twice
+log("Apply twice:");
+let double = multiply(2);
+let quadruple = apply_twice(double);
+quadruple(3) |> log(); // 12
+
+// Test predicate functions
+log("Predicate filtering:");
+numbers |> filter(is_even) |> log();            // Even numbers
+numbers |> filter(is_positive) |> log();        // All positive (should be all)
+numbers |> filter(greater_than(5)) |> log();    // Greater than 5
+
+// Complex pipeline
+log("Complex function pipeline:");
+let result = range(1, 21)
+|> filter(is_even)
+|> map(add(2))
+|> filter(greater_than(8))
+|> map(multiply(2))
+|> foldl(0, fn(acc, x) { acc + x });
+
+result |> log(); // Sum of processed values

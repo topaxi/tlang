@@ -1,9 +1,7 @@
 use crate::{pattern_match_generator::MatchContextStack, scope::Scope};
-use tlang_ast::{
-    symbols::SymbolType,
-    token::{Token, TokenKind},
-};
+use tlang_ast::token::{Token, TokenKind};
 use tlang_hir::hir;
+use tlang_symbols::SymbolType;
 
 // Before we indent a line, we reserve at least the indentation space plus some more for the the
 // next statement. We start with an assumption of 128 below, this might the maximum overhead once
@@ -99,11 +97,11 @@ impl CodegenJS {
             ("Ok", SymbolType::EnumVariant(1)),
             ("Err", SymbolType::EnumVariant(1)),
             ("len", SymbolType::Function(1)),
-            ("log", SymbolType::Function(1)),
+            ("log", SymbolType::Function(u16::MAX)),
             ("math", SymbolType::Module),
             ("math::pi", SymbolType::Variable),
-            ("math::max", SymbolType::Function(2)),
-            ("math::min", SymbolType::Function(2)),
+            ("math::max", SymbolType::Function(u16::MAX)),
+            ("math::min", SymbolType::Function(u16::MAX)),
             ("math::floor", SymbolType::Function(1)),
             ("math::random", SymbolType::Function(0)),
             ("random_int", SymbolType::Function(1)),
@@ -335,6 +333,12 @@ impl CodegenJS {
     pub(crate) fn push_let_declaration_to_expr(&mut self, name: &str, expr: &hir::Expr) {
         self.push_open_let_declaration(name);
         self.generate_expr(expr, None);
+    }
+
+    /// Returns true if the current completion variable can be reused (i.e., it's "return").
+    /// This is a helper to check if we should reuse existing completion vars.
+    pub(crate) fn can_reuse_current_completion_variable(&self) -> bool {
+        matches!(self.current_completion_variable(), Some("return"))
     }
 
     pub(crate) fn generate_comment(&mut self, comment: &Token) {

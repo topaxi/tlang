@@ -1,9 +1,9 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
-use tlang_ast::symbols::{SymbolId, SymbolInfo, SymbolType};
 use tlang_parser::Parser;
 use tlang_semantics::{analyzer::SemanticAnalyzer, diagnostic::Diagnostic};
 use tlang_span::{LineColumn, NodeId, Span};
+use tlang_symbols::{SymbolId, SymbolInfo, SymbolType};
 
 mod common;
 
@@ -222,7 +222,7 @@ fn test_should_error_on_unused_identifier_in_function_definition() {
     assert_eq!(
         diagnostics[..1],
         vec![Diagnostic::error(
-            "Use of undeclared variable `c`, did you mean the parameter `a`?".into(),
+            "Use of undeclared variable `c`, did you mean the parameter `a`?",
             Span::new(
                 LineColumn {
                     line: 1,
@@ -282,11 +282,11 @@ fn should_warn_about_unused_variables() {
         diagnostics,
         vec![
             Diagnostic::warn(
-                "Unused variable `a`, if this is intentional, prefix the name with an underscore: `_a`".into(),
+                "Unused variable `a`, if this is intentional, prefix the name with an underscore: `_a`",
                 Span::new((0, 4), (0, 5)),
             ),
             Diagnostic::warn(
-                "Unused variable `b`, if this is intentional, prefix the name with an underscore: `_b`".into(),
+                "Unused variable `b`, if this is intentional, prefix the name with an underscore: `_b`",
                 Span::new((1, 5), (1, 6)),
             ),
         ],
@@ -304,21 +304,18 @@ fn should_warn_about_unused_function_and_parameters() {
         diagnostics,
         vec![
             Diagnostic::warn(
-                "Unused parameter `a`, if this is intentional, prefix the name with an underscore: `_a`".into(),
+                "Unused parameter `a`, if this is intentional, prefix the name with an underscore: `_a`",
                 Span::new((0, 7), (0, 8)),
             ),
             Diagnostic::warn(
-                "Unused parameter `b`, if this is intentional, prefix the name with an underscore: `_b`".into(),
+                "Unused parameter `b`, if this is intentional, prefix the name with an underscore: `_b`",
                 Span::new((0, 10), (0, 11)),
             ),
             Diagnostic::warn(
-                "Unused variable `c`, if this is intentional, prefix the name with an underscore: `_c`".into(),
+                "Unused variable `c`, if this is intentional, prefix the name with an underscore: `_c`",
                 Span::new((1, 9), (1, 10)),
             ),
-            Diagnostic::warn(
-                "Unused function `add/2`".into(),
-                Span::new((0, 3), (0, 6)),
-            ),
+            Diagnostic::warn("Unused function `add/2`", Span::new((0, 3), (0, 6)),),
         ]
     );
 }
@@ -406,4 +403,78 @@ fn should_handle_fn_guard_variables() {
         ]
     );
     assert_eq!(diagnostics, vec![]);
+}
+
+#[test]
+fn test_should_warn_on_invalid_escape_sequences() {
+    let diagnostics = analyze_diag!(
+        r#"
+        let invalid_string = "Unknown escape: \q";
+        let another_invalid = "Bad char: \x";
+        let valid_string = "Good escape: \n";
+        let invalid_char = '\z';
+    "#
+    );
+
+    // Filter for only escape sequence warnings
+    let escape_warnings: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.message().contains("Unknown escape sequence"))
+        .collect();
+
+    // Should get warnings for the invalid escape sequences
+    assert_eq!(escape_warnings.len(), 3);
+
+    // Check that the warnings are for unknown escape sequences
+    assert!(
+        escape_warnings[0]
+            .message()
+            .contains("Unknown escape sequence")
+    );
+    assert!(escape_warnings[0].message().contains("\\q"));
+    assert!(escape_warnings[0].is_warning());
+
+    assert!(
+        escape_warnings[1]
+            .message()
+            .contains("Unknown escape sequence")
+    );
+    assert!(escape_warnings[1].message().contains("\\x"));
+    assert!(escape_warnings[1].is_warning());
+
+    assert!(
+        escape_warnings[2]
+            .message()
+            .contains("Unknown escape sequence")
+    );
+    assert!(escape_warnings[2].message().contains("\\z"));
+    assert!(escape_warnings[2].is_warning());
+}
+
+#[test]
+fn test_should_not_warn_on_valid_escape_sequences() {
+    let diagnostics = analyze_diag!(
+        r#"
+        let string1 = "Quote: \"Hello\"";
+        let string2 = "Backslash: \\";
+        let string3 = "Newline: \n";
+        let string4 = "Tab: \t";
+        let string5 = "Carriage: \r";
+        let string6 = "Null: \0";
+        let char1 = '\'';
+        let char2 = '\\';
+    "#
+    );
+
+    // Filter for only escape sequence warnings
+    let escape_warnings: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| {
+            d.message().contains("Unknown escape sequence")
+                || d.message().contains("Backslash at end")
+        })
+        .collect();
+
+    // Should not get any warnings for valid escape sequences
+    assert_eq!(escape_warnings.len(), 0);
 }

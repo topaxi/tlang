@@ -1,0 +1,25 @@
+=== Advanced Pattern Matching Demo ===
+Expression tree evaluation:
+8
+28
+36
+Node counting:
+3
+3
+7
+Add-only checking:
+true
+false
+false
+List descriptions:
+empty
+single
+pair
+triple
+many
+Number classification:
+negative
+zero
+small_positive
+medium
+large

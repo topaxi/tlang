@@ -8,8 +8,13 @@ tsconfig.tsbuildinfo
 /*.perf
 
 *.pending-snap
+*.snap.new
 
 # Benchmark output files
 *_benchmark.txt
 benchmark_report.md
 .benchmark-main-worktree/
+
+# Binaryen downloaded files
+binaryen-version_*
+binaryen-version_*.tar.gz

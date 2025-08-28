@@ -1,0 +1,26 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: output
+input_file: tests/structs/stack.tlang
+---
+=== Stack Data Structure Demo ===
+Creating empty stack:
+true
+0
+Pushing elements 1, 2, 3:
+[3, 2, 1]
+3
+Peek at top element:
+true
+3
+Pop elements:
+true
+3
+&[2, 1]
+2
+2
+&[1]
+1
+&[]
+true
+true

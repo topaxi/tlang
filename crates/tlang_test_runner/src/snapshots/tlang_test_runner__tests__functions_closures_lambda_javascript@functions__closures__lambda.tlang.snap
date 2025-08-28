@@ -1,0 +1,9 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: output
+input_file: tests/functions/closures/lambda.tlang
+---
+6
+12
+12
+19

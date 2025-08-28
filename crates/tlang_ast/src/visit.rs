@@ -1,135 +1,178 @@
 use crate::node;
+use crate::token::Literal;
+use tlang_span::{NodeId, Span};
 
 pub trait Visitor<'ast>: Sized {
-    fn visit_module(&mut self, module: &'ast node::Module) {
-        walk_module(self, module);
+    type Context;
+
+    #[allow(unused_variables)]
+    fn enter_scope(&mut self, node_id: NodeId, ctx: &mut Self::Context) {}
+    #[allow(unused_variables)]
+    fn leave_scope(&mut self, node_id: NodeId, ctx: &mut Self::Context) {}
+    fn visit_module(&mut self, module: &'ast node::Module, ctx: &mut Self::Context) {
+        walk_module(self, module, ctx);
     }
 
     fn visit_block(
         &mut self,
         statements: &'ast [node::Stmt],
         expression: &'ast Option<node::Expr>,
+        ctx: &mut Self::Context,
     ) {
-        walk_block(self, statements, expression);
+        walk_block(self, statements, expression, ctx);
     }
 
-    fn visit_ident(&mut self, _ident: &'ast node::Ident) {}
+    #[allow(unused_variables)]
+    fn visit_ident(&mut self, _ident: &'ast node::Ident, ctx: &mut Self::Context) {}
 
-    fn visit_pat(&mut self, pattern: &'ast node::Pat) {
-        walk_pat(self, pattern);
+    fn visit_pat(&mut self, pattern: &'ast node::Pat, ctx: &mut Self::Context) {
+        walk_pat(self, pattern, ctx);
     }
 
-    fn visit_stmt(&mut self, statement: &'ast node::Stmt) {
-        walk_stmt(self, statement);
+    fn visit_stmt(&mut self, statement: &'ast node::Stmt, ctx: &mut Self::Context) {
+        walk_stmt(self, statement, ctx);
     }
 
-    fn visit_struct_decl(&mut self, decl: &'ast node::StructDeclaration) {
-        self.visit_ident(&decl.name);
+    fn visit_struct_decl(&mut self, decl: &'ast node::StructDeclaration, ctx: &mut Self::Context) {
+        self.visit_ident(&decl.name, ctx);
 
         for node::StructField { name, ty, .. } in &decl.fields {
-            self.visit_ident(name);
-            self.visit_ty(ty);
+            self.visit_ident(name, ctx);
+            self.visit_ty(ty, ctx);
         }
     }
 
-    fn visit_enum_decl(&mut self, decl: &'ast node::EnumDeclaration) {
-        walk_enum_decl(self, decl);
+    fn visit_enum_decl(&mut self, decl: &'ast node::EnumDeclaration, ctx: &mut Self::Context) {
+        walk_enum_decl(self, decl, ctx);
     }
 
-    fn visit_fn_decls(&mut self, declarations: &'ast [node::FunctionDeclaration]) {
+    fn visit_fn_decls(
+        &mut self,
+        declarations: &'ast [node::FunctionDeclaration],
+        ctx: &mut Self::Context,
+    ) {
         for declaration in declarations {
-            walk_fn_decl(self, declaration);
+            self.visit_fn_decl(declaration, ctx);
         }
     }
 
-    fn visit_fn_decl(&mut self, declaration: &'ast node::FunctionDeclaration) {
-        walk_fn_decl(self, declaration);
+    fn visit_fn_decl(
+        &mut self,
+        declaration: &'ast node::FunctionDeclaration,
+        ctx: &mut Self::Context,
+    ) {
+        walk_fn_decl(self, declaration, ctx);
     }
 
-    fn visit_expr(&mut self, expression: &'ast node::Expr) {
-        walk_expr(self, expression);
+    fn visit_expr(&mut self, expression: &'ast node::Expr, ctx: &mut Self::Context) {
+        walk_expr(self, expression, ctx);
     }
 
-    fn visit_else_clause(&mut self, clause: &'ast node::ElseClause) {
+    fn visit_literal(&mut self, _literal: &'ast Literal, _span: Span, _ctx: &mut Self::Context) {}
+
+    fn visit_else_clause(&mut self, clause: &'ast node::ElseClause, ctx: &mut Self::Context) {
         if let Some(ref condition) = clause.condition {
-            walk_expr(self, condition);
+            walk_expr(self, condition, ctx);
         }
 
+        self.enter_scope(clause.consequence.id, ctx);
         walk_block(
             self,
             &clause.consequence.statements,
             &clause.consequence.expression,
+            ctx,
         );
+        self.leave_scope(clause.consequence.id, ctx);
     }
 
-    fn visit_fn_param(&mut self, parameter: &'ast node::FunctionParameter) {
-        walk_fn_param(self, parameter);
+    fn visit_fn_param(
+        &mut self,
+        parameter: &'ast node::FunctionParameter,
+        ctx: &mut Self::Context,
+    ) {
+        walk_fn_param(self, parameter, ctx);
     }
 
-    fn visit_fn_guard(&mut self, guard: &'ast node::Expr) {
-        walk_expr(self, guard);
+    fn visit_fn_guard(&mut self, guard: &'ast node::Expr, ctx: &mut Self::Context) {
+        walk_expr(self, guard, ctx);
     }
 
-    fn visit_ty(&mut self, ty: &'ast node::Ty) {
-        walk_ty(self, ty);
+    fn visit_ty(&mut self, ty: &'ast node::Ty, ctx: &mut Self::Context) {
+        walk_ty(self, ty, ctx);
     }
 
-    fn visit_fn_ret_ty(&mut self, annotation: &'ast node::Ty) {
-        walk_ty(self, annotation);
+    fn visit_fn_ret_ty(&mut self, annotation: &'ast node::Ty, ctx: &mut Self::Context) {
+        walk_ty(self, annotation, ctx);
     }
 
-    fn visit_fn_body(&mut self, body: &'ast node::Block) {
-        walk_fn_body(self, body);
+    fn visit_fn_body(&mut self, body: &'ast node::Block, ctx: &mut Self::Context) {
+        walk_fn_body(self, body, ctx);
     }
 
-    fn visit_variant(&mut self, variant: &'ast node::EnumVariant) {
-        walk_variant(self, variant);
+    fn visit_variant(&mut self, variant: &'ast node::EnumVariant, ctx: &mut Self::Context) {
+        walk_variant(self, variant, ctx);
     }
 
-    fn visit_path(&mut self, path: &'ast node::Path) {
-        walk_path(self, path);
+    fn visit_path(&mut self, path: &'ast node::Path, ctx: &mut Self::Context) {
+        walk_path(self, path, ctx);
     }
 }
 
-pub fn walk_module<'ast, V: Visitor<'ast>>(visitor: &mut V, module: &'ast node::Module) {
+pub fn walk_module<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    module: &'ast node::Module,
+    ctx: &mut V::Context,
+) {
+    visitor.enter_scope(module.id, ctx);
     for statement in &module.statements {
-        visitor.visit_stmt(statement);
+        visitor.visit_stmt(statement, ctx);
     }
+    visitor.leave_scope(module.id, ctx);
 }
 
-pub fn walk_path<'ast, V: Visitor<'ast>>(visitor: &mut V, path: &'ast node::Path) {
+pub fn walk_path<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    path: &'ast node::Path,
+    ctx: &mut V::Context,
+) {
     for segment in &path.segments {
-        visitor.visit_ident(segment);
+        visitor.visit_ident(segment, ctx);
     }
 }
 
-pub fn walk_pat<'ast, V: Visitor<'ast>>(visitor: &mut V, pattern: &'ast node::Pat) {
+pub fn walk_pat<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    pattern: &'ast node::Pat,
+    ctx: &mut V::Context,
+) {
     match &pattern.kind {
-        node::PatKind::Identifier(ident_pattern) => visitor.visit_ident(ident_pattern),
-        node::PatKind::Rest(pattern) => visitor.visit_pat(pattern),
+        node::PatKind::Identifier(ident_pattern) => visitor.visit_ident(ident_pattern, ctx),
+        node::PatKind::Rest(pattern) => visitor.visit_pat(pattern, ctx),
         node::PatKind::List(patterns) => {
             for pattern in patterns {
-                visitor.visit_pat(pattern);
+                visitor.visit_pat(pattern, ctx);
             }
         }
         node::PatKind::Enum(enum_pattern) => {
-            visitor.visit_path(&enum_pattern.path);
+            visitor.visit_path(&enum_pattern.path, ctx);
 
             for (ident, pat) in &enum_pattern.elements {
-                visitor.visit_ident(ident);
-                visitor.visit_pat(pat);
+                visitor.visit_ident(ident, ctx);
+                visitor.visit_pat(pat, ctx);
             }
         }
-        node::PatKind::Literal(_) => {}
+        node::PatKind::Literal(literal) => {
+            visitor.visit_literal(literal, pattern.span, ctx);
+        }
         node::PatKind::_Self => {}
         node::PatKind::Wildcard => {}
         node::PatKind::None => {}
     }
 }
 
-pub fn walk_ty<'ast, V: Visitor<'ast>>(visitor: &mut V, ty: &'ast node::Ty) {
+pub fn walk_ty<'ast, V: Visitor<'ast>>(visitor: &mut V, ty: &'ast node::Ty, ctx: &mut V::Context) {
     for ty in &ty.parameters {
-        visitor.visit_ty(ty);
+        visitor.visit_ty(ty, ctx);
     }
 }
 
@@ -137,178 +180,329 @@ pub fn walk_block<'ast, V: Visitor<'ast>>(
     visitor: &mut V,
     statements: &'ast [node::Stmt],
     expression: &'ast Option<node::Expr>,
+    ctx: &mut V::Context,
 ) {
     for statement in statements {
-        visitor.visit_stmt(statement);
+        visitor.visit_stmt(statement, ctx);
     }
     if let Some(expression) = expression {
-        visitor.visit_expr(expression);
+        visitor.visit_expr(expression, ctx);
     }
 }
 
-pub fn walk_stmt<'ast, V: Visitor<'ast>>(visitor: &mut V, statement: &'ast node::Stmt) {
+pub fn walk_stmt<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    statement: &'ast node::Stmt,
+    ctx: &mut V::Context,
+) {
     match &statement.kind {
         node::StmtKind::None => {}
         node::StmtKind::Expr(expr) => {
-            visitor.visit_expr(expr);
+            visitor.visit_expr(expr, ctx);
         }
         node::StmtKind::Let(let_decl) => {
-            visitor.visit_pat(&let_decl.pattern);
-            visitor.visit_expr(&let_decl.expression);
+            visitor.visit_pat(&let_decl.pattern, ctx);
+            visitor.visit_expr(&let_decl.expression, ctx);
 
             if let Some(ty) = &let_decl.type_annotation {
-                visitor.visit_ty(ty);
+                visitor.visit_ty(ty, ctx);
             }
         }
         node::StmtKind::FunctionDeclaration(declaration) => {
-            visitor.visit_fn_decl(declaration);
+            visitor.visit_fn_decl(declaration, ctx);
         }
         node::StmtKind::FunctionDeclarations(declarations) => {
-            visitor.visit_fn_decls(declarations);
+            visitor.visit_fn_decls(declarations, ctx);
         }
         node::StmtKind::Return(expr) => {
             if let Some(expr) = expr.as_ref() {
-                visitor.visit_expr(expr);
+                visitor.visit_expr(expr, ctx);
             }
         }
-        node::StmtKind::StructDeclaration(decl) => visitor.visit_struct_decl(decl),
-        node::StmtKind::EnumDeclaration(decl) => visitor.visit_enum_decl(decl),
+        node::StmtKind::StructDeclaration(decl) => visitor.visit_struct_decl(decl, ctx),
+        node::StmtKind::EnumDeclaration(decl) => visitor.visit_enum_decl(decl, ctx),
     }
 }
 
-pub fn walk_enum_decl<'ast, V: Visitor<'ast>>(visitor: &mut V, decl: &'ast node::EnumDeclaration) {
-    visitor.visit_ident(&decl.name);
+pub fn walk_enum_decl<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    decl: &'ast node::EnumDeclaration,
+    ctx: &mut V::Context,
+) {
+    visitor.visit_ident(&decl.name, ctx);
 
     for variant in &decl.variants {
-        visitor.visit_variant(variant);
+        visitor.visit_variant(variant, ctx);
     }
 }
 
-pub fn walk_variant<'ast, V: Visitor<'ast>>(visitor: &mut V, variant: &'ast node::EnumVariant) {
-    visitor.visit_ident(&variant.name);
+pub fn walk_variant<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    variant: &'ast node::EnumVariant,
+    ctx: &mut V::Context,
+) {
+    visitor.visit_ident(&variant.name, ctx);
 
     for node::StructField { name, ty, .. } in &variant.parameters {
-        visitor.visit_ident(name);
-        visitor.visit_ty(ty);
+        visitor.visit_ident(name, ctx);
+        visitor.visit_ty(ty, ctx);
     }
 }
 
 pub fn walk_fn_param<'ast, V: Visitor<'ast>>(
     visitor: &mut V,
     parameter: &'ast node::FunctionParameter,
+    ctx: &mut V::Context,
 ) {
-    visitor.visit_pat(&parameter.pattern);
+    visitor.visit_pat(&parameter.pattern, ctx);
 
     if let Some(ref type_annotation) = parameter.type_annotation {
-        visitor.visit_ty(type_annotation);
+        visitor.visit_ty(type_annotation, ctx);
     }
 }
 
-pub fn walk_fn_body<'ast, V: Visitor<'ast>>(visitor: &mut V, body: &'ast node::Block) {
-    visitor.visit_block(&body.statements, &body.expression);
+pub fn walk_fn_body<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    body: &'ast node::Block,
+    ctx: &mut V::Context,
+) {
+    visitor.visit_block(&body.statements, &body.expression, ctx);
 }
 
 pub fn walk_fn_decl<'ast, V: Visitor<'ast>>(
     visitor: &mut V,
     declaration: &'ast node::FunctionDeclaration,
+    ctx: &mut V::Context,
 ) {
+    visitor.visit_expr(&declaration.name, ctx);
+    visitor.enter_scope(declaration.id, ctx);
     for parameter in &declaration.parameters {
-        visitor.visit_fn_param(parameter);
+        visitor.visit_fn_param(parameter, ctx);
     }
     if let Some(ref guard) = declaration.guard {
-        visitor.visit_fn_guard(guard);
+        visitor.visit_fn_guard(guard, ctx);
     }
     if let Some(ref return_type_annotation) = declaration.return_type_annotation {
-        visitor.visit_fn_ret_ty(return_type_annotation);
+        visitor.visit_fn_ret_ty(return_type_annotation, ctx);
     }
-    visitor.visit_fn_body(&declaration.body);
+    visitor.visit_fn_body(&declaration.body, ctx);
+    visitor.leave_scope(declaration.id, ctx);
 }
 
-pub fn walk_expr<'ast, V: Visitor<'ast>>(visitor: &mut V, expression: &'ast node::Expr) {
+fn walk_block_or_loop<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    block: &'ast node::Block,
+    ctx: &mut V::Context,
+) {
+    visitor.enter_scope(block.id, ctx);
+    visitor.visit_block(&block.statements, &block.expression, ctx);
+    visitor.leave_scope(block.id, ctx);
+}
+
+fn walk_for_loop<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    expression: &'ast node::Expr,
+    for_loop: &'ast node::ForLoop,
+    ctx: &mut V::Context,
+) {
+    // Using the expression.id here, as the whole expression will be lowered into a block
+    // expression, referring to this expression.id.
+    visitor.enter_scope(expression.id, ctx);
+    visitor.visit_expr(&for_loop.iter, ctx);
+
+    visitor.enter_scope(for_loop.id, ctx);
+    if let Some((pat, expr)) = &for_loop.acc {
+        visitor.visit_pat(pat, ctx);
+        visitor.visit_expr(expr, ctx);
+    }
+
+    visitor.enter_scope(for_loop.block.id, ctx);
+    visitor.visit_pat(&for_loop.pat, ctx);
+    visitor.visit_block(&for_loop.block.statements, &for_loop.block.expression, ctx);
+    visitor.leave_scope(for_loop.block.id, ctx);
+    visitor.leave_scope(for_loop.id, ctx);
+    visitor.leave_scope(expression.id, ctx);
+
+    if let Some(else_block) = &for_loop.else_block {
+        visitor.enter_scope(else_block.id, ctx);
+        visitor.visit_block(&else_block.statements, &else_block.expression, ctx);
+        visitor.leave_scope(else_block.id, ctx);
+    }
+}
+
+fn walk_binary_op<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    binary_op_expression: &'ast node::BinaryOpExpression,
+    ctx: &mut V::Context,
+) {
+    visitor.visit_expr(&binary_op_expression.lhs, ctx);
+    visitor.visit_expr(&binary_op_expression.rhs, ctx);
+}
+
+fn walk_call<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    call_expr: &'ast node::CallExpression,
+    ctx: &mut V::Context,
+) {
+    for argument in &call_expr.arguments {
+        visitor.visit_expr(argument, ctx);
+    }
+    visitor.visit_expr(&call_expr.callee, ctx);
+}
+
+fn walk_dict<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    kvs: &'ast [(node::Expr, node::Expr)],
+    ctx: &mut V::Context,
+) {
+    for (key, value) in kvs {
+        visitor.visit_expr(key, ctx);
+        visitor.visit_expr(value, ctx);
+    }
+}
+
+fn walk_field_expression<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    field_expr: &'ast node::FieldAccessExpression,
+    ctx: &mut V::Context,
+) {
+    visitor.visit_expr(&field_expr.base, ctx);
+    visitor.visit_ident(&field_expr.field, ctx);
+}
+
+fn walk_index_expression<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    index_expr: &'ast node::IndexAccessExpression,
+    ctx: &mut V::Context,
+) {
+    visitor.visit_expr(&index_expr.base, ctx);
+    visitor.visit_expr(&index_expr.index, ctx);
+}
+
+fn walk_let_expression<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    pattern: &'ast node::Pat,
+    expr: &'ast node::Expr,
+    ctx: &mut V::Context,
+) {
+    visitor.visit_pat(pattern, ctx);
+    visitor.visit_expr(expr, ctx);
+}
+
+fn walk_list<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    exprs: &'ast [node::Expr],
+    ctx: &mut V::Context,
+) {
+    for expr in exprs {
+        visitor.visit_expr(expr, ctx);
+    }
+}
+
+fn walk_if_else<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    if_else_expr: &'ast node::IfElseExpression,
+    ctx: &mut V::Context,
+) {
+    visitor.visit_expr(&if_else_expr.condition, ctx);
+    visitor.enter_scope(if_else_expr.then_branch.id, ctx);
+    visitor.visit_block(
+        &if_else_expr.then_branch.statements,
+        &if_else_expr.then_branch.expression,
+        ctx,
+    );
+    visitor.leave_scope(if_else_expr.then_branch.id, ctx);
+
+    for else_branch in &if_else_expr.else_branches {
+        visitor.visit_else_clause(else_branch, ctx);
+    }
+}
+
+fn walk_match<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    match_expr: &'ast node::MatchExpression,
+    ctx: &mut V::Context,
+) {
+    visitor.visit_expr(&match_expr.expression, ctx);
+
+    for arm in &match_expr.arms {
+        visitor.enter_scope(arm.id, ctx);
+        visitor.visit_pat(&arm.pattern, ctx);
+        if let Some(ref guard) = arm.guard {
+            visitor.visit_expr(guard, ctx);
+        }
+        visitor.visit_expr(&arm.expression, ctx);
+        visitor.leave_scope(arm.id, ctx);
+    }
+}
+
+fn walk_range<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    range_expr: &'ast node::RangeExpression,
+    ctx: &mut V::Context,
+) {
+    visitor.visit_expr(&range_expr.start, ctx);
+    visitor.visit_expr(&range_expr.end, ctx);
+}
+
+pub fn walk_expr<'ast, V: Visitor<'ast>>(
+    visitor: &mut V,
+    expression: &'ast node::Expr,
+    ctx: &mut V::Context,
+) {
     match &expression.kind {
         node::ExprKind::None => {}
         node::ExprKind::Block(block) | node::ExprKind::Loop(block) => {
-            visitor.visit_block(&block.statements, &block.expression);
+            walk_block_or_loop(visitor, block, ctx);
         }
         node::ExprKind::Break(Some(expr)) => {
-            visitor.visit_expr(expr);
+            visitor.visit_expr(expr, ctx);
         }
         node::ExprKind::Break(_) => {}
         node::ExprKind::ForLoop(for_loop) => {
-            if let Some((pat, expr)) = &for_loop.acc {
-                visitor.visit_pat(pat);
-                visitor.visit_expr(expr);
-            }
-
-            visitor.visit_pat(&for_loop.pat);
-            visitor.visit_expr(&for_loop.iter);
-            visitor.visit_block(&for_loop.block.statements, &for_loop.block.expression);
+            walk_for_loop(visitor, expression, for_loop, ctx);
         }
         node::ExprKind::BinaryOp(binary_op_expression) => {
-            visitor.visit_expr(&binary_op_expression.lhs);
-            visitor.visit_expr(&binary_op_expression.rhs);
+            walk_binary_op(visitor, binary_op_expression, ctx);
         }
         node::ExprKind::UnaryOp(_, expression) => {
-            visitor.visit_expr(expression);
+            visitor.visit_expr(expression, ctx);
         }
         node::ExprKind::FieldExpression(field_expr) => {
-            visitor.visit_expr(&field_expr.base);
-            visitor.visit_ident(&field_expr.field);
+            walk_field_expression(visitor, field_expr, ctx);
         }
         node::ExprKind::Call(call_expr) | node::ExprKind::RecursiveCall(call_expr) => {
-            for argument in &call_expr.arguments {
-                visitor.visit_expr(argument);
-            }
-            visitor.visit_expr(&call_expr.callee);
+            walk_call(visitor, call_expr, ctx);
         }
         node::ExprKind::Dict(kvs) => {
-            for (key, value) in kvs {
-                visitor.visit_expr(key);
-                visitor.visit_expr(value);
-            }
+            walk_dict(visitor, kvs, ctx);
         }
         node::ExprKind::FunctionExpression(decl) => {
-            visitor.visit_fn_decl(decl);
+            visitor.visit_fn_decl(decl, ctx);
         }
         node::ExprKind::IndexExpression(index_expr) => {
-            visitor.visit_expr(&index_expr.base);
-            visitor.visit_expr(&index_expr.index);
+            walk_index_expression(visitor, index_expr, ctx);
         }
         node::ExprKind::Let(pattern, expr) => {
-            visitor.visit_pat(pattern);
-            visitor.visit_expr(expr);
+            walk_let_expression(visitor, pattern, expr, ctx);
         }
-        node::ExprKind::Literal(_) => {}
+        node::ExprKind::Literal(literal) => {
+            visitor.visit_literal(literal, expression.span, ctx);
+        }
         node::ExprKind::List(exprs) => {
-            for expr in exprs {
-                visitor.visit_expr(expr);
-            }
+            walk_list(visitor, exprs, ctx);
         }
         node::ExprKind::IfElse(if_else_expr) => {
-            visitor.visit_expr(&if_else_expr.condition);
-            visitor.visit_block(
-                &if_else_expr.then_branch.statements,
-                &if_else_expr.then_branch.expression,
-            );
-
-            for else_branch in &if_else_expr.else_branches {
-                visitor.visit_else_clause(else_branch);
-            }
+            walk_if_else(visitor, if_else_expr, ctx);
         }
         node::ExprKind::Match(match_expr) => {
-            visitor.visit_expr(&match_expr.expression);
-
-            for arm in &match_expr.arms {
-                visitor.visit_pat(&arm.pattern);
-                visitor.visit_expr(&arm.expression);
-            }
+            walk_match(visitor, match_expr, ctx);
         }
         node::ExprKind::Path(path) => {
-            visitor.visit_path(path);
+            visitor.visit_path(path, ctx);
         }
         node::ExprKind::Range(range_expr) => {
-            visitor.visit_expr(&range_expr.start);
-            visitor.visit_expr(&range_expr.end);
+            walk_range(visitor, range_expr, ctx);
         }
         node::ExprKind::Wildcard => {}
         node::ExprKind::Continue => {}
@@ -331,51 +525,62 @@ mod tests {
     }
 
     impl<'ast> Visitor<'ast> for TestVisitor {
-        fn visit_module(&mut self, module: &'ast node::Module) {
+        type Context = ();
+
+        fn visit_module(&mut self, module: &'ast node::Module, ctx: &mut Self::Context) {
             self.visited.push("visit_module");
-            walk_module(self, module);
+            walk_module(self, module, ctx);
         }
-        fn visit_ident(&mut self, _ident: &'ast node::Ident) {
+        fn visit_ident(&mut self, _ident: &'ast node::Ident, _ctx: &mut Self::Context) {
             self.visited.push("visit_identifier");
         }
         fn visit_block(
             &mut self,
             statements: &'ast [node::Stmt],
             expression: &'ast Option<node::Expr>,
+            ctx: &mut Self::Context,
         ) {
             self.visited.push("visit_block");
-            walk_block(self, statements, expression);
+            walk_block(self, statements, expression, ctx);
         }
-        fn visit_stmt(&mut self, statement: &'ast node::Stmt) {
+        fn visit_stmt(&mut self, statement: &'ast node::Stmt, ctx: &mut Self::Context) {
             self.visited.push("visit_statement");
-            walk_stmt(self, statement);
+            walk_stmt(self, statement, ctx);
         }
-        fn visit_fn_decl(&mut self, declaration: &'ast node::FunctionDeclaration) {
+        fn visit_fn_decl(
+            &mut self,
+            declaration: &'ast node::FunctionDeclaration,
+            ctx: &mut Self::Context,
+        ) {
             self.visited.push("visit_function_declaration");
-            walk_fn_decl(self, declaration);
+            walk_fn_decl(self, declaration, ctx);
         }
-        fn visit_expr(&mut self, expression: &'ast node::Expr) {
+        fn visit_expr(&mut self, expression: &'ast node::Expr, ctx: &mut Self::Context) {
             self.visited.push("visit_expression");
-            walk_expr(self, expression);
+            walk_expr(self, expression, ctx);
         }
-        fn visit_pat(&mut self, pattern: &'ast node::Pat) {
+        fn visit_pat(&mut self, pattern: &'ast node::Pat, ctx: &mut Self::Context) {
             self.visited.push("visit_pattern");
-            walk_pat(self, pattern);
+            walk_pat(self, pattern, ctx);
         }
-        fn visit_fn_param(&mut self, parameter: &'ast node::FunctionParameter) {
+        fn visit_fn_param(
+            &mut self,
+            parameter: &'ast node::FunctionParameter,
+            ctx: &mut Self::Context,
+        ) {
             self.visited.push("visit_function_parameter");
-            walk_fn_param(self, parameter);
+            walk_fn_param(self, parameter, ctx);
         }
-        fn visit_fn_guard(&mut self, guard: &'ast node::Expr) {
+        fn visit_fn_guard(&mut self, guard: &'ast node::Expr, ctx: &mut Self::Context) {
             self.visited.push("visit_function_guard");
-            walk_expr(self, guard);
+            walk_expr(self, guard, ctx);
         }
-        fn visit_fn_ret_ty(&mut self, _annotation: &'ast node::Ty) {
+        fn visit_fn_ret_ty(&mut self, _annotation: &'ast node::Ty, _ctx: &mut Self::Context) {
             self.visited.push("visit_function_return_type_annotation");
         }
-        fn visit_fn_body(&mut self, body: &'ast node::Block) {
+        fn visit_fn_body(&mut self, body: &'ast node::Block, ctx: &mut Self::Context) {
             self.visited.push("visit_function_body");
-            walk_fn_body(self, body);
+            walk_fn_body(self, body, ctx);
         }
     }
 
@@ -387,7 +592,8 @@ mod tests {
             Span::default(),
         );
         let mut visitor = TestVisitor { visited: vec![] };
-        walk_module(&mut visitor, &module);
+        let mut ctx = ();
+        walk_module(&mut visitor, &module, &mut ctx);
         assert_eq!(visitor.visited, vec!["visit_statement"]);
     }
 
@@ -396,7 +602,8 @@ mod tests {
         let statements = vec![node::Stmt::new(NodeId::new(1), node::StmtKind::None)];
         let expression = Some(node::Expr::new(NodeId::new(2), node::ExprKind::None));
         let mut visitor = TestVisitor { visited: vec![] };
-        walk_block(&mut visitor, &statements, &expression);
+        let mut ctx = ();
+        walk_block(&mut visitor, &statements, &expression, &mut ctx);
         assert_eq!(visitor.visited, vec!["visit_statement", "visit_expression"]);
     }
 
@@ -410,7 +617,8 @@ mod tests {
             ))),
         );
         let mut visitor = TestVisitor { visited: vec![] };
-        walk_stmt(&mut visitor, &statement);
+        let mut ctx = ();
+        walk_stmt(&mut visitor, &statement, &mut ctx);
         assert_eq!(visitor.visited, vec!["visit_expression"]);
     }
 
@@ -457,10 +665,13 @@ mod tests {
             span: Span::default(),
         };
         let mut visitor = TestVisitor { visited: vec![] };
-        walk_fn_decl(&mut visitor, &declaration);
+        let mut ctx = ();
+        walk_fn_decl(&mut visitor, &declaration, &mut ctx);
         assert_eq!(
             visitor.visited,
             vec![
+                "visit_expression",
+                "visit_identifier",
                 "visit_function_parameter",
                 "visit_pattern",
                 "visit_identifier",

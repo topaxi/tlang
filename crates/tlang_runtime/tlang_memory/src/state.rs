@@ -1,11 +1,11 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 use log::debug;
 use slab::Slab;
 use smallvec::SmallVec;
-use tlang_hir::hir::{self, HirId};
+use tlang_hir::hir;
+use tlang_span::HirId;
 
 use crate::resolver::Resolver;
 use crate::scope::{Scope, ScopeStack};
@@ -278,11 +278,11 @@ impl InterpreterState {
         }
     }
 
-    pub fn get_fn_decl(&self, id: hir::HirId) -> Option<Rc<hir::FunctionDeclaration>> {
+    pub fn get_fn_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
         self.fn_decls.get(&id).cloned()
     }
 
-    pub fn set_fn_decl(&mut self, id: hir::HirId, decl: Rc<hir::FunctionDeclaration>) {
+    pub fn set_fn_decl(&mut self, id: HirId, decl: Rc<hir::FunctionDeclaration>) {
         self.fn_decls.insert(id, decl);
     }
 
@@ -363,8 +363,34 @@ impl InterpreterState {
         self.scope_stack.pop();
     }
 
-    pub fn current_scope(&self) -> Rc<RefCell<Scope>> {
+    pub fn current_scope(&self) -> &Scope {
         self.scope_stack.current_scope()
+    }
+
+    pub fn push_value(&mut self, value: TlangValue) {
+        self.scope_stack.push_value(value);
+    }
+
+    /// Allocate a variable index for let bindings and set the value at that position
+    pub fn set_let_binding(&mut self, value: TlangValue) -> usize {
+        let index = self.scope_stack.allocate_let_binding_index();
+        self.scope_stack.set_local(index, value);
+        index
+    }
+
+    /// Initialize variable index counter after function parameters are pushed
+    pub fn init_var_index_after_params(&mut self, param_count: usize) {
+        self.scope_stack.init_var_index_after_params(param_count);
+    }
+
+    /// Check if we're currently in the global scope
+    pub fn is_global_scope(&self) -> bool {
+        self.scope_stack.scopes.len() == 1
+    }
+
+    /// Check if the current scope has allocated slots for variables
+    pub fn current_scope_has_slots(&self) -> bool {
+        self.scope_stack.current_scope_has_slots()
     }
 
     pub fn set_global(&mut self, name: String, value: TlangValue) {
@@ -393,7 +419,7 @@ impl InterpreterState {
 
         self.new_object(TlangObjectKind::Closure(TlangClosure {
             id: decl.hir_id,
-            scope_stack: self.scope_stack.clone(),
+            scope_stack: self.scope_stack.scopes.clone(),
         }))
     }
 
@@ -579,7 +605,7 @@ impl InterpreterState {
         let mut out = "[\n".to_string();
         for scope in self.scope_stack.iter() {
             out.push_str("  {\n");
-            for entry in scope.borrow().get_locals() {
+            for entry in self.scope_stack.get_scope_locals(scope) {
                 out.push_str("    ");
                 out.push_str(self.stringify(*entry).as_str());
                 out.push_str(",\n");

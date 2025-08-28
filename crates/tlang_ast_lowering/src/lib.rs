@@ -8,9 +8,9 @@ use log::{debug, warn};
 use tlang_ast as ast;
 use tlang_ast::keyword::kw;
 use tlang_ast::node::{EnumPattern, FunctionDeclaration, Ident};
-use tlang_ast::symbols::SymbolIdAllocator;
 use tlang_hir::hir;
-use tlang_span::{HirId, HirIdAllocator, LineColumn};
+use tlang_span::{HirId, HirIdAllocator, LineColumn, NodeId};
+use tlang_symbols::{SymbolIdAllocator, SymbolInfo, SymbolTable, SymbolType};
 
 mod expr;
 mod r#loop;
@@ -18,20 +18,20 @@ mod stmt;
 
 #[derive(Debug)]
 pub struct LoweringContext {
-    node_id_to_hir_id: HashMap<ast::NodeId, HirId>,
-    fn_node_id_to_hir_id: HashMap<ast::NodeId, HirId>,
+    node_id_to_hir_id: HashMap<NodeId, HirId>,
+    fn_node_id_to_hir_id: HashMap<NodeId, HirId>,
     hir_id_allocator: HirIdAllocator,
     symbol_id_allocator: SymbolIdAllocator,
-    symbol_tables: HashMap<ast::NodeId, Rc<RefCell<ast::symbols::SymbolTable>>>,
-    new_symbol_tables: HashMap<HirId, Rc<RefCell<ast::symbols::SymbolTable>>>,
-    current_symbol_table: Rc<RefCell<ast::symbols::SymbolTable>>,
+    symbol_tables: HashMap<NodeId, Rc<RefCell<SymbolTable>>>,
+    new_symbol_tables: HashMap<HirId, Rc<RefCell<SymbolTable>>>,
+    current_symbol_table: Rc<RefCell<SymbolTable>>,
 }
 
 impl LoweringContext {
     pub fn new(
         symbol_id_allocator: SymbolIdAllocator,
-        root_symbol_table: Rc<RefCell<ast::symbols::SymbolTable>>,
-        symbol_tables: HashMap<ast::NodeId, Rc<RefCell<ast::symbols::SymbolTable>>>,
+        root_symbol_table: Rc<RefCell<SymbolTable>>,
+        symbol_tables: HashMap<NodeId, Rc<RefCell<SymbolTable>>>,
     ) -> Self {
         Self {
             hir_id_allocator: HirIdAllocator::default(),
@@ -44,7 +44,7 @@ impl LoweringContext {
         }
     }
 
-    pub fn symbol_tables(&self) -> HashMap<HirId, Rc<RefCell<ast::symbols::SymbolTable>>> {
+    pub fn symbol_tables(&self) -> HashMap<HirId, Rc<RefCell<SymbolTable>>> {
         debug!("Translating symbol tables to HirIds");
 
         let mut symbol_tables = self.new_symbol_tables.clone();
@@ -91,7 +91,7 @@ impl LoweringContext {
     }
 
     #[inline(always)]
-    pub(crate) fn scope(&self) -> Rc<RefCell<ast::symbols::SymbolTable>> {
+    pub(crate) fn scope(&self) -> Rc<RefCell<SymbolTable>> {
         self.current_symbol_table.clone()
     }
 
@@ -99,7 +99,7 @@ impl LoweringContext {
         self.scope().borrow().has_multi_arity_fn(name, arity)
     }
 
-    pub(crate) fn with_scope<F, R>(&mut self, node_id: ast::NodeId, f: F) -> R
+    pub(crate) fn with_scope<F, R>(&mut self, node_id: NodeId, f: F) -> R
     where
         F: FnOnce(&mut Self) -> R,
         R: hir::HirScope,
@@ -128,11 +128,11 @@ impl LoweringContext {
 
     pub(crate) fn with_new_scope<F, R>(&mut self, f: F) -> R
     where
-        F: FnOnce(&mut Self, Rc<RefCell<ast::symbols::SymbolTable>>) -> (HirId, R),
+        F: FnOnce(&mut Self, Rc<RefCell<SymbolTable>>) -> (HirId, R),
         R: hir::HirScope,
     {
         let previous_symbol_table = self.current_symbol_table.clone();
-        self.current_symbol_table = Rc::new(RefCell::new(ast::symbols::SymbolTable::new(
+        self.current_symbol_table = Rc::new(RefCell::new(SymbolTable::new(
             previous_symbol_table.clone(),
         )));
         let (hir_id, result) = f(self, self.current_symbol_table.clone());
@@ -150,10 +150,10 @@ impl LoweringContext {
         &mut self,
         hir_id: HirId,
         name: &str,
-        symbol_type: ast::symbols::SymbolType,
+        symbol_type: SymbolType,
         scope_start: LineColumn,
     ) {
-        let symbol_info = ast::symbols::SymbolInfo::new(
+        let symbol_info = SymbolInfo::new(
             self.symbol_id_allocator.next_id(),
             name,
             symbol_type,
@@ -171,10 +171,10 @@ impl LoweringContext {
         index: usize,
         hir_id: HirId,
         name: &str,
-        symbol_type: ast::symbols::SymbolType,
+        symbol_type: SymbolType,
         scope_start: LineColumn,
     ) {
-        let symbol_info = ast::symbols::SymbolInfo::new(
+        let symbol_info = SymbolInfo::new(
             self.symbol_id_allocator.next_id(),
             name,
             symbol_type,
@@ -191,11 +191,11 @@ impl LoweringContext {
         &mut self,
         hir_id: HirId,
         name: &str,
-        symbol_type: ast::symbols::SymbolType,
+        symbol_type: SymbolType,
         scope_start: LineColumn,
-        predicate: impl Fn(&ast::symbols::SymbolInfo) -> bool,
+        predicate: impl Fn(&SymbolInfo) -> bool,
     ) {
-        let symbol_info = ast::symbols::SymbolInfo::new(
+        let symbol_info = SymbolInfo::new(
             self.symbol_id_allocator.next_id(),
             name,
             symbol_type,
@@ -219,7 +219,7 @@ impl LoweringContext {
         }
     }
 
-    fn lower_node_id(&mut self, id: ast::NodeId) -> HirId {
+    fn lower_node_id(&mut self, id: NodeId) -> HirId {
         if let Some(hir_id) = self.node_id_to_hir_id.get(&id) {
             *hir_id
         } else {
@@ -439,8 +439,8 @@ impl LoweringContext {
 pub fn lower_to_hir(
     tlang_ast: &ast::node::Module,
     symbol_id_allocator: SymbolIdAllocator,
-    root_symbol_table: Rc<RefCell<ast::symbols::SymbolTable>>,
-    symbol_tables: HashMap<tlang_ast::NodeId, Rc<RefCell<tlang_ast::symbols::SymbolTable>>>,
+    root_symbol_table: Rc<RefCell<SymbolTable>>,
+    symbol_tables: HashMap<NodeId, Rc<RefCell<SymbolTable>>>,
 ) -> hir::LowerResult {
     lower(
         &mut LoweringContext::new(symbol_id_allocator, root_symbol_table, symbol_tables),

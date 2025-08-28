@@ -110,6 +110,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "bstr"
+version = "1.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "234113d19d0d7d613b40e86fb654acf958910802bcceab913a4f9e7cda03b1a4"
+dependencies = [
+ "memchr",
+ "serde",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -417,10 +427,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "glob"
-version = "0.3.3"
+name = "globset"
+version = "0.4.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
+checksum = "54a1028dfc5f5df5da8a56a73e6c153c9a9708ec57232470703592a3f18e49f5"
+dependencies = [
+ "aho-corasick",
+ "bstr",
+ "log",
+ "regex-automata",
+ "regex-syntax",
+]
 
 [[package]]
 name = "half"
@@ -445,19 +462,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "154934ea70c58054b556dd430b99a98c2a7ff5309ac9891597e339b5c28f4371"
 dependencies = [
  "console",
+ "globset",
  "once_cell",
  "pest",
  "pest_derive",
  "ron 0.7.1",
  "serde",
  "similar",
+ "walkdir",
 ]
 
 [[package]]
 name = "inventory"
-version = "0.3.20"
+version = "0.3.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab08d7cd2c5897f2c949e5383ea7c7db03fb19130ffcfbf7eda795137ae3cb83"
+checksum = "bc61209c082fbeb19919bee74b176221b27223e27b65d781eb91af24eb1fb46e"
 dependencies = [
  "rustversion",
 ]
@@ -748,9 +767,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.11.1"
+version = "1.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b544ef1b4eac5dc2db33ea63606ae9ffcfac26c1416a2806ae0bf5f56b201191"
+checksum = "23d7fd106d8c02486a8d64e778353d1cffe08ce79ac2e82f540c86d0facf6912"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -968,6 +987,7 @@ dependencies = [
  "tlang_hir_pretty",
  "tlang_parser",
  "tlang_span",
+ "tlang_symbols",
 ]
 
 [[package]]
@@ -993,6 +1013,7 @@ dependencies = [
  "tlang_memory",
  "tlang_parser",
  "tlang_semantics",
+ "tlang_symbols",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "web-sys",
@@ -1030,6 +1051,7 @@ dependencies = [
  "tlang_hir_opt",
  "tlang_parser",
  "tlang_semantics",
+ "tlang_symbols",
 ]
 
 [[package]]
@@ -1041,6 +1063,7 @@ dependencies = [
  "serde",
  "tlang_ast",
  "tlang_span",
+ "tlang_symbols",
 ]
 
 [[package]]
@@ -1060,6 +1083,7 @@ dependencies = [
  "tlang_parser",
  "tlang_semantics",
  "tlang_span",
+ "tlang_symbols",
 ]
 
 [[package]]
@@ -1068,6 +1092,7 @@ version = "0.1.0"
 dependencies = [
  "tlang_ast",
  "tlang_hir",
+ "tlang_span",
 ]
 
 [[package]]
@@ -1092,6 +1117,7 @@ dependencies = [
  "tlang_semantics",
  "tlang_span",
  "tlang_stdlib",
+ "tlang_symbols",
 ]
 
 [[package]]
@@ -1154,6 +1180,7 @@ dependencies = [
  "tlang_ast",
  "tlang_parser",
  "tlang_span",
+ "tlang_symbols",
 ]
 
 [[package]]
@@ -1175,11 +1202,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "tlang_symbols"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "serde",
+ "tlang_span",
+]
+
+[[package]]
 name = "tlang_test_runner"
 version = "0.1.0"
 dependencies = [
- "glob",
+ "insta",
  "regex",
+ "serde_json",
 ]
 
 [[package]]

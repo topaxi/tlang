@@ -7,6 +7,7 @@ use tlang_hir_pretty::{HirPretty, HirPrettyOptions};
 use tlang_parser::Parser;
 use tlang_parser::error::{ParseError, ParseIssue};
 use tlang_semantics::SemanticAnalyzer;
+use tlang_symbols::SymbolType;
 use wasm_bindgen::prelude::*;
 
 use crate::codemirror;
@@ -61,6 +62,12 @@ pub struct BuildArtifacts {
 }
 
 #[wasm_bindgen]
+pub enum Runner {
+    JavaScript = "JavaScript",
+    Interpreter = "Interpreter",
+}
+
+#[wasm_bindgen]
 pub struct Tlang {
     source: String,
     build: BuildArtifacts,
@@ -72,10 +79,19 @@ pub struct Tlang {
 #[wasm_bindgen]
 impl Tlang {
     #[wasm_bindgen(constructor)]
-    pub fn new(source: String) -> Self {
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn new(source: String, runner: Runner) -> Self {
         let mut analyzer = SemanticAnalyzer::default();
 
-        analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());
+        match runner {
+            Runner::JavaScript => {
+                analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());
+            }
+            Runner::Interpreter => {
+                analyzer.add_builtin_symbols(&tlang_interpreter::Interpreter::builtin_symbols());
+            }
+            _ => {}
+        }
 
         Self {
             source,
@@ -116,7 +132,7 @@ impl Tlang {
 
         self.interpreter.define_js_fn(name, f);
         self.analyzer
-            .add_builtin_symbols(&[(name, tlang_ast::symbols::SymbolType::Function(arity))]);
+            .add_builtin_symbols(&[(name, SymbolType::Function(arity))]);
     }
 
     fn parse(&mut self) -> Result<&ast::Module, &ParseError> {

@@ -1,0 +1,11 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+description: Known failure - output may not match expected
+expression: apply_redactions(&output)
+input_file: tests/known_failures/error_handling_edge_cases.tlang
+---
+thread 'main' panicked at crates/tlang_parser/src/parser.rs:120:9:
+Expected primary expression on line 49, column 1, found RBrace instead
+}
+ ^
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

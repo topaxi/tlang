@@ -1,0 +1,68 @@
+// Pattern Matching Examples
+// Demonstrates: comprehensive pattern matching, guards, recursion
+
+// list_length(a[]) -> int
+fn list_length([]) { 0 }
+fn list_length([_, ...xs]) { 1 + list_length(xs) }
+
+// list_sum(int[]) -> int
+fn list_sum([]) { 0 }
+fn list_sum([x, ...xs]) { x + list_sum(xs) }
+
+// classify_number(int) -> string
+fn classify_number(n) if n < 0 { "negative" }
+fn classify_number(0) { "zero" }
+fn classify_number(n) if n > 0 && n < 10 { "single digit" }
+fn classify_number(n) if n >= 10 && n < 100 { "double digit" }
+fn classify_number(_) { "large number" }
+
+// fibonacci_pattern(int) -> int
+fn fibonacci_pattern(0) { 0 }
+fn fibonacci_pattern(1) { 1 }
+fn fibonacci_pattern(n) { fibonacci_pattern(n - 1) + fibonacci_pattern(n - 2) }
+
+// quicksort_simple(int[]) -> int[]
+fn quicksort_simple([]) { [] }
+fn quicksort_simple([pivot, ...rest]) {
+    let smaller = rest |> filter(fn(x) { x <= pivot });
+    let larger = rest |> filter(fn(x) { x > pivot });
+    [...quicksort_simple(smaller), pivot, ...quicksort_simple(larger)]
+}
+
+// filter(a[], fn(a) -> bool) -> a[]
+fn filter([], _) { [] }
+fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
+fn filter([_, ...xs], f) { rec filter(xs, f) }
+
+log("=== Advanced Pattern Matching Demo ===");
+
+let test_numbers = [64, 34, 25, 12, 22, 11, 90];
+
+log("Original list:");
+test_numbers |> log();
+
+log("Length:");
+test_numbers |> list_length() |> log();
+
+log("Sum:");
+test_numbers |> list_sum() |> log();
+
+log("Sorted:");
+test_numbers |> quicksort_simple() |> log();
+
+// Test number classification
+log("Number classifications:");
+log(classify_number(-5));
+log(classify_number(0));
+log(classify_number(7));
+log(classify_number(42));
+log(classify_number(123));
+
+// Test fibonacci with pattern matching
+log("Fibonacci numbers:");
+log(fibonacci_pattern(0));
+log(fibonacci_pattern(1));
+log(fibonacci_pattern(2));
+log(fibonacci_pattern(3));
+log(fibonacci_pattern(4));
+log(fibonacci_pattern(5));

@@ -1,0 +1,142 @@
+// Tests advanced function composition that may cause issues in JavaScript backend
+// Complex currying, partial application, and higher-order function chains
+
+// Create complex function combinators
+fn compose(f, g) {
+    fn(x) { f(g(x)) }
+}
+
+fn curry3(f) {
+    fn(a) {
+        fn(b) {
+            fn(c) {
+                f(a, b, c)
+            }
+        }
+    }
+}
+
+fn curry4(f) {
+    fn(a) {
+        fn(b) {
+            fn(c) {
+                fn(d) {
+                    f(a, b, c, d)
+                }
+            }
+        }
+    }
+}
+
+// Complex mathematical operations
+fn add3(a, b, c) { a + b + c }
+fn multiply4(a, b, c, d) { a * b * c * d }
+
+// Function that returns multiple nested functions
+fn create_math_factory(base) {
+    let adder = fn(x) { base + x };
+    let multiplier = fn(x) { base * x };
+    let power = fn(x) { base ** x };
+    
+    fn(operation) {
+        if operation == "add" {
+            adder
+        } else if operation == "mult" {
+            multiplier
+        } else if operation == "power" {
+            power
+        } else {
+            fn(x) { x }
+        }
+    }
+}
+
+// Complex chain of function compositions
+fn create_complex_pipeline() {
+    let step1 = fn(x) { x * 2 };
+    let step2 = fn(x) { x + 10 };
+    let step3 = fn(x) { x ** 2 };
+    let step4 = fn(x) { x / 3 };
+    
+    compose(compose(compose(step4, step3), step2), step1)
+}
+
+// Function that creates and returns other functions dynamically
+fn function_generator(type) {
+    if type == "fibonacci" {
+        let a = 0;
+        let b = 1;
+        fn() {
+            let result = a;
+            let temp = a + b;
+            a = b;
+            b = temp;
+            result
+        }
+    } else if type == "counter" {
+        let count = 0;
+        fn() {
+            count = count + 1;
+            count
+        }
+    } else if type == "factorial" {
+        let n = 1;
+        fn() {
+            fn factorial_helper(num, acc) {
+                if num <= 1 {
+                    acc
+                } else {
+                    factorial_helper(num - 1, acc * num)
+                }
+            }
+            let result = factorial_helper(n, 1);
+            n = n + 1;
+            result
+        }
+    } else {
+        fn() { 0 }
+    }
+}
+
+log("=== Advanced Function Composition Test ===");
+
+// Test complex currying
+let curried_add3 = curry3(add3);
+let curried_mult4 = curry4(multiply4);
+
+curried_add3(1)(2)(3) |> log();
+curried_mult4(2)(3)(4)(5) |> log();
+
+// Test function factories
+let math_factory = create_math_factory(5);
+let adder5 = math_factory("add");
+let mult5 = math_factory("mult");
+let power5 = math_factory("power");
+
+adder5(10) |> log();
+mult5(6) |> log();
+power5(3) |> log();
+
+// Test complex pipeline
+let pipeline = create_complex_pipeline();
+pipeline(7) |> log();
+
+// Test function generators with state
+let fib_gen = function_generator("fibonacci");
+let counter_gen = function_generator("counter");
+let fact_gen = function_generator("factorial");
+
+// Generate multiple values to test state preservation
+fib_gen() |> log();
+fib_gen() |> log();
+fib_gen() |> log();
+
+counter_gen() |> log();
+counter_gen() |> log();
+
+fact_gen() |> log();
+fact_gen() |> log();
+
+// Test composition of generated functions
+let composed_generators = compose(counter_gen, fib_gen);
+composed_generators() |> log();

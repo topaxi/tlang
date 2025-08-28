@@ -1,0 +1,10 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: output
+input_file: tests/functions/quicksort/quicksort_predicate.tlang
+---
+[
+  9, 6, 5, 5, 5,
+  4, 3, 3, 2, 1,
+  1
+]

@@ -7,6 +7,7 @@ edition.workspace = true
 tlang_ast = { path = "../tlang_ast" }
 tlang_hir = { path = "../tlang_hir" }
 tlang_span = { path = "../tlang_span" }
+tlang_symbols = { path = "../tlang_symbols" }
 log = { workspace = true }
 
 [dev-dependencies]

@@ -1,0 +1,7 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: output
+input_file: tests/strings/is_palindrome.tlang
+---
+true
+false

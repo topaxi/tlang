@@ -1,13 +1,10 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
-use tlang_ast::{
-    NodeId,
-    node::{ExprKind, StmtKind},
-    symbols::{SymbolId, SymbolInfo, SymbolType},
-};
+use tlang_ast::node::{ExprKind, StmtKind};
 use tlang_parser::Parser;
 use tlang_semantics::analyzer::SemanticAnalyzer;
-use tlang_span::{LineColumn, Span};
+use tlang_span::{LineColumn, NodeId, Span};
+use tlang_symbols::{SymbolId, SymbolInfo, SymbolType};
 
 mod common;
 
@@ -59,6 +56,7 @@ fn test_analyze_variable_declaration() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn test_block_scope() {
     let (analyzer, ast) = analyze!(
         "

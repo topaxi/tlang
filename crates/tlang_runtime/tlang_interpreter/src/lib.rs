@@ -7,13 +7,15 @@ use log::debug;
 use smallvec::SmallVec;
 use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token;
-use tlang_hir::hir::{self, BindingKind, HirId};
+use tlang_hir::hir::{self, BindingKind};
 use tlang_memory::shape::{ShapeKey, Shaped, TlangEnumVariant, TlangShape};
 use tlang_memory::state::TailCall;
 use tlang_memory::value::TlangArithmetic;
 use tlang_memory::value::object::TlangEnum;
 use tlang_memory::{InterpreterState, NativeFnReturn, Resolver, scope};
 use tlang_memory::{prelude::*, state};
+use tlang_span::HirId;
+use tlang_symbols::SymbolType;
 
 pub use tlang_memory::NativeFnDef;
 
@@ -65,47 +67,38 @@ impl Default for Interpreter {
 }
 
 impl Interpreter {
-    fn builtin_module_symbols() -> Vec<(&'static str, tlang_ast::symbols::SymbolType)> {
+    fn builtin_module_symbols() -> Vec<(&'static str, SymbolType)> {
         let mut module_names = HashSet::new();
 
         inventory::iter::<NativeFnDef>
             .into_iter()
             .map(|def| def.module())
             .filter(|module_name| module_names.insert(module_name.to_string()))
-            .map(|module_name| (module_name, tlang_ast::symbols::SymbolType::Module))
+            .map(|module_name| (module_name, SymbolType::Module))
             .collect()
     }
 
-    fn builtin_fn_symbols() -> Vec<(String, tlang_ast::symbols::SymbolType)> {
+    fn builtin_fn_symbols() -> Vec<(String, SymbolType)> {
         inventory::iter::<NativeFnDef>
             .into_iter()
-            .map(|def| {
-                (
-                    def.name(),
-                    tlang_ast::symbols::SymbolType::Function(def.arity() as u16),
-                )
-            })
+            .map(|def| (def.name(), SymbolType::Function(def.arity() as u16)))
             .collect::<Vec<_>>()
     }
 
-    const fn builtin_const_symbols() -> &'static [(&'static str, tlang_ast::symbols::SymbolType)] {
+    const fn builtin_const_symbols() -> &'static [(&'static str, SymbolType)] {
         &[
-            ("Option", tlang_ast::symbols::SymbolType::Enum),
-            (
-                "Option::None",
-                tlang_ast::symbols::SymbolType::EnumVariant(0),
-            ),
-            ("Result", tlang_ast::symbols::SymbolType::Enum),
-            ("math::pi", tlang_ast::symbols::SymbolType::Variable),
+            ("Option", SymbolType::Enum),
+            ("Option::None", SymbolType::EnumVariant(0)),
+            ("Result", SymbolType::Enum),
+            ("math::pi", SymbolType::Variable),
         ]
     }
 
-    pub fn builtin_symbols() -> Vec<(String, tlang_ast::symbols::SymbolType)> {
-        let mut symbols: Vec<(String, tlang_ast::symbols::SymbolType)> =
-            Self::builtin_module_symbols()
-                .iter()
-                .map(|(name, ty)| (name.to_string(), *ty))
-                .collect();
+    pub fn builtin_symbols() -> Vec<(String, SymbolType)> {
+        let mut symbols: Vec<(String, SymbolType)> = Self::builtin_module_symbols()
+            .iter()
+            .map(|(name, ty)| (name.to_string(), *ty))
+            .collect();
         symbols.extend(Self::builtin_fn_symbols());
         symbols.extend(
             Self::builtin_const_symbols()
@@ -226,7 +219,7 @@ impl Interpreter {
 
     #[inline(always)]
     fn push_value(&mut self, value: TlangValue) {
-        self.state.current_scope().borrow_mut().push_value(value);
+        self.state.scope_stack.push_value(value);
     }
 
     #[inline(always)]
@@ -271,18 +264,18 @@ impl Interpreter {
     where
         F: FnOnce(&mut Self) -> R,
     {
-        let root_scope = self.state.scope_stack.as_root();
+        let root_scope = vec![*self.state.scope_stack.root_scope()];
         self.with_scope(root_scope, f)
     }
 
     #[inline(always)]
-    fn with_scope<F, R>(&mut self, scope_stack: scope::ScopeStack, f: F) -> R
+    fn with_scope<F, R>(&mut self, scopes: Vec<scope::Scope>, f: F) -> R
     where
         F: FnOnce(&mut Self) -> R,
     {
-        let old_scope = std::mem::replace(&mut self.state.scope_stack, scope_stack);
+        let old_scopes = std::mem::replace(&mut self.state.scope_stack.scopes, scopes);
         let result = f(self);
-        self.state.scope_stack = old_scope;
+        self.state.scope_stack.scopes = old_scopes;
         result
     }
 
@@ -1081,7 +1074,7 @@ impl Interpreter {
                     self.panic(format!(
                         "Struct `{}` not found\nCurrent scope: {:?}",
                         path,
-                        self.state.current_scope().borrow()
+                        self.state.current_scope()
                     ));
                 };
 
@@ -1092,7 +1085,7 @@ impl Interpreter {
                     self.panic(format!(
                         "Enum variant `{}` not found\nCurrent scope: {:?}",
                         path,
-                        self.state.current_scope().borrow()
+                        self.state.current_scope()
                     ));
                 };
 
@@ -1179,6 +1172,10 @@ impl Interpreter {
             for arg in args {
                 this.push_value(*arg);
             }
+
+            // Initialize variable index counter after function parameters (callee + args)
+            let param_count = 1 + args.len(); // callee + arguments
+            this.state.init_var_index_after_params(param_count);
 
             match this.eval_block_inner(&fn_decl.body) {
                 EvalResult::TailCall => this.tail_call(),
@@ -1361,8 +1358,6 @@ impl Interpreter {
         let value = eval_value!(self.eval_expr(expr));
 
         if !self.eval_pat(pat, value) {
-            // We'd probably want to do it more like Rust via a if let statement, and have the
-            // normal let statement be only valid for identifiers.
             self.panic(format!(
                 "Pattern did not match value {:?}",
                 self.state.stringify(value)
@@ -1507,7 +1502,13 @@ impl Interpreter {
             hir::PatKind::Identifier(_id, ident) => {
                 debug!("eval_pat: {} = {}", ident, self.state.stringify(value));
 
-                self.push_value(value);
+                // Use slot-based assignment for non-global scopes that have allocated slots
+                // If scope has 0 locals, use sequential assignment instead
+                if self.state.is_global_scope() || !self.state.current_scope_has_slots() {
+                    self.push_value(value);
+                } else {
+                    let _index = self.state.set_let_binding(value);
+                }
 
                 true
             }

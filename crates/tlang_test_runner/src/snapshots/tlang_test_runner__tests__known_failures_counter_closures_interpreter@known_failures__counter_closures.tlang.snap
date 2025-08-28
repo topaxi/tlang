@@ -1,0 +1,22 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+description: Known failure - output may not match expected
+expression: output
+input_file: tests/known_failures/counter_closures.tlang
+---
+=== Counter and State Management Demo ===
+Basic counter starting from 10:
+11
+12
+13
+14
+15
+First 8 Fibonacci numbers:
+0
+1
+1
+2
+3
+5
+8
+13
