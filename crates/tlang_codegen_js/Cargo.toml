@@ -9,6 +9,7 @@ tlang_hir = { path = "../tlang_hir" }
 tlang_hir_opt = { path = "../tlang_hir_opt" }
 tlang_parser = { path = "../tlang_parser" }
 tlang_semantics = { path = "../tlang_semantics" }
+tlang_span = { path = "../tlang_span" }
 
 [dev-dependencies]
 tlang_ast_lowering = { path = "../tlang_ast_lowering" }

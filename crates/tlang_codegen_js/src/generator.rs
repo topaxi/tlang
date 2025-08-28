@@ -4,6 +4,7 @@ use tlang_ast::{
     token::{Token, TokenKind},
 };
 use tlang_hir::hir;
+use tlang_hir_opt::HirPass;
 
 // Before we indent a line, we reserve at least the indentation space plus some more for the the
 // next statement. We start with an assumption of 128 below, this might the maximum overhead once
@@ -234,7 +235,17 @@ impl CodegenJS {
     }
 
     pub fn generate_code(&mut self, module: &hir::Module) {
-        self.generate_statements(&module.block.stmts);
+        // Apply JS-specific HIR transformations
+        let mut js_module = module.clone();
+        let mut hir_js_pass = crate::HirJsPass::new();
+        let mut ctx = tlang_hir_opt::HirOptContext {
+            symbols: std::collections::HashMap::new(),
+            hir_id_allocator: tlang_span::HirIdAllocator::new(1000), // Start with a high number to avoid conflicts
+            current_scope: module.hir_id,
+        };
+        hir_js_pass.optimize_hir(&mut js_module, &mut ctx);
+        
+        self.generate_statements(&js_module.block.stmts);
         self.output.shrink_to_fit();
     }
 
