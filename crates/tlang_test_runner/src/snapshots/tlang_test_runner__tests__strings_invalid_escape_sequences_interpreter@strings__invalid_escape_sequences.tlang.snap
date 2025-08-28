@@ -1,0 +1,12 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: apply_redactions(&output)
+input_file: tests/strings/invalid_escape_sequences.tlang
+---
+Testing invalid escapes
+Bad escape: \q
+Another bad: \x
+More bad: \z
+Good: 
+, Bad: \w
+\p
