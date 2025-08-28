@@ -49,7 +49,7 @@ impl HirJsPass {
         span: Span,
     ) -> hir::Stmt {
         let hir_id = ctx.hir_id_allocator.next_id();
-        let temp_path = self.create_temp_var_path(ctx, temp_name, span);
+        let temp_path = self.create_temp_var_path(ctx, &temp_name, span);
 
         // Create an assignment using a binary operator (this is a simplification)
         // In a more complete implementation, we might need a dedicated assignment statement type
@@ -151,11 +151,6 @@ impl<'hir> Visitor<'hir> for HirJsPass {
                         // This is a let statement with an if/else expression that needs transformation
                         self.changes_made = true;
                     }
-                }
-                hir::ExprKind::Match(_, _) => {
-                    // Match expressions in let statements always need transformation
-                    // since they cannot be rendered as simple expressions
-                    self.changes_made = true;
                 }
                 _ => {}
             }
@@ -353,96 +348,6 @@ impl<'hir> Visitor<'hir> for HirJsPass {
                             self.changes_made = true;
                             continue;
                         }
-                    }
-                    hir::ExprKind::Match(match_expr, match_arms) => {
-                        // Transform match expression
-                        let temp_name = self.generate_temp_var_name();
-                        let span = stmt.span;
-
-                        // Create modified match arms with assignment statements
-                        let mut new_match_arms = Vec::new();
-                        for arm in match_arms {
-                            let mut new_block = arm.block.clone();
-                            if let Some(completion_expr) = new_block.expr.take() {
-                                let assignment_stmt = self.create_assignment_stmt(
-                                    ctx,
-                                    &temp_name,
-                                    completion_expr,
-                                    span,
-                                );
-                                new_block.stmts.push(assignment_stmt);
-                            }
-                            new_match_arms.push(hir::MatchArm {
-                                pat: arm.pat.clone(),
-                                guard: arm.guard.clone(),
-                                block: new_block,
-                                leading_comments: arm.leading_comments.clone(),
-                                trailing_comments: arm.trailing_comments.clone(),
-                            });
-                        }
-
-                        // Create a single statement that represents the temp declaration + match combination
-                        let combined_expr = hir::Expr {
-                            hir_id: ctx.hir_id_allocator.next_id(),
-                            kind: hir::ExprKind::Call(Box::new(hir::CallExpression {
-                                hir_id: ctx.hir_id_allocator.next_id(),
-                                callee: hir::Expr {
-                                    hir_id: ctx.hir_id_allocator.next_id(),
-                                    kind: hir::ExprKind::Path(Box::new(hir::Path::new(
-                                        vec![hir::PathSegment {
-                                            ident: Ident::new("__TEMP_VAR_MATCH__", span),
-                                        }],
-                                        span,
-                                    ))),
-                                    span,
-                                },
-                                arguments: vec![
-                                    // First argument: temp variable name
-                                    hir::Expr {
-                                        hir_id: ctx.hir_id_allocator.next_id(),
-                                        kind: hir::ExprKind::Literal(Box::new(
-                                            tlang_ast::token::Literal::String(
-                                                temp_name.clone().into(),
-                                            ),
-                                        )),
-                                        span,
-                                    },
-                                    // Second argument: the match expression
-                                    hir::Expr {
-                                        hir_id: ctx.hir_id_allocator.next_id(),
-                                        kind: hir::ExprKind::Match(
-                                            match_expr.clone(),
-                                            new_match_arms,
-                                        ),
-                                        span,
-                                    },
-                                ],
-                            })),
-                            span,
-                        };
-
-                        let combined_stmt = hir::Stmt::new(
-                            ctx.hir_id_allocator.next_id(),
-                            hir::StmtKind::Expr(Box::new(combined_expr)),
-                            span,
-                        );
-                        new_stmts.push(combined_stmt);
-
-                        // Create the modified let statement using temp variable
-                        let temp_path_expr = self.create_temp_var_path(ctx, &temp_name, span);
-                        let modified_let = hir::Stmt::new(
-                            stmt.hir_id,
-                            hir::StmtKind::Let(
-                                pat.clone(),
-                                Box::new(temp_path_expr),
-                                ty.clone(),
-                            ),
-                            span,
-                        );
-                        new_stmts.push(modified_let);
-
-                        self.changes_made = true;
-                        continue;
                     }
                     _ => {}
                 }
