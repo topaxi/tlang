@@ -69,9 +69,7 @@ pub trait Visitor<'ast>: Sized {
     }
 
     #[allow(unused_variables)]
-    fn visit_literal(&mut self, literal: &'ast Literal, span: Span, ctx: &mut Self::Context) {
-        // Default implementation does nothing
-    }
+    fn visit_literal(&mut self, literal: &'ast Literal, span: Span, ctx: &mut Self::Context) {}
 
     fn visit_else_clause(&mut self, clause: &'ast node::ElseClause, ctx: &mut Self::Context) {
         if let Some(ref condition) = clause.condition {
