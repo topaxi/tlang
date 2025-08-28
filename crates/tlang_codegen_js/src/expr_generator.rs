@@ -116,14 +116,14 @@ impl CodegenJS {
             self.push_str("{\n");
             self.inc_indent();
         }
-        
+
         self.push_scope();
 
         self.generate_statements(&block.stmts);
         self.generate_optional_expr(block.expr.as_ref(), None);
 
         self.pop_scope();
-        
+
         if self.current_context() == BlockContext::Statement {
             self.dec_indent();
             self.push_indent();
@@ -499,35 +499,93 @@ impl CodegenJS {
             if path.segments.len() == 1 && path.segments[0].ident.as_str() == "__TEMP_VAR_BLOCK__" {
                 // First argument is the temp variable name (as string literal)
                 // Second argument is the block expression
-                if call_expr.arguments.len() == 2 {
-                    if let hir::ExprKind::Literal(lit) = &call_expr.arguments[0].kind {
-                        if let tlang_ast::token::Literal::String(temp_name) = lit.as_ref() {
-                            // Generate: let $tmp$0;{...}
-                            self.push_str("let ");
-                            self.push_str(temp_name);
-                            self.push_str(";");
-                            
-                            // Generate the block expression with expression context to get braces
-                            self.push_context(BlockContext::Expression);
-                            if let hir::ExprKind::Block(block) = &call_expr.arguments[1].kind {
-                                self.push_str("{\n");
-                                self.inc_indent();
-                                self.push_scope();
-                                self.generate_statements(&block.stmts);
-                                self.generate_optional_expr(block.expr.as_ref(), None);
-                                self.pop_scope();
-                                self.dec_indent();
-                                self.push_indent();
-                                self.push_str("}");
-                            }
-                            self.pop_context();
-                            return;
-                        }
+                if call_expr.arguments.len() == 2
+                    && let hir::ExprKind::Literal(lit) = &call_expr.arguments[0].kind
+                    && let tlang_ast::token::Literal::String(temp_name) = lit.as_ref()
+                {
+                    // Generate: let $tmp$0;{...}
+                    self.push_str("let ");
+                    self.push_str(temp_name);
+                    self.push_str(";");
+
+                    // Generate the block expression with expression context to get braces
+                    self.push_context(BlockContext::Expression);
+                    if let hir::ExprKind::Block(block) = &call_expr.arguments[1].kind {
+                        self.push_str("{\n");
+                        self.inc_indent();
+                        self.push_scope();
+                        self.generate_statements(&block.stmts);
+                        self.generate_optional_expr(block.expr.as_ref(), None);
+                        self.pop_scope();
+                        self.dec_indent();
+                        self.push_indent();
+                        self.push_str("}");
                     }
+                    self.pop_context();
+                    return;
+                }
+            }
+
+            // Check for special temp var + if/else combination
+            if path.segments.len() == 1 && path.segments[0].ident.as_str() == "__TEMP_VAR_IF_ELSE__"
+            {
+                // First argument is the temp variable name (as string literal)
+                // Second argument is the if/else expression
+                if call_expr.arguments.len() == 2
+                    && let hir::ExprKind::Literal(lit) = &call_expr.arguments[0].kind
+                    && let tlang_ast::token::Literal::String(temp_name) = lit.as_ref()
+                {
+                    // Generate: let $tmp$0;if(...){...}else{...}
+                    self.push_str("let ");
+                    self.push_str(temp_name);
+                    self.push_str(";");
+
+                    // Generate the if/else expression as a statement
+                    if let hir::ExprKind::IfElse(condition, then_branch, else_branches) =
+                        &call_expr.arguments[1].kind
+                    {
+                        self.push_str("if (");
+                        let indent_level = self.current_indent();
+                        self.set_indent(0);
+                        self.generate_expr(condition, None);
+                        self.set_indent(indent_level);
+                        self.push_str(") {\n");
+                        self.inc_indent();
+                        self.generate_statements(&then_branch.stmts);
+                        self.generate_optional_expr(then_branch.expr.as_ref(), None);
+                        self.dec_indent();
+
+                        for else_branch in else_branches {
+                            self.push_indent();
+                            self.push_str("} else");
+
+                            if let Some(ref condition) = else_branch.condition {
+                                self.push_str(" if (");
+                                let indent_level = self.current_indent();
+                                self.set_indent(0);
+                                self.generate_expr(condition, None);
+                                self.set_indent(indent_level);
+                                self.push_char(')');
+                            }
+
+                            self.push_str(" {\n");
+                            self.inc_indent();
+                            self.generate_statements(&else_branch.consequence.stmts);
+                            self.generate_optional_expr(
+                                else_branch.consequence.expr.as_ref(),
+                                None,
+                            );
+                            self.dec_indent();
+                        }
+
+                        self.push_indent();
+                        self.push_char('}');
+                    }
+                    return;
                 }
             }
         }
-        
+
         // TODO: If the call is to a struct, we instead call it with `new` and map the fields to
         // the positional arguments of the constructor.
 
@@ -554,5 +612,3 @@ impl CodegenJS {
         self.push_char(')');
     }
 }
-
-

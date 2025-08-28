@@ -1,7 +1,7 @@
 use tlang_hir::hir;
 
-use crate::hir_js_pass::expr_can_render_as_js_expr;
 use crate::generator::{BlockContext, CodegenJS, FunctionContext};
+use crate::hir_js_pass::expr_can_render_as_js_expr;
 use crate::js;
 
 impl CodegenJS {

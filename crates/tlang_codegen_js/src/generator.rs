@@ -244,7 +244,7 @@ impl CodegenJS {
             current_scope: module.hir_id,
         };
         hir_js_pass.optimize_hir(&mut js_module, &mut ctx);
-        
+
         self.generate_statements(&js_module.block.stmts);
         self.output.shrink_to_fit();
     }
@@ -414,10 +414,12 @@ impl CodegenJS {
             }
             // Check for our special temp var + block combination
             Some(hir::ExprKind::Call(call)) => {
-                if let hir::ExprKind::Path(path) = &call.callee.kind {
-                    if path.segments.len() == 1 && path.segments[0].ident.as_str() == "__TEMP_VAR_BLOCK__" {
-                        return true; // This should have a semicolon
-                    }
+                if let hir::ExprKind::Path(path) = &call.callee.kind
+                    && path.segments.len() == 1
+                    && (path.segments[0].ident.as_str() == "__TEMP_VAR_BLOCK__"
+                        || path.segments[0].ident.as_str() == "__TEMP_VAR_IF_ELSE__")
+                {
+                    return true; // These should have semicolons
                 }
                 true // Regular calls need semicolons
             }
