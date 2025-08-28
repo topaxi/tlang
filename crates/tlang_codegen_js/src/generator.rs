@@ -406,9 +406,20 @@ impl CodegenJS {
 
     pub(crate) fn needs_semicolon(&self, expr: Option<&hir::Expr>) -> bool {
         match expr.map(|expr| &expr.kind) {
-            Some(hir::ExprKind::Block(..) | hir::ExprKind::Match(..)) => false,
+            // Blocks only skip semicolons in expression context, not statement context
+            Some(hir::ExprKind::Block(..)) => self.current_context() != BlockContext::Expression,
+            Some(hir::ExprKind::Match(..)) => false,
             Some(hir::ExprKind::IfElse(expr, then_branch, else_branches)) => {
                 self.should_render_if_else_as_ternary(expr, then_branch, else_branches)
+            }
+            // Check for our special temp var + block combination
+            Some(hir::ExprKind::Call(call)) => {
+                if let hir::ExprKind::Path(path) = &call.callee.kind {
+                    if path.segments.len() == 1 && path.segments[0].ident.as_str() == "__TEMP_VAR_BLOCK__" {
+                        return true; // This should have a semicolon
+                    }
+                }
+                true // Regular calls need semicolons
             }
             _ => true,
         }

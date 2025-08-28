@@ -36,31 +36,7 @@ impl HirJsPass {
         }
     }
 
-    fn create_temp_var_let_stmt(&mut self, ctx: &mut HirOptContext, temp_name: String, span: Span) -> hir::Stmt {
-        let hir_id = ctx.hir_id_allocator.next_id();
-        let pat_hir_id = ctx.hir_id_allocator.next_id();
-        let ident = Ident::new(&temp_name, span);
-        
-        let pat = hir::Pat {
-            kind: hir::PatKind::Identifier(pat_hir_id, Box::new(ident)),
-            span,
-        };
 
-        // For now, use an integer 0 as a placeholder - this will be overwritten anyway
-        let init_expr = hir::Expr {
-            hir_id: ctx.hir_id_allocator.next_id(),
-            kind: hir::ExprKind::Literal(Box::new(tlang_ast::token::Literal::Integer(0))),
-            span,
-        };
-
-        let ty = hir::Ty::default();
-
-        hir::Stmt::new(
-            hir_id,
-            hir::StmtKind::Let(Box::new(pat), Box::new(init_expr), Box::new(ty)),
-            span,
-        )
-    }
 
     fn create_assignment_stmt(&mut self, ctx: &mut HirOptContext, temp_name: String, value_expr: hir::Expr, span: Span) -> hir::Stmt {
         let hir_id = ctx.hir_id_allocator.next_id();
@@ -152,7 +128,7 @@ impl<'hir> Visitor<'hir> for HirJsPass {
         visit::walk_stmt(self, stmt, ctx);
         
         // Then check if this statement needs transformation
-        if let hir::StmtKind::Let(pat, expr, ty) = &mut stmt.kind {
+        if let hir::StmtKind::Let(_pat, expr, _ty) = &mut stmt.kind {
             if let hir::ExprKind::Block(block) = &expr.kind {
                 if block.has_completion() {
                     // This is a let statement with a block expression that has a completion value
@@ -177,11 +153,7 @@ impl<'hir> Visitor<'hir> for HirJsPass {
                         let temp_name = self.generate_temp_var_name();
                         let span = stmt.span;
                         
-                        // 1. Create temp variable declaration
-                        let temp_decl = self.create_temp_var_let_stmt(ctx, temp_name.clone(), span);
-                        new_stmts.push(temp_decl);
-                        
-                        // 2. Create block statement that assigns completion to temp var
+                        // Create the modified block with assignment statement
                         let mut new_block = block_expr.as_ref().clone();
                         
                         // Move the completion expression to an assignment statement
@@ -190,17 +162,44 @@ impl<'hir> Visitor<'hir> for HirJsPass {
                             new_block.stmts.push(assignment_stmt);
                         }
                         
-                        // Create the block statement
-                        let block_stmt = hir::Stmt::new(
-                            ctx.hir_id_allocator.next_id(),
-                            hir::StmtKind::Expr(Box::new(hir::Expr {
+                        // Create a single statement that represents the temp declaration + block combination
+                        // We'll use a special marker to encode this as one unit
+                        let combined_expr = hir::Expr {
+                            hir_id: ctx.hir_id_allocator.next_id(),
+                            kind: hir::ExprKind::Call(Box::new(hir::CallExpression {
                                 hir_id: ctx.hir_id_allocator.next_id(),
-                                kind: hir::ExprKind::Block(Box::new(new_block)),
-                                span,
+                                callee: hir::Expr {
+                                    hir_id: ctx.hir_id_allocator.next_id(),
+                                    kind: hir::ExprKind::Path(Box::new(hir::Path::new(
+                                        vec![hir::PathSegment { ident: Ident::new("__TEMP_VAR_BLOCK__", span) }],
+                                        span
+                                    ))),
+                                    span,
+                                },
+                                arguments: vec![
+                                    // First argument: temp variable name
+                                    hir::Expr {
+                                        hir_id: ctx.hir_id_allocator.next_id(),
+                                        kind: hir::ExprKind::Literal(Box::new(tlang_ast::token::Literal::String(temp_name.clone().into()))),
+                                        span,
+                                    },
+                                    // Second argument: the block
+                                    hir::Expr {
+                                        hir_id: ctx.hir_id_allocator.next_id(),
+                                        kind: hir::ExprKind::Block(Box::new(new_block)),
+                                        span,
+                                    }
+                                ],
                             })),
                             span,
+                        };
+
+                        let combined_stmt = hir::Stmt::new(
+                            ctx.hir_id_allocator.next_id(),
+                            hir::StmtKind::Expr(Box::new(combined_expr)),
+                            span,
                         );
-                        new_stmts.push(block_stmt);
+                        new_stmts.push(combined_stmt);
                         
                         // 3. Create the modified let statement using temp variable
                         let temp_path_expr = self.create_temp_var_path(ctx, temp_name, span);

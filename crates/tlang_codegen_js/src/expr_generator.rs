@@ -111,12 +111,24 @@ impl CodegenJS {
     }
 
     fn generate_block(&mut self, block: &hir::Block) {
+        // When generating a block in statement context, wrap it in braces
+        if self.current_context() == BlockContext::Statement {
+            self.push_str("{\n");
+            self.inc_indent();
+        }
+        
         self.push_scope();
 
         self.generate_statements(&block.stmts);
         self.generate_optional_expr(block.expr.as_ref(), None);
 
         self.pop_scope();
+        
+        if self.current_context() == BlockContext::Statement {
+            self.dec_indent();
+            self.push_indent();
+            self.push_str("}");
+        }
     }
 
     #[inline(always)]
@@ -482,6 +494,40 @@ impl CodegenJS {
     }
 
     pub(crate) fn generate_call_expression(&mut self, call_expr: &hir::CallExpression) {
+        // Check for special temp var + block combination
+        if let hir::ExprKind::Path(path) = &call_expr.callee.kind {
+            if path.segments.len() == 1 && path.segments[0].ident.as_str() == "__TEMP_VAR_BLOCK__" {
+                // First argument is the temp variable name (as string literal)
+                // Second argument is the block expression
+                if call_expr.arguments.len() == 2 {
+                    if let hir::ExprKind::Literal(lit) = &call_expr.arguments[0].kind {
+                        if let tlang_ast::token::Literal::String(temp_name) = lit.as_ref() {
+                            // Generate: let $tmp$0;{...}
+                            self.push_str("let ");
+                            self.push_str(temp_name);
+                            self.push_str(";");
+                            
+                            // Generate the block expression with expression context to get braces
+                            self.push_context(BlockContext::Expression);
+                            if let hir::ExprKind::Block(block) = &call_expr.arguments[1].kind {
+                                self.push_str("{\n");
+                                self.inc_indent();
+                                self.push_scope();
+                                self.generate_statements(&block.stmts);
+                                self.generate_optional_expr(block.expr.as_ref(), None);
+                                self.pop_scope();
+                                self.dec_indent();
+                                self.push_indent();
+                                self.push_str("}");
+                            }
+                            self.pop_context();
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+        
         // TODO: If the call is to a struct, we instead call it with `new` and map the fields to
         // the positional arguments of the constructor.
 
