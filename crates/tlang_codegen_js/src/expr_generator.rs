@@ -584,6 +584,29 @@ impl CodegenJS {
                     return;
                 }
             }
+
+            // Check for special temp var + match combination
+            if path.segments.len() == 1 && path.segments[0].ident.as_str() == "__TEMP_VAR_MATCH__" {
+                // First argument is the temp variable name (as string literal)
+                // Second argument is the match expression
+                if call_expr.arguments.len() == 2
+                    && let hir::ExprKind::Literal(lit) = &call_expr.arguments[0].kind
+                    && let tlang_ast::token::Literal::String(temp_name) = lit.as_ref()
+                {
+                    // Generate: let $tmp$0;[match expression as statement]
+                    self.push_str("let ");
+                    self.push_str(temp_name);
+                    self.push_str(";");
+
+                    // Generate the match expression as a statement
+                    if let hir::ExprKind::Match(match_expr, match_arms) =
+                        &call_expr.arguments[1].kind
+                    {
+                        self.generate_match_expression(match_expr, match_arms);
+                    }
+                    return;
+                }
+            }
         }
 
         // TODO: If the call is to a struct, we instead call it with `new` and map the fields to

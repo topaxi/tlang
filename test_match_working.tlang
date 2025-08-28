@@ -1,0 +1,15 @@
+fn factorial(n) { factorial(n, 1) }
+fn factorial(n, acc) {
+    match [n, acc] {
+        [0, acc] => acc,
+        [n, acc] => rec factorial(n - 1, n * acc)
+    }
+}
+
+// This should trigger match transformation in let expression with complex arms
+let result = match 5 {
+    0 => { let a = 10; let b = 20; a + b },
+    n => { let x = n * 2; x + 1 }
+};
+
+result |> log();

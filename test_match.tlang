@@ -1,0 +1,10 @@
+// Simple function that returns match in expression position
+fn test(n) {
+    let result = match n {
+        0 => "zero",
+        _ => "other"
+    };
+    result
+}
+
+test(0) |> log();

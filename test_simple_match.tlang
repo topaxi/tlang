@@ -1,0 +1,5 @@
+let result = match 42 {
+    0 => "zero",
+    n => "other"
+};
+result |> log();
