@@ -404,3 +404,77 @@ fn should_handle_fn_guard_variables() {
     );
     assert_eq!(diagnostics, vec![]);
 }
+
+#[test]
+fn test_should_warn_on_invalid_escape_sequences() {
+    let diagnostics = analyze_diag!(
+        r#"
+        let invalid_string = "Unknown escape: \q";
+        let another_invalid = "Bad char: \x";
+        let valid_string = "Good escape: \n";
+        let invalid_char = '\z';
+    "#
+    );
+
+    // Filter for only escape sequence warnings
+    let escape_warnings: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.message().contains("Unknown escape sequence"))
+        .collect();
+
+    // Should get warnings for the invalid escape sequences
+    assert_eq!(escape_warnings.len(), 3);
+
+    // Check that the warnings are for unknown escape sequences
+    assert!(
+        escape_warnings[0]
+            .message()
+            .contains("Unknown escape sequence")
+    );
+    assert!(escape_warnings[0].message().contains("\\q"));
+    assert!(escape_warnings[0].is_warning());
+
+    assert!(
+        escape_warnings[1]
+            .message()
+            .contains("Unknown escape sequence")
+    );
+    assert!(escape_warnings[1].message().contains("\\x"));
+    assert!(escape_warnings[1].is_warning());
+
+    assert!(
+        escape_warnings[2]
+            .message()
+            .contains("Unknown escape sequence")
+    );
+    assert!(escape_warnings[2].message().contains("\\z"));
+    assert!(escape_warnings[2].is_warning());
+}
+
+#[test]
+fn test_should_not_warn_on_valid_escape_sequences() {
+    let diagnostics = analyze_diag!(
+        r#"
+        let string1 = "Quote: \"Hello\"";
+        let string2 = "Backslash: \\";
+        let string3 = "Newline: \n";
+        let string4 = "Tab: \t";
+        let string5 = "Carriage: \r";
+        let string6 = "Null: \0";
+        let char1 = '\'';
+        let char2 = '\\';
+    "#
+    );
+
+    // Filter for only escape sequence warnings
+    let escape_warnings: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| {
+            d.message().contains("Unknown escape sequence")
+                || d.message().contains("Backslash at end")
+        })
+        .collect();
+
+    // Should not get any warnings for valid escape sequences
+    assert_eq!(escape_warnings.len(), 0);
+}
