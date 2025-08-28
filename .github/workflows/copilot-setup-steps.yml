@@ -11,7 +11,7 @@ on:
   pull_request:
 
 jobs:
-  setup-dev-environment:
+  copilot-setup-steps:
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
