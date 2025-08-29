@@ -1,0 +1,45 @@
+// Test loop expressions (loops used in expression position)
+fn loop_expression_test() {
+    let result = loop {
+        if true { break 42; }
+    };
+    result
+}
+
+// Test loop with complex expression in break
+fn loop_with_complex_break() {
+    let x = 10;
+    let result = loop {
+        if x > 5 { 
+            let y = x * 2;
+            break y + 1; 
+        }
+    };
+    result
+}
+
+// Test loop without explicit break (should use block completion)
+fn loop_with_completion() {
+    let result = loop {
+        let x = 42;
+        if x > 0 { break; }
+        x
+    };
+    result
+}
+
+// Test nested loops with different break values  
+fn nested_loop_expressions() {
+    let outer = loop {
+        let inner = loop {
+            break 5;
+        };
+        if inner == 5 { break inner * 2; }
+    };
+    outer
+}
+
+loop_expression_test() |> log();
+loop_with_complex_break() |> log(); 
+loop_with_completion() |> log();
+nested_loop_expressions() |> log();

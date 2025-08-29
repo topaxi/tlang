@@ -148,35 +148,8 @@ impl CodegenJS {
                 self.generate_block_expression(block);
             }
             hir::ExprKind::Block(block) => self.generate_block(block),
-            hir::ExprKind::Loop(block) => {
-                self.push_str("(() => {");
-                self.push_newline();
-                self.inc_indent();
-                self.push_indent();
-
-                self.push_indent();
-                self.push_str("for (;;) {");
-                self.push_newline();
-                self.inc_indent();
-
-                for stmt in &block.stmts {
-                    self.generate_stmt(stmt);
-                }
-
-                if block.has_completion() {
-                    self.generate_expr(block.expr.as_ref().unwrap(), None);
-                    self.push_char(';');
-                    self.push_newline();
-                }
-
-                self.dec_indent();
-                self.push_indent();
-                self.push_char('}');
-                self.push_newline();
-
-                self.dec_indent();
-                self.push_indent();
-                self.push_str("})()");
+            hir::ExprKind::Loop(_block) => {
+                panic!("Loop expressions should be transformed to statements by HirJsPass before reaching codegen");
             }
             hir::ExprKind::Break(expr) => {
                 self.push_str("return");
@@ -608,6 +581,27 @@ impl CodegenJS {
                     return;
                 }
             }
+
+            // Check for special temp var + loop combination  
+            if path.segments.len() == 1 && path.segments[0].ident.as_str() == "__TEMP_VAR_LOOP__" {
+                // First argument is the temp variable name (as string literal)
+                // Second argument is the loop expression
+                if call_expr.arguments.len() == 2
+                    && let hir::ExprKind::Literal(lit) = &call_expr.arguments[0].kind
+                    && let tlang_ast::token::Literal::String(temp_name) = lit.as_ref()
+                {
+                    // Generate: let $tmp$0;[loop as statement]
+                    self.push_str("let ");
+                    self.push_str(temp_name);
+                    self.push_str(";");
+
+                    // Generate the loop as a statement, transforming breaks
+                    if let hir::ExprKind::Loop(block) = &call_expr.arguments[1].kind {
+                        self.generate_loop_statement_with_temp_var(block, temp_name);
+                    }
+                    return;
+                }
+            }
         }
 
         // TODO: If the call is to a struct, we instead call it with `new` and map the fields to
@@ -634,5 +628,128 @@ impl CodegenJS {
         }
 
         self.push_char(')');
+    }
+
+    /// Generate a loop as a statement with break expressions transformed to assignments
+    pub(crate) fn generate_loop_statement_with_temp_var(&mut self, block: &hir::Block, temp_var: &str) {
+        self.push_str("for (;;) {");
+        self.push_newline();
+        self.inc_indent();
+
+        // Generate statements in the loop body, transforming break expressions
+        for stmt in &block.stmts {
+            self.generate_stmt_with_loop_temp_var(stmt, temp_var);
+        }
+
+        // Handle block completion if exists - this would be the default return value
+        if let Some(completion_expr) = &block.expr {
+            self.push_indent();
+            self.generate_expr_with_loop_temp_var(completion_expr, temp_var, None);
+            self.push_newline();
+        }
+
+        self.dec_indent();
+        self.push_indent();
+        self.push_str("}");
+    }
+
+    /// Generate a statement within a loop context, transforming break expressions
+    fn generate_stmt_with_loop_temp_var(&mut self, stmt: &hir::Stmt, temp_var: &str) {
+        match &stmt.kind {
+            hir::StmtKind::Expr(expr) => {
+                self.push_indent();
+                self.push_context(BlockContext::Statement);
+                self.generate_expr_with_loop_temp_var(expr, temp_var, None);
+                self.pop_context();
+
+                if self.needs_semicolon(Some(expr)) {
+                    self.push_char(';');
+                }
+                self.push_newline();
+            }
+            // For other statement types, generate normally since they don't contain break
+            _ => {
+                self.generate_stmt(stmt);
+            }
+        }
+    }
+
+    /// Generate an expression within a loop context, transforming break expressions  
+    fn generate_expr_with_loop_temp_var(&mut self, expr: &hir::Expr, temp_var: &str, parent_op: Option<hir::BinaryOpKind>) {
+        match &expr.kind {
+            hir::ExprKind::Break(break_expr) => {
+                // Transform break to assignment + break
+                if let Some(break_value) = break_expr {
+                    self.push_str(temp_var);
+                    self.push_str(" = ");
+                    self.generate_expr(break_value, parent_op);
+                    self.push_str("; ");
+                }
+                self.push_str("break");
+            }
+            hir::ExprKind::Block(block) => {
+                // Recursively handle blocks within the loop
+                self.push_str("{");
+                self.push_newline();
+                self.inc_indent();
+
+                for stmt in &block.stmts {
+                    self.generate_stmt_with_loop_temp_var(stmt, temp_var);
+                }
+
+                if let Some(completion_expr) = &block.expr {
+                    self.push_indent();
+                    self.generate_expr_with_loop_temp_var(completion_expr, temp_var, None);
+                    self.push_newline();
+                }
+
+                self.dec_indent();
+                self.push_indent();
+                self.push_str("}");
+            }
+            hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
+                // Handle if-else that might contain break expressions
+                self.push_str("if (");
+                self.generate_expr(condition, None);
+                self.push_str(") ");
+                self.generate_block_with_loop_temp_var(then_branch, temp_var);
+                
+                for else_clause in else_branches {
+                    if let Some(else_condition) = &else_clause.condition {
+                        self.push_str(" else if (");
+                        self.generate_expr(else_condition, None);
+                        self.push_str(") ");
+                    } else {
+                        self.push_str(" else ");
+                    }
+                    self.generate_block_with_loop_temp_var(&else_clause.consequence, temp_var);
+                }
+            }
+            // For other expressions, generate normally
+            _ => {
+                self.generate_expr(expr, parent_op);
+            }
+        }
+    }
+
+    /// Generate a block within a loop context, transforming break expressions
+    fn generate_block_with_loop_temp_var(&mut self, block: &hir::Block, temp_var: &str) {
+        self.push_str("{");
+        self.push_newline();
+        self.inc_indent();
+
+        for stmt in &block.stmts {
+            self.generate_stmt_with_loop_temp_var(stmt, temp_var);
+        }
+
+        if let Some(completion_expr) = &block.expr {
+            self.push_indent();
+            self.generate_expr_with_loop_temp_var(completion_expr, temp_var, None);
+            self.push_newline();
+        }
+
+        self.dec_indent();
+        self.push_indent();
+        self.push_str("}");
     }
 }
