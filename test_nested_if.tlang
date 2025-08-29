@@ -1,0 +1,23 @@
+// Test deeply nested if expressions
+fn test_nested() {
+    // This should work: return if (if true { true } else { false }) { true } else { false }
+    return if (if true { true } else { false }) { true } else { false };
+}
+
+// Test in function argument position
+fn test_arg_nested() {
+    log(if (if true { true } else { false }) { "nested_true" } else { "nested_false" });
+}
+
+// Test in condition position
+fn test_condition_nested() {
+    if (if true { true } else { false }) { 
+        log("condition worked");
+    } else {
+        log("condition failed");
+    }
+}
+
+test_nested() |> log();
+test_arg_nested();
+test_condition_nested();
