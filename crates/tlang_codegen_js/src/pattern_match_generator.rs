@@ -443,7 +443,11 @@ impl CodegenJS {
         let (lhs, mut has_let) = if let Some(var) = completion_var {
             // Use the provided completion variable instead of creating a new one
             self.push_completion_variable(Some(var));
-            (self.replace_statement_buffer(String::new()), false)
+            // Declare the temp variable at the beginning of the expression
+            self.push_str("let ");
+            self.push_str(var);
+            // Don't replace the statement buffer since we want to keep the "let" declaration
+            (String::new(), true)
         } else {
             self.setup_match_completion_variables(arms)
         };

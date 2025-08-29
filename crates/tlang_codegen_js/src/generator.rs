@@ -422,7 +422,8 @@ impl CodegenJS {
                     && path.segments.len() == 1
                     && (path.segments[0].ident.as_str() == "__TEMP_VAR_BLOCK__"
                         || path.segments[0].ident.as_str() == "__TEMP_VAR_IF_ELSE__"
-                        || path.segments[0].ident.as_str() == "__TEMP_VAR_LOOP__")
+                        || path.segments[0].ident.as_str() == "__TEMP_VAR_LOOP__"
+                        || path.segments[0].ident.as_str() == "__TEMP_VAR_MATCH__")
                 {
                     return true; // These should have semicolons
                 }

@@ -569,12 +569,8 @@ impl CodegenJS {
                     && let hir::ExprKind::Literal(lit) = &call_expr.arguments[0].kind
                     && let tlang_ast::token::Literal::String(temp_name) = lit.as_ref()
                 {
-                    // Generate: let $tmp$0;[match expression as statement]
-                    self.push_str("let ");
-                    self.push_str(temp_name);
-                    self.push_str(";");
-
                     // Generate the match expression as a statement with the specific completion variable
+                    // The temp variable declaration will be handled by the match generator itself
                     if let hir::ExprKind::Match(match_expr, match_arms) =
                         &call_expr.arguments[1].kind
                     {
