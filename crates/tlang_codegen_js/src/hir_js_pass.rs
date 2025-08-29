@@ -74,7 +74,7 @@ impl HirJsPass {
         ctx: &mut HirOptContext,
     ) -> (hir::Stmt, Vec<hir::Stmt>) {
         let mut temp_stmts = Vec::new();
-        
+
         match stmt.kind {
             // Handle let statements with complex expressions
             hir::StmtKind::Let(pat, expr, ty) => {
@@ -92,7 +92,7 @@ impl HirJsPass {
                         hir::StmtKind::Let(pat, Box::new(flattened_expr), ty),
                         stmt.span,
                     );
-                    
+
                     self.changes_made = true;
                     (modified_let, temp_stmts)
                 } else {
@@ -110,7 +110,7 @@ impl HirJsPass {
                             hir::StmtKind::Let(pat, Box::new(flattened_expr), ty),
                             stmt.span,
                         );
-                        
+
                         self.changes_made = true;
                         (modified_let, temp_stmts)
                     } else {
@@ -140,7 +140,7 @@ impl HirJsPass {
                         hir::StmtKind::Return(Some(Box::new(flattened_expr))),
                         stmt.span,
                     );
-                    
+
                     self.changes_made = true;
                     (modified_return, temp_stmts)
                 } else {
@@ -158,7 +158,7 @@ impl HirJsPass {
                             hir::StmtKind::Return(Some(Box::new(flattened_expr))),
                             stmt.span,
                         );
-                        
+
                         self.changes_made = true;
                         (modified_return, temp_stmts)
                     } else {
@@ -188,7 +188,7 @@ impl HirJsPass {
                         hir::StmtKind::Expr(Box::new(flattened_expr)),
                         stmt.span,
                     );
-                    
+
                     self.changes_made = true;
                     (modified_expr_stmt, temp_stmts)
                 } else {
@@ -216,8 +216,9 @@ impl HirJsPass {
         ctx: &mut HirOptContext,
     ) -> (hir::Expr, Vec<hir::Stmt>) {
         // First, try to flatten subexpressions
-        let (expr_with_flattened_subs, mut sub_stmts) = self.flatten_subexpressions_generically(expr, ctx);
-        
+        let (expr_with_flattened_subs, mut sub_stmts) =
+            self.flatten_subexpressions_generically(expr, ctx);
+
         // After flattening subexpressions, check if the expression can now be rendered as JS
         if !expr_can_render_as_js_expr(&expr_with_flattened_subs) {
             // This expression still needs flattening
@@ -225,7 +226,12 @@ impl HirJsPass {
             let span = expr_with_flattened_subs.span;
 
             // Create temporary variable assignments for this expression
-            let mut temp_stmts = self.create_temp_var_assignment_for_expr(ctx, &temp_name, expr_with_flattened_subs, span);
+            let mut temp_stmts = self.create_temp_var_assignment_for_expr(
+                ctx,
+                &temp_name,
+                expr_with_flattened_subs,
+                span,
+            );
 
             // Combine the subexpression statements with the temp variable statements
             sub_stmts.append(&mut temp_stmts);
@@ -255,7 +261,7 @@ impl HirJsPass {
                     hir::BinaryOpKind::Or | hir::BinaryOpKind::And => {
                         // For short-circuit operators, we need to be very careful about evaluation order
                         // to preserve short-circuit semantics
-                        
+
                         // Always process the left operand normally
                         if !expr_can_render_as_js_expr(lhs) {
                             let span = lhs.span;
@@ -267,12 +273,12 @@ impl HirJsPass {
                             statements.append(&mut stmts);
                             self.changes_made = true;
                         }
-                        
+
                         // For the right operand, we MUST NOT flatten any subexpressions if they
                         // would cause side effects or evaluation, as this would break short-circuit
                         // semantics. If the right operand cannot be rendered as JS expression,
                         // then the entire short-circuit expression needs to be transformed.
-                        
+
                         // Do NOT process the right operand subexpressions here for short-circuit
                         // operators. Let the higher-level flattening handle the entire expression.
                     }
@@ -675,14 +681,19 @@ impl HirJsPass {
             }
             hir::ExprKind::Call(_call_expr) => {
                 // For call expressions, we need to flatten the arguments first
-                let (flattened_call_expr, mut temp_stmts) = 
+                let (flattened_call_expr, mut temp_stmts) =
                     self.flatten_subexpressions_generically(expr, ctx);
-                
+
                 // Add any statements from flattening the arguments
                 statements.append(&mut temp_stmts);
-                
+
                 // Now create the assignment with the flattened call expression
-                statements.push(self.create_assignment_stmt(ctx, temp_name, flattened_call_expr, span));
+                statements.push(self.create_assignment_stmt(
+                    ctx,
+                    temp_name,
+                    flattened_call_expr,
+                    span,
+                ));
             }
             hir::ExprKind::Binary(op_kind, lhs, rhs) => {
                 // Handle short-circuit operators specially
@@ -690,48 +701,60 @@ impl HirJsPass {
                     hir::BinaryOpKind::Or => {
                         // Transform a || b into: if (a) { temp = a; } else { temp = b; }
                         // This preserves short-circuit semantics
-                        
+
                         // First, flatten the operands' subexpressions if needed
                         let (flattened_lhs, mut lhs_stmts) = if !expr_can_render_as_js_expr(lhs) {
                             self.flatten_expression_to_temp_var(*lhs.clone(), ctx)
                         } else {
-                            let (flattened, stmts) = self.flatten_subexpressions_generically(*lhs.clone(), ctx);
+                            let (flattened, stmts) =
+                                self.flatten_subexpressions_generically(*lhs.clone(), ctx);
                             (flattened, stmts)
                         };
                         statements.append(&mut lhs_stmts);
-                        
+
                         let (flattened_rhs, mut rhs_stmts) = if !expr_can_render_as_js_expr(rhs) {
                             self.flatten_expression_to_temp_var(*rhs.clone(), ctx)
                         } else {
-                            let (flattened, stmts) = self.flatten_subexpressions_generically(*rhs.clone(), ctx);
+                            let (flattened, stmts) =
+                                self.flatten_subexpressions_generically(*rhs.clone(), ctx);
                             (flattened, stmts)
                         };
-                        
+
                         // Create the if-else structure that preserves short-circuit semantics
                         let then_block = hir::Block::new(
                             ctx.hir_id_allocator.next_id(),
                             {
                                 let mut then_stmts = Vec::new();
                                 then_stmts.append(&mut lhs_stmts.clone());
-                                then_stmts.push(self.create_assignment_stmt(ctx, temp_name, flattened_lhs.clone(), span));
+                                then_stmts.push(self.create_assignment_stmt(
+                                    ctx,
+                                    temp_name,
+                                    flattened_lhs.clone(),
+                                    span,
+                                ));
                                 then_stmts
                             },
                             None,
                             span,
                         );
-                        
+
                         let else_block = hir::Block::new(
                             ctx.hir_id_allocator.next_id(),
                             {
                                 let mut else_stmts = Vec::new();
                                 else_stmts.append(&mut rhs_stmts);
-                                else_stmts.push(self.create_assignment_stmt(ctx, temp_name, flattened_rhs, span));
+                                else_stmts.push(self.create_assignment_stmt(
+                                    ctx,
+                                    temp_name,
+                                    flattened_rhs,
+                                    span,
+                                ));
                                 else_stmts
                             },
                             None,
                             span,
                         );
-                        
+
                         let if_else_expr = hir::Expr {
                             hir_id: ctx.hir_id_allocator.next_id(),
                             kind: hir::ExprKind::IfElse(
@@ -744,7 +767,7 @@ impl HirJsPass {
                             ),
                             span,
                         };
-                        
+
                         statements.push(hir::Stmt::new(
                             ctx.hir_id_allocator.next_id(),
                             hir::StmtKind::Expr(Box::new(if_else_expr)),
@@ -754,47 +777,59 @@ impl HirJsPass {
                     hir::BinaryOpKind::And => {
                         // Transform a && b into: if (a) { temp = b; } else { temp = a; }
                         // This preserves short-circuit semantics
-                        
+
                         // First, flatten the operands' subexpressions if needed
                         let (flattened_lhs, mut lhs_stmts) = if !expr_can_render_as_js_expr(lhs) {
                             self.flatten_expression_to_temp_var(*lhs.clone(), ctx)
                         } else {
-                            let (flattened, stmts) = self.flatten_subexpressions_generically(*lhs.clone(), ctx);
+                            let (flattened, stmts) =
+                                self.flatten_subexpressions_generically(*lhs.clone(), ctx);
                             (flattened, stmts)
                         };
                         statements.append(&mut lhs_stmts);
-                        
+
                         let (flattened_rhs, mut rhs_stmts) = if !expr_can_render_as_js_expr(rhs) {
                             self.flatten_expression_to_temp_var(*rhs.clone(), ctx)
                         } else {
-                            let (flattened, stmts) = self.flatten_subexpressions_generically(*rhs.clone(), ctx);
+                            let (flattened, stmts) =
+                                self.flatten_subexpressions_generically(*rhs.clone(), ctx);
                             (flattened, stmts)
                         };
-                        
+
                         let then_block = hir::Block::new(
                             ctx.hir_id_allocator.next_id(),
                             {
                                 let mut then_stmts = Vec::new();
                                 then_stmts.append(&mut rhs_stmts);
-                                then_stmts.push(self.create_assignment_stmt(ctx, temp_name, flattened_rhs, span));
+                                then_stmts.push(self.create_assignment_stmt(
+                                    ctx,
+                                    temp_name,
+                                    flattened_rhs,
+                                    span,
+                                ));
                                 then_stmts
                             },
                             None,
                             span,
                         );
-                        
+
                         let else_block = hir::Block::new(
                             ctx.hir_id_allocator.next_id(),
                             {
                                 let mut else_stmts = Vec::new();
                                 else_stmts.append(&mut lhs_stmts.clone());
-                                else_stmts.push(self.create_assignment_stmt(ctx, temp_name, flattened_lhs.clone(), span));
+                                else_stmts.push(self.create_assignment_stmt(
+                                    ctx,
+                                    temp_name,
+                                    flattened_lhs.clone(),
+                                    span,
+                                ));
                                 else_stmts
                             },
                             None,
                             span,
                         );
-                        
+
                         let if_else_expr = hir::Expr {
                             hir_id: ctx.hir_id_allocator.next_id(),
                             kind: hir::ExprKind::IfElse(
@@ -807,7 +842,7 @@ impl HirJsPass {
                             ),
                             span,
                         };
-                        
+
                         statements.push(hir::Stmt::new(
                             ctx.hir_id_allocator.next_id(),
                             hir::StmtKind::Expr(Box::new(if_else_expr)),
@@ -820,30 +855,41 @@ impl HirJsPass {
                         let (flattened_lhs, mut lhs_stmts) = if !expr_can_render_as_js_expr(lhs) {
                             self.flatten_expression_to_temp_var(*lhs.clone(), ctx)
                         } else {
-                            let (flattened, stmts) = self.flatten_subexpressions_generically(*lhs.clone(), ctx);
+                            let (flattened, stmts) =
+                                self.flatten_subexpressions_generically(*lhs.clone(), ctx);
                             (flattened, stmts)
                         };
-                        
+
                         let (flattened_rhs, mut rhs_stmts) = if !expr_can_render_as_js_expr(rhs) {
                             self.flatten_expression_to_temp_var(*rhs.clone(), ctx)
                         } else {
-                            let (flattened, stmts) = self.flatten_subexpressions_generically(*rhs.clone(), ctx);
+                            let (flattened, stmts) =
+                                self.flatten_subexpressions_generically(*rhs.clone(), ctx);
                             (flattened, stmts)
                         };
-                        
+
                         // Add the operand flattening statements
                         statements.append(&mut lhs_stmts);
                         statements.append(&mut rhs_stmts);
-                        
+
                         // Create the binary expression with flattened operands
                         let binary_expr = hir::Expr {
                             hir_id: ctx.hir_id_allocator.next_id(),
-                            kind: hir::ExprKind::Binary(*op_kind, Box::new(flattened_lhs), Box::new(flattened_rhs)),
+                            kind: hir::ExprKind::Binary(
+                                *op_kind,
+                                Box::new(flattened_lhs),
+                                Box::new(flattened_rhs),
+                            ),
                             span,
                         };
-                        
+
                         // Assign the result to the temporary variable
-                        statements.push(self.create_assignment_stmt(ctx, temp_name, binary_expr, span));
+                        statements.push(self.create_assignment_stmt(
+                            ctx,
+                            temp_name,
+                            binary_expr,
+                            span,
+                        ));
                     }
                 }
             }
@@ -941,11 +987,12 @@ impl<'hir> Visitor<'hir> for HirJsPass {
 
         for stmt in &mut block.stmts {
             // Apply generic flattening to ANY statement that might contain complex expressions
-            let (modified_stmt, mut temp_stmts) = self.flatten_statement_expressions(stmt.clone(), ctx);
-            
+            let (modified_stmt, mut temp_stmts) =
+                self.flatten_statement_expressions(stmt.clone(), ctx);
+
             // Add any temporary variable statements first
             new_stmts.append(&mut temp_stmts);
-            
+
             // Add the modified statement
             new_stmts.push(modified_stmt);
         }
@@ -969,13 +1016,18 @@ impl<'hir> Visitor<'hir> for HirJsPass {
                 let temp_name = self.generate_temp_var_name();
                 let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                 let expr_to_flatten = std::mem::replace(expr, placeholder);
-                
+
                 // Use the full flattening logic to handle the loop expression
-                let mut temp_stmts = self.create_temp_var_assignment_for_expr(ctx, &temp_name, expr_to_flatten, span);
-                
+                let mut temp_stmts = self.create_temp_var_assignment_for_expr(
+                    ctx,
+                    &temp_name,
+                    expr_to_flatten,
+                    span,
+                );
+
                 // Replace the block expression with a reference to the temp variable
                 *expr = self.create_temp_var_path(ctx, &temp_name, span);
-                
+
                 // Add the temporary variable statements to the block
                 block.stmts.append(&mut temp_stmts);
                 self.changes_made = true;

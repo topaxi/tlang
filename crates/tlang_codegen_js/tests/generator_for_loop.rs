@@ -17,7 +17,7 @@ fn test_for_loop_simple_iteration() {
             sum
         }
     "});
-    
+
     // Expected: Should generate JavaScript for loop or for...of with proper iteration
     assert_snapshot!(output, @"");
 }
@@ -31,7 +31,7 @@ fn test_for_loop_with_accumulator_simple() {
             }
         }
     "});
-    
+
     // Expected: Should generate JavaScript that accumulates values and returns final result
     assert_snapshot!(output, @"");
 }
@@ -49,7 +49,7 @@ fn test_for_loop_with_accumulator_pattern() {
             }
         }
     "});
-    
+
     // Expected: Should handle destructuring pattern in accumulator
     assert_snapshot!(output, @"");
 }
@@ -67,7 +67,7 @@ fn test_for_loop_nested() {
             total
         }
     "});
-    
+
     // Expected: Should handle nested for loops correctly
     assert_snapshot!(output, @"");
 }
@@ -81,7 +81,7 @@ fn test_for_loop_with_string_iteration() {
             }
         }
     "#});
-    
+
     // Expected: Should handle string iteration (may need special handling)
     assert_snapshot!(output, @"");
 }
@@ -95,7 +95,7 @@ fn test_for_loop_with_range() {
             }
         }
     "});
-    
+
     // Expected: Should handle range iteration
     assert_snapshot!(output, @"");
 }
@@ -109,7 +109,7 @@ fn test_for_loop_with_variable_iterable() {
             }
         }
     "});
-    
+
     // Expected: Should handle variable as iterable
     assert_snapshot!(output, @"");
 }
@@ -125,7 +125,7 @@ fn test_for_loop_with_function_call_iterable() {
             }
         }
     "});
-    
+
     // Expected: Should handle function call as iterable
     assert_snapshot!(output, @"");
 }
@@ -140,7 +140,7 @@ fn test_for_loop_expression_in_let() {
             result
         }
     "});
-    
+
     // Expected: Should handle for loop as expression in let statement
     assert_snapshot!(output, @"");
 }
@@ -154,7 +154,7 @@ fn test_for_loop_expression_in_return() {
             }
         }
     "});
-    
+
     // Expected: Should handle for loop as expression in return
     assert_snapshot!(output, @"");
 }
@@ -168,7 +168,7 @@ fn test_for_loop_with_complex_pattern() {
             }
         }
     "});
-    
+
     // Expected: Should handle complex destructuring pattern in for loop
     assert_snapshot!(output, @"");
 }
@@ -186,7 +186,7 @@ fn test_for_loop_with_guards() {
             }
         }
     "});
-    
+
     // Expected: Should handle conditional logic within for loop body
     assert_snapshot!(output, @"");
 }

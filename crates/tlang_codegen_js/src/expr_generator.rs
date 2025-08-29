@@ -149,7 +149,9 @@ impl CodegenJS {
             }
             hir::ExprKind::Block(block) => self.generate_block(block),
             hir::ExprKind::Loop(_block) => {
-                panic!("Loop expressions should be transformed to statements by HirJsPass before reaching codegen");
+                panic!(
+                    "Loop expressions should be transformed to statements by HirJsPass before reaching codegen"
+                );
             }
             hir::ExprKind::Break(expr) => {
                 self.push_str("return");
@@ -582,7 +584,7 @@ impl CodegenJS {
                 }
             }
 
-            // Check for special temp var + loop combination  
+            // Check for special temp var + loop combination
             if path.segments.len() == 1 && path.segments[0].ident.as_str() == "__TEMP_VAR_LOOP__" {
                 // First argument is the temp variable name (as string literal)
                 // Second argument is the loop expression
@@ -631,7 +633,11 @@ impl CodegenJS {
     }
 
     /// Generate a loop as a statement with break expressions transformed to assignments
-    pub(crate) fn generate_loop_statement_with_temp_var(&mut self, block: &hir::Block, temp_var: &str) {
+    pub(crate) fn generate_loop_statement_with_temp_var(
+        &mut self,
+        block: &hir::Block,
+        temp_var: &str,
+    ) {
         self.push_str("for (;;) {");
         self.push_newline();
         self.inc_indent();
@@ -675,7 +681,12 @@ impl CodegenJS {
     }
 
     /// Generate an expression within a loop context, transforming break expressions  
-    fn generate_expr_with_loop_temp_var(&mut self, expr: &hir::Expr, temp_var: &str, parent_op: Option<hir::BinaryOpKind>) {
+    fn generate_expr_with_loop_temp_var(
+        &mut self,
+        expr: &hir::Expr,
+        temp_var: &str,
+        parent_op: Option<hir::BinaryOpKind>,
+    ) {
         match &expr.kind {
             hir::ExprKind::Break(break_expr) => {
                 // Transform break to assignment + break
@@ -713,7 +724,7 @@ impl CodegenJS {
                 self.generate_expr(condition, None);
                 self.push_str(") ");
                 self.generate_block_with_loop_temp_var(then_branch, temp_var);
-                
+
                 for else_clause in else_branches {
                     if let Some(else_condition) = &else_clause.condition {
                         self.push_str(" else if (");

@@ -123,7 +123,7 @@ impl CodegenJS {
         self.pop_context();
         self.push_str(";\n");
     }
-    
+
     /// Generate a loop in statement context (not expression context)
     fn generate_loop_statement(&mut self, block: &hir::Block) {
         self.push_str("for (;;) {");
@@ -167,7 +167,11 @@ impl CodegenJS {
     }
 
     /// Generate an expression within a statement loop context (break becomes break, not return)
-    fn generate_expr_in_loop_context(&mut self, expr: &hir::Expr, parent_op: Option<hir::BinaryOpKind>) {
+    fn generate_expr_in_loop_context(
+        &mut self,
+        expr: &hir::Expr,
+        parent_op: Option<hir::BinaryOpKind>,
+    ) {
         match &expr.kind {
             hir::ExprKind::Break(break_expr) => {
                 self.push_str("break");
@@ -208,7 +212,7 @@ impl CodegenJS {
                 self.generate_expr_in_loop_context(condition, None);
                 self.push_str(") ");
                 self.generate_block_in_loop_context(then_branch);
-                
+
                 for else_clause in else_branches {
                     if let Some(else_condition) = &else_clause.condition {
                         self.push_str(" else if (");
@@ -255,6 +259,12 @@ impl CodegenJS {
 
     /// Check if an expression needs a semicolon in loop context
     fn needs_semicolon_in_loop_context(&self, expr: &hir::Expr) -> bool {
-        !matches!(expr.kind, hir::ExprKind::Block(..) | hir::ExprKind::IfElse(..) | hir::ExprKind::Break(..) | hir::ExprKind::Continue)
+        !matches!(
+            expr.kind,
+            hir::ExprKind::Block(..)
+                | hir::ExprKind::IfElse(..)
+                | hir::ExprKind::Break(..)
+                | hir::ExprKind::Continue
+        )
     }
 }
