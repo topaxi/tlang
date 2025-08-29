@@ -66,6 +66,148 @@ impl HirJsPass {
         hir::Stmt::new(hir_id, hir::StmtKind::Expr(Box::new(assignment_expr)), span)
     }
 
+    /// Generic function to flatten expressions within any statement
+    /// Returns (modified_statement, statements_to_insert_before)
+    fn flatten_statement_expressions(
+        &mut self,
+        stmt: hir::Stmt,
+        ctx: &mut HirOptContext,
+    ) -> (hir::Stmt, Vec<hir::Stmt>) {
+        let mut temp_stmts = Vec::new();
+        
+        match stmt.kind {
+            // Handle let statements with complex expressions
+            hir::StmtKind::Let(pat, expr, ty) => {
+                if !expr_can_render_as_js_expr(&expr) {
+                    // Use generic flattening for the expression
+                    let (flattened_expr, mut temp_var_stmts) =
+                        self.flatten_expression_to_temp_var(*expr, ctx);
+
+                    // Add the temporary variable statements
+                    temp_stmts.append(&mut temp_var_stmts);
+
+                    // Create the modified let statement using the flattened expression
+                    let modified_let = hir::Stmt::new(
+                        stmt.hir_id,
+                        hir::StmtKind::Let(pat, Box::new(flattened_expr), ty),
+                        stmt.span,
+                    );
+                    
+                    self.changes_made = true;
+                    (modified_let, temp_stmts)
+                } else {
+                    // Expression can be rendered as JS, but check subexpressions
+                    let (flattened_expr, mut sub_temp_stmts) =
+                        self.flatten_subexpressions_generically(*expr, ctx);
+
+                    if !sub_temp_stmts.is_empty() {
+                        // Add the temporary variable statements
+                        temp_stmts.append(&mut sub_temp_stmts);
+
+                        // Create the modified let statement using the flattened expression
+                        let modified_let = hir::Stmt::new(
+                            stmt.hir_id,
+                            hir::StmtKind::Let(pat, Box::new(flattened_expr), ty),
+                            stmt.span,
+                        );
+                        
+                        self.changes_made = true;
+                        (modified_let, temp_stmts)
+                    } else {
+                        // No changes needed - reconstruct the original statement
+                        let reconstructed_stmt = hir::Stmt::new(
+                            stmt.hir_id,
+                            hir::StmtKind::Let(pat, Box::new(flattened_expr), ty),
+                            stmt.span,
+                        );
+                        (reconstructed_stmt, temp_stmts)
+                    }
+                }
+            }
+            // Handle return statements with complex expressions
+            hir::StmtKind::Return(Some(expr)) => {
+                if !expr_can_render_as_js_expr(&expr) {
+                    // Use generic flattening for the expression
+                    let (flattened_expr, mut temp_var_stmts) =
+                        self.flatten_expression_to_temp_var(*expr, ctx);
+
+                    // Add the temporary variable statements
+                    temp_stmts.append(&mut temp_var_stmts);
+
+                    // Create the modified return statement using the flattened expression
+                    let modified_return = hir::Stmt::new(
+                        stmt.hir_id,
+                        hir::StmtKind::Return(Some(Box::new(flattened_expr))),
+                        stmt.span,
+                    );
+                    
+                    self.changes_made = true;
+                    (modified_return, temp_stmts)
+                } else {
+                    // Expression can be rendered as JS, but check subexpressions
+                    let (flattened_expr, mut sub_temp_stmts) =
+                        self.flatten_subexpressions_generically(*expr, ctx);
+
+                    if !sub_temp_stmts.is_empty() {
+                        // Add the temporary variable statements
+                        temp_stmts.append(&mut sub_temp_stmts);
+
+                        // Create the modified return statement using the flattened expression
+                        let modified_return = hir::Stmt::new(
+                            stmt.hir_id,
+                            hir::StmtKind::Return(Some(Box::new(flattened_expr))),
+                            stmt.span,
+                        );
+                        
+                        self.changes_made = true;
+                        (modified_return, temp_stmts)
+                    } else {
+                        // No changes needed - reconstruct the original statement
+                        let reconstructed_stmt = hir::Stmt::new(
+                            stmt.hir_id,
+                            hir::StmtKind::Return(Some(Box::new(flattened_expr))),
+                            stmt.span,
+                        );
+                        (reconstructed_stmt, temp_stmts)
+                    }
+                }
+            }
+            // Handle expression statements - THIS IS KEY for function calls!
+            hir::StmtKind::Expr(expr) => {
+                // Apply generic flattening to expression statements as well
+                let (flattened_expr, mut sub_temp_stmts) =
+                    self.flatten_subexpressions_generically(*expr, ctx);
+
+                if !sub_temp_stmts.is_empty() {
+                    // Add the temporary variable statements
+                    temp_stmts.append(&mut sub_temp_stmts);
+
+                    // Create the modified expression statement
+                    let modified_expr_stmt = hir::Stmt::new(
+                        stmt.hir_id,
+                        hir::StmtKind::Expr(Box::new(flattened_expr)),
+                        stmt.span,
+                    );
+                    
+                    self.changes_made = true;
+                    (modified_expr_stmt, temp_stmts)
+                } else {
+                    // No changes needed - reconstruct the original statement
+                    let reconstructed_stmt = hir::Stmt::new(
+                        stmt.hir_id,
+                        hir::StmtKind::Expr(Box::new(flattened_expr)),
+                        stmt.span,
+                    );
+                    (reconstructed_stmt, temp_stmts)
+                }
+            }
+            _ => {
+                // For other statement types (like Return(None)), just return as-is
+                (stmt, temp_stmts)
+            }
+        }
+    }
+
     /// Generic function to flatten a complex expression to a temporary variable
     /// Returns (flattened_expr, statements_to_insert)
     fn flatten_expression_to_temp_var(
@@ -73,21 +215,27 @@ impl HirJsPass {
         expr: hir::Expr,
         ctx: &mut HirOptContext,
     ) -> (hir::Expr, Vec<hir::Stmt>) {
-        if !expr_can_render_as_js_expr(&expr) {
-            // This expression needs flattening
+        // First, try to flatten subexpressions
+        let (expr_with_flattened_subs, mut sub_stmts) = self.flatten_subexpressions_generically(expr, ctx);
+        
+        // After flattening subexpressions, check if the expression can now be rendered as JS
+        if !expr_can_render_as_js_expr(&expr_with_flattened_subs) {
+            // This expression still needs flattening
             let temp_name = self.generate_temp_var_name();
-            let span = expr.span;
+            let span = expr_with_flattened_subs.span;
 
             // Create temporary variable assignments for this expression
-            let temp_stmts = self.create_temp_var_assignment_for_expr(ctx, &temp_name, expr, span);
+            let mut temp_stmts = self.create_temp_var_assignment_for_expr(ctx, &temp_name, expr_with_flattened_subs, span);
+
+            // Combine the subexpression statements with the temp variable statements
+            sub_stmts.append(&mut temp_stmts);
 
             // Return the temporary variable reference and the statements
             let temp_var_expr = self.create_temp_var_path(ctx, &temp_name, span);
-            (temp_var_expr, temp_stmts)
+            (temp_var_expr, sub_stmts)
         } else {
-            // Expression can be rendered as JS, but we still need to flatten its subexpressions
-            let (flattened_expr, stmts) = self.flatten_subexpressions_generically(expr, ctx);
-            (flattened_expr, stmts)
+            // Expression can be rendered as JS after flattening subexpressions
+            (expr_with_flattened_subs, sub_stmts)
         }
     }
 
@@ -457,6 +605,17 @@ impl HirJsPass {
                     span,
                 ));
             }
+            hir::ExprKind::Call(_call_expr) => {
+                // For call expressions, we need to flatten the arguments first
+                let (flattened_call_expr, mut temp_stmts) = 
+                    self.flatten_subexpressions_generically(expr, ctx);
+                
+                // Add any statements from flattening the arguments
+                statements.append(&mut temp_stmts);
+                
+                // Now create the assignment with the flattened call expression
+                statements.push(self.create_assignment_stmt(ctx, temp_name, flattened_call_expr, span));
+            }
             _ => {
                 // For other expressions, just create a simple assignment
                 statements.push(self.create_assignment_stmt(ctx, temp_name, expr, span));
@@ -534,21 +693,9 @@ impl<'hir> Visitor<'hir> for HirJsPass {
     type Context = HirOptContext;
 
     fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
-        // Don't recursively walk here - we'll handle recursion in our generic flattening
-
-        // Apply generic expression flattening
-        let span = expr.span;
-        let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
-        let expr_to_flatten = std::mem::replace(expr, placeholder);
-        let (flattened_expr, statements) =
-            self.flatten_subexpressions_generically(expr_to_flatten, ctx);
-        *expr = flattened_expr;
-
-        // If we generated statements, we need to handle them at the block level
-        // For now, just note that changes were made
-        if !statements.is_empty() {
-            self.changes_made = true;
-        }
+        // Only recursively walk expressions - don't try to handle statements here
+        // All statement-level flattening is handled in visit_block
+        visit::walk_expr(self, expr, ctx);
     }
 
     fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut Self::Context) {
@@ -562,126 +709,14 @@ impl<'hir> Visitor<'hir> for HirJsPass {
         let mut new_stmts = Vec::new();
 
         for stmt in &mut block.stmts {
-            match &stmt.kind {
-                // Handle let statements with complex expressions
-                hir::StmtKind::Let(pat, expr, ty) => {
-                    if !expr_can_render_as_js_expr(expr) {
-                        // Use generic flattening for the expression
-                        let (flattened_expr, mut temp_stmts) =
-                            self.flatten_expression_to_temp_var(expr.as_ref().clone(), ctx);
-
-                        // Add the temporary variable statements first
-                        new_stmts.append(&mut temp_stmts);
-
-                        // Create the modified let statement using the flattened expression
-                        let modified_let = hir::Stmt::new(
-                            stmt.hir_id,
-                            hir::StmtKind::Let(pat.clone(), Box::new(flattened_expr), ty.clone()),
-                            stmt.span,
-                        );
-                        new_stmts.push(modified_let);
-
-                        self.changes_made = true;
-                    } else {
-                        // Expression can be rendered as JS, but check subexpressions
-                        let (flattened_expr, mut temp_stmts) =
-                            self.flatten_subexpressions_generically(expr.as_ref().clone(), ctx);
-
-                        if !temp_stmts.is_empty() {
-                            // Add the temporary variable statements first
-                            new_stmts.append(&mut temp_stmts);
-
-                            // Create the modified let statement using the flattened expression
-                            let modified_let = hir::Stmt::new(
-                                stmt.hir_id,
-                                hir::StmtKind::Let(
-                                    pat.clone(),
-                                    Box::new(flattened_expr),
-                                    ty.clone(),
-                                ),
-                                stmt.span,
-                            );
-                            new_stmts.push(modified_let);
-
-                            self.changes_made = true;
-                        } else {
-                            // No changes needed
-                            new_stmts.push(stmt.clone());
-                        }
-                    }
-                }
-                // Handle return statements with complex expressions
-                hir::StmtKind::Return(Some(expr)) => {
-                    if !expr_can_render_as_js_expr(expr) {
-                        // Use generic flattening for the expression
-                        let (flattened_expr, mut temp_stmts) =
-                            self.flatten_expression_to_temp_var(expr.as_ref().clone(), ctx);
-
-                        // Add the temporary variable statements first
-                        new_stmts.append(&mut temp_stmts);
-
-                        // Create the modified return statement using the flattened expression
-                        let modified_return = hir::Stmt::new(
-                            stmt.hir_id,
-                            hir::StmtKind::Return(Some(Box::new(flattened_expr))),
-                            stmt.span,
-                        );
-                        new_stmts.push(modified_return);
-
-                        self.changes_made = true;
-                    } else {
-                        // Expression can be rendered as JS, but check subexpressions
-                        let (flattened_expr, mut temp_stmts) =
-                            self.flatten_subexpressions_generically(expr.as_ref().clone(), ctx);
-
-                        if !temp_stmts.is_empty() {
-                            // Add the temporary variable statements first
-                            new_stmts.append(&mut temp_stmts);
-
-                            // Create the modified return statement using the flattened expression
-                            let modified_return = hir::Stmt::new(
-                                stmt.hir_id,
-                                hir::StmtKind::Return(Some(Box::new(flattened_expr))),
-                                stmt.span,
-                            );
-                            new_stmts.push(modified_return);
-
-                            self.changes_made = true;
-                        } else {
-                            // No changes needed
-                            new_stmts.push(stmt.clone());
-                        }
-                    }
-                }
-                // Handle expression statements
-                hir::StmtKind::Expr(expr) => {
-                    // Apply generic flattening to expression statements as well
-                    let (flattened_expr, mut temp_stmts) =
-                        self.flatten_subexpressions_generically(expr.as_ref().clone(), ctx);
-
-                    if !temp_stmts.is_empty() {
-                        // Add the temporary variable statements first
-                        new_stmts.append(&mut temp_stmts);
-
-                        // Create the modified expression statement
-                        let modified_expr_stmt = hir::Stmt::new(
-                            stmt.hir_id,
-                            hir::StmtKind::Expr(Box::new(flattened_expr)),
-                            stmt.span,
-                        );
-                        new_stmts.push(modified_expr_stmt);
-
-                        self.changes_made = true;
-                    } else {
-                        // No changes needed
-                        new_stmts.push(stmt.clone());
-                    }
-                }
-                _ => {
-                    // For other statement types, just add them as-is
-                    new_stmts.push(stmt.clone());
-                }
-            }
+            // Apply generic flattening to ANY statement that might contain complex expressions
+            let (modified_stmt, mut temp_stmts) = self.flatten_statement_expressions(stmt.clone(), ctx);
+            
+            // Add any temporary variable statements first
+            new_stmts.append(&mut temp_stmts);
+            
+            // Add the modified statement
+            new_stmts.push(modified_stmt);
         }
 
         // Replace the statements if we made changes
