@@ -239,8 +239,12 @@ impl CodegenJS {
     }
 
     fn setup_match_context(&mut self, expr: &hir::Expr) {
+        // Only set up special match contexts for complex patterns
+        // For simple expressions in expression context, use the default dynamic context
+        let is_expression_context = self.current_context() == BlockContext::Expression;
+        
         match &expr.kind {
-            hir::ExprKind::Path(path) => {
+            hir::ExprKind::Path(path) if !is_expression_context => {
                 let match_context_identifier = self
                     .current_scope()
                     .resolve_variable(path.first_ident().as_str())
