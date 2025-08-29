@@ -66,7 +66,7 @@ impl HirJsPass {
         hir::Stmt::new(hir_id, hir::StmtKind::Expr(Box::new(assignment_expr)), span)
     }
 
-    fn transform_nested_expressions_in_expr(&mut self, expr: &mut hir::Expr, ctx: &mut HirOptContext) {
+    fn transform_nested_expressions_in_expr(&mut self, expr: &mut hir::Expr, _ctx: &mut HirOptContext) {
         match &mut expr.kind {
             hir::ExprKind::Call(call_expr) => {
                 // Transform function arguments with complex expressions
@@ -77,7 +77,7 @@ impl HirJsPass {
                     }
                 }
             }
-            hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
+            hir::ExprKind::IfElse(condition, _then_branch, _else_branches) => {
                 // Check if condition has nested complex expressions
                 if self.needs_transformation(condition) {
                     self.changes_made = true;
@@ -693,27 +693,11 @@ impl<'hir> Visitor<'hir> for HirJsPass {
                     new_stmts.push(stmt.clone());
                 }
                 // Handle expression statements with complex expressions
-                hir::StmtKind::Expr(expr) => {
-                    if self.needs_transformation(expr) {
-                        // For expression statements, we can transform the complex expression
-                        // into a series of statements
-                        let temp_name = self.generate_temp_var_name();
-                        let span = stmt.span;
-
-                        // Create the temp variable assignment for the complex expression
-                        let temp_assignment = self.create_temp_var_assignment_for_expr(
-                            ctx, 
-                            &temp_name, 
-                            expr.as_ref().clone(), 
-                            span
-                        );
-                        new_stmts.extend(temp_assignment);
-
-                        self.changes_made = true;
-                        continue;
-                    }
-                    
-                    // If we didn't transform this expression statement, just add it as-is
+                hir::StmtKind::Expr(_expr) => {
+                    // Only transform expressions that are problematic in statement context
+                    // Simple if-else statements should remain as if statements, not be transformed
+                    // We only need to transform expressions that will be used in expression contexts
+                    // For now, skip transformation of expression statements
                     new_stmts.push(stmt.clone());
                 }
                 _ => {

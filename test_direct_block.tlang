@@ -1,0 +1,8 @@
+fn test_direct_block_return() {
+    return { 
+        let x = 42;
+        x > 0
+    };
+}
+
+test_direct_block_return() |> log();
