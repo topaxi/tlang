@@ -62,11 +62,21 @@ impl CodegenJS {
                 self.push_str(";\n");
             }
         } else if let Some(expr) = &block.expr {
-            self.push_indent();
-            self.push_current_completion_variable();
-            self.push_str(" = ");
-            self.generate_expr(expr, None);
-            self.push_str(";\n");
+            // Handle break and continue expressions specially - they cannot be assigned
+            match &expr.kind {
+                hir::ExprKind::Break(_) | hir::ExprKind::Continue => {
+                    self.push_indent();
+                    self.generate_expr(expr, None);
+                    self.push_str(";\n");
+                }
+                _ => {
+                    self.push_indent();
+                    self.push_current_completion_variable();
+                    self.push_str(" = ");
+                    self.generate_expr(expr, None);
+                    self.push_str(";\n");
+                }
+            }
         }
     }
 
