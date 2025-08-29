@@ -66,47 +66,216 @@ impl HirJsPass {
         hir::Stmt::new(hir_id, hir::StmtKind::Expr(Box::new(assignment_expr)), span)
     }
 
-    fn transform_nested_expressions_in_expr(&mut self, expr: &mut hir::Expr, _ctx: &mut HirOptContext) {
+    /// Generic function to flatten a complex expression to a temporary variable
+    /// Returns (flattened_expr, statements_to_insert)
+    fn flatten_expression_to_temp_var(
+        &mut self,
+        expr: hir::Expr,
+        ctx: &mut HirOptContext,
+    ) -> (hir::Expr, Vec<hir::Stmt>) {
+        if !expr_can_render_as_js_expr(&expr) {
+            // This expression needs flattening
+            let temp_name = self.generate_temp_var_name();
+            let span = expr.span;
+            
+            // Create temporary variable assignments for this expression
+            let temp_stmts = self.create_temp_var_assignment_for_expr(
+                ctx,
+                &temp_name,
+                expr,
+                span,
+            );
+            
+            // Return the temporary variable reference and the statements
+            let temp_var_expr = self.create_temp_var_path(ctx, &temp_name, span);
+            (temp_var_expr, temp_stmts)
+        } else {
+            // Expression can be rendered as JS, but we still need to flatten its subexpressions
+            let (flattened_expr, stmts) = self.flatten_subexpressions_generically(expr, ctx);
+            (flattened_expr, stmts)
+        }
+    }
+
+    /// Recursively flatten subexpressions in all contexts
+    fn flatten_subexpressions_generically(
+        &mut self,
+        mut expr: hir::Expr,
+        ctx: &mut HirOptContext,
+    ) -> (hir::Expr, Vec<hir::Stmt>) {
+        let mut statements = Vec::new();
+
         match &mut expr.kind {
             hir::ExprKind::Call(call_expr) => {
-                // Transform function arguments with complex expressions
+                // Flatten function arguments
                 for arg in &mut call_expr.arguments {
-                    if self.needs_transformation(arg) {
-                        // Mark that this argument needs transformation
+                    if !expr_can_render_as_js_expr(arg) {
+                        let span = arg.span;
+                        let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                        let expr_to_flatten = std::mem::replace(arg, placeholder);
+                        let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                        *arg = flattened;
+                        statements.append(&mut stmts);
                         self.changes_made = true;
                     }
                 }
             }
-            hir::ExprKind::IfElse(condition, _then_branch, _else_branches) => {
-                // Check if condition has nested complex expressions
-                if self.needs_transformation(condition) {
+            hir::ExprKind::Binary(_, lhs, rhs) => {
+                // Flatten left and right operands
+                if !expr_can_render_as_js_expr(lhs) {
+                    let span = lhs.span;
+                    let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                    let expr_to_flatten = std::mem::replace(lhs.as_mut(), placeholder);
+                    let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                    **lhs = flattened;
+                    statements.append(&mut stmts);
+                    self.changes_made = true;
+                }
+                if !expr_can_render_as_js_expr(rhs) {
+                    let span = rhs.span;
+                    let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                    let expr_to_flatten = std::mem::replace(rhs.as_mut(), placeholder);
+                    let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                    **rhs = flattened;
+                    statements.append(&mut stmts);
+                    self.changes_made = true;
+                }
+            }
+            hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
+                // Flatten condition if it's complex
+                if !expr_can_render_as_js_expr(condition) {
+                    let span = condition.span;
+                    let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                    let expr_to_flatten = std::mem::replace(condition.as_mut(), placeholder);
+                    let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                    **condition = flattened;
+                    statements.append(&mut stmts);
+                    self.changes_made = true;
+                }
+                
+                // Recursively handle then and else expressions
+                if let Some(then_expr) = &mut then_branch.expr {
+                    let span = then_expr.span;
+                    let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                    let expr_to_flatten = std::mem::replace(then_expr, placeholder);
+                    let (flattened, mut stmts) = self.flatten_subexpressions_generically(expr_to_flatten, ctx);
+                    *then_expr = flattened;
+                    statements.append(&mut stmts);
+                }
+                
+                for else_branch in else_branches {
+                    if let Some(else_expr) = &mut else_branch.consequence.expr {
+                        let span = else_expr.span;
+                        let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                        let expr_to_flatten = std::mem::replace(else_expr, placeholder);
+                        let (flattened, mut stmts) = self.flatten_subexpressions_generically(expr_to_flatten, ctx);
+                        *else_expr = flattened;
+                        statements.append(&mut stmts);
+                    }
+                }
+            }
+            hir::ExprKind::List(exprs) => {
+                // Flatten list elements
+                for expr_elem in exprs {
+                    if !expr_can_render_as_js_expr(expr_elem) {
+                        let span = expr_elem.span;
+                        let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                        let expr_to_flatten = std::mem::replace(expr_elem, placeholder);
+                        let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                        *expr_elem = flattened;
+                        statements.append(&mut stmts);
+                        self.changes_made = true;
+                    }
+                }
+            }
+            hir::ExprKind::Dict(exprs) => {
+                // Flatten dictionary key-value pairs
+                for (key, value) in exprs {
+                    if !expr_can_render_as_js_expr(key) {
+                        let span = key.span;
+                        let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                        let expr_to_flatten = std::mem::replace(key, placeholder);
+                        let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                        *key = flattened;
+                        statements.append(&mut stmts);
+                        self.changes_made = true;
+                    }
+                    if !expr_can_render_as_js_expr(value) {
+                        let span = value.span;
+                        let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                        let expr_to_flatten = std::mem::replace(value, placeholder);
+                        let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                        *value = flattened;
+                        statements.append(&mut stmts);
+                        self.changes_made = true;
+                    }
+                }
+            }
+            hir::ExprKind::IndexAccess(base, index) => {
+                // Flatten base and index expressions
+                if !expr_can_render_as_js_expr(base) {
+                    let span = base.span;
+                    let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                    let expr_to_flatten = std::mem::replace(base.as_mut(), placeholder);
+                    let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                    **base = flattened;
+                    statements.append(&mut stmts);
+                    self.changes_made = true;
+                }
+                if !expr_can_render_as_js_expr(index) {
+                    let span = index.span;
+                    let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                    let expr_to_flatten = std::mem::replace(index.as_mut(), placeholder);
+                    let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                    **index = flattened;
+                    statements.append(&mut stmts);
+                    self.changes_made = true;
+                }
+            }
+            hir::ExprKind::FieldAccess(base, _) => {
+                // Flatten base expression
+                if !expr_can_render_as_js_expr(base) {
+                    let span = base.span;
+                    let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                    let expr_to_flatten = std::mem::replace(base.as_mut(), placeholder);
+                    let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                    **base = flattened;
+                    statements.append(&mut stmts);
+                    self.changes_made = true;
+                }
+            }
+            hir::ExprKind::Unary(_, operand) => {
+                // Flatten unary operand
+                if !expr_can_render_as_js_expr(operand) {
+                    let span = operand.span;
+                    let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                    let expr_to_flatten = std::mem::replace(operand.as_mut(), placeholder);
+                    let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                    **operand = flattened;
+                    statements.append(&mut stmts);
+                    self.changes_made = true;
+                }
+            }
+            hir::ExprKind::Cast(operand, _) => {
+                // Flatten cast operand
+                if !expr_can_render_as_js_expr(operand) {
+                    let span = operand.span;
+                    let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                    let expr_to_flatten = std::mem::replace(operand.as_mut(), placeholder);
+                    let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                    **operand = flattened;
+                    statements.append(&mut stmts);
                     self.changes_made = true;
                 }
             }
             _ => {
-                // For other expression types, continue recursion
+                // For other expression types, no subexpressions to flatten
             }
         }
+
+        (expr, statements)
     }
 
-    fn needs_transformation(&self, expr: &hir::Expr) -> bool {
-        match &expr.kind {
-            hir::ExprKind::Block(block) => block.has_completion(),
-            hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
-                // Check if this if/else contains statements or nested complex expressions
-                !then_branch.stmts.is_empty()
-                    || else_branches.iter().any(|else_branch| !else_branch.consequence.stmts.is_empty())
-                    || self.needs_transformation(condition)
-                    || (then_branch.expr.as_ref().map_or(false, |e| self.needs_transformation(e)))
-                    || else_branches.iter().any(|else_branch| {
-                        else_branch.condition.as_ref().map_or(false, |c| self.needs_transformation(c))
-                            || else_branch.consequence.expr.as_ref().map_or(false, |e| self.needs_transformation(e))
-                    })
-            }
-            hir::ExprKind::Match(..) => true, // Match expressions always need transformation in JS
-            _ => false,
-        }
-    }
+
 
     fn create_temp_var_assignment_for_expr(
         &mut self,
@@ -370,338 +539,164 @@ impl<'hir> Visitor<'hir> for HirJsPass {
     type Context = HirOptContext;
 
     fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
-        // First, recursively visit children to handle deeply nested cases
-        visit::walk_expr(self, expr, ctx);
-
-        // Check if this expression contains nested complex expressions that need transformation
-        self.transform_nested_expressions_in_expr(expr, ctx);
-    }
-
-    fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut Self::Context) {
-        // First, visit children to handle nested cases
-        visit::walk_stmt(self, stmt, ctx);
-
-        // Handle different statement types that may contain complex expressions
-        match &mut stmt.kind {
-            hir::StmtKind::Let(_pat, expr, _ty) => {
-                match &expr.kind {
-                    hir::ExprKind::Block(block) => {
-                        if block.has_completion() {
-                            // This is a let statement with a block expression that has a completion value
-                            // We need to transform this at a higher level since we need to insert statements
-                            // For now, just mark that we found something to transform
-                            self.changes_made = true;
-                        }
-                    }
-                    hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
-                        // Check if this if/else can be rendered as a ternary operator
-                        if !if_else_can_render_as_ternary(condition, then_branch, else_branches) {
-                            // This is a let statement with an if/else expression that needs transformation
-                            self.changes_made = true;
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            hir::StmtKind::Return(Some(expr)) => {
-                // Handle return statements with complex expressions
-                if self.needs_transformation(expr) {
-                    self.changes_made = true;
-                }
-            }
-            hir::StmtKind::Expr(expr) => {
-                // Handle expression statements with complex expressions
-                if self.needs_transformation(expr) {
-                    self.changes_made = true;
-                }
-            }
-            _ => {}
+        // Don't recursively walk here - we'll handle recursion in our generic flattening
+        
+        // Apply generic expression flattening
+        let span = expr.span;
+        let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+        let expr_to_flatten = std::mem::replace(expr, placeholder);
+        let (flattened_expr, statements) = self.flatten_subexpressions_generically(expr_to_flatten, ctx);
+        *expr = flattened_expr;
+        
+        // If we generated statements, we need to handle them at the block level
+        // For now, just note that changes were made
+        if !statements.is_empty() {
+            self.changes_made = true;
         }
     }
 
+    fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut Self::Context) {
+        // Let visit_block handle the complex transformation logic
+        // This is mainly for statements that aren't within blocks
+        visit::walk_stmt(self, stmt, ctx);
+    }
+
     fn visit_block(&mut self, block: &'hir mut hir::Block, ctx: &mut Self::Context) {
-        // Transform all statements that contain complex expressions
+        // Transform all statements using the generic flattening approach
         let mut new_stmts = Vec::new();
 
         for stmt in &mut block.stmts {
             match &stmt.kind {
-                // Handle let statements with complex expressions (existing logic)
+                // Handle let statements with complex expressions
                 hir::StmtKind::Let(pat, expr, ty) => {
-                    match &expr.kind {
-                        hir::ExprKind::Block(block_expr) => {
-                            if block_expr.has_completion() {
-                                // Transform block expression (existing logic)
-                                let temp_name = self.generate_temp_var_name();
-                                let span = stmt.span;
-
-                                // Create the modified block with assignment statement
-                                let mut new_block = block_expr.as_ref().clone();
-
-                                // Move the completion expression to an assignment statement
-                                if let Some(completion_expr) = new_block.expr.take() {
-                                    let assignment_stmt = self.create_assignment_stmt(
-                                        ctx,
-                                        &temp_name,
-                                        completion_expr,
-                                        span,
-                                    );
-                                    new_block.stmts.push(assignment_stmt);
-                                }
-
-                                // Create a single statement that represents the temp declaration + block combination
-                                let combined_expr = hir::Expr {
-                                    hir_id: ctx.hir_id_allocator.next_id(),
-                                    kind: hir::ExprKind::Call(Box::new(hir::CallExpression {
-                                        hir_id: ctx.hir_id_allocator.next_id(),
-                                        callee: hir::Expr {
-                                            hir_id: ctx.hir_id_allocator.next_id(),
-                                            kind: hir::ExprKind::Path(Box::new(hir::Path::new(
-                                                vec![hir::PathSegment {
-                                                    ident: Ident::new("__TEMP_VAR_BLOCK__", span),
-                                                }],
-                                                span,
-                                            ))),
-                                            span,
-                                        },
-                                        arguments: vec![
-                                            // First argument: temp variable name
-                                            hir::Expr {
-                                                hir_id: ctx.hir_id_allocator.next_id(),
-                                                kind: hir::ExprKind::Literal(Box::new(
-                                                    tlang_ast::token::Literal::String(
-                                                        temp_name.clone().into(),
-                                                    ),
-                                                )),
-                                                span,
-                                            },
-                                            // Second argument: the block
-                                            hir::Expr {
-                                                hir_id: ctx.hir_id_allocator.next_id(),
-                                                kind: hir::ExprKind::Block(Box::new(new_block)),
-                                                span,
-                                            },
-                                        ],
-                                    })),
-                                    span,
-                                };
-
-                                let combined_stmt = hir::Stmt::new(
-                                    ctx.hir_id_allocator.next_id(),
-                                    hir::StmtKind::Expr(Box::new(combined_expr)),
-                                    span,
-                                );
-                                new_stmts.push(combined_stmt);
-
-                                // Create the modified let statement using temp variable
-                                let temp_path_expr = self.create_temp_var_path(ctx, &temp_name, span);
-                                let modified_let = hir::Stmt::new(
-                                    stmt.hir_id,
-                                    hir::StmtKind::Let(
-                                        pat.clone(),
-                                        Box::new(temp_path_expr),
-                                        ty.clone(),
-                                    ),
-                                    span,
-                                );
-                                new_stmts.push(modified_let);
-
-                                self.changes_made = true;
-                                continue;
-                            }
+                    if !expr_can_render_as_js_expr(expr) {
+                        // Use generic flattening for the expression
+                        let (flattened_expr, mut temp_stmts) = self.flatten_expression_to_temp_var(
+                            expr.as_ref().clone(),
+                            ctx,
+                        );
+                        
+                        // Add the temporary variable statements first
+                        new_stmts.append(&mut temp_stmts);
+                        
+                        // Create the modified let statement using the flattened expression
+                        let modified_let = hir::Stmt::new(
+                            stmt.hir_id,
+                            hir::StmtKind::Let(
+                                pat.clone(),
+                                Box::new(flattened_expr),
+                                ty.clone(),
+                            ),
+                            stmt.span,
+                        );
+                        new_stmts.push(modified_let);
+                        
+                        self.changes_made = true;
+                    } else {
+                        // Expression can be rendered as JS, but check subexpressions
+                        let (flattened_expr, mut temp_stmts) = self.flatten_subexpressions_generically(
+                            expr.as_ref().clone(),
+                            ctx,
+                        );
+                        
+                        if !temp_stmts.is_empty() {
+                            // Add the temporary variable statements first
+                            new_stmts.append(&mut temp_stmts);
+                            
+                            // Create the modified let statement using the flattened expression
+                            let modified_let = hir::Stmt::new(
+                                stmt.hir_id,
+                                hir::StmtKind::Let(
+                                    pat.clone(),
+                                    Box::new(flattened_expr),
+                                    ty.clone(),
+                                ),
+                                stmt.span,
+                            );
+                            new_stmts.push(modified_let);
+                            
+                            self.changes_made = true;
+                        } else {
+                            // No changes needed
+                            new_stmts.push(stmt.clone());
                         }
-                        hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
-                            // Check if this if/else can be rendered as a ternary operator
-                            if !if_else_can_render_as_ternary(condition, then_branch, else_branches) {
-                                // Transform if/else expression (existing logic)
-                                let temp_name = self.generate_temp_var_name();
-                                let span = stmt.span;
-
-                                // Create modified if/else with assignment statements
-                                let mut new_then_branch = then_branch.as_ref().clone();
-                                if let Some(completion_expr) = new_then_branch.expr.take() {
-                                    let assignment_stmt = self.create_assignment_stmt(
-                                        ctx,
-                                        &temp_name,
-                                        completion_expr,
-                                        span,
-                                    );
-                                    new_then_branch.stmts.push(assignment_stmt);
-                                }
-
-                                let mut new_else_branches = Vec::new();
-                                for else_branch in else_branches {
-                                    let mut new_else_consequence = else_branch.consequence.clone();
-                                    if let Some(completion_expr) = new_else_consequence.expr.take() {
-                                        let assignment_stmt = self.create_assignment_stmt(
-                                            ctx,
-                                            &temp_name,
-                                            completion_expr,
-                                            span,
-                                        );
-                                        new_else_consequence.stmts.push(assignment_stmt);
-                                    }
-                                    new_else_branches.push(hir::ElseClause {
-                                        condition: else_branch.condition.clone(),
-                                        consequence: new_else_consequence,
-                                    });
-                                }
-
-                                // Create a single statement that represents the temp declaration + if/else combination
-                                let combined_expr = hir::Expr {
-                                    hir_id: ctx.hir_id_allocator.next_id(),
-                                    kind: hir::ExprKind::Call(Box::new(hir::CallExpression {
-                                        hir_id: ctx.hir_id_allocator.next_id(),
-                                        callee: hir::Expr {
-                                            hir_id: ctx.hir_id_allocator.next_id(),
-                                            kind: hir::ExprKind::Path(Box::new(hir::Path::new(
-                                                vec![hir::PathSegment {
-                                                    ident: Ident::new("__TEMP_VAR_IF_ELSE__", span),
-                                                }],
-                                                span,
-                                            ))),
-                                            span,
-                                        },
-                                        arguments: vec![
-                                            // First argument: temp variable name
-                                            hir::Expr {
-                                                hir_id: ctx.hir_id_allocator.next_id(),
-                                                kind: hir::ExprKind::Literal(Box::new(
-                                                    tlang_ast::token::Literal::String(
-                                                        temp_name.clone().into(),
-                                                    ),
-                                                )),
-                                                span,
-                                            },
-                                            // Second argument: the if/else expression
-                                            hir::Expr {
-                                                hir_id: ctx.hir_id_allocator.next_id(),
-                                                kind: hir::ExprKind::IfElse(
-                                                    condition.clone(),
-                                                    Box::new(new_then_branch),
-                                                    new_else_branches,
-                                                ),
-                                                span,
-                                            },
-                                        ],
-                                    })),
-                                    span,
-                                };
-
-                                let combined_stmt = hir::Stmt::new(
-                                    ctx.hir_id_allocator.next_id(),
-                                    hir::StmtKind::Expr(Box::new(combined_expr)),
-                                    span,
-                                );
-                                new_stmts.push(combined_stmt);
-
-                                // Create the modified let statement using temp variable
-                                let temp_path_expr = self.create_temp_var_path(ctx, &temp_name, span);
-                                let modified_let = hir::Stmt::new(
-                                    stmt.hir_id,
-                                    hir::StmtKind::Let(
-                                        pat.clone(),
-                                        Box::new(temp_path_expr),
-                                        ty.clone(),
-                                    ),
-                                    span,
-                                );
-                                new_stmts.push(modified_let);
-
-                                self.changes_made = true;
-                                continue;
-                            }
-                        }
-                        _ => {}
                     }
-                    
-                    // If we didn't transform this let statement, just add it as-is
-                    new_stmts.push(stmt.clone());
                 }
                 // Handle return statements with complex expressions
                 hir::StmtKind::Return(Some(expr)) => {
-                    match &expr.kind {
-                        hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
-                            // Check if the condition contains nested complex expressions
-                            if self.needs_transformation(condition) {
-                                // Transform the condition to use a temporary variable
-                                let temp_name = self.generate_temp_var_name();
-                                let span = stmt.span;
-
-                                // Create temporary variable assignments for the condition
-                                let temp_assignments = self.create_temp_var_assignment_for_expr(
-                                    ctx,
-                                    &temp_name,
-                                    condition.as_ref().clone(),
-                                    span,
-                                );
-                                new_stmts.extend(temp_assignments);
-
-                                // Create the modified return statement with temp variable as condition
-                                let temp_path_expr = self.create_temp_var_path(ctx, &temp_name, span);
-                                let modified_if_else = hir::Expr {
-                                    hir_id: ctx.hir_id_allocator.next_id(),
-                                    kind: hir::ExprKind::IfElse(
-                                        Box::new(temp_path_expr),
-                                        then_branch.clone(),
-                                        else_branches.clone(),
-                                    ),
-                                    span,
-                                };
-                                let modified_return = hir::Stmt::new(
-                                    stmt.hir_id,
-                                    hir::StmtKind::Return(Some(Box::new(modified_if_else))),
-                                    span,
-                                );
-                                new_stmts.push(modified_return);
-
-                                self.changes_made = true;
-                                continue;
-                            }
-                        }
-                        _ => {
-                            // For other return expressions, use the general transformation
-                            if self.needs_transformation(expr) {
-                                // Transform the complex expression in the return statement
-                                let temp_name = self.generate_temp_var_name();
-                                let span = stmt.span;
-
-                                // Create the temp variable assignment for the complex expression
-                                let temp_assignment = self.create_temp_var_assignment_for_expr(
-                                    ctx, 
-                                    &temp_name, 
-                                    expr.as_ref().clone(), 
-                                    span
-                                );
-                                new_stmts.extend(temp_assignment);
-
-                                // Create the modified return statement using temp variable
-                                let temp_path_expr = self.create_temp_var_path(ctx, &temp_name, span);
-                                let modified_return = hir::Stmt::new(
-                                    stmt.hir_id,
-                                    hir::StmtKind::Return(Some(Box::new(temp_path_expr))),
-                                    span,
-                                );
-                                new_stmts.push(modified_return);
-
-                                self.changes_made = true;
-                                continue;
-                            }
+                    if !expr_can_render_as_js_expr(expr) {
+                        // Use generic flattening for the expression
+                        let (flattened_expr, mut temp_stmts) = self.flatten_expression_to_temp_var(
+                            expr.as_ref().clone(),
+                            ctx,
+                        );
+                        
+                        // Add the temporary variable statements first
+                        new_stmts.append(&mut temp_stmts);
+                        
+                        // Create the modified return statement using the flattened expression
+                        let modified_return = hir::Stmt::new(
+                            stmt.hir_id,
+                            hir::StmtKind::Return(Some(Box::new(flattened_expr))),
+                            stmt.span,
+                        );
+                        new_stmts.push(modified_return);
+                        
+                        self.changes_made = true;
+                    } else {
+                        // Expression can be rendered as JS, but check subexpressions
+                        let (flattened_expr, mut temp_stmts) = self.flatten_subexpressions_generically(
+                            expr.as_ref().clone(),
+                            ctx,
+                        );
+                        
+                        if !temp_stmts.is_empty() {
+                            // Add the temporary variable statements first
+                            new_stmts.append(&mut temp_stmts);
+                            
+                            // Create the modified return statement using the flattened expression
+                            let modified_return = hir::Stmt::new(
+                                stmt.hir_id,
+                                hir::StmtKind::Return(Some(Box::new(flattened_expr))),
+                                stmt.span,
+                            );
+                            new_stmts.push(modified_return);
+                            
+                            self.changes_made = true;
+                        } else {
+                            // No changes needed
+                            new_stmts.push(stmt.clone());
                         }
                     }
-                    
-                    // If we didn't transform this return statement, just add it as-is
-                    new_stmts.push(stmt.clone());
                 }
-                // Handle expression statements with complex expressions
-                hir::StmtKind::Expr(_expr) => {
-                    // Only transform expressions that are problematic in statement context
-                    // Simple if-else statements should remain as if statements, not be transformed
-                    // We only need to transform expressions that will be used in expression contexts
-                    // For now, skip transformation of expression statements
-                    new_stmts.push(stmt.clone());
+                // Handle expression statements
+                hir::StmtKind::Expr(expr) => {
+                    // Apply generic flattening to expression statements as well
+                    let (flattened_expr, mut temp_stmts) = self.flatten_subexpressions_generically(
+                        expr.as_ref().clone(),
+                        ctx,
+                    );
+                    
+                    if !temp_stmts.is_empty() {
+                        // Add the temporary variable statements first
+                        new_stmts.append(&mut temp_stmts);
+                        
+                        // Create the modified expression statement
+                        let modified_expr_stmt = hir::Stmt::new(
+                            stmt.hir_id,
+                            hir::StmtKind::Expr(Box::new(flattened_expr)),
+                            stmt.span,
+                        );
+                        new_stmts.push(modified_expr_stmt);
+                        
+                        self.changes_made = true;
+                    } else {
+                        // No changes needed
+                        new_stmts.push(stmt.clone());
+                    }
                 }
                 _ => {
-                    // For other statement types, just add them as-is for now
+                    // For other statement types, just add them as-is
                     new_stmts.push(stmt.clone());
                 }
             }
@@ -714,7 +709,17 @@ impl<'hir> Visitor<'hir> for HirJsPass {
 
         // Visit the block expression if it exists
         if let Some(expr) = &mut block.expr {
-            self.visit_expr(expr, ctx);
+            let span = expr.span;
+            let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+            let expr_to_flatten = std::mem::replace(expr, placeholder);
+            let (flattened_expr, temp_stmts) = self.flatten_subexpressions_generically(expr_to_flatten, ctx);
+            *expr = flattened_expr;
+            
+            // If we generated statements for the block expression, add them to the block
+            if !temp_stmts.is_empty() {
+                block.stmts.extend(temp_stmts);
+                self.changes_made = true;
+            }
         }
     }
 }

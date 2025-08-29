@@ -1,0 +1,24 @@
+fn test_complex_function_args() {
+    // Test complex expressions in function arguments
+    let result = some_function(
+        if true { 
+            let x = 42;
+            x * 2
+        } else { 
+            let y = 10;
+            y + 5
+        },
+        if false {
+            let a = 1;
+            a + 1
+        } else {
+            let b = 2;
+            b * 3
+        }
+    );
+    return result;
+}
+
+fn some_function(a, b) {
+    return a + b;
+}
