@@ -213,9 +213,10 @@ impl CodegenJS {
         let mut lhs = self.replace_statement_buffer(String::new());
         let has_block_completions =
             self.current_context() == BlockContext::Expression && match_args_have_completions(arms);
+        let is_expression_context = self.current_context() == BlockContext::Expression;
         let mut has_let = false;
 
-        if has_block_completions {
+        if has_block_completions || is_expression_context {
             if let Some("return") = self.current_completion_variable() {
                 self.push_completion_variable(Some("return"));
                 lhs = self.replace_statement_buffer_with_empty_string();
@@ -425,8 +426,23 @@ impl CodegenJS {
     }
 
     pub(crate) fn generate_match_expression(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) {
+        self.generate_match_expression_with_completion_var(expr, arms, None);
+    }
+
+    pub(crate) fn generate_match_expression_with_completion_var(
+        &mut self,
+        expr: &hir::Expr,
+        arms: &[hir::MatchArm],
+        completion_var: Option<&str>,
+    ) {
         // TODO: A lot here is copied from the if statement generator.
-        let (lhs, mut has_let) = self.setup_match_completion_variables(arms);
+        let (lhs, mut has_let) = if let Some(var) = completion_var {
+            // Use the provided completion variable instead of creating a new one
+            self.push_completion_variable(Some(var));
+            (self.replace_statement_buffer(String::new()), false)
+        } else {
+            self.setup_match_completion_variables(arms)
+        };
         let has_block_completions =
             self.current_context() == BlockContext::Expression && match_args_have_completions(arms);
 
