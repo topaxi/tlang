@@ -92,44 +92,7 @@ impl CodegenJS {
 
     /// JavaScript helper functions that provide runtime support
     pub fn get_javascript_helpers() -> String {
-        r#"
-// JavaScript Iterator Helper Functions
-// Converts JavaScript arrays to tlang iterator protocol
-
-// Helper function to create a tlang iterator from a JavaScript array
-function createTlangIterator(jsArray) {
-    return {
-        _array: jsArray,
-        _index: 0,
-        next: function() {
-            if (this._index >= this._array.length) {
-                return { tag: 1, _0: undefined }; // Option::None
-            } else {
-                const value = this._array[this._index++];
-                return { tag: 0, _0: value }; // Option::Some(value)
-            }
-        }
-    };
-}
-
-// Iterator module for tlang
-const iterator = {
-    iter: function(value) {
-        // If it's a JavaScript array, convert it to tlang iterator
-        if (Array.isArray(value)) {
-            return createTlangIterator(value);
-        }
-        // If it already has an iter method, call it
-        if (value && typeof value.iter === 'function') {
-            return value.iter();
-        }
-        // Otherwise, assume it's a tlang list structure and create iterator
-        return createTlangIterator(value);
-    }
-};
-"#
-        .trim()
-        .to_string()
+        include_str!("../std/helpers.js").to_string()
     }
 
     pub fn get_standard_library_symbols() -> &'static [(&'static str, SymbolType); 32] {
