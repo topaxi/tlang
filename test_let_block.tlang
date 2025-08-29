@@ -1,9 +1,0 @@
-fn test_let_block() {
-    let result = { 
-        let x = 42;
-        x > 0
-    };
-    return result;
-}
-
-test_let_block() |> log();

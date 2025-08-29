@@ -1,6 +1,0 @@
-// Test for deeply nested if expressions that should be transformed
-fn test_nested_return() {
-    return if (if true { true } else { false }) { true } else { false };
-}
-
-test_nested_return() |> log();

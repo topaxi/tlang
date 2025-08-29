@@ -1,0 +1,17 @@
+fn test_complex_binary_operations() {
+    return (if true { 
+        let x = 10;
+        x + 5
+    } else { 
+        let y = 20;
+        y - 5
+    }) + (if false {
+        let a = 3;
+        a * 2
+    } else {
+        let b = 4;
+        b / 2
+    });
+}
+
+test_complex_binary_operations() |> log();

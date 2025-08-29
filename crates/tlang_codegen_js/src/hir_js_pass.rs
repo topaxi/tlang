@@ -49,7 +49,7 @@ impl HirJsPass {
         span: Span,
     ) -> hir::Stmt {
         let hir_id = ctx.hir_id_allocator.next_id();
-        let temp_path = self.create_temp_var_path(ctx, &temp_name, span);
+        let temp_path = self.create_temp_var_path(ctx, temp_name, span);
 
         // Create an assignment using a binary operator (this is a simplification)
         // In a more complete implementation, we might need a dedicated assignment statement type
@@ -77,15 +77,10 @@ impl HirJsPass {
             // This expression needs flattening
             let temp_name = self.generate_temp_var_name();
             let span = expr.span;
-            
+
             // Create temporary variable assignments for this expression
-            let temp_stmts = self.create_temp_var_assignment_for_expr(
-                ctx,
-                &temp_name,
-                expr,
-                span,
-            );
-            
+            let temp_stmts = self.create_temp_var_assignment_for_expr(ctx, &temp_name, expr, span);
+
             // Return the temporary variable reference and the statements
             let temp_var_expr = self.create_temp_var_path(ctx, &temp_name, span);
             (temp_var_expr, temp_stmts)
@@ -112,7 +107,8 @@ impl HirJsPass {
                         let span = arg.span;
                         let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                         let expr_to_flatten = std::mem::replace(arg, placeholder);
-                        let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                        let (flattened, mut stmts) =
+                            self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
                         *arg = flattened;
                         statements.append(&mut stmts);
                         self.changes_made = true;
@@ -125,7 +121,8 @@ impl HirJsPass {
                     let span = lhs.span;
                     let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                     let expr_to_flatten = std::mem::replace(lhs.as_mut(), placeholder);
-                    let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                    let (flattened, mut stmts) =
+                        self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
                     **lhs = flattened;
                     statements.append(&mut stmts);
                     self.changes_made = true;
@@ -134,7 +131,8 @@ impl HirJsPass {
                     let span = rhs.span;
                     let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                     let expr_to_flatten = std::mem::replace(rhs.as_mut(), placeholder);
-                    let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                    let (flattened, mut stmts) =
+                        self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
                     **rhs = flattened;
                     statements.append(&mut stmts);
                     self.changes_made = true;
@@ -146,28 +144,31 @@ impl HirJsPass {
                     let span = condition.span;
                     let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                     let expr_to_flatten = std::mem::replace(condition.as_mut(), placeholder);
-                    let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                    let (flattened, mut stmts) =
+                        self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
                     **condition = flattened;
                     statements.append(&mut stmts);
                     self.changes_made = true;
                 }
-                
+
                 // Recursively handle then and else expressions
                 if let Some(then_expr) = &mut then_branch.expr {
                     let span = then_expr.span;
                     let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                     let expr_to_flatten = std::mem::replace(then_expr, placeholder);
-                    let (flattened, mut stmts) = self.flatten_subexpressions_generically(expr_to_flatten, ctx);
+                    let (flattened, mut stmts) =
+                        self.flatten_subexpressions_generically(expr_to_flatten, ctx);
                     *then_expr = flattened;
                     statements.append(&mut stmts);
                 }
-                
+
                 for else_branch in else_branches {
                     if let Some(else_expr) = &mut else_branch.consequence.expr {
                         let span = else_expr.span;
                         let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                         let expr_to_flatten = std::mem::replace(else_expr, placeholder);
-                        let (flattened, mut stmts) = self.flatten_subexpressions_generically(expr_to_flatten, ctx);
+                        let (flattened, mut stmts) =
+                            self.flatten_subexpressions_generically(expr_to_flatten, ctx);
                         *else_expr = flattened;
                         statements.append(&mut stmts);
                     }
@@ -180,7 +181,8 @@ impl HirJsPass {
                         let span = expr_elem.span;
                         let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                         let expr_to_flatten = std::mem::replace(expr_elem, placeholder);
-                        let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                        let (flattened, mut stmts) =
+                            self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
                         *expr_elem = flattened;
                         statements.append(&mut stmts);
                         self.changes_made = true;
@@ -194,7 +196,8 @@ impl HirJsPass {
                         let span = key.span;
                         let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                         let expr_to_flatten = std::mem::replace(key, placeholder);
-                        let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                        let (flattened, mut stmts) =
+                            self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
                         *key = flattened;
                         statements.append(&mut stmts);
                         self.changes_made = true;
@@ -203,7 +206,8 @@ impl HirJsPass {
                         let span = value.span;
                         let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                         let expr_to_flatten = std::mem::replace(value, placeholder);
-                        let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                        let (flattened, mut stmts) =
+                            self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
                         *value = flattened;
                         statements.append(&mut stmts);
                         self.changes_made = true;
@@ -216,7 +220,8 @@ impl HirJsPass {
                     let span = base.span;
                     let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                     let expr_to_flatten = std::mem::replace(base.as_mut(), placeholder);
-                    let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                    let (flattened, mut stmts) =
+                        self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
                     **base = flattened;
                     statements.append(&mut stmts);
                     self.changes_made = true;
@@ -225,7 +230,8 @@ impl HirJsPass {
                     let span = index.span;
                     let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                     let expr_to_flatten = std::mem::replace(index.as_mut(), placeholder);
-                    let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                    let (flattened, mut stmts) =
+                        self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
                     **index = flattened;
                     statements.append(&mut stmts);
                     self.changes_made = true;
@@ -237,7 +243,8 @@ impl HirJsPass {
                     let span = base.span;
                     let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                     let expr_to_flatten = std::mem::replace(base.as_mut(), placeholder);
-                    let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                    let (flattened, mut stmts) =
+                        self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
                     **base = flattened;
                     statements.append(&mut stmts);
                     self.changes_made = true;
@@ -249,7 +256,8 @@ impl HirJsPass {
                     let span = operand.span;
                     let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                     let expr_to_flatten = std::mem::replace(operand.as_mut(), placeholder);
-                    let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                    let (flattened, mut stmts) =
+                        self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
                     **operand = flattened;
                     statements.append(&mut stmts);
                     self.changes_made = true;
@@ -261,7 +269,8 @@ impl HirJsPass {
                     let span = operand.span;
                     let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                     let expr_to_flatten = std::mem::replace(operand.as_mut(), placeholder);
-                    let (flattened, mut stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                    let (flattened, mut stmts) =
+                        self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
                     **operand = flattened;
                     statements.append(&mut stmts);
                     self.changes_made = true;
@@ -275,8 +284,6 @@ impl HirJsPass {
         (expr, statements)
     }
 
-
-
     fn create_temp_var_assignment_for_expr(
         &mut self,
         ctx: &mut HirOptContext,
@@ -285,7 +292,7 @@ impl HirJsPass {
         span: Span,
     ) -> Vec<hir::Stmt> {
         let mut statements = Vec::new();
-        
+
         match &expr.kind {
             hir::ExprKind::Block(block) => {
                 if block.has_completion() {
@@ -294,12 +301,8 @@ impl HirJsPass {
 
                     // Move the completion expression to an assignment statement
                     if let Some(completion_expr) = new_block.expr.take() {
-                        let assignment_stmt = self.create_assignment_stmt(
-                            ctx,
-                            temp_name,
-                            completion_expr,
-                            span,
-                        );
+                        let assignment_stmt =
+                            self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
                         new_block.stmts.push(assignment_stmt);
                     }
 
@@ -351,12 +354,8 @@ impl HirJsPass {
                     // Transform if/else expression (existing logic adapted)
                     let mut new_then_branch = then_branch.as_ref().clone();
                     if let Some(completion_expr) = new_then_branch.expr.take() {
-                        let assignment_stmt = self.create_assignment_stmt(
-                            ctx,
-                            temp_name,
-                            completion_expr,
-                            span,
-                        );
+                        let assignment_stmt =
+                            self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
                         new_then_branch.stmts.push(assignment_stmt);
                     }
 
@@ -364,12 +363,8 @@ impl HirJsPass {
                     for else_branch in else_branches {
                         let mut new_else_consequence = else_branch.consequence.clone();
                         if let Some(completion_expr) = new_else_consequence.expr.take() {
-                            let assignment_stmt = self.create_assignment_stmt(
-                                ctx,
-                                temp_name,
-                                completion_expr,
-                                span,
-                            );
+                            let assignment_stmt =
+                                self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
                             new_else_consequence.stmts.push(assignment_stmt);
                         }
                         new_else_branches.push(hir::ElseClause {
@@ -467,7 +462,7 @@ impl HirJsPass {
                 statements.push(self.create_assignment_stmt(ctx, temp_name, expr, span));
             }
         }
-        
+
         statements
     }
 }
@@ -506,7 +501,7 @@ pub fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
         hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
             // If-else can be rendered as a JS expression if it can be a ternary operator
             if_else_can_render_as_ternary(condition, then_branch, else_branches)
-        },
+        }
         hir::ExprKind::Match(..) => false,
         hir::ExprKind::Call(call_expr) => {
             call_expr.arguments.iter().all(expr_can_render_as_js_expr)
@@ -540,14 +535,15 @@ impl<'hir> Visitor<'hir> for HirJsPass {
 
     fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
         // Don't recursively walk here - we'll handle recursion in our generic flattening
-        
+
         // Apply generic expression flattening
         let span = expr.span;
         let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
         let expr_to_flatten = std::mem::replace(expr, placeholder);
-        let (flattened_expr, statements) = self.flatten_subexpressions_generically(expr_to_flatten, ctx);
+        let (flattened_expr, statements) =
+            self.flatten_subexpressions_generically(expr_to_flatten, ctx);
         *expr = flattened_expr;
-        
+
         // If we generated statements, we need to handle them at the block level
         // For now, just note that changes were made
         if !statements.is_empty() {
@@ -571,38 +567,30 @@ impl<'hir> Visitor<'hir> for HirJsPass {
                 hir::StmtKind::Let(pat, expr, ty) => {
                     if !expr_can_render_as_js_expr(expr) {
                         // Use generic flattening for the expression
-                        let (flattened_expr, mut temp_stmts) = self.flatten_expression_to_temp_var(
-                            expr.as_ref().clone(),
-                            ctx,
-                        );
-                        
+                        let (flattened_expr, mut temp_stmts) =
+                            self.flatten_expression_to_temp_var(expr.as_ref().clone(), ctx);
+
                         // Add the temporary variable statements first
                         new_stmts.append(&mut temp_stmts);
-                        
+
                         // Create the modified let statement using the flattened expression
                         let modified_let = hir::Stmt::new(
                             stmt.hir_id,
-                            hir::StmtKind::Let(
-                                pat.clone(),
-                                Box::new(flattened_expr),
-                                ty.clone(),
-                            ),
+                            hir::StmtKind::Let(pat.clone(), Box::new(flattened_expr), ty.clone()),
                             stmt.span,
                         );
                         new_stmts.push(modified_let);
-                        
+
                         self.changes_made = true;
                     } else {
                         // Expression can be rendered as JS, but check subexpressions
-                        let (flattened_expr, mut temp_stmts) = self.flatten_subexpressions_generically(
-                            expr.as_ref().clone(),
-                            ctx,
-                        );
-                        
+                        let (flattened_expr, mut temp_stmts) =
+                            self.flatten_subexpressions_generically(expr.as_ref().clone(), ctx);
+
                         if !temp_stmts.is_empty() {
                             // Add the temporary variable statements first
                             new_stmts.append(&mut temp_stmts);
-                            
+
                             // Create the modified let statement using the flattened expression
                             let modified_let = hir::Stmt::new(
                                 stmt.hir_id,
@@ -614,7 +602,7 @@ impl<'hir> Visitor<'hir> for HirJsPass {
                                 stmt.span,
                             );
                             new_stmts.push(modified_let);
-                            
+
                             self.changes_made = true;
                         } else {
                             // No changes needed
@@ -626,14 +614,12 @@ impl<'hir> Visitor<'hir> for HirJsPass {
                 hir::StmtKind::Return(Some(expr)) => {
                     if !expr_can_render_as_js_expr(expr) {
                         // Use generic flattening for the expression
-                        let (flattened_expr, mut temp_stmts) = self.flatten_expression_to_temp_var(
-                            expr.as_ref().clone(),
-                            ctx,
-                        );
-                        
+                        let (flattened_expr, mut temp_stmts) =
+                            self.flatten_expression_to_temp_var(expr.as_ref().clone(), ctx);
+
                         // Add the temporary variable statements first
                         new_stmts.append(&mut temp_stmts);
-                        
+
                         // Create the modified return statement using the flattened expression
                         let modified_return = hir::Stmt::new(
                             stmt.hir_id,
@@ -641,19 +627,17 @@ impl<'hir> Visitor<'hir> for HirJsPass {
                             stmt.span,
                         );
                         new_stmts.push(modified_return);
-                        
+
                         self.changes_made = true;
                     } else {
                         // Expression can be rendered as JS, but check subexpressions
-                        let (flattened_expr, mut temp_stmts) = self.flatten_subexpressions_generically(
-                            expr.as_ref().clone(),
-                            ctx,
-                        );
-                        
+                        let (flattened_expr, mut temp_stmts) =
+                            self.flatten_subexpressions_generically(expr.as_ref().clone(), ctx);
+
                         if !temp_stmts.is_empty() {
                             // Add the temporary variable statements first
                             new_stmts.append(&mut temp_stmts);
-                            
+
                             // Create the modified return statement using the flattened expression
                             let modified_return = hir::Stmt::new(
                                 stmt.hir_id,
@@ -661,7 +645,7 @@ impl<'hir> Visitor<'hir> for HirJsPass {
                                 stmt.span,
                             );
                             new_stmts.push(modified_return);
-                            
+
                             self.changes_made = true;
                         } else {
                             // No changes needed
@@ -672,15 +656,13 @@ impl<'hir> Visitor<'hir> for HirJsPass {
                 // Handle expression statements
                 hir::StmtKind::Expr(expr) => {
                     // Apply generic flattening to expression statements as well
-                    let (flattened_expr, mut temp_stmts) = self.flatten_subexpressions_generically(
-                        expr.as_ref().clone(),
-                        ctx,
-                    );
-                    
+                    let (flattened_expr, mut temp_stmts) =
+                        self.flatten_subexpressions_generically(expr.as_ref().clone(), ctx);
+
                     if !temp_stmts.is_empty() {
                         // Add the temporary variable statements first
                         new_stmts.append(&mut temp_stmts);
-                        
+
                         // Create the modified expression statement
                         let modified_expr_stmt = hir::Stmt::new(
                             stmt.hir_id,
@@ -688,7 +670,7 @@ impl<'hir> Visitor<'hir> for HirJsPass {
                             stmt.span,
                         );
                         new_stmts.push(modified_expr_stmt);
-                        
+
                         self.changes_made = true;
                     } else {
                         // No changes needed
@@ -712,9 +694,10 @@ impl<'hir> Visitor<'hir> for HirJsPass {
             let span = expr.span;
             let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
             let expr_to_flatten = std::mem::replace(expr, placeholder);
-            let (flattened_expr, temp_stmts) = self.flatten_subexpressions_generically(expr_to_flatten, ctx);
+            let (flattened_expr, temp_stmts) =
+                self.flatten_subexpressions_generically(expr_to_flatten, ctx);
             *expr = flattened_expr;
-            
+
             // If we generated statements for the block expression, add them to the block
             if !temp_stmts.is_empty() {
                 block.stmts.extend(temp_stmts);

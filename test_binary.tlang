@@ -1,3 +1,0 @@
-fn test_simple_binary() {
-    return (if true { 10 } else { 20 }) + (if false { 5 } else { 15 });
-}

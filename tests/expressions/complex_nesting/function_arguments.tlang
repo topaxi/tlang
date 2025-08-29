@@ -1,5 +1,8 @@
+fn some_function(a, b) {
+    return a + b;
+}
+
 fn test_complex_function_args() {
-    // Test complex expressions in function arguments
     let result = some_function(
         if true { 
             let x = 42;
@@ -19,6 +22,4 @@ fn test_complex_function_args() {
     return result;
 }
 
-fn some_function(a, b) {
-    return a + b;
-}
+test_complex_function_args() |> log();
