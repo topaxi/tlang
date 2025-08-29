@@ -1,0 +1,10 @@
+fn main() {
+    let total = for row in [[1, 2], [3, 4]] with acc = 0 {
+        for val in row with row_sum = acc {
+            row_sum + val
+        }
+    };
+    log(total);
+}
+
+main();
