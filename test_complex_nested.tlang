@@ -1,0 +1,12 @@
+// Test for more complex nested expressions that can't be simplified to ternary
+fn test_complex_nested() {
+    return if (if true { 
+        let x = 42;
+        x > 0
+    } else { 
+        let y = 0;
+        y == 0
+    }) { "positive" } else { "negative" };
+}
+
+test_complex_nested() |> log();

@@ -211,201 +211,6 @@ impl HirJsPass {
             _ => expr, // Return the expression unchanged if it doesn't need transformation
         }
     }
-
-    fn expr_needs_hoisting(&self, expr: &hir::Expr) -> bool {
-        // Check if an expression contains complex nested expressions that need to be hoisted
-        self.contains_complex_nested_expressions(expr)
-    }
-
-    fn contains_complex_nested_expressions(&self, expr: &hir::Expr) -> bool {
-        match &expr.kind {
-            hir::ExprKind::Call(call_expr) => {
-                // Check if any arguments contain complex expressions
-                call_expr.arguments.iter().any(|arg| self.needs_transformation(arg))
-                    || call_expr.arguments.iter().any(|arg| self.contains_complex_nested_expressions(arg))
-            }
-            hir::ExprKind::IfElse(condition, _then_branch, else_branches) => {
-                // Check if the condition contains complex expressions
-                self.needs_transformation(condition)
-                    || self.contains_complex_nested_expressions(condition)
-                    || else_branches.iter().any(|else_branch| {
-                        if let Some(ref else_condition) = else_branch.condition {
-                            self.needs_transformation(else_condition)
-                                || self.contains_complex_nested_expressions(else_condition)
-                        } else {
-                            false
-                        }
-                    })
-            }
-            hir::ExprKind::Binary(_, lhs, rhs) => {
-                self.needs_transformation(lhs) || self.contains_complex_nested_expressions(lhs)
-                    || self.needs_transformation(rhs) || self.contains_complex_nested_expressions(rhs)
-            }
-            hir::ExprKind::Unary(_, inner) => {
-                self.needs_transformation(inner) || self.contains_complex_nested_expressions(inner)
-            }
-            _ => false,
-        }
-    }
-
-    fn hoist_complex_expressions(
-        &mut self,
-        expr: hir::Expr,
-        ctx: &mut HirOptContext,
-    ) -> Option<(Vec<hir::Stmt>, hir::Expr)> {
-        let mut hoisted_stmts = Vec::new();
-        let simplified_expr = self.simplify_expression_recursive(expr, ctx, &mut hoisted_stmts);
-        
-        if hoisted_stmts.is_empty() {
-            None
-        } else {
-            Some((hoisted_stmts, simplified_expr))
-        }
-    }
-
-    fn simplify_expression_recursive(
-        &mut self,
-        mut expr: hir::Expr,
-        ctx: &mut HirOptContext,
-        hoisted_stmts: &mut Vec<hir::Stmt>,
-    ) -> hir::Expr {
-        match &mut expr.kind {
-            hir::ExprKind::Call(call_expr) => {
-                // Transform complex arguments
-                for arg in &mut call_expr.arguments {
-                    if self.needs_transformation(arg) {
-                        let temp_name = self.generate_temp_var_name();
-                        let span = arg.span;
-                        
-                        // Create temp variable declaration and complex expression execution
-                        let temp_decl_stmt = self.create_temp_var_declaration_stmt(ctx, &temp_name, span);
-                        hoisted_stmts.push(temp_decl_stmt);
-                        
-                        let complex_stmt = self.create_complex_expr_execution_stmt(
-                            ctx, &temp_name, arg.clone(), span
-                        );
-                        hoisted_stmts.push(complex_stmt);
-                        
-                        // Replace the argument with a reference to the temp variable
-                        *arg = self.create_temp_var_path(ctx, &temp_name, span);
-                    } else if self.contains_complex_nested_expressions(arg) {
-                        // Recursively simplify nested expressions
-                        *arg = self.simplify_expression_recursive(arg.clone(), ctx, hoisted_stmts);
-                    }
-                }
-                expr
-            }
-            _ => expr,
-        }
-    }
-
-    fn create_temp_var_declaration_stmt(
-        &mut self,
-        ctx: &mut HirOptContext,
-        temp_name: &str,
-        span: Span,
-    ) -> hir::Stmt {
-        // Create: let temp_var;
-        let hir_id = ctx.hir_id_allocator.next_id();
-        let pat = hir::Pat {
-            kind: hir::PatKind::Identifier(
-                ctx.hir_id_allocator.next_id(),
-                Box::new(Ident::new(temp_name, span))
-            ),
-            span,
-        };
-        
-        // Use undefined literal as initial value
-        let undefined_expr = hir::Expr {
-            hir_id: ctx.hir_id_allocator.next_id(),
-            kind: hir::ExprKind::Path(Box::new(hir::Path::new(
-                vec![hir::PathSegment {
-                    ident: Ident::new("undefined", span),
-                }],
-                span,
-            ))),
-            span,
-        };
-
-        // Create a basic type (we'll use a generic type for now)
-        let basic_ty = hir::Ty {
-            kind: hir::TyKind::Path(hir::Path::new(
-                vec![hir::PathSegment {
-                    ident: Ident::new("any", span),
-                }],
-                span,
-            )),
-            span,
-        };
-
-        hir::Stmt::new(
-            hir_id,
-            hir::StmtKind::Let(Box::new(pat), Box::new(undefined_expr), Box::new(basic_ty)),
-            span,
-        )
-    }
-
-    fn create_complex_expr_execution_stmt(
-        &mut self,
-        ctx: &mut HirOptContext,
-        temp_name: &str,
-        complex_expr: hir::Expr,
-        span: Span,
-    ) -> hir::Stmt {
-        match &complex_expr.kind {
-            hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
-                // Create modified if/else that assigns to temp variable
-                let mut new_then_branch = then_branch.as_ref().clone();
-                if let Some(completion_expr) = new_then_branch.expr.take() {
-                    let assignment_stmt = self.create_assignment_stmt(
-                        ctx,
-                        temp_name,
-                        completion_expr,
-                        span,
-                    );
-                    new_then_branch.stmts.push(assignment_stmt);
-                }
-
-                let mut new_else_branches = Vec::new();
-                for else_branch in else_branches {
-                    let mut new_else_consequence = else_branch.consequence.clone();
-                    if let Some(completion_expr) = new_else_consequence.expr.take() {
-                        let assignment_stmt = self.create_assignment_stmt(
-                            ctx,
-                            temp_name,
-                            completion_expr,
-                            span,
-                        );
-                        new_else_consequence.stmts.push(assignment_stmt);
-                    }
-                    new_else_branches.push(hir::ElseClause {
-                        condition: else_branch.condition.clone(),
-                        consequence: new_else_consequence,
-                    });
-                }
-
-                let if_else_expr = hir::Expr {
-                    hir_id: ctx.hir_id_allocator.next_id(),
-                    kind: hir::ExprKind::IfElse(
-                        condition.clone(),
-                        Box::new(new_then_branch),
-                        new_else_branches,
-                    ),
-                    span,
-                };
-
-                hir::Stmt::new(
-                    ctx.hir_id_allocator.next_id(),
-                    hir::StmtKind::Expr(Box::new(if_else_expr)),
-                    span,
-                )
-            }
-            _ => {
-                // For other complex expressions, just assign them directly
-                self.create_assignment_stmt(ctx, temp_name, complex_expr, span)
-            }
-        }
-    }
 }
 
 /// Check if an if-else expression can be rendered as a ternary operator in JavaScript
@@ -512,7 +317,7 @@ impl<'hir> Visitor<'hir> for HirJsPass {
 
         for stmt in &mut block.stmts {
             match &stmt.kind {
-                // Handle let statements with complex expressions
+                // Handle let statements with complex expressions (existing logic)
                 hir::StmtKind::Let(pat, expr, ty) => {
                     match &expr.kind {
                         hir::ExprKind::Block(block_expr) => {
@@ -704,29 +509,6 @@ impl<'hir> Visitor<'hir> for HirJsPass {
                     // If we didn't transform this let statement, just add it as-is
                     new_stmts.push(stmt.clone());
                 }
-                // Handle expression statements that might contain complex expressions
-                hir::StmtKind::Expr(expr) => {
-                    if self.expr_needs_hoisting(expr) {
-                        // Transform expression statements with complex nested expressions
-                        if let Some((hoisted_stmts, simplified_expr)) = 
-                            self.hoist_complex_expressions(expr.as_ref().clone(), ctx) {
-                            // Add hoisted statements first
-                            new_stmts.extend(hoisted_stmts);
-                            // Then add the simplified expression statement
-                            let simplified_stmt = hir::Stmt::new(
-                                stmt.hir_id,
-                                hir::StmtKind::Expr(Box::new(simplified_expr)),
-                                stmt.span,
-                            );
-                            new_stmts.push(simplified_stmt);
-                            self.changes_made = true;
-                            continue;
-                        }
-                    }
-                    
-                    // If we didn't transform this expression statement, just add it as-is
-                    new_stmts.push(stmt.clone());
-                }
                 _ => {
                     // For other statement types, just add them as-is for now
                     new_stmts.push(stmt.clone());
@@ -741,19 +523,7 @@ impl<'hir> Visitor<'hir> for HirJsPass {
 
         // Visit the block expression if it exists
         if let Some(expr) = &mut block.expr {
-            // If the block expression itself is complex, we may need to transform it too
-            if self.expr_needs_hoisting(expr) {
-                if let Some((hoisted_stmts, simplified_expr)) = 
-                    self.hoist_complex_expressions((*expr).clone(), ctx) {
-                    // Add hoisted statements to the block
-                    block.stmts.extend(hoisted_stmts);
-                    // Replace the block expression with the simplified one
-                    *expr = Box::new(simplified_expr);
-                    self.changes_made = true;
-                }
-            } else {
-                self.visit_expr(expr, ctx);
-            }
+            self.visit_expr(expr, ctx);
         }
     }
 }
