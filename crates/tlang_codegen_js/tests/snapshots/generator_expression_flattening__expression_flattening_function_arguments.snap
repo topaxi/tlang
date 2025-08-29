@@ -12,14 +12,14 @@ function test_complex_function_args() {
     } else {
         let y = 10;
         $tmp$0 = 15;
+    };
     let $tmp$1;if (false) {
         let a = 1;
         $tmp$1 = 2;
     } else {
         let b = 2;
         $tmp$1 = 6;
-    }
-    }
+    };
     let result = some_function($tmp$0, $tmp$1);
     return result;
 }

@@ -9,7 +9,7 @@ function test_let_complex() {
     } else {
         let y = 10;
         $tmp$0 = 15;
-    }
+    };
     let result = $tmp$0;
     return result;
 }

@@ -3,15 +3,12 @@ source: crates/tlang_codegen_js/tests/generator_expression_flattening.rs
 expression: output
 ---
 function test_nested_complex_expression() {
-if (true) {
-    let x = 42;
-    return 42 > 0;
-} else {
-    let y = 0;
-    return 0 === 0;
-}) {
-        return "positive";
+    let $tmp$0;if (true) {
+        let x = 42;
+        $tmp$0 = 42 > 0;
     } else {
-        return "negative";
-    }
+        let y = 0;
+        $tmp$0 = 0 === 0;
+    };
+    return $tmp$0 ? "positive" : "negative";
 }
