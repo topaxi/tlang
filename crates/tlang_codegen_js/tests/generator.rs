@@ -310,16 +310,20 @@ fn test_single_line_comments() {
 }
 */
 
-// TODO: Pre-existing issue - comments are not preserved in codegen 
+// TODO: Pre-existing issue - comments are not preserved in codegen
 /*
 #[test]
 fn test_multi_line_comments() {
-    let output = compile!("/* this is a comment */\nlet a = 1;");
-    let expected_output = "/* this is a comment */\nlet a = 1;\n";
+    let output = compile!("/* this is a comment */
+\nlet a = 1;");
+let expected_output = " /* this is a comment */
+\nlet a = 1;\n";
     assert_eq!(output, expected_output);
 
-    let output = compile!("/* this is a comment\non multiple lines */\nlet a = 1;");
-    let expected_output = "/* this is a comment\non multiple lines */\nlet a = 1;\n";
+let output = compile!(" /* this is a comment\non multiple lines */
+\nlet a = 1;");
+let expected_output = " /* this is a comment\non multiple lines */
+\nlet a = 1;\n";
     assert_eq!(output, expected_output);
 }
 */

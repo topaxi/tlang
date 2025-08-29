@@ -174,31 +174,66 @@ impl HirJsPass {
             }
             // Handle expression statements - THIS IS KEY for function calls!
             hir::StmtKind::Expr(expr) => {
-                // Apply generic flattening to expression statements as well
-                let (flattened_expr, mut sub_temp_stmts) =
-                    self.flatten_subexpressions_generically(*expr, ctx);
+                // Check if this is a loop expression that needs transformation to a statement
+                if matches!(expr.kind, hir::ExprKind::Loop(..)) {
+                    // Transform loop expression to statement using the marker approach
+                    let span = expr.span;
+                    let temp_name = self.generate_temp_var_name();
+                    let temp_var_statements = self.create_temp_var_assignment_for_expr(
+                        ctx,
+                        &temp_name,
+                        *expr.clone(),
+                        span,
+                    );
 
-                if !sub_temp_stmts.is_empty() {
-                    // Add the temporary variable statements
-                    temp_stmts.append(&mut sub_temp_stmts);
+                    // Add all the temp var statements
+                    temp_stmts.extend(temp_var_statements);
 
-                    // Create the modified expression statement
-                    let modified_expr_stmt = hir::Stmt::new(
+                    // Return an empty expression statement as placeholder
+                    // (the loop was converted to statements)
+                    let placeholder_stmt = hir::Stmt::new(
                         stmt.hir_id,
-                        hir::StmtKind::Expr(Box::new(flattened_expr)),
+                        hir::StmtKind::Expr(Box::new(hir::Expr {
+                            hir_id: ctx.hir_id_allocator.next_id(),
+                            kind: hir::ExprKind::Literal(Box::new(
+                                tlang_ast::token::Literal::String(
+                                    "/* loop converted to statements */".into(),
+                                ),
+                            )),
+                            span,
+                        })),
                         stmt.span,
                     );
 
                     self.changes_made = true;
-                    (modified_expr_stmt, temp_stmts)
+                    (placeholder_stmt, temp_stmts)
                 } else {
-                    // No changes needed - reconstruct the original statement
-                    let reconstructed_stmt = hir::Stmt::new(
-                        stmt.hir_id,
-                        hir::StmtKind::Expr(Box::new(flattened_expr)),
-                        stmt.span,
-                    );
-                    (reconstructed_stmt, temp_stmts)
+                    // Apply generic flattening to expression statements as usual
+                    let (flattened_expr, mut sub_temp_stmts) =
+                        self.flatten_subexpressions_generically(*expr, ctx);
+
+                    if !sub_temp_stmts.is_empty() {
+                        // Add the temporary variable statements
+                        temp_stmts.append(&mut sub_temp_stmts);
+
+                        // Create the modified expression statement
+                        let modified_expr_stmt = hir::Stmt::new(
+                            stmt.hir_id,
+                            hir::StmtKind::Expr(Box::new(flattened_expr)),
+                            stmt.span,
+                        );
+
+                        self.changes_made = true;
+                        (modified_expr_stmt, temp_stmts)
+                    } else {
+                        // No changes needed - reconstruct the original statement
+                        let reconstructed_stmt = hir::Stmt::new(
+                            stmt.hir_id,
+                            hir::StmtKind::Expr(Box::new(flattened_expr)),
+                            stmt.span,
+                        );
+                        (reconstructed_stmt, temp_stmts)
+                    }
                 }
             }
             _ => {
@@ -970,8 +1005,49 @@ impl<'hir> Visitor<'hir> for HirJsPass {
     type Context = HirOptContext;
 
     fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
-        // Only recursively walk expressions - don't try to handle statements here
-        // All statement-level flattening is handled in visit_block
+        // Handle loop expressions anywhere they appear in the HIR tree
+        if let hir::ExprKind::Loop(loop_block) = &expr.kind {
+            // Transform this loop expression using the temp var approach
+            let span = expr.span;
+            let temp_name = self.generate_temp_var_name();
+
+            // Create the special marker call for loop transformation
+            let combined_expr = hir::Expr {
+                hir_id: ctx.hir_id_allocator.next_id(),
+                kind: hir::ExprKind::Call(Box::new(hir::CallExpression {
+                    hir_id: ctx.hir_id_allocator.next_id(),
+                    callee: hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::Path(Box::new(hir::Path::new(
+                            vec![hir::PathSegment {
+                                ident: tlang_ast::node::Ident::new("__TEMP_VAR_LOOP__", span),
+                            }],
+                            span,
+                        ))),
+                        span,
+                    },
+                    arguments: vec![
+                        // First argument: temp variable name
+                        hir::Expr {
+                            hir_id: ctx.hir_id_allocator.next_id(),
+                            kind: hir::ExprKind::Literal(Box::new(
+                                tlang_ast::token::Literal::String(temp_name.into()),
+                            )),
+                            span,
+                        },
+                        // Second argument: the loop expression
+                        expr.clone(),
+                    ],
+                })),
+                span,
+            };
+
+            // Replace the loop expression with the marker call
+            *expr = combined_expr;
+            self.changes_made = true;
+        }
+
+        // Recursively walk expressions after handling loops
         visit::walk_expr(self, expr, ctx);
     }
 

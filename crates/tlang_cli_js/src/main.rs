@@ -82,7 +82,7 @@ fn compile_standard_library() -> Result<String, ParserError> {
 
     // Add JavaScript helpers
     js.insert_str(0, &format!("{}\n", CodegenJS::get_javascript_helpers()));
-    
+
     js.push_str("\nfunction panic(msg) { throw new Error(msg); }\n");
 
     Ok(js)
