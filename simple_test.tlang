@@ -1,0 +1,10 @@
+fn test1() {
+    if true { "yes" } else { "no" }
+}
+
+fn test2() {
+    return if true { "yes" } else { "no" };
+}
+
+test1() |> log();
+test2() |> log();

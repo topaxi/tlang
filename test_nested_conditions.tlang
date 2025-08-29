@@ -1,0 +1,10 @@
+fn test_simple_nested_condition() {
+    return if (if true { true } else { false }) { "positive" } else { "negative" };
+}
+
+fn test_complex_nested_condition() {
+    return if (if true { let x = 42; x > 0 } else { let y = 0; y == 0 }) { "positive" } else { "negative" };
+}
+
+test_simple_nested_condition() |> log();
+test_complex_nested_condition() |> log();

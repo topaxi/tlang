@@ -1,0 +1,10 @@
+fn test_nested() {
+    return if (true) { "yes" } else { "no" };
+}
+
+fn test_very_nested() {
+    return if (if true { true } else { false }) { "yes" } else { "no" };
+}
+
+test_nested() |> log();
+test_very_nested() |> log();
