@@ -172,67 +172,45 @@ impl HirJsPass {
                     }
                 }
             }
-            // Handle expression statements - THIS IS KEY for function calls!
-            hir::StmtKind::Expr(expr) => {
-                // Check if this is a loop expression that needs transformation to a statement
-                if matches!(expr.kind, hir::ExprKind::Loop(..)) {
-                    // Transform loop expression to statement using the marker approach
-                    let span = expr.span;
-                    let temp_name = self.generate_temp_var_name();
-                    let temp_var_statements = self.create_temp_var_assignment_for_expr(
-                        ctx,
-                        &temp_name,
-                        *expr.clone(),
-                        span,
-                    );
+            // Handle expression statements
+            hir::StmtKind::Expr(ref expr) => {
+                // For expression statements, we should be conservative:
+                // - Blocks and loops in statement position can be handled natively by JavaScript
+                // - Only flatten subexpressions when they contain complex nested expressions
 
-                    // Add all the temp var statements
-                    temp_stmts.extend(temp_var_statements);
+                match &expr.kind {
+                    // Blocks and loops in statement position can be handled natively by JavaScript
+                    hir::ExprKind::Block(_) | hir::ExprKind::Loop(_) => {
+                        // Let these pass through to codegen naturally - JavaScript can handle them
+                        (stmt, temp_stmts)
+                    }
+                    _ => {
+                        // For other expression types, apply generic flattening for complex subexpressions
+                        let (flattened_expr, mut sub_temp_stmts) =
+                            self.flatten_subexpressions_generically(*expr.clone(), ctx);
 
-                    // Return an empty expression statement as placeholder
-                    // (the loop was converted to statements)
-                    let placeholder_stmt = hir::Stmt::new(
-                        stmt.hir_id,
-                        hir::StmtKind::Expr(Box::new(hir::Expr {
-                            hir_id: ctx.hir_id_allocator.next_id(),
-                            kind: hir::ExprKind::Literal(Box::new(
-                                tlang_ast::token::Literal::String(
-                                    "/* loop converted to statements */".into(),
-                                ),
-                            )),
-                            span,
-                        })),
-                        stmt.span,
-                    );
+                        if !sub_temp_stmts.is_empty() {
+                            // Add the temporary variable statements
+                            temp_stmts.append(&mut sub_temp_stmts);
 
-                    self.changes_made = true;
-                    (placeholder_stmt, temp_stmts)
-                } else {
-                    // Apply generic flattening to expression statements as usual
-                    let (flattened_expr, mut sub_temp_stmts) =
-                        self.flatten_subexpressions_generically(*expr, ctx);
+                            // Create the modified expression statement
+                            let modified_expr_stmt = hir::Stmt::new(
+                                stmt.hir_id,
+                                hir::StmtKind::Expr(Box::new(flattened_expr)),
+                                stmt.span,
+                            );
 
-                    if !sub_temp_stmts.is_empty() {
-                        // Add the temporary variable statements
-                        temp_stmts.append(&mut sub_temp_stmts);
-
-                        // Create the modified expression statement
-                        let modified_expr_stmt = hir::Stmt::new(
-                            stmt.hir_id,
-                            hir::StmtKind::Expr(Box::new(flattened_expr)),
-                            stmt.span,
-                        );
-
-                        self.changes_made = true;
-                        (modified_expr_stmt, temp_stmts)
-                    } else {
-                        // No changes needed - reconstruct the original statement
-                        let reconstructed_stmt = hir::Stmt::new(
-                            stmt.hir_id,
-                            hir::StmtKind::Expr(Box::new(flattened_expr)),
-                            stmt.span,
-                        );
-                        (reconstructed_stmt, temp_stmts)
+                            self.changes_made = true;
+                            (modified_expr_stmt, temp_stmts)
+                        } else {
+                            // No changes needed - reconstruct the original statement
+                            let reconstructed_stmt = hir::Stmt::new(
+                                stmt.hir_id,
+                                hir::StmtKind::Expr(Box::new(flattened_expr)),
+                                stmt.span,
+                            );
+                            (reconstructed_stmt, temp_stmts)
+                        }
                     }
                 }
             }
@@ -1043,41 +1021,54 @@ impl<'hir> Visitor<'hir> for HirJsPass {
 
         // Visit the block expression if it exists
         if let Some(expr) = &mut block.expr {
-            // Check if this is a loop expression that needs full transformation
-            if matches!(expr.kind, hir::ExprKind::Loop(..)) {
-                // Loop expressions in block completion position need full transformation
-                let span = expr.span;
-                let temp_name = self.generate_temp_var_name();
-                let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
-                let expr_to_flatten = std::mem::replace(expr, placeholder);
+            match &expr.kind {
+                // Loops and blocks in block completion position that can be statements
+                hir::ExprKind::Loop(_) | hir::ExprKind::Block(_) => {
+                    // Check if this block's completion expression can be converted to a statement
+                    // This is appropriate when JavaScript can handle it as a statement
 
-                // Use the full flattening logic to handle the loop expression
-                let mut temp_stmts = self.create_temp_var_assignment_for_expr(
-                    ctx,
-                    &temp_name,
-                    expr_to_flatten,
-                    span,
-                );
+                    // For now, move loop/block completion expressions to statements
+                    // This avoids the complex temp variable flattening for cases JS can handle natively
+                    let completion_expr = std::mem::replace(
+                        expr,
+                        hir::Expr {
+                            hir_id: ctx.hir_id_allocator.next_id(),
+                            kind: hir::ExprKind::Literal(Box::new(
+                                tlang_ast::token::Literal::String("()".into()),
+                            )),
+                            span: expr.span,
+                        },
+                    );
 
-                // Replace the block expression with a reference to the temp variable
-                *expr = self.create_temp_var_path(ctx, &temp_name, span);
+                    // Convert the completion expression to a statement
+                    let completion_stmt = hir::Stmt::new(
+                        ctx.hir_id_allocator.next_id(),
+                        hir::StmtKind::Expr(Box::new(completion_expr)),
+                        expr.span,
+                    );
 
-                // Add the temporary variable statements to the block
-                block.stmts.append(&mut temp_stmts);
-                self.changes_made = true;
-            } else {
-                // For other expressions, just flatten subexpressions
-                let span = expr.span;
-                let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
-                let expr_to_flatten = std::mem::replace(expr, placeholder);
-                let (flattened_expr, temp_stmts) =
-                    self.flatten_subexpressions_generically(expr_to_flatten, ctx);
-                *expr = flattened_expr;
+                    // Add it as the last statement
+                    block.stmts.push(completion_stmt);
 
-                // If we generated statements for the block expression, add them to the block
-                if !temp_stmts.is_empty() {
-                    block.stmts.extend(temp_stmts);
+                    // Clear the block expression since we moved it to statements
+                    block.expr = None;
+
                     self.changes_made = true;
+                }
+                _ => {
+                    // For other expressions, check if they need flattening but avoid loop transformation
+                    let span = expr.span;
+                    let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                    let expr_to_flatten = std::mem::replace(expr, placeholder);
+                    let (flattened_expr, temp_stmts) =
+                        self.flatten_subexpressions_generically(expr_to_flatten, ctx);
+                    *expr = flattened_expr;
+
+                    // If we generated statements for the block expression, add them to the block
+                    if !temp_stmts.is_empty() {
+                        block.stmts.extend(temp_stmts);
+                        self.changes_made = true;
+                    }
                 }
             }
         }
