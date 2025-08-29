@@ -1,0 +1,52 @@
+fn test_nested_complex_expression() {
+    // Test deeply nested expressions in various contexts
+    return if (if true { 
+        let x = 42;
+        x > 0
+    } else { 
+        let y = 0;
+        y == 0
+    }) { "positive" } else { "negative" };
+}
+
+fn test_complex_function_args() {
+    // Test complex expressions in function arguments
+    let result = some_function(
+        if true { 
+            let x = 42;
+            x * 2
+        } else { 
+            let y = 10;
+            y + 5
+        },
+        if false {
+            let a = 1;
+            a + 1
+        } else {
+            let b = 2;
+            b * 3
+        }
+    );
+    return result;
+}
+
+fn test_complex_binary_operations() {
+    // Test complex expressions in binary operations
+    return (if true { 
+        let x = 10;
+        x + 5
+    } else { 
+        let y = 20;
+        y - 5
+    }) + (if false {
+        let a = 3;
+        a * 2
+    } else {
+        let b = 4;
+        b / 2
+    });
+}
+
+fn some_function(a, b) {
+    return a + b;
+}
