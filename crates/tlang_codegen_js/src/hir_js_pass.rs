@@ -1005,49 +1005,7 @@ impl<'hir> Visitor<'hir> for HirJsPass {
     type Context = HirOptContext;
 
     fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
-        // Handle loop expressions anywhere they appear in the HIR tree
-        if let hir::ExprKind::Loop(loop_block) = &expr.kind {
-            // Transform this loop expression using the temp var approach
-            let span = expr.span;
-            let temp_name = self.generate_temp_var_name();
-
-            // Create the special marker call for loop transformation
-            let combined_expr = hir::Expr {
-                hir_id: ctx.hir_id_allocator.next_id(),
-                kind: hir::ExprKind::Call(Box::new(hir::CallExpression {
-                    hir_id: ctx.hir_id_allocator.next_id(),
-                    callee: hir::Expr {
-                        hir_id: ctx.hir_id_allocator.next_id(),
-                        kind: hir::ExprKind::Path(Box::new(hir::Path::new(
-                            vec![hir::PathSegment {
-                                ident: tlang_ast::node::Ident::new("__TEMP_VAR_LOOP__", span),
-                            }],
-                            span,
-                        ))),
-                        span,
-                    },
-                    arguments: vec![
-                        // First argument: temp variable name
-                        hir::Expr {
-                            hir_id: ctx.hir_id_allocator.next_id(),
-                            kind: hir::ExprKind::Literal(Box::new(
-                                tlang_ast::token::Literal::String(temp_name.into()),
-                            )),
-                            span,
-                        },
-                        // Second argument: the loop expression
-                        expr.clone(),
-                    ],
-                })),
-                span,
-            };
-
-            // Replace the loop expression with the marker call
-            *expr = combined_expr;
-            self.changes_made = true;
-        }
-
-        // Recursively walk expressions after handling loops
+        // Just recursively walk expressions - let the statement-level processing handle loops
         visit::walk_expr(self, expr, ctx);
     }
 
