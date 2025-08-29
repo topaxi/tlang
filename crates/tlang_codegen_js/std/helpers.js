@@ -4,20 +4,19 @@
  */
 
 /**
- * Creates a tlang iterator from any JavaScript iterable
- * @param {Iterable<any>} jsIterable - The JavaScript iterable to convert (arrays, strings, Sets, Maps, etc.)
+ * Creates a tlang iterator from a JavaScript iterator
+ * @param {Iterator<any>} jsIterator - The JavaScript iterator to convert
  * @returns {Object} An iterator object with a next() method that returns Option::Some or Option::None
  */
-function createTlangIterator(jsIterable) {
-  const jsIterator = jsIterable[Symbol.iterator]();
+function createTlangIterator(jsIterator) {
   return {
     _jsIterator: jsIterator,
     next: function () {
       const result = this._jsIterator.next();
       if (result.done) {
-        return { tag: 1, _0: undefined }; // Option::None
+        return Option.None;
       } else {
-        return { tag: 0, _0: result.value }; // Option::Some(value)
+        return Option.Some(result.value);
       }
     },
   };
@@ -38,23 +37,13 @@ const iterator = {
     // Check if the value implements the JavaScript iterator protocol (Symbol.iterator)
     // This handles arrays, strings, Sets, Maps, generators, typed arrays, NodeLists, etc.
     if (value != null && typeof value[Symbol.iterator] === 'function') {
-      return createTlangIterator(value);
+      return createTlangIterator(value[Symbol.iterator]());
     }
 
     // Check if the object is already an iterator (has a next method)
     if (value != null && typeof value.next === 'function') {
       // Wrap existing iterator to ensure tlang compatibility
-      return {
-        _iterator: value,
-        next: function () {
-          const result = this._iterator.next();
-          if (result.done) {
-            return { tag: 1, _0: undefined }; // Option::None
-          } else {
-            return { tag: 0, _0: result.value }; // Option::Some(value)
-          }
-        },
-      };
+      return createTlangIterator(value);
     }
 
     // Check if it has a tlang iter method and call it
