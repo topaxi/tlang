@@ -574,6 +574,9 @@ impl CodegenJS {
                     self.push_str(temp_name);
                     self.push_str(";");
 
+                    // Set the completion variable to the temp variable name before generating match
+                    self.push_completion_variable(Some(temp_name));
+
                     // Generate the match expression as a statement
                     if let hir::ExprKind::Match(match_expr, match_arms) =
                         &call_expr.arguments[1].kind

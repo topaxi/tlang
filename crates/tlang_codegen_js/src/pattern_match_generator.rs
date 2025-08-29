@@ -216,10 +216,12 @@ impl CodegenJS {
         let mut has_let = false;
 
         if has_block_completions {
-            // TODO: We could probably reuse existing completion vars here.
             if let Some("return") = self.current_completion_variable() {
                 self.push_completion_variable(Some("return"));
                 lhs = self.replace_statement_buffer_with_empty_string();
+            } else if let Some(existing_var) = self.current_completion_variable().map(String::from) {
+                // Reuse existing completion variable if available
+                self.push_completion_variable(Some(&existing_var));
             } else {
                 let completion_tmp_var = self.current_scope().declare_tmp_variable();
                 self.push_indent();
