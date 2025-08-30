@@ -126,7 +126,18 @@ impl CodegenJS {
         self.push_scope();
 
         self.generate_statements(&block.stmts);
-        self.generate_optional_expr(block.expr.as_ref(), None);
+        
+        // Special handling for loop expressions in block completion position
+        if let Some(expr) = block.expr.as_ref() {
+            if let hir::ExprKind::Loop(loop_block) = &expr.kind {
+                // Generate the loop as a statement instead of an expression
+                self.push_indent();
+                self.generate_loop_statement(loop_block);
+                self.push_newline();
+            } else {
+                self.generate_optional_expr(block.expr.as_ref(), None);
+            }
+        }
 
         self.pop_scope();
 

@@ -125,7 +125,7 @@ impl CodegenJS {
     }
 
     /// Generate a loop in statement context (not expression context)
-    fn generate_loop_statement(&mut self, block: &hir::Block) {
+    pub(crate) fn generate_loop_statement(&mut self, block: &hir::Block) {
         self.push_str("for (;;) {");
         self.push_newline();
         self.inc_indent();
