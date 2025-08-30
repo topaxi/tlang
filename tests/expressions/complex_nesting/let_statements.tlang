@@ -1,0 +1,12 @@
+fn test_let_complex() {
+    let result = if true { 
+        let x = 42;
+        x * 2
+    } else { 
+        let y = 10;
+        y + 5
+    };
+    return result;
+}
+
+test_let_complex() |> log();

@@ -55,7 +55,7 @@ fn test_codegen_pattern_match_expressions() {
             $tmp$0 = 1;
         } else {
             $tmp$0 = 0;
-        }
+        };
         let y = $tmp$0;
     "};
 
@@ -80,7 +80,7 @@ fn test_codegen_pattern_match_blocks() {
             $tmp$0 = 1;
         } else {
             $tmp$0 = 0;
-        }
+        };
         let y = $tmp$0;
     "};
 
@@ -98,12 +98,12 @@ fn test_codegen_pattern_match_list_bindings() {
     "});
     let expected_output = indoc! {"
         let x = 42;
-        let $tmp$0,$tmp$1 = [42, 43],x$0,y$0;if ($tmp$1.length >= 2 && (x$0 = $tmp$1[0], true) && (y$0 = $tmp$1[1], true)) {
-            $tmp$0 = x$0 + y$0;
+        let $tmp$0,$tmp$1 = [42, 43],x$0,y;if ($tmp$1.length >= 2 && (x$0 = $tmp$1[0], true) && (y = $tmp$1[1], true)) {
+            $tmp$0 = x$0 + y;
         } else {
             $tmp$0 = 0;
-        }
-        let y = $tmp$0;
+        };
+        let y$0 = $tmp$0;
     "};
     assert_eq!(output, expected_output);
 }
@@ -121,7 +121,7 @@ fn test_codegen_pattern_match_list_empty() {
             $tmp$0 = 1;
         } else {
             $tmp$0 = 0;
-        }
+        };
         let x = $tmp$0;
     "};
     assert_eq!(output, expected_output);
@@ -140,7 +140,7 @@ fn test_codegen_pattern_match_list_rest_elements() {
             $tmp$0 = n + rest.length;
         } else {
             $tmp$0 = 0;
-        }
+        };
         let x = $tmp$0;
     "};
     assert_eq!(output, expected_output);
@@ -159,7 +159,7 @@ fn test_codegen_pattern_match_enum_bindings() {
             $tmp$0 = x;
         } else {
             $tmp$0 = 0;
-        }
+        };
         let y = $tmp$0;
     "};
     assert_eq!(output, expected_output);
@@ -196,7 +196,7 @@ fn test_codegen_pattern_match_positional_enum() {
             $tmp$0 = x + y;
         } else {
             $tmp$0 = 0;
-        }
+        };
         let z = $tmp$0;
     "};
     assert_eq!(output, expected_output);
@@ -221,7 +221,7 @@ fn test_codegen_pattern_match_nested_enum() {
             $tmp$0 = 0;
         } else if ($tmp$1.tag === Option.None) {
             $tmp$0 = 0;
-        }
+        };
         let y = $tmp$0;
     "};
     assert_eq!(output, expected_output);
@@ -240,7 +240,7 @@ fn test_codegen_pattern_match_guards() {
             $tmp$0 = 1;
         } else {
             $tmp$0 = 0;
-        }
+        };
         let x = $tmp$0;
     "};
     assert_eq!(output, expected_output);
@@ -259,7 +259,7 @@ fn test_codegen_pattern_match_let_guards() {
             $tmp$0 = y;
         } else {
             $tmp$0 = 0;
-        }
+        };
         let x = $tmp$0;
     "};
     assert_eq!(output, expected_output);

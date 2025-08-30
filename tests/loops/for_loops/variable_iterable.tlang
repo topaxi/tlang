@@ -1,0 +1,13 @@
+fn sum_list(list) {
+    for item in list with sum = 0 {
+        sum + item
+    }
+}
+
+fn main() {
+    let numbers = [10, 20, 30];
+    let result = sum_list(numbers);
+    log(result);
+}
+
+main();
