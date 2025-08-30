@@ -171,13 +171,20 @@ impl CodegenJS {
                 );
             }
             hir::ExprKind::Break(expr) => {
-                self.push_str("return");
-
-                if let Some(expr) = expr {
-                    self.push_char(' ');
-                    self.generate_expr(expr, parent_op);
+                // In loop contexts, generate proper break; otherwise, generate return
+                if self.is_in_loop_context() {
+                    self.push_str("break");
+                    if let Some(expr) = expr {
+                        self.push_char(' ');
+                        self.generate_expr(expr, parent_op);
+                    }
+                } else {
+                    self.push_str("return");
+                    if let Some(expr) = expr {
+                        self.push_char(' ');
+                        self.generate_expr(expr, parent_op);
+                    }
                 }
-
                 self.push_char(';');
             }
             hir::ExprKind::Continue => self.push_str("continue"),
@@ -659,6 +666,9 @@ impl CodegenJS {
         self.push_newline();
         self.inc_indent();
 
+        // Push loop context so break/continue expressions work correctly
+        self.push_context(BlockContext::Loop);
+
         // Generate statements in the loop body, transforming break expressions
         for stmt in &block.stmts {
             self.generate_stmt_with_loop_temp_var(stmt, temp_var);
@@ -670,6 +680,9 @@ impl CodegenJS {
             self.generate_expr_with_loop_temp_var(completion_expr, temp_var, None);
             self.push_newline();
         }
+
+        // Pop loop context
+        self.pop_context();
 
         self.dec_indent();
         self.push_indent();
@@ -685,7 +698,17 @@ impl CodegenJS {
                 self.generate_expr_with_loop_temp_var(expr, temp_var, None);
                 self.pop_context();
 
-                if self.needs_semicolon(Some(expr)) {
+                // Check if this is a match expression or binary assignment of match to avoid double semicolons
+                let needs_semicolon = match &expr.kind {
+                    hir::ExprKind::Match(..) => false,
+                    hir::ExprKind::Binary(hir::BinaryOpKind::Assign, _, rhs) => {
+                        // If the RHS is a match expression, don't add semicolon
+                        !matches!(rhs.kind, hir::ExprKind::Match(..))
+                    },
+                    _ => self.needs_semicolon(Some(expr))
+                };
+
+                if needs_semicolon {
                     self.push_char(';');
                 }
                 self.push_newline();

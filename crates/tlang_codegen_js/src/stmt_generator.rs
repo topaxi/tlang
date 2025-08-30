@@ -177,6 +177,9 @@ impl CodegenJS {
         self.push_newline();
         self.inc_indent();
 
+        // Push loop context so break/continue expressions work correctly
+        self.push_context(BlockContext::Loop);
+
         for stmt in &block.stmts {
             self.generate_stmt_in_loop_context(stmt);
         }
@@ -189,6 +192,9 @@ impl CodegenJS {
             }
             self.push_newline();
         }
+
+        // Pop loop context
+        self.pop_context();
 
         self.dec_indent();
         self.push_indent();

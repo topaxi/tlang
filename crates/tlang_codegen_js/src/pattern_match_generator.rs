@@ -56,23 +56,12 @@ impl CodegenJS {
             self.generate_statements(&block.stmts);
         }
 
-        if self.current_completion_variable() == Some("return") {
-            if let Some(expr) = &block.expr {
-                if expr.is_tail_call() {
-                    self.generate_expr(expr, None);
-                } else {
-                    self.push_indent();
-                    self.push_str("return ");
-                    self.generate_expr(expr, None);
-                    self.push_str(";\n");
-                }
-            }
-        } else if let Some(expr) = &block.expr {
-            // Handle break and continue expressions specially - they cannot be assigned
+        if let Some(expr) = &block.expr {
+            // Handle break and continue expressions specially - they cannot be assigned or returned
             match &expr.kind {
                 hir::ExprKind::Break(_) => {
                     self.push_indent();
-                    self.generate_expr(expr, None); // Break already includes semicolon
+                    self.generate_expr(expr, None); // Main generator now handles loop context
                     self.push_str("\n");
                 }
                 hir::ExprKind::Continue => {
@@ -81,14 +70,26 @@ impl CodegenJS {
                     self.push_str(";\n"); // Continue needs semicolon
                 }
                 _ => {
-                    self.push_indent();
-                    self.push_current_completion_variable();
-                    self.push_str(" = ");
-                    self.generate_expr(expr, None);
-                    self.push_str(";\n");
+                    if self.current_completion_variable() == Some("return") {
+                        if expr.is_tail_call() {
+                            self.generate_expr(expr, None);
+                        } else {
+                            self.push_indent();
+                            self.push_str("return ");
+                            self.generate_expr(expr, None);
+                            self.push_str(";\n");
+                        }
+                    } else {
+                        self.push_indent();
+                        self.push_current_completion_variable();
+                        self.push_str(" = ");
+                        self.generate_expr(expr, None);
+                        self.push_str(";\n");
+                    }
                 }
             }
         }
+
     }
 
     fn get_pat_identifiers(pattern: &hir::Pat) -> Vec<String> {
@@ -294,7 +295,10 @@ impl CodegenJS {
                 let match_value_binding = self.current_scope().declare_tmp_variable();
 
                 if *has_let {
-                    self.push_char(',');
+                    self.push_char(';');
+                    self.push_newline();
+                    self.push_indent();
+                    self.push_str("let ");
                     self.push_str(&match_value_binding);
                     self.push_str(" = ");
                     self.generate_expr(expr, None);
@@ -356,16 +360,16 @@ impl CodegenJS {
         for binding in all_pat_identifiers {
             if unique.insert(binding.clone()) {
                 let binding = self.current_scope().declare_variable(&binding);
-                // TODO: Ugly workaround, as we always push a comma when generating pat identifiers
-                //       bindings.
+                // Generate separate let statements instead of comma-separated declarations
+                // to avoid JavaScript syntax errors with different assignment values
                 if *has_let {
-                    self.push_char(',');
-                } else {
-                    self.push_indent();
-                    self.push_str("let ");
-                    *has_let = true;
+                    self.push_char(';');
+                    self.push_newline();
                 }
+                self.push_indent();
+                self.push_str("let ");
                 self.push_str(&binding);
+                *has_let = true;
             }
         }
     }
@@ -427,10 +431,16 @@ impl CodegenJS {
             // Otherwise, we assign the completion_var to the previous completion_var.
             if lhs.is_empty() {
                 self.push_indent();
-                let prev_completion_var = self
-                    .nth_completion_variable(self.current_completion_variable_count() - 2)
-                    .unwrap()
-                    .to_string();
+                // Get the actual previous completion variable (the one that should receive the result)
+                // In most cases, this should be the completion variable just before the current one
+                let prev_completion_var = if self.current_completion_variable_count() >= 2 {
+                    self.nth_completion_variable(self.current_completion_variable_count() - 2)
+                        .unwrap()
+                        .to_string()
+                } else {
+                    // Fallback to current completion variable if there's no previous one
+                    self.current_completion_variable().unwrap().to_string()
+                };
                 self.push_str(&prev_completion_var);
                 self.push_str(" = ");
                 self.push_current_completion_variable();

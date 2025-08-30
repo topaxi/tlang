@@ -22,6 +22,8 @@ pub(crate) enum BlockContext {
     Statement,
     // Are we in an expression with a Block?
     Expression,
+    // Are we in a loop context where break/continue should work?
+    Loop,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -236,6 +238,11 @@ impl CodegenJS {
     #[inline(always)]
     pub(crate) fn pop_context(&mut self) {
         self.context_stack.pop();
+    }
+
+    #[inline(always)]
+    pub(crate) fn is_in_loop_context(&self) -> bool {
+        self.context_stack.contains(&BlockContext::Loop)
     }
 
     pub fn generate_code(&mut self, module: &hir::Module) {
