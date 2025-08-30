@@ -126,7 +126,7 @@ impl CodegenJS {
         self.push_scope();
 
         self.generate_statements(&block.stmts);
-        
+
         // Special handling for loop expressions in block completion position
         if let Some(expr) = block.expr.as_ref() {
             if let hir::ExprKind::Loop(loop_block) = &expr.kind {

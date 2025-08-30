@@ -55,7 +55,7 @@ impl CodegenJS {
             // For now, avoid generate_block_expression which can add };
             self.generate_statements(&block.stmts);
         }
-        
+
         if self.current_completion_variable() == Some("return") {
             if let Some(expr) = &block.expr {
                 if expr.is_tail_call() {
@@ -226,7 +226,8 @@ impl CodegenJS {
             if let Some("return") = self.current_completion_variable() {
                 self.push_completion_variable(Some("return"));
                 lhs = self.replace_statement_buffer_with_empty_string();
-            } else if let Some(existing_var) = self.current_completion_variable().map(String::from) {
+            } else if let Some(existing_var) = self.current_completion_variable().map(String::from)
+            {
                 // Reuse existing completion variable if available
                 self.push_completion_variable(Some(&existing_var));
             } else {
