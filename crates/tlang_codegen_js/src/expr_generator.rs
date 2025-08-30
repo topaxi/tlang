@@ -753,6 +753,14 @@ impl CodegenJS {
                     self.generate_block_with_loop_temp_var(&else_clause.consequence, temp_var);
                 }
             }
+            hir::ExprKind::Match(match_expr, match_arms) => {
+                // Handle match expressions with the loop temp variable as completion variable
+                self.generate_match_expression_with_completion_var(
+                    match_expr,
+                    match_arms,
+                    Some(temp_var),
+                );
+            }
             // For other expressions, generate normally
             _ => {
                 self.generate_expr(expr, parent_op);

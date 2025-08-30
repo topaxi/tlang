@@ -237,6 +237,14 @@ impl CodegenJS {
                 self.push_completion_variable(Some(&completion_tmp_var));
                 has_let = true;
             }
+        } else if match_args_have_completions(arms) {
+            // Even in statement context, if match arms have completions, we need a temp variable
+            let completion_tmp_var = self.current_scope().declare_tmp_variable();
+            self.push_indent();
+            self.push_str("let ");
+            self.push_str(&completion_tmp_var);
+            self.push_completion_variable(Some(&completion_tmp_var));
+            has_let = true;
         } else {
             self.push_completion_variable(None);
         }
