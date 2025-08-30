@@ -180,8 +180,31 @@ impl HirJsPass {
 
                 match &expr.kind {
                     // Blocks and loops in statement position can be handled natively by JavaScript
-                    hir::ExprKind::Block(_) | hir::ExprKind::Loop(_) => {
-                        // Let these pass through to codegen naturally - JavaScript can handle them
+                    hir::ExprKind::Block(_) => {
+                        // For blocks, we need to check their contents for loop expressions that need transformation
+                        let (flattened_expr, mut sub_temp_stmts) =
+                            self.flatten_subexpressions_generically(*expr.clone(), ctx);
+
+                        if !sub_temp_stmts.is_empty() {
+                            // Add the temporary variable statements
+                            temp_stmts.append(&mut sub_temp_stmts);
+
+                            // Create the modified expression statement
+                            let modified_expr_stmt = hir::Stmt::new(
+                                stmt.hir_id,
+                                hir::StmtKind::Expr(Box::new(flattened_expr)),
+                                stmt.span,
+                            );
+
+                            self.changes_made = true;
+                            (modified_expr_stmt, temp_stmts)
+                        } else {
+                            // No changes needed - let the block pass through
+                            (stmt, temp_stmts)
+                        }
+                    }
+                    hir::ExprKind::Loop(_) => {
+                        // Let standalone loops pass through to codegen naturally - JavaScript can handle them
                         (stmt, temp_stmts)
                     }
                     _ => {
