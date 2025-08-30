@@ -204,7 +204,8 @@ impl HirJsPass {
                         }
                     }
                     hir::ExprKind::Loop(_) => {
-                        // Let standalone loops pass through to codegen naturally - JavaScript can handle them
+                        // Loops in statement position need special handling for JavaScript generation
+                        // They should be transformed to use proper for(;;) constructs
                         (stmt, temp_stmts)
                     }
                     _ => {
@@ -1017,12 +1018,17 @@ impl<'hir> Visitor<'hir> for HirJsPass {
     }
 
     fn visit_block(&mut self, block: &'hir mut hir::Block, ctx: &mut Self::Context) {
+        eprintln!("DEBUG: HIR JS Pass visiting block with {} statements, expr: {:?}", 
+                  block.stmts.len(), 
+                  block.expr.as_ref().map(|e| std::mem::discriminant(&e.kind)));
+        
         // FIRST: Handle block completion expressions - move loops to statements before processing
         // Visit the block expression if it exists
         if let Some(expr) = &mut block.expr {
             match &expr.kind {
                 // Loops and blocks in block completion position that can be statements
                 hir::ExprKind::Loop(_) => {
+                    eprintln!("DEBUG: Found loop in block completion, moving to statement");
                     // Check if this block's completion expression can be converted to a statement
                     // This is appropriate when JavaScript can handle it as a statement
 

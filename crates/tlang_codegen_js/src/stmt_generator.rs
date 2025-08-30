@@ -8,12 +8,16 @@ impl CodegenJS {
 
         match &statement.kind {
             hir::StmtKind::Expr(expr) => {
+                eprintln!("DEBUG: Processing expression statement with type: {:?}", std::mem::discriminant(&expr.kind));
+                
                 // Special handling for loops in statement context
                 if let hir::ExprKind::Loop(block) = &expr.kind {
+                    eprintln!("DEBUG: MATCHED Loop expression, calling generate_loop_statement");
                     self.push_indent();
                     self.generate_loop_statement(block);
                     self.push_newline();
                 } else if let hir::ExprKind::Block(block) = &expr.kind {
+                    eprintln!("DEBUG: MATCHED Block expression");
                     // Special handling for blocks that contain loops as completion expressions
                     if let Some(completion_expr) = &block.expr {
                         if let hir::ExprKind::Loop(loop_block) = &completion_expr.kind {
@@ -90,6 +94,10 @@ impl CodegenJS {
     #[inline(always)]
     pub(crate) fn generate_statements(&mut self, statements: &[hir::Stmt]) {
         for statement in statements {
+            eprintln!("DEBUG: Generating statement: {:?}", std::mem::discriminant(&statement.kind));
+            if let hir::StmtKind::Expr(expr) = &statement.kind {
+                eprintln!("  -> Expression type: {:?}", std::mem::discriminant(&expr.kind));
+            }
             self.generate_stmt(statement);
             self.flush_statement_buffer();
         }
@@ -173,7 +181,9 @@ impl CodegenJS {
 
     /// Generate a loop in statement context (not expression context)
     pub(crate) fn generate_loop_statement(&mut self, block: &hir::Block) {
+        eprintln!("DEBUG: generate_loop_statement called with block containing {} statements", block.stmts.len());
         self.push_str("for (;;) {");
+        eprintln!("DEBUG: Generated for (;;) {{ opening");
         self.push_newline();
         self.inc_indent();
 
