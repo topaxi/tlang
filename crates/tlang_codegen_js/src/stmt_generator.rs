@@ -14,30 +14,50 @@ impl CodegenJS {
                     self.generate_loop_statement(block);
                     self.push_newline();
                 } else if let hir::ExprKind::Block(block) = &expr.kind {
-                    // Special handling for blocks that contain loops as completion expressions
-                    if let Some(completion_expr) = &block.expr {
-                        if let hir::ExprKind::Loop(loop_block) = &completion_expr.kind {
-                            // This is a block with a loop completion expression (e.g., for loops)
-                            // Generate the block statements first, then the loop as a statement
-                            self.push_indent();
-                            self.push_str("{");
-                            self.push_newline();
-                            self.inc_indent();
-                            
-                            // Generate the block statements (e.g., let iterator$$ = ...)
-                            for stmt in &block.stmts {
-                                self.generate_stmt(stmt);
+                    // Check if this block represents a for loop pattern
+                    if self.is_for_loop_pattern(block) {
+                        // Generate this block as a for loop with proper iteration
+                        self.push_str("/* FOR LOOP DETECTED */");
+                        self.push_newline();
+                        self.generate_for_loop_block(block);
+                        return; // Don't continue with regular block processing
+                    } else {
+                        // Special handling for blocks that contain loops as completion expressions
+                        if let Some(completion_expr) = &block.expr {
+                            if let hir::ExprKind::Loop(loop_block) = &completion_expr.kind {
+                                // This is a block with a loop completion expression (e.g., for loops)
+                                // Generate the block statements first, then the loop as a statement
+                                self.push_indent();
+                                self.push_str("{");
+                                self.push_newline();
+                                self.inc_indent();
+                                
+                                // Generate the block statements (e.g., let iterator$$ = ...)
+                                for stmt in &block.stmts {
+                                    self.generate_stmt(stmt);
+                                }
+                                
+                                // Generate the loop as a statement
+                                self.generate_loop_statement(loop_block);
+                                
+                                self.dec_indent();
+                                self.push_indent();
+                                self.push_str("}");
+                                self.push_newline();
+                            } else {
+                                // Regular block expression - use normal expression handling
+                                self.push_indent();
+                                self.push_context(BlockContext::Statement);
+                                self.generate_expr(expr, None);
+                                self.pop_context();
+
+                                if self.needs_semicolon(Some(expr)) {
+                                    self.push_char(';');
+                                }
+                                self.push_newline();
                             }
-                            
-                            // Generate the loop as a statement
-                            self.generate_loop_statement(loop_block);
-                            
-                            self.dec_indent();
-                            self.push_indent();
-                            self.push_str("}");
-                            self.push_newline();
                         } else {
-                            // Regular block expression - use normal expression handling
+                            // Block without completion expression - use normal expression handling
                             self.push_indent();
                             self.push_context(BlockContext::Statement);
                             self.generate_expr(expr, None);
@@ -48,17 +68,6 @@ impl CodegenJS {
                             }
                             self.push_newline();
                         }
-                    } else {
-                        // Block without completion expression - use normal expression handling
-                        self.push_indent();
-                        self.push_context(BlockContext::Statement);
-                        self.generate_expr(expr, None);
-                        self.pop_context();
-
-                        if self.needs_semicolon(Some(expr)) {
-                            self.push_char(';');
-                        }
-                        self.push_newline();
                     }
                 } else {
                     self.push_indent();
@@ -319,5 +328,195 @@ impl CodegenJS {
                 | hir::ExprKind::Break(..)
                 | hir::ExprKind::Continue
         )
+    }
+
+    /// Check if a block represents a for loop pattern
+    /// For loops are typically lowered to blocks with iterator setup + pattern matching
+    fn is_for_loop_pattern(&self, block: &hir::Block) -> bool {
+        // Check if the block has iterator setup statements
+        let has_iterator_setup = block.stmts.iter().any(|stmt| {
+            if let hir::StmtKind::Let(pat, _expr, _) = &stmt.kind {
+                if let hir::PatKind::Identifier(_, ident) = &pat.kind {
+                    if ident.as_str().contains("iterator$$") {
+                        return true;
+                    }
+                }
+            }
+            false
+        });
+
+        // Check if the block has pattern matching statements that check iterator results
+        let has_iterator_pattern_matching = block.stmts.iter().any(|stmt| {
+            let result = self.statement_contains_iterator_pattern_matching(stmt);
+            result
+        });
+
+        // Also check the block completion expression for pattern matching
+        let completion_has_pattern_matching = if let Some(completion_expr) = &block.expr {
+            match &completion_expr.kind {
+                hir::ExprKind::Loop(loop_block) => {
+                    // Check if the loop block contains pattern matching
+                    let loop_has_pattern_matching = loop_block.stmts.iter().any(|stmt| {
+                        self.statement_contains_iterator_pattern_matching(stmt)
+                    }) || loop_block.expr.as_ref().map_or(false, |expr| {
+                        self.expr_contains_iterator_pattern_matching(expr)
+                    });
+                    loop_has_pattern_matching
+                }
+                _ => {
+                    let result = self.expr_contains_iterator_pattern_matching(completion_expr);
+                    result
+                }
+            }
+        } else {
+            false
+        };
+
+        let is_for_loop = has_iterator_setup && (has_iterator_pattern_matching || completion_has_pattern_matching);
+        is_for_loop
+    }
+
+    /// Check if a statement contains iterator pattern matching
+    fn statement_contains_iterator_pattern_matching(&self, stmt: &hir::Stmt) -> bool {
+        match &stmt.kind {
+            hir::StmtKind::Expr(expr) => {
+                let result = self.expr_contains_iterator_pattern_matching(expr);
+                result
+            }
+            _ => false,
+        }
+    }
+
+    /// Check if an expression contains iterator pattern matching (break statements with Option checks)
+    fn expr_contains_iterator_pattern_matching(&self, expr: &hir::Expr) -> bool {
+        match &expr.kind {
+            hir::ExprKind::Match(_match_expr, arms) => {
+                // Check if this is a match on iterator results with Option patterns
+                arms.iter().any(|arm| {
+                    // Look for Option::None patterns with break expressions
+                    if let hir::PatKind::Enum(path, _) = &arm.pat.kind {
+                        if path.segments.len() >= 1 {
+                            let segment = &path.segments[path.segments.len() - 1];
+                            if segment.ident.as_str() == "None" {
+                                // Check if the consequence has a break expression
+                                return self.block_contains_break(&arm.block);
+                            }
+                        }
+                    }
+                    false
+                })
+            }
+            hir::ExprKind::IfElse(_, then_branch, else_branches) => {
+                // Check if this is an if-else pattern that handles Option results
+                let then_has_break = self.block_contains_break(then_branch);
+                let else_has_break = else_branches.iter().any(|else_branch| self.block_contains_break(&else_branch.consequence));
+                then_has_break || else_has_break
+            }
+            _ => false,
+        }
+    }
+
+    /// Check if a block contains break expressions
+    fn block_contains_break(&self, block: &hir::Block) -> bool {
+        block.stmts.iter().any(|stmt| self.statement_contains_break(stmt)) ||
+        block.expr.as_ref().map_or(false, |expr| self.expr_contains_break(expr))
+    }
+
+    /// Check if a statement contains break expressions
+    fn statement_contains_break(&self, stmt: &hir::Stmt) -> bool {
+        match &stmt.kind {
+            hir::StmtKind::Expr(expr) => self.expr_contains_break(expr),
+            _ => false,
+        }
+    }
+
+    /// Check if an expression contains break expressions
+    fn expr_contains_break(&self, expr: &hir::Expr) -> bool {
+        matches!(expr.kind, hir::ExprKind::Break(_))
+    }
+
+    /// Generate a for loop block with proper iteration wrapper
+    fn generate_for_loop_block(&mut self, block: &hir::Block) {
+        self.push_indent();
+        self.push_str("{");
+        self.push_newline();
+        self.inc_indent();
+
+        // Generate iterator setup statements first
+        for stmt in &block.stmts {
+            if self.is_iterator_setup_statement(stmt) {
+                self.generate_stmt(stmt);
+            }
+        }
+
+        // Generate the for loop wrapper
+        self.push_indent();
+        self.push_str("for (;;) {");
+        self.push_newline();
+        self.inc_indent();
+
+        // Set loop context for break statements
+        self.push_context(BlockContext::Loop);
+
+        // Generate non-iterator-setup statements inside the loop
+        for stmt in &block.stmts {
+            if !self.is_iterator_setup_statement(stmt) {
+                self.generate_stmt_in_loop_context(stmt);
+            }
+        }
+
+        // Generate block completion expression if it exists and it's a loop
+        if let Some(completion_expr) = &block.expr {
+            if let hir::ExprKind::Loop(loop_block) = &completion_expr.kind {
+                // Generate the loop content directly (pattern matching logic)
+                for stmt in &loop_block.stmts {
+                    self.generate_stmt_in_loop_context(stmt);
+                }
+                
+                if let Some(loop_completion_expr) = &loop_block.expr {
+                    self.push_indent();
+                    self.generate_expr_in_loop_context(loop_completion_expr, None);
+                    if self.needs_semicolon_in_loop_context(loop_completion_expr) {
+                        self.push_char(';');
+                    }
+                    self.push_newline();
+                }
+            } else {
+                // Handle other completion expressions normally
+                self.push_indent();
+                self.generate_expr_in_loop_context(completion_expr, None);
+                if self.needs_semicolon_in_loop_context(completion_expr) {
+                    self.push_char(';');
+                }
+                self.push_newline();
+            }
+        }
+
+        // Restore context
+        self.pop_context();
+
+        // Close the for loop
+        self.dec_indent();
+        self.push_indent();
+        self.push_str("}");
+        self.push_newline();
+
+        // Close the outer block
+        self.dec_indent();
+        self.push_indent();
+        self.push_str("}");
+        self.push_newline();
+    }
+
+    /// Check if a statement is iterator setup (should be outside the loop)
+    fn is_iterator_setup_statement(&self, stmt: &hir::Stmt) -> bool {
+        if let hir::StmtKind::Let(pat, _expr, _) = &stmt.kind {
+            if let hir::PatKind::Identifier(_, ident) = &pat.kind {
+                if ident.as_str().contains("iterator$$") {
+                    return true;
+                }
+            }
+        }
+        false
     }
 }
