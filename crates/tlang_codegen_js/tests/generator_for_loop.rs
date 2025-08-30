@@ -27,7 +27,7 @@ fn test_for_loop_simple_iteration() {
                 let $tmp$0,$tmp$1 = iterator$$.next(),i;if ($tmp$1.tag === Option.Some && (i = $tmp$1[0], true)) {
                     sum = sum + i;
                 } else if ($tmp$1.tag === Option.None) {
-                    return;;
+                    return;
                 };
             }
         };
@@ -55,7 +55,7 @@ fn test_for_loop_with_accumulator_simple() {
                 let $tmp$0,$tmp$1 = iterator$$.next(),i;if ($tmp$1.tag === Option.Some && (i = $tmp$1[0], true)) {
                     $tmp$0 = sum + i;
                 } else if ($tmp$1.tag === Option.None) {
-                    return accumulator$$;;
+                    return accumulator$$;
                 };
             }
         };
@@ -94,7 +94,7 @@ fn test_for_loop_with_accumulator_pattern() {
                         };
     $tmp$3                };
                 } else if ($tmp$1.tag === Option.None) {
-                    return accumulator$$;;
+                    return accumulator$$;
                 };
             }
         };
@@ -140,7 +140,7 @@ fn test_for_loop_with_string_iteration() {
                 let $tmp$0,$tmp$1 = iterator$$.next(),char;if ($tmp$1.tag === Option.Some && (char = $tmp$1[0], true)) {
                     $tmp$0 = count + 1;
                 } else if ($tmp$1.tag === Option.None) {
-                    return accumulator$$;;
+                    return accumulator$$;
                 };
             }
         };
@@ -167,7 +167,7 @@ fn test_for_loop_with_range() {
                 let $tmp$0,$tmp$1 = iterator$$.next(),i;if ($tmp$1.tag === Option.Some && (i = $tmp$1[0], true)) {
                     $tmp$0 = sum + i;
                 } else if ($tmp$1.tag === Option.None) {
-                    return accumulator$$;;
+                    return accumulator$$;
                 };
             }
         };
@@ -194,7 +194,7 @@ fn test_for_loop_with_variable_iterable() {
                 let $tmp$0,$tmp$1 = iterator$$.next(),item;if ($tmp$1.tag === Option.Some && (item = $tmp$1[0], true)) {
                     $tmp$0 = sum + item;
                 } else if ($tmp$1.tag === Option.None) {
-                    return accumulator$$;;
+                    return accumulator$$;
                 };
             }
         };
@@ -226,7 +226,7 @@ fn test_for_loop_with_function_call_iterable() {
                 let $tmp$0,$tmp$1 = iterator$$.next(),num;if ($tmp$1.tag === Option.Some && (num = $tmp$1[0], true)) {
                     $tmp$0 = sum + num;
                 } else if ($tmp$1.tag === Option.None) {
-                    return accumulator$$;;
+                    return accumulator$$;
                 };
             }
         };
@@ -256,7 +256,7 @@ fn test_for_loop_expression_in_let() {
                 let $tmp$2,$tmp$0 = iterator$$.next(),i;if ($tmp$0.tag === Option.Some && (i = $tmp$0[0], true)) {
                     $tmp$2 = acc + i;
                 } else if ($tmp$0.tag === Option.None) {
-                    return accumulator$$;;
+                    return accumulator$$;
                 };
                 accumulator$$ = $tmp$2
             };
@@ -287,7 +287,7 @@ fn test_for_loop_expression_in_return() {
                 let $tmp$0,$tmp$1 = iterator$$.next(),i;if ($tmp$1.tag === Option.Some && (i = $tmp$1[0], true)) {
                     $tmp$0 = acc + i;
                 } else if ($tmp$1.tag === Option.None) {
-                    return accumulator$$;;
+                    return accumulator$$;
                 };
             }
         };
@@ -314,7 +314,7 @@ fn test_for_loop_with_complex_pattern() {
                 let $tmp$0,$tmp$1 = iterator$$.next(),a,b;if ($tmp$1.tag === Option.Some && $tmp$1[0].length >= 2 && (a = $tmp$1[0][0], true) && (b = $tmp$1[0][1], true)) {
                     $tmp$0 = sum + a + b;
                 } else if ($tmp$1.tag === Option.None) {
-                    return accumulator$$;;
+                    return accumulator$$;
                 };
             }
         };
@@ -353,7 +353,7 @@ fn test_for_loop_with_guards() {
                         };
     $tmp$3                };
                 } else if ($tmp$1.tag === Option.None) {
-                    return accumulator$$;;
+                    return accumulator$$;
                 };
             }
         };
