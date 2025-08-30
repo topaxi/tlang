@@ -1018,47 +1018,15 @@ impl<'hir> Visitor<'hir> for HirJsPass {
     }
 
     fn visit_block(&mut self, block: &'hir mut hir::Block, ctx: &mut Self::Context) {
-        eprintln!("DEBUG: HIR JS Pass visiting block with {} statements, expr: {:?}", 
-                  block.stmts.len(), 
-                  block.expr.as_ref().map(|e| std::mem::discriminant(&e.kind)));
-        
         // FIRST: Handle block completion expressions - move loops to statements before processing
         // Visit the block expression if it exists
         if let Some(expr) = &mut block.expr {
             match &expr.kind {
                 // Loops and blocks in block completion position that can be statements
                 hir::ExprKind::Loop(_) => {
-                    eprintln!("DEBUG: Found loop in block completion, moving to statement");
-                    // Check if this block's completion expression can be converted to a statement
-                    // This is appropriate when JavaScript can handle it as a statement
-
-                    // For now, move loop/block completion expressions to statements
-                    // This avoids the complex temp variable flattening for cases JS can handle natively
-                    let completion_expr = std::mem::replace(
-                        expr,
-                        hir::Expr {
-                            hir_id: ctx.hir_id_allocator.next_id(),
-                            kind: hir::ExprKind::Literal(Box::new(
-                                tlang_ast::token::Literal::String("()".into()),
-                            )),
-                            span: expr.span,
-                        },
-                    );
-
-                    // Convert the completion expression to a statement
-                    let completion_stmt = hir::Stmt::new(
-                        ctx.hir_id_allocator.next_id(),
-                        hir::StmtKind::Expr(Box::new(completion_expr)),
-                        expr.span,
-                    );
-
-                    // Add it as the last statement
-                    block.stmts.push(completion_stmt);
-
-                    // Clear the block expression since we moved it to statements
-                    block.expr = None;
-
-                    self.changes_made = true;
+                    // Don't move loop completion expressions to statements for now
+                    // Let the expression generator handle them with proper loop wrappers
+                    // This ensures the loop structure is preserved
                 }
                 hir::ExprKind::Block(inner_block) => {
                     // For block completion expressions, check if they contain loops that need special handling
