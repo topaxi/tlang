@@ -70,10 +70,15 @@ impl CodegenJS {
         } else if let Some(expr) = &block.expr {
             // Handle break and continue expressions specially - they cannot be assigned
             match &expr.kind {
-                hir::ExprKind::Break(_) | hir::ExprKind::Continue => {
+                hir::ExprKind::Break(_) => {
+                    self.push_indent();
+                    self.generate_expr(expr, None); // Break already includes semicolon
+                    self.push_str("\n");
+                }
+                hir::ExprKind::Continue => {
                     self.push_indent();
                     self.generate_expr(expr, None);
-                    self.push_str(";\n");
+                    self.push_str(";\n"); // Continue needs semicolon
                 }
                 _ => {
                     self.push_indent();

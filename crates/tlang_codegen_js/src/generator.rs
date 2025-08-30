@@ -416,6 +416,9 @@ impl CodegenJS {
             Some(hir::ExprKind::IfElse(expr, then_branch, else_branches)) => {
                 self.should_render_if_else_as_ternary(expr, then_branch, else_branches)
             }
+            // Break and Continue expressions already include their own semicolons
+            Some(hir::ExprKind::Break(..)) => false,
+            Some(hir::ExprKind::Continue) => false,
             // Check for our special temp var + block combination
             Some(hir::ExprKind::Call(call)) => {
                 if let hir::ExprKind::Path(path) = &call.callee.kind
