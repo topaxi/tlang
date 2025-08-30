@@ -431,16 +431,8 @@ impl CodegenJS {
             // Otherwise, we assign the completion_var to the previous completion_var.
             if lhs.is_empty() {
                 self.push_indent();
-                // Get the actual previous completion variable (the one that should receive the result)
-                // In most cases, this should be the completion variable just before the current one
-                let prev_completion_var = if self.current_completion_variable_count() >= 2 {
-                    self.nth_completion_variable(self.current_completion_variable_count() - 2)
-                        .unwrap()
-                        .to_string()
-                } else {
-                    // Fallback to current completion variable if there's no previous one
-                    self.current_completion_variable().unwrap().to_string()
-                };
+                // Use the current completion variable (which should contain the match result)
+                let prev_completion_var = self.current_completion_variable().unwrap().to_string();
                 self.push_str(&prev_completion_var);
                 self.push_str(" = ");
                 self.push_current_completion_variable();

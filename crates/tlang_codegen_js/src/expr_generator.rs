@@ -698,14 +698,14 @@ impl CodegenJS {
                 self.generate_expr_with_loop_temp_var(expr, temp_var, None);
                 self.pop_context();
 
-                // Check if this is a match expression or binary assignment of match to avoid double semicolons
+                // Don't add semicolons for match expressions or binary assignments containing matches
                 let needs_semicolon = match &expr.kind {
                     hir::ExprKind::Match(..) => false,
                     hir::ExprKind::Binary(hir::BinaryOpKind::Assign, _, rhs) => {
                         // If the RHS is a match expression, don't add semicolon
                         !matches!(rhs.kind, hir::ExprKind::Match(..))
                     },
-                    _ => self.needs_semicolon(Some(expr))
+                    _ => false  // Conservative: don't add semicolons in loop temp var context
                 };
 
                 if needs_semicolon {
