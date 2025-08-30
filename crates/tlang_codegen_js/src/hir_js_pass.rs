@@ -1017,36 +1017,12 @@ impl<'hir> Visitor<'hir> for HirJsPass {
     }
 
     fn visit_block(&mut self, block: &'hir mut hir::Block, ctx: &mut Self::Context) {
-        // Transform all statements using the generic flattening approach
-        let mut new_stmts = Vec::new();
-
-        for stmt in &mut block.stmts {
-            // Apply generic flattening to ANY statement that might contain complex expressions
-            let (modified_stmt, mut temp_stmts) =
-                self.flatten_statement_expressions(stmt.clone(), ctx);
-
-            // Add any temporary variable statements first
-            new_stmts.append(&mut temp_stmts);
-
-            // Add the modified statement
-            new_stmts.push(modified_stmt);
-        }
-
-        // Replace the statements if we made changes
-        if !new_stmts.is_empty() {
-            block.stmts = new_stmts;
-        }
-
-        // After transformation, visit all statements to handle nested function declarations, etc.
-        for stmt in &mut block.stmts {
-            self.visit_stmt(stmt, ctx);
-        }
-
+        // FIRST: Handle block completion expressions - move loops to statements before processing
         // Visit the block expression if it exists
         if let Some(expr) = &mut block.expr {
             match &expr.kind {
                 // Loops and blocks in block completion position that can be statements
-                hir::ExprKind::Loop(_) | hir::ExprKind::Block(_) => {
+                hir::ExprKind::Loop(_) => {
                     // Check if this block's completion expression can be converted to a statement
                     // This is appropriate when JavaScript can handle it as a statement
 
@@ -1078,6 +1054,81 @@ impl<'hir> Visitor<'hir> for HirJsPass {
 
                     self.changes_made = true;
                 }
+                hir::ExprKind::Block(inner_block) => {
+                    // For block completion expressions, check if they contain loops that need special handling
+                    if let Some(ref inner_expr) = inner_block.expr {
+                        if matches!(inner_expr.kind, hir::ExprKind::Loop(_)) {
+                            // This block contains a loop completion expression
+                            // Move the entire block to statements so the loop can be handled properly
+                            let completion_expr = std::mem::replace(
+                                expr,
+                                hir::Expr {
+                                    hir_id: ctx.hir_id_allocator.next_id(),
+                                    kind: hir::ExprKind::Literal(Box::new(
+                                        tlang_ast::token::Literal::String("()".into()),
+                                    )),
+                                    span: expr.span,
+                                },
+                            );
+
+                            // Convert the completion expression to a statement
+                            let completion_stmt = hir::Stmt::new(
+                                ctx.hir_id_allocator.next_id(),
+                                hir::StmtKind::Expr(Box::new(completion_expr)),
+                                expr.span,
+                            );
+
+                            // Add it as the last statement
+                            block.stmts.push(completion_stmt);
+
+                            // Clear the block expression since we moved it to statements
+                            block.expr = None;
+
+                            self.changes_made = true;
+                        } else {
+                            // Regular block without loop - handle with generic flattening
+                            let span = expr.span;
+                            let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                            let expr_to_flatten = std::mem::replace(expr, placeholder);
+                            let (flattened_expr, temp_stmts) =
+                                self.flatten_subexpressions_generically(expr_to_flatten, ctx);
+                            *expr = flattened_expr;
+
+                            // If we generated statements for the block expression, add them to the block
+                            if !temp_stmts.is_empty() {
+                                block.stmts.extend(temp_stmts);
+                                self.changes_made = true;
+                            }
+                        }
+                    } else {
+                        // Block without completion expression - move to statements
+                        let completion_expr = std::mem::replace(
+                            expr,
+                            hir::Expr {
+                                hir_id: ctx.hir_id_allocator.next_id(),
+                                kind: hir::ExprKind::Literal(Box::new(
+                                    tlang_ast::token::Literal::String("()".into()),
+                                )),
+                                span: expr.span,
+                            },
+                        );
+
+                        // Convert the completion expression to a statement
+                        let completion_stmt = hir::Stmt::new(
+                            ctx.hir_id_allocator.next_id(),
+                            hir::StmtKind::Expr(Box::new(completion_expr)),
+                            expr.span,
+                        );
+
+                        // Add it as the last statement
+                        block.stmts.push(completion_stmt);
+
+                        // Clear the block expression since we moved it to statements
+                        block.expr = None;
+
+                        self.changes_made = true;
+                    }
+                }
                 _ => {
                     // For other expressions, check if they need flattening but avoid loop transformation
                     let span = expr.span;
@@ -1094,6 +1145,31 @@ impl<'hir> Visitor<'hir> for HirJsPass {
                     }
                 }
             }
+        }
+
+        // SECOND: Transform all statements using the generic flattening approach
+        let mut new_stmts = Vec::new();
+
+        for stmt in &mut block.stmts {
+            // Apply generic flattening to ANY statement that might contain complex expressions
+            let (modified_stmt, mut temp_stmts) =
+                self.flatten_statement_expressions(stmt.clone(), ctx);
+
+            // Add any temporary variable statements first
+            new_stmts.append(&mut temp_stmts);
+
+            // Add the modified statement
+            new_stmts.push(modified_stmt);
+        }
+
+        // Replace the statements if we made changes
+        if !new_stmts.is_empty() {
+            block.stmts = new_stmts;
+        }
+
+        // After transformation, visit all statements to handle nested function declarations, etc.
+        for stmt in &mut block.stmts {
+            self.visit_stmt(stmt, ctx);
         }
     }
 }

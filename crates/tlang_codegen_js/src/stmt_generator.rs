@@ -13,6 +13,53 @@ impl CodegenJS {
                     self.push_indent();
                     self.generate_loop_statement(block);
                     self.push_newline();
+                } else if let hir::ExprKind::Block(block) = &expr.kind {
+                    // Special handling for blocks that contain loops as completion expressions
+                    if let Some(completion_expr) = &block.expr {
+                        if let hir::ExprKind::Loop(loop_block) = &completion_expr.kind {
+                            // This is a block with a loop completion expression (e.g., for loops)
+                            // Generate the block statements first, then the loop as a statement
+                            self.push_indent();
+                            self.push_str("{");
+                            self.push_newline();
+                            self.inc_indent();
+                            
+                            // Generate the block statements (e.g., let iterator$$ = ...)
+                            for stmt in &block.stmts {
+                                self.generate_stmt(stmt);
+                            }
+                            
+                            // Generate the loop as a statement
+                            self.generate_loop_statement(loop_block);
+                            
+                            self.dec_indent();
+                            self.push_indent();
+                            self.push_str("}");
+                            self.push_newline();
+                        } else {
+                            // Regular block expression - use normal expression handling
+                            self.push_indent();
+                            self.push_context(BlockContext::Statement);
+                            self.generate_expr(expr, None);
+                            self.pop_context();
+
+                            if self.needs_semicolon(Some(expr)) {
+                                self.push_char(';');
+                            }
+                            self.push_newline();
+                        }
+                    } else {
+                        // Block without completion expression - use normal expression handling
+                        self.push_indent();
+                        self.push_context(BlockContext::Statement);
+                        self.generate_expr(expr, None);
+                        self.pop_context();
+
+                        if self.needs_semicolon(Some(expr)) {
+                            self.push_char(';');
+                        }
+                        self.push_newline();
+                    }
                 } else {
                     self.push_indent();
                     self.push_context(BlockContext::Statement);
