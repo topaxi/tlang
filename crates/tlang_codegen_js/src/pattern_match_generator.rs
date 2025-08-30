@@ -453,6 +453,8 @@ impl CodegenJS {
         let (lhs, mut has_let) = if let Some(var) = completion_var {
             // Use the provided completion variable instead of creating a new one
             self.push_completion_variable(Some(var));
+            // Make sure the variable is registered in the scope so subsequent declare_tmp_variable calls work correctly
+            self.current_scope().declare_variable_alias(var, var);
             // Declare the temp variable at the beginning of the expression
             self.push_str("let ");
             self.push_str(var);
