@@ -51,15 +51,21 @@ impl CodegenJS {
     fn generate_match_arm_block(&mut self, block: &hir::Block) {
         self.flush_statement_buffer();
         if !block.stmts.is_empty() {
-            self.generate_block_expression(block);
-        } else if self.current_completion_variable() == Some("return") {
-            if block.expr.as_ref().is_some_and(|expr| expr.is_tail_call()) {
-                self.generate_block_expression(block);
-            } else if let Some(expr) = &block.expr {
-                self.push_indent();
-                self.push_str("return ");
-                self.generate_expr(expr, None);
-                self.push_str(";\n");
+            // TODO: Handle statements in match arms properly
+            // For now, avoid generate_block_expression which can add };
+            self.generate_statements(&block.stmts);
+        }
+        
+        if self.current_completion_variable() == Some("return") {
+            if let Some(expr) = &block.expr {
+                if expr.is_tail_call() {
+                    self.generate_expr(expr, None);
+                } else {
+                    self.push_indent();
+                    self.push_str("return ");
+                    self.generate_expr(expr, None);
+                    self.push_str(";\n");
+                }
             }
         } else if let Some(expr) = &block.expr {
             // Handle break and continue expressions specially - they cannot be assigned
@@ -418,7 +424,7 @@ impl CodegenJS {
                 self.push_str(&prev_completion_var);
                 self.push_str(" = ");
                 self.push_current_completion_variable();
-                self.push_char(';');
+                // Never add semicolon here - let the statement handler decide
                 self.push_newline();
             } else {
                 self.push_str(lhs);

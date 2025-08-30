@@ -80,7 +80,13 @@ impl CodegenJS {
         if !has_completion_var {
             self.dec_indent();
             self.push_indent();
-            self.push_str("};\n");
+            // Don't add }; in expression context - let the caller handle statement termination
+            if self.current_context() == BlockContext::Statement {
+                self.push_str("};\n");
+            } else {
+                self.push_char('}');
+                self.push_newline();
+            }
             self.flush_statement_buffer();
             self.push_str(&lhs);
             self.push_str(completion_tmp_var.as_str());
