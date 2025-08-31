@@ -22,6 +22,9 @@ fn test_for_loop_simple_iteration() {
     assert_snapshot!(output, @r"
     function test_sum() {
         let sum = 0;
+        {
+            let iterator$$ = iterator.iter([1, 2, 3, 4, 5]);
+            for (;;) {
                 let $tmp$0;
                 let $tmp$1 = iterator$$.next();
                 let i;if ($tmp$1.tag === Option.Some && (i = $tmp$1[0], true)) {
