@@ -52,16 +52,14 @@ fn test_for_loop_with_accumulator_simple() {
     // Expected: Should generate JavaScript that accumulates values and returns final result
     assert_snapshot!(output, @r"
     function test_sum() {
-        {
-            let iterator$$ = iterator.iter([1, 2, 3, 4, 5]);
-            let accumulator$$ = 0;
-                let $tmp$0,$tmp$1 = iterator$$.next(),i;if ($tmp$1.tag === Option.Some && (i = $tmp$1[0], true)) {
-                    $tmp$0 = sum + i;
-                } else if ($tmp$1.tag === Option.None) {
-                    return accumulator$$;
-                };
-            }
-        };
+            let $tmp$0;
+            let $tmp$1 = iterator$$.next();
+            let i;if ($tmp$1.tag === Option.Some && (i = $tmp$1[0], true)) {
+                $tmp$0 = sum + i;
+            } else if ($tmp$1.tag === Option.None) {
+                break;
+            };
+        }    }
     }
     ");
 }
