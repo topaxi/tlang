@@ -17,8 +17,6 @@ impl CodegenJS {
                     // Check if this block represents a for loop pattern
                     if self.is_for_loop_pattern(block) {
                         // Generate this block as a for loop with proper iteration
-                        self.push_str("/* FOR LOOP DETECTED */");
-                        self.push_newline();
                         self.generate_for_loop_block(block);
                         return; // Don't continue with regular block processing
                     } else {
@@ -236,13 +234,11 @@ impl CodegenJS {
     ) {
         match &expr.kind {
             hir::ExprKind::Break(break_expr) => {
+                // In JavaScript loops, break cannot have a value
+                // For loops with accumulators, we just generate 'break' and handle the return value elsewhere
                 self.push_str("break");
-                if let Some(break_value) = break_expr {
-                    // Note: break with value in statement loop context is unusual
-                    // but we'll generate it anyway
-                    self.push_char(' ');
-                    self.generate_expr_in_loop_context(break_value, parent_op);
-                }
+                // Note: break_expr value is ignored in JavaScript loop context
+                // The accumulator value should be handled by the loop return logic
             }
             hir::ExprKind::Continue => {
                 self.push_str("continue");
@@ -442,10 +438,43 @@ impl CodegenJS {
         self.push_newline();
         self.inc_indent();
 
-        // Generate iterator setup statements first
-        for stmt in &block.stmts {
+        // Generate iterator setup statements first - ensure they are properly output
+        for (i, stmt) in block.stmts.iter().enumerate() {
             if self.is_iterator_setup_statement(stmt) {
+                // Force generation of iterator setup by handling it directly
+                if let hir::StmtKind::Let(pat, expr, _) = &stmt.kind {
+                    if let hir::PatKind::Identifier(_, ident) = &pat.kind {
+                        if ident.as_str().contains("iterator$$") || ident.as_str().contains("accumulator$$") {
+                            // Generate the statement with proper indentation and context
+                            self.push_indent();
+                            self.push_str("let ");
+                            self.push_str(ident.as_str());
+                            self.push_str(" = ");
+                            self.generate_expr(expr, None);
+                            self.push_str(";");
+                            self.push_newline();
+                            
+                            // Force flush the statement buffer
+                            self.flush_statement_buffer();
+                            
+                            continue;
+                        }
+                    }
+                }
+                // Fallback to normal statement generation
                 self.generate_stmt(stmt);
+            }
+        }
+
+        // Also handle accumulator statements
+        for stmt in &block.stmts {
+            if let hir::StmtKind::Let(pat, expr, _) = &stmt.kind {
+                if let hir::PatKind::Identifier(_, ident) = &pat.kind {
+                    if ident.as_str().contains("accumulator$$") && !self.is_iterator_setup_statement(stmt) {
+                        self.push_indent();
+                        self.generate_variable_declaration(pat, expr);
+                    }
+                }
             }
         }
 
@@ -454,13 +483,16 @@ impl CodegenJS {
         self.push_str("for (;;) {");
         self.push_newline();
         self.inc_indent();
+        
+        // Force flush to ensure for loop wrapper appears
+        self.flush_statement_buffer();
 
         // Set loop context for break statements
         self.push_context(BlockContext::Loop);
 
         // Generate non-iterator-setup statements inside the loop
         for stmt in &block.stmts {
-            if !self.is_iterator_setup_statement(stmt) {
+            if !self.is_iterator_setup_statement(stmt) && !self.is_accumulator_setup_statement(stmt) {
                 self.generate_stmt_in_loop_context(stmt);
             }
         }
@@ -513,6 +545,18 @@ impl CodegenJS {
         if let hir::StmtKind::Let(pat, _expr, _) = &stmt.kind {
             if let hir::PatKind::Identifier(_, ident) = &pat.kind {
                 if ident.as_str().contains("iterator$$") {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if a statement is accumulator setup (should be outside the loop)
+    fn is_accumulator_setup_statement(&self, stmt: &hir::Stmt) -> bool {
+        if let hir::StmtKind::Let(pat, _expr, _) = &stmt.kind {
+            if let hir::PatKind::Identifier(_, ident) = &pat.kind {
+                if ident.as_str().contains("accumulator$$") {
                     return true;
                 }
             }

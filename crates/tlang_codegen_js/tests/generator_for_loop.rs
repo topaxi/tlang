@@ -22,15 +22,15 @@ fn test_for_loop_simple_iteration() {
     assert_snapshot!(output, @r"
     function test_sum() {
         let sum = 0;
-        {
-            let iterator$$ = iterator.iter([1, 2, 3, 4, 5]);
-                let $tmp$0,$tmp$1 = iterator$$.next(),i;if ($tmp$1.tag === Option.Some && (i = $tmp$1[0], true)) {
+                let $tmp$0;
+                let $tmp$1 = iterator$$.next();
+                let i;if ($tmp$1.tag === Option.Some && (i = $tmp$1[0], true)) {
                     sum = sum + i;
                 } else if ($tmp$1.tag === Option.None) {
-                    return;
+                    break;
                 };
             }
-        };
+        }
         return sum;
     }
     ");

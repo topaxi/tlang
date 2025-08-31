@@ -173,11 +173,11 @@ impl CodegenJS {
             hir::ExprKind::Break(expr) => {
                 // In loop contexts, generate proper break; otherwise, generate return
                 if self.is_in_loop_context() {
+                    // In JavaScript loops, break cannot have a value
+                    // For loops with accumulators, we just generate 'break' and handle the return value elsewhere
                     self.push_str("break");
-                    if let Some(expr) = expr {
-                        self.push_char(' ');
-                        self.generate_expr(expr, parent_op);
-                    }
+                    // Note: expr value is ignored in JavaScript loop context
+                    // The accumulator value should be handled by the loop return logic
                 } else {
                     self.push_str("return");
                     if let Some(expr) = expr {
