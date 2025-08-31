@@ -677,12 +677,28 @@ impl CodegenJS {
         // Handle block completion if exists - this would be the default return value
         if let Some(completion_expr) = &block.expr {
             self.push_indent();
+            
+            // Generate the expression and capture the result in the temp variable
+            // The pattern match will assign the result to the temp variable through finalization
             self.generate_expr_with_loop_temp_var(completion_expr, temp_var, None);
+            self.push_newline();
+            
+            // Then assign the temp variable result to the accumulator for the next iteration
+            self.push_indent();
+            self.push_str("accumulator$$ = ");
+            self.push_str(temp_var);
             self.push_newline();
         }
 
         // Pop loop context
         self.pop_context();
+
+        // At the end of the loop, assign the accumulator value to the temp variable
+        // This ensures the loop result is the final accumulator value
+        self.push_indent();
+        self.push_str(temp_var);
+        self.push_str(" = accumulator$$");
+        self.push_newline();
 
         self.dec_indent();
         self.push_indent();

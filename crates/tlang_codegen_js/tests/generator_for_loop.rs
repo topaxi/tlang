@@ -253,6 +253,7 @@ fn test_for_loop_expression_in_let() {
                 }
                 
                 accumulator$$ = $tmp$2
+                $tmp$1 = accumulator$$
             };
             $tmp$0 = $tmp$1;
         };

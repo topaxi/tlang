@@ -81,7 +81,8 @@ impl CodegenJS {
                         }
                     } else {
                         self.push_indent();
-                        self.push_current_completion_variable();
+                        let completion_var = self.current_completion_variable().unwrap().to_string();
+                        self.push_str(&completion_var);
                         self.push_str(" = ");
                         self.generate_expr(expr, None);
                         self.push_str(";\n");
@@ -433,14 +434,24 @@ impl CodegenJS {
             // If we have an lhs, put the completion var as the rhs of the lhs.
             // Otherwise, we assign the completion_var to the previous completion_var.
             if lhs.is_empty() {
-                self.push_indent();
-                // Use the current completion variable (which should contain the match result)
-                let prev_completion_var = self.current_completion_variable().unwrap().to_string();
-                self.push_str(&prev_completion_var);
-                self.push_str(" = ");
-                self.push_current_completion_variable();
-                // Never add semicolon here - let the statement handler decide
-                self.push_newline();
+                // For loop contexts, assign the latest temp variable to the completion variable
+                if self.is_in_loop_context() {
+                    self.push_indent();
+                    let completion_var = self.current_completion_variable().unwrap().to_string();
+                    self.push_str(&completion_var);
+                    self.push_str(" = ");
+                    // Get the latest temp variable that actually holds the expression result
+                    let latest_temp_var = self.current_scope().get_latest_temp_variable();
+                    self.push_str(&latest_temp_var);
+                    self.push_newline();
+                } else {
+                    self.push_indent();
+                    let completion_var = self.current_completion_variable().unwrap().to_string();
+                    self.push_str(&completion_var);
+                    self.push_str(" = ");
+                    self.push_current_completion_variable();
+                    self.push_newline();
+                }
             } else {
                 self.push_str(lhs);
                 self.push_current_completion_variable();
@@ -466,11 +477,17 @@ impl CodegenJS {
             self.push_completion_variable(Some(var));
             // Make sure the variable is registered in the scope so subsequent declare_tmp_variable calls work correctly
             self.current_scope().declare_variable_alias(var, var);
-            // Declare the temp variable at the beginning of the expression
-            self.push_str("let ");
-            self.push_str(var);
-            // Don't replace the statement buffer since we want to keep the "let" declaration
-            (String::new(), true)
+            
+            if var == "accumulator$$" {
+                // Don't declare accumulator$$ since it's already declared by the for loop
+                (String::new(), false)
+            } else {
+                // Declare the temp variable at the beginning of the expression
+                self.push_str("let ");
+                self.push_str(var);
+                // Don't replace the statement buffer since we want to keep the "let" declaration
+                (String::new(), true)
+            }
         } else {
             self.setup_match_completion_variables(arms)
         };
