@@ -315,7 +315,10 @@ impl CodegenJS {
     fn setup_let_guard_variable(&mut self, arms: &[hir::MatchArm], has_let: &mut bool) -> String {
         if arms.iter().any(|arm| arm.has_let_guard()) {
             if *has_let {
-                self.push_char(',');
+                self.push_char(';');
+                self.push_newline();
+                self.push_indent();
+                self.push_str("let ");
             } else {
                 self.push_indent();
                 self.push_str("let ");
