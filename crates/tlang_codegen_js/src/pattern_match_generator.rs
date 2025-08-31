@@ -435,11 +435,8 @@ impl CodegenJS {
             // If we have an lhs, put the completion var as the rhs of the lhs.
             // Otherwise, we assign the completion_var to the previous completion_var.
             if lhs.is_empty() {
-                // For loop contexts, assign the match expression result to the completion variable
-                if self.is_in_loop_context() {
-                    // Don't generate additional assignment - the completion variable is already correct
-                    // The issue is elsewhere in the pipeline
-                } else {
+                // For loop contexts, don't generate additional assignments - the __TEMP_VAR_MATCH__ mechanism handles it
+                if !self.is_in_loop_context() {
                     self.push_indent();
                     let completion_var = self.current_completion_variable().unwrap().to_string();
                     self.push_str(&completion_var);
@@ -466,14 +463,10 @@ impl CodegenJS {
         arms: &[hir::MatchArm],
         completion_var: Option<&str>,
     ) {
-        eprintln!("DEBUG: generate_match_expression_with_completion_var called with completion_var={:?}", completion_var);
-        
         // TODO: A lot here is copied from the if statement generator.
         let (lhs, mut has_let) = if let Some(var) = completion_var {
             // Use the provided completion variable instead of creating a new one
-            eprintln!("DEBUG: Setting completion variable to {}", var);
             self.push_completion_variable(Some(var));
-            eprintln!("DEBUG: After push, current completion variable: {:?}", self.current_completion_variable());
             // Make sure the variable is registered in the scope so subsequent declare_tmp_variable calls work correctly
             self.current_scope().declare_variable_alias(var, var);
             
@@ -493,18 +486,13 @@ impl CodegenJS {
         let has_block_completions =
             self.current_context() == BlockContext::Expression && match_args_have_completions(arms);
 
-        eprintln!("DEBUG: Before setup_match_context, current completion variable: {:?}", self.current_completion_variable());
         self.setup_match_context(expr);
-        eprintln!("DEBUG: After setup_match_context, current completion variable: {:?}", self.current_completion_variable());
 
         let match_value_binding = self.setup_match_value_binding(expr, &mut has_let);
-        eprintln!("DEBUG: After setup_match_value_binding, current completion variable: {:?}", self.current_completion_variable());
 
         let let_guard_var = self.setup_let_guard_variable(arms, &mut has_let);
-        eprintln!("DEBUG: After setup_let_guard_variable, current completion variable: {:?}", self.current_completion_variable());
 
         self.setup_pattern_identifiers(arms, &mut has_let);
-        eprintln!("DEBUG: After setup_pattern_identifiers, current completion variable: {:?}", self.current_completion_variable());
 
         if has_let {
             self.push_char(';');

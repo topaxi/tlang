@@ -598,23 +598,15 @@ impl CodegenJS {
                     if let hir::ExprKind::Match(match_expr, match_arms) =
                         &call_expr.arguments[1].kind
                     {
-                        // In expression contexts, we need to ensure the result is available
-                        // Generate the match expression and then output the result variable name
                         self.generate_match_expression_with_completion_var(
                             match_expr,
                             match_arms,
                             Some(temp_name),
                         );
                         
-                        // After generating the match expression, output the result variable
-                        // Since we control the completion variable, we know the result is in temp_name
-                        // But we need to check what the actual completion variable is after generation
-                        let current_var = self.current_completion_variable().map(|s| s.to_string());
-                        if let Some(var) = current_var {
-                            self.push_str(&var);
-                        } else {
-                            self.push_str(temp_name);
-                        }
+                        // For expression contexts (like binary assignments), output the completion variable
+                        // The match expression was generated with this completion variable, so use it directly
+                        self.push_str(temp_name);
                     }
                     return;
                 }

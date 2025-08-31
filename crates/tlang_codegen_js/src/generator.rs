@@ -334,7 +334,18 @@ impl CodegenJS {
         let current_completion_variable = self.pop_completion_variable();
 
         if let Some(str) = &current_completion_variable {
-            self.push_str(str);
+            // For loop contexts, check if the completion variable exists and prefer latest temp variable
+            if self.is_in_loop_context() && str.starts_with("$tmp$") {
+                let latest_temp_var = self.current_scope().get_latest_temp_variable();
+                if latest_temp_var != str.as_ref() {
+                    // Use the latest temp variable instead of the potentially stale completion variable
+                    self.push_str(&latest_temp_var);
+                } else {
+                    self.push_str(str);
+                }
+            } else {
+                self.push_str(str);
+            }
         }
 
         self.completion_variables.push(current_completion_variable);
