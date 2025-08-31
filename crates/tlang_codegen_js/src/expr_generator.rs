@@ -683,11 +683,8 @@ impl CodegenJS {
             self.generate_expr_with_loop_temp_var(completion_expr, temp_var, None);
             self.push_newline();
             
-            // Then assign the temp variable result to the accumulator for the next iteration
-            self.push_indent();
-            self.push_str("accumulator$$ = ");
-            self.push_str(temp_var);
-            self.push_newline();
+            // The pattern match generator will handle the accumulator assignment in loop context
+            // through its finalize_match_expression function, so we don't need to do it here
         }
 
         // Pop loop context
