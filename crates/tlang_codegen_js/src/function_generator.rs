@@ -85,6 +85,7 @@ impl CodegenJS {
             &declaration.parameters,
             &[],
             is_tail_recursive,
+            false, // Function declaration
         );
 
         let is_method = matches!(declaration.name.kind, hir::ExprKind::FieldAccess(_, _));
@@ -183,6 +184,7 @@ impl CodegenJS {
             &declaration.parameters,
             &[],
             is_tail_recursive,
+            true, // Function expression
         );
 
         if generate_arrow {

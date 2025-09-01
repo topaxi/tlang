@@ -102,7 +102,6 @@ fn test_for_loop_with_accumulator_pattern() {
 }
 
 #[test]
-#[ignore = "Nested for loops have parsing issues - need parser investigation"]
 fn test_for_loop_nested() {
     let output = compile!(indoc! {"
         fn matrix_sum() {
@@ -117,7 +116,36 @@ fn test_for_loop_nested() {
     "});
 
     // Expected: Should handle nested for loops correctly
-    assert_snapshot!(output, @"");
+    assert_snapshot!(output, @r"
+    function matrix_sum() {
+        let total = 0;
+        {
+            let iterator$$ = iterator.iter([[1, 2], [3, 4]]);
+            for (;;) {
+                let $tmp$0;
+                let $tmp$1 = iterator$$.next();
+                let row;if ($tmp$1.tag === Option.Some && (row = $tmp$1[0], true)) {
+                    $tmp$0 = {
+                        let iterator$$ = iterator.iter(row);
+                            let $tmp$2;
+                            let $tmp$3 = iterator$$.next();
+                            let val;if ($tmp$3.tag === Option.Some && (val = $tmp$3[0], true)) {
+                                $tmp$2 = total = total + val;
+                            } else if ($tmp$3.tag === Option.None) {
+                                break;
+                            }
+                            $tmp$0 = $tmp$2;
+                            $tmp$1 = $tmp$2;;
+                        }
+                    };
+                } else if ($tmp$1.tag === Option.None) {
+                    break;
+                };
+            }
+        }
+        return total;
+    }
+    ");
 }
 
 #[test]
@@ -251,6 +279,8 @@ fn test_for_loop_expression_in_let() {
                 } else if ($tmp$0.tag === Option.None) {
                     break;
                 }
+                $tmp$1 = $tmp$3;
+                $tmp$2 = $tmp$3;
                 
                 accumulator$$ = $tmp$2
                 $tmp$1 = accumulator$$

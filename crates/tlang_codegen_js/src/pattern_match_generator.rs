@@ -223,41 +223,17 @@ impl CodegenJS {
     }
 
     fn setup_match_completion_variables(&mut self, arms: &[hir::MatchArm]) -> (String, bool) {
-        let mut lhs = self.replace_statement_buffer_with_empty_string();
+        let lhs = self.replace_statement_buffer_with_empty_string();
         let has_block_completions =
             self.current_context() == BlockContext::Expression && match_args_have_completions(arms);
-<<<<<<< HEAD
-        let is_expression_context = self.current_context() == BlockContext::Expression;
-        let mut has_let = false;
-||||||| f9857ce7
-        let mut has_let = false;
-=======
->>>>>>> main
 
-<<<<<<< HEAD
-        if has_block_completions || is_expression_context {
-            if let Some("return") = self.current_completion_variable() {
-||||||| f9857ce7
-        if has_block_completions {
-            // TODO: We could probably reuse existing completion vars here.
-            if let Some("return") = self.current_completion_variable() {
-=======
         if has_block_completions {
             // Note: We check if we can reuse the existing completion variable ("return")
             // instead of creating a new temporary variable each time.
             if self.can_reuse_current_completion_variable() {
->>>>>>> main
                 self.push_completion_variable(Some("return"));
-                lhs = self.replace_statement_buffer_with_empty_string();
-<<<<<<< HEAD
-            } else if let Some(existing_var) = self.current_completion_variable().map(String::from)
-            {
-                // Reuse existing completion variable if available
-                self.push_completion_variable(Some(&existing_var));
-||||||| f9857ce7
-=======
+                let lhs = self.replace_statement_buffer_with_empty_string();
                 (lhs, false)
->>>>>>> main
             } else {
                 let completion_tmp_var = self.current_scope().declare_tmp_variable();
                 self.push_indent();
@@ -273,7 +249,7 @@ impl CodegenJS {
             self.push_str("let ");
             self.push_str(&completion_tmp_var);
             self.push_completion_variable(Some(&completion_tmp_var));
-            has_let = true;
+            (lhs, true)
         } else {
             self.push_completion_variable(None);
             (lhs, false)

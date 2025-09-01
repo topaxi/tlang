@@ -36,6 +36,10 @@ pub(crate) struct FunctionContext {
     // Is the current function body tail recursive?
     // This is used to determine if we should unwrap the recursion into a while loop.
     pub is_tail_recursive: bool,
+
+    // Is this a function expression (true) or a function declaration (false)?
+    // This affects how break statements are handled when nested in loops.
+    pub is_expression: bool,
 }
 
 #[derive(Debug)]
@@ -268,6 +272,7 @@ impl CodegenJS {
         parameters: &[hir::FunctionParameter],
         parameter_bindings: &[String],
         is_tail_recursive: bool,
+        is_expression: bool,
     ) {
         // We currently only need the parameter names/bindings for tail recursive functions.
         let parameter_bindings = if !is_tail_recursive {
@@ -295,6 +300,7 @@ impl CodegenJS {
             name: name.to_string(),
             parameter_bindings,
             is_tail_recursive,
+            is_expression,
         });
     }
 

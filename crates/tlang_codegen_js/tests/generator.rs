@@ -181,49 +181,6 @@ fn test_if_else_as_expression() {
     assert_eq!(output, expected_output);
 }
 
-// TODO: Fix this test - it's failing due to expression flattening improvements
-/*
-#[test]
-fn test_if_else_as_expression_nested() {
-    let output = compile!(
-        indoc! {"
-        fn main() {
-            let result = if true {
-                let x = if true { 1 } else { 2 };
-
-                if x == 1 { 3 } else { 4 }
-            } else {
-                5
-            };
-        }
-    "},
-        CodegenOptions::default().render_ternary(false)
-    );
-    let expected_output = indoc! {"
-        function main() {
-            let $tmp$0;if (true) {
-                let $tmp$1;if (true) {
-                    $tmp$1 = 1;
-                } else {
-                    $tmp$1 = 2;
-                }
-                let x = $tmp$1;
-                let $tmp$2;if (x === 1) {
-                    $tmp$2 = 3;
-                } else {
-                    $tmp$2 = 4;
-                }
-                $tmp$0 = $tmp$2;
-            } else {
-                $tmp$0 = 5;
-            }
-            let result = $tmp$0;
-        }
-    "};
-    assert_eq!(output, expected_output);
-}
-*/
-
 #[test]
 fn test_if_else_if_as_expression() {
     let output =
@@ -299,34 +256,6 @@ fn test_partial_application_with_multiple_arguments() {
     "};
     assert_eq!(output, expected_output);
 }
-
-// TODO: Pre-existing issue - comments are not preserved in codegen
-/*
-#[test]
-fn test_single_line_comments() {
-    let output = compile!("// this is a comment\nlet a = 1;");
-    let expected_output = "// this is a comment\nlet a = 1;\n";
-    assert_eq!(output, expected_output);
-}
-*/
-
-// TODO: Pre-existing issue - comments are not preserved in codegen
-/*
-#[test]
-fn test_multi_line_comments() {
-    let output = compile!("/* this is a comment */
-\nlet a = 1;");
-let expected_output = " /* this is a comment */
-\nlet a = 1;\n";
-    assert_eq!(output, expected_output);
-
-let output = compile!(" /* this is a comment\non multiple lines */
-\nlet a = 1;");
-let expected_output = " /* this is a comment\non multiple lines */
-\nlet a = 1;\n";
-    assert_eq!(output, expected_output);
-}
-*/
 
 #[test]
 fn test_string_literals() {

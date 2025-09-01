@@ -172,7 +172,9 @@ impl CodegenJS {
             }
             hir::ExprKind::Break(expr) => {
                 // In loop contexts, generate proper break; otherwise, generate return
-                if self.is_in_loop_context() {
+                // However, if we're inside a function expression (even if nested in a loop), generate return
+                if self.is_in_loop_context() 
+                    && self.get_function_context().map_or(true, |ctx| !ctx.is_expression) {
                     // In JavaScript loops, break cannot have a value
                     // For loops with accumulators, we just generate 'break' and handle the return value elsewhere
                     self.push_str("break");
