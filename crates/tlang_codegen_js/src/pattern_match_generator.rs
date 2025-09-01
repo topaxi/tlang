@@ -449,29 +449,25 @@ impl CodegenJS {
         } else {
             // In cases where the match expression is used in assignment contexts but doesn't
             // go through the normal completion variable assignment (lhs is empty, has_block_completions is false),
-            // we still need to handle the case where temp variables were created during match arm evaluation.
-            // If the completion variable differs from the latest temp variable, assign the latest to the completion variable.
+            // ensure that undefined temp variables that should reference the pattern match result get assigned.
             if self.is_in_loop_context() {
                 if let Some(current_completion) = self.current_completion_variable().map(String::from) {
                     if current_completion.starts_with("$tmp$") {
-                        let latest_temp_var = self.current_scope().get_latest_temp_variable();
-                        if latest_temp_var != current_completion && latest_temp_var.starts_with("$tmp$") {
-                            // DEBUG: Output what's happening
-                            self.push_str("/* DEBUG: completion=");
-                            self.push_str(&current_completion);
-                            self.push_str(", latest=");
-                            self.push_str(&latest_temp_var);
-                            self.push_str(" */");
-                            self.push_newline();
-                            
-                            // Generate an assignment to ensure the completion variable has the correct value
-                            self.push_newline();
-                            self.push_indent();
-                            self.push_str(&current_completion);
-                            self.push_str(" = ");
-                            self.push_str(&latest_temp_var);
-                            self.push_char(';');
-                            self.push_newline();
+                        // Generate a mapping from any "previous" temp variables to the current completion variable
+                        // This handles cases where HIR expected result in $tmp$N but it's actually in $tmp$M
+                        if let Ok(current_num) = current_completion.strip_prefix("$tmp$").unwrap().parse::<i32>() {
+                            for i in 0..current_num {
+                                let potential_temp_var = format!("$tmp${}", i);
+                                if !self.current_scope().has_local_variable(&potential_temp_var) {
+                                    // This temp variable was expected but never defined, assign it from the completion variable
+                                    self.push_newline();
+                                    self.push_indent();
+                                    self.push_str(&potential_temp_var);
+                                    self.push_str(" = ");
+                                    self.push_str(&current_completion);
+                                    self.push_char(';');
+                                }
+                            }
                         }
                     }
                 }
