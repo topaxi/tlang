@@ -1,0 +1,14 @@
+---
+source: crates/tlang_codegen_js/tests/hir_js_pass.rs
+expression: pretty_print(&hir)
+---
+fn main() -> unknown {
+    __TEMP_VAR_IF_ELSE__("$tmp$0", if true {
+        let y: unknown = 1;
+        ($tmp$0 = (y + 2));
+    } else {
+        ($tmp$0 = 3);
+    });
+    let x: unknown = $tmp$0;
+    x
+}

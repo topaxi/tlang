@@ -1,0 +1,16 @@
+---
+source: crates/tlang_codegen_js/tests/hir_js_pass.rs
+expression: pretty_print(&hir)
+---
+fn main() -> unknown {
+    __TEMP_VAR_BLOCK__("$tmp$0", {
+        let arr: unknown = [1, 2, 3];
+        ($tmp$0 = arr);
+    });
+    __TEMP_VAR_BLOCK__("$tmp$1", {
+        let i: unknown = 1;
+        ($tmp$1 = i);
+    });
+    let x: unknown = $tmp$0[$tmp$1];
+    x
+}

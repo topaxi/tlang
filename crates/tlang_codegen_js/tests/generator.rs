@@ -182,6 +182,25 @@ fn test_if_else_as_expression() {
 }
 
 #[test]
+fn test_if_else_as_expression_nested() {
+    let output = compile!(
+        indoc! {"
+        fn main() {
+            let result = if true {
+                let x = if true { 1 } else { 2 };
+
+                if x == 1 { 3 } else { 4 }
+            } else {
+                5
+            };
+        }
+    "},
+        CodegenOptions::default().render_ternary(false)
+    );
+    insta::assert_snapshot!(output);
+}
+
+#[test]
 fn test_if_else_if_as_expression() {
     let output =
         compile!("fn main() { let result = if true { 1 } else if true { 2 } else { 3 }; }");
@@ -254,6 +273,26 @@ fn test_partial_application_with_multiple_arguments() {
     let expected_output = indoc! {"
         let add1 = (_0, _1) => add(_0, 1, _1);
     "};
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn test_single_line_comments() {
+    // Comments are not preserved in codegen by design
+    let output = compile!("// this is a comment\nlet a = 1;");
+    let expected_output = "let a = 1;\n";
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn test_multi_line_comments() {
+    // Comments are not preserved in codegen by design
+    let output = compile!("/* this is a comment */\nlet a = 1;");
+    let expected_output = "let a = 1;\n";
+    assert_eq!(output, expected_output);
+
+    let output = compile!("/* this is a comment\non multiple lines */\nlet a = 1;");
+    let expected_output = "let a = 1;\n";
     assert_eq!(output, expected_output);
 }
 

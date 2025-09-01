@@ -4,7 +4,7 @@ mod enum_generator;
 mod expr_generator;
 mod function_generator;
 pub mod generator;
-mod hir_js_pass;
+pub mod hir_js_pass;
 mod js;
 mod pattern_match_generator;
 mod scope;
