@@ -82,7 +82,6 @@ impl LoweringContext {
         let hir_id = self.unique_id();
         let iter_expr = self.lower_expr(&for_loop.iter);
 
-        // Create a call to iterator::iter function instead of calling .iter() method directly
         let iterator_path = hir::Path::new(
             vec![
                 hir::PathSegment::new(Ident::new("iterator", Default::default())),
