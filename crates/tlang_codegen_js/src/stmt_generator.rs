@@ -233,7 +233,7 @@ impl CodegenJS {
         parent_op: Option<hir::BinaryOpKind>,
     ) {
         match &expr.kind {
-            hir::ExprKind::Break(break_expr) => {
+            hir::ExprKind::Break(_break_expr) => {
                 // In JavaScript loops, break cannot have a value
                 // For loops with accumulators, we just generate 'break' and handle the return value elsewhere
                 self.push_str("break");
@@ -439,7 +439,7 @@ impl CodegenJS {
         self.inc_indent();
 
         // Generate iterator setup statements first - ensure they are properly output
-        for (i, stmt) in block.stmts.iter().enumerate() {
+        for (_i, stmt) in block.stmts.iter().enumerate() {
             if self.is_iterator_setup_statement(stmt) {
                 // Force generation of iterator setup by handling it directly
                 if let hir::StmtKind::Let(pat, expr, _) = &stmt.kind {

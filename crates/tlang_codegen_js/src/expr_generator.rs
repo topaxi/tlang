@@ -603,8 +603,7 @@ impl CodegenJS {
                             Some(temp_name),
                         );
                         
-                        // For assignment expressions, output the temp variable name
-                        self.push_str(temp_name);
+                        // Note: Do not output temp variable name here - HIR JS pass handles assignment separately
                     }
                     return;
                 }

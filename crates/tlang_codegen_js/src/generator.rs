@@ -443,10 +443,16 @@ impl CodegenJS {
                     && path.segments.len() == 1
                     && (path.segments[0].ident.as_str() == "__TEMP_VAR_BLOCK__"
                         || path.segments[0].ident.as_str() == "__TEMP_VAR_IF_ELSE__"
-                        || path.segments[0].ident.as_str() == "__TEMP_VAR_LOOP__"
-                        || path.segments[0].ident.as_str() == "__TEMP_VAR_MATCH__")
+                        || path.segments[0].ident.as_str() == "__TEMP_VAR_LOOP__")
                 {
                     return true; // These should have semicolons
+                }
+                // __TEMP_VAR_MATCH__ handles its own semicolons in finalize_match_expression
+                if let hir::ExprKind::Path(path) = &call.callee.kind
+                    && path.segments.len() == 1
+                    && path.segments[0].ident.as_str() == "__TEMP_VAR_MATCH__"
+                {
+                    return false; // Pattern match generator already adds semicolon
                 }
                 true // Regular calls need semicolons
             }
