@@ -446,6 +446,36 @@ impl CodegenJS {
                 self.push_str(lhs);
                 self.push_current_completion_variable();
             }
+        } else {
+            // In cases where the match expression is used in assignment contexts but doesn't
+            // go through the normal completion variable assignment (lhs is empty, has_block_completions is false),
+            // we still need to handle the case where temp variables were created during match arm evaluation.
+            // If the completion variable differs from the latest temp variable, assign the latest to the completion variable.
+            if self.is_in_loop_context() {
+                if let Some(current_completion) = self.current_completion_variable().map(String::from) {
+                    if current_completion.starts_with("$tmp$") {
+                        let latest_temp_var = self.current_scope().get_latest_temp_variable();
+                        if latest_temp_var != current_completion && latest_temp_var.starts_with("$tmp$") {
+                            // DEBUG: Output what's happening
+                            self.push_str("/* DEBUG: completion=");
+                            self.push_str(&current_completion);
+                            self.push_str(", latest=");
+                            self.push_str(&latest_temp_var);
+                            self.push_str(" */");
+                            self.push_newline();
+                            
+                            // Generate an assignment to ensure the completion variable has the correct value
+                            self.push_newline();
+                            self.push_indent();
+                            self.push_str(&current_completion);
+                            self.push_str(" = ");
+                            self.push_str(&latest_temp_var);
+                            self.push_char(';');
+                            self.push_newline();
+                        }
+                    }
+                }
+            }
         }
         self.pop_completion_variable();
         self.match_context_stack.pop();

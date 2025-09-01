@@ -593,6 +593,12 @@ impl CodegenJS {
                     && let hir::ExprKind::Literal(lit) = &call_expr.arguments[0].kind
                     && let tlang_ast::token::Literal::String(temp_name) = lit.as_ref()
                 {
+                    // DEBUG: Output when __TEMP_VAR_MATCH__ is processed
+                    self.push_str("/* DEBUG: __TEMP_VAR_MATCH__ with temp_name=");
+                    self.push_str(temp_name);
+                    self.push_str(" */");
+                    self.push_newline();
+                    
                     // Generate the match expression with the completion variable
                     if let hir::ExprKind::Match(match_expr, match_arms) =
                         &call_expr.arguments[1].kind
