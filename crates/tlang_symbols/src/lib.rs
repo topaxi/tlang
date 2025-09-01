@@ -1,4 +1,9 @@
-// TODO: Does this module belong in the ast crate?
+//! Symbol types and symbol table implementation.
+//!
+//! This crate defines the core symbol management types used throughout the tlang compilation
+//! pipeline. By separating symbols into their own crate, we achieve better separation of
+//! concerns and allow later compilation phases to avoid depending on the entire AST crate.
+
 use log::debug;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -7,7 +12,7 @@ use std::collections::HashSet;
 use std::fmt::Display;
 use std::rc::Rc;
 
-use tlang_span::{HirId, LineColumn, NodeId, Span};
+pub use tlang_span::{HirId, LineColumn, NodeId, Span};
 
 #[derive(Debug, Default, PartialEq, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -188,12 +193,7 @@ impl SymbolTable {
                 .borrow()
                 .symbols
                 .iter()
-                // Builtins are currently not slotted and are looked up by name.
-                .filter(|s| !s.builtin)
-                // Enum and struct definitions do not generate a slot
-                .filter(|s| !matches!(s.symbol_type, SymbolType::Enum | SymbolType::Struct))
-                // And tagged enum variant definitions do not generate a slot
-                .filter(|s| !matches!(s.symbol_type, SymbolType::EnumVariant(len) if len > 0))
+                .filter(|s| t.borrow().symbol_gets_slot(s))
                 // Filter out duplicate symbols, as fn definitions might have multiple symbols
                 // attached to them. The lowering result should properly assign the same HirId to
                 // each fn symbol representing the same fn.
@@ -408,5 +408,24 @@ impl SymbolTable {
             names.extend(parent.borrow().get_all_declared_symbols());
         }
         names
+    }
+
+    /// Returns the count of local symbols that would get slots allocated.
+    /// This uses the same filtering logic as `get_slot`.
+    pub fn locals(&self) -> usize {
+        self.get_all_declared_local_symbols()
+            .filter(|s| self.symbol_gets_slot(s))
+            .count()
+    }
+
+    /// Helper method to determine if a symbol gets a slot allocated.
+    /// This centralizes the filtering logic used in both `get_slot` and `locals`.
+    fn symbol_gets_slot(&self, s: &SymbolInfo) -> bool {
+        // Builtins are currently not slotted and are looked up by name.
+        !s.builtin
+            // Enum and struct definitions do not generate a slot
+            && !matches!(s.symbol_type, SymbolType::Enum | SymbolType::Struct)
+            // And tagged enum variant definitions do not generate a slot
+            && !matches!(s.symbol_type, SymbolType::EnumVariant(len) if len > 0)
     }
 }

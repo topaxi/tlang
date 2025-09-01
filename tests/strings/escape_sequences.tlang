@@ -1,0 +1,32 @@
+// String escape sequences test
+// Demonstrates support for escape sequences in string and char literals
+
+fn test_escape_sequences() {
+    // Test all supported escape sequences
+    let quotes = "Quote: \"Hello\"";
+    let backslash = "Path: C:\\test";
+    let newline = "Line1\nLine2";
+    let tab = "Col1\tCol2";
+    let carriage = "Before\rAfter";
+    let null_char = "Text\0End";
+    
+    // Test char literals with escapes
+    let quote_char = '\'';
+    let backslash_char = '\\';
+    let newline_char = '\n';
+    
+    log("=== Escape Sequences Test ===");
+    quotes |> log();
+    backslash |> log();
+    newline |> log();
+    tab |> log();
+    carriage |> log();
+    null_char |> log();
+    
+    log("=== Char Escape Sequences ===");
+    quote_char |> log();
+    backslash_char |> log();
+    newline_char |> log();
+}
+
+test_escape_sequences();

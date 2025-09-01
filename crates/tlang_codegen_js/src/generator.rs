@@ -1,10 +1,8 @@
 use crate::{pattern_match_generator::MatchContextStack, scope::Scope};
-use tlang_ast::{
-    symbols::SymbolType,
-    token::{Token, TokenKind},
-};
+use tlang_ast::token::{Token, TokenKind};
 use tlang_hir::hir;
 use tlang_hir_opt::HirPass;
+use tlang_symbols::SymbolType;
 
 // Before we indent a line, we reserve at least the indentation space plus some more for the the
 // next statement. We start with an assumption of 128 below, this might the maximum overhead once
@@ -387,6 +385,12 @@ impl CodegenJS {
         }
         
         self.generate_expr(expr, None);
+    }
+
+    /// Returns true if the current completion variable can be reused (i.e., it's "return").
+    /// This is a helper to check if we should reuse existing completion vars.
+    pub(crate) fn can_reuse_current_completion_variable(&self) -> bool {
+        matches!(self.current_completion_variable(), Some("return"))
     }
 
     pub(crate) fn generate_comment(&mut self, comment: &Token) {

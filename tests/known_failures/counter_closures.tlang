@@ -1,0 +1,46 @@
+// Counter with Closures and State
+// Demonstrates: closures for state management, mutability, function factories
+
+// create_counter(int) -> fn() -> int
+fn create_counter(initial) {
+    let count = initial;
+    
+    fn() {
+        count = count + 1;
+        count
+    }
+}
+
+// test_counter(fn() -> int, int) -> ()
+fn test_counter(counter_fn, times) {
+    if times > 0 {
+        counter_fn() |> log();
+        test_counter(counter_fn, times - 1);
+    }
+}
+
+// fibonacci_generator() -> fn() -> int
+fn fibonacci_generator() {
+    let a = 0;
+    let b = 1;
+    
+    fn() {
+        let result = a;
+        let temp = a + b;
+        a = b;
+        b = temp;
+        result
+    }
+}
+
+log("=== Counter and State Management Demo ===");
+
+// Test basic counter
+log("Basic counter starting from 10:");
+let counter = create_counter(10);
+test_counter(counter, 5);
+
+// Test fibonacci generator
+log("First 8 Fibonacci numbers:");
+let fib = fibonacci_generator();
+test_counter(fib, 8);

@@ -7,22 +7,44 @@ Always reference these instructions first and fallback to search or bash command
 ## Working Effectively
 
 ### Bootstrap and Build (NEVER CANCEL - Build times are long)
+
 **CRITICAL**: All build commands can take 30+ minutes. NEVER CANCEL builds or tests. Use timeouts of 60+ minutes for build commands and 30+ minutes for test commands.
 
+#### Automated GitHub Copilot Environment Setup
+
+The repository includes a custom GitHub Actions workflow (`.github/workflows/copilot-dev-environment.yml`) that automatically sets up the complete development environment for GitHub Copilot coding agents. This workflow:
+
+- Installs Rust nightly toolchain with wasm32-unknown-unknown target
+- Installs all required Rust tools (cargo-nextest, cargo-insta, wasm-pack, wasm-bindgen-cli)
+- Sets up exact Node.js version 24.0.2 as required by package.json
+- Downloads and configures binaryen for WebAssembly optimization
+- Verifies all tools are properly installed and working
+- Runs comprehensive build and test validation
+
+This automated setup ensures a consistent development environment and eliminates manual setup errors.
+
+#### Manual Bootstrap (if automated setup is not available)
+
 1. **Install Rust toolchain and dependencies:**
+
    ```bash
    # Rust nightly is required (set by rust-toolchain.toml)
    rustup target add wasm32-unknown-unknown
-   cargo install cargo-nextest        # ~3m 10s installation time
-   cargo install wasm-pack           # ~1m 30s installation time
-   
+
+   # Install required Rust components for testing and formatting
+   rustup component add clippy rustfmt
+   cargo install cargo-nextest cargo-insta wasm-pack
+
    # Install exact wasm-bindgen-cli version (CRITICAL - version must match Cargo.toml)
-   WASM_BINDGEN_VERSION=$(grep -oP 'wasm-bindgen = "=\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
-   cargo install wasm-bindgen-cli --version $WASM_BINDGEN_VERSION  # ~1m 30s installation time
+   cargo install wasm-bindgen-cli --version $(grep -oP 'wasm-bindgen = "=\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
    ```
 
-2. **Install Node.js dependencies:**
+2. **Install Node.js dependencies (CRITICAL - Node.js version must be 24.0.2):**
+
    ```bash
+   # CRITICAL: Ensure Node.js version 24.0.2 is installed (required by package.json volta config)
+   # Tests will fail with incorrect Node.js versions due to stack trace differences in expected output
+   node --version  # Must show v24.0.2
    npm ci  # ~12s installation time
    ```
 
@@ -34,14 +56,18 @@ Always reference these instructions first and fallback to search or bash command
    ```
 
 ### Build Commands (NEVER CANCEL - Set timeout to 60+ minutes)
+
+**CRITICAL: Node.js version 24.0.2 is required for all tests to pass. Verify with `node --version` before running tests.**
+
 - **Rust tests**: `cargo nextest run --profile=ci` -- takes ~55s. NEVER CANCEL. Set timeout to 30+ minutes.
-- **Integration tests**: `make test` -- takes ~64s. Tests built compiler/interpreter with both backends. Requires Node.js 24.0.2 (see package.json volta). NEVER CANCEL. Set timeout to 30+ minutes.
+- **Integration tests**: `make test` -- takes ~64s. Tests built compiler/interpreter with both backends. **REQUIRES Node.js 24.0.2 exactly** (see package.json volta config). Test failures with different Node.js versions are due to stack trace differences in expected output. NEVER CANCEL. Set timeout to 30+ minutes.
 - **WebAssembly bindings test**: `make test-bindings-js` -- takes ~21s. NEVER CANCEL. Set timeout to 30+ minutes.
 - **Build playground**: `npm run build` -- takes ~13s. NEVER CANCEL. Set timeout to 30+ minutes.
 - **Build interpreter**: `cargo build --release --features=binary --bin tlangdi` -- takes ~30s. NEVER CANCEL. Set timeout to 60+ minutes.
 - **Build CLI**: `cargo build --release --bin tlang_cli_js` -- takes ~21s. NEVER CANCEL. Set timeout to 60+ minutes.
 
 ### Run Applications
+
 - **Development server**: `npm run dev` (starts Vite dev server on http://localhost:5173/)
 - **CLI compiler**: `./target/release/tlang_cli_js input.tlang --output-type js`
 - **Interpreter**: `./target/release/tlangdi input.tlang`
@@ -49,6 +75,7 @@ Always reference these instructions first and fallback to search or bash command
 ## Commit Message Guidelines
 
 ### Semantic Commit Messages
+
 Use semantic commit messages following the [Conventional Commits](https://www.conventionalcommits.org/) specification:
 
 ```
@@ -60,6 +87,7 @@ Use semantic commit messages following the [Conventional Commits](https://www.co
 ```
 
 #### Commit Types
+
 - **feat**: A new feature for the tlang language or tooling
 - **fix**: A bug fix in the compiler, interpreter, or tooling
 - **docs**: Documentation only changes (README, copilot instructions, code comments)
@@ -71,9 +99,10 @@ Use semantic commit messages following the [Conventional Commits](https://www.co
 - **ci**: Changes to CI configuration files and scripts
 
 #### Examples for tlang Project
+
 ```bash
 feat(parser): add support for optional function parameters
-fix(codegen): resolve tail call optimization bug in nested functions  
+fix(codegen): resolve tail call optimization bug in nested functions
 docs: update installation instructions for wasm-bindgen
 test(interpreter): add tests for enum pattern matching
 refactor(hir): simplify expression lowering logic
@@ -83,7 +112,9 @@ ci: add semantic commit message validation
 ```
 
 #### Scope Guidelines
+
 Common scopes for tlang:
+
 - **parser**: Changes to parsing logic
 - **lexer**: Tokenization and lexical analysis
 - **ast**: Abstract syntax tree definitions
@@ -99,39 +130,45 @@ Common scopes for tlang:
 ## Validation
 
 ### Mandatory Testing After Changes
+
 ALWAYS manually validate any code changes through complete end-to-end scenarios:
 
 0. **Run linting and formatting before any commits:**
+
    ```bash
-   # First install required Rust components if not already installed
-   rustup component add clippy rustfmt
-   
+   # Ensure required Rust components are installed (should be done in bootstrap step 1)
+   # rustup component add clippy rustfmt
+
    # Run Rust linting and formatting before any commits
    cargo clippy --fix --allow-dirty --lib --all-features    # Fix Rust linting issues automatically
    cargo clippy --fix --allow-dirty --tests --all-features  # Fix Rust linting issues in tests
    cargo fmt                                                # Format Rust code
    ```
-   
+
    **Remember to use semantic commit messages** (see Commit Message Guidelines above) when committing your changes.
 
 1. **Test Rust build and core functionality:**
+
    ```bash
    cargo nextest run --profile=ci  # NEVER CANCEL - takes ~55s
-   make test                       # NEVER CANCEL - takes ~64s (integration tests with interpreter + JS backends, requires Node.js 24.0.2)
+   make test                       # NEVER CANCEL - takes ~64s (integration tests with interpreter + JS backends, **REQUIRES Node.js 24.0.2 exactly**)
    ```
 
 2. **Test WebAssembly bindings:**
+
    ```bash
    make test-bindings-js           # NEVER CANCEL - takes ~21s
    ```
 
 3. **Test CLI functionality with working example:**
+
    ```bash
    # This should output generated JavaScript and print "120" when executed
    ./target/release/tlang_cli_js tests/functions/pipeline/pipeline.tlang --output-type js | node
    ```
 
 4. **Test interpreter functionality:**
+
    ```bash
    # This should print "120"
    ./target/release/tlangdi tests/functions/pipeline/pipeline.tlang
@@ -144,10 +181,12 @@ ALWAYS manually validate any code changes through complete end-to-end scenarios:
    ```
 
 ### Required Linting and Validation
+
 ALWAYS run these before completing changes or CI will fail:
+
 ```bash
-# First install required Rust components if not already installed
-rustup component add clippy rustfmt
+# Ensure required Rust components are installed (should be done in bootstrap step 1)
+# rustup component add clippy rustfmt
 
 # Run Rust linting and formatting before any commits
 cargo clippy --fix --allow-dirty --lib --all-features    # Fix Rust linting issues automatically
@@ -164,6 +203,7 @@ npm run typecheck   # ~0.3s - TypeScript check
 ## Project Structure
 
 ### Key Crates (Rust workspace)
+
 - **tlang_lexer**: Tokenization and lexical analysis
 - **tlang_parser**: Parse tree generation
 - **tlang_ast**: Abstract syntax tree definitions
@@ -177,16 +217,19 @@ npm run typecheck   # ~0.3s - TypeScript check
 - **tlang_test_runner**: Integration test runner
 
 ### Frontend Components
+
 - **tlang-playground/**: Web-based playground (Vite + TypeScript + Lit)
 - **packages/**: Shared TypeScript packages including CodeMirror language support
 
 ### Test Structure
+
 - **tests/**: Integration tests organized by feature (enums, functions, loops, operators, strings, structs)
-- **crates/*/tests/**: Unit tests for individual crates
+- **crates/\*/tests/**: Unit tests for individual crates
 
 ## Common Tasks
 
 ### Repo Root Directory Listing
+
 ```
 .
 ..
@@ -211,30 +254,36 @@ tsconfig.json
 ```
 
 ### Understanding Test Failures
+
 - The `make test` command runs integration tests with both interpreter and JavaScript backends
+- **CRITICAL**: Tests require Node.js 24.0.2 exactly (specified in package.json volta config). Test failures with different Node.js versions are due to stack trace differences in expected output files.
 - Common failure causes:
-  1. **Node.js version mismatch**: Ensure you're using Node.js 24.0.2 (specified in package.json volta config)
-  2. **Stacktrace/line number differences**: When only stacktraces or line numbers differ, update the expected output instead of treating as real failure
+  1. **Node.js version mismatch**: Ensure you're using Node.js 24.0.2 exactly. Use `node --version` to verify. Do NOT update expected output files if using wrong Node.js version.
+  2. **Stacktrace/line number differences**: When only stacktraces or line numbers differ, verify you're using the correct Node.js version first before updating expected output.
 - Interpreter tests should always pass
 - Use CI results as authoritative - if tests pass on CI, local failures are likely environment issues
 - Focus on ensuring your changes don't break existing interpreter functionality
 
 ### Working with WebAssembly
+
 - WebAssembly build requires binaryen in PATH for optimization
 - Development builds: `wasm-pack build --dev --target web crates/tlang_bindings_js`
 - Production builds: `wasm-pack build --target web crates/tlang_bindings_js`
 - The playground automatically rebuilds WASM when starting dev server
 
 ### Language Features to Test
+
 When making changes, test these key language features:
+
 - **Function definitions and calls**: Pattern matching in function parameters
 - **Enums and pattern matching**: Option, Result, custom enums
-- **List operations**: Map, filter, fold with proper tail call optimization  
+- **List operations**: Map, filter, fold with proper tail call optimization
 - **Pipeline operator**: Functional composition with `|>`
 - **Tail call optimization**: Functions marked with `rec` keyword
 - **Struct definitions and methods**: Object-like data structures
 
 ### Example Working tlang Code
+
 ```tlang
 // map(a[], fn(a) -> b) -> b[]
 fn map([], _) { [] }
@@ -250,20 +299,23 @@ fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
 ## Troubleshooting
 
 ### Common Build Issues
+
 - **Missing wasm target**: Run `rustup target add wasm32-unknown-unknown`
 - **Wrong wasm-bindgen version**: Reinstall with exact version from Cargo.toml
 - **Binaryen not found**: Download and add to PATH as shown above
-- **Node.js version**: Project requires Node.js 24.0.2 (see package.json volta config)
+- **Node.js version**: Project requires Node.js 24.0.2 exactly (see package.json volta config). Use `node --version` to verify. Test failures with wrong Node.js versions are due to stack trace format differences in expected output files.
 
 ### Known Limitations
+
 - Some JavaScript backend tests fail due to panic handling differences
 - CLI requires file input (cannot use stdin directly)
 - WebAssembly builds require internet access to download binaryen
 - Build times are long due to the complexity of the compiler pipeline
 
 ### Time Expectations
+
 - Initial setup (tools installation): 5-7 minutes
-- Full rebuild from scratch: 2-3 minutes  
+- Full rebuild from scratch: 2-3 minutes
 - Incremental builds: 10-30 seconds
 - Test suite: 1-2 minutes
 - **NEVER CANCEL any build or test command before these time limits**

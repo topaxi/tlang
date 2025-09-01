@@ -4,8 +4,9 @@ version = "0.1.0"
 edition.workspace = true
 
 [dependencies]
-glob = "0.3"
+insta = { workspace = true, features = ["glob"] }
 regex = "1.11"
+serde_json = "1.0"
 
 [lints]
 workspace = true

@@ -1,0 +1,24 @@
+// Test for invalid escape sequences that should generate warnings
+// This should compile but generate semantic warnings
+
+fn test_invalid_escapes() {
+    // These should generate warnings for unknown escape sequences
+    let invalid1 = "Bad escape: \q";
+    let invalid2 = "Another bad: \x";
+    let invalid3 = "More bad: \z";
+    
+    // Mix valid and invalid
+    let mixed = "Good: \n, Bad: \w";
+    
+    // Invalid char literal
+    let bad_char = '\p';
+    
+    log("Testing invalid escapes");
+    invalid1 |> log();
+    invalid2 |> log();
+    invalid3 |> log();
+    mixed |> log();
+    bad_char |> log();
+}
+
+test_invalid_escapes();

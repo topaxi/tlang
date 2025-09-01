@@ -1,8 +1,8 @@
-use tlang_ast::symbols::SymbolType;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_hir_opt::HirOptimizer;
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
+use tlang_symbols::SymbolType;
 
 #[ctor::ctor]
 fn before_all() {

@@ -1,0 +1,13 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: output
+input_file: tests/structs/binary_tree.tlang
+---
+=== Binary Tree Operations Demo ===
+Tree built with values: 5, 3, 7, 1, 4, 6, 9
+Contains 4:
+true
+Contains 8:
+false
+Total nodes:
+7

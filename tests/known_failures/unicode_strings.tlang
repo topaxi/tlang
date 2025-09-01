@@ -1,0 +1,27 @@
+// Tests unicode and special string handling
+// May have different behavior between interpreter and JavaScript
+
+fn unicode_test() {
+    let unicode_str = "Hello 🌍";
+    unicode_str |> log();
+    
+    // Test string length with unicode
+    let length_test = "café";
+    length_test |> log();
+}
+
+fn special_chars_test() {
+    let newline_str = "line1
+line2";
+    newline_str |> log();
+    
+    let tab_str = "col1	col2";
+    tab_str |> log();
+    
+    let simple_str = "He said hello";
+    simple_str |> log();
+}
+
+log("=== Unicode and Special Characters Test ===");
+unicode_test();
+special_chars_test();

@@ -1,0 +1,13 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: output
+input_file: tests/enums/simple_calculator.tlang
+---
+=== Simple Calculator Demo ===
+Testing basic expressions:
+42
+15
+21
+10
+Complex expression result:
+50

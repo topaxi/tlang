@@ -1,5 +1,5 @@
 [profile.default]
-default-filter = "not package(tlang_bindings_js)"
+default-filter = "not package(tlang_bindings_js) and not package(tlang_test_runner)"
 
 [profile.ci]
 fail-fast = false

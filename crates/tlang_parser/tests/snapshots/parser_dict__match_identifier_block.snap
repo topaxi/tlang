@@ -1,0 +1,134 @@
+---
+source: crates/tlang_parser/tests/parser_dict.rs
+expression: "parse! (r\"match foo { _ => 1 }\")"
+---
+Module(
+  id: 2,
+  statements: [
+    Stmt(
+      id: 3,
+      kind: Expr(Expr(
+        id: 8,
+        kind: Match(MatchExpression(
+          expression: Expr(
+            id: 4,
+            kind: Path(Path(
+              segments: [
+                Ident(
+                  name: "foo",
+                  span: Span(
+                    start: LineColumn(
+                      line: 0,
+                      column: 6,
+                    ),
+                    end: LineColumn(
+                      line: 0,
+                      column: 9,
+                    ),
+                  ),
+                ),
+              ],
+              res: Res(
+                node_id: None,
+              ),
+              span: Span(
+                start: LineColumn(
+                  line: 0,
+                  column: 6,
+                ),
+                end: LineColumn(
+                  line: 0,
+                  column: 9,
+                ),
+              ),
+            )),
+            leading_comments: [],
+            trailing_comments: [],
+            span: Span(
+              start: LineColumn(
+                line: 0,
+                column: 6,
+              ),
+              end: LineColumn(
+                line: 0,
+                column: 9,
+              ),
+            ),
+          ),
+          arms: [
+            MatchArm(
+              id: 7,
+              pattern: Pat(
+                id: 5,
+                kind: Wildcard,
+                leading_comments: [],
+                trailing_comments: [],
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 12,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 13,
+                  ),
+                ),
+              ),
+              guard: None,
+              expression: Expr(
+                id: 6,
+                kind: Literal(UnsignedInteger(1)),
+                leading_comments: [],
+                trailing_comments: [],
+                span: Span(
+                  start: LineColumn(
+                    line: 0,
+                    column: 17,
+                  ),
+                  end: LineColumn(
+                    line: 0,
+                    column: 18,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        )),
+        leading_comments: [],
+        trailing_comments: [],
+        span: Span(
+          start: LineColumn(
+            line: 0,
+            column: 0,
+          ),
+          end: LineColumn(
+            line: 0,
+            column: 20,
+          ),
+        ),
+      )),
+      span: Span(
+        start: LineColumn(
+          line: 0,
+          column: 0,
+        ),
+        end: LineColumn(
+          line: 0,
+          column: 20,
+        ),
+      ),
+      leading_comments: [],
+      trailing_comments: [],
+    ),
+  ],
+  span: Span(
+    start: LineColumn(
+      line: 0,
+      column: 0,
+    ),
+    end: LineColumn(
+      line: 0,
+      column: 20,
+    ),
+  ),
+)

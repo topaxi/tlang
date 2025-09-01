@@ -25,6 +25,7 @@ tlang_macros = { path = "../../tlang_macros" }
 tlang_parser = { path = "../../tlang_parser" }
 tlang_semantics = { path = "../../tlang_semantics" }
 tlang_span = { path = "../../tlang_span" }
+tlang_symbols = { path = "../../tlang_symbols" }
 tlang_memory = { path = "../tlang_memory" }
 tlang_stdlib = { path = "../tlang_stdlib", optional = true }
 tlang_hir_opt = { path = "../../tlang_hir_opt" }

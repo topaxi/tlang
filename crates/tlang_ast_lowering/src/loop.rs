@@ -1,8 +1,8 @@
 use tlang_ast as ast;
 use tlang_ast::node::Ident;
-use tlang_ast::symbols::SymbolType;
 use tlang_hir::hir;
 use tlang_span::NodeId;
+use tlang_symbols::SymbolType;
 
 use crate::LoweringContext;
 

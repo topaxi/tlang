@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use log::debug;
-use tlang_ast::symbols::SymbolTable;
 use tlang_hir::hir;
 use tlang_span::{HirId, HirIdAllocator};
+use tlang_symbols::SymbolTable;
 
 pub struct HirOptContext {
     pub symbols: HashMap<HirId, Rc<RefCell<SymbolTable>>>,
@@ -99,7 +99,7 @@ impl Default for HirOptimizer {
         Self::new(vec![
             Box::new(crate::symbol_resolution::SymbolResolution::default()),
             Box::new(crate::constant_folding::ConstantFolding::default()),
-            Box::new(crate::slot_allocation::SlotAllocator::default()),
+            Box::new(crate::slot_allocation::SlotAllocation::default()),
         ])
     }
 }

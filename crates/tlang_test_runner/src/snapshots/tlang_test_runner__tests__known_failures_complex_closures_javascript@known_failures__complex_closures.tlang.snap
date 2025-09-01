@@ -1,0 +1,15 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+description: Known failure - output may not match expected
+expression: output
+input_file: tests/known_failures/complex_closures.tlang
+---
+=== Complex Closures Test ===
+1
+2
+1
+2
+4
+2
+4
+2

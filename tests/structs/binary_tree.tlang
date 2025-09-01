@@ -1,0 +1,73 @@
+// Binary Tree Operations
+// Demonstrates: recursion, pattern matching, complex data structures
+
+enum Tree {
+    Empty,
+    Node { value: int, left: Tree, right: Tree },
+}
+
+// insert(Tree, int) -> Tree
+fn insert(Tree::Empty, value) {
+    Tree::Node { value: value, left: Tree::Empty, right: Tree::Empty }
+}
+fn insert(Tree::Node { value: node_val, left: left_tree, right: right_tree }, value) {
+    if value < node_val {
+        Tree::Node { 
+            value: node_val, 
+            left: insert(left_tree, value), 
+            right: right_tree 
+        }
+    } else {
+        Tree::Node { 
+            value: node_val, 
+            left: left_tree, 
+            right: insert(right_tree, value) 
+        }
+    }
+}
+
+// contains(Tree, int) -> bool
+fn contains(Tree::Empty, _) { false }
+fn contains(Tree::Node { value: node_val, left: left_tree, right: right_tree }, value) {
+    if value == node_val {
+        true
+    } else if value < node_val {
+        contains(left_tree, value)
+    } else {
+        contains(right_tree, value)
+    }
+}
+
+// count_nodes(Tree) -> int
+fn count_nodes(Tree::Empty) { 0 }
+fn count_nodes(Tree::Node { value: _, left: left_tree, right: right_tree }) {
+    1 + count_nodes(left_tree) + count_nodes(right_tree)
+}
+
+// Demo: Build and query a binary search tree
+log("=== Binary Tree Operations Demo ===");
+
+let empty_tree = Tree::Empty;
+
+// Build tree by inserting values
+let tree = empty_tree
+|> insert(5)
+|> insert(3)
+|> insert(7)
+|> insert(1)
+|> insert(4)
+|> insert(6)
+|> insert(9);
+
+log("Tree built with values: 5, 3, 7, 1, 4, 6, 9");
+
+// Test contains operations
+log("Contains 4:");
+tree |> contains(4) |> log();
+
+log("Contains 8:");
+tree |> contains(8) |> log();
+
+// Count nodes
+log("Total nodes:");
+tree |> count_nodes() |> log();

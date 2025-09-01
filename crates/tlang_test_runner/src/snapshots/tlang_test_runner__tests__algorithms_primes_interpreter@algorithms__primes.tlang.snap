@@ -1,0 +1,25 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: output
+input_file: tests/algorithms/primes.tlang
+---
+=== Prime Number Demo ===
+Testing is_prime function:
+false
+true
+true
+false
+true
+true
+false
+true
+true
+First 15 primes:
+[2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]
+Twin primes under 30:
+[3, 5, 7, 11, 13, 17, 19, 29]
+Prime counts in different ranges:
+4
+4
+2
+2

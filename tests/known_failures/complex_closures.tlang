@@ -1,0 +1,45 @@
+// Tests complex closures that may have issues in JavaScript backend
+// Demonstrates state management with closures
+
+fn create_stateful_counter() {
+    let count = 0;
+    let step = 1;
+    
+    fn(operation) {
+        if operation == "inc" {
+            count = count + step;
+            count
+        } else if operation == "dec" {
+            count = count - step;
+            count
+        } else if operation == "step" {
+            step = step + 1;
+            step
+        } else if operation == "get" {
+            count
+        } else {
+            -1
+        }
+    }
+}
+
+fn test_multiple_closures() {
+    let counter1 = create_stateful_counter();
+    let counter2 = create_stateful_counter();
+    
+    // Test that closures maintain separate state
+    counter1("inc") |> log();    // 1
+    counter1("inc") |> log();    // 2
+    counter2("inc") |> log();    // 1 (separate state)
+    
+    counter1("step") |> log();   // 2 (step is now 2)
+    counter1("inc") |> log();    // 4 (2 + 2)
+    counter2("inc") |> log();    // 2 (still step 1)
+    
+    counter1("get") |> log();    // 4
+    counter2("get") |> log();    // 2
+    "done"
+}
+
+log("=== Complex Closures Test ===");
+test_multiple_closures();

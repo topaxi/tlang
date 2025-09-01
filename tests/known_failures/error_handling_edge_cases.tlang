@@ -1,0 +1,102 @@
+// Tests error handling and edge cases that may behave differently in JavaScript backend
+// Panic handling, division by zero, out of bounds access, null references
+
+// Function that should panic on certain inputs
+fn risky_divide(a, b) {
+    if b == 0 {
+        panic("Division by zero!");
+    } else {
+        a / b
+    }
+}
+
+// Function that accesses list elements without bounds checking
+fn unsafe_list_access(list, index) {
+    match list {
+        [] => panic("Empty list access!"),
+        [x] if index == 0 => x,
+        [x] => panic("Index out of bounds!"),
+        [x, ...xs] if index == 0 => x,
+        [_, ...xs] => unsafe_list_access(xs, index - 1),
+    }
+}
+
+// Recursive function that might cause stack overflow
+fn deep_recursion(n) {
+    if n <= 0 {
+        panic("Reached dangerous recursion depth!");
+    } else if n == 1 {
+        1
+    } else {
+        n + deep_recursion(n - 1)
+    }
+}
+
+// Function with multiple potential failure points
+fn complex_computation(x, y, z) {
+    let step1 = risky_divide(x, y - 5);
+    let step2 = risky_divide(step1, z);
+    let step3 = deep_recursion(step2);
+    step3
+}
+
+// Test Option unwrapping that might panic
+fn test_option_unwrap() {
+    let some_val = Option::Some(42);
+    let none_val = Option::None;
+    
+    some_val.unwrap() |> log();
+    none_val.unwrap() |> log(); // This should panic
+}
+
+// Test Result error propagation
+enum MyResult {
+    Ok(i32),
+    Error(string),
+}
+
+fn fallible_operation(x) {
+    if x < 0 {
+        MyResult::Error("Negative input not allowed")
+    } else if x > 100 {
+        MyResult::Error("Input too large")
+    } else {
+        MyResult::Ok(x * 2)
+    }
+}
+
+fn chain_fallible_operations(x) {
+    match fallible_operation(x) {
+        MyResult::Ok(result1) => {
+            match fallible_operation(result1) {
+                MyResult::Ok(result2) => MyResult::Ok(result2 + 10),
+                MyResult::Error(msg) => MyResult::Error(msg),
+            }
+        },
+        MyResult::Error(msg) => MyResult::Error(msg),
+    }
+}
+
+log("=== Error Handling Edge Cases Test ===");
+
+// Test normal operations first
+risky_divide(10, 2) |> log();
+unsafe_list_access([1, 2, 3, 4, 5], 2) |> log();
+deep_recursion(5) |> log();
+
+// Test error cases that should be handled differently in JS vs interpreter
+log("Testing error cases...");
+
+// These might panic or behave differently
+risky_divide(10, 0);  // Division by zero
+unsafe_list_access([], 0);  // Empty list access
+unsafe_list_access([1, 2], 5);  // Out of bounds
+deep_recursion(1000);  // Stack overflow risk
+
+// Test Option panics
+test_option_unwrap();
+
+// Test Result chains
+chain_fallible_operations(50) |> log();
+chain_fallible_operations(-5) |> log();
+chain_fallible_operations(150) |> log();

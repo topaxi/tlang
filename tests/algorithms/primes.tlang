@@ -1,0 +1,89 @@
+// Prime number generation and testing
+// Demonstrates: mathematical computation, list processing, algorithms
+
+// Helper functions
+fn range(start, end) {
+    if start >= end {
+        []
+    } else {
+        [start, ...range(start + 1, end)]
+    }
+}
+
+fn length([]) { 0 }
+fn length([_, ...xs]) { 1 + length(xs) }
+
+fn filter([], _) { [] }
+fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
+fn filter([_, ...xs], f) { rec filter(xs, f) }
+
+fn map([], _) { [] }
+fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
+
+// is_prime(int) -> bool
+fn is_prime(n) {
+    if n < 2 {
+        false
+    } else if n == 2 {
+        true
+    } else if n % 2 == 0 {
+        false
+    } else {
+        is_prime_helper(n, 3)
+    }
+}
+
+// Helper for checking odd divisors up to sqrt(n)
+fn is_prime_helper(n, divisor) {
+    if divisor * divisor > n {
+        true
+    } else if n % divisor == 0 {
+        false
+    } else {
+        rec is_prime_helper(n, divisor + 2)
+    }
+}
+
+// Generate primes up to n using simple sieve approach
+fn primes_up_to(n) {
+    range(2, n + 1) |> filter(is_prime)
+}
+
+// Count primes in a range
+fn count_primes(start, end) {
+    range(start, end + 1) |> filter(is_prime) |> length()
+}
+
+// Check if a number is a twin prime (prime where p+2 or p-2 is also prime)
+fn is_twin_prime(p) {
+    is_prime(p) && (is_prime(p + 2) || is_prime(p - 2))
+}
+
+log("=== Prime Number Demo ===");
+
+// Test prime checking on specific numbers
+log("Testing is_prime function:");
+is_prime(1) |> log();  // false
+is_prime(2) |> log();  // true
+is_prime(3) |> log();  // true
+is_prime(4) |> log();  // false
+is_prime(5) |> log();  // true
+is_prime(17) |> log(); // true
+is_prime(25) |> log(); // false
+is_prime(29) |> log(); // true
+is_prime(97) |> log(); // true
+
+// Generate first several primes
+log("First 15 primes:");
+primes_up_to(50) |> log();
+
+// Find twin primes in a range
+log("Twin primes under 30:");
+primes_up_to(30) |> filter(is_twin_prime) |> log();
+
+// Count primes in ranges
+log("Prime counts in different ranges:");
+count_primes(1, 10) |> log();   // 4 primes: 2,3,5,7
+count_primes(11, 20) |> log();  // 4 primes: 11,13,17,19
+count_primes(21, 30) |> log();  // 2 primes: 23,29
+count_primes(31, 40) |> log();  // 2 primes: 31,37

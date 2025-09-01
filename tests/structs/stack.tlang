@@ -1,0 +1,76 @@
+// Stack data structure implementation
+// Demonstrates: data structures, algebraic data types, methods
+
+// Stack operations using lists
+fn empty_stack() { [] }
+
+fn push(stack, item) { [item, ...stack] }
+
+fn pop([]) { Option::None }
+fn pop([top, ...rest]) { Option::Some([top, rest]) }
+
+fn peek([]) { Option::None }
+fn peek([top, ...rest]) { Option::Some(top) }
+
+fn is_empty([]) { true }
+fn is_empty(_) { false }
+
+fn stack_size([]) { 0 }
+fn stack_size([_, ...rest]) { 1 + stack_size(rest) }
+
+// Helper to convert stack to list for display
+fn stack_to_list(stack) { stack }
+
+log("=== Stack Data Structure Demo ===");
+
+// Test stack operations
+log("Creating empty stack:");
+let stack = empty_stack();
+is_empty(stack) |> log();  // true
+stack_size(stack) |> log(); // 0
+
+log("Pushing elements 1, 2, 3:");
+stack = push(stack, 1);
+stack = push(stack, 2);
+stack = push(stack, 3);
+stack_to_list(stack) |> log(); // [3, 2, 1]
+stack_size(stack) |> log();    // 3
+
+log("Peek at top element:");
+let peek_result = peek(stack);
+peek_result.is_some() |> log(); // true
+peek_result.unwrap() |> log();  // 3
+
+log("Pop elements:");
+let pop_result = pop(stack);
+pop_result.is_some() |> log(); // true
+
+let popped_data = pop_result.unwrap();
+let popped_value = popped_data[0];
+let new_stack = popped_data[1];
+
+popped_value |> log();         // 3
+stack_to_list(new_stack) |> log(); // [2, 1]
+stack_size(new_stack) |> log();    // 2
+
+// Pop until empty
+let result2 = pop(new_stack);
+let data2 = result2.unwrap();
+let value2 = data2[0];
+let stack2 = data2[1];
+
+value2 |> log(); // 2
+stack_to_list(stack2) |> log(); // [1]
+
+let result3 = pop(stack2);
+let data3 = result3.unwrap();
+let value3 = data3[0];
+let stack3 = data3[1];
+
+value3 |> log(); // 1
+stack_to_list(stack3) |> log(); // []
+is_empty(stack3) |> log(); // true
+
+// Try to pop from empty stack
+let empty_pop = pop(stack3);
+empty_pop.is_none() |> log(); // true

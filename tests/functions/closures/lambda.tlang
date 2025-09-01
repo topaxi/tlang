@@ -1,0 +1,37 @@
+// Test that verifies lambda functions have their scope data properly set
+// This should compile and run without scope warnings
+
+// Simple lambda with local variable
+let add_one = fn (x) {
+   let result = x + 1;
+   result
+};
+
+// Lambda that captures from outer scope
+let multiplier = 3;
+let multiply = fn (x) {
+   let temp = x * multiplier;
+   temp
+};
+
+// Lambda in higher-order function
+fn apply_twice(f, x) {
+   f(f(x))
+}
+
+let double = fn (x) { x * 2 };
+
+// Test the lambdas
+add_one(5) |> log();
+multiply(4) |> log();
+apply_twice(double, 3) |> log();
+
+// Test lambda with more complex local state
+let complex_lambda = fn (a, b, c) {
+   let sum = a + b;
+   let product = sum * c;
+   let final_result = product + 10;
+   final_result
+};
+
+complex_lambda(1, 2, 3) |> log();
