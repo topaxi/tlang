@@ -1,7 +1,7 @@
 use tlang_ast::node::Ident;
 use tlang_hir::{Visitor, hir, visit};
 use tlang_hir_opt::{HirOptContext, HirPass};
-use tlang_span::{Span, HirId};
+use tlang_span::{HirId, Span};
 
 #[derive(Debug, Default)]
 pub struct HirJsPass {
@@ -92,7 +92,7 @@ impl HirJsPass {
         ctx: &mut HirOptContext,
     ) -> (hir::Stmt, Vec<hir::Stmt>) {
         let mut temp_stmts = Vec::new();
-        
+
         // Clone the original statement for reference to preserve comments
         let original_stmt = stmt.clone();
 

@@ -1,9 +1,0 @@
----
-source: crates/tlang_codegen_js/tests/hir_js_pass.rs
-expression: pretty_print(&hir)
----
-fn main() -> unknown {
-    let x: unknown = 1;
-    let y: unknown = 2;
-    (x + y)
-}
