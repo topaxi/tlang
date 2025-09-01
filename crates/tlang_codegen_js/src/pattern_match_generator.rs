@@ -432,27 +432,14 @@ impl CodegenJS {
         // Add a semicolon after the if-else statement when we have a completion variable
         if self.current_completion_variable().is_some() && 
            self.current_completion_variable() != Some("return") &&
-           !self.is_in_loop_context() &&
            lhs.is_empty() {
-            // Add a semicolon after the if-else statement
+            // Add a semicolon after the if-else statement - SIMPLE VERSION
             self.push_char(';');
-            // Don't output the completion variable - it should be handled by the variable assignment
-        } else if (has_block_completions && self.current_completion_variable() != Some("return")) || 
-                  (self.is_in_loop_context() && self.current_completion_variable().is_some() && self.current_completion_variable() != Some("return")) {
+            // DEBUG: This should NOT output the completion variable
+        } else if has_block_completions && self.current_completion_variable() != Some("return") {
             self.push_newline();
             // If we have an lhs, put the completion var as the rhs of the lhs.
-            // Otherwise, we assign the completion_var to the previous completion_var.
-            if lhs.is_empty() {
-                // For loop contexts, don't generate additional assignments - the __TEMP_VAR_MATCH__ mechanism handles it
-                if !self.is_in_loop_context() {
-                    self.push_indent();
-                    let completion_var = self.current_completion_variable().unwrap().to_string();
-                    self.push_str(&completion_var);
-                    self.push_str(" = ");
-                    self.push_current_completion_variable();
-                    self.push_newline();
-                }
-            } else {
+            if !lhs.is_empty() {
                 self.push_str(lhs);
                 self.push_current_completion_variable();
             }

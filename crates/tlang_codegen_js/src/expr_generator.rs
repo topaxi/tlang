@@ -604,8 +604,9 @@ impl CodegenJS {
                             Some(temp_name),
                         );
                         
-                        // For expression contexts (like binary assignments), output the completion variable
-                        // The match expression was generated with this completion variable, so use it directly
+                        // Output the completion variable name for assignment
+                        // But this needs to be handled differently - the match logic should be
+                        // separate statements, not embedded in the assignment expression
                         self.push_str(temp_name);
                     }
                     return;
