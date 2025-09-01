@@ -81,7 +81,8 @@ impl CodegenJS {
                         }
                     } else {
                         self.push_indent();
-                        let completion_var = self.current_completion_variable().unwrap().to_string();
+                        let completion_var =
+                            self.current_completion_variable().unwrap().to_string();
                         self.push_str(&completion_var);
                         self.push_str(" = ");
                         self.generate_expr(expr, None);
@@ -90,7 +91,6 @@ impl CodegenJS {
                 }
             }
         }
-
     }
 
     fn get_pat_identifiers(pattern: &hir::Pat) -> Vec<String> {
@@ -430,10 +430,12 @@ impl CodegenJS {
 
     fn finalize_match_expression(&mut self, lhs: &str, has_block_completions: bool) {
         // Add a semicolon after the if-else statement when we have a completion variable
-        if self.current_completion_variable().is_some() && 
-           self.current_completion_variable() != Some("return") &&
-           lhs.is_empty() &&
-           !self.is_in_loop_context() {  // Don't add semicolon in loop contexts
+        if self.current_completion_variable().is_some()
+            && self.current_completion_variable() != Some("return")
+            && lhs.is_empty()
+            && !self.is_in_loop_context()
+        {
+            // Don't add semicolon in loop contexts
             // Add a semicolon after the if-else statement - SIMPLE VERSION
             self.push_char(';');
             // DEBUG: This should NOT output the completion variable
@@ -465,7 +467,7 @@ impl CodegenJS {
             self.push_completion_variable(Some(var));
             // Make sure the variable is registered in the scope so subsequent declare_tmp_variable calls work correctly
             self.current_scope().declare_variable_alias(var, var);
-            
+
             if var == "accumulator$$" {
                 // Don't declare accumulator$$ since it's already declared by the for loop
                 (String::new(), false)

@@ -68,6 +68,11 @@ impl Scope {
 
     pub(crate) fn declare_variable_alias(&mut self, from: &str, to: &str) {
         self.insert_variable(from, to);
+
+        // If this is a temp variable alias, update the latest temp variable tracking
+        if from.starts_with("$tmp$") && from == to {
+            self.latest_temp_var = Some(from.to_string());
+        }
     }
 
     fn get_unique_variable_name(&self, prefix: &str) -> String {
@@ -89,12 +94,12 @@ impl Scope {
         let tmp_var_name = self.get_unique_variable_name(prefix);
         self.variables
             .insert(tmp_var_name.clone(), tmp_var_name.clone());
-        
+
         // Track the latest temp variable if it's a $tmp$ variable
         if prefix == "$tmp$" {
             self.latest_temp_var = Some(tmp_var_name.clone());
         }
-        
+
         tmp_var_name
     }
 

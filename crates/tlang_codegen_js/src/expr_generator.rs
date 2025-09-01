@@ -602,7 +602,7 @@ impl CodegenJS {
                             match_arms,
                             Some(temp_name),
                         );
-                        
+
                         // Note: Do not output temp variable name here - HIR JS pass handles assignment separately
                     }
                     return;
@@ -678,12 +678,12 @@ impl CodegenJS {
         // Handle block completion if exists - this would be the default return value
         if let Some(completion_expr) = &block.expr {
             self.push_indent();
-            
+
             // Generate the expression and capture the result in the temp variable
             // The pattern match will assign the result to the temp variable through finalization
             self.generate_expr_with_loop_temp_var(completion_expr, temp_var, None);
             self.push_newline();
-            
+
             // The pattern match generator will handle the accumulator assignment in loop context
             // through its finalize_match_expression function, so we don't need to do it here
         }
@@ -694,8 +694,24 @@ impl CodegenJS {
         // At the end of the loop, assign the accumulator value to the temp variable
         // This ensures the loop result is the final accumulator value
         self.push_indent();
-        self.push_str(temp_var);
-        self.push_str(" = accumulator$$");
+
+        // For loops in loop context, the pattern match might use a different completion variable
+        // than the one provided, so we need to get the correct one to use
+        if self.is_in_loop_context() {
+            let actual_completion_var = self.current_scope().get_latest_temp_variable();
+            if actual_completion_var != temp_var && actual_completion_var.starts_with("$tmp$") {
+                // Use the actual completion variable that was created by the pattern match
+                self.push_str(temp_var);
+                self.push_str(" = ");
+                self.push_str(&actual_completion_var);
+            } else {
+                self.push_str(temp_var);
+                self.push_str(" = accumulator$$");
+            }
+        } else {
+            self.push_str(temp_var);
+            self.push_str(" = accumulator$$");
+        }
         self.push_newline();
 
         self.dec_indent();
@@ -718,8 +734,8 @@ impl CodegenJS {
                     hir::ExprKind::Binary(hir::BinaryOpKind::Assign, _, rhs) => {
                         // If the RHS is a match expression, don't add semicolon
                         !matches!(rhs.kind, hir::ExprKind::Match(..))
-                    },
-                    _ => false  // Conservative: don't add semicolons in loop temp var context
+                    }
+                    _ => false, // Conservative: don't add semicolons in loop temp var context
                 };
 
                 if needs_semicolon {

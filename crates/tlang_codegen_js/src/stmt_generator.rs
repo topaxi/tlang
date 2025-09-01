@@ -29,15 +29,15 @@ impl CodegenJS {
                                 self.push_str("{");
                                 self.push_newline();
                                 self.inc_indent();
-                                
+
                                 // Generate the block statements (e.g., let iterator$$ = ...)
                                 for stmt in &block.stmts {
                                     self.generate_stmt(stmt);
                                 }
-                                
+
                                 // Generate the loop as a statement
                                 self.generate_loop_statement(loop_block);
-                                
+
                                 self.dec_indent();
                                 self.push_indent();
                                 self.push_str("}");
@@ -331,54 +331,49 @@ impl CodegenJS {
     fn is_for_loop_pattern(&self, block: &hir::Block) -> bool {
         // Check if the block has iterator setup statements
         let has_iterator_setup = block.stmts.iter().any(|stmt| {
-            if let hir::StmtKind::Let(pat, _expr, _) = &stmt.kind {
-                if let hir::PatKind::Identifier(_, ident) = &pat.kind {
-                    if ident.as_str().contains("iterator$$") {
-                        return true;
-                    }
-                }
+            if let hir::StmtKind::Let(pat, _expr, _) = &stmt.kind
+                && let hir::PatKind::Identifier(_, ident) = &pat.kind
+                && ident.as_str().contains("iterator$$")
+            {
+                return true;
             }
             false
         });
 
         // Check if the block has pattern matching statements that check iterator results
-        let has_iterator_pattern_matching = block.stmts.iter().any(|stmt| {
-            let result = self.statement_contains_iterator_pattern_matching(stmt);
-            result
-        });
+        let has_iterator_pattern_matching = block
+            .stmts
+            .iter()
+            .any(|stmt| self.statement_contains_iterator_pattern_matching(stmt));
 
         // Also check the block completion expression for pattern matching
         let completion_has_pattern_matching = if let Some(completion_expr) = &block.expr {
             match &completion_expr.kind {
                 hir::ExprKind::Loop(loop_block) => {
                     // Check if the loop block contains pattern matching
-                    let loop_has_pattern_matching = loop_block.stmts.iter().any(|stmt| {
-                        self.statement_contains_iterator_pattern_matching(stmt)
-                    }) || loop_block.expr.as_ref().map_or(false, |expr| {
-                        self.expr_contains_iterator_pattern_matching(expr)
-                    });
-                    loop_has_pattern_matching
+
+                    loop_block
+                        .stmts
+                        .iter()
+                        .any(|stmt| self.statement_contains_iterator_pattern_matching(stmt))
+                        || loop_block
+                            .expr
+                            .as_ref()
+                            .is_some_and(|expr| self.expr_contains_iterator_pattern_matching(expr))
                 }
-                _ => {
-                    let result = self.expr_contains_iterator_pattern_matching(completion_expr);
-                    result
-                }
+                _ => self.expr_contains_iterator_pattern_matching(completion_expr),
             }
         } else {
             false
         };
 
-        let is_for_loop = has_iterator_setup && (has_iterator_pattern_matching || completion_has_pattern_matching);
-        is_for_loop
+        has_iterator_setup && (has_iterator_pattern_matching || completion_has_pattern_matching)
     }
 
     /// Check if a statement contains iterator pattern matching
     fn statement_contains_iterator_pattern_matching(&self, stmt: &hir::Stmt) -> bool {
         match &stmt.kind {
-            hir::StmtKind::Expr(expr) => {
-                let result = self.expr_contains_iterator_pattern_matching(expr);
-                result
-            }
+            hir::StmtKind::Expr(expr) => self.expr_contains_iterator_pattern_matching(expr),
             _ => false,
         }
     }
@@ -390,13 +385,13 @@ impl CodegenJS {
                 // Check if this is a match on iterator results with Option patterns
                 arms.iter().any(|arm| {
                     // Look for Option::None patterns with break expressions
-                    if let hir::PatKind::Enum(path, _) = &arm.pat.kind {
-                        if path.segments.len() >= 1 {
-                            let segment = &path.segments[path.segments.len() - 1];
-                            if segment.ident.as_str() == "None" {
-                                // Check if the consequence has a break expression
-                                return self.block_contains_break(&arm.block);
-                            }
+                    if let hir::PatKind::Enum(path, _) = &arm.pat.kind
+                        && !path.segments.is_empty()
+                    {
+                        let segment = &path.segments[path.segments.len() - 1];
+                        if segment.ident.as_str() == "None" {
+                            // Check if the consequence has a break expression
+                            return self.block_contains_break(&arm.block);
                         }
                     }
                     false
@@ -405,7 +400,9 @@ impl CodegenJS {
             hir::ExprKind::IfElse(_, then_branch, else_branches) => {
                 // Check if this is an if-else pattern that handles Option results
                 let then_has_break = self.block_contains_break(then_branch);
-                let else_has_break = else_branches.iter().any(|else_branch| self.block_contains_break(&else_branch.consequence));
+                let else_has_break = else_branches
+                    .iter()
+                    .any(|else_branch| self.block_contains_break(&else_branch.consequence));
                 then_has_break || else_has_break
             }
             _ => false,
@@ -414,8 +411,14 @@ impl CodegenJS {
 
     /// Check if a block contains break expressions
     fn block_contains_break(&self, block: &hir::Block) -> bool {
-        block.stmts.iter().any(|stmt| self.statement_contains_break(stmt)) ||
-        block.expr.as_ref().map_or(false, |expr| self.expr_contains_break(expr))
+        block
+            .stmts
+            .iter()
+            .any(|stmt| self.statement_contains_break(stmt))
+            || block
+                .expr
+                .as_ref()
+                .is_some_and(|expr| self.expr_contains_break(expr))
     }
 
     /// Check if a statement contains break expressions
@@ -439,27 +442,27 @@ impl CodegenJS {
         self.inc_indent();
 
         // Generate iterator setup statements first - ensure they are properly output
-        for (_i, stmt) in block.stmts.iter().enumerate() {
+        for stmt in &block.stmts {
             if self.is_iterator_setup_statement(stmt) {
                 // Force generation of iterator setup by handling it directly
-                if let hir::StmtKind::Let(pat, expr, _) = &stmt.kind {
-                    if let hir::PatKind::Identifier(_, ident) = &pat.kind {
-                        if ident.as_str().contains("iterator$$") || ident.as_str().contains("accumulator$$") {
-                            // Generate the statement with proper indentation and context
-                            self.push_indent();
-                            self.push_str("let ");
-                            self.push_str(ident.as_str());
-                            self.push_str(" = ");
-                            self.generate_expr(expr, None);
-                            self.push_str(";");
-                            self.push_newline();
-                            
-                            // Force flush the statement buffer
-                            self.flush_statement_buffer();
-                            
-                            continue;
-                        }
-                    }
+                if let hir::StmtKind::Let(pat, expr, _) = &stmt.kind
+                    && let hir::PatKind::Identifier(_, ident) = &pat.kind
+                    && (ident.as_str().contains("iterator$$")
+                        || ident.as_str().contains("accumulator$$"))
+                {
+                    // Generate the statement with proper indentation and context
+                    self.push_indent();
+                    self.push_str("let ");
+                    self.push_str(ident.as_str());
+                    self.push_str(" = ");
+                    self.generate_expr(expr, None);
+                    self.push_str(";");
+                    self.push_newline();
+
+                    // Force flush the statement buffer
+                    self.flush_statement_buffer();
+
+                    continue;
                 }
                 // Fallback to normal statement generation
                 self.generate_stmt(stmt);
@@ -468,13 +471,13 @@ impl CodegenJS {
 
         // Also handle accumulator statements
         for stmt in &block.stmts {
-            if let hir::StmtKind::Let(pat, expr, _) = &stmt.kind {
-                if let hir::PatKind::Identifier(_, ident) = &pat.kind {
-                    if ident.as_str().contains("accumulator$$") && !self.is_iterator_setup_statement(stmt) {
-                        self.push_indent();
-                        self.generate_variable_declaration(pat, expr);
-                    }
-                }
+            if let hir::StmtKind::Let(pat, expr, _) = &stmt.kind
+                && let hir::PatKind::Identifier(_, ident) = &pat.kind
+                && ident.as_str().contains("accumulator$$")
+                && !self.is_iterator_setup_statement(stmt)
+            {
+                self.push_indent();
+                self.generate_variable_declaration(pat, expr);
             }
         }
 
@@ -483,7 +486,7 @@ impl CodegenJS {
         self.push_str("for (;;) {");
         self.push_newline();
         self.inc_indent();
-        
+
         // Force flush to ensure for loop wrapper appears
         self.flush_statement_buffer();
 
@@ -492,7 +495,8 @@ impl CodegenJS {
 
         // Generate non-iterator-setup statements inside the loop
         for stmt in &block.stmts {
-            if !self.is_iterator_setup_statement(stmt) && !self.is_accumulator_setup_statement(stmt) {
+            if !self.is_iterator_setup_statement(stmt) && !self.is_accumulator_setup_statement(stmt)
+            {
                 self.generate_stmt_in_loop_context(stmt);
             }
         }
@@ -504,7 +508,7 @@ impl CodegenJS {
                 for stmt in &loop_block.stmts {
                     self.generate_stmt_in_loop_context(stmt);
                 }
-                
+
                 if let Some(loop_completion_expr) = &loop_block.expr {
                     self.push_indent();
                     self.generate_expr_in_loop_context(loop_completion_expr, None);
@@ -542,24 +546,22 @@ impl CodegenJS {
 
     /// Check if a statement is iterator setup (should be outside the loop)
     fn is_iterator_setup_statement(&self, stmt: &hir::Stmt) -> bool {
-        if let hir::StmtKind::Let(pat, _expr, _) = &stmt.kind {
-            if let hir::PatKind::Identifier(_, ident) = &pat.kind {
-                if ident.as_str().contains("iterator$$") {
-                    return true;
-                }
-            }
+        if let hir::StmtKind::Let(pat, _expr, _) = &stmt.kind
+            && let hir::PatKind::Identifier(_, ident) = &pat.kind
+            && ident.as_str().contains("iterator$$")
+        {
+            return true;
         }
         false
     }
 
     /// Check if a statement is accumulator setup (should be outside the loop)
     fn is_accumulator_setup_statement(&self, stmt: &hir::Stmt) -> bool {
-        if let hir::StmtKind::Let(pat, _expr, _) = &stmt.kind {
-            if let hir::PatKind::Identifier(_, ident) = &pat.kind {
-                if ident.as_str().contains("accumulator$$") {
-                    return true;
-                }
-            }
+        if let hir::StmtKind::Let(pat, _expr, _) = &stmt.kind
+            && let hir::PatKind::Identifier(_, ident) = &pat.kind
+            && ident.as_str().contains("accumulator$$")
+        {
+            return true;
         }
         false
     }
