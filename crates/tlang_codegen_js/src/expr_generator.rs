@@ -593,8 +593,7 @@ impl CodegenJS {
                     && let hir::ExprKind::Literal(lit) = &call_expr.arguments[0].kind
                     && let tlang_ast::token::Literal::String(temp_name) = lit.as_ref()
                 {
-                    // Generate the match expression as a statement with the specific completion variable
-                    // The temp variable declaration will be handled by the match generator itself
+                    // Generate the match expression with the completion variable
                     if let hir::ExprKind::Match(match_expr, match_arms) =
                         &call_expr.arguments[1].kind
                     {
@@ -604,9 +603,7 @@ impl CodegenJS {
                             Some(temp_name),
                         );
                         
-                        // Output the completion variable name for assignment
-                        // But this needs to be handled differently - the match logic should be
-                        // separate statements, not embedded in the assignment expression
+                        // For assignment expressions, output the temp variable name
                         self.push_str(temp_name);
                     }
                     return;
