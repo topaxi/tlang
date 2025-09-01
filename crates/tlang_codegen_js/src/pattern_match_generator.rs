@@ -429,8 +429,17 @@ impl CodegenJS {
     }
 
     fn finalize_match_expression(&mut self, lhs: &str, has_block_completions: bool) {
-        if (has_block_completions && self.current_completion_variable() != Some("return")) || 
-           (self.is_in_loop_context() && self.current_completion_variable().is_some() && self.current_completion_variable() != Some("return")) {
+        // If we have a completion variable and we're not in a special context, 
+        // add a semicolon after the if-else statement
+        if self.current_completion_variable().is_some() && 
+           self.current_completion_variable() != Some("return") &&
+           !self.is_in_loop_context() &&
+           lhs.is_empty() {
+            // Add a semicolon after the if-else statement
+            self.push_char(';');
+            // Don't output the completion variable here - let other logic handle it
+        } else if (has_block_completions && self.current_completion_variable() != Some("return")) || 
+                  (self.is_in_loop_context() && self.current_completion_variable().is_some() && self.current_completion_variable() != Some("return")) {
             self.push_newline();
             // If we have an lhs, put the completion var as the rhs of the lhs.
             // Otherwise, we assign the completion_var to the previous completion_var.
