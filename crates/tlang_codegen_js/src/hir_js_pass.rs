@@ -1,7 +1,7 @@
 use tlang_ast::node::Ident;
 use tlang_hir::{Visitor, hir, visit};
 use tlang_hir_opt::{HirOptContext, HirPass};
-use tlang_span::Span;
+use tlang_span::{Span, HirId};
 
 #[derive(Debug, Default)]
 pub struct HirJsPass {
@@ -14,6 +14,23 @@ impl HirJsPass {
         Self {
             temp_var_counter: 0,
             changes_made: false,
+        }
+    }
+
+    /// Create a new statement while preserving comments from the original statement
+    fn create_stmt_preserving_comments(
+        &self,
+        hir_id: HirId,
+        kind: hir::StmtKind,
+        span: Span,
+        original_stmt: &hir::Stmt,
+    ) -> hir::Stmt {
+        hir::Stmt {
+            hir_id,
+            kind,
+            span,
+            leading_comments: original_stmt.leading_comments.clone(),
+            trailing_comments: original_stmt.trailing_comments.clone(),
         }
     }
 
@@ -63,6 +80,7 @@ impl HirJsPass {
             span,
         };
 
+        // Note: This creates a new synthetic statement, so no original comments to preserve
         hir::Stmt::new(hir_id, hir::StmtKind::Expr(Box::new(assignment_expr)), span)
     }
 
@@ -74,6 +92,9 @@ impl HirJsPass {
         ctx: &mut HirOptContext,
     ) -> (hir::Stmt, Vec<hir::Stmt>) {
         let mut temp_stmts = Vec::new();
+        
+        // Clone the original statement for reference to preserve comments
+        let original_stmt = stmt.clone();
 
         match stmt.kind {
             // Handle let statements with complex expressions
@@ -87,10 +108,11 @@ impl HirJsPass {
                     temp_stmts.append(&mut temp_var_stmts);
 
                     // Create the modified let statement using the flattened expression
-                    let modified_let = hir::Stmt::new(
-                        stmt.hir_id,
+                    let modified_let = self.create_stmt_preserving_comments(
+                        original_stmt.hir_id,
                         hir::StmtKind::Let(pat, Box::new(flattened_expr), ty),
-                        stmt.span,
+                        original_stmt.span,
+                        &original_stmt,
                     );
 
                     self.changes_made = true;
@@ -105,20 +127,22 @@ impl HirJsPass {
                         temp_stmts.append(&mut sub_temp_stmts);
 
                         // Create the modified let statement using the flattened expression
-                        let modified_let = hir::Stmt::new(
-                            stmt.hir_id,
+                        let modified_let = self.create_stmt_preserving_comments(
+                            original_stmt.hir_id,
                             hir::StmtKind::Let(pat, Box::new(flattened_expr), ty),
-                            stmt.span,
+                            original_stmt.span,
+                            &original_stmt,
                         );
 
                         self.changes_made = true;
                         (modified_let, temp_stmts)
                     } else {
-                        // No changes needed - reconstruct the original statement
-                        let reconstructed_stmt = hir::Stmt::new(
-                            stmt.hir_id,
+                        // No changes needed - reconstruct the original statement preserving comments
+                        let reconstructed_stmt = self.create_stmt_preserving_comments(
+                            original_stmt.hir_id,
                             hir::StmtKind::Let(pat, Box::new(flattened_expr), ty),
-                            stmt.span,
+                            original_stmt.span,
+                            &original_stmt,
                         );
                         (reconstructed_stmt, temp_stmts)
                     }
@@ -135,10 +159,11 @@ impl HirJsPass {
                     temp_stmts.append(&mut temp_var_stmts);
 
                     // Create the modified return statement using the flattened expression
-                    let modified_return = hir::Stmt::new(
-                        stmt.hir_id,
+                    let modified_return = self.create_stmt_preserving_comments(
+                        original_stmt.hir_id,
                         hir::StmtKind::Return(Some(Box::new(flattened_expr))),
-                        stmt.span,
+                        original_stmt.span,
+                        &original_stmt,
                     );
 
                     self.changes_made = true;
@@ -153,20 +178,22 @@ impl HirJsPass {
                         temp_stmts.append(&mut sub_temp_stmts);
 
                         // Create the modified return statement using the flattened expression
-                        let modified_return = hir::Stmt::new(
-                            stmt.hir_id,
+                        let modified_return = self.create_stmt_preserving_comments(
+                            original_stmt.hir_id,
                             hir::StmtKind::Return(Some(Box::new(flattened_expr))),
-                            stmt.span,
+                            original_stmt.span,
+                            &original_stmt,
                         );
 
                         self.changes_made = true;
                         (modified_return, temp_stmts)
                     } else {
-                        // No changes needed - reconstruct the original statement
-                        let reconstructed_stmt = hir::Stmt::new(
-                            stmt.hir_id,
+                        // No changes needed - reconstruct the original statement preserving comments
+                        let reconstructed_stmt = self.create_stmt_preserving_comments(
+                            original_stmt.hir_id,
                             hir::StmtKind::Return(Some(Box::new(flattened_expr))),
-                            stmt.span,
+                            original_stmt.span,
+                            &original_stmt,
                         );
                         (reconstructed_stmt, temp_stmts)
                     }
@@ -190,23 +217,24 @@ impl HirJsPass {
                             temp_stmts.append(&mut sub_temp_stmts);
 
                             // Create the modified expression statement
-                            let modified_expr_stmt = hir::Stmt::new(
-                                stmt.hir_id,
+                            let modified_expr_stmt = self.create_stmt_preserving_comments(
+                                original_stmt.hir_id,
                                 hir::StmtKind::Expr(Box::new(flattened_expr)),
-                                stmt.span,
+                                original_stmt.span,
+                                &original_stmt,
                             );
 
                             self.changes_made = true;
                             (modified_expr_stmt, temp_stmts)
                         } else {
                             // No changes needed - let the block pass through
-                            (stmt, temp_stmts)
+                            (original_stmt, temp_stmts)
                         }
                     }
                     hir::ExprKind::Loop(_) => {
                         // Loops in statement position need special handling for JavaScript generation
                         // They should be transformed to use proper for(;;) constructs
-                        (stmt, temp_stmts)
+                        (original_stmt, temp_stmts)
                     }
                     _ => {
                         // For other expression types, apply generic flattening for complex subexpressions
@@ -218,20 +246,22 @@ impl HirJsPass {
                             temp_stmts.append(&mut sub_temp_stmts);
 
                             // Create the modified expression statement
-                            let modified_expr_stmt = hir::Stmt::new(
-                                stmt.hir_id,
+                            let modified_expr_stmt = self.create_stmt_preserving_comments(
+                                original_stmt.hir_id,
                                 hir::StmtKind::Expr(Box::new(flattened_expr)),
-                                stmt.span,
+                                original_stmt.span,
+                                &original_stmt,
                             );
 
                             self.changes_made = true;
                             (modified_expr_stmt, temp_stmts)
                         } else {
-                            // No changes needed - reconstruct the original statement
-                            let reconstructed_stmt = hir::Stmt::new(
-                                stmt.hir_id,
+                            // No changes needed - reconstruct the original statement preserving comments
+                            let reconstructed_stmt = self.create_stmt_preserving_comments(
+                                original_stmt.hir_id,
                                 hir::StmtKind::Expr(Box::new(flattened_expr)),
-                                stmt.span,
+                                original_stmt.span,
+                                &original_stmt,
                             );
                             (reconstructed_stmt, temp_stmts)
                         }

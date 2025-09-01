@@ -278,21 +278,19 @@ fn test_partial_application_with_multiple_arguments() {
 
 #[test]
 fn test_single_line_comments() {
-    // Comments are not preserved in codegen by design
     let output = compile!("// this is a comment\nlet a = 1;");
-    let expected_output = "let a = 1;\n";
+    let expected_output = "// this is a comment\nlet a = 1;\n";
     assert_eq!(output, expected_output);
 }
 
 #[test]
 fn test_multi_line_comments() {
-    // Comments are not preserved in codegen by design
     let output = compile!("/* this is a comment */\nlet a = 1;");
-    let expected_output = "let a = 1;\n";
+    let expected_output = "/* this is a comment */\nlet a = 1;\n";
     assert_eq!(output, expected_output);
 
     let output = compile!("/* this is a comment\non multiple lines */\nlet a = 1;");
-    let expected_output = "let a = 1;\n";
+    let expected_output = "/* this is a comment\non multiple lines */\nlet a = 1;\n";
     assert_eq!(output, expected_output);
 }
 
