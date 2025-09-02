@@ -279,6 +279,25 @@ impl HirJsPass {
                     }
                 }
             }
+            // Handle function declarations by processing their bodies
+            hir::StmtKind::FunctionDeclaration(func_decl) => {
+                // Process the function body to handle any complex expressions in it
+                // We need to visit the function body to apply HIR JS transformations
+                
+                // Clone the function declaration and process its body
+                let mut modified_func = func_decl.as_ref().clone();
+                self.visit_block(&mut modified_func.body, ctx);
+                
+                // Create the modified function declaration statement
+                let modified_stmt = self.create_stmt_preserving_comments(
+                    original_stmt.hir_id,
+                    hir::StmtKind::FunctionDeclaration(Box::new(modified_func)),
+                    original_stmt.span,
+                    &original_stmt,
+                );
+                
+                (modified_stmt, temp_stmts)
+            }
             _ => {
                 // For other statement types (like Return(None)), just return as-is
                 (stmt, temp_stmts)
