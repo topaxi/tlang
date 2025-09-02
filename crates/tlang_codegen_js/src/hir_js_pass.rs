@@ -605,18 +605,42 @@ impl HirJsPass {
                     // Transform if/else expression (existing logic adapted)
                     let mut new_then_branch = then_branch.as_ref().clone();
                     if let Some(completion_expr) = new_then_branch.expr.take() {
-                        let assignment_stmt =
-                            self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
-                        new_then_branch.stmts.push(assignment_stmt);
+                        // Check if the completion expression is an if-else that needs flattening
+                        if let hir::ExprKind::IfElse(_inner_condition, _inner_then, _inner_else) = &completion_expr.kind {
+                            // Always flatten if-else completion expressions to avoid malformed JavaScript
+                            let (flattened_expr, inner_stmts) = 
+                                self.flatten_expression_to_temp_var(completion_expr, ctx);
+                            new_then_branch.stmts.extend(inner_stmts);
+                            let assignment_stmt =
+                                self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
+                            new_then_branch.stmts.push(assignment_stmt);
+                        } else {
+                            // Non-if-else completion expression
+                            let assignment_stmt =
+                                self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                            new_then_branch.stmts.push(assignment_stmt);
+                        }
                     }
 
                     let mut new_else_branches = Vec::new();
                     for else_branch in else_branches {
                         let mut new_else_consequence = else_branch.consequence.clone();
                         if let Some(completion_expr) = new_else_consequence.expr.take() {
-                            let assignment_stmt =
-                                self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
-                            new_else_consequence.stmts.push(assignment_stmt);
+                            // Check if the completion expression is an if-else that needs flattening
+                            if let hir::ExprKind::IfElse(_inner_condition, _inner_then, _inner_else) = &completion_expr.kind {
+                                // Always flatten if-else completion expressions to avoid malformed JavaScript
+                                let (flattened_expr, inner_stmts) = 
+                                    self.flatten_expression_to_temp_var(completion_expr, ctx);
+                                new_else_consequence.stmts.extend(inner_stmts);
+                                let assignment_stmt =
+                                    self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
+                                new_else_consequence.stmts.push(assignment_stmt);
+                            } else {
+                                // Non-if-else completion expression
+                                let assignment_stmt =
+                                    self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                                new_else_consequence.stmts.push(assignment_stmt);
+                            }
                         }
                         new_else_branches.push(hir::ElseClause {
                             condition: else_branch.condition.clone(),

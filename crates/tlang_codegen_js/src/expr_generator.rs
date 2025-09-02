@@ -347,7 +347,8 @@ impl CodegenJS {
     ) -> bool {
         self.get_render_ternary()
             && (self.current_context() == BlockContext::Expression
-                || self.current_completion_variable() == Some("return")) // Also allow ternary in return statements
+                || self.current_completion_variable() == Some("return") // Also allow ternary in return statements
+                || self.current_context() == BlockContext::Statement) // Allow ternary in statement context for assignments
             && else_branches.len() == 1 // Let's not nest ternary expressions for now.
             && if_else_can_render_as_ternary(expr, then_branch, else_branches)
     }
