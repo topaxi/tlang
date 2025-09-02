@@ -1068,10 +1068,9 @@ pub fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
         hir::ExprKind::Break(..) => false,
         hir::ExprKind::Continue => false,
         hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
-            // If-else can be rendered as a JS expression if it can be a ternary operator
-            // OR if it can be rendered as if-statements (in statement contexts)
+            // If-else can be rendered as a JS expression only if it can be a ternary operator
+            // If-else expressions that require statements must be flattened to temp variables
             if_else_can_render_as_ternary(condition, then_branch, else_branches)
-                || if_else_can_render_as_js_statements(condition, then_branch, else_branches)
         }
         hir::ExprKind::Match(..) => false,
         hir::ExprKind::Call(call_expr) => {
