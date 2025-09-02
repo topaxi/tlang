@@ -99,13 +99,13 @@ impl HirJsPass {
         match stmt.kind {
             // Handle let statements with complex expressions
             hir::StmtKind::Let(pat, expr, ty) => {
-                // Check if if-else expressions can be rendered by the JavaScript generator
+                // For let statements with if-else expressions, flatten based on context
                 let needs_flattening = match &expr.kind {
                     hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
+                        // Always flatten if-else in let statements since they need temp variable assignment
+                        // But use more careful logic to avoid infinite optimization loops
                         let can_render_ternary = if_else_can_render_as_ternary(condition, then_branch, else_branches);
-                        let can_render_statements = if_else_can_render_as_js_statements(condition, then_branch, else_branches);
-                        // Only flatten if-else if it cannot be rendered as ternary OR as statements
-                        !can_render_ternary && !can_render_statements
+                        !can_render_ternary  // Only flatten if it cannot be a simple ternary
                     }
                     _ => !expr_can_render_as_js_expr(&expr)
                 };
@@ -440,36 +440,30 @@ impl HirJsPass {
 
                 // Recursively handle then and else expressions
                 if let Some(then_expr) = &mut then_branch.expr {
-                    let span = then_expr.span;
-                    let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
-                    let expr_to_flatten = std::mem::replace(then_expr, placeholder);
-                    
-                    // Check if the expression is an if-else that should be flattened to temp var
-                    let (flattened, mut stmts) = if let hir::ExprKind::IfElse(..) = &expr_to_flatten.kind {
-                        // For nested if-else expressions, flatten to temp var to avoid malformed JavaScript
-                        self.flatten_expression_to_temp_var(expr_to_flatten, ctx)
-                    } else {
-                        self.flatten_subexpressions_generically(expr_to_flatten, ctx)
-                    };
-                    *then_expr = flattened;
-                    statements.append(&mut stmts);
+                    if !expr_can_render_as_js_expr(then_expr) {
+                        let span = then_expr.span;
+                        let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                        let expr_to_flatten = std::mem::replace(then_expr, placeholder);
+                        let (flattened, mut stmts) =
+                            self.flatten_subexpressions_generically(expr_to_flatten, ctx);
+                        *then_expr = flattened;
+                        statements.append(&mut stmts);
+                        self.changes_made = true;
+                    }
                 }
 
                 for else_branch in else_branches {
                     if let Some(else_expr) = &mut else_branch.consequence.expr {
-                        let span = else_expr.span;
-                        let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
-                        let expr_to_flatten = std::mem::replace(else_expr, placeholder);
-                        
-                        // Check if the expression is an if-else that should be flattened to temp var
-                        let (flattened, mut stmts) = if let hir::ExprKind::IfElse(..) = &expr_to_flatten.kind {
-                            // For nested if-else expressions, flatten to temp var to avoid malformed JavaScript
-                            self.flatten_expression_to_temp_var(expr_to_flatten, ctx)
-                        } else {
-                            self.flatten_subexpressions_generically(expr_to_flatten, ctx)
-                        };
-                        *else_expr = flattened;
-                        statements.append(&mut stmts);
+                        if !expr_can_render_as_js_expr(else_expr) {
+                            let span = else_expr.span;
+                            let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                            let expr_to_flatten = std::mem::replace(else_expr, placeholder);
+                            let (flattened, mut stmts) =
+                                self.flatten_subexpressions_generically(expr_to_flatten, ctx);
+                            *else_expr = flattened;
+                            statements.append(&mut stmts);
+                            self.changes_made = true;
+                        }
                     }
                 }
             }
