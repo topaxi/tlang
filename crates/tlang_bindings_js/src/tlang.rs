@@ -1,5 +1,6 @@
 use serde::Deserialize;
 use tlang_ast::node::{self as ast};
+use tlang_codegen_js::HirJsPass;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_hir::hir;
 use tlang_hir_opt::HirOptimizer;
@@ -61,6 +62,7 @@ pub struct BuildArtifacts {
     hir: Option<hir::Module>,
 }
 
+#[derive(PartialEq, Eq)]
 #[wasm_bindgen]
 pub enum Runner {
     JavaScript = "JavaScript",
@@ -69,6 +71,7 @@ pub enum Runner {
 
 #[wasm_bindgen]
 pub struct Tlang {
+    runner: Runner,
     source: String,
     build: BuildArtifacts,
     analyzer: SemanticAnalyzer,
@@ -94,6 +97,7 @@ impl Tlang {
         }
 
         Self {
+            runner,
             source,
             build: BuildArtifacts::default(),
             analyzer,
@@ -182,6 +186,11 @@ impl Tlang {
                 self.analyzer.symbol_tables().clone(),
             );
             let mut optimizer = HirOptimizer::default();
+
+            if self.runner == Runner::JavaScript {
+                optimizer.add_pass(Box::new(HirJsPass::default()));
+            }
+
             optimizer.optimize_hir(&mut module, meta.into());
             self.build.hir = Some(module);
         }

@@ -6,10 +6,10 @@ use std::{
 
 use clap::{ArgMatches, arg, command};
 use tlang_ast_lowering::lower_to_hir;
-use tlang_codegen_js::generator::CodegenJS;
 use tlang_codegen_js::HirJsPass;
+use tlang_codegen_js::generator::CodegenJS;
 use tlang_hir::hir;
-use tlang_hir_opt::{HirOptimizer, HirPass, HirOptContext};
+use tlang_hir_opt::{HirOptContext, HirOptimizer, HirPass};
 use tlang_parser::error::ParseIssue;
 use tlang_semantics::{SemanticAnalyzer, diagnostic::Diagnostic};
 
@@ -207,18 +207,9 @@ fn compile_to_hir(source: &str, show_warnings: bool) -> Result<hir::Module, Pars
     );
 
     let mut optimizer = HirOptimizer::default();
-    
-    // Run JavaScript-specific optimizations after the standard HIR optimizations
+
+    optimizer.add_pass(Box::new(HirJsPass::default()));
     optimizer.optimize_hir(&mut module, meta.into());
-    
-    // Apply JavaScript-specific HIR transformations as a final pass
-    let mut js_pass = HirJsPass::new();
-    let mut js_ctx = HirOptContext {
-        symbols: std::collections::HashMap::new(),
-        hir_id_allocator: tlang_span::HirIdAllocator::new(1000), // Start with a high number to avoid conflicts
-        current_scope: module.hir_id,
-    };
-    js_pass.optimize_hir(&mut module, &mut js_ctx);
 
     Ok(module)
 }
