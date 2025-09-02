@@ -11,14 +11,14 @@ function main() {
         }
         let x = $tmp$1;
 
-        let $tmp$2;if (x == 1) {
+        let $tmp$2;if (x === 1) {
             $tmp$2 = 3;
         } else {
             $tmp$2 = 4;
         }
         $tmp$0 = $tmp$2;
     } else {
-      $tmp$0 = 5;
+        $tmp$0 = 5;
     }
     let result = $tmp$0;
 }

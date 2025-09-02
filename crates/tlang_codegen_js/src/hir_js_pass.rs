@@ -407,8 +407,14 @@ impl HirJsPass {
                     let span = then_expr.span;
                     let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                     let expr_to_flatten = std::mem::replace(then_expr, placeholder);
-                    let (flattened, mut stmts) =
-                        self.flatten_subexpressions_generically(expr_to_flatten, ctx);
+                    
+                    // Check if the expression is an if-else that should be flattened to temp var
+                    let (flattened, mut stmts) = if let hir::ExprKind::IfElse(..) = &expr_to_flatten.kind {
+                        // For nested if-else expressions, flatten to temp var to avoid malformed JavaScript
+                        self.flatten_expression_to_temp_var(expr_to_flatten, ctx)
+                    } else {
+                        self.flatten_subexpressions_generically(expr_to_flatten, ctx)
+                    };
                     *then_expr = flattened;
                     statements.append(&mut stmts);
                 }
@@ -418,8 +424,14 @@ impl HirJsPass {
                         let span = else_expr.span;
                         let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                         let expr_to_flatten = std::mem::replace(else_expr, placeholder);
-                        let (flattened, mut stmts) =
-                            self.flatten_subexpressions_generically(expr_to_flatten, ctx);
+                        
+                        // Check if the expression is an if-else that should be flattened to temp var
+                        let (flattened, mut stmts) = if let hir::ExprKind::IfElse(..) = &expr_to_flatten.kind {
+                            // For nested if-else expressions, flatten to temp var to avoid malformed JavaScript
+                            self.flatten_expression_to_temp_var(expr_to_flatten, ctx)
+                        } else {
+                            self.flatten_subexpressions_generically(expr_to_flatten, ctx)
+                        };
                         *else_expr = flattened;
                         statements.append(&mut stmts);
                     }
