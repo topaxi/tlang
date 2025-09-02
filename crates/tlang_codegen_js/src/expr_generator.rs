@@ -525,7 +525,7 @@ impl CodegenJS {
                         self.pop_scope();
                         self.dec_indent();
                         self.push_indent();
-                        self.push_str("}");
+                        self.push_str("};");
                     }
                     self.pop_context();
                     return;
@@ -585,7 +585,7 @@ impl CodegenJS {
                         }
 
                         self.push_indent();
-                        self.push_char('}');
+                        self.push_str("};");
                     }
                     return;
                 }
@@ -722,7 +722,7 @@ impl CodegenJS {
 
         self.dec_indent();
         self.push_indent();
-        self.push_str("}");
+        self.push_str("};");
     }
 
     /// Generate a statement within a loop context, transforming break expressions

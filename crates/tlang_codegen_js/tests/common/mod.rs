@@ -1,5 +1,6 @@
 use tlang_codegen_js::generator::CodegenJS;
-use tlang_hir_opt::HirOptimizer;
+use tlang_codegen_js::HirJsPass;
+use tlang_hir_opt::{HirOptimizer, HirPass, HirOptContext};
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
 use tlang_symbols::SymbolType;
@@ -70,10 +71,21 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
                 semantic_analyzer.symbol_tables().clone(),
             );
 
+            let mut optimizer = HirOptimizer::default();
+                
             if options.optimize {
-                let mut optimizer = HirOptimizer::default();
+                // Run standard HIR optimizations first
                 optimizer.optimize_hir(&mut module, meta.into());
             }
+            
+            // Always apply JavaScript-specific HIR transformations for JavaScript generation
+            let mut js_pass = HirJsPass::new();
+            let mut js_ctx = HirOptContext {
+                symbols: std::collections::HashMap::new(),
+                hir_id_allocator: tlang_span::HirIdAllocator::new(1000), // Start with a high number to avoid conflicts
+                current_scope: module.hir_id,
+            };
+            js_pass.optimize_hir(&mut module, &mut js_ctx);
 
             let mut codegen = CodegenJS::default();
             codegen.set_render_ternary(options.render_ternary);

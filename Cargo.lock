@@ -1046,6 +1046,7 @@ dependencies = [
  "tlang_interpreter",
  "tlang_parser",
  "tlang_semantics",
+ "tlang_span",
 ]
 
 [[package]]
