@@ -1,6 +1,6 @@
 ---
 source: crates/tlang_test_runner/src/main.rs
-expression: output
+expression: apply_redactions(&output)
 input_file: tests/structs/stack.tlang
 ---
 === Stack Data Structure Demo ===

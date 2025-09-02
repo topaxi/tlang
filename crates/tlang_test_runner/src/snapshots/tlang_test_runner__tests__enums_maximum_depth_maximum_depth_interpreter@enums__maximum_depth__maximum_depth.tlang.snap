@@ -1,6 +1,6 @@
 ---
 source: crates/tlang_test_runner/src/main.rs
-expression: output
+expression: apply_redactions(&output)
 input_file: tests/enums/maximum_depth/maximum_depth.tlang
 ---
 5

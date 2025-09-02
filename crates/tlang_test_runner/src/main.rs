@@ -143,7 +143,6 @@ fn run_test_with_backend(file_path: &Path, backend: Backend) -> Result<String, S
             #[allow(clippy::zombie_processes)]
             let tlang_js_compiler_output = Command::new("./target/release/tlang_cli_js")
                 .arg(file_path)
-                .arg("--quiet-warnings")
                 .stdout(Stdio::piped())
                 .spawn()
                 .map_err(|err| {
@@ -268,14 +267,30 @@ mod tests {
         insta::glob!(&tests_dir, "**/*.tlang", |path| {
             for backend in Backend::values() {
                 let relative_path = path.strip_prefix(&tests_dir_clone).unwrap();
-                let test_name = format!(
-                    "{}_{}",
-                    relative_path
-                        .with_extension("")
-                        .to_string_lossy()
-                        .replace(['/', '\\'], "_"),
-                    backend.as_str()
-                );
+                let path_str = relative_path
+                    .with_extension("")
+                    .to_string_lossy()
+                    .replace(['/', '\\'], "_");
+                
+                // Shorten test names to avoid filesystem filename length limits
+                // Some filesystems or git configurations have issues with very long filenames
+                let test_name = if path_str.len() > 40 {
+                    // For long paths, use a hash-based approach to ensure uniqueness
+                    // while keeping the name readable
+                    use std::collections::hash_map::DefaultHasher;
+                    use std::hash::{Hash, Hasher};
+                    
+                    let mut hasher = DefaultHasher::new();
+                    path_str.hash(&mut hasher);
+                    let hash = hasher.finish();
+                    
+                    // Keep the last part of the path (usually the test name) and add hash
+                    let parts: Vec<&str> = path_str.split('_').collect();
+                    let last_part = parts.last().unwrap_or(&"test");
+                    format!("{}_{:x}_{}", last_part, hash & 0xFFFF, backend.as_str())
+                } else {
+                    format!("{}_{}",path_str, backend.as_str())
+                };
 
                 let is_known_failure = path.to_string_lossy().contains("known_failures");
 
