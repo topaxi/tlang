@@ -10,7 +10,6 @@ function main() {
             $tmp$1 = 2;
         }
         let x = $tmp$1;
-
         let $tmp$2;if (x === 1) {
             $tmp$2 = 3;
         } else {

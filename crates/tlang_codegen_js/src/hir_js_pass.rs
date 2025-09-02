@@ -99,10 +99,14 @@ impl HirJsPass {
         match stmt.kind {
             // Handle let statements with complex expressions
             hir::StmtKind::Let(pat, expr, ty) => {
-                // Always flatten if-else expressions in let statements to ensure proper JavaScript generation
-                // regardless of whether they could technically be rendered as ternary operators
+                // Check if if-else expressions can be rendered by the JavaScript generator
                 let needs_flattening = match &expr.kind {
-                    hir::ExprKind::IfElse(..) => true, // Always flatten if-else in let statements
+                    hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
+                        let can_render_ternary = if_else_can_render_as_ternary(condition, then_branch, else_branches);
+                        let can_render_statements = if_else_can_render_as_js_statements(condition, then_branch, else_branches);
+                        // Only flatten if-else if it cannot be rendered as ternary OR as statements
+                        !can_render_ternary && !can_render_statements
+                    }
                     _ => !expr_can_render_as_js_expr(&expr)
                 };
                 
@@ -629,170 +633,18 @@ impl HirJsPass {
                 // The decision about ternary vs statement rendering should be made at JS generation time
                 let mut new_then_branch = then_branch.as_ref().clone();
                 if let Some(completion_expr) = new_then_branch.expr.take() {
-                    // Handle if-else completion expressions specially to avoid hoisting
-                    if let hir::ExprKind::IfElse(inner_condition, inner_then, inner_else) = completion_expr.kind {
-                        // Create a temp variable for the nested if-else result
-                        let inner_temp_name = self.generate_temp_var_name();
-                        
-                        // Create temp variable assignment statements for each branch
-                        let mut flattened_inner_then = inner_then.as_ref().clone();
-                        if let Some(inner_completion) = flattened_inner_then.expr.take() {
-                            let inner_assignment = self.create_assignment_stmt(ctx, &inner_temp_name, inner_completion, span);
-                            flattened_inner_then.stmts.push(inner_assignment);
-                        }
-                        
-                        let mut flattened_inner_else = Vec::new();
-                        for inner_else_branch in inner_else {
-                            let mut flattened_inner_else_consequence = inner_else_branch.consequence.clone();
-                            if let Some(inner_else_completion) = flattened_inner_else_consequence.expr.take() {
-                                let inner_else_assignment = self.create_assignment_stmt(ctx, &inner_temp_name, inner_else_completion, span);
-                                flattened_inner_else_consequence.stmts.push(inner_else_assignment);
-                            }
-                            flattened_inner_else.push(hir::ElseClause {
-                                condition: inner_else_branch.condition,
-                                consequence: flattened_inner_else_consequence,
-                            });
-                        }
-                        
-                        // Create the flattened if-else as a __TEMP_VAR_IF_ELSE__ call, but add it locally
-                        let flattened_if_else = hir::Expr {
-                            hir_id: ctx.hir_id_allocator.next_id(),
-                            kind: hir::ExprKind::Call(Box::new(hir::CallExpression {
-                                hir_id: ctx.hir_id_allocator.next_id(),
-                                callee: hir::Expr {
-                                    hir_id: ctx.hir_id_allocator.next_id(),
-                                    kind: hir::ExprKind::Path(Box::new(hir::Path::new(
-                                        vec![hir::PathSegment {
-                                            ident: Ident::new("__TEMP_VAR_IF_ELSE__", span),
-                                        }],
-                                        span,
-                                    ))),
-                                    span,
-                                },
-                                arguments: vec![
-                                    hir::Expr {
-                                        hir_id: ctx.hir_id_allocator.next_id(),
-                                        kind: hir::ExprKind::Literal(Box::new(
-                                            tlang_ast::token::Literal::String(inner_temp_name.clone().into()),
-                                        )),
-                                        span,
-                                    },
-                                    hir::Expr {
-                                        hir_id: ctx.hir_id_allocator.next_id(),
-                                        kind: hir::ExprKind::IfElse(
-                                            inner_condition,
-                                            Box::new(flattened_inner_then),
-                                            flattened_inner_else,
-                                        ),
-                                        span,
-                                    },
-                                ],
-                            })),
-                            span,
-                        };
-                        
-                        // Add the flattened if-else statement to the then-branch
-                        new_then_branch.stmts.push(hir::Stmt::new(
-                            ctx.hir_id_allocator.next_id(),
-                            hir::StmtKind::Expr(Box::new(flattened_if_else)),
-                            span,
-                        ));
-                        
-                        // Create assignment to the outer temp variable
-                        let inner_temp_ref = self.create_temp_var_path(ctx, &inner_temp_name, span);
-                        let outer_assignment = self.create_assignment_stmt(ctx, temp_name, inner_temp_ref, span);
-                        new_then_branch.stmts.push(outer_assignment);
-                    } else {
-                        // Non-if-else completion expression
-                        let assignment_stmt =
-                            self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
-                        new_then_branch.stmts.push(assignment_stmt);
-                    }
+                    let assignment_stmt =
+                        self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                    new_then_branch.stmts.push(assignment_stmt);
                 }
 
                 let mut new_else_branches = Vec::new();
                 for else_branch in else_branches {
                     let mut new_else_consequence = else_branch.consequence.clone();
                     if let Some(completion_expr) = new_else_consequence.expr.take() {
-                        // Handle if-else completion expressions specially to avoid hoisting
-                        if let hir::ExprKind::IfElse(inner_condition, inner_then, inner_else) = completion_expr.kind {
-                            // Create a temp variable for the nested if-else result
-                            let inner_temp_name = self.generate_temp_var_name();
-                            
-                            // Create temp variable assignment statements for each branch
-                            let mut flattened_inner_then = inner_then.as_ref().clone();
-                            if let Some(inner_completion) = flattened_inner_then.expr.take() {
-                                let inner_assignment = self.create_assignment_stmt(ctx, &inner_temp_name, inner_completion, span);
-                                flattened_inner_then.stmts.push(inner_assignment);
-                            }
-                            
-                            let mut flattened_inner_else = Vec::new();
-                            for inner_else_branch in inner_else {
-                                let mut flattened_inner_else_consequence = inner_else_branch.consequence.clone();
-                                if let Some(inner_else_completion) = flattened_inner_else_consequence.expr.take() {
-                                    let inner_else_assignment = self.create_assignment_stmt(ctx, &inner_temp_name, inner_else_completion, span);
-                                    flattened_inner_else_consequence.stmts.push(inner_else_assignment);
-                                }
-                                flattened_inner_else.push(hir::ElseClause {
-                                    condition: inner_else_branch.condition,
-                                    consequence: flattened_inner_else_consequence,
-                                });
-                            }
-                            
-                            // Create the flattened if-else as a __TEMP_VAR_IF_ELSE__ call, but add it locally
-                            let flattened_if_else = hir::Expr {
-                                hir_id: ctx.hir_id_allocator.next_id(),
-                                kind: hir::ExprKind::Call(Box::new(hir::CallExpression {
-                                    hir_id: ctx.hir_id_allocator.next_id(),
-                                    callee: hir::Expr {
-                                        hir_id: ctx.hir_id_allocator.next_id(),
-                                        kind: hir::ExprKind::Path(Box::new(hir::Path::new(
-                                            vec![hir::PathSegment {
-                                                ident: Ident::new("__TEMP_VAR_IF_ELSE__", span),
-                                            }],
-                                            span,
-                                        ))),
-                                        span,
-                                    },
-                                    arguments: vec![
-                                        hir::Expr {
-                                            hir_id: ctx.hir_id_allocator.next_id(),
-                                            kind: hir::ExprKind::Literal(Box::new(
-                                                tlang_ast::token::Literal::String(inner_temp_name.clone().into()),
-                                            )),
-                                            span,
-                                        },
-                                        hir::Expr {
-                                            hir_id: ctx.hir_id_allocator.next_id(),
-                                            kind: hir::ExprKind::IfElse(
-                                                inner_condition,
-                                                Box::new(flattened_inner_then),
-                                                flattened_inner_else,
-                                            ),
-                                            span,
-                                        },
-                                    ],
-                                })),
-                                span,
-                            };
-                            
-                            // Add the flattened if-else statement to the else-branch
-                            new_else_consequence.stmts.push(hir::Stmt::new(
-                                ctx.hir_id_allocator.next_id(),
-                                hir::StmtKind::Expr(Box::new(flattened_if_else)),
-                                span,
-                            ));
-                            
-                            // Create assignment to the outer temp variable
-                            let inner_temp_ref = self.create_temp_var_path(ctx, &inner_temp_name, span);
-                            let outer_assignment = self.create_assignment_stmt(ctx, temp_name, inner_temp_ref, span);
-                            new_else_consequence.stmts.push(outer_assignment);
-                        } else {
-                            // Non-if-else completion expression
-                            let assignment_stmt =
-                                self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
-                            new_else_consequence.stmts.push(assignment_stmt);
-                        }
+                        let assignment_stmt =
+                            self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                        new_else_consequence.stmts.push(assignment_stmt);
                     }
                     new_else_branches.push(hir::ElseClause {
                         condition: else_branch.condition.clone(),
@@ -1162,6 +1014,45 @@ pub fn if_else_can_render_as_ternary(
         })
 }
 
+/// Check if an if-else can be rendered as JavaScript if-statements
+/// This is more permissive than ternary rendering and allows statements in branches
+pub fn if_else_can_render_as_js_statements(
+    expr: &hir::Expr,
+    then_branch: &hir::Block,
+    else_branches: &[hir::ElseClause],
+) -> bool {
+    // The condition must be a simple expression
+    expr_can_render_as_js_expr(expr)
+        // All statements in branches must be simple
+        && then_branch.stmts.iter().all(|stmt| stmt_can_render_as_js(stmt))
+        // The completion expression (if any) must be simple
+        && then_branch.expr.as_ref().map_or(true, |e| expr_can_render_as_js_expr(e))
+        // All else branches must be simple
+        && else_branches.iter().all(|else_branch| {
+            // Else condition (if any) must be simple
+            (else_branch.condition.is_none()
+                || expr_can_render_as_js_expr(else_branch.condition.as_ref().unwrap()))
+                // All statements in else branch must be simple
+                && else_branch.consequence.stmts.iter().all(|stmt| stmt_can_render_as_js(stmt))
+                // The completion expression (if any) must be simple
+                && else_branch.consequence.expr.as_ref().map_or(true, |e| expr_can_render_as_js_expr(e))
+        })
+}
+
+/// Check if a statement can be rendered as JavaScript without special HIR flattening
+fn stmt_can_render_as_js(stmt: &hir::Stmt) -> bool {
+    match &stmt.kind {
+        hir::StmtKind::Let(_, expr, _) => expr_can_render_as_js_expr(expr),
+        hir::StmtKind::Return(None) => true,
+        hir::StmtKind::Return(Some(expr)) => expr_can_render_as_js_expr(expr),
+        hir::StmtKind::Expr(expr) => expr_can_render_as_js_expr(expr),
+        hir::StmtKind::FunctionDeclaration(_) => true,
+        hir::StmtKind::DynFunctionDeclaration(_) => true,
+        hir::StmtKind::EnumDeclaration(_) => true,
+        hir::StmtKind::StructDeclaration(_) => true,
+    }
+}
+
 /// Check if an expression can be rendered as a JavaScript expression (vs statement)
 pub fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
     match &expr.kind {
@@ -1178,7 +1069,9 @@ pub fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
         hir::ExprKind::Continue => false,
         hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
             // If-else can be rendered as a JS expression if it can be a ternary operator
+            // OR if it can be rendered as if-statements (in statement contexts)
             if_else_can_render_as_ternary(condition, then_branch, else_branches)
+                || if_else_can_render_as_js_statements(condition, then_branch, else_branches)
         }
         hir::ExprKind::Match(..) => false,
         hir::ExprKind::Call(call_expr) => {
@@ -1343,12 +1236,24 @@ impl<'hir> Visitor<'hir> for HirJsPass {
 
         // Replace the statements if we made changes
         if !new_stmts.is_empty() {
+            let original_stmt_count = block.stmts.len();
             block.stmts = new_stmts;
-        }
-
-        // After transformation, visit all statements to handle nested function declarations, etc.
-        for stmt in &mut block.stmts {
-            self.visit_stmt(stmt, ctx);
+            
+            // After transformation, visit only the original statements (modified) to handle nested function declarations, etc.
+            // Skip the generated temp variable statements to avoid double processing
+            let total_stmts = block.stmts.len();
+            if total_stmts > original_stmt_count {
+                // Visit only the last original_stmt_count statements, which are the modified original statements
+                let start_idx = total_stmts - original_stmt_count;
+                for stmt in &mut block.stmts[start_idx..] {
+                    self.visit_stmt(stmt, ctx);
+                }
+            }
+        } else {
+            // If no changes were made, visit all statements normally
+            for stmt in &mut block.stmts {
+                self.visit_stmt(stmt, ctx);
+            }
         }
     }
 }
