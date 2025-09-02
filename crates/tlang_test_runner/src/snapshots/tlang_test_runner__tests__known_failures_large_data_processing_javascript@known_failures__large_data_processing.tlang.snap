@@ -19,20 +19,20 @@ Creating large nested structure...
 1
 Processing large strings...
 
-[stdin]:353
+[stdin]:357
         return current <= 0 ? acc : helper(current - 1, acc + "a");
         ^
 
 RangeError: Maximum call stack size exceeded
-    at helper ([stdin]:353:9)
-    at helper ([stdin]:353:37)
-    at helper ([stdin]:353:37)
-    at helper ([stdin]:353:37)
-    at helper ([stdin]:353:37)
-    at helper ([stdin]:353:37)
-    at helper ([stdin]:353:37)
-    at helper ([stdin]:353:37)
-    at helper ([stdin]:353:37)
-    at helper ([stdin]:353:37)
+    at helper ([stdin]:357:9)
+    at helper ([stdin]:357:37)
+    at helper ([stdin]:357:37)
+    at helper ([stdin]:357:37)
+    at helper ([stdin]:357:37)
+    at helper ([stdin]:357:37)
+    at helper ([stdin]:357:37)
+    at helper ([stdin]:357:37)
+    at helper ([stdin]:357:37)
+    at helper ([stdin]:357:37)
 
 Node.js v24.0.2

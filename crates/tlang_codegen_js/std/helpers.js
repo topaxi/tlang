@@ -3,23 +3,27 @@
  * Provides runtime support for converting JavaScript iterables to tlang iterator protocol
  */
 
-/**
- * Creates a tlang iterator from a JavaScript iterator
- * @param {Iterator<any>} jsIterator - The JavaScript iterator to convert
- * @returns {Object} An iterator object with a next() method that returns Option::Some or Option::None
- */
-function createTlangIterator(jsIterator) {
-  return {
-    _jsIterator: jsIterator,
-    next: function () {
-      const result = this._jsIterator.next();
-      if (result.done) {
-        return Option.None;
-      } else {
-        return Option.Some(result.value);
-      }
-    },
-  };
+class TlangIteratorWrapper {
+  #jsIterator;
+
+  /**
+   * Creates a tlang iterator from a JavaScript iterator
+   * @param {Iterator<any>} jsIterator - The JavaScript iterator to convert
+   * @returns {Object} An iterator object with a next() method that returns Option::Some or Option::None
+   */
+  static from(jsIterator) {
+    return new TlangIteratorWrapper(jsIterator);
+  }
+
+  constructor(jsIterator) {
+    this.#jsIterator = jsIterator;
+  }
+
+  next() {
+    const { done, value } = this.#jsIterator.next();
+
+    return done ? Option.None : Option.Some(value);
+  }
 }
 
 /**
@@ -37,13 +41,13 @@ const iterator = {
     // Check if the value implements the JavaScript iterator protocol (Symbol.iterator)
     // This handles arrays, strings, Sets, Maps, generators, typed arrays, NodeLists, etc.
     if (value != null && typeof value[Symbol.iterator] === 'function') {
-      return createTlangIterator(value[Symbol.iterator]());
+      return TlangIteratorWrapper.from(value[Symbol.iterator]());
     }
 
     // Check if the object is already an iterator (has a next method)
     if (value != null && typeof value.next === 'function') {
       // Wrap existing iterator to ensure tlang compatibility
-      return createTlangIterator(value);
+      return TlangIteratorWrapper.from(value);
     }
 
     // Check if it has a tlang iter method and call it
