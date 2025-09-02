@@ -4,7 +4,7 @@ description: Known failure - output may not match expected
 expression: apply_redactions(&output)
 input_file: tests/known_failures/unicode_strings.tlang
 ---
-[stdin]:213
+[stdin]:289
     let newline_str = "line1
                       ^^^^^^
 Expected ';', '}' or <eof>

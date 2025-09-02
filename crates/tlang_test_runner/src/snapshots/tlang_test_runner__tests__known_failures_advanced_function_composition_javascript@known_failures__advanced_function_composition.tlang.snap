@@ -1,21 +1,27 @@
 ---
 source: crates/tlang_test_runner/src/main.rs
 description: Known failure - output may not match expected
-expression: output
+expression: apply_redactions(&output)
 input_file: tests/known_failures/advanced_function_composition.tlang
 ---
 === Advanced Function Composition Test ===
 6
 120
-15
-30
-125
-192
-0
-1
-1
-1
-2
-1
-2
-3
+
+[stdin]:303
+    if (operation === "add") {
+    ^
+
+ReferenceError: operation is not defined
+    at create_math_factory ([stdin]:303:5)
+    at [stdin]:360:20
+    at runScriptInThisContext (node:internal/vm:218:10)
+    at node:internal/process/execution:456:12
+    at [stdin]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:454:60)
+    at evalFunction (node:internal/process/execution:286:30)
+    at evalTypeScript (node:internal/process/execution:298:3)
+    at node:internal/main/eval_stdin:51:5
+    at Socket.<anonymous> (node:internal/process/execution:206:5)
+
+Node.js v24.0.2

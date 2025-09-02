@@ -1,7 +1,6 @@
 ---
 source: crates/tlang_test_runner/src/main.rs
 expression: apply_redactions(&output)
-input_file: tests/functions/tco/tco_mutual.tlang
+input_file: tests/expressions/complex_nesting/return_statement.tlang
 ---
-undefined
-undefined
+true

@@ -1,14 +1,14 @@
 ---
 source: crates/tlang_test_runner/src/main.rs
 expression: apply_redactions(&output)
-input_file: tests/strings/invalid_escape_sequences.tlang
+input_file: tests/loops/for_loops/nested_loops.tlang
 ---
-[stdin]:284
-    let invalid2 = "Another bad: \x";
-                                 ^^^^
-Bad character escape sequence, expected 2 hex characters
+[stdin]:296
+            } else if ($tmp$0.tag === Option.None) {
+              ^^^^
+Expression expected
 
-SyntaxError: Invalid hexadecimal escape sequence
+SyntaxError: Unexpected token 'else'
     at makeContextifyScript (node:internal/vm:194:14)
     at compileScript (node:internal/process/execution:393:10)
     at evalTypeScript (node:internal/process/execution:261:22)

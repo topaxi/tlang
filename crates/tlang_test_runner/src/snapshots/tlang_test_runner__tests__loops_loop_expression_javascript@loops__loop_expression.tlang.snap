@@ -1,7 +1,9 @@
 ---
 source: crates/tlang_test_runner/src/main.rs
 expression: apply_redactions(&output)
-input_file: tests/functions/tco/tco_mutual.tlang
+input_file: tests/loops/loop_expression.tlang
 ---
+42
+21
 undefined
-undefined
+10

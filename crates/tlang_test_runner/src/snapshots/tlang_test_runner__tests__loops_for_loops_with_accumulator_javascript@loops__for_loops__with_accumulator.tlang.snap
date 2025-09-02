@@ -1,7 +1,6 @@
 ---
 source: crates/tlang_test_runner/src/main.rs
 expression: apply_redactions(&output)
-input_file: tests/functions/tco/tco_mutual.tlang
+input_file: tests/loops/for_loops/with_accumulator.tlang
 ---
-undefined
-undefined
+15
