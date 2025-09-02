@@ -585,6 +585,40 @@ fn test_ternary_operator_preservation() {
 }
 
 #[test]
+fn test_nested_if_else_expressions() {
+    let source = r#"
+        fn main() {
+            let result = if true {
+                let x = if true { 1 } else { 2 };
+                if x == 1 { 3 } else { 4 }
+            } else {
+                5
+            };
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        __TEMP_VAR_IF_ELSE__("$tmp$0", if true {
+            let x: unknown = if true {
+                1
+            } else {
+                2
+            };
+            ($tmp$0 = if (x == 1) {
+                3
+            } else {
+                4
+            });
+        } else {
+            ($tmp$0 = 5);
+        });
+        let result: unknown = $tmp$0;
+    }
+    "###);
+}
+
+#[test]
 fn test_complex_nested_function_calls() {
     let source = r#"
         fn main() {

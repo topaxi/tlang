@@ -84,15 +84,7 @@ fn test_for_loop_with_accumulator_pattern() {
                 let $tmp$0;
                 let $tmp$1 = iterator$$.next();
                 let n;if ($tmp$1.tag === Option.Some && (n = $tmp$1[0], true)) {
-                    $tmp$0 = if (n % 2 === 0) {
-                                            let $tmp$2;{
-                            $tmp$2 = [[...even, n], odd];
-                        };
-    $tmp$2                } else {
-                                            let $tmp$3;{
-                            $tmp$3 = [even, [...odd, n]];
-                        };
-    $tmp$3                };
+                    $tmp$0 = n % 2 === 0 ? [[...even, n], odd] : [even, [...odd, n]];
                 } else if ($tmp$1.tag === Option.None) {
                     break;
                 };
@@ -364,15 +356,7 @@ fn test_for_loop_with_guards() {
                 let $tmp$0;
                 let $tmp$1 = iterator$$.next();
                 let i;if ($tmp$1.tag === Option.Some && (i = $tmp$1[0], true)) {
-                    $tmp$0 = if (i % 2 === 0) {
-                                            let $tmp$2;{
-                            $tmp$2 = sum + i;
-                        };
-    $tmp$2                } else {
-                                            let $tmp$3;{
-                            $tmp$3 = sum;
-                        };
-    $tmp$3                };
+                    $tmp$0 = i % 2 === 0 ? sum + i : sum;
                 } else if ($tmp$1.tag === Option.None) {
                     break;
                 };

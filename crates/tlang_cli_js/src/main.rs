@@ -207,7 +207,7 @@ fn compile_to_hir(source: &str, show_warnings: bool) -> Result<hir::Module, Pars
     );
 
     let mut optimizer = HirOptimizer::default();
-    let mut hir_opt_ctx = meta.into();
+    let hir_opt_ctx = meta.into();
     
     // Run standard HIR optimizations first
     optimizer.optimize_hir(&mut module, hir_opt_ctx);
