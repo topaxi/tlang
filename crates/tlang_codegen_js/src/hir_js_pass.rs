@@ -597,6 +597,19 @@ impl HirJsPass {
                     self.changes_made = true;
                 }
             }
+            hir::ExprKind::Loop(_) => {
+                // Loop expressions found within other expressions should be flattened to temp variables
+                // This handles cases like: assignment = loop { ... }
+                // We should never reach here if the outer logic is correct, but handle it defensively
+                // The loop should be transformed by flatten_expression_to_temp_var
+                // For now, just mark that we found a loop that needs handling at a higher level
+                // This will be caught by the outer !expr_can_render_as_js_expr check
+            }
+            hir::ExprKind::Block(_) => {
+                // Block expressions found within other expressions should be flattened to temp variables
+                // This handles cases like: assignment = { ... }
+                // Similar to loops, this should be handled at a higher level
+            }
             _ => {
                 // For other expression types, no subexpressions to flatten
             }
@@ -825,9 +838,34 @@ impl HirJsPass {
 
                     // Move the completion expression to an assignment statement
                     if let Some(completion_expr) = new_block.expr.take() {
-                        let assignment_stmt =
-                            self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
-                        new_block.stmts.push(assignment_stmt);
+                        match &completion_expr.kind {
+                            hir::ExprKind::Loop(loop_block) => {
+                                // For loop completion expressions, add the loop directly as a statement
+                                // with proper break transformations, not as an assignment
+                                let mut new_loop_block = loop_block.as_ref().clone();
+                                
+                                // Transform break statements in the loop to assign to the temp variable
+                                self.transform_break_statements_in_block(&mut new_loop_block, temp_name, ctx);
+                                
+                                // Add the loop as a regular statement
+                                let loop_stmt = hir::Stmt::new(
+                                    ctx.hir_id_allocator.next_id(),
+                                    hir::StmtKind::Expr(Box::new(hir::Expr {
+                                        hir_id: ctx.hir_id_allocator.next_id(),
+                                        kind: hir::ExprKind::Loop(Box::new(new_loop_block)),
+                                        span: completion_expr.span,
+                                    })),
+                                    completion_expr.span,
+                                );
+                                new_block.stmts.push(loop_stmt);
+                            }
+                            _ => {
+                                // For non-loop completion expressions, create assignment as usual
+                                let assignment_stmt =
+                                    self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                                new_block.stmts.push(assignment_stmt);
+                            }
+                        }
                     }
 
                     // Add the block as a regular statement

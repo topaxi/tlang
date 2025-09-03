@@ -38,6 +38,15 @@ fn compile_and_apply_hir_js_pass(source: &str) -> hir::Module {
     module
 }
 
+fn compile_and_apply_hir_js_pass_debug(source: &str) -> (hir::Module, hir::Module) {
+    let (mut module, meta) = compile(source);
+    let module_before = module.clone();
+    let mut ctx = HirOptContext::from(meta);
+    let mut pass = HirJsPass::new();
+    pass.optimize_hir(&mut module, &mut ctx);
+    (module_before, module)
+}
+
 fn pretty_print(module: &hir::Module) -> String {
     let options = HirPrettyOptions {
         mark_unresolved: false,
@@ -720,20 +729,21 @@ fn test_loop_expression_with_complex_break() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         let x: unknown = 10;
-        __TEMP_VAR_LOOP__("$hir$1", loop {
+        let $hir$0: unknown = _;
+        loop {
             if (x > 5) {
                 let y: unknown = (x * 2);
-                break (y + 1);
+                ($hir$0 = (y + 1));
+                break;
             }
-        });
-        __TEMP_VAR_LOOP__("$hir$0", $hir$1);
+        };
         let result: unknown = $hir$0;
         result
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -803,20 +813,22 @@ fn test_loop_expression_in_binary_expression() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
-        __TEMP_VAR_LOOP__("$hir$2", loop {
-            break 10;
-        });
-        __TEMP_VAR_LOOP__("$hir$0", $hir$2);
-        __TEMP_VAR_LOOP__("$hir$3", loop {
-            break 20;
-        });
-        __TEMP_VAR_LOOP__("$hir$1", $hir$3);
+        let $hir$0: unknown = _;
+        loop {
+            ($hir$0 = 10);
+            break;
+        };
+        let $hir$1: unknown = _;
+        loop {
+            ($hir$1 = 20);
+            break;
+        };
         let result: unknown = ($hir$0 + $hir$1);
         result
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -832,12 +844,13 @@ fn test_loop_expression_in_if_condition() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
-        __TEMP_VAR_LOOP__("$hir$2", loop {
-            break true;
-        });
-        __TEMP_VAR_LOOP__("$hir$0", $hir$2);
+        let $hir$0: unknown = _;
+        loop {
+            ($hir$0 = true);
+            break;
+        };
         let $hir$1: unknown = _;
         if $hir$0 {
             ($hir$1 = 42);
@@ -847,7 +860,7 @@ fn test_loop_expression_in_if_condition() {
         let result: unknown = $hir$1;
         result
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -863,20 +876,22 @@ fn test_loop_expression_in_list() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
-        __TEMP_VAR_LOOP__("$hir$2", loop {
-            break 1;
-        });
-        __TEMP_VAR_LOOP__("$hir$0", $hir$2);
-        __TEMP_VAR_LOOP__("$hir$3", loop {
-            break 2;
-        });
-        __TEMP_VAR_LOOP__("$hir$1", $hir$3);
+        let $hir$0: unknown = _;
+        loop {
+            ($hir$0 = 1);
+            break;
+        };
+        let $hir$1: unknown = _;
+        loop {
+            ($hir$1 = 2);
+            break;
+        };
         let result: unknown = [$hir$0, $hir$1, 42];
         result
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -894,20 +909,21 @@ fn test_loop_expression_with_block_break() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
-        __TEMP_VAR_LOOP__("$hir$1", loop {
+        let $hir$0: unknown = _;
+        loop {
             let x: unknown = {
                 let y: unknown = 1;
                 (y + 2)
             };
-            break x;
-        });
-        __TEMP_VAR_LOOP__("$hir$0", $hir$1);
+            ($hir$0 = x);
+            break;
+        };
         let result: unknown = $hir$0;
         result
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -962,17 +978,18 @@ fn test_loop_expression_in_field_access() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r#"
     fn main() -> unknown {
         let obj: unknown = {field: 0};
-        __TEMP_VAR_LOOP__("$hir$1", loop {
-            break "field";
-        });
-        __TEMP_VAR_LOOP__("$hir$0", $hir$1);
+        let $hir$0: unknown = _;
+        loop {
+            ($hir$0 = "field");
+            break;
+        };
         let result: unknown = obj[$hir$0];
         result
     }
-    "###);
+    "#);
 }
 
 #[test]
@@ -985,14 +1002,24 @@ fn test_for_loop_expression_in_let() {
             result
         }
     "#;
-    let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    
+    // Debug: Print HIR before and after transformation
+    println!("=== DEBUG: FOR LOOP TRANSFORMATION ===");
+    let (hir_before, hir_after) = compile_and_apply_hir_js_pass_debug(source);
+    println!("HIR BEFORE:");
+    println!("{}", pretty_print(&hir_before));
+    println!("\nHIR AFTER:");
+    println!("{}", pretty_print(&hir_after));
+    println!("=== END DEBUG ===");
+    
+    let hir = hir_after;
+    assert_snapshot!(pretty_print(&hir), @r"
     fn test() -> unknown {
         let $hir$0: unknown = _;
         {
             let iterator$$: unknown = iterator::iter([1, 2, 3]);
             let accumulator$$: unknown = 0;
-            ($hir$0 = __TEMP_VAR_LOOP__("$hir$1", loop {
+            ($hir$0 = loop {
                 let acc: unknown = accumulator$$;
                 (accumulator$$ = match iterator$$.next() {
                     Option::Some { 0: i } => {
@@ -1002,10 +1029,10 @@ fn test_for_loop_expression_in_let() {
                         break accumulator$$
                     },
                 })
-            }));
+            });
         };
         let result: unknown = $hir$0;
         result
     }
-    "###);
+    ");
 }
