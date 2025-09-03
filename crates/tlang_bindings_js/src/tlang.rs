@@ -254,6 +254,19 @@ impl Tlang {
         serde_wasm_bindgen::to_value(self.analyzer.get_diagnostics())
     }
 
+    #[wasm_bindgen(js_name = "getDiagnosticsQuiet")]
+    pub fn diagnostics_quiet(&mut self) -> Result<JsValue, serde_wasm_bindgen::Error> {
+        // Filter out warnings, keeping only errors
+        // This provides a "quiet" mode that suppresses warnings from standard library symbols
+        let filtered_diagnostics: Vec<_> = self
+            .analyzer
+            .get_diagnostics()
+            .iter()
+            .filter(|diagnostic| diagnostic.is_error())
+            .collect();
+        serde_wasm_bindgen::to_value(&filtered_diagnostics)
+    }
+
     #[wasm_bindgen(js_name = "getCodemirrorDiagnostics")]
     pub fn codemirror_diagnostics(&mut self) -> Vec<codemirror::CodemirrorDiagnostic> {
         let source = self.source.clone();
@@ -261,6 +274,25 @@ impl Tlang {
             .analyzer
             .get_diagnostics()
             .iter()
+            .map(|d| codemirror::from_tlang_diagnostic(&source, d))
+            .collect::<Vec<_>>();
+        let parse_errors = self
+            .parse_issues()
+            .iter()
+            .map(|e| codemirror::from_parse_issue(&source, e));
+
+        parse_errors.chain(diagnostics).collect()
+    }
+
+    #[wasm_bindgen(js_name = "getCodemirrorDiagnosticsQuiet")]
+    pub fn codemirror_diagnostics_quiet(&mut self) -> Vec<codemirror::CodemirrorDiagnostic> {
+        let source = self.source.clone();
+        // Filter out warnings, keeping only errors
+        let diagnostics = self
+            .analyzer
+            .get_diagnostics()
+            .iter()
+            .filter(|diagnostic| diagnostic.is_error())
             .map(|d| codemirror::from_tlang_diagnostic(&source, d))
             .collect::<Vec<_>>();
         let parse_errors = self

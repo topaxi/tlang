@@ -178,6 +178,12 @@ fn compile_to_ast_string(source: &str) -> Result<String, ParserError> {
     Ok(ron::ser::to_string_pretty(&ast, ron::ser::PrettyConfig::default()).unwrap())
 }
 
+fn is_standard_library_source(source: &str) -> bool {
+    // Get the raw standard library source without the comment header
+    let stdlib_raw = include_str!("../../tlang_codegen_js/std/lib.tlang");
+    source.trim() == stdlib_raw.trim()
+}
+
 fn compile_to_hir(source: &str, show_warnings: bool) -> Result<hir::Module, ParserError> {
     let mut parser = tlang_parser::Parser::from_source(source);
     let ast = parser.parse()?;
@@ -186,8 +192,11 @@ fn compile_to_hir(source: &str, show_warnings: bool) -> Result<hir::Module, Pars
     semantic_analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());
     semantic_analyzer.analyze(&ast)?;
 
+    // Automatically suppress warnings for standard library code
+    let suppress_warnings = !show_warnings || is_standard_library_source(source);
+
     // Display warnings (but don't fail compilation)
-    if show_warnings {
+    if !suppress_warnings {
         for diagnostic in semantic_analyzer.get_diagnostics() {
             if diagnostic.is_warning() {
                 eprintln!("{}", diagnostic);
