@@ -361,6 +361,12 @@ impl CodegenJS {
     pub(crate) fn push_let_declaration_to_expr(&mut self, name: &str, expr: &hir::Expr) {
         self.push_open_let_declaration(name);
 
+        // Handle wildcard expressions specially - generate 'undefined' for uninitialized variables
+        if let hir::ExprKind::Wildcard = expr.kind {
+            self.push_str("undefined");
+            return;
+        }
+
         // In loop contexts, if the expression is a temp variable reference that doesn't exist,
         // try to use the latest temp variable that actually holds a meaningful result
         if self.is_in_loop_context() {

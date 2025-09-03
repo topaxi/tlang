@@ -612,166 +612,70 @@ impl HirJsPass {
     ) -> Vec<hir::Stmt> {
         let mut statements = Vec::new();
 
+        // First, create a let declaration with wildcard as initial value
+        let temp_var_decl = hir::Stmt::new(
+            ctx.hir_id_allocator.next_id(),
+            hir::StmtKind::Let(
+                Box::new(hir::Pat {
+                    kind: hir::PatKind::Identifier(
+                        ctx.hir_id_allocator.next_id(),
+                        Box::new(Ident::new(temp_name, span))
+                    ),
+                    span,
+                }),
+                Box::new(hir::Expr {
+                    hir_id: ctx.hir_id_allocator.next_id(),
+                    kind: hir::ExprKind::Wildcard,
+                    span,
+                }),
+                Box::new(hir::Ty {
+                    kind: hir::TyKind::Unknown,
+                    span,
+                }), // Unknown type for now
+            ),
+            span,
+        );
+        statements.push(temp_var_decl);
+
         match &expr.kind {
             hir::ExprKind::Block(block) => {
                 if block.has_completion() {
-                    // Transform block expression (existing logic adapted)
+                    // Transform block expression to regular statements
                     let mut new_block = block.as_ref().clone();
 
                     // Move the completion expression to an assignment statement
                     if let Some(completion_expr) = new_block.expr.take() {
-                        // Check if the completion expression is a Loop that needs special handling
-                        match &completion_expr.kind {
-                            hir::ExprKind::Loop(_) => {
-                                // For Loop expressions, we need to create a __TEMP_VAR_LOOP__ call
-                                // instead of recursively flattening them
-                                let combined_expr = hir::Expr {
-                                    hir_id: ctx.hir_id_allocator.next_id(),
-                                    kind: hir::ExprKind::Call(Box::new(hir::CallExpression {
-                                        hir_id: ctx.hir_id_allocator.next_id(),
-                                        callee: hir::Expr {
-                                            hir_id: ctx.hir_id_allocator.next_id(),
-                                            kind: hir::ExprKind::Path(Box::new(hir::Path::new(
-                                                vec![hir::PathSegment {
-                                                    ident: Ident::new("__TEMP_VAR_LOOP__", span),
-                                                }],
-                                                span,
-                                            ))),
-                                            span,
-                                        },
-                                        arguments: vec![
-                                            // First argument: temp variable name
-                                            hir::Expr {
-                                                hir_id: ctx.hir_id_allocator.next_id(),
-                                                kind: hir::ExprKind::Literal(Box::new(
-                                                    tlang_ast::token::Literal::String(temp_name.into()),
-                                                )),
-                                                span,
-                                            },
-                                            // Second argument: the loop expression
-                                            completion_expr,
-                                        ],
-                                    })),
-                                    span,
-                                };
-
-                                let stmt = hir::Stmt::new(
-                                    ctx.hir_id_allocator.next_id(),
-                                    hir::StmtKind::Expr(Box::new(combined_expr)),
-                                    span,
-                                );
-                                new_block.stmts.push(stmt);
-                            }
-                            _ => {
-                                // For other expression types, create a normal assignment
-                                let assignment_stmt =
-                                    self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
-                                new_block.stmts.push(assignment_stmt);
-                            }
-                        }
+                        let assignment_stmt =
+                            self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                        new_block.stmts.push(assignment_stmt);
                     }
 
-                    // Create a combined statement with the block
-                    let combined_expr = hir::Expr {
-                        hir_id: ctx.hir_id_allocator.next_id(),
-                        kind: hir::ExprKind::Call(Box::new(hir::CallExpression {
-                            hir_id: ctx.hir_id_allocator.next_id(),
-                            callee: hir::Expr {
-                                hir_id: ctx.hir_id_allocator.next_id(),
-                                kind: hir::ExprKind::Path(Box::new(hir::Path::new(
-                                    vec![hir::PathSegment {
-                                        ident: Ident::new("__TEMP_VAR_BLOCK__", span),
-                                    }],
-                                    span,
-                                ))),
-                                span,
-                            },
-                            arguments: vec![
-                                // First argument: temp variable name
-                                hir::Expr {
-                                    hir_id: ctx.hir_id_allocator.next_id(),
-                                    kind: hir::ExprKind::Literal(Box::new(
-                                        tlang_ast::token::Literal::String(temp_name.into()),
-                                    )),
-                                    span,
-                                },
-                                // Second argument: the block
-                                hir::Expr {
-                                    hir_id: ctx.hir_id_allocator.next_id(),
-                                    kind: hir::ExprKind::Block(Box::new(new_block)),
-                                    span,
-                                },
-                            ],
-                        })),
-                        span,
-                    };
-
+                    // Add the block as a regular statement
                     statements.push(hir::Stmt::new(
                         ctx.hir_id_allocator.next_id(),
-                        hir::StmtKind::Expr(Box::new(combined_expr)),
+                        hir::StmtKind::Expr(Box::new(hir::Expr {
+                            hir_id: ctx.hir_id_allocator.next_id(),
+                            kind: hir::ExprKind::Block(Box::new(new_block)),
+                            span,
+                        })),
                         span,
                     ));
                 }
             }
             hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
-                // Always transform if/else expressions to ensure proper JavaScript generation
-                // The decision about ternary vs statement rendering should be made at JS generation time
+                // Transform if/else expressions to regular if/else statements
                 let mut new_then_branch = then_branch.as_ref().clone();
                 if let Some(completion_expr) = new_then_branch.expr.take() {
-                    // In completion position of temp variable assignment, we need to flatten
-                    // ANY expression that might cause JavaScript generation issues
-                    match &completion_expr.kind {
-                        hir::ExprKind::IfElse(..) => {
-                            // Always flatten if-else expressions in completion position to avoid
-                            // embedded if-statements in assignments which can cause invalid JavaScript
-                            let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(completion_expr, ctx);
-                            new_then_branch.stmts.extend(temp_stmts);
-                            let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
-                            new_then_branch.stmts.push(assignment_stmt);
-                        }
-                        _ => {
-                            // For other expressions, check if they're complex
-                            if !expr_can_render_as_js_expr(&completion_expr) {
-                                let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(completion_expr, ctx);
-                                new_then_branch.stmts.extend(temp_stmts);
-                                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
-                                new_then_branch.stmts.push(assignment_stmt);
-                            } else {
-                                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
-                                new_then_branch.stmts.push(assignment_stmt);
-                            }
-                        }
-                    }
+                    let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                    new_then_branch.stmts.push(assignment_stmt);
                 }
 
                 let mut new_else_branches = Vec::new();
                 for else_branch in else_branches {
                     let mut new_else_consequence = else_branch.consequence.clone();
                     if let Some(completion_expr) = new_else_consequence.expr.take() {
-                        // In completion position of temp variable assignment, we need to flatten
-                        // ANY expression that might cause JavaScript generation issues
-                        match &completion_expr.kind {
-                            hir::ExprKind::IfElse(..) => {
-                                // Always flatten if-else expressions in completion position to avoid
-                                // embedded if-statements in assignments which can cause invalid JavaScript
-                                let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(completion_expr, ctx);
-                                new_else_consequence.stmts.extend(temp_stmts);
-                                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
-                                new_else_consequence.stmts.push(assignment_stmt);
-                            }
-                            _ => {
-                                // For other expressions, check if they're complex
-                                if !expr_can_render_as_js_expr(&completion_expr) {
-                                    let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(completion_expr, ctx);
-                                    new_else_consequence.stmts.extend(temp_stmts);
-                                    let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
-                                    new_else_consequence.stmts.push(assignment_stmt);
-                                } else {
-                                    let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
-                                    new_else_consequence.stmts.push(assignment_stmt);
-                                }
-                            }
-                        }
+                        let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                        new_else_consequence.stmts.push(assignment_stmt);
                     }
                     new_else_branches.push(hir::ElseClause {
                         condition: else_branch.condition.clone(),
@@ -779,48 +683,18 @@ impl HirJsPass {
                     });
                 }
 
-                // Create a combined statement with the if/else
-                let combined_expr = hir::Expr {
-                    hir_id: ctx.hir_id_allocator.next_id(),
-                    kind: hir::ExprKind::Call(Box::new(hir::CallExpression {
-                        hir_id: ctx.hir_id_allocator.next_id(),
-                        callee: hir::Expr {
-                            hir_id: ctx.hir_id_allocator.next_id(),
-                            kind: hir::ExprKind::Path(Box::new(hir::Path::new(
-                                vec![hir::PathSegment {
-                                    ident: Ident::new("__TEMP_VAR_IF_ELSE__", span),
-                                }],
-                                span,
-                            ))),
-                            span,
-                        },
-                        arguments: vec![
-                            // First argument: temp variable name
-                            hir::Expr {
-                                hir_id: ctx.hir_id_allocator.next_id(),
-                                kind: hir::ExprKind::Literal(Box::new(
-                                    tlang_ast::token::Literal::String(temp_name.into()),
-                                )),
-                                span,
-                            },
-                            // Second argument: the if/else expression
-                            hir::Expr {
-                                hir_id: ctx.hir_id_allocator.next_id(),
-                                kind: hir::ExprKind::IfElse(
-                                    condition.clone(),
-                                    Box::new(new_then_branch),
-                                    new_else_branches,
-                                ),
-                                span,
-                            },
-                        ],
-                    })),
-                    span,
-                };
-
+                // Add the if/else statement directly
                 statements.push(hir::Stmt::new(
                     ctx.hir_id_allocator.next_id(),
-                    hir::StmtKind::Expr(Box::new(combined_expr)),
+                    hir::StmtKind::Expr(Box::new(hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::IfElse(
+                            condition.clone(),
+                            Box::new(new_then_branch),
+                            new_else_branches,
+                        ),
+                        span,
+                    })),
                     span,
                 ));
             }
@@ -1236,14 +1110,14 @@ impl<'hir> Visitor<'hir> for HirJsPass {
     }
 
     fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut Self::Context) {
-        // Don't recursively walk statements - let visit_block handle all transformations
-        // Only handle function declarations that need their nested content processed
+        // Process function declarations recursively
         match &stmt.kind {
             hir::StmtKind::FunctionDeclaration(_) => {
                 visit::walk_stmt(self, stmt, ctx);
             }
             _ => {
-                // Skip other statement types to avoid double processing
+                // For other statements, allow processing but avoid visiting nested expressions
+                // to prevent double-processing already transformed expressions
             }
         }
     }

@@ -79,11 +79,12 @@ fn test_block_expression_flattening() {
     let hir = compile_and_apply_hir_js_pass(source);
     assert_snapshot!(pretty_print(&hir), @r###"
     fn main() -> unknown {
-        __TEMP_VAR_BLOCK__("$tmp$0", {
+        let $hir$0: unknown = _;
+        {
             let y: unknown = 1;
-            ($tmp$0 = (y + 2));
-        });
-        let x: unknown = $tmp$0;
+            ($hir$0 = (y + 2));
+        };
+        let x: unknown = $hir$0;
         x
     }
     "###);

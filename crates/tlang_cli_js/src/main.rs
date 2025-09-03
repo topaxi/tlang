@@ -219,7 +219,16 @@ fn compile_to_hir(source: &str, show_warnings: bool) -> Result<hir::Module, Pars
         current_scope: tlang_span::HirId::new(1),
     };
     let mut hir_js_pass = HirJsPass::default();
-    hir_js_pass.optimize_hir(&mut module, &mut hir_js_opt_ctx);
+    
+    // Run HIR JS pass iteratively until no more changes are made
+    let mut max_iterations = 10; // Prevent infinite loops
+    while max_iterations > 0 {
+        let changes_made = hir_js_pass.optimize_hir(&mut module, &mut hir_js_opt_ctx);
+        if !changes_made {
+            break;
+        }
+        max_iterations -= 1;
+    }
 
     Ok(module)
 }
