@@ -500,11 +500,11 @@ fn test_variable_usage_validator_independent_usage() {
 
     // First run declaration analysis to collect declarations
     let mut declaration_analyzer = DeclarationAnalyzer::default();
-    let mut context = SemanticAnalysisContext::new();
+    let mut context = SemanticAnalysisContext::default();
     declaration_analyzer.analyze(&ast, &mut context, true);
 
     // Now run the VariableUsageValidator independently
-    let mut validator = VariableUsageValidator::new();
+    let mut validator = VariableUsageValidator::default();
     validator.analyze(&ast, &mut context, true);
 
     let diagnostics = context.get_diagnostics();
@@ -534,11 +534,11 @@ fn test_variable_usage_validator_undeclared_variable() {
 
     // First run declaration analysis to collect declarations
     let mut declaration_analyzer = DeclarationAnalyzer::default();
-    let mut context = SemanticAnalysisContext::new();
+    let mut context = SemanticAnalysisContext::default();
     declaration_analyzer.analyze(&ast, &mut context, true);
 
     // Now run the VariableUsageValidator independently
-    let mut validator = VariableUsageValidator::new();
+    let mut validator = VariableUsageValidator::default();
     validator.analyze(&ast, &mut context, true);
 
     let diagnostics = context.get_diagnostics();
