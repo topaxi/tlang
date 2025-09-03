@@ -1,6 +1,8 @@
 pub mod analyzer;
-mod declarations;
 pub mod diagnostic;
+pub mod passes;
 
-pub use analyzer::SemanticAnalyzer;
-pub use declarations::{DeclarationAnalyzer, DeclarationContext};
+pub use analyzer::{
+    SemanticAnalysisContext, SemanticAnalysisGroup, SemanticAnalysisPass, SemanticAnalyzer,
+};
+pub use passes::{DeclarationAnalyzer, StringLiteralValidator, VariableUsageValidator};
