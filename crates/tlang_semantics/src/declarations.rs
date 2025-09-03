@@ -14,25 +14,13 @@ use crate::analyzer::{SemanticAnalysisContext, SemanticAnalysisPass};
 /**
  * The declaration analyzer is responsible for collecting all the declarations in a module.
  */
+#[derive(Default)]
 pub struct DeclarationAnalyzer {
     symbol_table_stack: Vec<Rc<RefCell<SymbolTable>>>,
     symbol_type_context: Vec<SymbolType>,
 }
 
-impl Default for DeclarationAnalyzer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl DeclarationAnalyzer {
-    pub fn new() -> Self {
-        DeclarationAnalyzer {
-            symbol_table_stack: vec![],
-            symbol_type_context: vec![],
-        }
-    }
-
     fn current_symbol_table(&self) -> &Rc<RefCell<SymbolTable>> {
         self.symbol_table_stack.last().unwrap()
     }

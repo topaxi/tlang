@@ -133,8 +133,8 @@ pub struct SemanticAnalyzer {
 impl Default for SemanticAnalyzer {
     fn default() -> Self {
         Self::new(vec![
-            Box::new(DeclarationAnalyzer),
-            Box::new(VariableUsageValidator),
+            Box::new(DeclarationAnalyzer::default()),
+            Box::new(VariableUsageValidator::default()),
             Box::new(StringLiteralValidator),
         ])
     }

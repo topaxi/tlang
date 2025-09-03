@@ -16,17 +16,12 @@ use tlang_symbols::{SymbolInfo, SymbolTable};
 
 /// Pass for validating variable usage, handling both unused variables
 /// and undeclared variable references.
+#[derive(Default)]
 pub struct VariableUsageValidator {
     symbol_table_stack: Vec<Rc<RefCell<SymbolTable>>>,
 }
 
 impl VariableUsageValidator {
-    pub fn new() -> Self {
-        Self {
-            symbol_table_stack: Vec::new(),
-        }
-    }
-
     fn current_symbol_table(&self) -> Rc<RefCell<SymbolTable>> {
         self.symbol_table_stack.last().cloned().unwrap()
     }
@@ -275,12 +270,6 @@ impl VariableUsageValidator {
                 "Use of undeclared function `{name}` with arity {arity}",
             ));
         }
-    }
-}
-
-impl Default for VariableUsageValidator {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

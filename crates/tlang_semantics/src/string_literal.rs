@@ -11,10 +11,6 @@ use crate::{analyzer::SemanticAnalysisContext, analyzer::SemanticAnalysisPass, d
 pub struct StringLiteralValidator;
 
 impl StringLiteralValidator {
-    pub fn new() -> Self {
-        Self
-    }
-
     fn validate_escape_sequences(
         &mut self,
         string_content: &str,
