@@ -158,6 +158,10 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                     stmt.span,
                     stmt.span.end,
                 );
+
+                // Also store the struct declaration for later reference
+                ctx.struct_declarations
+                    .insert(decl.name.to_string(), (**decl).clone());
             }
             StmtKind::Let(decl) => {
                 self.visit_expr(&decl.expression, ctx);

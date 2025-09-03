@@ -7,8 +7,7 @@ use tlang_symbols::{SymbolIdAllocator, SymbolTable, SymbolType};
 
 use crate::{
     declarations::DeclarationAnalyzer, diagnostic::Diagnostic,
-    string_literal::StringLiteralValidator, struct_declaration::StructDeclarationAnalyzer,
-    variable_usage::VariableUsageValidator,
+    string_literal::StringLiteralValidator, variable_usage::VariableUsageValidator,
 };
 
 /**
@@ -134,10 +133,9 @@ pub struct SemanticAnalyzer {
 impl Default for SemanticAnalyzer {
     fn default() -> Self {
         Self::new(vec![
-            Box::new(DeclarationAnalyzer::default()),
-            Box::new(VariableUsageValidator::default()),
-            Box::new(StructDeclarationAnalyzer),
-            Box::new(StringLiteralValidator),
+            Box::new(DeclarationAnalyzer::new()),
+            Box::new(VariableUsageValidator::new()),
+            Box::new(StringLiteralValidator::new()),
         ])
     }
 }
