@@ -35,7 +35,7 @@ impl HirJsPass {
     }
 
     fn generate_temp_var_name(&mut self) -> String {
-        let name = format!("$tmp${}", self.temp_var_counter);
+        let name = format!("$hir${}", self.temp_var_counter);
         self.temp_var_counter += 1;
         name
     }
