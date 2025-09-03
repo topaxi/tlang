@@ -106,13 +106,14 @@ fn test_if_else_expression_flattening() {
     let hir = compile_and_apply_hir_js_pass(source);
     assert_snapshot!(pretty_print(&hir), @r###"
     fn main() -> unknown {
-        __TEMP_VAR_IF_ELSE__("$tmp$0", if true {
+        let $hir$0: unknown = _;
+        if true {
             let y: unknown = 1;
-            ($tmp$0 = (y + 2));
+            ($hir$0 = (y + 2));
         } else {
-            ($tmp$0 = 3);
-        });
-        let x: unknown = $tmp$0;
+            ($hir$0 = 3);
+        };
+        let x: unknown = $hir$0;
         x
     }
     "###);
@@ -435,15 +436,15 @@ fn test_let_statement_flattening() {
     let hir = compile_and_apply_hir_js_pass(source);
     assert_snapshot!(pretty_print(&hir), @r###"
     fn main() -> unknown {
-        __TEMP_VAR_BLOCK__("$tmp$0", {
-            __TEMP_VAR_BLOCK__("$tmp$1", {
+        let $hir$0: unknown = _;
+        {
+            let x: unknown = {
                 let y: unknown = 1;
-                ($tmp$1 = (y + 2));
-            });
-            let x: unknown = $tmp$1;
-            ($tmp$0 = (x * 3));
-        });
-        let result: unknown = $tmp$0;
+                (y + 2)
+            };
+            ($hir$0 = (x * 3));
+        };
+        let result: unknown = $hir$0;
         result
     }
     "###);

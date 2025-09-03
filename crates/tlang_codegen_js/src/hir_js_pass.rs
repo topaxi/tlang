@@ -666,16 +666,40 @@ impl HirJsPass {
                 // Transform if/else expressions to regular if/else statements
                 let mut new_then_branch = then_branch.as_ref().clone();
                 if let Some(completion_expr) = new_then_branch.expr.take() {
-                    let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
-                    new_then_branch.stmts.push(assignment_stmt);
+                    // If the completion expression is an if-else, we need to flatten it too
+                    match &completion_expr.kind {
+                        hir::ExprKind::IfElse(..) => {
+                            // Recursively flatten nested if-else expressions
+                            let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(completion_expr, ctx);
+                            new_then_branch.stmts.extend(temp_stmts);
+                            let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
+                            new_then_branch.stmts.push(assignment_stmt);
+                        }
+                        _ => {
+                            let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                            new_then_branch.stmts.push(assignment_stmt);
+                        }
+                    }
                 }
 
                 let mut new_else_branches = Vec::new();
                 for else_branch in else_branches {
                     let mut new_else_consequence = else_branch.consequence.clone();
                     if let Some(completion_expr) = new_else_consequence.expr.take() {
-                        let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
-                        new_else_consequence.stmts.push(assignment_stmt);
+                        // If the completion expression is an if-else, we need to flatten it too
+                        match &completion_expr.kind {
+                            hir::ExprKind::IfElse(..) => {
+                                // Recursively flatten nested if-else expressions
+                                let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(completion_expr, ctx);
+                                new_else_consequence.stmts.extend(temp_stmts);
+                                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
+                                new_else_consequence.stmts.push(assignment_stmt);
+                            }
+                            _ => {
+                                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                                new_else_consequence.stmts.push(assignment_stmt);
+                            }
+                        }
                     }
                     new_else_branches.push(hir::ElseClause {
                         condition: else_branch.condition.clone(),

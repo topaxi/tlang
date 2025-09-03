@@ -92,10 +92,11 @@ fn test_codegen_operator_precedence() {
 fn test_block_expression() {
     let output = compile!("let one = { 1 };");
     let expected_output = indoc! {"
-        let $tmp$0;{
-            $tmp$0 = 1;
+        let $hir$0 = undefined;
+        {
+            $hir$0 = 1;
         };
-        let one = $tmp$0;
+        let one = $hir$0;
     "};
     assert_eq!(output, expected_output);
 }
@@ -107,11 +108,12 @@ fn test_block_expression_with_statements() {
         CodegenOptions::default().optimize(false)
     );
     let expected_output = indoc! {"
-        let $tmp$0;{
+        let $hir$0 = undefined;
+        {
             let x = 1;
-            $tmp$0 = x;
+            $hir$0 = x;
         };
-        let one = $tmp$0;
+        let one = $hir$0;
     "};
     assert_eq!(output, expected_output);
 }

@@ -3,21 +3,23 @@ source: crates/tlang_codegen_js/tests/generator.rs
 expression: output
 ---
 function main() {
-    let $tmp$0;if (true) {
-        let $tmp$1;if (true) {
-            $tmp$1 = 1;
+    let $hir$0 = undefined;
+    if (true) {
+        let $tmp$0;if (true) {
+            $tmp$0 = 1;
         } else {
-            $tmp$1 = 2;
+            $tmp$0 = 2;
         }
-        let x = $tmp$1;
-        let $tmp$2;if (x === 1) {
-            $tmp$2 = 3;
+        let x = $tmp$0;
+        let $hir$1 = undefined;
+        if (x === 1) {
+            $hir$1 = 3;
         } else {
-            $tmp$2 = 4;
+            $hir$1 = 4;
         }
-        $tmp$0 = $tmp$2;
+        $hir$0 = $hir$1;
     } else {
-        $tmp$0 = 5;
+        $hir$0 = 5;
     }
-    let result = $tmp$0;
+    let result = $hir$0;
 }
