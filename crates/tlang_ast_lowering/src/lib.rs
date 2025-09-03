@@ -132,7 +132,7 @@ impl LoweringContext {
         R: hir::HirScope,
     {
         let previous_symbol_table = self.current_symbol_table.clone();
-        self.current_symbol_table = Rc::new(RefCell::new(SymbolTable::new(
+        self.current_symbol_table = Rc::new(RefCell::new(SymbolTable::new_child_with_storage(
             previous_symbol_table.clone(),
         )));
         let (hir_id, result) = f(self, self.current_symbol_table.clone());

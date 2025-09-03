@@ -24,7 +24,7 @@ pub struct SemanticAnalysisContext {
 
 impl SemanticAnalysisContext {
     pub fn new() -> Self {
-        let root_symbol_table = Rc::new(RefCell::new(SymbolTable::default()));
+        let root_symbol_table = Rc::new(RefCell::new(SymbolTable::new_with_storage()));
         SemanticAnalysisContext {
             symbol_tables: HashMap::from([(NodeId::new(1), root_symbol_table.clone())]),
             symbol_id_allocator: SymbolIdAllocator::default(),

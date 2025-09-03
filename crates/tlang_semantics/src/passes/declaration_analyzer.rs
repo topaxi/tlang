@@ -33,7 +33,7 @@ impl DeclarationAnalyzer {
         debug!("Entering new scope for node: {}", node_id);
 
         let parent = self.current_symbol_table().clone();
-        let new_symbol_table = Rc::new(RefCell::new(SymbolTable::new(parent)));
+        let new_symbol_table = Rc::new(RefCell::new(SymbolTable::new_child_with_storage(parent)));
         ctx.symbol_tables.insert(node_id, new_symbol_table.clone());
         self.symbol_table_stack.push(new_symbol_table.clone());
 

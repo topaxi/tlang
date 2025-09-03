@@ -163,6 +163,11 @@ pub struct SymbolTable {
     #[cfg_attr(feature = "serde", serde(skip_serializing))]
     parent: Option<Rc<RefCell<SymbolTable>>>,
     symbols: Vec<SymbolInfo>,
+    
+    // NEW: Storage infrastructure for the updated pattern
+    #[cfg_attr(feature = "serde", serde(skip_serializing))]
+    storage: Option<Rc<RefCell<SymbolStorage>>>,
+    scope: Option<SymbolScope>,
 }
 
 // TODO: Should we keep track of the symbol id within the symbol table?
@@ -174,12 +179,77 @@ impl SymbolTable {
         }
     }
 
+    /// Create a new SymbolTable using the new storage pattern
+    pub fn new_with_storage() -> Self {
+        SymbolTable {
+            parent: None,
+            symbols: Vec::new(),
+            storage: Some(Rc::new(RefCell::new(SymbolStorage::new()))),
+            scope: Some(SymbolScope::new(0, 0)),
+        }
+    }
+
+    /// Create a child SymbolTable that shares storage with its parent
+    pub fn new_child_with_storage(parent: Rc<RefCell<SymbolTable>>) -> Self {
+        let (storage, start) = {
+            let parent_borrow = parent.borrow();
+            let storage = parent_borrow.storage.clone();
+            let start = storage.as_ref().map_or(0, |s| s.borrow().symbols.len());
+            (storage, start)
+        };
+        
+        SymbolTable {
+            parent: Some(parent),
+            symbols: Vec::new(),
+            storage,
+            scope: Some(SymbolScope::new(start, 0)),
+        }
+    }
+
     pub fn parent(&self) -> Option<Rc<RefCell<SymbolTable>>> {
         self.parent.clone()
     }
 
     pub fn set_parent(&mut self, parent: Rc<RefCell<SymbolTable>>) {
         self.parent = Some(parent);
+    }
+
+    /// Get a symbol by ID (direct access) - NEW METHOD for the updated pattern
+    /// For now, this traverses the hierarchy until we fully migrate
+    pub fn get_by_id(&self, target_id: SymbolId) -> Option<SymbolInfo> {
+        // NEW: If using storage pattern, use direct access
+        if let Some(storage) = &self.storage {
+            return storage.borrow().get(target_id).cloned();
+        }
+
+        // OLD: Fall back to traversal for current pattern
+        // First check local symbols
+        if let Some(symbol) = self.symbols.iter().find(|s| s.id == target_id) {
+            return Some(symbol.clone());
+        }
+
+        // Then check parent tables
+        if let Some(parent) = &self.parent {
+            parent.borrow().get_by_id(target_id)
+        } else {
+            None
+        }
+    }
+
+    /// Insert using the new storage pattern if available, fallback to old pattern
+    pub fn insert_with_storage(&mut self, symbol_info: SymbolInfo) -> SymbolId {
+        if let (Some(storage), Some(scope)) = (&self.storage, &mut self.scope) {
+            // NEW: Use storage pattern
+            let id = storage.borrow_mut().push(symbol_info);
+            scope.size += 1; // Expand this scope's size
+            debug!("Symbol inserted with ID: {:?} using storage pattern", id);
+            id
+        } else {
+            // OLD: Use existing pattern
+            let id = symbol_info.id;
+            self.insert(symbol_info);
+            id
+        }
     }
 
     pub fn get_slot(&self, predicate: impl Fn(&SymbolInfo) -> bool) -> Option<(usize, usize)> {
@@ -427,5 +497,87 @@ impl SymbolTable {
             && !matches!(s.symbol_type, SymbolType::Enum | SymbolType::Struct)
             // And tagged enum variant definitions do not generate a slot
             && !matches!(s.symbol_type, SymbolType::EnumVariant(len) if len > 0)
+    }
+}
+
+/// Scope definition for symbols within the global storage
+#[derive(Debug, Default, PartialEq, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct SymbolScope {
+    /// Starting position of symbols for this scope in the global symbol vec
+    start: usize,
+    /// Number of symbols in this scope
+    size: usize,
+}
+
+impl SymbolScope {
+    pub fn new(start: usize, size: usize) -> Self {
+        Self { start, size }
+    }
+
+    pub fn start(&self) -> usize {
+        self.start
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
+    }
+
+    pub fn end(&self) -> usize {
+        self.start + self.size
+    }
+
+    pub fn contains_index(&self, index: usize) -> bool {
+        index >= self.start && index < self.end()
+    }
+}
+
+/// Global symbol storage that holds all symbols in a continuous vector
+#[derive(Debug, Default, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct SymbolStorage {
+    /// All symbols stored in a continuous vector
+    symbols: Vec<SymbolInfo>,
+}
+
+impl SymbolStorage {
+    pub fn new() -> Self {
+        Self {
+            symbols: Vec::new(),
+        }
+    }
+
+    /// Get a symbol by its ID (direct indexing)
+    pub fn get(&self, id: SymbolId) -> Option<&SymbolInfo> {
+        self.symbols.get(id.as_index())
+    }
+
+    /// Get a mutable reference to a symbol by its ID (direct indexing)
+    pub fn get_mut(&mut self, id: SymbolId) -> Option<&mut SymbolInfo> {
+        self.symbols.get_mut(id.as_index())
+    }
+
+    /// Push a new symbol and return its ID
+    pub fn push(&mut self, mut symbol: SymbolInfo) -> SymbolId {
+        // Ensure the symbol's ID matches its position in the vector
+        let id = SymbolId::new(self.symbols.len() + 1); // IDs start from 1
+        symbol.id = id;
+        self.symbols.push(symbol);
+        id
+    }
+
+    /// Get all symbols
+    pub fn all(&self) -> &[SymbolInfo] {
+        &self.symbols
+    }
+
+    /// Get symbols in a specific range
+    pub fn range(&self, start: usize, end: usize) -> &[SymbolInfo] {
+        &self.symbols[start..end.min(self.symbols.len())]
+    }
+
+    /// Get symbols for a specific scope
+    pub fn scope_symbols(&self, scope: &SymbolScope) -> &[SymbolInfo] {
+        self.range(scope.start(), scope.end())
     }
 }
