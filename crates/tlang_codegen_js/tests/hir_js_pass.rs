@@ -694,10 +694,11 @@ fn test_simple_loop_expression_in_let() {
     let hir = compile_and_apply_hir_js_pass(source);
     assert_snapshot!(pretty_print(&hir), @r###"
     fn main() -> unknown {
-        __TEMP_VAR_LOOP__("$hir$1", loop {
-            break 42;
-        });
-        __TEMP_VAR_LOOP__("$hir$0", $hir$1);
+        let $hir$0: unknown = _;
+        loop {
+            ($hir$0 = 42);
+            break;
+        };
         let result: unknown = $hir$0;
         result
     }
@@ -751,15 +752,16 @@ fn test_nested_loop_expressions() {
     let hir = compile_and_apply_hir_js_pass(source);
     assert_snapshot!(pretty_print(&hir), @r###"
     fn main() -> unknown {
-        __TEMP_VAR_LOOP__("$hir$1", loop {
+        let $hir$0: unknown = _;
+        loop {
             let inner: unknown = loop {
                 break 5;
             };
             if (inner == 5) {
-                break (inner * 2);
+                ($hir$0 = (inner * 2));
+                break;
             }
-        });
-        __TEMP_VAR_LOOP__("$hir$0", $hir$1);
+        };
         let outer: unknown = $hir$0;
         outer
     }
@@ -778,10 +780,11 @@ fn test_loop_expression_in_function_argument() {
     let hir = compile_and_apply_hir_js_pass(source);
     assert_snapshot!(pretty_print(&hir), @r###"
     fn main() -> unknown {
-        __TEMP_VAR_LOOP__("$hir$1", loop {
-            break 42;
-        });
-        __TEMP_VAR_LOOP__("$hir$0", $hir$1);
+        let $hir$0: unknown = _;
+        loop {
+            ($hir$0 = 42);
+            break;
+        };
         println($hir$0);
     }
     "###);
@@ -929,7 +932,8 @@ fn test_nested_loop_with_complex_expressions() {
     let hir = compile_and_apply_hir_js_pass(source);
     assert_snapshot!(pretty_print(&hir), @r###"
     fn main() -> unknown {
-        __TEMP_VAR_LOOP__("$hir$1", loop {
+        let $hir$0: unknown = _;
+        loop {
             let inner_result: unknown = loop {
                 let value: unknown = {
                     let a: unknown = 1;
@@ -938,10 +942,10 @@ fn test_nested_loop_with_complex_expressions() {
                 break (value * 2);
             };
             if (inner_result > 3) {
-                break (inner_result + 10);
+                ($hir$0 = (inner_result + 10));
+                break;
             }
-        });
-        __TEMP_VAR_LOOP__("$hir$0", $hir$1);
+        };
         let result: unknown = $hir$0;
         result
     }
