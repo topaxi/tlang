@@ -24,6 +24,16 @@ impl<T> Id<T> {
     pub const fn next(self) -> Self {
         Id::new(self.inner.get().saturating_add(1))
     }
+
+    /// Get the raw ID value (starts from 1)
+    pub const fn get(self) -> usize {
+        self.inner.get()
+    }
+
+    /// Get the index for use in Vec (starts from 0)
+    pub const fn as_index(self) -> usize {
+        self.inner.get() - 1
+    }
 }
 
 impl<T> std::fmt::Display for Id<T> {
