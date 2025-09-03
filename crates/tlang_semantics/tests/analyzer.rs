@@ -1,10 +1,12 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
 use tlang_parser::Parser;
-use tlang_semantics::{analyzer::SemanticAnalyzer, diagnostic::Diagnostic, variable_usage::VariableUsageValidator, DeclarationAnalyzer};
+use tlang_semantics::{
+    DeclarationAnalyzer, SemanticAnalysisContext, SemanticAnalysisPass, analyzer::SemanticAnalyzer,
+    diagnostic::Diagnostic, variable_usage::VariableUsageValidator,
+};
 use tlang_span::{LineColumn, NodeId, Span};
 use tlang_symbols::{SymbolId, SymbolInfo, SymbolType};
-
 
 mod common;
 
@@ -490,25 +492,28 @@ fn test_variable_usage_validator_independent_usage() {
         let _unused_var = 99; // Should not be reported due to underscore prefix
         used_var;
     "};
-    
+
     let mut parser = Parser::from_source(source);
-    let mut ast = parser.parse().unwrap();
-    
+    let ast = parser.parse().unwrap();
+
     // First run declaration analysis to collect declarations
     let mut declaration_analyzer = DeclarationAnalyzer::default();
-    let declaration_context = declaration_analyzer.analyze(&mut ast, true);
-    
+    let mut context = SemanticAnalysisContext::new();
+    declaration_analyzer.analyze(&ast, &mut context, true);
+
     // Now run the VariableUsageValidator independently
     let mut validator = VariableUsageValidator::new();
-    let symbol_tables = declaration_context.symbol_tables().clone();
-    let root_table = declaration_context.root_symbol_table().clone();
-    validator.validate_module(&ast, symbol_tables, root_table);
-    
-    let diagnostics = validator.get_diagnostics();
-    
+    validator.analyze(&ast, &mut context, true);
+
+    let diagnostics = context.get_diagnostics();
+
     // Should only report the unused variable (not the used one or the prefixed one)
     assert_eq!(diagnostics.len(), 1);
-    assert!(diagnostics[0].message().contains("Unused variable `unused_var`"));
+    assert!(
+        diagnostics[0]
+            .message()
+            .contains("Unused variable `unused_var`")
+    );
     assert!(diagnostics[0].is_warning());
 }
 
@@ -521,25 +526,28 @@ fn test_variable_usage_validator_undeclared_variable() {
         similar_name; // Use the variable properly
         similar_nam; // Missing 'e' - should trigger did_you_mean
     "};
-    
+
     let mut parser = Parser::from_source(source);
-    let mut ast = parser.parse().unwrap();
-    
+    let ast = parser.parse().unwrap();
+
     // First run declaration analysis to collect declarations
     let mut declaration_analyzer = DeclarationAnalyzer::default();
-    let declaration_context = declaration_analyzer.analyze(&mut ast, true);
-    
+    let mut context = SemanticAnalysisContext::new();
+    declaration_analyzer.analyze(&ast, &mut context, true);
+
     // Now run the VariableUsageValidator independently
     let mut validator = VariableUsageValidator::new();
-    let symbol_tables = declaration_context.symbol_tables().clone();
-    let root_table = declaration_context.root_symbol_table().clone();
-    validator.validate_module(&ast, symbol_tables, root_table);
-    
-    let diagnostics = validator.get_diagnostics();
-    
+    validator.analyze(&ast, &mut context, true);
+
+    let diagnostics = context.get_diagnostics();
+
     // Should report with suggestion
     assert_eq!(diagnostics.len(), 1);
-    assert!(diagnostics[0].message().contains("Use of undeclared variable `similar_nam`"));
+    assert!(
+        diagnostics[0]
+            .message()
+            .contains("Use of undeclared variable `similar_nam`")
+    );
     assert!(diagnostics[0].message().contains("did you mean"));
     assert!(diagnostics[0].message().contains("similar_name"));
     assert!(diagnostics[0].is_error());

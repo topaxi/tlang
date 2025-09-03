@@ -1,69 +1,15 @@
 use log::debug;
+use std::cell::RefCell;
 use std::rc::Rc;
-use std::{cell::RefCell, collections::HashMap};
 use tlang_ast::keyword::kw;
 use tlang_ast::node::{
     Expr, ExprKind, FunctionDeclaration, FunctionParameter, Module, Pat, PatKind, Stmt, StmtKind,
 };
 use tlang_ast::visit::{Visitor, walk_expr, walk_stmt};
 use tlang_span::{LineColumn, NodeId, Span};
-use tlang_symbols::{SymbolId, SymbolIdAllocator, SymbolInfo, SymbolTable, SymbolType};
+use tlang_symbols::{SymbolInfo, SymbolTable, SymbolType};
 
-/**
- * Context for declaration analysis, containing all the state needed
- * during the visitor traversal.
- */
-pub struct DeclarationContext {
-    symbol_id_allocator: SymbolIdAllocator,
-    symbol_tables: HashMap<NodeId, Rc<RefCell<SymbolTable>>>,
-    root_symbol_table: Rc<RefCell<SymbolTable>>,
-}
-
-impl DeclarationContext {
-    pub fn new() -> Self {
-        let root_symbol_table = Rc::new(RefCell::new(SymbolTable::default()));
-        DeclarationContext {
-            symbol_id_allocator: SymbolIdAllocator::default(),
-            symbol_tables: HashMap::from([(NodeId::new(1), root_symbol_table.clone())]),
-            root_symbol_table,
-        }
-    }
-
-    pub fn symbol_tables(&self) -> &HashMap<NodeId, Rc<RefCell<SymbolTable>>> {
-        &self.symbol_tables
-    }
-
-    pub fn symbol_id_allocator(&self) -> SymbolIdAllocator {
-        self.symbol_id_allocator
-    }
-
-    pub fn root_symbol_table(&self) -> &Rc<RefCell<SymbolTable>> {
-        &self.root_symbol_table
-    }
-
-    fn unique_id(&mut self) -> SymbolId {
-        self.symbol_id_allocator.next_id()
-    }
-
-    pub fn add_builtin_symbols<'a, S, I>(&mut self, symbols: I)
-    where
-        S: AsRef<str> + 'a,
-        I: IntoIterator<Item = &'a (S, SymbolType)>,
-    {
-        for (name, symbol_type) in symbols {
-            let symbol_info =
-                SymbolInfo::new_builtin(self.unique_id(), name.as_ref(), *symbol_type);
-
-            self.root_symbol_table.borrow_mut().insert(symbol_info);
-        }
-    }
-}
-
-impl Default for DeclarationContext {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+use crate::analyzer::{SemanticAnalysisContext, SemanticAnalysisPass};
 
 /**
  * The declaration analyzer is responsible for collecting all the declarations in a module.
@@ -87,36 +33,6 @@ impl DeclarationAnalyzer {
         }
     }
 
-    pub fn analyze(&mut self, module: &Module, is_root: bool) -> DeclarationContext {
-        let mut ctx = DeclarationContext::new();
-        self.analyze_with_context(module, is_root, &mut ctx);
-        ctx
-    }
-
-    pub fn analyze_with_context(
-        &mut self,
-        module: &Module,
-        is_root: bool,
-        ctx: &mut DeclarationContext,
-    ) {
-        // Initialize symbol table stack with root table
-        self.symbol_table_stack = vec![ctx.root_symbol_table().clone()];
-
-        if !is_root {
-            self.push_symbol_table(module.id, ctx);
-        }
-
-        self.visit_module(module, ctx);
-
-        if !is_root {
-            self.pop_symbol_table();
-        }
-
-        // After collecting all declarations, we should be left with the root symbol table on the
-        // symbol table stack.
-        debug_assert_eq!(self.symbol_table_stack.len(), 1);
-    }
-
     fn current_symbol_table(&self) -> &Rc<RefCell<SymbolTable>> {
         self.symbol_table_stack.last().unwrap()
     }
@@ -124,7 +40,7 @@ impl DeclarationAnalyzer {
     fn push_symbol_table(
         &mut self,
         node_id: NodeId,
-        ctx: &mut DeclarationContext,
+        ctx: &mut SemanticAnalysisContext,
     ) -> Rc<RefCell<SymbolTable>> {
         debug!("Entering new scope for node: {}", node_id);
 
@@ -145,14 +61,14 @@ impl DeclarationAnalyzer {
     #[inline(always)]
     fn declare_symbol(
         &mut self,
-        ctx: &mut DeclarationContext,
+        ctx: &mut SemanticAnalysisContext,
         node_id: NodeId,
         name: &str,
         symbol_type: SymbolType,
         defined_at: Span,
         scope_start: LineColumn,
     ) {
-        let id = ctx.unique_id();
+        let id = ctx.symbol_id_allocator.next_id();
         let symbol_info =
             SymbolInfo::new(id, name, symbol_type, defined_at, scope_start).with_node_id(node_id);
 
@@ -162,8 +78,37 @@ impl DeclarationAnalyzer {
     }
 }
 
+impl SemanticAnalysisPass for DeclarationAnalyzer {
+    fn analyze(
+        &mut self,
+        module: &Module,
+        ctx: &mut SemanticAnalysisContext,
+        is_root: bool,
+    ) -> bool {
+        // Initialize symbol table stack with root table
+        self.symbol_table_stack = vec![ctx.root_symbol_table.clone()];
+
+        if !is_root {
+            self.push_symbol_table(module.id, ctx);
+        }
+
+        self.visit_module(module, ctx);
+
+        if !is_root {
+            self.pop_symbol_table();
+        }
+
+        // After collecting all declarations, we should be left with the root symbol table on the
+        // symbol table stack.
+        debug_assert_eq!(self.symbol_table_stack.len(), 1);
+
+        // Declaration collection doesn't change the AST structure
+        false
+    }
+}
+
 impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
-    type Context = DeclarationContext;
+    type Context = SemanticAnalysisContext;
 
     fn enter_scope(&mut self, node_id: NodeId, ctx: &mut Self::Context) {
         self.push_symbol_table(node_id, ctx);
@@ -175,7 +120,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
 
     fn visit_module(&mut self, module: &'ast Module, ctx: &mut Self::Context) {
         // Don't use walk_module as it includes scope management that conflicts
-        // with our explicit scope management in analyze_with_context
+        // with our explicit scope management in analyze method
         for statement in &module.statements {
             self.visit_stmt(statement, ctx);
         }
@@ -349,7 +294,7 @@ impl DeclarationAnalyzer {
         &mut self,
         pattern: &Pat,
         scope_start: LineColumn,
-        ctx: &mut DeclarationContext,
+        ctx: &mut SemanticAnalysisContext,
     ) {
         match &pattern.kind {
             PatKind::Identifier(ident) => {
@@ -392,38 +337,5 @@ impl DeclarationAnalyzer {
             PatKind::Literal(_) => {} // Literal patterns don't need to be declared.
             _ => {}
         }
-    }
-}
-
-// Provide public API methods that maintain compatibility with the original interface
-impl DeclarationAnalyzer {
-    /// Get symbol tables from the analysis context
-    pub fn symbol_tables<'a>(
-        &self,
-        ctx: &'a DeclarationContext,
-    ) -> &'a HashMap<NodeId, Rc<RefCell<SymbolTable>>> {
-        ctx.symbol_tables()
-    }
-
-    /// Get the symbol ID allocator from the analysis context
-    pub fn symbol_id_allocator(&self, ctx: &DeclarationContext) -> SymbolIdAllocator {
-        ctx.symbol_id_allocator()
-    }
-
-    /// Get the root symbol table from the analysis context
-    pub fn root_symbol_table<'a>(
-        &self,
-        ctx: &'a DeclarationContext,
-    ) -> &'a Rc<RefCell<SymbolTable>> {
-        ctx.root_symbol_table()
-    }
-
-    /// Add builtin symbols to the analysis context - delegate to context method
-    pub fn add_builtin_symbols<'a, S, I>(&mut self, ctx: &mut DeclarationContext, symbols: I)
-    where
-        S: AsRef<str> + 'a,
-        I: IntoIterator<Item = &'a (S, SymbolType)>,
-    {
-        ctx.add_builtin_symbols(symbols);
     }
 }

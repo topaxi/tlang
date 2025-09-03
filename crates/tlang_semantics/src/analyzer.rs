@@ -1,5 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
+use log::debug;
 use tlang_ast::{
     node::{Module, StructDeclaration},
     token::Literal,
@@ -9,54 +10,163 @@ use tlang_span::{NodeId, Span};
 use tlang_symbols::{SymbolIdAllocator, SymbolTable, SymbolType};
 
 use crate::{
-    declarations::{DeclarationAnalyzer, DeclarationContext},
+    declarations::DeclarationAnalyzer,
     diagnostic::{self, Diagnostic},
     variable_usage::VariableUsageValidator,
 };
 
 /**
- * Context for semantic analysis, containing only shared state needed
- * during the visitor traversal (similar to DeclarationContext).
+ * Context for semantic analysis, containing shared state needed
+ * across all semantic analysis passes.
  */
 pub struct SemanticAnalysisContext {
-    pub declaration_context: DeclarationContext,
+    pub symbol_tables: HashMap<NodeId, Rc<RefCell<SymbolTable>>>,
+    pub symbol_id_allocator: SymbolIdAllocator,
+    pub root_symbol_table: Rc<RefCell<SymbolTable>>,
     pub struct_declarations: HashMap<String, StructDeclaration>,
+    pub diagnostics: Vec<Diagnostic>,
 }
 
 impl SemanticAnalysisContext {
-    pub fn new(declaration_context: DeclarationContext) -> Self {
+    pub fn new() -> Self {
+        let root_symbol_table = Rc::new(RefCell::new(SymbolTable::default()));
         SemanticAnalysisContext {
-            declaration_context,
+            symbol_tables: HashMap::from([(NodeId::new(1), root_symbol_table.clone())]),
+            symbol_id_allocator: SymbolIdAllocator::default(),
+            root_symbol_table,
             struct_declarations: HashMap::new(),
+            diagnostics: Vec::new(),
         }
     }
 
     pub fn get_symbol_table(&self, id: NodeId) -> Option<Rc<RefCell<SymbolTable>>> {
-        self.declaration_context.symbol_tables().get(&id).cloned()
+        self.symbol_tables.get(&id).cloned()
+    }
+
+    pub fn add_diagnostic(&mut self, diagnostic: Diagnostic) {
+        self.diagnostics.push(diagnostic);
+    }
+
+    pub fn get_diagnostics(&self) -> &[Diagnostic] {
+        &self.diagnostics
+    }
+
+    pub fn add_builtin_symbols<'a, S, I>(&mut self, symbols: I)
+    where
+        S: AsRef<str> + 'a,
+        I: IntoIterator<Item = &'a (S, SymbolType)>,
+    {
+        use tlang_symbols::SymbolInfo;
+
+        for (name, symbol_type) in symbols {
+            let symbol_info = SymbolInfo::new_builtin(
+                self.symbol_id_allocator.next_id(),
+                name.as_ref(),
+                *symbol_type,
+            );
+            self.root_symbol_table.borrow_mut().insert(symbol_info);
+        }
+    }
+}
+
+impl Default for SemanticAnalysisContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/**
+ * Trait for semantic analysis passes, similar to HirPass in the HIR optimizer.
+ */
+pub trait SemanticAnalysisPass {
+    fn name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+
+    #[allow(unused_variables)]
+    fn init_context(&mut self, ctx: &mut SemanticAnalysisContext) {}
+
+    fn analyze(
+        &mut self,
+        module: &Module,
+        ctx: &mut SemanticAnalysisContext,
+        is_root: bool,
+    ) -> bool;
+}
+
+/**
+ * Group of semantic analysis passes that implements SemanticAnalysisPass.
+ * Similar to HirOptGroup in the HIR optimizer.
+ */
+#[derive(Default)]
+pub struct SemanticAnalysisGroup {
+    name: &'static str,
+    passes: Vec<Box<dyn SemanticAnalysisPass>>,
+}
+
+impl SemanticAnalysisGroup {
+    pub fn new(name: &'static str, passes: Vec<Box<dyn SemanticAnalysisPass>>) -> Self {
+        Self { name, passes }
+    }
+
+    pub fn add_pass(&mut self, pass: Box<dyn SemanticAnalysisPass>) {
+        self.passes.push(pass);
+    }
+}
+
+impl SemanticAnalysisPass for SemanticAnalysisGroup {
+    fn name(&self) -> &'static str {
+        self.name
+    }
+
+    fn init_context(&mut self, ctx: &mut SemanticAnalysisContext) {
+        for pass in &mut self.passes {
+            debug!("Initializing context for pass: {}", pass.name());
+            pass.init_context(ctx);
+        }
+    }
+
+    fn analyze(
+        &mut self,
+        module: &Module,
+        ctx: &mut SemanticAnalysisContext,
+        is_root: bool,
+    ) -> bool {
+        let mut changed = false;
+        for pass in &mut self.passes {
+            debug!("Running semantic analysis pass: {}", pass.name());
+            changed |= pass.analyze(module, ctx, is_root);
+        }
+        changed
     }
 }
 
 pub struct SemanticAnalyzer {
-    declaration_analyzer: DeclarationAnalyzer,
-    variable_usage_validator: VariableUsageValidator,
+    group: SemanticAnalysisGroup,
     context: Option<SemanticAnalysisContext>,
     diagnostics: Vec<Diagnostic>,
 }
 
 impl Default for SemanticAnalyzer {
     fn default() -> Self {
-        Self::new(DeclarationAnalyzer::default())
+        Self::new(vec![
+            Box::new(DeclarationAnalyzer::default()),
+            Box::new(VariableUsageValidator::default()),
+        ])
     }
 }
 
 impl SemanticAnalyzer {
-    pub fn new(declaration_analyzer: DeclarationAnalyzer) -> Self {
+    pub fn new(passes: Vec<Box<dyn SemanticAnalysisPass>>) -> Self {
         SemanticAnalyzer {
-            declaration_analyzer,
-            variable_usage_validator: VariableUsageValidator::new(),
+            group: SemanticAnalysisGroup::new("semantic_analysis", passes),
             context: None,
             diagnostics: vec![],
         }
+    }
+
+    pub fn add_pass(&mut self, pass: Box<dyn SemanticAnalysisPass>) {
+        self.group.add_pass(pass);
     }
 
     #[inline(always)]
@@ -64,7 +174,7 @@ impl SemanticAnalyzer {
     /// Panics if analysis has not been run first.
     pub fn symbol_tables(&self) -> &HashMap<NodeId, Rc<RefCell<SymbolTable>>> {
         let ctx = self.context.as_ref().expect("Analysis must be run first");
-        ctx.declaration_context.symbol_tables()
+        &ctx.symbol_tables
     }
 
     #[inline(always)]
@@ -76,24 +186,24 @@ impl SemanticAnalyzer {
     /// Panics if analysis has not been run first.
     pub fn root_symbol_table(&self) -> Rc<RefCell<SymbolTable>> {
         let ctx = self.context.as_ref().expect("Analysis must be run first");
-        ctx.declaration_context.root_symbol_table().clone()
+        ctx.root_symbol_table.clone()
     }
 
     /// # Panics
     /// Panics if analysis has not been run first.
     pub fn symbol_id_allocator(&self) -> SymbolIdAllocator {
         let ctx = self.context.as_ref().expect("Analysis must be run first");
-        ctx.declaration_context.symbol_id_allocator()
+        ctx.symbol_id_allocator
     }
 
     pub fn get_diagnostics(&self) -> Vec<Diagnostic> {
         let mut all_diagnostics = self.diagnostics.clone();
-        all_diagnostics.extend(
-            self.variable_usage_validator
-                .get_diagnostics()
-                .iter()
-                .cloned(),
-        );
+
+        // Include diagnostics from the context
+        if let Some(ref ctx) = self.context {
+            all_diagnostics.extend(ctx.get_diagnostics().iter().cloned());
+        }
+
         all_diagnostics
     }
 
@@ -116,12 +226,11 @@ impl SemanticAnalyzer {
     {
         // Initialize context if it doesn't exist
         if self.context.is_none() {
-            let declaration_context = DeclarationContext::new();
-            self.context = Some(SemanticAnalysisContext::new(declaration_context));
+            self.context = Some(SemanticAnalysisContext::new());
         }
 
         if let Some(ref mut ctx) = self.context {
-            ctx.declaration_context.add_builtin_symbols(symbols);
+            ctx.add_builtin_symbols(symbols);
         }
     }
 
@@ -138,32 +247,21 @@ impl SemanticAnalyzer {
         module: &Module,
         is_root: bool,
     ) -> Result<(), Vec<Diagnostic>> {
-        // First run declaration analysis to collect all declarations
-        let declaration_context = if let Some(ref mut existing_ctx) = self.context {
-            // Reuse existing context with builtin symbols
-            self.declaration_analyzer.analyze_with_context(
-                module,
-                is_root,
-                &mut existing_ctx.declaration_context,
-            );
-            std::mem::take(&mut existing_ctx.declaration_context)
-        } else {
-            // Create new context
-            self.declaration_analyzer.analyze(module, is_root)
-        };
+        // Initialize or reuse existing context
+        let mut context = self.context.take().unwrap_or_default();
 
-        // Create analysis context and reset analyzer state
-        let mut context = SemanticAnalysisContext::new(declaration_context);
+        // Reset analyzer state
         self.diagnostics.clear();
-        self.variable_usage_validator = VariableUsageValidator::new();
+        context.diagnostics.clear();
 
-        // Run semantic analysis for struct declarations and other non-variable-usage concerns
+        // Initialize context for all passes
+        self.group.init_context(&mut context);
+
+        // Run all semantic analysis passes
+        self.group.analyze(module, &mut context, is_root);
+
+        // Run semantic analysis for struct declarations and other remaining concerns
         self.visit_module(module, &mut context);
-
-        // Run variable usage validation as a separate pass
-        let symbol_tables = context.declaration_context.symbol_tables().clone();
-        let root_table = context.declaration_context.root_symbol_table().clone();
-        self.variable_usage_validator.validate_module(module, symbol_tables, root_table);
 
         // Store context
         self.context = Some(context);

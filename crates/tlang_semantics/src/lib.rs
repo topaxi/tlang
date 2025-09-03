@@ -3,6 +3,8 @@ mod declarations;
 pub mod diagnostic;
 pub mod variable_usage;
 
-pub use analyzer::SemanticAnalyzer;
-pub use declarations::{DeclarationAnalyzer, DeclarationContext};
-pub use variable_usage::{VariableUsageValidator, VariableUsageContext};
+pub use analyzer::{
+    SemanticAnalysisContext, SemanticAnalysisGroup, SemanticAnalysisPass, SemanticAnalyzer,
+};
+pub use declarations::DeclarationAnalyzer;
+pub use variable_usage::VariableUsageValidator;

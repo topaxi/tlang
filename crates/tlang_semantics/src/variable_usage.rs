@@ -1,6 +1,9 @@
-use crate::diagnostic::{self, Diagnostic};
+use crate::{
+    analyzer::{SemanticAnalysisContext, SemanticAnalysisPass},
+    diagnostic::{self, Diagnostic},
+};
 use log::debug;
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 use tlang_ast::{
     node::{
         BinaryOpKind, Expr, ExprKind, FunctionDeclaration, LetDeclaration, Module, Pat, PatKind,
@@ -11,55 +14,17 @@ use tlang_ast::{
 use tlang_span::{NodeId, Span};
 use tlang_symbols::{SymbolInfo, SymbolTable};
 
-/// Context for variable usage validation, containing symbol tables
-/// and any shared state needed during traversal.
-pub struct VariableUsageContext {
-    pub symbol_tables: HashMap<NodeId, Rc<RefCell<SymbolTable>>>,
-}
-
-impl VariableUsageContext {
-    pub fn new(symbol_tables: HashMap<NodeId, Rc<RefCell<SymbolTable>>>) -> Self {
-        Self { symbol_tables }
-    }
-
-    pub fn get_symbol_table(&self, id: NodeId) -> Option<Rc<RefCell<SymbolTable>>> {
-        self.symbol_tables.get(&id).cloned()
-    }
-}
-
 /// Pass for validating variable usage, handling both unused variables
 /// and undeclared variable references.
 pub struct VariableUsageValidator {
-    diagnostics: Vec<Diagnostic>,
     symbol_table_stack: Vec<Rc<RefCell<SymbolTable>>>,
 }
 
 impl VariableUsageValidator {
     pub fn new() -> Self {
         Self {
-            diagnostics: Vec::new(),
             symbol_table_stack: Vec::new(),
         }
-    }
-
-    /// Validate variable usage for the given module
-    pub fn validate_module(&mut self, module: &Module, symbol_tables: HashMap<NodeId, Rc<RefCell<SymbolTable>>>, root_symbol_table: Rc<RefCell<SymbolTable>>) {
-        // Reset state
-        self.diagnostics.clear();
-        self.symbol_table_stack.clear();
-
-        // Create context
-        let mut context = VariableUsageContext::new(symbol_tables);
-
-        // Initialize with root symbol table
-        self.push_symbol_table(&root_symbol_table);
-
-        // Visit the module
-        self.visit_module(module, &mut context);
-
-        // Report unused symbols in root table
-        let root_table = self.pop_symbol_table();
-        self.report_unused_symbols(&root_table);
     }
 
     fn current_symbol_table(&self) -> Rc<RefCell<SymbolTable>> {
@@ -74,18 +39,30 @@ impl VariableUsageValidator {
         self.symbol_table_stack.pop().unwrap()
     }
 
-    /// Get all diagnostics collected during validation
+    /// Get all diagnostics collected during validation (for backward compatibility with tests)
     pub fn get_diagnostics(&self) -> &[Diagnostic] {
-        &self.diagnostics
+        // This is now empty since diagnostics are reported to the context
+        // This method is kept for test compatibility but should not be used
+        &[]
     }
 
-    /// Take all diagnostics, clearing the internal list
+    /// Take all diagnostics, clearing the internal list (for backward compatibility with tests)
     pub fn take_diagnostics(&mut self) -> Vec<Diagnostic> {
-        std::mem::take(&mut self.diagnostics)
+        // This is now empty since diagnostics are reported to the context
+        // This method is kept for test compatibility but should not be used
+        Vec::new()
     }
 
     /// Report unused symbols in the given symbol table
-    pub fn report_unused_symbols(&mut self, symbol_table: &Rc<RefCell<SymbolTable>>) {
+    /// 
+    /// # Panics
+    /// Panics if a function symbol has no arity information when calling `symbol_type.arity().unwrap()`.
+    /// This should not happen in practice as all function symbols are expected to have arity information.
+    pub fn report_unused_symbols(
+        &mut self,
+        symbol_table: &Rc<RefCell<SymbolTable>>,
+        ctx: &mut SemanticAnalysisContext,
+    ) {
         let symbol_table = symbol_table.borrow();
         let unused_symbols = symbol_table
             .get_all_declared_local_symbols()
@@ -102,7 +79,7 @@ impl VariableUsageValidator {
 
         for unused_symbol in &unused_symbols {
             if unused_symbol.is_any_fn() {
-                self.diagnostics.push(diagnostic::warn_at!(
+                ctx.add_diagnostic(diagnostic::warn_at!(
                     unused_symbol.defined_at,
                     "Unused {} `{}/{}`",
                     unused_symbol.symbol_type,
@@ -110,7 +87,7 @@ impl VariableUsageValidator {
                     unused_symbol.symbol_type.arity().unwrap(),
                 ));
             } else {
-                self.diagnostics.push(diagnostic::warn_at!(
+                ctx.add_diagnostic(diagnostic::warn_at!(
                     unused_symbol.defined_at,
                     "Unused {} `{}`, if this is intentional, prefix the name with an underscore: `_{}`",
                     unused_symbol.symbol_type, unused_symbol.name, unused_symbol.name
@@ -119,7 +96,7 @@ impl VariableUsageValidator {
         }
     }
 
-    fn mark_as_used_by_name(&mut self, name: &str, span: Span) {
+    fn mark_as_used_by_name(&mut self, name: &str, span: Span, ctx: &mut SemanticAnalysisContext) {
         let symbol_info = self
             .current_symbol_table()
             .borrow()
@@ -129,15 +106,17 @@ impl VariableUsageValidator {
                 .borrow_mut()
                 .mark_as_used(symbol_info.id);
         } else {
-            self.report_undeclared_variable(
-                name,
-                span,
-                &self.current_symbol_table(),
-            );
+            self.report_undeclared_variable(name, span, &self.current_symbol_table(), ctx);
         }
     }
 
-    fn mark_as_used_by_name_and_arity(&mut self, name: &str, arity: usize, span: Span) {
+    fn mark_as_used_by_name_and_arity(
+        &mut self,
+        name: &str,
+        arity: usize,
+        span: Span,
+        ctx: &mut SemanticAnalysisContext,
+    ) {
         let symbol_info_ids: Vec<_> = self
             .current_symbol_table()
             .borrow()
@@ -147,12 +126,7 @@ impl VariableUsageValidator {
             .collect();
 
         if symbol_info_ids.is_empty() {
-            self.report_undeclared_function(
-                name,
-                arity,
-                span,
-                &self.current_symbol_table(),
-            );
+            self.report_undeclared_function(name, arity, span, &self.current_symbol_table(), ctx);
             return;
         }
 
@@ -166,19 +140,25 @@ impl VariableUsageValidator {
         }
     }
 
-    fn analyze_path(&mut self, path: &Path, span: Span) {
+    fn analyze_path(&mut self, path: &Path, span: Span, ctx: &mut SemanticAnalysisContext) {
         debug!("Analyzing path: {}", path);
 
         let mut path_str = String::new();
 
         for segment in &path.segments {
             path_str.push_str(segment.as_str());
-            self.mark_as_used_by_name(&path_str, span);
+            self.mark_as_used_by_name(&path_str, span, ctx);
             path_str.push_str("::");
         }
     }
 
-    fn analyze_path_with_known_arity(&mut self, path: &Path, arity: usize, span: Span) {
+    fn analyze_path_with_known_arity(
+        &mut self,
+        path: &Path,
+        arity: usize,
+        span: Span,
+        ctx: &mut SemanticAnalysisContext,
+    ) {
         debug!(
             "Analyzing path with known arity: {}, arity: {}",
             path, arity
@@ -188,17 +168,17 @@ impl VariableUsageValidator {
 
         for segment in path.segments.iter().take(path.segments.len() - 1) {
             path_str.push_str(segment.as_str());
-            self.mark_as_used_by_name(&path_str, span);
+            self.mark_as_used_by_name(&path_str, span, ctx);
             path_str.push_str("::");
         }
 
-        self.mark_as_used_by_name_and_arity(&path.to_string(), arity, span);
+        self.mark_as_used_by_name_and_arity(&path.to_string(), arity, span, ctx);
     }
 
     fn analyze_variable_declaration(
         &mut self,
         decl: &LetDeclaration,
-        ctx: &mut VariableUsageContext,
+        ctx: &mut SemanticAnalysisContext,
     ) {
         self.visit_pat(&decl.pattern, ctx);
 
@@ -234,7 +214,7 @@ impl VariableUsageValidator {
         }
     }
 
-    fn visit_expr_in_pipeline_context(&mut self, expr: &Expr, ctx: &mut VariableUsageContext) {
+    fn visit_expr_in_pipeline_context(&mut self, expr: &Expr, ctx: &mut SemanticAnalysisContext) {
         match &expr.kind {
             ExprKind::Call(call_expr) | ExprKind::RecursiveCall(call_expr) => {
                 // For direct calls in pipeline context, add +1 to arity
@@ -244,7 +224,7 @@ impl VariableUsageValidator {
 
                 if let ExprKind::Path(path) = &call_expr.callee.kind {
                     let arity = call_expr.arguments.len() + 1; // +1 for the pipeline operator
-                    self.analyze_path_with_known_arity(path, arity, call_expr.callee.span);
+                    self.analyze_path_with_known_arity(path, arity, call_expr.callee.span, ctx);
                 } else {
                     self.visit_expr(&call_expr.callee, ctx);
                 }
@@ -259,18 +239,19 @@ impl VariableUsageValidator {
         name: &str,
         span: Span,
         symbol_table: &Rc<RefCell<SymbolTable>>,
+        ctx: &mut SemanticAnalysisContext,
     ) {
         let did_you_mean = did_you_mean(name, &symbol_table.borrow().get_all_declared_symbols());
 
         if let Some(suggestion) = did_you_mean {
-            self.diagnostics.push(diagnostic::error_at!(
+            ctx.add_diagnostic(diagnostic::error_at!(
                 span,
                 "Use of undeclared variable `{name}`, did you mean the {} `{}`?",
                 suggestion.symbol_type,
                 suggestion.name,
             ));
         } else {
-            self.diagnostics.push(diagnostic::error_at!(
+            ctx.add_diagnostic(diagnostic::error_at!(
                 span,
                 "Use of undeclared variable `{name}`",
             ));
@@ -284,18 +265,19 @@ impl VariableUsageValidator {
         arity: usize,
         span: Span,
         symbol_table: &Rc<RefCell<SymbolTable>>,
+        ctx: &mut SemanticAnalysisContext,
     ) {
         let did_you_mean = did_you_mean(name, &symbol_table.borrow().get_all_declared_symbols());
 
         if let Some(suggestion) = did_you_mean {
-            self.diagnostics.push(diagnostic::error_at!(
+            ctx.add_diagnostic(diagnostic::error_at!(
                 span,
                 "Use of undeclared function `{name}` with arity {arity}, did you mean the {} `{}`?",
                 suggestion.symbol_type,
                 suggestion.name
             ));
         } else {
-            self.diagnostics.push(diagnostic::error_at!(
+            ctx.add_diagnostic(diagnostic::error_at!(
                 span,
                 "Use of undeclared function `{name}` with arity {arity}",
             ));
@@ -309,8 +291,33 @@ impl Default for VariableUsageValidator {
     }
 }
 
+impl SemanticAnalysisPass for VariableUsageValidator {
+    fn analyze(
+        &mut self,
+        module: &Module,
+        ctx: &mut SemanticAnalysisContext,
+        _is_root: bool,
+    ) -> bool {
+        // Reset state
+        self.symbol_table_stack.clear();
+
+        // Initialize with root symbol table
+        self.push_symbol_table(&ctx.root_symbol_table);
+
+        // Visit the module
+        self.visit_module(module, ctx);
+
+        // Report unused symbols in root table
+        let root_table = self.pop_symbol_table();
+        self.report_unused_symbols(&root_table, ctx);
+
+        // Variable usage validation doesn't change the AST structure
+        false
+    }
+}
+
 impl<'ast> Visitor<'ast> for VariableUsageValidator {
-    type Context = VariableUsageContext;
+    type Context = SemanticAnalysisContext;
 
     fn enter_scope(&mut self, node_id: NodeId, ctx: &mut Self::Context) {
         if let Some(symbol_table) = ctx.get_symbol_table(node_id) {
@@ -321,7 +328,7 @@ impl<'ast> Visitor<'ast> for VariableUsageValidator {
     fn leave_scope(&mut self, node_id: NodeId, ctx: &mut Self::Context) {
         if ctx.get_symbol_table(node_id).is_some() {
             let symbol_table = self.pop_symbol_table();
-            self.report_unused_symbols(&symbol_table);
+            self.report_unused_symbols(&symbol_table, ctx);
         }
     }
 
@@ -378,13 +385,13 @@ impl<'ast> Visitor<'ast> for VariableUsageValidator {
 
                 if let ExprKind::Path(path) = &call_expr.callee.kind {
                     let arity = call_expr.arguments.len(); // Normal arity for non-pipeline calls
-                    self.analyze_path_with_known_arity(path, arity, call_expr.callee.span);
+                    self.analyze_path_with_known_arity(path, arity, call_expr.callee.span, ctx);
                 } else {
                     self.visit_expr(&call_expr.callee, ctx);
                 }
             }
             ExprKind::Path(path) => {
-                self.analyze_path(path, expr.span);
+                self.analyze_path(path, expr.span, ctx);
             }
             ExprKind::Dict(kvs) => {
                 for (_key, value) in kvs {
@@ -407,7 +414,7 @@ impl<'ast> Visitor<'ast> for VariableUsageValidator {
     fn visit_pat(&mut self, pat: &'ast Pat, ctx: &mut Self::Context) {
         match &pat.kind {
             PatKind::Enum(enum_pattern) => {
-                self.analyze_path(&enum_pattern.path, pat.span);
+                self.analyze_path(&enum_pattern.path, pat.span, ctx);
 
                 for (_ident, pat) in &enum_pattern.elements {
                     // Don't analyze the field name as it's not a variable reference,
