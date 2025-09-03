@@ -21,6 +21,10 @@ pub struct DeclarationAnalyzer {
 }
 
 impl DeclarationAnalyzer {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     fn current_symbol_table(&self) -> &Rc<RefCell<SymbolTable>> {
         self.symbol_table_stack.last().unwrap()
     }

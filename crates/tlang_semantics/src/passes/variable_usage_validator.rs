@@ -22,6 +22,10 @@ pub struct VariableUsageValidator {
 }
 
 impl VariableUsageValidator {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     fn current_symbol_table(&self) -> Rc<RefCell<SymbolTable>> {
         self.symbol_table_stack.last().cloned().unwrap()
     }

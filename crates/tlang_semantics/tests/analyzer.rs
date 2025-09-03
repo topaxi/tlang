@@ -2,8 +2,10 @@ use indoc::indoc;
 use pretty_assertions::assert_eq;
 use tlang_parser::Parser;
 use tlang_semantics::{
-    DeclarationAnalyzer, SemanticAnalysisContext, SemanticAnalysisPass, analyzer::SemanticAnalyzer,
-    diagnostic::Diagnostic, variable_usage::VariableUsageValidator,
+    SemanticAnalysisContext, SemanticAnalysisPass,
+    analyzer::SemanticAnalyzer,
+    diagnostic::Diagnostic,
+    passes::{DeclarationAnalyzer, VariableUsageValidator},
 };
 use tlang_span::{LineColumn, NodeId, Span};
 use tlang_symbols::{SymbolId, SymbolInfo, SymbolType};
