@@ -1230,15 +1230,22 @@ impl HirPass for HirJsPass {
 impl<'hir> Visitor<'hir> for HirJsPass {
     type Context = HirOptContext;
 
-    fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
-        // Just recursively walk expressions - let the statement-level processing handle loops
-        visit::walk_expr(self, expr, ctx);
+    fn visit_expr(&mut self, _expr: &'hir mut hir::Expr, _ctx: &mut Self::Context) {
+        // Don't recursively walk expressions - let visit_block handle all transformations
+        // Recursive walking can cause double-processing of already-transformed expressions
     }
 
     fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut Self::Context) {
-        // Let visit_block handle the complex transformation logic
-        // This is mainly for statements that aren't within blocks
-        visit::walk_stmt(self, stmt, ctx);
+        // Don't recursively walk statements - let visit_block handle all transformations
+        // Only handle function declarations that need their nested content processed
+        match &stmt.kind {
+            hir::StmtKind::FunctionDeclaration(_) => {
+                visit::walk_stmt(self, stmt, ctx);
+            }
+            _ => {
+                // Skip other statement types to avoid double processing
+            }
+        }
     }
 
     fn visit_block(&mut self, block: &'hir mut hir::Block, ctx: &mut Self::Context) {
