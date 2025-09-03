@@ -217,9 +217,14 @@ impl SymbolTable {
     /// Get a symbol by ID (direct access) - NEW METHOD for the updated pattern
     /// For now, this traverses the hierarchy until we fully migrate
     pub fn get_by_id(&self, target_id: SymbolId) -> Option<SymbolInfo> {
-        // NEW: If using storage pattern, use direct access
+        // NEW: If using storage pattern, respect scope boundaries and hierarchy
         if let Some(storage) = &self.storage {
-            return storage.borrow().get(target_id).cloned();
+            // First, check if the symbol is in our global storage at all
+            if let Some(symbol) = storage.borrow().get(target_id) {
+                // Now check if we can access it based on scope hierarchy
+                return self.can_access_symbol(target_id, symbol);
+            }
+            return None;
         }
 
         // OLD: Fall back to traversal for current pattern
@@ -233,6 +238,43 @@ impl SymbolTable {
             parent.borrow().get_by_id(target_id)
         } else {
             None
+        }
+    }
+
+    /// Check if this symbol table can access a given symbol (respects scope hierarchy)
+    fn can_access_symbol(&self, target_id: SymbolId, symbol: &SymbolInfo) -> Option<SymbolInfo> {
+        // Check if symbol is in our own scope
+        if let Some(ref scope) = self.scope {
+            let symbol_index = target_id.as_index();
+            if scope.contains_index(symbol_index) {
+                return Some(symbol.clone());
+            }
+        }
+
+        // Check if symbol is in parent scopes (can access upward)
+        if let Some(parent) = &self.parent {
+            return parent.borrow().can_access_symbol(target_id, symbol);
+        }
+
+        None
+    }
+
+    /// Debug method to inspect storage (for testing)
+    pub fn debug_storage_info(&self) -> String {
+        if let Some(storage_ref) = &self.storage {
+            let storage = storage_ref.borrow();
+            format!("Global storage contains {} symbols", storage.all().len())
+        } else {
+            "No storage (using old pattern)".to_string()
+        }
+    }
+
+    /// Debug method to inspect scope (for testing)
+    pub fn debug_scope_info(&self) -> String {
+        if let Some(ref scope) = self.scope {
+            format!("Scope: start={}, size={}", scope.start(), scope.size())
+        } else {
+            "No scope (using old pattern)".to_string()
         }
     }
 
