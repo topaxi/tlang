@@ -510,9 +510,22 @@ impl CodegenJS {
                     && let hir::ExprKind::Literal(lit) = &call_expr.arguments[0].kind
                     && let tlang_ast::token::Literal::String(temp_name) = lit.as_ref()
                 {
+                    // Check for collision with existing variables and use a unique name if needed
+                    let actual_temp_name = if self.current_scope().has_variable_in_scope(temp_name) {
+                        // Collision detected - generate a unique temp variable name
+                        let unique_name = self.current_scope().declare_tmp_variable();
+                        // Create an alias so references to the original name use the new name
+                        self.current_scope().declare_variable_alias(temp_name, &unique_name);
+                        unique_name
+                    } else {
+                        // No collision - register the HIR-provided name and use it
+                        self.current_scope().declare_variable_alias(temp_name, temp_name);
+                        temp_name.to_string()
+                    };
+
                     // Generate: let $tmp$0;{...}
                     self.push_str("let ");
-                    self.push_str(temp_name);
+                    self.push_str(&actual_temp_name);
                     self.push_str(";");
 
                     // Generate the block expression with expression context to get braces
@@ -542,9 +555,22 @@ impl CodegenJS {
                     && let hir::ExprKind::Literal(lit) = &call_expr.arguments[0].kind
                     && let tlang_ast::token::Literal::String(temp_name) = lit.as_ref()
                 {
+                    // Check for collision with existing variables and use a unique name if needed
+                    let actual_temp_name = if self.current_scope().has_variable_in_scope(temp_name) {
+                        // Collision detected - generate a unique temp variable name
+                        let unique_name = self.current_scope().declare_tmp_variable();
+                        // Create an alias so references to the original name use the new name
+                        self.current_scope().declare_variable_alias(temp_name, &unique_name);
+                        unique_name
+                    } else {
+                        // No collision - register the HIR-provided name and use it
+                        self.current_scope().declare_variable_alias(temp_name, temp_name);
+                        temp_name.to_string()
+                    };
+
                     // Generate: let $tmp$0;if(...){...}else{...}
                     self.push_str("let ");
-                    self.push_str(temp_name);
+                    self.push_str(&actual_temp_name);
                     self.push_str(";");
 
                     // Generate the if/else expression as a statement
@@ -624,14 +650,27 @@ impl CodegenJS {
                     && let hir::ExprKind::Literal(lit) = &call_expr.arguments[0].kind
                     && let tlang_ast::token::Literal::String(temp_name) = lit.as_ref()
                 {
+                    // Check for collision with existing variables and use a unique name if needed
+                    let actual_temp_name = if self.current_scope().has_variable_in_scope(temp_name) {
+                        // Collision detected - generate a unique temp variable name
+                        let unique_name = self.current_scope().declare_tmp_variable();
+                        // Create an alias so references to the original name use the new name
+                        self.current_scope().declare_variable_alias(temp_name, &unique_name);
+                        unique_name
+                    } else {
+                        // No collision - register the HIR-provided name and use it
+                        self.current_scope().declare_variable_alias(temp_name, temp_name);
+                        temp_name.to_string()
+                    };
+
                     // Generate: let $tmp$0;[loop as statement]
                     self.push_str("let ");
-                    self.push_str(temp_name);
+                    self.push_str(&actual_temp_name);
                     self.push_str(";");
 
                     // Generate the loop as a statement, transforming breaks
                     if let hir::ExprKind::Loop(block) = &call_expr.arguments[1].kind {
-                        self.generate_loop_statement_with_temp_var(block, temp_name);
+                        self.generate_loop_statement_with_temp_var(block, &actual_temp_name);
                     }
                     return;
                 }

@@ -324,6 +324,20 @@ impl HirJsPass {
         expr: hir::Expr,
         ctx: &mut HirOptContext,
     ) -> (hir::Expr, Vec<hir::Stmt>) {
+        // Check if this expression is already a temp variable call - don't process it again
+        if let hir::ExprKind::Call(call_expr) = &expr.kind {
+            if let hir::ExprKind::Path(path) = &call_expr.callee.kind {
+                if path.segments.len() == 1 && (
+                    path.segments[0].ident.as_str() == "__TEMP_VAR_IF_ELSE__" ||
+                    path.segments[0].ident.as_str() == "__TEMP_VAR_LOOP__" ||
+                    path.segments[0].ident.as_str() == "__TEMP_VAR_BLOCK__"
+                ) {
+                    // This is already a temp variable call - return as-is
+                    return (expr, Vec::new());
+                }
+            }
+        }
+
         // First, try to flatten subexpressions
         let (expr_with_flattened_subs, mut sub_stmts) =
             self.flatten_subexpressions_generically(expr, ctx);
@@ -1356,26 +1370,19 @@ impl<'hir> Visitor<'hir> for HirJsPass {
             new_stmts.push(modified_stmt);
         }
 
-        // Replace the statements if we made changes
-        if !new_stmts.is_empty() {
-            block.stmts = new_stmts;
-            
-            // After transformation, we need to visit nested structures like function declarations
-            // But we should avoid double-processing let statements that were already transformed
-            for stmt in &mut block.stmts {
-                match &stmt.kind {
-                    // Only visit function declarations to handle their nested content
-                    hir::StmtKind::FunctionDeclaration(_) => {
-                        self.visit_stmt(stmt, ctx);
-                    }
-                    // Skip other statement types to avoid double processing
-                    _ => {}
+        // Replace the statements and handle nested visiting properly
+        block.stmts = new_stmts;
+        
+        // After transformation, we need to visit nested structures like function declarations
+        // But we should avoid double-processing let statements that were already transformed
+        for stmt in &mut block.stmts {
+            match &stmt.kind {
+                // Only visit function declarations to handle their nested content
+                hir::StmtKind::FunctionDeclaration(_) => {
+                    self.visit_stmt(stmt, ctx);
                 }
-            }
-        } else {
-            // If no changes were made, visit all statements normally
-            for stmt in &mut block.stmts {
-                self.visit_stmt(stmt, ctx);
+                // Skip other statement types to avoid double processing
+                _ => {}
             }
         }
     }
