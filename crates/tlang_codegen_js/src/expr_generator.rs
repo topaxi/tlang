@@ -219,7 +219,11 @@ impl CodegenJS {
             }
             hir::ExprKind::FunctionExpression(decl) => self.generate_function_expression(decl),
             hir::ExprKind::Range(_) => todo!("Range expression not implemented yet."),
-            hir::ExprKind::Wildcard => {}
+            hir::ExprKind::Wildcard => {
+                // Wildcard expressions should be rendered as 'undefined' in JavaScript
+                // This is used for temp variable initialization in the HIR JS pass
+                self.push_str("undefined");
+            }
         }
     }
 

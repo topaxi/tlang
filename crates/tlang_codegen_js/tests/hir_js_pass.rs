@@ -138,25 +138,24 @@ fn test_nested_complex_expressions() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
-        __TEMP_VAR_IF_ELSE__("$tmp$0", if true {
-            __TEMP_VAR_BLOCK__("$tmp$1", {
+        let $hir$0: unknown = _;
+        if true {
+            ($hir$0 = {
                 let a: unknown = 1;
-                ($tmp$1 = (a + 2));
+                (a + 2)
             });
-            ($tmp$0 = $tmp$1);
         } else {
-            __TEMP_VAR_BLOCK__("$tmp$2", {
+            ($hir$0 = {
                 let b: unknown = 3;
-                ($tmp$2 = (b * 2));
+                (b * 2)
             });
-            ($tmp$0 = $tmp$2);
-        });
-        let x: unknown = $tmp$0;
+        };
+        let x: unknown = $hir$0;
         x
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -170,15 +169,16 @@ fn test_function_call_argument_flattening() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
-        __TEMP_VAR_BLOCK__("$tmp$0", {
+        let $hir$0: unknown = _;
+        {
             let x: unknown = 1;
-            ($tmp$0 = (x + 2));
-        });
-        println($tmp$0);
+            ($hir$0 = (x + 2));
+        };
+        println($hir$0);
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -196,20 +196,22 @@ fn test_binary_expression_with_complex_operands() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
-        __TEMP_VAR_BLOCK__("$tmp$0", {
+        let $hir$0: unknown = _;
+        {
             let a: unknown = 1;
-            ($tmp$0 = (a + 1));
-        });
-        __TEMP_VAR_BLOCK__("$tmp$1", {
+            ($hir$0 = (a + 1));
+        };
+        let $hir$1: unknown = _;
+        {
             let b: unknown = 2;
-            ($tmp$1 = (b * 2));
-        });
-        let x: unknown = ($tmp$0 + $tmp$1);
+            ($hir$1 = (b * 2));
+        };
+        let x: unknown = ($hir$0 + $hir$1);
         x
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -227,22 +229,28 @@ fn test_short_circuit_operators_special_handling() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
-        __TEMP_VAR_BLOCK__("$tmp$0", {
+        let $hir$0: unknown = _;
+        {
             let a: unknown = true;
-            ($tmp$0 = a);
-        });
-        if $tmp$0 {
-            __TEMP_VAR_BLOCK__("$tmp$2", $tmp$3);
-            ($tmp$1 = $tmp$2);
-        } else {
-            ($tmp$1 = $tmp$0);
+            ($hir$0 = a);
         };
-        let x: unknown = $tmp$1;
+        let $hir$1: unknown = _;
+        if $hir$0 {
+            let $hir$2: unknown = _;
+            {
+                let b: unknown = false;
+                ($hir$2 = b);
+            };
+            ($hir$1 = $hir$2);
+        } else {
+            ($hir$1 = $hir$0);
+        };
+        let x: unknown = $hir$1;
         x
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -260,20 +268,22 @@ fn test_list_expression_flattening() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
-        __TEMP_VAR_BLOCK__("$tmp$0", {
+        let $hir$0: unknown = _;
+        {
             let a: unknown = 1;
-            ($tmp$0 = (a + 1));
-        });
-        __TEMP_VAR_BLOCK__("$tmp$1", {
+            ($hir$0 = (a + 1));
+        };
+        let $hir$1: unknown = _;
+        {
             let b: unknown = 2;
-            ($tmp$1 = (b * 2));
-        });
-        let x: unknown = [$tmp$0, $tmp$1];
+            ($hir$1 = (b * 2));
+        };
+        let x: unknown = [$hir$0, $hir$1];
         x
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -298,24 +308,27 @@ fn test_dict_expression_flattening() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r#"
     fn main() -> unknown {
-        __TEMP_VAR_BLOCK__("$tmp$0", {
+        let $hir$0: unknown = _;
+        {
             let a: unknown = 1;
-            ($tmp$0 = (a + 1));
-        });
-        __TEMP_VAR_BLOCK__("$tmp$1", {
+            ($hir$0 = (a + 1));
+        };
+        let $hir$1: unknown = _;
+        {
             let b: unknown = "key";
-            ($tmp$1 = (b + "2"));
-        });
-        __TEMP_VAR_BLOCK__("$tmp$2", {
+            ($hir$1 = (b + "2"));
+        };
+        let $hir$2: unknown = _;
+        {
             let c: unknown = 2;
-            ($tmp$2 = (c * 2));
-        });
-        let x: unknown = [$tmp$0, $tmp$1, $tmp$2];
+            ($hir$2 = (c * 2));
+        };
+        let x: unknown = [$hir$0, $hir$1, $hir$2];
         x
     }
-    "###);
+    "#);
 }
 
 #[test]
@@ -333,20 +346,22 @@ fn test_index_access_flattening() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
-        __TEMP_VAR_BLOCK__("$tmp$0", {
+        let $hir$0: unknown = _;
+        {
             let arr: unknown = [1, 2, 3];
-            ($tmp$0 = arr);
-        });
-        __TEMP_VAR_BLOCK__("$tmp$1", {
+            ($hir$0 = arr);
+        };
+        let $hir$1: unknown = _;
+        {
             let i: unknown = 1;
-            ($tmp$1 = i);
-        });
-        let x: unknown = $tmp$0[$tmp$1];
+            ($hir$1 = i);
+        };
+        let x: unknown = $hir$0[$hir$1];
         x
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -361,16 +376,17 @@ fn test_field_access_flattening() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
-        __TEMP_VAR_BLOCK__("$tmp$0", {
+        let $hir$0: unknown = _;
+        {
             let obj: unknown = {field: 42};
-            ($tmp$0 = obj);
-        });
-        let x: unknown = $tmp$0.field;
+            ($hir$0 = obj);
+        };
+        let x: unknown = $hir$0.field;
         x
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -385,16 +401,17 @@ fn test_unary_expression_flattening() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
-        __TEMP_VAR_BLOCK__("$tmp$0", {
+        let $hir$0: unknown = _;
+        {
             let a: unknown = true;
-            ($tmp$0 = a);
-        });
-        let x: unknown = !$tmp$0;
+            ($hir$0 = a);
+        };
+        let x: unknown = !$hir$0;
         x
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -408,15 +425,16 @@ fn test_return_statement_flattening() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
-        __TEMP_VAR_BLOCK__("$tmp$0", {
+        let $hir$0: unknown = _;
+        {
             let x: unknown = 1;
-            ($tmp$0 = (x + 2));
-        });
-        return $tmp$0;
+            ($hir$0 = (x + 2));
+        };
+        return $hir$0;
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -464,18 +482,17 @@ fn test_expression_statement_flattening() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         {
-            __TEMP_VAR_BLOCK__("$tmp$0", {
+            let x: unknown = {
                 let y: unknown = 1;
-                ($tmp$0 = (y + 2));
-            });
-            let x: unknown = $tmp$0;
+                (y + 2)
+            };
             println(x);
         };
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -498,26 +515,29 @@ fn test_temp_var_generation() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
-        __TEMP_VAR_BLOCK__("$tmp$0", {
+        let $hir$0: unknown = _;
+        {
             let x: unknown = 1;
-            ($tmp$0 = (x + 1));
-        });
-        let a: unknown = $tmp$0;
-        __TEMP_VAR_BLOCK__("$tmp$1", {
+            ($hir$0 = (x + 1));
+        };
+        let a: unknown = $hir$0;
+        let $hir$1: unknown = _;
+        {
             let y: unknown = 2;
-            ($tmp$1 = (y + 2));
-        });
-        let b: unknown = $tmp$1;
-        __TEMP_VAR_BLOCK__("$tmp$2", {
+            ($hir$1 = (y + 2));
+        };
+        let b: unknown = $hir$1;
+        let $hir$2: unknown = _;
+        {
             let z: unknown = 3;
-            ($tmp$2 = (z + 3));
-        });
-        let c: unknown = $tmp$2;
+            ($hir$2 = (z + 3));
+        };
+        let c: unknown = $hir$2;
         ((a + b) + c)
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -552,17 +572,18 @@ fn test_mixed_simple_and_complex_expressions() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         let simple: unknown = (1 + 2);
-        __TEMP_VAR_BLOCK__("$tmp$0", {
+        let $hir$0: unknown = _;
+        {
             let inner: unknown = (simple * 2);
-            ($tmp$0 = (inner + 1));
-        });
-        let complex: unknown = $tmp$0;
+            ($hir$0 = (inner + 1));
+        };
+        let complex: unknown = $hir$0;
         (simple + complex)
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -599,25 +620,28 @@ fn test_nested_if_else_expressions() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
-        __TEMP_VAR_IF_ELSE__("$tmp$0", if true {
+        let $hir$0: unknown = _;
+        if true {
             let x: unknown = if true {
                 1
             } else {
                 2
             };
-            ($tmp$0 = if (x == 1) {
-                3
+            let $hir$1: unknown = _;
+            if (x == 1) {
+                ($hir$1 = 3);
             } else {
-                4
-            });
+                ($hir$1 = 4);
+            };
+            ($hir$0 = $hir$1);
         } else {
-            ($tmp$0 = 5);
-        });
-        let result: unknown = $tmp$0;
+            ($hir$0 = 5);
+        };
+        let result: unknown = $hir$0;
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -638,22 +662,21 @@ fn test_complex_nested_function_calls() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
-        __TEMP_VAR_BLOCK__("$tmp$0", {
-            __TEMP_VAR_BLOCK__("$tmp$1", {
+        let $hir$0: unknown = _;
+        {
+            let a: unknown = {
                 let x: unknown = 1;
-                ($tmp$1 = (x + 1));
-            });
-            let a: unknown = $tmp$1;
-            __TEMP_VAR_BLOCK__("$tmp$2", {
+                (x + 1)
+            };
+            let b: unknown = {
                 let y: unknown = 2;
-                ($tmp$2 = (y * 2));
-            });
-            let b: unknown = $tmp$2;
-            ($tmp$0 = (a + b));
-        });
-        println($tmp$0);
+                (y * 2)
+            };
+            ($hir$0 = (a + b));
+        };
+        println($hir$0);
     }
-    "###);
+    ");
 }

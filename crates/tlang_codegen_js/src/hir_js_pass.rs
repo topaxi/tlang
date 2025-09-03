@@ -343,9 +343,11 @@ impl HirJsPass {
             self.flatten_subexpressions_generically(expr, ctx);
 
         // For if-else expressions, always flatten to temp variables to ensure proper JavaScript generation
+        // For loop expressions, check if they're in assignment contexts where they need special handling
         // For other expressions, check if they can be rendered as JS
         let needs_flattening = match &expr_with_flattened_subs.kind {
             hir::ExprKind::IfElse(..) => true, // Always flatten if-else expressions
+            hir::ExprKind::Loop(..) => true,   // Loop expressions need transformation for JavaScript
             _ => !expr_can_render_as_js_expr(&expr_with_flattened_subs)
         };
 
@@ -612,7 +614,48 @@ impl HirJsPass {
     ) -> Vec<hir::Stmt> {
         let mut statements = Vec::new();
 
-        // First, create a let declaration with wildcard as initial value
+        // Loop expressions use a special marker approach and don't need wildcard declarations
+        if let hir::ExprKind::Loop(_) = &expr.kind {
+            // Create the __TEMP_VAR_LOOP__ marker directly
+            let combined_expr = hir::Expr {
+                hir_id: ctx.hir_id_allocator.next_id(),
+                kind: hir::ExprKind::Call(Box::new(hir::CallExpression {
+                    hir_id: ctx.hir_id_allocator.next_id(),
+                    callee: hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::Path(Box::new(hir::Path::new(
+                            vec![hir::PathSegment {
+                                ident: Ident::new("__TEMP_VAR_LOOP__", span),
+                            }],
+                            span,
+                        ))),
+                        span,
+                    },
+                    arguments: vec![
+                        // First argument: temp variable name
+                        hir::Expr {
+                            hir_id: ctx.hir_id_allocator.next_id(),
+                            kind: hir::ExprKind::Literal(Box::new(
+                                tlang_ast::token::Literal::String(temp_name.into()),
+                            )),
+                            span,
+                        },
+                        // Second argument: the loop expression
+                        expr,
+                    ],
+                })),
+                span,
+            };
+
+            statements.push(hir::Stmt::new(
+                ctx.hir_id_allocator.next_id(),
+                hir::StmtKind::Expr(Box::new(combined_expr)),
+                span,
+            ));
+            return statements;
+        }
+
+        // For non-loop expressions, create a let declaration with wildcard as initial value
         let temp_var_decl = hir::Stmt::new(
             ctx.hir_id_allocator.next_id(),
             hir::StmtKind::Let(
@@ -723,80 +766,14 @@ impl HirJsPass {
                 ));
             }
             hir::ExprKind::Match(..) => {
-                // Transform match expression (existing logic adapted)
-                let combined_expr = hir::Expr {
-                    hir_id: ctx.hir_id_allocator.next_id(),
-                    kind: hir::ExprKind::Call(Box::new(hir::CallExpression {
-                        hir_id: ctx.hir_id_allocator.next_id(),
-                        callee: hir::Expr {
-                            hir_id: ctx.hir_id_allocator.next_id(),
-                            kind: hir::ExprKind::Path(Box::new(hir::Path::new(
-                                vec![hir::PathSegment {
-                                    ident: Ident::new("__TEMP_VAR_MATCH__", span),
-                                }],
-                                span,
-                            ))),
-                            span,
-                        },
-                        arguments: vec![
-                            // First argument: temp variable name
-                            hir::Expr {
-                                hir_id: ctx.hir_id_allocator.next_id(),
-                                kind: hir::ExprKind::Literal(Box::new(
-                                    tlang_ast::token::Literal::String(temp_name.into()),
-                                )),
-                                span,
-                            },
-                            // Second argument: the match expression
-                            expr,
-                        ],
-                    })),
-                    span,
-                };
-
-                statements.push(hir::Stmt::new(
-                    ctx.hir_id_allocator.next_id(),
-                    hir::StmtKind::Expr(Box::new(combined_expr)),
-                    span,
-                ));
+                // Transform match expression to a statement with temp variable assignment
+                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, expr, span);
+                statements.push(assignment_stmt);
             }
-            hir::ExprKind::Loop(_block) => {
-                // Transform loop expression using the marker approach
-                let combined_expr = hir::Expr {
-                    hir_id: ctx.hir_id_allocator.next_id(),
-                    kind: hir::ExprKind::Call(Box::new(hir::CallExpression {
-                        hir_id: ctx.hir_id_allocator.next_id(),
-                        callee: hir::Expr {
-                            hir_id: ctx.hir_id_allocator.next_id(),
-                            kind: hir::ExprKind::Path(Box::new(hir::Path::new(
-                                vec![hir::PathSegment {
-                                    ident: Ident::new("__TEMP_VAR_LOOP__", span),
-                                }],
-                                span,
-                            ))),
-                            span,
-                        },
-                        arguments: vec![
-                            // First argument: temp variable name
-                            hir::Expr {
-                                hir_id: ctx.hir_id_allocator.next_id(),
-                                kind: hir::ExprKind::Literal(Box::new(
-                                    tlang_ast::token::Literal::String(temp_name.into()),
-                                )),
-                                span,
-                            },
-                            // Second argument: the loop expression
-                            expr,
-                        ],
-                    })),
-                    span,
-                };
-
-                statements.push(hir::Stmt::new(
-                    ctx.hir_id_allocator.next_id(),
-                    hir::StmtKind::Expr(Box::new(combined_expr)),
-                    span,
-                ));
+            hir::ExprKind::Loop(_) => {
+                // Loop expressions are handled at the beginning of this function
+                // This case should not be reached
+                panic!("Loop expressions should be handled before this match statement");
             }
             hir::ExprKind::Call(_call_expr) => {
                 // For call expressions, we need to flatten the arguments first
