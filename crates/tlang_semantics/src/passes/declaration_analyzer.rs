@@ -67,10 +67,12 @@ impl DeclarationAnalyzer {
 }
 
 impl SemanticAnalysisPass for DeclarationAnalyzer {
-    fn analyze(&mut self, module: &Module, ctx: &mut SemanticAnalysisContext, is_root: bool) {
+    fn init_context(&mut self, ctx: &mut crate::SemanticAnalysisContext) {
         // Initialize symbol table stack with root table
         self.symbol_table_stack = vec![ctx.root_symbol_table.clone()];
+    }
 
+    fn analyze(&mut self, module: &Module, ctx: &mut SemanticAnalysisContext, is_root: bool) {
         if !is_root {
             self.push_symbol_table(module.id, ctx);
         }

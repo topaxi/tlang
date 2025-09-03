@@ -3,11 +3,14 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use log::debug;
 use tlang_ast::node::{Module, StructDeclaration};
 use tlang_span::NodeId;
-use tlang_symbols::{SymbolIdAllocator, SymbolTable, SymbolType};
+use tlang_symbols::{SymbolId, SymbolIdAllocator, SymbolTable, SymbolType};
+use tlang_types::Type;
 
 use crate::{
     diagnostic::Diagnostic,
-    passes::{DeclarationAnalyzer, StringLiteralValidator, VariableUsageValidator},
+    passes::{
+        DeclarationAnalyzer, StringLiteralValidator, VariableUsageValidator, types::TypePass,
+    },
 };
 
 /**
@@ -20,17 +23,20 @@ pub struct SemanticAnalysisContext {
     pub root_symbol_table: Rc<RefCell<SymbolTable>>,
     pub struct_declarations: HashMap<String, StructDeclaration>,
     pub diagnostics: Vec<Diagnostic>,
+    pub symbol_types: HashMap<SymbolId, Type>,
 }
 
 impl SemanticAnalysisContext {
     pub fn new() -> Self {
         let root_symbol_table = Rc::new(RefCell::new(SymbolTable::default()));
+
         SemanticAnalysisContext {
             symbol_tables: HashMap::from([(NodeId::new(1), root_symbol_table.clone())]),
             symbol_id_allocator: SymbolIdAllocator::default(),
             root_symbol_table,
             struct_declarations: HashMap::new(),
             diagnostics: Vec::new(),
+            symbol_types: HashMap::new(),
         }
     }
 
@@ -134,6 +140,7 @@ impl Default for SemanticAnalyzer {
     fn default() -> Self {
         Self::new(vec![
             Box::new(DeclarationAnalyzer::default()),
+            Box::new(TypePass::default()),
             Box::new(VariableUsageValidator::default()),
             Box::new(StringLiteralValidator),
         ])
@@ -153,9 +160,9 @@ impl SemanticAnalyzer {
         self.group.add_pass(pass);
     }
 
-    #[inline(always)]
     /// # Panics
     /// Panics if analysis has not been run first.
+    #[inline(always)]
     pub fn symbol_tables(&self) -> &HashMap<NodeId, Rc<RefCell<SymbolTable>>> {
         let ctx = self.context.as_ref().expect("Analysis must be run first");
         &ctx.symbol_tables

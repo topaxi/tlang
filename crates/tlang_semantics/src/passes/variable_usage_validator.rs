@@ -274,14 +274,12 @@ impl VariableUsageValidator {
 }
 
 impl SemanticAnalysisPass for VariableUsageValidator {
-    fn analyze(&mut self, module: &Module, ctx: &mut SemanticAnalysisContext, _is_root: bool) {
-        // Reset state
+    fn init_context(&mut self, ctx: &mut SemanticAnalysisContext) {
         self.symbol_table_stack.clear();
-
-        // Initialize with root symbol table
         self.push_symbol_table(&ctx.root_symbol_table);
+    }
 
-        // Visit the module
+    fn analyze(&mut self, module: &Module, ctx: &mut SemanticAnalysisContext, _is_root: bool) {
         self.visit_module(module, ctx);
 
         // Report unused symbols in root table

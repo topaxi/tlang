@@ -163,6 +163,7 @@ pub struct SymbolTable {
     #[cfg_attr(feature = "serde", serde(skip_serializing))]
     parent: Option<Rc<RefCell<SymbolTable>>>,
     symbols: Vec<SymbolInfo>,
+    // TODO: Introduce another symbol table for types
 }
 
 // TODO: Should we keep track of the symbol id within the symbol table?

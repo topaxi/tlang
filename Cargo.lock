@@ -1181,6 +1181,7 @@ dependencies = [
  "tlang_parser",
  "tlang_span",
  "tlang_symbols",
+ "tlang_types",
 ]
 
 [[package]]

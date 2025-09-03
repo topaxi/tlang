@@ -1,5 +1,6 @@
 pub mod declaration_analyzer;
 pub mod string_literal_validator;
+pub mod types;
 pub mod variable_usage_validator;
 
 pub use declaration_analyzer::DeclarationAnalyzer;
