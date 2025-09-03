@@ -101,11 +101,23 @@ impl HirJsPass {
             hir::StmtKind::Let(pat, expr, ty) => {
                 // For let statements with if-else expressions, flatten based on context
                 let needs_flattening = match &expr.kind {
-                    hir::ExprKind::IfElse(..) => {
-                        // Always flatten if-else expressions in let statements since they need 
-                        // proper temp variable coordination and the JavaScript generator will
-                        // decide whether to render as ternary or statements based on its configuration
-                        true
+                    hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
+                        // For if-else expressions in let statements, we need to be more careful:
+                        // 1. Always flatten if there are statements in branches (cannot be ternary)
+                        // 2. Always flatten if any subexpressions are complex
+                        // 3. Always flatten if the condition is complex
+                        let has_statements = !then_branch.stmts.is_empty() || 
+                            else_branches.iter().any(|branch| !branch.consequence.stmts.is_empty());
+                        
+                        let has_complex_condition = !expr_can_render_as_js_expr(condition);
+                        
+                        let has_complex_completion = then_branch.expr.as_ref().map_or(false, |e| !expr_can_render_as_js_expr(e)) ||
+                            else_branches.iter().any(|branch| 
+                                branch.consequence.expr.as_ref().map_or(false, |e| !expr_can_render_as_js_expr(e))
+                            );
+                        
+                        // Flatten if there are statements OR if any part is complex
+                        has_statements || has_complex_condition || has_complex_completion
                     }
                     _ => !expr_can_render_as_js_expr(&expr)
                 };
@@ -692,19 +704,29 @@ impl HirJsPass {
                 // The decision about ternary vs statement rendering should be made at JS generation time
                 let mut new_then_branch = then_branch.as_ref().clone();
                 if let Some(completion_expr) = new_then_branch.expr.take() {
-                    // If the completion expression is complex, we need to flatten it first
-                    if !expr_can_render_as_js_expr(&completion_expr) {
-                        // Flatten the completion expression to temp variables first
-                        let (flattened_expr, mut temp_stmts) = self.flatten_expression_to_temp_var(completion_expr, ctx);
-                        // Add the temp statements to the then branch
-                        new_then_branch.stmts.extend(temp_stmts);
-                        // Then create the assignment with the flattened expression
-                        let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
-                        new_then_branch.stmts.push(assignment_stmt);
-                    } else {
-                        // Simple expression, can assign directly
-                        let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
-                        new_then_branch.stmts.push(assignment_stmt);
+                    // In completion position of temp variable assignment, we need to flatten
+                    // ANY expression that might cause JavaScript generation issues
+                    match &completion_expr.kind {
+                        hir::ExprKind::IfElse(..) => {
+                            // Always flatten if-else expressions in completion position to avoid
+                            // embedded if-statements in assignments which can cause invalid JavaScript
+                            let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(completion_expr, ctx);
+                            new_then_branch.stmts.extend(temp_stmts);
+                            let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
+                            new_then_branch.stmts.push(assignment_stmt);
+                        }
+                        _ => {
+                            // For other expressions, check if they're complex
+                            if !expr_can_render_as_js_expr(&completion_expr) {
+                                let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(completion_expr, ctx);
+                                new_then_branch.stmts.extend(temp_stmts);
+                                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
+                                new_then_branch.stmts.push(assignment_stmt);
+                            } else {
+                                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                                new_then_branch.stmts.push(assignment_stmt);
+                            }
+                        }
                     }
                 }
 
@@ -712,19 +734,29 @@ impl HirJsPass {
                 for else_branch in else_branches {
                     let mut new_else_consequence = else_branch.consequence.clone();
                     if let Some(completion_expr) = new_else_consequence.expr.take() {
-                        // If the completion expression is complex, we need to flatten it first
-                        if !expr_can_render_as_js_expr(&completion_expr) {
-                            // Flatten the completion expression to temp variables first
-                            let (flattened_expr, mut temp_stmts) = self.flatten_expression_to_temp_var(completion_expr, ctx);
-                            // Add the temp statements to the else branch
-                            new_else_consequence.stmts.extend(temp_stmts);
-                            // Then create the assignment with the flattened expression
-                            let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
-                            new_else_consequence.stmts.push(assignment_stmt);
-                        } else {
-                            // Simple expression, can assign directly
-                            let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
-                            new_else_consequence.stmts.push(assignment_stmt);
+                        // In completion position of temp variable assignment, we need to flatten
+                        // ANY expression that might cause JavaScript generation issues
+                        match &completion_expr.kind {
+                            hir::ExprKind::IfElse(..) => {
+                                // Always flatten if-else expressions in completion position to avoid
+                                // embedded if-statements in assignments which can cause invalid JavaScript
+                                let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(completion_expr, ctx);
+                                new_else_consequence.stmts.extend(temp_stmts);
+                                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
+                                new_else_consequence.stmts.push(assignment_stmt);
+                            }
+                            _ => {
+                                // For other expressions, check if they're complex
+                                if !expr_can_render_as_js_expr(&completion_expr) {
+                                    let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(completion_expr, ctx);
+                                    new_else_consequence.stmts.extend(temp_stmts);
+                                    let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
+                                    new_else_consequence.stmts.push(assignment_stmt);
+                                } else {
+                                    let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                                    new_else_consequence.stmts.push(assignment_stmt);
+                                }
+                            }
                         }
                     }
                     new_else_branches.push(hir::ElseClause {
@@ -1148,11 +1180,10 @@ pub fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
         hir::ExprKind::Loop(..) => false,
         hir::ExprKind::Break(..) => false,
         hir::ExprKind::Continue => false,
-        hir::ExprKind::IfElse(..) => {
-            // If-else expressions should always be flattened by the HIR JS pass to ensure
-            // proper temp variable coordination and avoid conflicts with JavaScript generator settings.
-            // The JavaScript generator will decide how to render them based on its configuration.
-            false
+        hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
+            // If-else can be rendered as a JS expression only if it can be a ternary operator
+            // AND we're not in a complex context that requires statement-level flattening
+            if_else_can_render_as_ternary(condition, then_branch, else_branches)
         }
         hir::ExprKind::Match(..) => false,
         hir::ExprKind::Call(call_expr) => {
