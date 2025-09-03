@@ -1,10 +1,10 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
 use tlang_parser::Parser;
-use tlang_semantics::{analyzer::SemanticAnalyzer, diagnostic::Diagnostic, variable_usage::VariableUsageValidator};
+use tlang_semantics::{analyzer::SemanticAnalyzer, diagnostic::Diagnostic, variable_usage::VariableUsageValidator, DeclarationAnalyzer};
 use tlang_span::{LineColumn, NodeId, Span};
-use tlang_symbols::{SymbolId, SymbolInfo, SymbolType, SymbolTable};
-use std::{cell::RefCell, rc::Rc};
+use tlang_symbols::{SymbolId, SymbolInfo, SymbolType};
+
 
 mod common;
 
@@ -483,50 +483,30 @@ fn test_should_not_warn_on_valid_escape_sequences() {
 /// Test that demonstrates the VariableUsageValidator can be used independently
 #[test]
 fn test_variable_usage_validator_independent_usage() {
-    // Create a simple symbol table with unused symbols
-    let mut symbol_table = SymbolTable::default();
+    // Parse a simple code snippet with unused variables
+    let source = indoc! {"
+        let unused_var = 42;
+        let used_var = 24;
+        let _unused_var = 99; // Should not be reported due to underscore prefix
+        used_var;
+    "};
     
-    // Add a few test symbols - some used, some unused
-    let mut unused_var = SymbolInfo::new(
-        tlang_span::id::Id::new(1),
-        "unused_var",
-        SymbolType::Variable,
-        Span::new((0, 0), (0, 10)),
-        LineColumn::default(),
-    );
-    unused_var.used = false; // This should be reported as unused
+    let mut parser = Parser::from_source(source);
+    let mut ast = parser.parse().unwrap();
     
-    let mut used_var = SymbolInfo::new(
-        tlang_span::id::Id::new(2),
-        "used_var",
-        SymbolType::Variable,
-        Span::new((1, 0), (1, 8)),
-        LineColumn::default(),
-    );
-    used_var.used = true; // This should NOT be reported
+    // First run declaration analysis to collect declarations
+    let mut declaration_analyzer = DeclarationAnalyzer::default();
+    let declaration_context = declaration_analyzer.analyze(&mut ast, true);
     
-    let mut prefixed_unused_var = SymbolInfo::new(
-        tlang_span::id::Id::new(3),
-        "_unused_var", // Starts with underscore
-        SymbolType::Variable,
-        Span::new((2, 0), (2, 11)),
-        LineColumn::default(),
-    );
-    prefixed_unused_var.used = false; // Should NOT be reported due to underscore prefix
-    
-    symbol_table.insert(unused_var);
-    symbol_table.insert(used_var);
-    symbol_table.insert(prefixed_unused_var);
-    
-    let symbol_table_rc = Rc::new(RefCell::new(symbol_table));
-    
-    // Create and use the VariableUsageValidator independently
+    // Now run the VariableUsageValidator independently
     let mut validator = VariableUsageValidator::new();
-    validator.report_unused_symbols(&symbol_table_rc);
+    let symbol_tables = declaration_context.symbol_tables().clone();
+    let root_table = declaration_context.root_symbol_table().clone();
+    validator.validate_module(&ast, symbol_tables, root_table);
     
     let diagnostics = validator.get_diagnostics();
     
-    // Should only report the one unused variable (not the used one or the prefixed one)
+    // Should only report the unused variable (not the used one or the prefixed one)
     assert_eq!(diagnostics.len(), 1);
     assert!(diagnostics[0].message().contains("Unused variable `unused_var`"));
     assert!(diagnostics[0].is_warning());
@@ -535,29 +515,25 @@ fn test_variable_usage_validator_independent_usage() {
 /// Test that demonstrates undeclared variable reporting works independently
 #[test]
 fn test_variable_usage_validator_undeclared_variable() {
-    // Create a symbol table with some declared symbols
-    let mut symbol_table = SymbolTable::default();
+    // Parse a simple code snippet with an undeclared variable
+    let source = indoc! {"
+        let similar_name = 42;
+        similar_name; // Use the variable properly
+        similar_nam; // Missing 'e' - should trigger did_you_mean
+    "};
     
-    let declared_var = SymbolInfo::new(
-        tlang_span::id::Id::new(1),
-        "similar_name",
-        SymbolType::Variable,
-        Span::new((0, 0), (0, 12)),
-        LineColumn::default(),
-    );
+    let mut parser = Parser::from_source(source);
+    let mut ast = parser.parse().unwrap();
     
-    symbol_table.insert(declared_var);
-    let symbol_table_rc = Rc::new(RefCell::new(symbol_table));
+    // First run declaration analysis to collect declarations
+    let mut declaration_analyzer = DeclarationAnalyzer::default();
+    let declaration_context = declaration_analyzer.analyze(&mut ast, true);
     
-    // Create and use the VariableUsageValidator independently
+    // Now run the VariableUsageValidator independently
     let mut validator = VariableUsageValidator::new();
-    
-    // Report an undeclared variable that's similar to the declared one
-    validator.report_undeclared_variable(
-        "similar_nam", // Missing 'e' - should trigger did_you_mean
-        Span::new((1, 0), (1, 11)),
-        &symbol_table_rc
-    );
+    let symbol_tables = declaration_context.symbol_tables().clone();
+    let root_table = declaration_context.root_symbol_table().clone();
+    validator.validate_module(&ast, symbol_tables, root_table);
     
     let diagnostics = validator.get_diagnostics();
     
