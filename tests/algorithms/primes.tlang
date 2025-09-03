@@ -17,9 +17,6 @@ fn filter([], _) { [] }
 fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
 fn filter([_, ...xs], f) { rec filter(xs, f) }
 
-fn map([], _) { [] }
-fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
-
 // is_prime(int) -> bool
 fn is_prime(n) {
     if n < 2 {
