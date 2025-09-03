@@ -101,11 +101,11 @@ impl HirJsPass {
             hir::StmtKind::Let(pat, expr, ty) => {
                 // For let statements with if-else expressions, flatten based on context
                 let needs_flattening = match &expr.kind {
-                    hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
-                        // Always flatten if-else in let statements since they need temp variable assignment
-                        // But use more careful logic to avoid infinite optimization loops
-                        let can_render_ternary = if_else_can_render_as_ternary(condition, then_branch, else_branches);
-                        !can_render_ternary  // Only flatten if it cannot be a simple ternary
+                    hir::ExprKind::IfElse(..) => {
+                        // Always flatten if-else expressions in let statements since they need 
+                        // proper temp variable coordination and the JavaScript generator will
+                        // decide whether to render as ternary or statements based on its configuration
+                        true
                     }
                     _ => !expr_can_render_as_js_expr(&expr)
                 };
@@ -692,18 +692,40 @@ impl HirJsPass {
                 // The decision about ternary vs statement rendering should be made at JS generation time
                 let mut new_then_branch = then_branch.as_ref().clone();
                 if let Some(completion_expr) = new_then_branch.expr.take() {
-                    let assignment_stmt =
-                        self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
-                    new_then_branch.stmts.push(assignment_stmt);
+                    // If the completion expression is complex, we need to flatten it first
+                    if !expr_can_render_as_js_expr(&completion_expr) {
+                        // Flatten the completion expression to temp variables first
+                        let (flattened_expr, mut temp_stmts) = self.flatten_expression_to_temp_var(completion_expr, ctx);
+                        // Add the temp statements to the then branch
+                        new_then_branch.stmts.extend(temp_stmts);
+                        // Then create the assignment with the flattened expression
+                        let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
+                        new_then_branch.stmts.push(assignment_stmt);
+                    } else {
+                        // Simple expression, can assign directly
+                        let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                        new_then_branch.stmts.push(assignment_stmt);
+                    }
                 }
 
                 let mut new_else_branches = Vec::new();
                 for else_branch in else_branches {
                     let mut new_else_consequence = else_branch.consequence.clone();
                     if let Some(completion_expr) = new_else_consequence.expr.take() {
-                        let assignment_stmt =
-                            self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
-                        new_else_consequence.stmts.push(assignment_stmt);
+                        // If the completion expression is complex, we need to flatten it first
+                        if !expr_can_render_as_js_expr(&completion_expr) {
+                            // Flatten the completion expression to temp variables first
+                            let (flattened_expr, mut temp_stmts) = self.flatten_expression_to_temp_var(completion_expr, ctx);
+                            // Add the temp statements to the else branch
+                            new_else_consequence.stmts.extend(temp_stmts);
+                            // Then create the assignment with the flattened expression
+                            let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
+                            new_else_consequence.stmts.push(assignment_stmt);
+                        } else {
+                            // Simple expression, can assign directly
+                            let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                            new_else_consequence.stmts.push(assignment_stmt);
+                        }
                     }
                     new_else_branches.push(hir::ElseClause {
                         condition: else_branch.condition.clone(),
@@ -1126,10 +1148,11 @@ pub fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
         hir::ExprKind::Loop(..) => false,
         hir::ExprKind::Break(..) => false,
         hir::ExprKind::Continue => false,
-        hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
-            // If-else can be rendered as a JS expression only if it can be a ternary operator
-            // If-else expressions that require statements must be flattened to temp variables
-            if_else_can_render_as_ternary(condition, then_branch, else_branches)
+        hir::ExprKind::IfElse(..) => {
+            // If-else expressions should always be flattened by the HIR JS pass to ensure
+            // proper temp variable coordination and avoid conflicts with JavaScript generator settings.
+            // The JavaScript generator will decide how to render them based on its configuration.
+            false
         }
         hir::ExprKind::Match(..) => false,
         hir::ExprKind::Call(call_expr) => {
@@ -1304,17 +1327,18 @@ impl<'hir> Visitor<'hir> for HirJsPass {
 
         // Replace the statements if we made changes
         if !new_stmts.is_empty() {
-            let original_stmt_count = block.stmts.len();
             block.stmts = new_stmts;
             
-            // After transformation, visit only the original statements (modified) to handle nested function declarations, etc.
-            // Skip the generated temp variable statements to avoid double processing
-            let total_stmts = block.stmts.len();
-            if total_stmts > original_stmt_count {
-                // Visit only the last original_stmt_count statements, which are the modified original statements
-                let start_idx = total_stmts - original_stmt_count;
-                for stmt in &mut block.stmts[start_idx..] {
-                    self.visit_stmt(stmt, ctx);
+            // After transformation, we need to visit nested structures like function declarations
+            // But we should avoid double-processing let statements that were already transformed
+            for stmt in &mut block.stmts {
+                match &stmt.kind {
+                    // Only visit function declarations to handle their nested content
+                    hir::StmtKind::FunctionDeclaration(_) => {
+                        self.visit_stmt(stmt, ctx);
+                    }
+                    // Skip other statement types to avoid double processing
+                    _ => {}
                 }
             }
         } else {

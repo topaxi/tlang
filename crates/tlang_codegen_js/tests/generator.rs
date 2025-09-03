@@ -505,3 +505,40 @@ fn test_dict_literal_shorthand() {
     "};
     assert_eq!(output, expected_output);
 }
+
+#[cfg(test)]
+mod debug_tests {
+    use indoc::indoc;
+    use crate::common::{compile_src, CodegenOptions};
+
+    #[test] 
+    fn debug_simple_if_else() {
+        let output = compile_src(
+            indoc! {"
+            fn main() {
+                let x = if true { 1 } else { 2 };
+            }
+        "},
+            &CodegenOptions::default().render_ternary(false).into()
+        );
+        println!("Simple if-else output (render_ternary=false):\n{}", output);
+    }
+
+    #[test]
+    fn debug_nested_if_else() {
+        let output = compile_src(
+            indoc! {"
+            fn main() {
+                let result = if true {
+                    let x = if true { 1 } else { 2 };
+                    if x == 1 { 3 } else { 4 }
+                } else {
+                    5
+                };
+            }
+        "},
+            &CodegenOptions::default().render_ternary(false).into()
+        );
+        println!("Nested if-else output (render_ternary=false):\n{}", output);
+    }
+}
