@@ -1220,6 +1220,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tlang_types"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "serde",
+ "tlang_span",
+ "tlang_symbols",
+]
+
+[[package]]
 name = "typenum"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
