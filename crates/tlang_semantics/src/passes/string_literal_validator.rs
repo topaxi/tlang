@@ -7,14 +7,9 @@ use crate::{analyzer::SemanticAnalysisContext, analyzer::SemanticAnalysisPass, d
  * String literal validation pass that validates escape sequences
  * in string and character literals.
  */
-#[derive(Default)]
 pub struct StringLiteralValidator;
 
 impl StringLiteralValidator {
-    pub fn new() -> Self {
-        Self
-    }
-
     fn validate_escape_sequences(
         &mut self,
         string_content: &str,
