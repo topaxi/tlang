@@ -595,22 +595,54 @@ impl HirJsPass {
                     // Move the completion expression to an assignment statement
                     if let Some(completion_expr) = new_block.expr.take() {
                         // Check if the completion expression is a Loop that needs special handling
-                        let assignment_expr = match &completion_expr.kind {
+                        match &completion_expr.kind {
                             hir::ExprKind::Loop(_) => {
-                                // For Loop expressions, we need to first transform them to a temp variable
-                                // and then assign that temp variable to our target temp variable
-                                let (loop_temp_expr, loop_stmts) = 
-                                    self.flatten_expression_to_temp_var(completion_expr, ctx);
-                                // Add the loop statements to the block
-                                new_block.stmts.extend(loop_stmts);
-                                loop_temp_expr
+                                // For Loop expressions, we need to create a __TEMP_VAR_LOOP__ call
+                                // instead of recursively flattening them
+                                let combined_expr = hir::Expr {
+                                    hir_id: ctx.hir_id_allocator.next_id(),
+                                    kind: hir::ExprKind::Call(Box::new(hir::CallExpression {
+                                        hir_id: ctx.hir_id_allocator.next_id(),
+                                        callee: hir::Expr {
+                                            hir_id: ctx.hir_id_allocator.next_id(),
+                                            kind: hir::ExprKind::Path(Box::new(hir::Path::new(
+                                                vec![hir::PathSegment {
+                                                    ident: Ident::new("__TEMP_VAR_LOOP__", span),
+                                                }],
+                                                span,
+                                            ))),
+                                            span,
+                                        },
+                                        arguments: vec![
+                                            // First argument: temp variable name
+                                            hir::Expr {
+                                                hir_id: ctx.hir_id_allocator.next_id(),
+                                                kind: hir::ExprKind::Literal(Box::new(
+                                                    tlang_ast::token::Literal::String(temp_name.into()),
+                                                )),
+                                                span,
+                                            },
+                                            // Second argument: the loop expression
+                                            completion_expr,
+                                        ],
+                                    })),
+                                    span,
+                                };
+
+                                let stmt = hir::Stmt::new(
+                                    ctx.hir_id_allocator.next_id(),
+                                    hir::StmtKind::Expr(Box::new(combined_expr)),
+                                    span,
+                                );
+                                new_block.stmts.push(stmt);
                             }
-                            _ => completion_expr
-                        };
-                        
-                        let assignment_stmt =
-                            self.create_assignment_stmt(ctx, temp_name, assignment_expr, span);
-                        new_block.stmts.push(assignment_stmt);
+                            _ => {
+                                // For other expression types, create a normal assignment
+                                let assignment_stmt =
+                                    self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                                new_block.stmts.push(assignment_stmt);
+                            }
+                        }
                     }
 
                     // Create a combined statement with the block
