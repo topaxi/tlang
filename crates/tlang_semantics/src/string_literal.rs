@@ -4,13 +4,13 @@ use tlang_span::Span;
 use crate::{analyzer::SemanticAnalysisContext, analyzer::SemanticAnalysisPass, diagnostic};
 
 /**
- * Miscellaneous analysis pass that handles struct declaration collection
- * and string literal validation.
+ * String literal validation pass that validates escape sequences
+ * in string and character literals.
  */
 #[derive(Default)]
-pub struct MiscellaneousAnalyzer;
+pub struct StringLiteralValidator;
 
-impl MiscellaneousAnalyzer {
+impl StringLiteralValidator {
     pub fn new() -> Self {
         Self
     }
@@ -106,23 +106,14 @@ impl MiscellaneousAnalyzer {
     }
 }
 
-impl SemanticAnalysisPass for MiscellaneousAnalyzer {
+impl SemanticAnalysisPass for StringLiteralValidator {
     fn analyze(&mut self, module: &Module, ctx: &mut SemanticAnalysisContext, _is_root: bool) {
         self.visit_module(module, ctx);
     }
 }
 
-impl<'ast> Visitor<'ast> for MiscellaneousAnalyzer {
+impl<'ast> Visitor<'ast> for StringLiteralValidator {
     type Context = SemanticAnalysisContext;
-
-    fn visit_struct_decl(
-        &mut self,
-        decl: &'ast tlang_ast::node::StructDeclaration,
-        ctx: &mut Self::Context,
-    ) {
-        ctx.struct_declarations
-            .insert(decl.name.to_string(), decl.clone());
-    }
 
     fn visit_literal(&mut self, literal: &'ast Literal, span: Span, ctx: &mut Self::Context) {
         match literal {

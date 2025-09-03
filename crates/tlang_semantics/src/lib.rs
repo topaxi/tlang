@@ -1,12 +1,14 @@
 pub mod analyzer;
 mod declarations;
 pub mod diagnostic;
-mod misc_analysis;
+mod string_literal;
+mod struct_declaration;
 pub mod variable_usage;
 
 pub use analyzer::{
     SemanticAnalysisContext, SemanticAnalysisGroup, SemanticAnalysisPass, SemanticAnalyzer,
 };
 pub use declarations::DeclarationAnalyzer;
-pub use misc_analysis::MiscellaneousAnalyzer;
+pub use string_literal::StringLiteralValidator;
+pub use struct_declaration::StructDeclarationAnalyzer;
 pub use variable_usage::VariableUsageValidator;
