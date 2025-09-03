@@ -680,3 +680,328 @@ fn test_complex_nested_function_calls() {
     }
     ");
 }
+
+#[test]
+fn test_simple_loop_expression_in_let() {
+    let source = r#"
+        fn main() {
+            let result = loop {
+                break 42;
+            };
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        __TEMP_VAR_LOOP__("$hir$1", loop {
+            break 42;
+        });
+        __TEMP_VAR_LOOP__("$hir$0", $hir$1);
+        let result: unknown = $hir$0;
+        result
+    }
+    "###);
+}
+
+#[test]
+fn test_loop_expression_with_complex_break() {
+    let source = r#"
+        fn main() {
+            let x = 10;
+            let result = loop {
+                if x > 5 { 
+                    let y = x * 2;
+                    break y + 1; 
+                }
+            };
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        let x: unknown = 10;
+        __TEMP_VAR_LOOP__("$hir$1", loop {
+            if (x > 5) {
+                let y: unknown = (x * 2);
+                break (y + 1);
+            }
+        });
+        __TEMP_VAR_LOOP__("$hir$0", $hir$1);
+        let result: unknown = $hir$0;
+        result
+    }
+    "###);
+}
+
+#[test]
+fn test_nested_loop_expressions() {
+    let source = r#"
+        fn main() {
+            let outer = loop {
+                let inner = loop {
+                    break 5;
+                };
+                if inner == 5 { break inner * 2; }
+            };
+            outer
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        __TEMP_VAR_LOOP__("$hir$1", loop {
+            let inner: unknown = loop {
+                break 5;
+            };
+            if (inner == 5) {
+                break (inner * 2);
+            }
+        });
+        __TEMP_VAR_LOOP__("$hir$0", $hir$1);
+        let outer: unknown = $hir$0;
+        outer
+    }
+    "###);
+}
+
+#[test]
+fn test_loop_expression_in_function_argument() {
+    let source = r#"
+        fn main() {
+            println(loop {
+                break 42;
+            });
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        __TEMP_VAR_LOOP__("$hir$1", loop {
+            break 42;
+        });
+        __TEMP_VAR_LOOP__("$hir$0", $hir$1);
+        println($hir$0);
+    }
+    "###);
+}
+
+#[test]
+fn test_loop_expression_in_binary_expression() {
+    let source = r#"
+        fn main() {
+            let result = loop {
+                break 10;
+            } + loop {
+                break 20;
+            };
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        __TEMP_VAR_LOOP__("$hir$2", loop {
+            break 10;
+        });
+        __TEMP_VAR_LOOP__("$hir$0", $hir$2);
+        __TEMP_VAR_LOOP__("$hir$3", loop {
+            break 20;
+        });
+        __TEMP_VAR_LOOP__("$hir$1", $hir$3);
+        let result: unknown = ($hir$0 + $hir$1);
+        result
+    }
+    "###);
+}
+
+#[test]
+fn test_loop_expression_in_if_condition() {
+    let source = r#"
+        fn main() {
+            let result = if loop { break true; } {
+                42
+            } else {
+                0
+            };
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        __TEMP_VAR_LOOP__("$hir$2", loop {
+            break true;
+        });
+        __TEMP_VAR_LOOP__("$hir$0", $hir$2);
+        let $hir$1: unknown = _;
+        if $hir$0 {
+            ($hir$1 = 42);
+        } else {
+            ($hir$1 = 0);
+        };
+        let result: unknown = $hir$1;
+        result
+    }
+    "###);
+}
+
+#[test]
+fn test_loop_expression_in_list() {
+    let source = r#"
+        fn main() {
+            let result = [
+                loop { break 1; },
+                loop { break 2; },
+                42
+            ];
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        __TEMP_VAR_LOOP__("$hir$2", loop {
+            break 1;
+        });
+        __TEMP_VAR_LOOP__("$hir$0", $hir$2);
+        __TEMP_VAR_LOOP__("$hir$3", loop {
+            break 2;
+        });
+        __TEMP_VAR_LOOP__("$hir$1", $hir$3);
+        let result: unknown = [$hir$0, $hir$1, 42];
+        result
+    }
+    "###);
+}
+
+#[test]
+fn test_loop_expression_with_block_break() {
+    let source = r#"
+        fn main() {
+            let result = loop {
+                let x = {
+                    let y = 1;
+                    y + 2
+                };
+                break x;
+            };
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        __TEMP_VAR_LOOP__("$hir$1", loop {
+            let x: unknown = {
+                let y: unknown = 1;
+                (y + 2)
+            };
+            break x;
+        });
+        __TEMP_VAR_LOOP__("$hir$0", $hir$1);
+        let result: unknown = $hir$0;
+        result
+    }
+    "###);
+}
+
+#[test]
+fn test_nested_loop_with_complex_expressions() {
+    let source = r#"
+        fn main() {
+            let result = loop {
+                let inner_result = loop {
+                    let value = {
+                        let a = 1;
+                        a + 1
+                    };
+                    break value * 2;
+                };
+                if inner_result > 3 {
+                    break inner_result + 10;
+                }
+            };
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        __TEMP_VAR_LOOP__("$hir$1", loop {
+            let inner_result: unknown = loop {
+                let value: unknown = {
+                    let a: unknown = 1;
+                    (a + 1)
+                };
+                break (value * 2);
+            };
+            if (inner_result > 3) {
+                break (inner_result + 10);
+            }
+        });
+        __TEMP_VAR_LOOP__("$hir$0", $hir$1);
+        let result: unknown = $hir$0;
+        result
+    }
+    "###);
+}
+
+#[test]
+fn test_loop_expression_in_field_access() {
+    let source = r#"
+        fn main() {
+            let obj = { field: 0 };
+            let result = obj[loop { break "field"; }];
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        let obj: unknown = {field: 0};
+        __TEMP_VAR_LOOP__("$hir$1", loop {
+            break "field";
+        });
+        __TEMP_VAR_LOOP__("$hir$0", $hir$1);
+        let result: unknown = obj[$hir$0];
+        result
+    }
+    "###);
+}
+
+#[test]
+fn test_for_loop_expression_in_let() {
+    let source = r#"
+        fn test() {
+            let result = for i in [1, 2, 3] with acc = 0 {
+                acc + i
+            };
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn test() -> unknown {
+        let $hir$0: unknown = _;
+        {
+            let iterator$$: unknown = iterator::iter([1, 2, 3]);
+            let accumulator$$: unknown = 0;
+            ($hir$0 = __TEMP_VAR_LOOP__("$hir$1", loop {
+                let acc: unknown = accumulator$$;
+                (accumulator$$ = match iterator$$.next() {
+                    Option::Some { 0: i } => {
+                        (acc + i)
+                    },
+                    Option::None => {
+                        break accumulator$$
+                    },
+                })
+            }));
+        };
+        let result: unknown = $hir$0;
+        result
+    }
+    "###);
+}
