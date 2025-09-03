@@ -1,69 +1,3 @@
-use std::path::Path;
-use std::process::{Command, Stdio};
-use std::sync::LazyLock;
-
-use regex::Regex;
-
-// Static regex patterns for redactions
-static THREAD_PANIC_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"thread '(\w+)' \(\d+\) panicked at").expect("Failed to compile regex")
-});
-
-static TIMESTAMP_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z (WARN|ERROR|INFO|DEBUG)")
-        .expect("Failed to compile timestamp redaction regex")
-});
-
-static BACKTRACE_SECTION_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"stack backtrace:\n(   \d+: .+\n)*")
-        .expect("Failed to compile backtrace section redaction regex")
-});
-
-static NUMBERED_TRACE_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"  \d+: [^\n]+\n").expect("Failed to compile numbered trace redaction regex")
-});
-
-static NOTE_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace\.",
-    )
-    .expect("Failed to compile backtrace note redaction regex")
-});
-
-static SYMBOL_DUMP_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"Available symbols: \[\n(.*?\n)*?\s*\]")
-        .expect("Failed to compile symbol dump redaction regex")
-});
-
-static MEMORY_DUMP_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"Current scope: \[\n(.*?\n)*?\]")
-        .expect("Failed to compile memory dump redaction regex")
-});
-
-static ID_TAG_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(SymbolIdTag|NodeIdTag|HirIdTag)\(\d+\)")
-        .expect("Failed to compile ID tag redaction regex")
-});
-
-#[derive(Clone, Copy)]
-enum Backend {
-    Interpreter,
-    JavaScript,
-}
-
-impl Backend {
-    fn as_str(&self) -> &'static str {
-        match self {
-            Backend::Interpreter => "interpreter",
-            Backend::JavaScript => "javascript",
-        }
-    }
-
-    fn values() -> impl Iterator<Item = Backend> {
-        [Backend::Interpreter, Backend::JavaScript].into_iter()
-    }
-}
-
 fn main() {
     println!("Test runner now uses insta snapshots.");
     println!("Recommended: Use 'make test' to run all tests.");
@@ -75,178 +9,242 @@ fn main() {
     );
 }
 
-fn check_nodejs_version() {
-    // Read the Node.js version from the workspace package.json file
-    let current_dir = std::env::current_dir().unwrap();
-    let workspace_root = current_dir
-        .ancestors()
-        .find(|path| path.join("Cargo.toml").exists() && path.join("package.json").exists())
-        .expect("Could not find workspace root with package.json");
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+    use std::process::{Command, Stdio};
+    use std::sync::LazyLock;
 
-    let package_json_path = workspace_root.join("package.json");
-    let package_json_content =
-        std::fs::read_to_string(&package_json_path).expect("Failed to read package.json");
+    use regex::Regex;
 
-    let package_json: serde_json::Value =
-        serde_json::from_str(&package_json_content).expect("Failed to parse package.json");
+    // Static regex patterns for redactions
+    static THREAD_PANIC_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"thread '(\w+)' \(\d+\) panicked at").expect("Failed to compile regex")
+    });
 
-    let required_version = package_json
-        .get("engines")
-        .and_then(|engines| engines.get("node"))
-        .and_then(|node| node.as_str())
-        .expect("Failed to read Node.js version from package.json engines field");
+    static TIMESTAMP_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z (WARN|ERROR|INFO|DEBUG)")
+            .expect("Failed to compile timestamp redaction regex")
+    });
 
-    // Enforce the exact Node.js version specified in package.json instead of using redactions
-    // to normalize output differences between Node.js versions. This ensures consistent test
-    // results by requiring developers to use the exact Node.js version the project targets.
-    let output = Command::new("node")
-        .arg("--version")
-        .output()
-        .expect("Failed to execute 'node --version'. Make sure Node.js is installed.");
+    static BACKTRACE_SECTION_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"stack backtrace:\n(   \d+: .+\n)*")
+            .expect("Failed to compile backtrace section redaction regex")
+    });
 
-    let version_output = String::from_utf8_lossy(&output.stdout);
-    let version = version_output
-        .trim()
-        .strip_prefix('v')
-        .unwrap_or(version_output.trim());
+    static NUMBERED_TRACE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"  \d+: [^\n]+\n").expect("Failed to compile numbered trace redaction regex")
+    });
 
-    if version != required_version {
-        panic!(
-            "Node.js version {} is required (as specified in package.json), but found version {}. \
-             Please install Node.js {} or use a version manager like volta to switch to the required version.",
-            required_version, version, required_version
-        );
+    static NOTE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+        r"note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace\.",
+    )
+    .expect("Failed to compile backtrace note redaction regex")
+    });
+
+    static SYMBOL_DUMP_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"Available symbols: \[\n(.*?\n)*?\s*\]")
+            .expect("Failed to compile symbol dump redaction regex")
+    });
+
+    static MEMORY_DUMP_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"Current scope: \[\n(.*?\n)*?\]")
+            .expect("Failed to compile memory dump redaction regex")
+    });
+
+    static ID_TAG_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(SymbolIdTag|NodeIdTag|HirIdTag)\(\d+\)")
+            .expect("Failed to compile ID tag redaction regex")
+    });
+
+    #[derive(Clone, Copy)]
+    enum Backend {
+        Interpreter,
+        JavaScript,
     }
 
-    println!("✓ Node.js version {} verified", required_version);
-}
+    impl Backend {
+        fn as_str(&self) -> &'static str {
+            match self {
+                Backend::Interpreter => "interpreter",
+                Backend::JavaScript => "javascript",
+            }
+        }
 
-fn run_test_with_backend(file_path: &Path, backend: Backend) -> Result<String, String> {
-    let start = std::time::Instant::now();
-    let exec_start;
-    let output = match backend {
-        Backend::Interpreter => {
-            exec_start = std::time::Instant::now();
+        fn values() -> impl Iterator<Item = Backend> {
+            [Backend::Interpreter, Backend::JavaScript].into_iter()
+        }
+    }
 
-            Command::new("./target/release/tlangdi")
-                .arg(file_path)
-                .output()
-                .map_err(|e| {
+    fn check_nodejs_version() {
+        // Read the Node.js version from the workspace package.json file
+        let current_dir = std::env::current_dir().unwrap();
+        let workspace_root = current_dir
+            .ancestors()
+            .find(|path| path.join("Cargo.toml").exists() && path.join("package.json").exists())
+            .expect("Could not find workspace root with package.json");
+
+        let package_json_path = workspace_root.join("package.json");
+        let package_json_content =
+            std::fs::read_to_string(&package_json_path).expect("Failed to read package.json");
+
+        let package_json: serde_json::Value =
+            serde_json::from_str(&package_json_content).expect("Failed to parse package.json");
+
+        let required_version = package_json
+            .get("engines")
+            .and_then(|engines| engines.get("node"))
+            .and_then(|node| node.as_str())
+            .expect("Failed to read Node.js version from package.json engines field");
+
+        // Enforce the exact Node.js version specified in package.json instead of using redactions
+        // to normalize output differences between Node.js versions. This ensures consistent test
+        // results by requiring developers to use the exact Node.js version the project targets.
+        let output = Command::new("node")
+            .arg("--version")
+            .output()
+            .expect("Failed to execute 'node --version'. Make sure Node.js is installed.");
+
+        let version_output = String::from_utf8_lossy(&output.stdout);
+        let version = version_output
+            .trim()
+            .strip_prefix('v')
+            .unwrap_or(version_output.trim());
+
+        if version != required_version {
+            panic!(
+                "Node.js version {} is required (as specified in package.json), but found version {}. \
+             Please install Node.js {} or use a version manager like volta to switch to the required version.",
+                required_version, version, required_version
+            );
+        }
+
+        println!("✓ Node.js version {} verified", required_version);
+    }
+
+    fn run_test_with_backend(file_path: &Path, backend: Backend) -> Result<String, String> {
+        let start = std::time::Instant::now();
+        let exec_start;
+        let output = match backend {
+            Backend::Interpreter => {
+                exec_start = std::time::Instant::now();
+
+                Command::new("./target/release/tlangdi")
+                    .arg(file_path)
+                    .output()
+                    .map_err(|e| {
+                        format!(
+                            "Failed to execute interpreter for {}: {}",
+                            file_path.display(),
+                            e
+                        )
+                    })?
+            }
+            Backend::JavaScript => {
+                #[allow(clippy::zombie_processes)]
+                let tlang_js_compiler_output = Command::new("./target/release/tlang_cli_js")
+                    .arg(file_path)
+                    .stdout(Stdio::piped())
+                    .spawn()
+                    .map_err(|err| {
+                        format!(
+                            "Failed to compile to JavaScript for {}\n{}",
+                            file_path.display(),
+                            err,
+                        )
+                    })?;
+
+                exec_start = std::time::Instant::now();
+
+                let javascript_output = Command::new("node")
+                    .stdin(tlang_js_compiler_output.stdout.unwrap())
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
+                    .spawn()
+                    .map_err(|err| {
+                        format!(
+                            "Failed to execute JavaScript for {}\n{}",
+                            file_path.display(),
+                            err
+                        )
+                    })?;
+
+                javascript_output.wait_with_output().map_err(|e| {
                     format!(
-                        "Failed to execute interpreter for {}: {}",
+                        "Failed to get JavaScript output for {}: {}",
                         file_path.display(),
                         e
                     )
                 })?
-        }
-        Backend::JavaScript => {
-            #[allow(clippy::zombie_processes)]
-            let tlang_js_compiler_output = Command::new("./target/release/tlang_cli_js")
-                .arg(file_path)
-                .stdout(Stdio::piped())
-                .spawn()
-                .map_err(|err| {
-                    format!(
-                        "Failed to compile to JavaScript for {}\n{}",
-                        file_path.display(),
-                        err,
-                    )
-                })?;
+            }
+        };
+        let elapsed = start.elapsed();
+        let exec_elapsed = exec_start.elapsed();
 
-            exec_start = std::time::Instant::now();
+        let actual_output = format!(
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let actual_output = normalize_output(&actual_output);
 
-            let javascript_output = Command::new("node")
-                .stdin(tlang_js_compiler_output.stdout.unwrap())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .spawn()
-                .map_err(|err| {
-                    format!(
-                        "Failed to execute JavaScript for {}\n{}",
-                        file_path.display(),
-                        err
-                    )
-                })?;
+        println!(
+            "Test executed for {} with {} backend in {:?} (total {:?})",
+            file_path.display(),
+            backend.as_str(),
+            exec_elapsed,
+            elapsed
+        );
+        Ok(actual_output.trim().to_string())
+    }
 
-            javascript_output.wait_with_output().map_err(|e| {
-                format!(
-                    "Failed to get JavaScript output for {}: {}",
-                    file_path.display(),
-                    e
-                )
-            })?
-        }
-    };
-    let elapsed = start.elapsed();
-    let exec_elapsed = exec_start.elapsed();
+    fn normalize_output(output: &str) -> std::borrow::Cow<'_, str> {
+        // Normalize rust panic message from
+        // thread 'main' (6734) panicked at...
+        // to
+        // thread 'main' panicked at...
+        THREAD_PANIC_RE.replace_all(output, "thread '$1' panicked at")
+    }
 
-    let actual_output = format!(
-        "{}\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let actual_output = normalize_output(&actual_output);
+    fn apply_redactions(output: &str) -> String {
+        let mut result = output.to_string();
 
-    println!(
-        "Test executed for {} with {} backend in {:?} (total {:?})",
-        file_path.display(),
-        backend.as_str(),
-        exec_elapsed,
-        elapsed
-    );
-    Ok(actual_output.trim().to_string())
-}
+        // Redact log timestamps that may vary between runs
+        result = TIMESTAMP_RE
+            .replace_all(&result, "[TIMESTAMP] $1")
+            .into_owned();
 
-fn normalize_output(output: &str) -> std::borrow::Cow<'_, str> {
-    // Normalize rust panic message from
-    // thread 'main' (6734) panicked at...
-    // to
-    // thread 'main' panicked at...
-    THREAD_PANIC_RE.replace_all(output, "thread '$1' panicked at")
-}
+        // Redact the entire stack backtrace section (including header) that may or may not be present
+        // Some environments show backtraces, others don't - remove the section entirely if present
+        result = BACKTRACE_SECTION_RE.replace_all(&result, "").into_owned();
 
-fn apply_redactions(output: &str) -> String {
-    let mut result = output.to_string();
+        // Redact numbered stack trace lines that appear with RUST_BACKTRACE=1
+        result = NUMBERED_TRACE_RE.replace_all(&result, "").into_owned();
 
-    // Redact log timestamps that may vary between runs
-    result = TIMESTAMP_RE
-        .replace_all(&result, "[TIMESTAMP] $1")
-        .into_owned();
+        // Normalize backtrace notes that may vary between environments
+        result = NOTE_RE
+            .replace_all(
+                &result,
+                "note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace",
+            )
+            .into_owned();
 
-    // Redact the entire stack backtrace section (including header) that may or may not be present
-    // Some environments show backtraces, others don't - remove the section entirely if present
-    result = BACKTRACE_SECTION_RE.replace_all(&result, "").into_owned();
+        // Redact internal compiler symbol dumps that contain varying identifiers
+        result = SYMBOL_DUMP_RE
+            .replace_all(&result, "Available symbols: [INTERNAL_SYMBOL_TABLE]")
+            .into_owned();
 
-    // Redact numbered stack trace lines that appear with RUST_BACKTRACE=1
-    result = NUMBERED_TRACE_RE.replace_all(&result, "").into_owned();
+        // Redact memory state dumps in panic messages that contain varying data structures
+        result = MEMORY_DUMP_RE
+            .replace_all(&result, "Current scope: [INTERNAL_MEMORY_STATE]")
+            .into_owned();
 
-    // Normalize backtrace notes that may vary between environments
-    result = NOTE_RE
-        .replace_all(
-            &result,
-            "note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace",
-        )
-        .into_owned();
+        // Redact specific internal IDs that may vary between runs
+        result = ID_TAG_RE.replace_all(&result, "$1([ID])").into_owned();
 
-    // Redact internal compiler symbol dumps that contain varying identifiers
-    result = SYMBOL_DUMP_RE
-        .replace_all(&result, "Available symbols: [INTERNAL_SYMBOL_TABLE]")
-        .into_owned();
-
-    // Redact memory state dumps in panic messages that contain varying data structures
-    result = MEMORY_DUMP_RE
-        .replace_all(&result, "Current scope: [INTERNAL_MEMORY_STATE]")
-        .into_owned();
-
-    // Redact specific internal IDs that may vary between runs
-    result = ID_TAG_RE.replace_all(&result, "$1([ID])").into_owned();
-
-    result
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
+        result
+    }
 
     // Test all .tlang files using insta's glob functionality
     #[test]
@@ -271,7 +269,7 @@ mod tests {
                     .with_extension("")
                     .to_string_lossy()
                     .replace(['/', '\\'], "_");
-                
+
                 // Shorten test names to avoid filesystem filename length limits
                 // Some filesystems or git configurations have issues with very long filenames
                 let test_name = if path_str.len() > 40 {
@@ -279,17 +277,17 @@ mod tests {
                     // while keeping the name readable
                     use std::collections::hash_map::DefaultHasher;
                     use std::hash::{Hash, Hasher};
-                    
+
                     let mut hasher = DefaultHasher::new();
                     path_str.hash(&mut hasher);
                     let hash = hasher.finish();
-                    
+
                     // Keep the last part of the path (usually the test name) and add hash
                     let parts: Vec<&str> = path_str.split('_').collect();
                     let last_part = parts.last().unwrap_or(&"test");
                     format!("{}_{:x}_{}", last_part, hash & 0xFFFF, backend.as_str())
                 } else {
-                    format!("{}_{}",path_str, backend.as_str())
+                    format!("{}_{}", path_str, backend.as_str())
                 };
 
                 let is_known_failure = path.to_string_lossy().contains("known_failures");
