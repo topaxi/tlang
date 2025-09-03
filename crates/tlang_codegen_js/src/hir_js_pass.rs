@@ -594,8 +594,22 @@ impl HirJsPass {
 
                     // Move the completion expression to an assignment statement
                     if let Some(completion_expr) = new_block.expr.take() {
+                        // Check if the completion expression is a Loop that needs special handling
+                        let assignment_expr = match &completion_expr.kind {
+                            hir::ExprKind::Loop(_) => {
+                                // For Loop expressions, we need to first transform them to a temp variable
+                                // and then assign that temp variable to our target temp variable
+                                let (loop_temp_expr, loop_stmts) = 
+                                    self.flatten_expression_to_temp_var(completion_expr, ctx);
+                                // Add the loop statements to the block
+                                new_block.stmts.extend(loop_stmts);
+                                loop_temp_expr
+                            }
+                            _ => completion_expr
+                        };
+                        
                         let assignment_stmt =
-                            self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                            self.create_assignment_stmt(ctx, temp_name, assignment_expr, span);
                         new_block.stmts.push(assignment_stmt);
                     }
 
@@ -1132,11 +1146,21 @@ impl<'hir> Visitor<'hir> for HirJsPass {
         // Visit the block expression if it exists
         if let Some(expr) = &mut block.expr {
             match &expr.kind {
-                // Loops and blocks in block completion position that can be statements
+                // Loops in block completion position should be transformed like other expressions
                 hir::ExprKind::Loop(_) => {
-                    // Don't move loop completion expressions to statements for now
-                    // Let the expression generator handle them with proper loop wrappers
-                    // This ensures the loop structure is preserved
+                    // Transform loop expressions using the standard flattening approach
+                    let span = expr.span;
+                    let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                    let expr_to_flatten = std::mem::replace(expr, placeholder);
+                    let (flattened_expr, temp_stmts) =
+                        self.flatten_subexpressions_generically(expr_to_flatten, ctx);
+                    *expr = flattened_expr;
+
+                    // If we generated statements for the loop expression, add them to the block
+                    if !temp_stmts.is_empty() {
+                        block.stmts.extend(temp_stmts);
+                        self.changes_made = true;
+                    }
                 }
                 hir::ExprKind::Block(inner_block) => {
                     // For block completion expressions, check if they contain loops that need special handling
