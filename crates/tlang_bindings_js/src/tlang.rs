@@ -251,7 +251,7 @@ impl Tlang {
 
     #[wasm_bindgen(js_name = "getDiagnostics")]
     pub fn diagnostics(&mut self) -> Result<JsValue, serde_wasm_bindgen::Error> {
-        serde_wasm_bindgen::to_value(self.analyzer.get_diagnostics())
+        serde_wasm_bindgen::to_value(&self.analyzer.get_diagnostics())
     }
 
     #[wasm_bindgen(js_name = "getCodemirrorDiagnostics")]
