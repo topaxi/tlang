@@ -46,15 +46,8 @@ impl VariableUsageValidator {
         &[]
     }
 
-    /// Take all diagnostics, clearing the internal list (for backward compatibility with tests)
-    pub fn take_diagnostics(&mut self) -> Vec<Diagnostic> {
-        // This is now empty since diagnostics are reported to the context
-        // This method is kept for test compatibility but should not be used
-        Vec::new()
-    }
-
     /// Report unused symbols in the given symbol table
-    /// 
+    ///
     /// # Panics
     /// Panics if a function symbol has no arity information when calling `symbol_type.arity().unwrap()`.
     /// This should not happen in practice as all function symbols are expected to have arity information.
@@ -292,12 +285,7 @@ impl Default for VariableUsageValidator {
 }
 
 impl SemanticAnalysisPass for VariableUsageValidator {
-    fn analyze(
-        &mut self,
-        module: &Module,
-        ctx: &mut SemanticAnalysisContext,
-        _is_root: bool,
-    ) -> bool {
+    fn analyze(&mut self, module: &Module, ctx: &mut SemanticAnalysisContext, _is_root: bool) {
         // Reset state
         self.symbol_table_stack.clear();
 
@@ -310,9 +298,6 @@ impl SemanticAnalysisPass for VariableUsageValidator {
         // Report unused symbols in root table
         let root_table = self.pop_symbol_table();
         self.report_unused_symbols(&root_table, ctx);
-
-        // Variable usage validation doesn't change the AST structure
-        false
     }
 }
 

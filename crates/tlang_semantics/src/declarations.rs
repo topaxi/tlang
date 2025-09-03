@@ -79,12 +79,7 @@ impl DeclarationAnalyzer {
 }
 
 impl SemanticAnalysisPass for DeclarationAnalyzer {
-    fn analyze(
-        &mut self,
-        module: &Module,
-        ctx: &mut SemanticAnalysisContext,
-        is_root: bool,
-    ) -> bool {
+    fn analyze(&mut self, module: &Module, ctx: &mut SemanticAnalysisContext, is_root: bool) {
         // Initialize symbol table stack with root table
         self.symbol_table_stack = vec![ctx.root_symbol_table.clone()];
 
@@ -101,9 +96,6 @@ impl SemanticAnalysisPass for DeclarationAnalyzer {
         // After collecting all declarations, we should be left with the root symbol table on the
         // symbol table stack.
         debug_assert_eq!(self.symbol_table_stack.len(), 1);
-
-        // Declaration collection doesn't change the AST structure
-        false
     }
 }
 

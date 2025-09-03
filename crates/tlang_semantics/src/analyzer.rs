@@ -1,18 +1,13 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use log::debug;
-use tlang_ast::{
-    node::{Module, StructDeclaration},
-    token::Literal,
-    visit::Visitor,
-};
-use tlang_span::{NodeId, Span};
+use tlang_ast::node::{Module, StructDeclaration};
+use tlang_span::NodeId;
 use tlang_symbols::{SymbolIdAllocator, SymbolTable, SymbolType};
 
 use crate::{
-    declarations::DeclarationAnalyzer,
-    diagnostic::{self, Diagnostic},
-    variable_usage::VariableUsageValidator,
+    declarations::DeclarationAnalyzer, diagnostic::Diagnostic,
+    misc_analysis::MiscellaneousAnalyzer, variable_usage::VariableUsageValidator,
 };
 
 /**
@@ -86,12 +81,7 @@ pub trait SemanticAnalysisPass {
     #[allow(unused_variables)]
     fn init_context(&mut self, ctx: &mut SemanticAnalysisContext) {}
 
-    fn analyze(
-        &mut self,
-        module: &Module,
-        ctx: &mut SemanticAnalysisContext,
-        is_root: bool,
-    ) -> bool;
+    fn analyze(&mut self, module: &Module, ctx: &mut SemanticAnalysisContext, is_root: bool);
 }
 
 /**
@@ -126,18 +116,11 @@ impl SemanticAnalysisPass for SemanticAnalysisGroup {
         }
     }
 
-    fn analyze(
-        &mut self,
-        module: &Module,
-        ctx: &mut SemanticAnalysisContext,
-        is_root: bool,
-    ) -> bool {
-        let mut changed = false;
+    fn analyze(&mut self, module: &Module, ctx: &mut SemanticAnalysisContext, is_root: bool) {
         for pass in &mut self.passes {
             debug!("Running semantic analysis pass: {}", pass.name());
-            changed |= pass.analyze(module, ctx, is_root);
+            pass.analyze(module, ctx, is_root);
         }
-        changed
     }
 }
 
@@ -152,6 +135,7 @@ impl Default for SemanticAnalyzer {
         Self::new(vec![
             Box::new(DeclarationAnalyzer::default()),
             Box::new(VariableUsageValidator::default()),
+            Box::new(MiscellaneousAnalyzer),
         ])
     }
 }
@@ -260,9 +244,6 @@ impl SemanticAnalyzer {
         // Run all semantic analysis passes
         self.group.analyze(module, &mut context, is_root);
 
-        // Run semantic analysis for struct declarations and other remaining concerns
-        self.visit_module(module, &mut context);
-
         // Store context
         self.context = Some(context);
 
@@ -270,115 +251,6 @@ impl SemanticAnalyzer {
             Ok(())
         } else {
             Err(self.get_errors())
-        }
-    }
-
-    fn validate_escape_sequences(&mut self, string_content: &str, span: Span) {
-        let mut chars = string_content.chars().peekable();
-
-        while let Some(ch) = chars.next() {
-            if ch == '\\'
-                && let Some(&next_ch) = chars.peek()
-            {
-                // Check if this is a valid escape sequence
-                // Valid escape sequences in tlang: \", \', \\, \n, \t, \r, \0, \u{...}
-                match next_ch {
-                    '"' | '\'' | '\\' | 'n' | 't' | 'r' | '0' => {
-                        // Valid escape sequence, no warning needed
-                        chars.next(); // consume the character after backslash
-                    }
-                    'u' => {
-                        // Check for Unicode escape sequence \u{...}
-                        chars.next(); // consume 'u'
-                        if let Some(&'{') = chars.peek() {
-                            chars.next(); // consume '{'
-                            let mut hex_digits = String::new();
-                            let mut found_closing_brace = false;
-
-                            // Collect hex digits until we find '}'
-                            while let Some(&hex_ch) = chars.peek() {
-                                if hex_ch == '}' {
-                                    chars.next(); // consume '}'
-                                    found_closing_brace = true;
-                                    break;
-                                } else if hex_ch.is_ascii_hexdigit() && hex_digits.len() < 6 {
-                                    hex_digits.push(hex_ch);
-                                    chars.next();
-                                } else {
-                                    // Invalid character or too many digits
-                                    break;
-                                }
-                            }
-
-                            // Validate the Unicode escape sequence
-                            if !found_closing_brace {
-                                self.diagnostics.push(diagnostic::warn_at!(
-                                    span,
-                                    "Unterminated Unicode escape sequence in string literal",
-                                ));
-                            } else if hex_digits.is_empty() {
-                                self.diagnostics.push(diagnostic::warn_at!(
-                                    span,
-                                    "Empty Unicode escape sequence in string literal",
-                                ));
-                            } else if let Ok(code_point) = u32::from_str_radix(&hex_digits, 16) {
-                                if char::from_u32(code_point).is_none() {
-                                    self.diagnostics.push(diagnostic::warn_at!(
-                                        span,
-                                        "Invalid Unicode code point in string literal",
-                                    ));
-                                }
-                                // Valid Unicode escape sequence, no warning needed
-                            } else {
-                                self.diagnostics.push(diagnostic::warn_at!(
-                                    span,
-                                    "Invalid hexadecimal in Unicode escape sequence",
-                                ));
-                            }
-                        } else {
-                            // \u not followed by {, treat as unknown escape sequence
-                            self.diagnostics.push(diagnostic::warn_at!(
-                                span,
-                                "Unknown escape sequence '\\{}' in string literal",
-                                next_ch
-                            ));
-                        }
-                    }
-                    _ => {
-                        // Unknown escape sequence, emit warning
-                        self.diagnostics.push(diagnostic::warn_at!(
-                            span,
-                            "Unknown escape sequence '\\{}' in string literal",
-                            next_ch
-                        ));
-                        chars.next(); // consume the character after backslash
-                    }
-                }
-            }
-        }
-    }
-}
-
-impl<'ast> Visitor<'ast> for SemanticAnalyzer {
-    type Context = SemanticAnalysisContext;
-
-    fn visit_struct_decl(
-        &mut self,
-        decl: &'ast tlang_ast::node::StructDeclaration,
-        ctx: &mut Self::Context,
-    ) {
-        ctx.struct_declarations
-            .insert(decl.name.to_string(), decl.clone());
-    }
-
-    fn visit_literal(&mut self, literal: &'ast Literal, span: Span, _ctx: &mut Self::Context) {
-        match literal {
-            Literal::String(string_content) | Literal::Char(string_content) => {
-                self.validate_escape_sequences(string_content, span);
-            }
-            _ => {
-                // No validation needed for other literal types
-            }
         }
     }
 }
