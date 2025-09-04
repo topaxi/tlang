@@ -1019,17 +1019,18 @@ fn test_for_loop_expression_in_let() {
         {
             let iterator$$: unknown = iterator::iter([1, 2, 3]);
             let accumulator$$: unknown = 0;
-            ($hir$0 = loop {
+            loop {
                 let acc: unknown = accumulator$$;
                 (accumulator$$ = match iterator$$.next() {
                     Option::Some { 0: i } => {
                         (acc + i)
                     },
                     Option::None => {
-                        break accumulator$$
+                        ($hir$0 = accumulator$$);
+                        break;
                     },
                 })
-            });
+            };
         };
         let result: unknown = $hir$0;
         result

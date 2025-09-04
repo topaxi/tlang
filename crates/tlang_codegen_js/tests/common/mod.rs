@@ -76,16 +76,18 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
             if options.optimize {
                 // Run standard HIR optimizations first
                 optimizer.optimize_hir(&mut module, meta.into());
+                
+                // Apply JavaScript-specific HIR transformations after other optimizations
+                // This is only needed for optimized builds where complex expressions might need HIR-level transformation
+                let mut js_pass = HirJsPass::new();
+                let mut js_ctx = HirOptContext {
+                    symbols: std::collections::HashMap::new(),
+                    hir_id_allocator: tlang_span::HirIdAllocator::new(1000), // Start with a high number to avoid conflicts
+                    current_scope: module.hir_id,
+                };
+                js_pass.optimize_hir(&mut module, &mut js_ctx);
             }
-            
-            // Always apply JavaScript-specific HIR transformations for JavaScript generation
-            let mut js_pass = HirJsPass::new();
-            let mut js_ctx = HirOptContext {
-                symbols: std::collections::HashMap::new(),
-                hir_id_allocator: tlang_span::HirIdAllocator::new(1000), // Start with a high number to avoid conflicts
-                current_scope: module.hir_id,
-            };
-            js_pass.optimize_hir(&mut module, &mut js_ctx);
+            // For unoptimized builds, skip HIR JS pass and let JavaScript generator handle everything directly
 
             let mut codegen = CodegenJS::default();
             codegen.set_render_ternary(options.render_ternary);

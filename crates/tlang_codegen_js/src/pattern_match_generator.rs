@@ -436,6 +436,8 @@ impl CodegenJS {
             self.push_char(';');
             // DEBUG: This should NOT output the completion variable
         } else if has_block_completions && self.current_completion_variable() != Some("return") {
+            // Add semicolon after the if-else statement first
+            self.push_char(';');
             self.push_newline();
             // If we have an lhs, put the completion var as the rhs of the lhs.
             if !lhs.is_empty() {

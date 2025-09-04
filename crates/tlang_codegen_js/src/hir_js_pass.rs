@@ -99,7 +99,7 @@ impl HirJsPass {
         match stmt.kind {
             // Handle let statements with complex expressions
             hir::StmtKind::Let(pat, expr, ty) => {
-                // For let statements with if-else expressions, flatten based on context
+                // For let statements with complex expressions, flatten based on context
                 let needs_flattening = match &expr.kind {
                     hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
                         // For if-else expressions in let statements, we need to be more careful:
@@ -118,6 +118,11 @@ impl HirJsPass {
                         
                         // Flatten if there are statements OR if any part is complex
                         has_statements || has_complex_condition || has_complex_completion
+                    }
+                    hir::ExprKind::Match(..) => {
+                        // Skip match expressions - let JavaScript generator handle them directly
+                        // The JS generator has its own temp variable system for match expressions
+                        false
                     }
                     _ => !expr_can_render_as_js_expr(&expr)
                 };
@@ -789,6 +794,12 @@ impl HirJsPass {
             }
             hir::ExprKind::Cast(operand, _) => {
                 self.transform_break_statements_in_expr(operand, temp_name, ctx);
+            }
+            hir::ExprKind::Match(scrutinee, arms) => {
+                self.transform_break_statements_in_expr(scrutinee, temp_name, ctx);
+                for arm in arms {
+                    self.transform_break_statements_in_block(&mut arm.block, temp_name, ctx);
+                }
             }
             _ => {
                 // For other expression types, no nested expressions to transform
