@@ -109,11 +109,8 @@ impl LoweringContext {
         let previous_symbol_table = self.current_symbol_table.clone();
         if let Some(symbol_table) = self.symbol_tables.get(&node_id).cloned() {
             self.current_symbol_table = symbol_table;
-            // Reparent the current symbol table to the previous one, in case we created a new
-            // scope while lowering.
-            self.current_symbol_table
-                .borrow_mut()
-                .set_parent(previous_symbol_table.clone());
+            // Note: With the new storage architecture, parent relationships are 
+            // encoded in scope indices and no longer need explicit re-parenting
         }
 
         let result = f(self);

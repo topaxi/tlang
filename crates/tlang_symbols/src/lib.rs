@@ -160,9 +160,6 @@ impl SymbolInfo {
 #[derive(Debug, PartialEq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct SymbolTable {
-    #[cfg_attr(feature = "serde", serde(skip_serializing))]
-    parent: Option<Rc<RefCell<SymbolTable>>>,
-    
     // Storage infrastructure for the new pattern
     #[cfg_attr(feature = "serde", serde(skip_serializing))]
     storage: Option<Rc<RefCell<SymbolStorage>>>,
@@ -174,7 +171,6 @@ impl SymbolTable {
     /// Create a new root SymbolTable
     pub fn new() -> Self {
         SymbolTable {
-            parent: None,
             storage: Some(Rc::new(RefCell::new(SymbolStorage::new()))),
             scope: Some(SymbolScope::new(0, 0)),
         }
@@ -190,18 +186,9 @@ impl SymbolTable {
         };
         
         SymbolTable {
-            parent: Some(parent),
             storage,
             scope: Some(SymbolScope::new(start, 0)),
         }
-    }
-
-    pub fn parent(&self) -> Option<Rc<RefCell<SymbolTable>>> {
-        self.parent.clone()
-    }
-
-    pub fn set_parent(&mut self, parent: Rc<RefCell<SymbolTable>>) {
-        self.parent = Some(parent);
     }
 
     /// Get a symbol by ID (direct access)
@@ -220,17 +207,15 @@ impl SymbolTable {
 
     /// Check if this symbol table can access a given symbol (respects scope hierarchy)
     fn can_access_symbol(&self, target_id: SymbolId, symbol: &SymbolInfo) -> Option<SymbolInfo> {
-        // Check if symbol is in our own scope
         if let Some(ref scope) = self.scope {
             let symbol_index = target_id.as_index();
-            if scope.contains_index(symbol_index) {
+            
+            // In the new architecture, a scope can access:
+            // 1. Symbols in its own scope (from scope.start to scope.start + scope.size)
+            // 2. Symbols from parent scopes (from 0 to scope.start)
+            if symbol_index < scope.start() + scope.size() {
                 return Some(symbol.clone());
             }
-        }
-
-        // Check if symbol is in parent scopes (can access upward)
-        if let Some(parent) = &self.parent {
-            return parent.borrow().can_access_symbol(target_id, symbol);
         }
 
         None
@@ -268,27 +253,28 @@ impl SymbolTable {
     }
 
     pub fn get_slot(&self, predicate: impl Fn(&SymbolInfo) -> bool) -> Option<(usize, usize)> {
-        let mut table = Some(Rc::new(RefCell::new(self.clone())));
-        let mut scope_index = 0;
-
-        while let Some(t) = table {
-            let mut set = HashSet::new();
-            let local_symbols = t.borrow().get_all_local_symbols();
-
-            if let Some(index) = local_symbols
+        if let (Some(storage), Some(scope)) = (&self.storage, &self.scope) {
+            let storage_ref = storage.borrow();
+            
+            // For now, only search within the current scope
+            // TODO: Implement proper parent scope traversal without parent references
+            let scope_symbols: Vec<_> = storage_ref.scope_symbols(scope)
                 .iter()
-                .filter(|s| t.borrow().symbol_gets_slot(s))
-                // Filter out duplicate symbols, as fn definitions might have multiple symbols
-                // attached to them. The lowering result should properly assign the same HirId to
-                // each fn symbol representing the same fn.
-                .filter(|s| s.hir_id.is_none() || set.insert(s.hir_id))
-                .position(&predicate)
-            {
-                return Some((index, scope_index));
-            }
+                .filter(|s| s.declared)
+                .filter(|s| self.symbol_gets_slot(s))
+                .collect();
 
-            scope_index += 1;
-            table = t.borrow().parent();
+            // Filter out duplicate symbols, as fn definitions might have multiple symbols
+            // attached to them. The lowering result should properly assign the same HirId to
+            // each fn symbol representing the same fn.
+            let mut set = HashSet::new();
+            if let Some(index) = scope_symbols
+                .iter()
+                .filter(|s| s.hir_id.is_none() || set.insert(s.hir_id))
+                .position(|s| predicate(s))
+            {
+                return Some((index, 0)); // scope_index = 0 for current scope
+            }
         }
 
         None
@@ -300,7 +286,7 @@ impl SymbolTable {
 
     fn get_local_mut(
         &mut self,
-        predicate: impl Fn(&SymbolInfo) -> bool,
+        _predicate: impl Fn(&SymbolInfo) -> bool,
     ) -> Option<&mut SymbolInfo> {
         // For the new storage pattern, we need to implement this differently
         // For now, let's avoid this method and update callers
@@ -332,48 +318,43 @@ impl SymbolTable {
         panic!("SymbolTable not properly initialized with storage");
     }
 
-    fn get_locals_by_name(&self, name: &str) -> Vec<SymbolInfo> {
-        self.get_locals(|s| *s.name == *name)
-    }
-
     pub fn get_by_name(&self, name: &str) -> Vec<SymbolInfo> {
-        let locals = self.get_locals_by_name(name);
-
-        if !locals.is_empty() {
-            return locals;
+        if let (Some(storage), Some(scope)) = (&self.storage, &self.scope) {
+            let storage_ref = storage.borrow();
+            // Search all symbols accessible to this scope (from 0 to scope.start + scope.size)
+            let accessible_end = scope.start() + scope.size();
+            return storage_ref.range(0, accessible_end)
+                .iter()
+                .filter(|s| s.declared && *s.name == *name)
+                .cloned()
+                .collect();
         }
 
-        if let Some(parent) = &self.parent {
-            parent.borrow().get_by_name(name)
-        } else {
-            vec![]
-        }
+        panic!("SymbolTable not properly initialized with storage");
     }
 
     pub fn get_by_name_and_arity(&self, name: &str, arity: usize) -> Vec<SymbolInfo> {
-        let locals = self
-            .get_locals_by_name(name)
-            .into_iter()
-            .filter(|s| {
-                if let SymbolType::Function(a) | SymbolType::FunctionSelfRef(a) = s.symbol_type {
-                    a == u16::MAX || // Builtin n-ary function
-                    a as usize == arity
-                } else {
-                    // Not a function, so we don't care about arity, might be a variable instead.
-                    true
-                }
-            })
-            .collect::<Vec<_>>();
-
-        if !locals.is_empty() {
-            return locals;
+        if let (Some(storage), Some(scope)) = (&self.storage, &self.scope) {
+            let storage_ref = storage.borrow();
+            // Search all symbols accessible to this scope (from 0 to scope.start + scope.size)
+            let accessible_end = scope.start() + scope.size();
+            return storage_ref.range(0, accessible_end)
+                .iter()
+                .filter(|s| s.declared && *s.name == *name)
+                .filter(|s| {
+                    if let SymbolType::Function(a) | SymbolType::FunctionSelfRef(a) = s.symbol_type {
+                        a == u16::MAX || // Builtin n-ary function
+                        a as usize == arity
+                    } else {
+                        // Not a function, so we don't care about arity, might be a variable instead.
+                        true
+                    }
+                })
+                .cloned()
+                .collect();
         }
 
-        if let Some(parent) = &self.parent {
-            parent.borrow().get_by_name_and_arity(name, arity)
-        } else {
-            vec![]
-        }
+        panic!("SymbolTable not properly initialized with storage");
     }
 
     pub fn get_closest_by_name(&self, name: &str, span: Span) -> Option<SymbolInfo> {
@@ -437,7 +418,6 @@ impl SymbolTable {
 
 
     pub fn mark_as_used(&mut self, id: SymbolId) {
-        // First check if this symbol is in our local scope
         if let Some(storage) = &self.storage {
             // Check if we can access this symbol from our scope
             let can_access = {
@@ -471,14 +451,10 @@ impl SymbolTable {
                     }
 
                     symbol_mut.used = true;
-                    return;
                 }
             }
-        }
-
-        // If not found locally, delegate to parent
-        if let Some(parent) = &self.parent {
-            parent.borrow_mut().mark_as_used(id);
+        } else {
+            panic!("SymbolTable not properly initialized with storage");
         }
     }
 
@@ -502,11 +478,18 @@ impl SymbolTable {
     }
 
     pub fn get_all_declared_symbols(&self) -> Vec<SymbolInfo> {
-        let mut names = self.get_all_declared_local_symbols();
-        if let Some(parent) = &self.parent {
-            names.extend(parent.borrow().get_all_declared_symbols());
+        if let (Some(storage), Some(scope)) = (&self.storage, &self.scope) {
+            let storage_ref = storage.borrow();
+            // Get all symbols accessible to this scope (from 0 to scope.start + scope.size)
+            let accessible_end = scope.start() + scope.size();
+            return storage_ref.range(0, accessible_end)
+                .iter()
+                .filter(|s| s.declared)
+                .cloned()
+                .collect();
         }
-        names
+
+        panic!("SymbolTable not properly initialized with storage");
     }
 
     /// Returns the count of local symbols that would get slots allocated.
