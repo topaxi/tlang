@@ -53,16 +53,17 @@ impl LoweringContext {
             if let Some(hir_id) = self.node_id_to_hir_id.get(node_id) {
                 let symbol_table = symbol_table.clone();
 
+                // Capture variables needed in the closure
+                let fn_node_id_to_hir_id = &self.fn_node_id_to_hir_id;
+                let node_id_to_hir_id = &self.node_id_to_hir_id;
+
                 symbol_table
-                    .borrow_mut()
-                    .get_all_local_symbols_mut()
-                    .iter_mut()
-                    .for_each(|symbol| {
+                    .borrow()
+                    .for_each_local_symbol_mut(|symbol| {
                         if let Some(node_id) = symbol.node_id {
-                            if let Some(hir_id) = self
-                                .fn_node_id_to_hir_id
+                            if let Some(hir_id) = fn_node_id_to_hir_id
                                 .get(&node_id)
-                                .or_else(|| self.node_id_to_hir_id.get(&node_id))
+                                .or_else(|| node_id_to_hir_id.get(&node_id))
                             {
                                 symbol.hir_id = Some(*hir_id);
 

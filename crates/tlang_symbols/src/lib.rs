@@ -603,9 +603,27 @@ impl SymbolTable {
     }
 
     pub fn get_all_local_symbols_mut(&mut self) -> Vec<&mut SymbolInfo> {
-        // This is complex with the new storage pattern - return empty for now
-        // Methods that need this should be redesigned
-        unimplemented!("get_all_local_symbols_mut needs redesign for new storage pattern");
+        // Note: This method is problematic with the RefCell pattern because we can't
+        // return multiple mutable references from a single borrow.
+        // However, for compatibility with existing code, we'll implement a workaround
+        // by borrowing the storage mutably and extracting pointers.
+        // This is safe because we only access the scope's local symbols.
+        unimplemented!("get_all_local_symbols_mut needs redesign for new storage pattern - use for_each_local_symbol_mut instead");
+    }
+
+    /// Apply a function to each local symbol mutably
+    /// This is the preferred way to mutate local symbols in the new storage pattern
+    pub fn for_each_local_symbol_mut<F>(&self, mut f: F)
+    where
+        F: FnMut(&mut SymbolInfo),
+    {
+        if let (Some(storage), Some(scope)) = (&self.storage, &self.scope) {
+            let mut storage_borrow = storage.borrow_mut();
+            let local_symbols = storage_borrow.scope_symbols_mut(scope);
+            for symbol in local_symbols {
+                f(symbol);
+            }
+        }
     }
 
     pub fn get_all_declared_symbols(&self) -> Vec<SymbolInfo> {
@@ -749,5 +767,12 @@ impl SymbolStorage {
     /// Get symbols for a specific scope
     pub fn scope_symbols(&self, scope: &SymbolScope) -> &[SymbolInfo] {
         self.range(scope.start(), scope.end())
+    }
+
+    /// Get mutable symbols for a specific scope
+    pub fn scope_symbols_mut(&mut self, scope: &SymbolScope) -> &mut [SymbolInfo] {
+        let start = scope.start();
+        let end = scope.end().min(self.symbols.len());
+        &mut self.symbols[start..end]
     }
 }
