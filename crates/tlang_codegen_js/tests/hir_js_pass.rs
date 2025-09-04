@@ -1370,3 +1370,29 @@ fn test_shortcut_operators_with_block_expressions() {
     }
     ");
 }
+
+#[test]
+fn test_loop_expression_with_if_else_break() {
+    let source = r#"
+        fn test() {
+            let result = loop {
+                if true { break 42; }
+            };
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn test() -> unknown {
+        let $hir$0: unknown = _;
+        loop {
+            if true {
+                ($hir$0 = 42);
+                break;
+            }
+        };
+        let result: unknown = $hir$0;
+        result
+    }
+    "###);
+}
