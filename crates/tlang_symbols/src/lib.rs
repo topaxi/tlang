@@ -406,7 +406,17 @@ impl SymbolTable {
                 return true;
             }
             
-            // 3. For other symbols, use the traditional range check
+            // 3. EnumVariant symbols are accessible to all scopes (like functions)
+            if matches!(symbol.symbol_type, SymbolType::EnumVariant(_)) {
+                return true;
+            }
+            
+            // 4. Enum symbols are accessible to all scopes (like functions)
+            if matches!(symbol.symbol_type, SymbolType::Enum) {
+                return true;
+            }
+            
+            // 5. For other symbols, use the traditional range check
             return storage_index >= scope.start() && storage_index < scope.start() + scope.size();
         }
         false
@@ -424,12 +434,24 @@ impl SymbolTable {
                 }
                 
                 // Check arity match
-                if let SymbolType::Function(a) | SymbolType::FunctionSelfRef(a) = symbol.symbol_type {
-                    if a != u16::MAX && a as usize != arity {
-                        continue;
+                match symbol.symbol_type {
+                    SymbolType::Function(a) | SymbolType::FunctionSelfRef(a) => {
+                        if a != u16::MAX && a as usize != arity {
+                            continue;
+                        }
                     }
-                } else {
-                    continue; // Not a function
+                    SymbolType::EnumVariant(a) => {
+                        if a as usize != arity {
+                            continue;
+                        }
+                    }
+                    SymbolType::Struct => {
+                        // Struct constructors can be called with any arity
+                        // The exact arity checking is done in later semantic analysis
+                    }
+                    _ => {
+                        continue; // Not callable
+                    }
                 }
                 
                 // Check if this symbol is accessible from the current scope

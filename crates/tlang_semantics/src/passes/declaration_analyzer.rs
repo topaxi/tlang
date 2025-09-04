@@ -128,11 +128,22 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                 );
 
                 for element in &decl.variants {
+                    // Calculate arity for enum variant:
+                    // - For positional parameters (e.g., Foo(x, y)), arity = number of parameters
+                    // - For named parameters (e.g., Foo { x, y }), arity = 1 (takes single object)
+                    let arity = if element.parameters.is_empty() {
+                        0 // No parameters
+                    } else if element.parameters[0].name.as_str().chars().all(|c| c.is_ascii_digit()) {
+                        element.parameters.len() as u16 // Positional parameters (numbered field names)
+                    } else {
+                        1 // Named parameters (takes single object)
+                    };
+                    
                     self.declare_symbol(
                         ctx,
                         element.id,
                         &(decl.name.to_string() + "::" + element.name.as_str()),
-                        SymbolType::EnumVariant(element.parameters.len() as u16),
+                        SymbolType::EnumVariant(arity),
                         element.span,
                         element.span.end,
                     );
