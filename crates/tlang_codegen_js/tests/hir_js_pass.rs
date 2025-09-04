@@ -170,15 +170,19 @@ fn test_nested_complex_expressions() {
     fn main() -> unknown {
         let $hir$0: unknown = _;
         if true {
-            ($hir$0 = {
+            let $hir$1: unknown = _;
+            {
                 let a: unknown = 1;
-                (a + 2)
-            });
+                ($hir$1 = (a + 2));
+            };
+            ($hir$0 = $hir$1);
         } else {
-            ($hir$0 = {
+            let $hir$2: unknown = _;
+            {
                 let b: unknown = 3;
-                (b * 2)
-            });
+                ($hir$2 = (b * 2));
+            };
+            ($hir$0 = $hir$2);
         };
         let x: unknown = $hir$0;
         x
@@ -480,20 +484,22 @@ fn test_let_statement_flattening() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         let $hir$0: unknown = _;
         {
-            let x: unknown = {
+            let $hir$1: unknown = _;
+            {
                 let y: unknown = 1;
-                (y + 2)
+                ($hir$1 = (y + 2));
             };
+            let x: unknown = $hir$1;
             ($hir$0 = (x * 3));
         };
         let result: unknown = $hir$0;
         result
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -513,10 +519,12 @@ fn test_expression_statement_flattening() {
     assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         {
-            let x: unknown = {
+            let $hir$0: unknown = _;
+            {
                 let y: unknown = 1;
-                (y + 2)
+                ($hir$0 = (y + 2));
             };
+            let x: unknown = $hir$0;
             println(x);
         };
     }
@@ -657,13 +665,11 @@ fn test_nested_if_else_expressions() {
             } else {
                 2
             };
-            let $hir$1: unknown = _;
-            if (x == 1) {
-                ($hir$1 = 3);
+            ($hir$0 = if (x == 1) {
+                3
             } else {
-                ($hir$1 = 4);
-            };
-            ($hir$0 = $hir$1);
+                4
+            });
         } else {
             ($hir$0 = 5);
         };
@@ -694,14 +700,18 @@ fn test_complex_nested_function_calls() {
     fn main() -> unknown {
         let $hir$0: unknown = _;
         {
-            let a: unknown = {
+            let $hir$1: unknown = _;
+            {
                 let x: unknown = 1;
-                (x + 1)
+                ($hir$1 = (x + 1));
             };
-            let b: unknown = {
+            let a: unknown = $hir$1;
+            let $hir$2: unknown = _;
+            {
                 let y: unknown = 2;
-                (y * 2)
+                ($hir$2 = (y * 2));
             };
+            let b: unknown = $hir$2;
             ($hir$0 = (a + b));
         };
         println($hir$0);
@@ -779,13 +789,16 @@ fn test_nested_loop_expressions() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         let $hir$0: unknown = _;
         loop {
-            let inner: unknown = loop {
-                break 5;
+            let $hir$1: unknown = _;
+            loop {
+                ($hir$1 = 5);
+                break;
             };
+            let inner: unknown = $hir$1;
             if (inner == 5) {
                 ($hir$0 = (inner * 2));
                 break;
@@ -794,7 +807,7 @@ fn test_nested_loop_expressions() {
         let outer: unknown = $hir$0;
         outer
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -870,13 +883,11 @@ fn test_loop_expression_in_if_condition() {
             ($hir$0 = true);
             break;
         };
-        let $hir$1: unknown = _;
-        if $hir$0 {
-            ($hir$1 = 42);
+        let result: unknown = if $hir$0 {
+            42
         } else {
-            ($hir$1 = 0);
+            0
         };
-        let result: unknown = $hir$1;
         result
     }
     ");
@@ -932,10 +943,12 @@ fn test_loop_expression_with_block_break() {
     fn main() -> unknown {
         let $hir$0: unknown = _;
         loop {
-            let x: unknown = {
+            let $hir$1: unknown = _;
+            {
                 let y: unknown = 1;
-                (y + 2)
+                ($hir$1 = (y + 2));
             };
+            let x: unknown = $hir$1;
             ($hir$0 = x);
             break;
         };
@@ -965,17 +978,22 @@ fn test_nested_loop_with_complex_expressions() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         let $hir$0: unknown = _;
         loop {
-            let inner_result: unknown = loop {
-                let value: unknown = {
+            let $hir$1: unknown = _;
+            loop {
+                let $hir$2: unknown = _;
+                {
                     let a: unknown = 1;
-                    (a + 1)
+                    ($hir$2 = (a + 1));
                 };
-                break (value * 2);
+                let value: unknown = $hir$2;
+                ($hir$1 = (value * 2));
+                break;
             };
+            let inner_result: unknown = $hir$1;
             if (inner_result > 3) {
                 ($hir$0 = (inner_result + 10));
                 break;
@@ -984,7 +1002,7 @@ fn test_nested_loop_with_complex_expressions() {
         let result: unknown = $hir$0;
         result
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -1040,15 +1058,17 @@ fn test_for_loop_expression_in_let() {
             let accumulator$$: unknown = 0;
             loop {
                 let acc: unknown = accumulator$$;
-                (accumulator$$ = match iterator$$.next() {
+                let $hir$1: unknown = _;
+                match iterator$$.next() {
                     Option::Some { 0: i } => {
-                        (acc + i)
+                        ($hir$1 = (acc + i));
                     },
                     Option::None => {
                         ($hir$0 = accumulator$$);
                         break;
                     },
-                })
+                };
+                (accumulator$$ = $hir$1)
             };
         };
         let result: unknown = $hir$0;
@@ -1191,13 +1211,11 @@ fn test_match_expression_in_if_condition() {
                 ($hir$0 = false);
             },
         };
-        let $hir$1: unknown = _;
-        if $hir$0 {
-            ($hir$1 = 42);
+        let result: unknown = if $hir$0 {
+            42
         } else {
-            ($hir$1 = 0);
+            0
         };
-        let result: unknown = $hir$1;
         result
     }
     ");
@@ -1491,7 +1509,78 @@ fn test_complex_nested_all_expression_types() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @"");
+    assert_snapshot!(pretty_print(&hir), @r#"
+    fn main() -> unknown {
+        let $hir$0: unknown = _;
+        {
+            let $hir$2: unknown = _;
+            loop {
+                let $hir$3: unknown = _;
+                match Some(42) {
+                    Some { 0: n } => {
+                        ($hir$3 = (n + 1));
+                    },
+                    None => {
+                        ($hir$3 = 0);
+                    },
+                };
+                let value: unknown = $hir$3;
+                ($hir$2 = value);
+                break;
+            };
+            let x: unknown = $hir$2;
+            let $hir$4: unknown = _;
+            if (x > 0) {
+                let $hir$5: unknown = _;
+                {
+                    let $hir$6: unknown = _;
+                    loop {
+                        let $hir$7: unknown = _;
+                        match (x % 2) {
+                            0 => {
+                                ($hir$7 = true);
+                            },
+                            _ => {
+                                ($hir$7 = false);
+                            },
+                        };
+                        let check: unknown = $hir$7;
+                        ($hir$6 = check);
+                        break;
+                    };
+                    let nested_loop: unknown = $hir$6;
+                    ($hir$5 = nested_loop);
+                };
+                ($hir$4 = $hir$5);
+            } else {
+                ($hir$4 = (x > 0));
+            };
+            ($hir$0 = $hir$4);
+        };
+        let result: unknown = $hir$0;
+        let $hir$1: unknown = _;
+        {
+            let $hir$8: unknown = _;
+            match result {
+                true => {
+                    let $hir$9: unknown = _;
+                    loop {
+                        ($hir$9 = "success");
+                        break;
+                    };
+                    ($hir$8 = $hir$9);
+                },
+                false => {
+                    let msg: unknown = "failure";
+                    ($hir$8 = msg);
+                },
+            };
+            let final_check: unknown = $hir$8;
+            ($hir$1 = final_check);
+        };
+        println($hir$1);
+    }
+    "#);
 }
 
 #[test]
@@ -1505,17 +1594,17 @@ fn test_break_expression_in_let_statement() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         loop {
             let $hir$0: unknown = _;
             ($hir$0 = 42);
             break;
             let x: unknown = $hir$0;
-            x;
+            x
         };
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -1552,17 +1641,17 @@ fn test_break_expression_in_binary_expression() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         loop {
             let $hir$0: unknown = _;
             ($hir$0 = 42);
             break;
             let result: unknown = ($hir$0 + 10);
-            result;
+            result
         };
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -1576,17 +1665,17 @@ fn test_break_expression_in_function_call() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r#"
     fn main() -> unknown {
         loop {
             let $hir$0: unknown = _;
             ($hir$0 = "hello");
             break;
             let result: unknown = println($hir$0);
-            result;
+            result
         };
     }
-    "###);
+    "#);
 }
 
 // Continue expressions are not implemented in the parser, so this test is removed.
@@ -1603,17 +1692,17 @@ fn test_break_expression_in_list() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         loop {
             let $hir$0: unknown = _;
             ($hir$0 = 42);
             break;
             let list: unknown = [1, $hir$0, 3];
-            list;
+            list
         };
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -1631,22 +1720,26 @@ fn test_nested_break_expressions() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         loop {
             let $hir$0: unknown = _;
             if true {
-                ($hir$0 = 42);
+                let $hir$1: unknown = _;
+                ($hir$1 = 42);
                 break;
+                ($hir$0 = $hir$1);
             } else {
-                ($hir$0 = 24);
+                let $hir$2: unknown = _;
+                ($hir$2 = 24);
                 break;
+                ($hir$0 = $hir$2);
             };
             let result: unknown = $hir$0;
-            result;
+            result
         };
     }
-    "###);
+    ");
 }
 
 // Continue expressions are not implemented in the parser, so this test is removed.

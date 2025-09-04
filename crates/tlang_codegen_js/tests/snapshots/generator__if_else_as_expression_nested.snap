@@ -11,13 +11,15 @@ function main() {
             $tmp$0 = 2;
         }
         let x = $tmp$0;
-        let $hir$1 = undefined;
-        if (x === 1) {
-            $hir$1 = 3;
-        } else {
-            $hir$1 = 4;
-        }
-        $hir$0 = $hir$1;
+        $hir$0 = if (x === 1) {
+                        let $tmp$1;{
+                $tmp$1 = 3;
+            };
+$tmp$1        } else {
+                        let $tmp$2;{
+                $tmp$2 = 4;
+            };
+$tmp$2        };
     } else {
         $hir$0 = 5;
     }

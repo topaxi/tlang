@@ -11,11 +11,5 @@ function test_nested_complex_expression() {
         let y = 0;
         $hir$0 = 0 === 0;
     }
-    let $hir$1 = undefined;
-    if ($hir$0) {
-        $hir$1 = "positive";
-    } else {
-        $hir$1 = "negative";
-    }
-    return $hir$1;
+    return $hir$0 ? "positive" : "negative";
 }

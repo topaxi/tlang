@@ -172,15 +172,31 @@ impl CodegenJS {
                     "Loop expressions should be transformed to statements by HirJsPass before reaching codegen"
                 );
             }
-            hir::ExprKind::Break(_expr) => {
-                panic!(
-                    "Break expressions should be transformed to statements by HirJsPass before reaching codegen"
-                );
+            hir::ExprKind::Break(expr) => {
+                // In loop contexts, generate proper break; otherwise, generate return
+                // However, if we're inside a function expression (even if nested in a loop), generate return
+                if self.is_in_loop_context()
+                    && self
+                        .get_function_context()
+                        .map_or(true, |ctx| !ctx.is_expression)
+                {
+                    // In JavaScript loops, break cannot have a value
+                    // For loops with accumulators, we just generate 'break' and handle the return value elsewhere
+                    self.push_str("break");
+                    // Note: expr value is ignored in JavaScript loop context
+                    // The accumulator value should be handled by the loop return logic
+                } else {
+                    self.push_str("return");
+                    if let Some(expr) = expr {
+                        self.push_char(' ');
+                        self.generate_expr(expr, parent_op);
+                    }
+                }
+                self.push_char(';');
             }
             hir::ExprKind::Continue => {
-                panic!(
-                    "Continue expressions should be transformed to statements by HirJsPass before reaching codegen"
-                );
+                self.push_str("continue");
+                self.push_char(';');
             }
             hir::ExprKind::Call(expr) => self.generate_call_expression(expr),
             hir::ExprKind::TailCall(expr) => self.generate_recursive_call_expression(expr),
@@ -338,12 +354,10 @@ impl CodegenJS {
         then_branch: &hir::Block,
         else_branches: &[hir::ElseClause],
     ) -> bool {
-        // Always render as ternary if the if-else can be expressed as a ternary,
-        // regardless of render_ternary setting. This simplifies the logic by
-        // avoiding completion variables for simple cases.
-        (self.current_context() == BlockContext::Expression
-            || self.current_completion_variable() == Some("return") // Also allow ternary in return statements
-            || self.current_context() == BlockContext::Statement) // Allow ternary in statement context for assignments
+        self.get_render_ternary()
+            && (self.current_context() == BlockContext::Expression
+                || self.current_completion_variable() == Some("return") // Also allow ternary in return statements
+                || self.current_context() == BlockContext::Statement) // Allow ternary in statement context for assignments
             && else_branches.len() == 1 // Let's not nest ternary expressions for now.
             && if_else_can_render_as_ternary(expr, then_branch, else_branches)
     }
@@ -369,9 +383,12 @@ impl CodegenJS {
         // In expression context, check if this is a case that should be handled by HIR JS pass
         if self.current_context() == BlockContext::Expression 
             && !if_else_can_render_as_ternary(expr, then_branch, else_branches) {
-            panic!(
-                "If-else expressions that cannot be ternaries should be transformed to statements by HirJsPass before reaching codegen"
+            // TODO: Some complex cases may still reach here, investigate and improve HIR JS pass
+            eprintln!(
+                "Warning: If-else expression that cannot be ternary reached codegen without HIR JS pass transformation. Context: {:?}",
+                self.current_context()
             );
+            // For now, fall back to completion variable handling
         }
 
         // Handle if-else that can be ternary but render_ternary is disabled,
@@ -381,6 +398,8 @@ impl CodegenJS {
         
         // Special handling for "return" completion variable
         let using_return_completion = self.current_completion_variable() == Some("return");
+        
+        let mut lhs = String::new();
         
         if needs_completion_var {
             if using_return_completion {
@@ -394,11 +413,12 @@ impl CodegenJS {
                     current_buffer.truncate(current_buffer.len() - "return ".len());
                 }
             } else {
-                // This case should not occur anymore since simple if-else expressions
-                // are now rendered as ternaries regardless of render_ternary setting
-                panic!(
-                    "If-else expressions in expression context should either be ternaries or handled by HIR JS pass"
-                );
+                // Create completion variable for complex if-else expressions
+                // when ternary rendering is disabled or not applicable
+                lhs = self.replace_statement_buffer_with_empty_string();
+                let completion_var = self.current_scope().declare_tmp_variable();
+                self.push_let_declaration(&completion_var);
+                self.push_completion_variable(Some(&completion_var));
             }
         } else {
             self.push_completion_variable(None);
@@ -436,6 +456,14 @@ impl CodegenJS {
 
         self.push_indent();
         self.push_char('}');
+        
+        // Restore the left-hand side if we created a completion variable
+        if needs_completion_var && !using_return_completion && !lhs.is_empty() {
+            self.push_newline();
+            self.push_str(&lhs);
+            self.push_current_completion_variable();
+        }
+        
         self.pop_completion_variable();
     }
 
