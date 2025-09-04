@@ -378,12 +378,27 @@ impl SymbolTable {
             // 1. Symbols from parent scopes (storage_index < scope.start) are accessible
             //    BUT only if they were declared before this scope started
             if storage_index < scope.start() {
-                // For function scopes, check if the symbol was declared before the function
-                if scope.start() > 1 {
+                // We need to determine if we're in a function scope or just a statement scope
+                // Check if the symbol immediately before our scope start is a function
+                let is_function_scope = if scope.start() > 0 {
+                    if let Some(storage) = &self.storage {
+                        let storage_ref = storage.borrow();
+                        if let Some(prev_symbol) = storage_ref.all().get(scope.start() - 1) {
+                            matches!(prev_symbol.symbol_type, SymbolType::FunctionSelfRef(_))
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
+                
+                if is_function_scope {
                     // This is a function scope. We need to get the function's declaration span
                     // to compare with the symbol's declaration span.
-                    // For now, we'll do a simple check: variables should not be accessible
-                    // if they are declared after the function in the source code.
+                    // Variables should not be accessible if they are declared after the function.
                     
                     // Get our function's declaration from storage
                     if let Some(storage) = &self.storage {
@@ -398,7 +413,8 @@ impl SymbolTable {
                         }
                     }
                 }
-                return true; // Parent scope symbol that was declared before us
+                
+                return true; // Parent scope symbol that was declared before us (or we're not in a function scope)
             }
             
             // 2. Function symbols are accessible to all scopes (but still subject to declaration order)
@@ -564,8 +580,16 @@ impl SymbolTable {
         // TODO: Maybe we shouldn't remove symbols...
         //       This is used to remove the fn self binding from the table when within an
         //       match arm (during lowering).
-        // For the new storage pattern, this operation is more complex and might need redesign
-        unimplemented!("shift method needs redesign for new storage pattern");
+        
+        // In the new storage pattern, we need to mark the first symbol in our scope as "removed"
+        // Since we can't actually remove from shared storage, we'll adjust our scope start
+        if let Some(scope) = &mut self.scope {
+            if scope.size > 0 {
+                // Move the scope start forward by 1, effectively "removing" the first symbol
+                scope.start += 1;
+                scope.size = scope.size.saturating_sub(1);
+            }
+        }
     }
 
 
