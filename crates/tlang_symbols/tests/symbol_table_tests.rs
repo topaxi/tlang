@@ -108,13 +108,18 @@ fn test_new_storage_pattern_direct_access() {
     
     let actual_id1 = table.insert_with_storage(symbol1);
     
+    // Test that we can find by the original ID (this is what semantic analyzer expects)
+    let found_by_original = table.get_by_id(id1);
+    assert!(found_by_original.is_some());
+    assert_eq!(found_by_original.unwrap().name.as_ref(), "storage_function");
+    
     // Test direct access (no traversal)
     let found = table.get_by_id(actual_id1);
     assert!(found.is_some());
     assert_eq!(found.unwrap().name.as_ref(), "storage_function");
     
-    // Verify the ID matches what we expect (should be 1 since storage starts from 1)
-    assert_eq!(actual_id1.get(), 1);
+    // The original and returned IDs should be the same
+    assert_eq!(actual_id1, id1);
 }
 
 #[test]
@@ -154,10 +159,20 @@ fn test_storage_pattern_scope_boundaries() {
     assert!(child_sees_parent.is_some());
     assert_eq!(child_sees_parent.unwrap().name.as_ref(), "parent_function");
     
+    // Child can see parent using original ID too
+    let child_sees_parent_orig = child_table.borrow().get_by_id(parent_id);
+    assert!(child_sees_parent_orig.is_some());
+    assert_eq!(child_sees_parent_orig.unwrap().name.as_ref(), "parent_function");
+    
     // Child can see itself
     let child_sees_self = child_table.borrow().get_by_id(actual_child_id);
     assert!(child_sees_self.is_some());
     assert_eq!(child_sees_self.unwrap().name.as_ref(), "child_parameter");
+    
+    // Child can see itself using original ID too
+    let child_sees_self_orig = child_table.borrow().get_by_id(child_id);
+    assert!(child_sees_self_orig.is_some());
+    assert_eq!(child_sees_self_orig.unwrap().name.as_ref(), "child_parameter");
     
     // Parent cannot see child (scope boundary enforcement)
     let parent_sees_child = parent_table.borrow().get_by_id(actual_child_id);

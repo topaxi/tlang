@@ -62,7 +62,11 @@ impl DeclarationAnalyzer {
 
         debug!("Declaring symbol: {:#?}", symbol_info);
 
-        self.current_symbol_table().borrow_mut().insert(symbol_info);
+        let returned_id = self.current_symbol_table().borrow_mut().insert_with_storage(symbol_info);
+        debug!("Symbol inserted with returned ID: {:?}, original ID: {:?}", returned_id, id);
+        
+        // The returned ID should match the original ID for proper lookup
+        assert_eq!(returned_id, id, "ID mismatch in storage!");
     }
 }
 

@@ -339,15 +339,29 @@ impl SymbolTable {
         }
     }
 
-    fn get_locals(&self, predicate: impl Fn(&SymbolInfo) -> bool) -> Vec<&SymbolInfo> {
+    fn get_locals(&self, predicate: impl Fn(&SymbolInfo) -> bool) -> Vec<SymbolInfo> {
+        // NEW: If using storage pattern, get symbols from storage within our scope
+        if let (Some(storage), Some(scope)) = (&self.storage, &self.scope) {
+            let storage_ref = storage.borrow();
+            let scope_symbols = storage_ref.scope_symbols(scope);
+            return scope_symbols
+                .iter()
+                .filter(|s| s.declared)
+                .filter(|s| predicate(s))
+                .cloned()
+                .collect();
+        }
+
+        // OLD: Fall back to local symbols vector
         self.symbols
             .iter()
             .filter(|s| s.declared)
             .filter(|s| predicate(s))
+            .cloned()
             .collect()
     }
 
-    fn get_locals_by_name(&self, name: &str) -> Vec<&SymbolInfo> {
+    fn get_locals_by_name(&self, name: &str) -> Vec<SymbolInfo> {
         self.get_locals(|s| *s.name == *name)
     }
 
@@ -355,7 +369,7 @@ impl SymbolTable {
         let locals = self.get_locals_by_name(name);
 
         if !locals.is_empty() {
-            return locals.into_iter().cloned().collect();
+            return locals;
         }
 
         if let Some(parent) = &self.parent {
@@ -378,7 +392,6 @@ impl SymbolTable {
                     true
                 }
             })
-            .cloned()
             .collect::<Vec<_>>();
 
         if !locals.is_empty() {
@@ -600,11 +613,31 @@ impl SymbolStorage {
     }
 
     /// Push a new symbol and return its ID
-    pub fn push(&mut self, mut symbol: SymbolInfo) -> SymbolId {
-        // Ensure the symbol's ID matches its position in the vector
-        let id = SymbolId::new(self.symbols.len() + 1); // IDs start from 1
-        symbol.id = id;
-        self.symbols.push(symbol);
+    pub fn push(&mut self, symbol: SymbolInfo) -> SymbolId {
+        let id = symbol.id;
+        let index = id.as_index();
+        
+        // Extend the vector to accommodate this index if needed
+        while self.symbols.len() <= index {
+            // Create a placeholder symbol for any gaps
+            let placeholder_id = SymbolId::new(self.symbols.len() + 1);
+            let placeholder = SymbolInfo::new(
+                placeholder_id,
+                "__placeholder__",
+                SymbolType::Variable,
+                tlang_span::Span::default(),
+                tlang_span::LineColumn::default(),
+            );
+            self.symbols.push(placeholder);
+        }
+        
+        // Now insert at the correct index
+        if index < self.symbols.len() {
+            self.symbols[index] = symbol;
+        } else {
+            self.symbols.push(symbol);
+        }
+        
         id
     }
 
