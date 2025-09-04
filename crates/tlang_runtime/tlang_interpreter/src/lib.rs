@@ -865,8 +865,10 @@ impl Interpreter {
         // TODO: AND has no functions attached to it.
 
         if is_simple_enum {
-            for (value, _variant) in decl.variants.iter().enumerate() {
-                self.push_value(TlangValue::from(value));
+            for (value, variant) in decl.variants.iter().enumerate() {
+                let enum_value = TlangValue::from(value);
+                let qualified_name = format!("{}::{}", decl.name, variant.name);
+                self.state.set_global(qualified_name, enum_value);
             }
         } else {
             let variant_shapes = decl
@@ -888,7 +890,7 @@ impl Interpreter {
 
             let shape_key = decl.hir_id.into();
 
-            for (variant_index, _) in variant_shapes
+            for (variant_index, variant) in variant_shapes
                 .iter()
                 .enumerate()
                 .filter(|(_, v)| v.field_map.is_empty())
@@ -899,7 +901,8 @@ impl Interpreter {
                     vec![],
                 )));
 
-                self.push_value(enum_value);
+                let qualified_name = format!("{}::{}", decl.name, variant.name);
+                self.state.set_global(qualified_name, enum_value);
             }
 
             let enum_shape =
