@@ -120,9 +120,9 @@ impl HirJsPass {
                         has_statements || has_complex_condition || has_complex_completion
                     }
                     hir::ExprKind::Match(..) => {
-                        // Skip match expressions - let JavaScript generator handle them directly
-                        // The JS generator has its own temp variable system for match expressions
-                        false
+                        // Match expressions need to be transformed to use temp variables
+                        // Always flatten match expressions to ensure proper JavaScript generation
+                        true
                     }
                     _ => !expr_can_render_as_js_expr(&expr)
                 };
@@ -951,10 +951,66 @@ impl HirJsPass {
                     span,
                 ));
             }
-            hir::ExprKind::Match(..) => {
-                // Transform match expression to a statement with temp variable assignment
-                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, expr, span);
-                statements.push(assignment_stmt);
+            hir::ExprKind::Match(scrutinee, arms) => {
+                // Transform match expression to use wildcard sentinel approach
+                // Similar to loop expressions, we need to transform each arm to assign to the temp variable
+                
+                // First, flatten any complex expressions in the scrutinee
+                let (flattened_scrutinee, mut scrutinee_stmts) = if !expr_can_render_as_js_expr(scrutinee) {
+                    self.flatten_expression_to_temp_var(*scrutinee.clone(), ctx)
+                } else {
+                    (*scrutinee.clone(), Vec::new())
+                };
+                
+                // Add any statements from flattening the scrutinee
+                statements.append(&mut scrutinee_stmts);
+                
+                // Transform each arm
+                let mut new_arms = Vec::new();
+                for arm in arms {
+                    let mut new_arm_block = arm.block.clone();
+                    
+                    // Transform the arm completion expression to assign to temp variable
+                    if let Some(completion_expr) = new_arm_block.expr.take() {
+                        // For complex expressions, flatten them first
+                        match &completion_expr.kind {
+                            hir::ExprKind::IfElse(..) | hir::ExprKind::Loop(..) | hir::ExprKind::Match(..) | hir::ExprKind::Block(..) => {
+                                // Recursively flatten nested complex expressions
+                                let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(completion_expr, ctx);
+                                new_arm_block.stmts.extend(temp_stmts);
+                                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
+                                new_arm_block.stmts.push(assignment_stmt);
+                            }
+                            _ => {
+                                // For simple expressions, create direct assignment
+                                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                                new_arm_block.stmts.push(assignment_stmt);
+                            }
+                        }
+                    }
+                    
+                    new_arms.push(hir::MatchArm {
+                        pat: arm.pat.clone(),
+                        guard: arm.guard.clone(),
+                        block: new_arm_block,
+                        leading_comments: arm.leading_comments.clone(),
+                        trailing_comments: arm.trailing_comments.clone(),
+                    });
+                }
+                
+                // Add the match statement directly
+                statements.push(hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::Match(
+                            Box::new(flattened_scrutinee),
+                            new_arms,
+                        ),
+                        span,
+                    })),
+                    span,
+                ));
             }
             hir::ExprKind::Loop(loop_block) => {
                 // Transform loop expression to regular statements

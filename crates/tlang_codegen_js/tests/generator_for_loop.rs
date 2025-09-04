@@ -259,27 +259,21 @@ fn test_for_loop_expression_in_let() {
     // Expected: Should handle for loop as expression in let statement
     assert_snapshot!(output, @r"
     function test() {
-        let $tmp$0;{
+        let $hir$0 = undefined;
+        {
             let iterator$$ = iterator.iter([1, 2, 3]);
             let accumulator$$ = 0;
-            let $tmp$1;for (;;) {
-                let acc = accumulator$$;
-                let $tmp$3;
-                let $tmp$0 = iterator$$.next();
-                let i;if ($tmp$0.tag === Option.Some && (i = $tmp$0[0], true)) {
-                    $tmp$3 = acc + i;
-                } else if ($tmp$0.tag === Option.None) {
+                let $tmp$0;
+                let $tmp$1 = iterator$$.next();
+                let i;if ($tmp$1.tag === Option.Some && (i = $tmp$1[0], true)) {
+                    $tmp$0 = acc + i;
+                } else if ($tmp$1.tag === Option.None) {
+                    $hir$0 = accumulator$$;
                     break;
-                }
-                $tmp$1 = $tmp$3;
-                $tmp$2 = $tmp$3;
-                
-                accumulator$$ = $tmp$2
-                $tmp$1 = accumulator$$
-            };
-            $tmp$0 = $tmp$1;
+                };
+            }
         };
-        let result = $tmp$0;
+        let result = $hir$0;
         return result;
     }
     ");

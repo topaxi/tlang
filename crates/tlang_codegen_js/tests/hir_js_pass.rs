@@ -20,7 +20,12 @@ fn before_all() {
 fn compile(source: &str) -> hir::LowerResult {
     let ast = Parser::from_source(source).parse().unwrap();
     let mut semantic_analyzer = SemanticAnalyzer::default();
-    semantic_analyzer.add_builtin_symbols(&[("println", SymbolType::Function(u16::MAX))]);
+    semantic_analyzer.add_builtin_symbols(&[
+        ("println", SymbolType::Function(u16::MAX)),
+        ("Some", SymbolType::EnumVariant(1)),
+        ("None", SymbolType::EnumVariant(0)),
+        ("Option", SymbolType::Enum),
+    ]);
     semantic_analyzer.analyze(&ast).unwrap();
     lower_to_hir(
         &ast,
@@ -1033,6 +1038,334 @@ fn test_for_loop_expression_in_let() {
             };
         };
         let result: unknown = $hir$0;
+        result
+    }
+    ");
+}
+
+#[test]
+fn test_match_expression_in_let() {
+    let source = r#"
+        fn main() {
+            let value = Some(42);
+            let result = match value {
+                Some(x) => x * 2,
+                None => 0
+            };
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r"
+    fn main() -> unknown {
+        let value: unknown = Some(42);
+        let $hir$0: unknown = _;
+        match value {
+            Some { 0: x } => {
+                ($hir$0 = (x * 2));
+            },
+            None => {
+                ($hir$0 = 0);
+            },
+        };
+        let result: unknown = $hir$0;
+        result
+    }
+    ");
+}
+
+#[test]
+fn test_match_expression_in_function_argument() {
+    let source = r#"
+        fn main() {
+            let value = Some(42);
+            println(match value {
+                Some(x) => x,
+                None => 0
+            });
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r"
+    fn main() -> unknown {
+        let value: unknown = Some(42);
+        let $hir$0: unknown = _;
+        match value {
+            Some { 0: x } => {
+                ($hir$0 = x);
+            },
+            None => {
+                ($hir$0 = 0);
+            },
+        };
+        println($hir$0);
+    }
+    ");
+}
+
+#[test]
+fn test_match_expression_in_binary_expression() {
+    let source = r#"
+        fn main() {
+            let value1 = Some(10);
+            let value2 = Some(20);
+            let result = match value1 {
+                Some(x) => x,
+                None => 0
+            } + match value2 {
+                Some(y) => y,
+                None => 0
+            };
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r"
+    fn main() -> unknown {
+        let value1: unknown = Some(10);
+        let value2: unknown = Some(20);
+        let $hir$0: unknown = _;
+        match value1 {
+            Some { 0: x } => {
+                ($hir$0 = x);
+            },
+            None => {
+                ($hir$0 = 0);
+            },
+        };
+        let $hir$1: unknown = _;
+        match value2 {
+            Some { 0: y } => {
+                ($hir$1 = y);
+            },
+            None => {
+                ($hir$1 = 0);
+            },
+        };
+        let result: unknown = ($hir$0 + $hir$1);
+        result
+    }
+    ");
+}
+
+#[test]
+fn test_match_expression_in_if_condition() {
+    let source = r#"
+        fn main() {
+            let value = Some(5);
+            let result = if match value {
+                Some(x) => x > 3,
+                None => false
+            } {
+                42
+            } else {
+                0
+            };
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r"
+    fn main() -> unknown {
+        let value: unknown = Some(5);
+        let $hir$0: unknown = _;
+        match value {
+            Some { 0: x } => {
+                ($hir$0 = (x > 3));
+            },
+            None => {
+                ($hir$0 = false);
+            },
+        };
+        let $hir$1: unknown = _;
+        if $hir$0 {
+            ($hir$1 = 42);
+        } else {
+            ($hir$1 = 0);
+        };
+        let result: unknown = $hir$1;
+        result
+    }
+    ");
+}
+
+#[test]
+fn test_match_expression_in_list() {
+    let source = r#"
+        fn main() {
+            let value1 = Some(1);
+            let value2 = Some(2);
+            let result = [
+                match value1 {
+                    Some(x) => x,
+                    None => 0
+                },
+                match value2 {
+                    Some(y) => y,
+                    None => 0
+                },
+                42
+            ];
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r"
+    fn main() -> unknown {
+        let value1: unknown = Some(1);
+        let value2: unknown = Some(2);
+        let $hir$0: unknown = _;
+        match value1 {
+            Some { 0: x } => {
+                ($hir$0 = x);
+            },
+            None => {
+                ($hir$0 = 0);
+            },
+        };
+        let $hir$1: unknown = _;
+        match value2 {
+            Some { 0: y } => {
+                ($hir$1 = y);
+            },
+            None => {
+                ($hir$1 = 0);
+            },
+        };
+        let result: unknown = [$hir$0, $hir$1, 42];
+        result
+    }
+    ");
+}
+
+#[test]
+fn test_nested_match_expressions() {
+    let source = r#"
+        fn main() {
+            let outer = Some(Some(42));
+            let result = match outer {
+                Some(inner) => match inner {
+                    Some(x) => x * 2,
+                    None => -1
+                },
+                None => 0
+            };
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r"
+    fn main() -> unknown {
+        let outer: unknown = Some(Some(42));
+        let $hir$0: unknown = _;
+        match outer {
+            Some { 0: inner } => {
+                let $hir$1: unknown = _;
+                match inner {
+                    Some { 0: x } => {
+                        ($hir$1 = (x * 2));
+                    },
+                    None => {
+                        ($hir$1 = -1);
+                    },
+                };
+                ($hir$0 = $hir$1);
+            },
+            None => {
+                ($hir$0 = 0);
+            },
+        };
+        let result: unknown = $hir$0;
+        result
+    }
+    ");
+}
+
+#[test]
+fn test_shortcut_operators_with_match_expressions() {
+    let source = r#"
+        fn main() {
+            let value1 = Some(true);
+            let value2 = Some(false);
+            let result = match value1 {
+                Some(x) => x,
+                None => false
+            } && match value2 {
+                Some(y) => y,
+                None => true
+            };
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r"
+    fn main() -> unknown {
+        let value1: unknown = Some(true);
+        let value2: unknown = Some(false);
+        let $hir$0: unknown = _;
+        match value1 {
+            Some { 0: x } => {
+                ($hir$0 = x);
+            },
+            None => {
+                ($hir$0 = false);
+            },
+        };
+        let $hir$1: unknown = _;
+        if $hir$0 {
+            let $hir$2: unknown = _;
+            match value2 {
+                Some { 0: y } => {
+                    ($hir$2 = y);
+                },
+                None => {
+                    ($hir$2 = true);
+                },
+            };
+            ($hir$1 = $hir$2);
+        } else {
+            ($hir$1 = $hir$0);
+        };
+        let result: unknown = $hir$1;
+        result
+    }
+    ");
+}
+
+#[test]
+fn test_shortcut_operators_with_block_expressions() {
+    let source = r#"
+        fn main() {
+            let result = {
+                let x = 5;
+                x > 3
+            } || {
+                let y = 2;
+                y < 1
+            };
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r"
+    fn main() -> unknown {
+        let $hir$0: unknown = _;
+        {
+            let x: unknown = 5;
+            ($hir$0 = (x > 3));
+        };
+        let $hir$1: unknown = _;
+        if $hir$0 {
+            ($hir$1 = $hir$0);
+        } else {
+            let $hir$2: unknown = _;
+            {
+                let y: unknown = 2;
+                ($hir$2 = (y < 1));
+            };
+            ($hir$1 = $hir$2);
+        };
+        let result: unknown = $hir$1;
         result
     }
     ");
