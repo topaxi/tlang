@@ -970,6 +970,9 @@ impl HirJsPass {
                 for arm in arms {
                     let mut new_arm_block = arm.block.clone();
                     
+                    // FIRST: Recursively apply HIR JS pass to the arm block to handle nested expressions
+                    self.visit_block(&mut new_arm_block, ctx);
+                    
                     // Transform the arm completion expression to assign to temp variable
                     if let Some(completion_expr) = new_arm_block.expr.take() {
                         // For complex expressions, flatten them first
@@ -1016,7 +1019,11 @@ impl HirJsPass {
                 // Transform loop expression to regular statements
                 let mut new_loop_block = loop_block.as_ref().clone();
                 
-                // Transform break statements in the loop to assign to the temp variable
+                // FIRST: Recursively apply HIR JS pass to all expressions in the loop block
+                // This ensures nested complex expressions (match, block, etc.) are transformed
+                self.visit_block(&mut new_loop_block, ctx);
+                
+                // THEN: Transform break statements in the loop to assign to the temp variable
                 self.transform_break_statements_in_block(&mut new_loop_block, temp_name, ctx);
                 
                 // Add the loop as a regular statement
@@ -1360,9 +1367,20 @@ impl HirPass for HirJsPass {
 impl<'hir> Visitor<'hir> for HirJsPass {
     type Context = HirOptContext;
 
-    fn visit_expr(&mut self, _expr: &'hir mut hir::Expr, _ctx: &mut Self::Context) {
-        // Don't recursively walk expressions - let visit_block handle all transformations
-        // Recursive walking can cause double-processing of already-transformed expressions
+    fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
+        // We need to visit expressions to handle nested complex expressions
+        // The key is to transform bottom-up (children first, then parent)
+        match &mut expr.kind {
+            hir::ExprKind::Block(..) | hir::ExprKind::IfElse(..) | hir::ExprKind::Loop(..) | hir::ExprKind::Match(..) => {
+                // For complex expressions, first visit their children
+                visit::walk_expr(self, expr, ctx);
+                // Note: the actual transformation happens in visit_block when these are in expression positions
+            }
+            _ => {
+                // For other expressions, continue walking
+                visit::walk_expr(self, expr, ctx);
+            }
+        }
     }
 
     fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut Self::Context) {

@@ -39,7 +39,21 @@ fn compile_and_apply_hir_js_pass(source: &str) -> hir::Module {
     let (mut module, meta) = compile(source);
     let mut ctx = HirOptContext::from(meta);
     let mut pass = HirJsPass::new();
-    pass.optimize_hir(&mut module, &mut ctx);
+    
+    // Run the HIR JS pass iteratively until no more changes are made
+    // This is necessary for complex nested expressions that require multiple passes
+    let mut iterations = 0;
+    let max_iterations = 10; // Safety limit to prevent infinite loops
+    
+    loop {
+        let changes_made = pass.optimize_hir(&mut module, &mut ctx);
+        iterations += 1;
+        
+        if !changes_made || iterations >= max_iterations {
+            break;
+        }
+    }
+    
     module
 }
 
@@ -1395,4 +1409,42 @@ fn test_loop_expression_with_if_else_break() {
         result
     }
     "###);
+}
+
+#[test]
+fn test_complex_nested_all_expression_types() {
+    let source = r#"
+        fn main() {
+            let result = {
+                let x = loop {
+                    let value = match Some(42) {
+                        Some(n) => n + 1,
+                        None => 0
+                    };
+                    break value;
+                };
+                
+                x > 0 && {
+                    let nested_loop = loop {
+                        let check = match x % 2 {
+                            0 => true,
+                            _ => false
+                        };
+                        break check;
+                    };
+                    nested_loop
+                }
+            };
+            
+            println({
+                let final_check = match result {
+                    true => loop { break "success"; },
+                    false => { let msg = "failure"; msg }
+                };
+                final_check
+            });
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @"");
 }
