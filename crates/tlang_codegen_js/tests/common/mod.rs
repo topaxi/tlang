@@ -15,7 +15,6 @@ fn before_all() {
 }
 
 pub struct CodegenOptions<'a> {
-    pub render_ternary: bool,
     pub builtin_symbols: Vec<(&'a str, SymbolType)>,
     pub optimize: bool,
 }
@@ -23,7 +22,6 @@ pub struct CodegenOptions<'a> {
 impl Default for CodegenOptions<'_> {
     fn default() -> Self {
         Self {
-            render_ternary: true,
             builtin_symbols: CodegenJS::get_standard_library_symbols().to_vec(),
             optimize: true,
         }
@@ -31,12 +29,6 @@ impl Default for CodegenOptions<'_> {
 }
 
 impl CodegenOptions<'_> {
-    #[allow(dead_code)]
-    pub fn render_ternary(mut self, render_ternary: bool) -> Self {
-        self.render_ternary = render_ternary;
-        self
-    }
-
     #[allow(dead_code)]
     pub fn optimize(mut self, optimize: bool) -> Self {
         self.optimize = optimize;
@@ -90,7 +82,6 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
             js_pass.optimize_hir(&mut module, &mut js_ctx);
 
             let mut codegen = CodegenJS::default();
-            codegen.set_render_ternary(options.render_ternary);
             codegen.generate_code(&module);
             codegen.get_output().to_string()
         }

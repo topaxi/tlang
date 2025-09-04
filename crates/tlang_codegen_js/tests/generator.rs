@@ -149,16 +149,11 @@ fn test_if_else_if() {
 #[test]
 fn test_if_else_as_expression_as_fn_completion() {
     let output = compile!(
-        "fn main() { if true { 1 } else { 2 } }",
-        CodegenOptions::default().render_ternary(false)
+        "fn main() { if true { 1 } else { 2 } }"
     );
     let expected_output = indoc! {"
         function main() {
-            if (true) {
-                return 1;
-            } else {
-                return 2;
-            }
+            return true ? 1 : 2;
         }
     "};
     assert_eq!(output, expected_output);
@@ -167,17 +162,11 @@ fn test_if_else_as_expression_as_fn_completion() {
 #[test]
 fn test_if_else_as_expression() {
     let output = compile!(
-        "fn main() { let result = if true { 1 } else { 2 }; }",
-        CodegenOptions::default().render_ternary(false)
+        "fn main() { let result = if true { 1 } else { 2 }; }"
     );
     let expected_output = indoc! {"
         function main() {
-            let $tmp$0;if (true) {
-                $tmp$0 = 1;
-            } else {
-                $tmp$0 = 2;
-            }
-            let result = $tmp$0;
+            let result = true ? 1 : 2;
         }
     "};
     assert_eq!(output, expected_output);
@@ -196,8 +185,7 @@ fn test_if_else_as_expression_nested() {
                 5
             };
         }
-    "},
-        CodegenOptions::default().render_ternary(false)
+    "}
     );
     insta::assert_snapshot!(output);
 }
@@ -208,14 +196,15 @@ fn test_if_else_if_as_expression() {
         compile!("fn main() { let result = if true { 1 } else if true { 2 } else { 3 }; }");
     let expected_output = indoc! {"
         function main() {
-            let $tmp$0;if (true) {
-                $tmp$0 = 1;
+            let $hir$0 = undefined;
+            if (true) {
+                $hir$0 = 1;
             } else if (true) {
-                $tmp$0 = 2;
+                $hir$0 = 2;
             } else {
-                $tmp$0 = 3;
+                $hir$0 = 3;
             }
-            let result = $tmp$0;
+            let result = $hir$0;
         }
     "};
     assert_eq!(output, expected_output);
@@ -521,9 +510,9 @@ mod debug_tests {
                 let x = if true { 1 } else { 2 };
             }
         "},
-            &CodegenOptions::default().render_ternary(false).into()
+            &CodegenOptions::default().into()
         );
-        println!("Simple if-else output (render_ternary=false):\n{}", output);
+        println!("Simple if-else output:\n{}", output);
     }
 
     #[test]
@@ -539,8 +528,8 @@ mod debug_tests {
                 };
             }
         "},
-            &CodegenOptions::default().render_ternary(false).into()
+            &CodegenOptions::default().into()
         );
-        println!("Nested if-else output (render_ternary=false):\n{}", output);
+        println!("Nested if-else output:\n{}", output);
     }
 }

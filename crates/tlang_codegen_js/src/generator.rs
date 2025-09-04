@@ -51,7 +51,6 @@ pub struct CodegenJS {
     pub(crate) match_context_stack: MatchContextStack,
     statement_buffer: Vec<String>,
     completion_variables: Vec<Option<Box<str>>>,
-    render_ternary: bool,
 }
 
 impl Default for CodegenJS {
@@ -71,17 +70,10 @@ impl CodegenJS {
             match_context_stack: MatchContextStack::default(),
             statement_buffer: vec![String::with_capacity(STATEMENT_BUFFER_CAPACITY)],
             completion_variables: vec![None],
-            render_ternary: true,
         }
     }
 
-    pub fn set_render_ternary(&mut self, render_ternary: bool) {
-        self.render_ternary = render_ternary;
-    }
 
-    pub(crate) fn get_render_ternary(&self) -> bool {
-        self.render_ternary
-    }
 
     pub fn get_standard_library_source() -> String {
         include_str!("../std/lib.tlang").to_string()
@@ -209,9 +201,7 @@ impl CodegenJS {
         self.statement_buffer.last_mut().unwrap().clear();
     }
 
-    pub(crate) fn current_statement_buffer_mut(&mut self) -> &mut String {
-        self.statement_buffer.last_mut().unwrap()
-    }
+
 
     #[inline(always)]
     pub(crate) fn current_scope(&mut self) -> &mut Scope {
@@ -316,15 +306,7 @@ impl CodegenJS {
         self.completion_variables.last().unwrap().as_deref()
     }
 
-    #[inline(always)]
-    pub(crate) fn current_completion_variable_count(&self) -> usize {
-        self.completion_variables.len()
-    }
 
-    #[inline(always)]
-    pub(crate) fn nth_completion_variable(&self, index: usize) -> Option<&str> {
-        self.completion_variables.get(index).unwrap().as_deref()
-    }
 
     #[inline(always)]
     pub(crate) fn push_current_completion_variable(&mut self) {

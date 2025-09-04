@@ -102,8 +102,16 @@ impl HirJsPass {
                 // For let statements with complex expressions, flatten based on context
                 let needs_flattening = match &expr.kind {
                     hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
-                        // For if-else expressions in let statements, only flatten if they cannot be ternaries
-                        !if_else_can_render_as_ternary(condition, then_branch, else_branches)
+                        // For if-else expressions in let statements:
+                        // - Always flatten if-else-if expressions (multiple else branches)
+                        // - Only flatten simple if-else if they cannot be ternaries
+                        if else_branches.len() > 1 {
+                            // if-else-if expressions cannot be ternaries, always flatten
+                            true
+                        } else {
+                            // Simple if-else, only flatten if they cannot be ternaries
+                            !if_else_can_render_as_ternary(condition, then_branch, else_branches)
+                        }
                     }
                     hir::ExprKind::Match(..) => {
                         // Match expressions need to be transformed to use temp variables
@@ -339,8 +347,13 @@ impl HirJsPass {
         // For other expressions, check if they can be rendered as JS
         let needs_flattening = match &expr_with_flattened_subs.kind {
             hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
-                // Only flatten if-else expressions that cannot be rendered as ternaries
-                !if_else_can_render_as_ternary(condition, then_branch, else_branches)
+                // Always flatten if-else-if expressions (multiple else branches)
+                // Only flatten simple if-else expressions that cannot be rendered as ternaries
+                if else_branches.len() > 1 {
+                    true // if-else-if expressions cannot be ternaries, always flatten
+                } else {
+                    !if_else_can_render_as_ternary(condition, then_branch, else_branches)
+                }
             }
             hir::ExprKind::Loop(..) => true,   // Loop expressions need transformation for JavaScript
             hir::ExprKind::Break(..) => true, // Break expressions always need flattening
@@ -1389,9 +1402,11 @@ pub fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
         hir::ExprKind::Break(..) => false,
         hir::ExprKind::Continue => false,
         hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
-            // If-else can be rendered as a JS expression only if it can be a ternary operator
-            // AND we're not in a complex context that requires statement-level flattening
-            if_else_can_render_as_ternary(condition, then_branch, else_branches)
+            // If-else can be rendered as a JS expression only if:
+            // 1. It has only one else clause (no if-else-if)
+            // 2. It can be a ternary operator
+            else_branches.len() == 1 
+                && if_else_can_render_as_ternary(condition, then_branch, else_branches)
         }
         hir::ExprKind::Match(..) => false,
         hir::ExprKind::Call(call_expr) => {

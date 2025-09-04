@@ -354,10 +354,9 @@ impl CodegenJS {
         then_branch: &hir::Block,
         else_branches: &[hir::ElseClause],
     ) -> bool {
-        self.get_render_ternary()
-            && (self.current_context() == BlockContext::Expression
-                || self.current_completion_variable() == Some("return") // Also allow ternary in return statements
-                || self.current_context() == BlockContext::Statement) // Allow ternary in statement context for assignments
+        (self.current_context() == BlockContext::Expression
+            || self.current_completion_variable() == Some("return") // Also allow ternary in return statements
+            || self.current_context() == BlockContext::Statement) // Allow ternary in statement context for assignments
             && else_branches.len() == 1 // Let's not nest ternary expressions for now.
             && if_else_can_render_as_ternary(expr, then_branch, else_branches)
     }
@@ -380,49 +379,16 @@ impl CodegenJS {
         }
 
         // If we reach here, the if-else cannot be rendered as a ternary expression
-        // In expression context, check if this is a case that should be handled by HIR JS pass
-        if self.current_context() == BlockContext::Expression 
-            && !if_else_can_render_as_ternary(expr, then_branch, else_branches) {
-            // TODO: Some complex cases may still reach here, investigate and improve HIR JS pass
-            eprintln!(
-                "Warning: If-else expression that cannot be ternary reached codegen without HIR JS pass transformation. Context: {:?}",
-                self.current_context()
+        // In expression context, this should have been handled by HIR JS pass
+        if self.current_context() == BlockContext::Expression {
+            panic!(
+                "If-else expression that cannot be ternary reached codegen without HIR JS pass transformation. \
+                All complex if-else expressions should be transformed to statements by HIR JS pass."
             );
-            // For now, fall back to completion variable handling
         }
 
-        // Handle if-else that can be ternary but render_ternary is disabled,
-        // or if-else in statement context
-        let needs_completion_var = self.current_context() == BlockContext::Expression 
-            && then_branch.has_completion();
-        
-        // Special handling for "return" completion variable
-        let using_return_completion = self.current_completion_variable() == Some("return");
-        
-        let mut lhs = String::new();
-        
-        if needs_completion_var {
-            if using_return_completion {
-                // For return completion, we'll generate returns in each branch
-                // Don't create a new completion variable
-                self.push_completion_variable(Some("return"));
-                
-                // Remove the "return " that was already pushed to the statement buffer
-                let current_buffer = self.current_statement_buffer_mut();
-                if current_buffer.ends_with("return ") {
-                    current_buffer.truncate(current_buffer.len() - "return ".len());
-                }
-            } else {
-                // Create completion variable for complex if-else expressions
-                // when ternary rendering is disabled or not applicable
-                lhs = self.replace_statement_buffer_with_empty_string();
-                let completion_var = self.current_scope().declare_tmp_variable();
-                self.push_let_declaration(&completion_var);
-                self.push_completion_variable(Some(&completion_var));
-            }
-        } else {
-            self.push_completion_variable(None);
-        }
+        // Handle if-else in statement context (simple case without completion variables)
+        self.push_completion_variable(None);
         self.push_str("if (");
         let indent_level = self.current_indent();
         self.set_indent(0);
@@ -456,13 +422,6 @@ impl CodegenJS {
 
         self.push_indent();
         self.push_char('}');
-        
-        // Restore the left-hand side if we created a completion variable
-        if needs_completion_var && !using_return_completion && !lhs.is_empty() {
-            self.push_newline();
-            self.push_str(&lhs);
-            self.push_current_completion_variable();
-        }
         
         self.pop_completion_variable();
     }

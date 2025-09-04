@@ -1813,3 +1813,28 @@ fn test_debug_block_inside_loop() {
     // Just to satisfy the test, use a dummy assertion for now
     assert!(true);
 }
+
+#[test]
+fn test_if_else_if_expression_transformation() {
+    let source = r#"
+        fn main() {
+            let result = if true { 1 } else if true { 2 } else { 3 };
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        let $hir$0: unknown = _;
+        if true {
+            ($hir$0 = 1);
+        } else if true {
+            ($hir$0 = 2);
+        } else {
+            ($hir$0 = 3);
+        };
+        let result: unknown = $hir$0;
+        result
+    }
+    "###);
+}
