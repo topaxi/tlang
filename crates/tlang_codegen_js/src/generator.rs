@@ -465,23 +465,8 @@ impl CodegenJS {
             // Break and Continue expressions already include their own semicolons
             Some(hir::ExprKind::Break(..)) => false,
             Some(hir::ExprKind::Continue) => false,
-            // Check for our special temp var + block combination
-            Some(hir::ExprKind::Call(call)) => {
-                if let hir::ExprKind::Path(path) = &call.callee.kind
-                    && path.segments.len() == 1
-                    && (path.segments[0].ident.as_str() == "__TEMP_VAR_BLOCK__"
-                        || path.segments[0].ident.as_str() == "__TEMP_VAR_IF_ELSE__"
-                        || path.segments[0].ident.as_str() == "__TEMP_VAR_LOOP__")
-                {
-                    return false; // These handle their own semicolons
-                }
-                // __TEMP_VAR_MATCH__ handles its own semicolons in finalize_match_expression
-                if let hir::ExprKind::Path(path) = &call.callee.kind
-                    && path.segments.len() == 1
-                    && path.segments[0].ident.as_str() == "__TEMP_VAR_MATCH__"
-                {
-                    return false; // Pattern match generator already adds semicolon
-                }
+            // Check for regular call expressions
+            Some(hir::ExprKind::Call(_call)) => {
                 true // Regular calls need semicolons
             }
             _ => true,
