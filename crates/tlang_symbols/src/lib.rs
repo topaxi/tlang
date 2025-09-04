@@ -342,17 +342,36 @@ impl SymbolTable {
             // Special logic for Function vs FunctionSelfRef symbols:
             
             if symbol.is_fn_self_binding() {
-                // FunctionSelfRef symbols: accessible to function scopes but not program scope
-                // Program scope typically has start <= 1 (starting from builtins or the first program symbol)
-                // Function scopes have start > 1 (after builtins and program function symbols)
+                // FunctionSelfRef symbols: only accessible within their own function scope
+                // They should never be accessible from the program scope
                 
-                if scope.start() <= 1 {
-                    // This is likely the program scope - FunctionSelfRef symbols not accessible
+                // First check if this symbol is within our scope range
+                if !(storage_index >= scope.start() && storage_index < scope.start() + scope.size()) {
                     return false;
                 }
                 
-                // For function scopes, FunctionSelfRef symbols in their range are accessible
-                return storage_index >= scope.start() && storage_index < scope.start() + scope.size();
+                // Additional check: determine if we're in the program scope by checking
+                // if our scope contains Function symbols (which are only in program scope)
+                if let Some(storage) = &self.storage {
+                    let storage_ref = storage.borrow();
+                    
+                    // Check if our scope contains any Function symbols
+                    let contains_function_symbols = (scope.start()..scope.start() + scope.size())
+                        .any(|i| {
+                            if let Some(sym) = storage_ref.all().get(i) {
+                                matches!(sym.symbol_type, SymbolType::Function(_))
+                            } else {
+                                false
+                            }
+                        });
+                    
+                    if contains_function_symbols {
+                        // We're in program scope - FunctionSelfRef symbols not accessible
+                        return false;
+                    }
+                }
+                
+                return true;
             }
             
             // For non-FunctionSelfRef symbols:
