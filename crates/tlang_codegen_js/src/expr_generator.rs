@@ -219,9 +219,13 @@ impl CodegenJS {
                 self.generate_binary_op(*op, lhs, rhs, parent_op);
             }
             hir::ExprKind::Match(_expr, _arms) => {
-                panic!(
-                    "Match expressions should be transformed to statements by HirJsPass before reaching codegen"
-                );
+                if self.current_context() == BlockContext::Expression {
+                    panic!(
+                        "Match expressions should be transformed to statements by HirJsPass before reaching codegen"
+                    );
+                } else {
+                    self.generate_match_expression(_expr, _arms);
+                }
             }
             hir::ExprKind::IfElse(expr, then_branch, else_branches) => {
                 self.generate_if_else(expr, then_branch, else_branches, parent_op);

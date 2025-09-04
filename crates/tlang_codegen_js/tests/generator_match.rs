@@ -51,12 +51,13 @@ fn test_codegen_pattern_match_expressions() {
     );
     let expected_output = indoc! {"
         let x = 42;
-        let $tmp$0;if (x === 42) {
-            $tmp$0 = 1;
+        let $hir$0 = undefined;
+        if (x === 42) {
+            $hir$0 = 1;
         } else {
-            $tmp$0 = 0;
-        };
-        let y = $tmp$0;
+            $hir$0 = 0;
+        }
+        let y = $hir$0;
     "};
 
     assert_eq!(output, expected_output);
