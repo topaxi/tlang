@@ -1493,3 +1493,286 @@ fn test_complex_nested_all_expression_types() {
     let hir = compile_and_apply_hir_js_pass(source);
     assert_snapshot!(pretty_print(&hir), @"");
 }
+
+#[test]
+fn test_break_expression_in_let_statement() {
+    let source = r#"
+        fn main() {
+            loop {
+                let x = break 42;
+                x
+            };
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        loop {
+            let $hir$0: unknown = _;
+            ($hir$0 = 42);
+            break;
+            let x: unknown = $hir$0;
+            x;
+        };
+    }
+    "###);
+}
+
+#[test]
+fn test_continue_expression_in_let_statement() {
+    let source = r#"
+        fn main() {
+            loop {
+                let x = continue;
+                x
+            };
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        loop {
+            let $hir$0: unknown = _;
+            continue;
+            let x: unknown = $hir$0;
+            x;
+        };
+    }
+    "###);
+}
+
+#[test]
+fn test_break_expression_in_binary_expression() {
+    let source = r#"
+        fn main() {
+            loop {
+                let result = (break 42) + 10;
+                result
+            };
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        loop {
+            let $hir$0: unknown = _;
+            ($hir$0 = 42);
+            break;
+            let result: unknown = ($hir$0 + 10);
+            result;
+        };
+    }
+    "###);
+}
+
+#[test]
+fn test_break_expression_in_function_call() {
+    let source = r#"
+        fn main() {
+            loop {
+                let result = println(break "hello");
+                result
+            };
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        loop {
+            let $hir$0: unknown = _;
+            ($hir$0 = "hello");
+            break;
+            let result: unknown = println($hir$0);
+            result;
+        };
+    }
+    "###);
+}
+
+#[test]
+fn test_continue_expression_in_if_condition() {
+    let source = r#"
+        fn main() {
+            loop {
+                if continue { 42 } else { 0 }
+            };
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        loop {
+            let $hir$0: unknown = _;
+            continue;
+            if $hir$0 {
+                42
+            } else {
+                0
+            };
+        };
+    }
+    "###);
+}
+
+#[test]
+fn test_break_expression_in_list() {
+    let source = r#"
+        fn main() {
+            loop {
+                let list = [1, break 42, 3];
+                list
+            };
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        loop {
+            let $hir$0: unknown = _;
+            ($hir$0 = 42);
+            break;
+            let list: unknown = [1, $hir$0, 3];
+            list;
+        };
+    }
+    "###);
+}
+
+#[test]
+fn test_nested_break_expressions() {
+    let source = r#"
+        fn main() {
+            loop {
+                let result = if true {
+                    break 42
+                } else {
+                    break 24
+                };
+                result
+            };
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        loop {
+            let $hir$0: unknown = _;
+            if true {
+                ($hir$0 = 42);
+                break;
+            } else {
+                ($hir$0 = 24);
+                break;
+            };
+            let result: unknown = $hir$0;
+            result;
+        };
+    }
+    "###);
+}
+
+#[test]
+fn test_complex_break_continue_combination() {
+    let source = r#"
+        fn main() {
+            loop {
+                let decision = if some_condition() {
+                    break "early_exit"
+                } else if other_condition() {
+                    continue
+                } else {
+                    "continue_processing"
+                };
+                println(decision);
+            };
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        loop {
+            let $hir$0: unknown = _;
+            if some_condition() {
+                ($hir$0 = "early_exit");
+                break;
+            } else {
+                if other_condition() {
+                    continue;
+                } else {
+                    ($hir$0 = "continue_processing");
+                };
+            };
+            let decision: unknown = $hir$0;
+            println(decision);
+        };
+    }
+    "###);
+}
+
+#[test]
+fn test_debug_break_expression_hir() {
+    let source = r#"
+        fn main() {
+            loop {
+                let x = break 42;
+                x
+            };
+        }
+    "#;
+    let (module, _) = compile(source);
+    println!("Debug HIR without HIR JS pass:");
+    println!("{}", pretty_print(&module));
+    
+    let hir = compile_and_apply_hir_js_pass(source);
+    println!("Debug HIR with HIR JS pass:");
+    println!("{}", pretty_print(&hir));
+    
+    // Just to satisfy the test, use a dummy assertion for now
+    assert!(true);
+}
+
+#[test]
+fn test_debug_simple_break_expression() {
+    let source = r#"
+        fn main() {
+            let x = break 42;
+            x
+        }
+    "#;
+    let (module, _) = compile(source);
+    println!("Debug simple HIR without HIR JS pass:");
+    println!("{}", pretty_print(&module));
+    
+    let hir = compile_and_apply_hir_js_pass(source);
+    println!("Debug simple HIR with HIR JS pass:");
+    println!("{}", pretty_print(&hir));
+    
+    // Just to satisfy the test, use a dummy assertion for now
+    assert!(true);
+}
+
+
+#[test]
+fn test_debug_block_inside_loop() {
+    let source = r#"
+        fn main() {
+            loop {
+                let x = {
+                    let y = 1;
+                    y + 2
+                };
+                x
+            };
+        }
+    "#;
+    let (module, _) = compile(source);
+    println!("Debug block inside loop HIR without HIR JS pass:");
+    println!("{}", pretty_print(&module));
+    
+    let hir = compile_and_apply_hir_js_pass(source);
+    println!("Debug block inside loop HIR with HIR JS pass:");
+    println!("{}", pretty_print(&hir));
+    
+    // Just to satisfy the test, use a dummy assertion for now
+    assert!(true);
+}

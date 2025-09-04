@@ -335,6 +335,7 @@ impl HirJsPass {
 
         // For if-else expressions, only flatten if they cannot be ternaries
         // For loop expressions, check if they're in assignment contexts where they need special handling
+        // For break/continue/return expressions, always flatten as they cannot be JS expressions
         // For other expressions, check if they can be rendered as JS
         let needs_flattening = match &expr_with_flattened_subs.kind {
             hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
@@ -342,6 +343,8 @@ impl HirJsPass {
                 !if_else_can_render_as_ternary(condition, then_branch, else_branches)
             }
             hir::ExprKind::Loop(..) => true,   // Loop expressions need transformation for JavaScript
+            hir::ExprKind::Break(..) => true, // Break expressions always need flattening
+            hir::ExprKind::Continue => true,  // Continue expressions always need flattening
             _ => !expr_can_render_as_js_expr(&expr_with_flattened_subs)
         };
 
@@ -590,6 +593,25 @@ impl HirJsPass {
                     statements.append(&mut stmts);
                     self.changes_made = true;
                 }
+            }
+            hir::ExprKind::Break(Some(break_expr)) => {
+                // For break expressions with values, flatten the value expression
+                if !expr_can_render_as_js_expr(break_expr) {
+                    let span = break_expr.span;
+                    let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                    let expr_to_flatten = std::mem::replace(break_expr.as_mut(), placeholder);
+                    let (flattened, mut stmts) =
+                        self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                    **break_expr = flattened;
+                    statements.append(&mut stmts);
+                    self.changes_made = true;
+                }
+            }
+            hir::ExprKind::Break(None) => {
+                // Plain break without value - no subexpressions to flatten
+            }
+            hir::ExprKind::Continue => {
+                // Continue has no subexpressions to flatten
             }
             hir::ExprKind::Loop(_) => {
                 // Loop expressions found within other expressions should be flattened to temp variables
@@ -1240,6 +1262,52 @@ impl HirJsPass {
                     }
                 }
             }
+            hir::ExprKind::Break(Some(break_expr)) => {
+                // Transform break expressions with values to: temp_var = value; break;
+                // First create the assignment for the break value
+                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, *break_expr.clone(), span);
+                statements.push(assignment_stmt);
+                
+                // Then create a plain break statement
+                let plain_break_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::Break(None),
+                        span,
+                    })),
+                    span,
+                );
+                statements.push(plain_break_stmt);
+            }
+            hir::ExprKind::Break(None) => {
+                // Transform plain break expressions to just a break statement
+                // No temp variable assignment needed since there's no value
+                let plain_break_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::Break(None),
+                        span,
+                    })),
+                    span,
+                );
+                statements.push(plain_break_stmt);
+            }
+            hir::ExprKind::Continue => {
+                // Transform continue expressions to just a continue statement
+                // No temp variable assignment needed since continue has no value
+                let continue_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::Continue,
+                        span,
+                    })),
+                    span,
+                );
+                statements.push(continue_stmt);
+            }
             _ => {
                 // For other expressions, just create a simple assignment
                 statements.push(self.create_assignment_stmt(ctx, temp_name, expr, span));
@@ -1373,16 +1441,9 @@ impl<'hir> Visitor<'hir> for HirJsPass {
     }
 
     fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut Self::Context) {
-        // Process function declarations recursively
-        match &stmt.kind {
-            hir::StmtKind::FunctionDeclaration(_) => {
-                visit::walk_stmt(self, stmt, ctx);
-            }
-            _ => {
-                // For other statements, allow processing but avoid visiting nested expressions
-                // to prevent double-processing already transformed expressions
-            }
-        }
+        // Always walk the statement to ensure nested expressions are visited
+        // The actual statement transformation happens in visit_block()
+        visit::walk_stmt(self, stmt, ctx);
     }
 
     fn visit_block(&mut self, block: &'hir mut hir::Block, ctx: &mut Self::Context) {
