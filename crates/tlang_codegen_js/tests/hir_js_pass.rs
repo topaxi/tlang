@@ -1879,3 +1879,22 @@ fn test_function_declaration_with_match_expressions() {
     }
     "#);
 }
+
+#[test]
+fn test_debug_function_pattern_matching() {
+    let source = r#"
+        enum Tree {
+            Leaf(x),
+            Node { left, right },
+        }
+
+        fn maximum_depth(Tree::Leaf(_)) { 1 }
+
+        fn main() {
+            maximum_depth(Tree::Leaf(42));
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    println!("HIR after JS pass:");
+    println!("{}", pretty_print(&hir));
+}
