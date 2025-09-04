@@ -77,12 +77,13 @@ fn test_codegen_pattern_match_blocks() {
     );
     let expected_output = indoc! {"
         let x = 42;
-        let $tmp$0;if (x === 42) {
-            $tmp$0 = 1;
+        let $hir$0 = undefined;
+        if (x === 42) {
+            $hir$0 = 1;
         } else {
-            $tmp$0 = 0;
-        };
-        let y = $tmp$0;
+            $hir$0 = 0;
+        }
+        let y = $hir$0;
     "};
 
     assert_eq!(output, expected_output);
@@ -99,15 +100,15 @@ fn test_codegen_pattern_match_list_bindings() {
     "});
     let expected_output = indoc! {"
         let x = 42;
-        let $tmp$0;
-        let $tmp$1 = [42, 43];
+        let $hir$0 = undefined;
+        let $tmp$0 = [42, 43];
         let x$0;
-        let y;if ($tmp$1.length >= 2 && (x$0 = $tmp$1[0], true) && (y = $tmp$1[1], true)) {
-            $tmp$0 = x$0 + y;
+        let y;if ($tmp$0.length >= 2 && (x$0 = $tmp$0[0], true) && (y = $tmp$0[1], true)) {
+            $hir$0 = x$0 + y;
         } else {
-            $tmp$0 = 0;
-        };
-        let y$0 = $tmp$0;
+            $hir$0 = 0;
+        }
+        let y$0 = $hir$0;
     "};
     assert_eq!(output, expected_output);
 }
@@ -121,13 +122,13 @@ fn test_codegen_pattern_match_list_empty() {
         };
     "});
     let expected_output = indoc! {"
-        let $tmp$0;
-        let $tmp$1 = [];if ($tmp$1.length === 0) {
-            $tmp$0 = 1;
+        let $hir$0 = undefined;
+        let $tmp$0 = [];if ($tmp$0.length === 0) {
+            $hir$0 = 1;
         } else {
-            $tmp$0 = 0;
-        };
-        let x = $tmp$0;
+            $hir$0 = 0;
+        }
+        let x = $hir$0;
     "};
     assert_eq!(output, expected_output);
 }
@@ -141,15 +142,15 @@ fn test_codegen_pattern_match_list_rest_elements() {
         };
     "});
     let expected_output = indoc! {"
-        let $tmp$0;
-        let $tmp$1 = [1, 2, 3, 4, 5];
+        let $hir$0 = undefined;
+        let $tmp$0 = [1, 2, 3, 4, 5];
         let n;
-        let rest;if ($tmp$1.length >= 1 && (n = $tmp$1[0], true) && (rest = $tmp$1.slice(1), true)) {
-            $tmp$0 = n + rest.length;
+        let rest;if ($tmp$0.length >= 1 && (n = $tmp$0[0], true) && (rest = $tmp$0.slice(1), true)) {
+            $hir$0 = n + rest.length;
         } else {
-            $tmp$0 = 0;
-        };
-        let x = $tmp$0;
+            $hir$0 = 0;
+        }
+        let x = $hir$0;
     "};
     assert_eq!(output, expected_output);
 }
@@ -163,14 +164,14 @@ fn test_codegen_pattern_match_enum_bindings() {
         };
     "});
     let expected_output = indoc! {"
-        let $tmp$0;
-        let $tmp$1 = Option.Some(42);
-        let x;if ($tmp$1.tag === Option.Some && (x = $tmp$1[0], true)) {
-            $tmp$0 = x;
+        let $hir$0 = undefined;
+        let $tmp$0 = Option.Some(42);
+        let x;if ($tmp$0.tag === Option.Some && (x = $tmp$0[0], true)) {
+            $hir$0 = x;
         } else {
-            $tmp$0 = 0;
-        };
-        let y = $tmp$0;
+            $hir$0 = 0;
+        }
+        let y = $hir$0;
     "};
     assert_eq!(output, expected_output);
 }
@@ -200,16 +201,16 @@ fn test_codegen_pattern_match_positional_enum() {
             static Add = (lhs, rhs) => Object.assign(new this, { tag: this.Add, [0]: lhs, [1]: rhs });
         }
         let expr = Expr.Value(42);
-        let $tmp$0;
+        let $hir$0 = undefined;
         let x;
         let y;if (expr.tag === Expr.Value && (x = expr[0], true)) {
-            $tmp$0 = x;
+            $hir$0 = x;
         } else if (expr.tag === Expr.Add && (x = expr[0], true) && (y = expr[1], true)) {
-            $tmp$0 = x + y;
+            $hir$0 = x + y;
         } else {
-            $tmp$0 = 0;
-        };
-        let z = $tmp$0;
+            $hir$0 = 0;
+        }
+        let z = $hir$0;
     "};
     assert_eq!(output, expected_output);
 }
@@ -227,16 +228,16 @@ fn test_codegen_pattern_match_nested_enum() {
     "});
     let expected_output = indoc! {"
         let x = 42;
-        let $tmp$0;
-        let $tmp$1 = Option.Some(Option.Some(42));
-        let x$0;if ($tmp$1.tag === Option.Some && $tmp$1[0].tag === Option.Some && (x$0 = $tmp$1[0][0], true)) {
-            $tmp$0 = x$0;
-        } else if ($tmp$1.tag === Option.Some && $tmp$1[0].tag === Option.None) {
-            $tmp$0 = 0;
-        } else if ($tmp$1.tag === Option.None) {
-            $tmp$0 = 0;
-        };
-        let y = $tmp$0;
+        let $hir$0 = undefined;
+        let $tmp$0 = Option.Some(Option.Some(42));
+        let x$0;if ($tmp$0.tag === Option.Some && $tmp$0[0].tag === Option.Some && (x$0 = $tmp$0[0][0], true)) {
+            $hir$0 = x$0;
+        } else if ($tmp$0.tag === Option.Some && $tmp$0[0].tag === Option.None) {
+            $hir$0 = 0;
+        } else if ($tmp$0.tag === Option.None) {
+            $hir$0 = 0;
+        }
+        let y = $hir$0;
     "};
     assert_eq!(output, expected_output);
 }
@@ -250,14 +251,14 @@ fn test_codegen_pattern_match_guards() {
         };
     "});
     let expected_output = indoc! {"
-        let $tmp$0;
-        let $tmp$1 = 42;
-        let n;if ((n = $tmp$1, true) && n > 0) {
-            $tmp$0 = 1;
+        let $hir$0 = undefined;
+        let $tmp$0 = 42;
+        let n;if ((n = $tmp$0, true) && n > 0) {
+            $hir$0 = 1;
         } else {
-            $tmp$0 = 0;
-        };
-        let x = $tmp$0;
+            $hir$0 = 0;
+        }
+        let x = $hir$0;
     "};
     assert_eq!(output, expected_output);
 }
@@ -271,16 +272,16 @@ fn test_codegen_pattern_match_let_guards() {
         };
     "});
     let expected_output = indoc! {"
-        let $tmp$0;
-        let $tmp$1 = Option.Some(42);
-        let $tmp$2;
+        let $hir$0 = undefined;
+        let $tmp$0 = Option.Some(42);
+        let $tmp$1;
         let n;
-        let y;if ((n = $tmp$1, true) && ($tmp$2 = n * 2, true) && $tmp$2.tag === Option.Some && (y = $tmp$2[0], true)) {
-            $tmp$0 = y;
+        let y;if ((n = $tmp$0, true) && ($tmp$1 = n * 2, true) && $tmp$1.tag === Option.Some && (y = $tmp$1[0], true)) {
+            $hir$0 = y;
         } else {
-            $tmp$0 = 0;
-        };
-        let x = $tmp$0;
+            $hir$0 = 0;
+        }
+        let x = $hir$0;
     "};
     assert_eq!(output, expected_output);
 }

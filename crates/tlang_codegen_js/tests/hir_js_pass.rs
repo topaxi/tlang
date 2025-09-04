@@ -1838,3 +1838,44 @@ fn test_if_else_if_expression_transformation() {
     }
     "###);
 }
+
+#[test]
+fn test_function_declaration_with_match_expressions() {
+    let source = r#"
+        enum Option {
+            Some(value),
+            None,
+        }
+        
+        fn test_func(x) {
+            let result = match x {
+                Option::Some(n) => n + 1,
+                Option::None => 0,
+            };
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r#"
+    enum Option {
+        Some {
+            0: value,
+        }
+        None {
+        }
+    }
+    fn test_func(x: unknown) -> unknown {
+        let $hir$0: unknown = _;
+        match x {
+            Option::Some { 0: n } => {
+                ($hir$0 = (n + 1));
+            },
+            Option::None => {
+                ($hir$0 = 0);
+            },
+        };
+        let result: unknown = $hir$0;
+        result
+    }
+    "#);
+}
