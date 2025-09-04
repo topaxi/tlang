@@ -6,7 +6,7 @@ use std::cell::RefCell;
 #[test]
 fn test_direct_symbol_lookup_by_id() {
     let mut allocator = SymbolIdAllocator::default();
-    let mut table = SymbolTable::default();
+    let mut table = SymbolTable::new();
     
     // Create and insert symbols
     let id1 = allocator.next_id();
@@ -50,7 +50,7 @@ fn test_hierarchical_symbol_lookup_by_id() {
     let mut allocator = SymbolIdAllocator::default();
     
     // Create parent table
-    let parent_table = Rc::new(RefCell::new(SymbolTable::default()));
+    let parent_table = Rc::new(RefCell::new(SymbolTable::new()));
     
     let parent_id = allocator.next_id();
     let parent_symbol = SymbolInfo::new(
@@ -64,7 +64,7 @@ fn test_hierarchical_symbol_lookup_by_id() {
     parent_table.borrow_mut().insert(parent_symbol);
     
     // Create child table
-    let child_table = SymbolTable::new(parent_table.clone());
+    let child_table = SymbolTable::new_child(parent_table.clone());
     
     let child_id = allocator.next_id();
     let child_symbol = SymbolInfo::new(
@@ -94,7 +94,7 @@ fn test_new_storage_pattern_direct_access() {
     let mut allocator = SymbolIdAllocator::default();
     
     // Create table with new storage pattern
-    let mut table = SymbolTable::new_with_storage();
+    let mut table = SymbolTable::new();
     
     // Insert symbols using new pattern
     let id1 = allocator.next_id();
@@ -106,7 +106,7 @@ fn test_new_storage_pattern_direct_access() {
         LineColumn::default(),
     );
     
-    let actual_id1 = table.insert_with_storage(symbol1);
+    let actual_id1 = table.insert(symbol1);
     
     // Test that we can find by the original ID (this is what semantic analyzer expects)
     let found_by_original = table.get_by_id(id1);
@@ -127,7 +127,7 @@ fn test_storage_pattern_scope_boundaries() {
     let mut allocator = SymbolIdAllocator::default();
     
     // Create parent with storage
-    let parent_table = Rc::new(RefCell::new(SymbolTable::new_with_storage()));
+    let parent_table = Rc::new(RefCell::new(SymbolTable::new()));
     
     let parent_id = allocator.next_id();
     let parent_symbol = SymbolInfo::new(
@@ -138,10 +138,10 @@ fn test_storage_pattern_scope_boundaries() {
         LineColumn::default(),
     );
     
-    let actual_parent_id = parent_table.borrow_mut().insert_with_storage(parent_symbol);
+    let actual_parent_id = parent_table.borrow_mut().insert(parent_symbol);
     
     // Create child with shared storage
-    let child_table = Rc::new(RefCell::new(SymbolTable::new_child_with_storage(parent_table.clone())));
+    let child_table = Rc::new(RefCell::new(SymbolTable::new_child(parent_table.clone())));
     
     let child_id = allocator.next_id();
     let child_symbol = SymbolInfo::new(
@@ -152,7 +152,7 @@ fn test_storage_pattern_scope_boundaries() {
         LineColumn::default(),
     );
     
-    let actual_child_id = child_table.borrow_mut().insert_with_storage(child_symbol);
+    let actual_child_id = child_table.borrow_mut().insert(child_symbol);
     
     // Child can see parent (upward scope access)
     let child_sees_parent = child_table.borrow().get_by_id(actual_parent_id);

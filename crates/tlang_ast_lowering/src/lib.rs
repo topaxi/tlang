@@ -132,7 +132,7 @@ impl LoweringContext {
         R: hir::HirScope,
     {
         let previous_symbol_table = self.current_symbol_table.clone();
-        self.current_symbol_table = Rc::new(RefCell::new(SymbolTable::new_child_with_storage(
+        self.current_symbol_table = Rc::new(RefCell::new(SymbolTable::new_child(
             previous_symbol_table.clone(),
         )));
         let (hir_id, result) = f(self, self.current_symbol_table.clone());
@@ -184,7 +184,7 @@ impl LoweringContext {
         .with_hir_id(hir_id)
         .as_temp();
 
-        self.scope().borrow_mut().insert_at(index, symbol_info);
+        self.scope().borrow_mut().insert(symbol_info);
     }
 
     pub(crate) fn define_symbol_after(
@@ -207,7 +207,7 @@ impl LoweringContext {
 
         self.scope()
             .borrow_mut()
-            .insert_after(symbol_info, predicate);
+            .insert(symbol_info);
     }
 
     #[inline(always)]

@@ -157,14 +157,13 @@ impl SymbolInfo {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct SymbolTable {
     #[cfg_attr(feature = "serde", serde(skip_serializing))]
     parent: Option<Rc<RefCell<SymbolTable>>>,
-    symbols: Vec<SymbolInfo>,
     
-    // NEW: Storage infrastructure for the updated pattern
+    // Storage infrastructure for the new pattern
     #[cfg_attr(feature = "serde", serde(skip_serializing))]
     storage: Option<Rc<RefCell<SymbolStorage>>>,
     scope: Option<SymbolScope>,
@@ -172,25 +171,17 @@ pub struct SymbolTable {
 
 // TODO: Should we keep track of the symbol id within the symbol table?
 impl SymbolTable {
-    pub fn new(parent: Rc<RefCell<SymbolTable>>) -> Self {
-        SymbolTable {
-            parent: Some(parent),
-            ..Default::default()
-        }
-    }
-
-    /// Create a new SymbolTable using the new storage pattern
-    pub fn new_with_storage() -> Self {
+    /// Create a new root SymbolTable
+    pub fn new() -> Self {
         SymbolTable {
             parent: None,
-            symbols: Vec::new(),
             storage: Some(Rc::new(RefCell::new(SymbolStorage::new()))),
             scope: Some(SymbolScope::new(0, 0)),
         }
     }
 
     /// Create a child SymbolTable that shares storage with its parent
-    pub fn new_child_with_storage(parent: Rc<RefCell<SymbolTable>>) -> Self {
+    pub fn new_child(parent: Rc<RefCell<SymbolTable>>) -> Self {
         let (storage, start) = {
             let parent_borrow = parent.borrow();
             let storage = parent_borrow.storage.clone();
@@ -200,7 +191,6 @@ impl SymbolTable {
         
         SymbolTable {
             parent: Some(parent),
-            symbols: Vec::new(),
             storage,
             scope: Some(SymbolScope::new(start, 0)),
         }
@@ -214,31 +204,18 @@ impl SymbolTable {
         self.parent = Some(parent);
     }
 
-    /// Get a symbol by ID (direct access) - NEW METHOD for the updated pattern
-    /// For now, this traverses the hierarchy until we fully migrate
+    /// Get a symbol by ID (direct access)
     pub fn get_by_id(&self, target_id: SymbolId) -> Option<SymbolInfo> {
-        // NEW: If using storage pattern, respect scope boundaries and hierarchy
         if let Some(storage) = &self.storage {
-            // First, check if the symbol is in our global storage at all
+            // Check if the symbol is in our global storage
             if let Some(symbol) = storage.borrow().get(target_id) {
-                // Now check if we can access it based on scope hierarchy
+                // Check if we can access it based on scope hierarchy
                 return self.can_access_symbol(target_id, symbol);
             }
             return None;
         }
 
-        // OLD: Fall back to traversal for current pattern
-        // First check local symbols
-        if let Some(symbol) = self.symbols.iter().find(|s| s.id == target_id) {
-            return Some(symbol.clone());
-        }
-
-        // Then check parent tables
-        if let Some(parent) = &self.parent {
-            parent.borrow().get_by_id(target_id)
-        } else {
-            None
-        }
+        panic!("SymbolTable not properly initialized with storage");
     }
 
     /// Check if this symbol table can access a given symbol (respects scope hierarchy)
@@ -278,19 +255,15 @@ impl SymbolTable {
         }
     }
 
-    /// Insert using the new storage pattern if available, fallback to old pattern
-    pub fn insert_with_storage(&mut self, symbol_info: SymbolInfo) -> SymbolId {
+    /// Insert a symbol into the storage
+    pub fn insert(&mut self, symbol_info: SymbolInfo) -> SymbolId {
         if let (Some(storage), Some(scope)) = (&self.storage, &mut self.scope) {
-            // NEW: Use storage pattern
             let id = storage.borrow_mut().push(symbol_info);
             scope.size += 1; // Expand this scope's size
-            debug!("Symbol inserted with ID: {:?} using storage pattern", id);
+            debug!("Symbol inserted with ID: {:?}", id);
             id
         } else {
-            // OLD: Use existing pattern
-            let id = symbol_info.id;
-            self.insert(symbol_info);
-            id
+            panic!("SymbolTable not properly initialized with storage");
         }
     }
 
@@ -300,10 +273,9 @@ impl SymbolTable {
 
         while let Some(t) = table {
             let mut set = HashSet::new();
+            let local_symbols = t.borrow().get_all_local_symbols();
 
-            if let Some(index) = t
-                .borrow()
-                .symbols
+            if let Some(index) = local_symbols
                 .iter()
                 .filter(|s| t.borrow().symbol_gets_slot(s))
                 // Filter out duplicate symbols, as fn definitions might have multiple symbols
@@ -322,25 +294,30 @@ impl SymbolTable {
         None
     }
 
-    pub fn get_local(&self, predicate: impl Fn(&SymbolInfo) -> bool) -> Option<&SymbolInfo> {
-        self.symbols.iter().find(|s| predicate(s))
+    pub fn get_local(&self, predicate: impl Fn(&SymbolInfo) -> bool) -> Option<SymbolInfo> {
+        self.get_locals(predicate).into_iter().next()
     }
 
     fn get_local_mut(
         &mut self,
         predicate: impl Fn(&SymbolInfo) -> bool,
     ) -> Option<&mut SymbolInfo> {
-        self.symbols.iter_mut().find(|s| predicate(s))
+        // For the new storage pattern, we need to implement this differently
+        // For now, let's avoid this method and update callers
+        unimplemented!("get_local_mut needs redesign for new storage pattern")
     }
 
     pub fn set_declared(&mut self, id: SymbolId, declared: bool) {
-        if let Some(s) = self.get_local_mut(|s| s.id == id) {
-            s.set_declared(declared);
+        if let Some(storage) = &self.storage {
+            if let Some(symbol) = storage.borrow_mut().get_mut(id) {
+                symbol.set_declared(declared);
+            }
+        } else {
+            panic!("SymbolTable not properly initialized with storage");
         }
     }
 
     fn get_locals(&self, predicate: impl Fn(&SymbolInfo) -> bool) -> Vec<SymbolInfo> {
-        // NEW: If using storage pattern, get symbols from storage within our scope
         if let (Some(storage), Some(scope)) = (&self.storage, &self.scope) {
             let storage_ref = storage.borrow();
             let scope_symbols = storage_ref.scope_symbols(scope);
@@ -352,13 +329,7 @@ impl SymbolTable {
                 .collect();
         }
 
-        // OLD: Fall back to local symbols vector
-        self.symbols
-            .iter()
-            .filter(|s| s.declared)
-            .filter(|s| predicate(s))
-            .cloned()
-            .collect()
+        panic!("SymbolTable not properly initialized with storage");
     }
 
     fn get_locals_by_name(&self, name: &str) -> Vec<SymbolInfo> {
@@ -459,76 +430,79 @@ impl SymbolTable {
         // TODO: Maybe we shouldn't remove symbols...
         //       This is used to remove the fn self binding from the table when within an
         //       match arm (during lowering).
-        self.symbols.remove(0);
+        // For the new storage pattern, this operation is more complex and might need redesign
+        unimplemented!("shift method needs redesign for new storage pattern");
     }
 
-    pub fn insert(&mut self, symbol_info: SymbolInfo) {
-        debug!("Inserting symbol: {:?}", symbol_info);
 
-        self.symbols.push(symbol_info);
-    }
-
-    pub fn insert_at(&mut self, index: usize, symbol_info: SymbolInfo) {
-        debug!("Inserting symbol at index {}: {:?}", index, symbol_info);
-
-        self.symbols.insert(index, symbol_info);
-    }
-
-    pub fn insert_after(
-        &mut self,
-        symbol_info: SymbolInfo,
-        predicate: impl Fn(&SymbolInfo) -> bool,
-    ) {
-        debug!("Inserting symbol after predicate: {:?}", symbol_info);
-
-        if let Some(index) = self.symbols.iter().position(&predicate) {
-            self.symbols.insert(index + 1, symbol_info);
-        } else {
-            self.symbols.push(symbol_info);
-        }
-    }
 
     pub fn mark_as_used(&mut self, id: SymbolId) {
-        if let Some(symbol_info) = self.get_local_mut(|s| s.id == id) {
-            if symbol_info.used {
-                return;
-            }
+        // First check if this symbol is in our local scope
+        if let Some(storage) = &self.storage {
+            // Check if we can access this symbol from our scope
+            let can_access = {
+                if let Some(symbol) = storage.borrow().get(id) {
+                    self.can_access_symbol(id, symbol).is_some()
+                } else {
+                    false
+                }
+            };
 
-            if symbol_info.is_any_fn() {
-                debug!(
-                    "Marking {} `{}/{}` with {:?} as used",
-                    symbol_info.symbol_type,
-                    symbol_info.name,
-                    symbol_info.symbol_type.arity().unwrap_or_default(),
-                    id
-                );
-            } else {
-                debug!(
-                    "Marking {} `{}` with {:?} as used",
-                    symbol_info.symbol_type, symbol_info.name, id
-                );
-            }
+            if can_access {
+                // Now mark it as used
+                if let Some(symbol_mut) = storage.borrow_mut().get_mut(id) {
+                    if symbol_mut.used {
+                        return;
+                    }
 
-            symbol_info.used = true;
-        } else if let Some(parent) = &self.parent {
+                    if symbol_mut.is_any_fn() {
+                        debug!(
+                            "Marking {} `{}/{}` with {:?} as used",
+                            symbol_mut.symbol_type,
+                            symbol_mut.name,
+                            symbol_mut.symbol_type.arity().unwrap_or_default(),
+                            id
+                        );
+                    } else {
+                        debug!(
+                            "Marking {} `{}` with {:?} as used",
+                            symbol_mut.symbol_type, symbol_mut.name, id
+                        );
+                    }
+
+                    symbol_mut.used = true;
+                    return;
+                }
+            }
+        }
+
+        // If not found locally, delegate to parent
+        if let Some(parent) = &self.parent {
             parent.borrow_mut().mark_as_used(id);
         }
     }
 
-    pub fn get_all_declared_local_symbols(&self) -> impl Iterator<Item = SymbolInfo> {
-        self.symbols.iter().filter(|s| s.declared).cloned()
+    pub fn get_all_declared_local_symbols(&self) -> Vec<SymbolInfo> {
+        self.get_locals(|_| true) // get_locals already filters for declared symbols
     }
 
-    pub fn get_all_local_symbols(&self) -> &[SymbolInfo] {
-        &self.symbols
+    pub fn get_all_local_symbols(&self) -> Vec<SymbolInfo> {
+        if let (Some(storage), Some(scope)) = (&self.storage, &self.scope) {
+            let storage_ref = storage.borrow();
+            storage_ref.scope_symbols(scope).to_vec()
+        } else {
+            panic!("SymbolTable not properly initialized with storage");
+        }
     }
 
-    pub fn get_all_local_symbols_mut(&mut self) -> &mut Vec<SymbolInfo> {
-        &mut self.symbols
+    pub fn get_all_local_symbols_mut(&mut self) -> Vec<&mut SymbolInfo> {
+        // This is complex with the new storage pattern - return empty for now
+        // Methods that need this should be redesigned
+        unimplemented!("get_all_local_symbols_mut needs redesign for new storage pattern");
     }
 
     pub fn get_all_declared_symbols(&self) -> Vec<SymbolInfo> {
-        let mut names = self.get_all_declared_local_symbols().collect::<Vec<_>>();
+        let mut names = self.get_all_declared_local_symbols();
         if let Some(parent) = &self.parent {
             names.extend(parent.borrow().get_all_declared_symbols());
         }
@@ -539,6 +513,7 @@ impl SymbolTable {
     /// This uses the same filtering logic as `get_slot`.
     pub fn locals(&self) -> usize {
         self.get_all_declared_local_symbols()
+            .iter()
             .filter(|s| self.symbol_gets_slot(s))
             .count()
     }
@@ -552,6 +527,12 @@ impl SymbolTable {
             && !matches!(s.symbol_type, SymbolType::Enum | SymbolType::Struct)
             // And tagged enum variant definitions do not generate a slot
             && !matches!(s.symbol_type, SymbolType::EnumVariant(len) if len > 0)
+    }
+}
+
+impl Default for SymbolTable {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

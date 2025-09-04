@@ -54,6 +54,7 @@ impl VariableUsageValidator {
         let symbol_table = symbol_table.borrow();
         let unused_symbols = symbol_table
             .get_all_declared_local_symbols()
+            .into_iter()
             .filter(|symbol| !symbol.used)
             .filter(|symbol| !symbol.is_builtin())
             // Do not report the binding introduced within function bodies to reference to

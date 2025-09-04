@@ -33,7 +33,7 @@ impl DeclarationAnalyzer {
         debug!("Entering new scope for node: {}", node_id);
 
         let parent = self.current_symbol_table().clone();
-        let new_symbol_table = Rc::new(RefCell::new(SymbolTable::new_child_with_storage(parent)));
+        let new_symbol_table = Rc::new(RefCell::new(SymbolTable::new_child(parent)));
         ctx.symbol_tables.insert(node_id, new_symbol_table.clone());
         self.symbol_table_stack.push(new_symbol_table.clone());
 
@@ -62,7 +62,7 @@ impl DeclarationAnalyzer {
 
         debug!("Declaring symbol: {:#?}", symbol_info);
 
-        let returned_id = self.current_symbol_table().borrow_mut().insert_with_storage(symbol_info);
+        let returned_id = self.current_symbol_table().borrow_mut().insert(symbol_info);
         debug!("Symbol inserted with returned ID: {:?}, original ID: {:?}", returned_id, id);
         
         // The returned ID should match the original ID for proper lookup
