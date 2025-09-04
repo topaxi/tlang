@@ -60,10 +60,7 @@ impl DeclarationAnalyzer {
         let symbol_info =
             SymbolInfo::new(id, name, symbol_type, defined_at, scope_start).with_node_id(node_id);
 
-        debug!("Declaring symbol: {:#?}", symbol_info);
-
         let returned_id = self.current_symbol_table().borrow_mut().insert(symbol_info);
-        debug!("Symbol inserted with returned ID: {:?}, original ID: {:?}", returned_id, id);
         
         // The returned ID should match the original ID for proper lookup
         assert_eq!(returned_id, id, "ID mismatch in storage!");

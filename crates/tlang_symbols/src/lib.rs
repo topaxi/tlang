@@ -181,6 +181,7 @@ impl SymbolTable {
         let (storage, start) = {
             let parent_borrow = parent.borrow();
             let storage = parent_borrow.storage.clone();
+            // Child scope starts where the current storage ends, not where parent scope ends
             let start = storage.as_ref().map_or(0, |s| s.borrow().symbols.len());
             (storage, start)
         };
@@ -321,37 +322,111 @@ impl SymbolTable {
     pub fn get_by_name(&self, name: &str) -> Vec<SymbolInfo> {
         if let (Some(storage), Some(scope)) = (&self.storage, &self.scope) {
             let storage_ref = storage.borrow();
-            // Search all symbols accessible to this scope (from 0 to scope.start + scope.size)
-            let accessible_end = scope.start() + scope.size();
-            return storage_ref.range(0, accessible_end)
-                .iter()
-                .filter(|s| s.declared && *s.name == *name)
-                .cloned()
-                .collect();
+            let mut result = Vec::new();
+            
+            // For symbol lookup, we need to search all symbols that are accessible to this scope
+            // In the shared storage model, we need to search through all symbols and check
+            // accessibility based on where they were declared
+            
+            for (storage_index, symbol) in storage_ref.all().iter().enumerate() {
+                if !symbol.declared || *symbol.name != *name {
+                    continue;
+                }
+                
+                // Check if this symbol is accessible from the current scope
+                if self.can_access_symbol_at_index(storage_index, symbol) {
+                    result.push(symbol.clone());
+                }
+            }
+            
+            return result;
         }
 
         panic!("SymbolTable not properly initialized with storage");
     }
+    
+    /// Check if a symbol at a specific storage index is accessible from this scope
+    fn can_access_symbol_at_index(&self, storage_index: usize, symbol: &SymbolInfo) -> bool {
+        if let Some(ref scope) = self.scope {
+            // Special logic for Function vs FunctionSelfRef symbols:
+            
+            if symbol.is_fn_self_binding() {
+                // FunctionSelfRef symbols: accessible to function scopes but not program scope
+                // Function scopes typically have start > 1 (after builtins and program symbols)
+                // Program scope typically has start == 1 (after builtins)
+                
+                if scope.start() == 1 {
+                    // This is likely the program scope - FunctionSelfRef symbols not accessible
+                    return false;
+                }
+                
+                // For function scopes, FunctionSelfRef symbols in their range are accessible
+                return storage_index >= scope.start() && storage_index < scope.start() + scope.size();
+            }
+            
+            // For non-FunctionSelfRef symbols:
+            // 1. Symbols from parent scopes (storage_index < scope.start) are accessible
+            if storage_index < scope.start() {
+                return true; // Parent scope symbol
+            }
+            
+            // 2. Function symbols are accessible to all scopes
+            if matches!(symbol.symbol_type, SymbolType::Function(_)) {
+                return true;
+            }
+            
+            // 3. For other symbols, use the traditional range check
+            return storage_index >= scope.start() && storage_index < scope.start() + scope.size();
+        }
+        false
+    }
 
     pub fn get_by_name_and_arity(&self, name: &str, arity: usize) -> Vec<SymbolInfo> {
-        if let (Some(storage), Some(scope)) = (&self.storage, &self.scope) {
+        if let (Some(storage), Some(_scope)) = (&self.storage, &self.scope) {
             let storage_ref = storage.borrow();
-            // Search all symbols accessible to this scope (from 0 to scope.start + scope.size)
-            let accessible_end = scope.start() + scope.size();
-            return storage_ref.range(0, accessible_end)
-                .iter()
-                .filter(|s| s.declared && *s.name == *name)
-                .filter(|s| {
-                    if let SymbolType::Function(a) | SymbolType::FunctionSelfRef(a) = s.symbol_type {
-                        a == u16::MAX || // Builtin n-ary function
-                        a as usize == arity
-                    } else {
-                        // Not a function, so we don't care about arity, might be a variable instead.
-                        true
+            let mut result = Vec::new();
+            
+            for (storage_index, symbol) in storage_ref.all().iter().enumerate() {
+                if !symbol.declared || *symbol.name != *name {
+                    continue;
+                }
+                
+                // Check arity match
+                if let SymbolType::Function(a) | SymbolType::FunctionSelfRef(a) = symbol.symbol_type {
+                    if a != u16::MAX && a as usize != arity {
+                        continue;
                     }
-                })
-                .cloned()
-                .collect();
+                } else {
+                    continue; // Not a function
+                }
+                
+                // Check if this symbol is accessible from the current scope
+                if self.can_access_symbol_at_index(storage_index, symbol) {
+                    result.push(symbol.clone());
+                }
+            }
+            
+            // Debug function lookup issues
+            debug!("=== FUNCTION LOOKUP DEBUG ===");
+            debug!("Looking for function '{}' with arity {} in scope start={}, size={}", 
+                   name, arity, _scope.start(), _scope.size());
+            debug!("Found {} matching functions", result.len());
+            for s in &result {
+                debug!("  Found: {} '{}' arity={:?}", s.symbol_type, s.name, s.symbol_type.arity());
+            }
+            if result.is_empty() {
+                debug!("Available functions in storage:");
+                for (i, s) in storage_ref.all().iter().enumerate() {
+                    if s.declared && *s.name == *name && s.is_any_fn() {
+                        let accessible = self.can_access_symbol_at_index(i, s);
+                        debug!("  [{}] {} '{}' arity={:?} accessible={}", 
+                               i, s.symbol_type, s.name, s.symbol_type.arity(), accessible);
+                    }
+                }
+            }
+            debug!("=== END FUNCTION LOOKUP DEBUG ===");
+            
+            return result;
         }
 
         panic!("SymbolTable not properly initialized with storage");
@@ -568,41 +643,33 @@ impl SymbolStorage {
 
     /// Get a symbol by its ID (direct indexing)
     pub fn get(&self, id: SymbolId) -> Option<&SymbolInfo> {
-        self.symbols.get(id.as_index())
+        // Convert 1-based ID to 0-based storage index
+        let storage_index = id.as_index();
+        self.symbols.get(storage_index)
     }
 
     /// Get a mutable reference to a symbol by its ID (direct indexing)
     pub fn get_mut(&mut self, id: SymbolId) -> Option<&mut SymbolInfo> {
-        self.symbols.get_mut(id.as_index())
+        // Convert 1-based ID to 0-based storage index
+        let storage_index = id.as_index();
+        self.symbols.get_mut(storage_index)
     }
 
     /// Push a new symbol and return its ID
     pub fn push(&mut self, symbol: SymbolInfo) -> SymbolId {
-        let id = symbol.id;
-        let index = id.as_index();
+        // In the new storage architecture, we append symbols sequentially
+        // and the symbol's ID should correspond to its storage index
+        let storage_index = self.symbols.len();
+        let expected_id = SymbolId::new(storage_index + 1); // IDs are 1-based
         
-        // Extend the vector to accommodate this index if needed
-        while self.symbols.len() <= index {
-            // Create a placeholder symbol for any gaps
-            let placeholder_id = SymbolId::new(self.symbols.len() + 1);
-            let placeholder = SymbolInfo::new(
-                placeholder_id,
-                "__placeholder__",
-                SymbolType::Variable,
-                tlang_span::Span::default(),
-                tlang_span::LineColumn::default(),
-            );
-            self.symbols.push(placeholder);
+        // Verify that the symbol's ID matches what we expect for sequential allocation
+        if symbol.id != expected_id {
+            panic!("Symbol ID mismatch: expected {:?}, got {:?} for storage index {}", 
+                   expected_id, symbol.id, storage_index);
         }
         
-        // Now insert at the correct index
-        if index < self.symbols.len() {
-            self.symbols[index] = symbol;
-        } else {
-            self.symbols.push(symbol);
-        }
-        
-        id
+        self.symbols.push(symbol);
+        expected_id
     }
 
     /// Get all symbols
