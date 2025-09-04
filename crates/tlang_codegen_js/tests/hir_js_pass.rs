@@ -1412,6 +1412,51 @@ fn test_loop_expression_with_if_else_break() {
 }
 
 #[test]
+fn test_simple_vs_complex_if_else_transformation() {
+    // Simple if-else - should NOT be transformed by HIR JS pass
+    let simple_source = r#"
+        fn main() {
+            let result = if true { 1 } else { 2 };
+        }
+    "#;
+    let simple_hir = compile_and_apply_hir_js_pass(simple_source);
+    assert_snapshot!(pretty_print(&simple_hir), @r###"
+    fn main() -> unknown {
+        let result: unknown = if true {
+            1
+        } else {
+            2
+        };
+    }
+    "###);
+    
+    // Complex if-else - SHOULD be transformed by HIR JS pass  
+    let complex_source = r#"
+        fn main() {
+            let result = if true {
+                let x = 1;
+                x + 2
+            } else {
+                3
+            };
+        }
+    "#;
+    let complex_hir = compile_and_apply_hir_js_pass(complex_source);
+    assert_snapshot!(pretty_print(&complex_hir), @r###"
+    fn main() -> unknown {
+        let $hir$0: unknown = _;
+        if true {
+            let x: unknown = 1;
+            ($hir$0 = (x + 2));
+        } else {
+            ($hir$0 = 3);
+        };
+        let result: unknown = $hir$0;
+    }
+    "###);
+}
+
+#[test]
 fn test_complex_nested_all_expression_types() {
     let source = r#"
         fn main() {
