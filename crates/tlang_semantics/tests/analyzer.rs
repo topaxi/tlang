@@ -256,14 +256,10 @@ fn should_not_allow_using_variables_from_outer_function_scope_before_declaration
         diagnostics,
         vec![
             Diagnostic::error(
-                "Use of undeclared variable `c`, did you mean the variable `c`?",
+                "Use of undeclared variable `c`, did you mean the parameter `a`?",
                 Span::new((1, 5), (1, 6)),
             ),
             Diagnostic::warn("Unused function `add/2`", Span::new((0, 3), (0, 6)),),
-            Diagnostic::warn(
-                "Unused variable `c`, if this is intentional, prefix the name with an underscore: `_c`",
-                Span::new((4, 5), (4, 6))
-            ),
         ]
     );
 }

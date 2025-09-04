@@ -165,7 +165,7 @@ impl LoweringContext {
 
     pub(crate) fn define_symbol_at(
         &mut self,
-        index: usize,
+        _index: usize,
         hir_id: HirId,
         name: &str,
         symbol_type: SymbolType,
@@ -190,7 +190,7 @@ impl LoweringContext {
         name: &str,
         symbol_type: SymbolType,
         scope_start: LineColumn,
-        predicate: impl Fn(&SymbolInfo) -> bool,
+        _predicate: impl Fn(&SymbolInfo) -> bool,
     ) {
         let symbol_info = SymbolInfo::new(
             self.symbol_id_allocator.next_id(),
