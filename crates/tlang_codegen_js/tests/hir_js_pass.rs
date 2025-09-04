@@ -1883,17 +1883,30 @@ fn test_function_declaration_with_match_expressions() {
 #[test]
 fn test_debug_function_pattern_matching() {
     let source = r#"
-        enum Tree {
-            Leaf(x),
-            Node { left, right },
-        }
-
-        fn maximum_depth(Tree::Leaf(_)) { 1 }
-
-        fn main() {
-            maximum_depth(Tree::Leaf(42));
-        }
+        fn factorial(0) { 1 }
+        fn factorial(n) { n * factorial(n - 1) }
     "#;
+    
+    // First, test the HIR lowering to see what's generated
+    let mut parser = tlang_parser::Parser::from_source(source);
+    let ast = parser.parse().unwrap();
+
+    let mut semantic_analyzer = tlang_semantics::SemanticAnalyzer::default();
+    semantic_analyzer.add_builtin_symbols(tlang_codegen_js::generator::CodegenJS::get_standard_library_symbols());
+    semantic_analyzer.analyze(&ast).unwrap();
+
+    let (module, _) = tlang_ast_lowering::lower_to_hir(
+        &ast,
+        semantic_analyzer.symbol_id_allocator(),
+        semantic_analyzer.root_symbol_table(),
+        semantic_analyzer.symbol_tables().clone(),
+    );
+
+    println!("HIR before JS pass:");
+    println!("{}", pretty_print(&module));
+    println!("=====================================");
+
+    // Now test HIR JS pass
     let hir = compile_and_apply_hir_js_pass(source);
     println!("HIR after JS pass:");
     println!("{}", pretty_print(&hir));

@@ -1482,6 +1482,22 @@ impl<'hir> Visitor<'hir> for HirJsPass {
                         self.changes_made = true;
                     }
                 }
+                // Match expressions in block completion position should be transformed to statements
+                hir::ExprKind::Match(..) => {
+                    // Transform match expressions using the specialized flattening approach
+                    let span = expr.span;
+                    let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                    let expr_to_flatten = std::mem::replace(expr, placeholder);
+                    let (flattened_expr, temp_stmts) =
+                        self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                    *expr = flattened_expr;
+
+                    // If we generated statements for the match expression, add them to the block
+                    if !temp_stmts.is_empty() {
+                        block.stmts.extend(temp_stmts);
+                        self.changes_made = true;
+                    }
+                }
                 hir::ExprKind::Block(inner_block) => {
                     // For block completion expressions, check if they contain loops that need special handling
                     if let Some(ref inner_expr) = inner_block.expr {

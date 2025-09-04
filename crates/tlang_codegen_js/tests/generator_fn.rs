@@ -15,13 +15,15 @@ fn test_recursive_function_definition() {
         // factorial(int) -> int
         // factorial(int) -> int
         function factorial(n) {
+            let $hir$0 = undefined;
             if (n === 0) {
                 // factorial(int) -> int
-                return 1;
+                $hir$0 = 1;
             } else {
                 // factorial(int) -> int
-                return n * factorial(n - 1);
+                $hir$0 = n * factorial(n - 1);
             }
+            return $hir$0;
         }
     "};
     assert_eq!(output, expected_output);
@@ -33,13 +35,15 @@ fn test_recursive_function_definition() {
     "});
     let expected_output = indoc! {"
         function fibonacci(n) {
+            let $hir$0 = undefined;
             if (n === 0) {
-                return 0;
+                $hir$0 = 0;
             } else if (n === 1) {
-                return 1;
+                $hir$0 = 1;
             } else {
-                return fibonacci(n - 1) + fibonacci(n - 2);
+                $hir$0 = fibonacci(n - 1) + fibonacci(n - 2);
             }
+            return $hir$0;
         }
     "};
     assert_eq!(output, expected_output);
@@ -54,13 +58,15 @@ fn test_recursive_function_definition_multiple_with_multiple_args() {
     "});
     let expected_output = indoc! {"
         function gcd(m, n) {
+            let $hir$0 = undefined;
             if (m === 0) {
-                return n;
+                $hir$0 = n;
             } else if (n === 0) {
-                return m;
+                $hir$0 = m;
             } else {
-                return gcd(n, m % n);
+                $hir$0 = gcd(n, m % n);
             }
+            return $hir$0;
         }
     "};
     assert_eq!(output, expected_output);
