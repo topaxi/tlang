@@ -1518,8 +1518,28 @@ fn test_break_expression_in_let_statement() {
     "###);
 }
 
-// Continue expressions are not implemented in the parser, so this test is removed.
-// Continue is not supported as either an expression or statement in the current language.
+#[test]
+fn test_continue_expression_in_let_statement() {
+    let source = r#"
+        fn main() {
+            loop {
+                let x = continue;
+                x
+            };
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        loop {
+            let $hir$0: unknown = _;
+            continue;
+            let x: unknown = $hir$0;
+            x
+        };
+    }
+    "###);
+}
 
 #[test]
 fn test_break_expression_in_binary_expression() {
