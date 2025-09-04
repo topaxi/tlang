@@ -79,7 +79,16 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
                 hir_id_allocator: tlang_span::HirIdAllocator::new(1000), // Start with a high number to avoid conflicts
                 current_scope: module.hir_id,
             };
-            js_pass.optimize_hir(&mut module, &mut js_ctx);
+            
+            // Run HIR JS pass iteratively until no more changes are made
+            let mut max_iterations = 10; // Prevent infinite loops
+            while max_iterations > 0 {
+                let changes_made = js_pass.optimize_hir(&mut module, &mut js_ctx);
+                if !changes_made {
+                    break;
+                }
+                max_iterations -= 1;
+            }
 
             let mut codegen = CodegenJS::default();
             codegen.generate_code(&module);

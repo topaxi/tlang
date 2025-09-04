@@ -218,7 +218,11 @@ impl CodegenJS {
             hir::ExprKind::Binary(op, lhs, rhs) => {
                 self.generate_binary_op(*op, lhs, rhs, parent_op);
             }
-            hir::ExprKind::Match(expr, arms) => self.generate_match_expression(expr, arms),
+            hir::ExprKind::Match(_expr, _arms) => {
+                panic!(
+                    "Match expressions should be transformed to statements by HirJsPass before reaching codegen"
+                );
+            }
             hir::ExprKind::IfElse(expr, then_branch, else_branches) => {
                 self.generate_if_else(expr, then_branch, else_branches, parent_op);
             }
