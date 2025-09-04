@@ -1498,6 +1498,58 @@ impl<'hir> Visitor<'hir> for HirJsPass {
                         self.changes_made = true;
                     }
                 }
+                // If-else expressions that cannot be rendered as JavaScript expressions should be transformed
+                hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
+                    // Only transform if-else-if expressions (multiple else branches) as they cannot be ternaries
+                    // Simple if-else expressions should be handled by the JavaScript generator if possible
+                    if else_branches.len() > 1 {
+                        // Transform if-else-if expressions using the specialized flattening approach
+                        let span = expr.span;
+                        let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                        let expr_to_flatten = std::mem::replace(expr, placeholder);
+                        let (flattened_expr, temp_stmts) =
+                            self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                        *expr = flattened_expr;
+
+                        // If we generated statements for the if-else expression, add them to the block
+                        if !temp_stmts.is_empty() {
+                            block.stmts.extend(temp_stmts);
+                            self.changes_made = true;
+                        }
+                    }
+                }
+                // Break expressions in block completion position should be transformed
+                hir::ExprKind::Break(..) => {
+                    // Transform break expressions using the specialized flattening approach
+                    let span = expr.span;
+                    let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                    let expr_to_flatten = std::mem::replace(expr, placeholder);
+                    let (flattened_expr, temp_stmts) =
+                        self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                    *expr = flattened_expr;
+
+                    // If we generated statements for the break expression, add them to the block
+                    if !temp_stmts.is_empty() {
+                        block.stmts.extend(temp_stmts);
+                        self.changes_made = true;
+                    }
+                }
+                // Continue expressions in block completion position should be transformed
+                hir::ExprKind::Continue => {
+                    // Transform continue expressions using the specialized flattening approach
+                    let span = expr.span;
+                    let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                    let expr_to_flatten = std::mem::replace(expr, placeholder);
+                    let (flattened_expr, temp_stmts) =
+                        self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                    *expr = flattened_expr;
+
+                    // If we generated statements for the continue expression, add them to the block
+                    if !temp_stmts.is_empty() {
+                        block.stmts.extend(temp_stmts);
+                        self.changes_made = true;
+                    }
+                }
                 hir::ExprKind::Block(inner_block) => {
                     // For block completion expressions, check if they contain loops that need special handling
                     if let Some(ref inner_expr) = inner_block.expr {
@@ -1575,17 +1627,34 @@ impl<'hir> Visitor<'hir> for HirJsPass {
                 }
                 _ => {
                     // For other expressions, check if they need flattening but avoid loop transformation
-                    let span = expr.span;
-                    let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
-                    let expr_to_flatten = std::mem::replace(expr, placeholder);
-                    let (flattened_expr, temp_stmts) =
-                        self.flatten_subexpressions_generically(expr_to_flatten, ctx);
-                    *expr = flattened_expr;
+                    if !expr_can_render_as_js_expr(expr) {
+                        // This expression cannot be rendered as JS - transform it to temp variables
+                        let span = expr.span;
+                        let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                        let expr_to_flatten = std::mem::replace(expr, placeholder);
+                        let (flattened_expr, temp_stmts) =
+                            self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                        *expr = flattened_expr;
 
-                    // If we generated statements for the block expression, add them to the block
-                    if !temp_stmts.is_empty() {
-                        block.stmts.extend(temp_stmts);
-                        self.changes_made = true;
+                        // If we generated statements for the expression, add them to the block
+                        if !temp_stmts.is_empty() {
+                            block.stmts.extend(temp_stmts);
+                            self.changes_made = true;
+                        }
+                    } else {
+                        // Expression can be rendered as JS, but still process subexpressions
+                        let span = expr.span;
+                        let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                        let expr_to_flatten = std::mem::replace(expr, placeholder);
+                        let (flattened_expr, temp_stmts) =
+                            self.flatten_subexpressions_generically(expr_to_flatten, ctx);
+                        *expr = flattened_expr;
+
+                        // If we generated statements for subexpressions, add them to the block
+                        if !temp_stmts.is_empty() {
+                            block.stmts.extend(temp_stmts);
+                            self.changes_made = true;
+                        }
                     }
                 }
             }
