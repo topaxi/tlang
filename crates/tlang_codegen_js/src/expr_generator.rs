@@ -161,8 +161,10 @@ impl CodegenJS {
 
     pub(crate) fn generate_expr(&mut self, expr: &hir::Expr, parent_op: Option<hir::BinaryOpKind>) {
         match &expr.kind {
-            hir::ExprKind::Block(block) if self.current_context() == BlockContext::Expression => {
-                self.generate_block_expression(block);
+            hir::ExprKind::Block(_block) if self.current_context() == BlockContext::Expression => {
+                panic!(
+                    "Block expressions should be transformed to statements by HirJsPass before reaching codegen"
+                );
             }
             hir::ExprKind::Block(block) => self.generate_block(block),
             hir::ExprKind::Loop(_block) => {
@@ -170,29 +172,16 @@ impl CodegenJS {
                     "Loop expressions should be transformed to statements by HirJsPass before reaching codegen"
                 );
             }
-            hir::ExprKind::Break(expr) => {
-                // In loop contexts, generate proper break; otherwise, generate return
-                // However, if we're inside a function expression (even if nested in a loop), generate return
-                if self.is_in_loop_context()
-                    && self
-                        .get_function_context()
-                        .map_or(true, |ctx| !ctx.is_expression)
-                {
-                    // In JavaScript loops, break cannot have a value
-                    // For loops with accumulators, we just generate 'break' and handle the return value elsewhere
-                    self.push_str("break");
-                    // Note: expr value is ignored in JavaScript loop context
-                    // The accumulator value should be handled by the loop return logic
-                } else {
-                    self.push_str("return");
-                    if let Some(expr) = expr {
-                        self.push_char(' ');
-                        self.generate_expr(expr, parent_op);
-                    }
-                }
-                self.push_char(';');
+            hir::ExprKind::Break(_expr) => {
+                panic!(
+                    "Break expressions should be transformed to statements by HirJsPass before reaching codegen"
+                );
             }
-            hir::ExprKind::Continue => self.push_str("continue"),
+            hir::ExprKind::Continue => {
+                panic!(
+                    "Continue expressions should be transformed to statements by HirJsPass before reaching codegen"
+                );
+            }
             hir::ExprKind::Call(expr) => self.generate_call_expression(expr),
             hir::ExprKind::TailCall(expr) => self.generate_recursive_call_expression(expr),
             hir::ExprKind::Cast(expr, _) => {
