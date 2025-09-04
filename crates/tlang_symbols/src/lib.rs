@@ -257,8 +257,7 @@ impl SymbolTable {
         if let (Some(storage), Some(scope)) = (&self.storage, &self.scope) {
             let storage_ref = storage.borrow();
             
-            // For now, only search within the current scope
-            // TODO: Implement proper parent scope traversal without parent references
+            // First, try to find the symbol in the current scope
             let scope_symbols: Vec<_> = storage_ref.scope_symbols(scope)
                 .iter()
                 .filter(|s| s.declared)
@@ -275,6 +274,27 @@ impl SymbolTable {
                 .position(|s| predicate(s))
             {
                 return Some((index, 0)); // scope_index = 0 for current scope
+            }
+            
+            // If not found in current scope, search parent scopes
+            // We can access symbols from index 0 to scope.start (parent scopes)
+            if scope.start() > 0 {
+                let parent_symbols: Vec<_> = storage_ref.all()
+                    .iter()
+                    .take(scope.start()) // All symbols before our scope (parent scopes)
+                    .filter(|s| s.declared)
+                    .filter(|s| self.symbol_gets_slot(s))
+                    .collect();
+
+                let mut set = HashSet::new();
+                if let Some(index) = parent_symbols
+                    .iter()
+                    .filter(|s| s.hir_id.is_none() || set.insert(s.hir_id))
+                    .position(|s| predicate(s))
+                {
+                    // Return with scope_index = 1 to indicate parent scope
+                    return Some((index, 1));
+                }
             }
         }
 
