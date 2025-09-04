@@ -338,10 +338,12 @@ impl CodegenJS {
         then_branch: &hir::Block,
         else_branches: &[hir::ElseClause],
     ) -> bool {
-        self.get_render_ternary()
-            && (self.current_context() == BlockContext::Expression
-                || self.current_completion_variable() == Some("return") // Also allow ternary in return statements
-                || self.current_context() == BlockContext::Statement) // Allow ternary in statement context for assignments
+        // Always render as ternary if the if-else can be expressed as a ternary,
+        // regardless of render_ternary setting. This simplifies the logic by
+        // avoiding completion variables for simple cases.
+        (self.current_context() == BlockContext::Expression
+            || self.current_completion_variable() == Some("return") // Also allow ternary in return statements
+            || self.current_context() == BlockContext::Statement) // Allow ternary in statement context for assignments
             && else_branches.len() == 1 // Let's not nest ternary expressions for now.
             && if_else_can_render_as_ternary(expr, then_branch, else_branches)
     }
@@ -363,28 +365,40 @@ impl CodegenJS {
             return;
         }
 
-        let mut lhs = String::new();
-        // TODO: Potentially in a return position or other expression, before we generate the if
-        //       statement, replace the current statement buffer with a new one, generate the if
-        //       statement, and then swap the statement buffer back.
-        //       Similar to how we generate blocks in expression position.
-        // TODO: Find a way to do this generically for all expressions which are represented as
-        //       statements in JavaScript.
-        // TODO: In case of recursive calls in tail position, we'll want to omit lhs.
-        let has_block_completions =
-            self.current_context() == BlockContext::Expression && then_branch.has_completion();
-        if has_block_completions {
-            // Note: We check if we can reuse the existing completion variable ("return")
-            // instead of creating a new temporary variable each time.
-            if self.can_reuse_current_completion_variable() {
+        // If we reach here, the if-else cannot be rendered as a ternary expression
+        // In expression context, check if this is a case that should be handled by HIR JS pass
+        if self.current_context() == BlockContext::Expression 
+            && !if_else_can_render_as_ternary(expr, then_branch, else_branches) {
+            panic!(
+                "If-else expressions that cannot be ternaries should be transformed to statements by HirJsPass before reaching codegen"
+            );
+        }
+
+        // Handle if-else that can be ternary but render_ternary is disabled,
+        // or if-else in statement context
+        let needs_completion_var = self.current_context() == BlockContext::Expression 
+            && then_branch.has_completion();
+        
+        // Special handling for "return" completion variable
+        let using_return_completion = self.current_completion_variable() == Some("return");
+        
+        if needs_completion_var {
+            if using_return_completion {
+                // For return completion, we'll generate returns in each branch
+                // Don't create a new completion variable
                 self.push_completion_variable(Some("return"));
-                lhs = self.replace_statement_buffer_with_empty_string();
-                self.push_indent();
+                
+                // Remove the "return " that was already pushed to the statement buffer
+                let current_buffer = self.current_statement_buffer_mut();
+                if current_buffer.ends_with("return ") {
+                    current_buffer.truncate(current_buffer.len() - "return ".len());
+                }
             } else {
-                lhs = self.replace_statement_buffer_with_empty_string();
-                let completion_tmp_var = self.current_scope().declare_tmp_variable();
-                self.push_let_declaration(&completion_tmp_var);
-                self.push_completion_variable(Some(&completion_tmp_var));
+                // This case should not occur anymore since simple if-else expressions
+                // are now rendered as ternaries regardless of render_ternary setting
+                panic!(
+                    "If-else expressions in expression context should either be ternaries or handled by HIR JS pass"
+                );
             }
         } else {
             self.push_completion_variable(None);
@@ -422,26 +436,6 @@ impl CodegenJS {
 
         self.push_indent();
         self.push_char('}');
-        if has_block_completions && self.current_completion_variable() != Some("return") {
-            self.push_newline();
-
-            // If we have an lhs, put the completion var as the rhs of the lhs.
-            // Otherwise, we assign the completion_var to the previous completion_var.
-            if lhs.is_empty() {
-                self.push_indent();
-                let prev_completion_var = self
-                    .nth_completion_variable(self.current_completion_variable_count() - 2)
-                    .unwrap()
-                    .to_string();
-                self.push_str(&prev_completion_var);
-                self.push_str(" = ");
-                self.push_current_completion_variable();
-                self.push_str(";\n");
-            } else {
-                self.push_str(&lhs);
-                self.push_current_completion_variable();
-            }
-        }
         self.pop_completion_variable();
     }
 

@@ -102,22 +102,8 @@ impl HirJsPass {
                 // For let statements with complex expressions, flatten based on context
                 let needs_flattening = match &expr.kind {
                     hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
-                        // For if-else expressions in let statements, we need to be more careful:
-                        // 1. Always flatten if there are statements in branches (cannot be ternary)
-                        // 2. Always flatten if any subexpressions are complex
-                        // 3. Always flatten if the condition is complex
-                        let has_statements = !then_branch.stmts.is_empty() || 
-                            else_branches.iter().any(|branch| !branch.consequence.stmts.is_empty());
-                        
-                        let has_complex_condition = !expr_can_render_as_js_expr(condition);
-                        
-                        let has_complex_completion = then_branch.expr.as_ref().map_or(false, |e| !expr_can_render_as_js_expr(e)) ||
-                            else_branches.iter().any(|branch| 
-                                branch.consequence.expr.as_ref().map_or(false, |e| !expr_can_render_as_js_expr(e))
-                            );
-                        
-                        // Flatten if there are statements OR if any part is complex
-                        has_statements || has_complex_condition || has_complex_completion
+                        // For if-else expressions in let statements, only flatten if they cannot be ternaries
+                        !if_else_can_render_as_ternary(condition, then_branch, else_branches)
                     }
                     hir::ExprKind::Match(..) => {
                         // Match expressions need to be transformed to use temp variables
@@ -347,11 +333,14 @@ impl HirJsPass {
         let (expr_with_flattened_subs, mut sub_stmts) =
             self.flatten_subexpressions_generically(expr, ctx);
 
-        // For if-else expressions, always flatten to temp variables to ensure proper JavaScript generation
+        // For if-else expressions, only flatten if they cannot be ternaries
         // For loop expressions, check if they're in assignment contexts where they need special handling
         // For other expressions, check if they can be rendered as JS
         let needs_flattening = match &expr_with_flattened_subs.kind {
-            hir::ExprKind::IfElse(..) => true, // Always flatten if-else expressions
+            hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
+                // Only flatten if-else expressions that cannot be rendered as ternaries
+                !if_else_can_render_as_ternary(condition, then_branch, else_branches)
+            }
             hir::ExprKind::Loop(..) => true,   // Loop expressions need transformation for JavaScript
             _ => !expr_can_render_as_js_expr(&expr_with_flattened_subs)
         };

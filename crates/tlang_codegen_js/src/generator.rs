@@ -209,6 +209,10 @@ impl CodegenJS {
         self.statement_buffer.last_mut().unwrap().clear();
     }
 
+    pub(crate) fn current_statement_buffer_mut(&mut self) -> &mut String {
+        self.statement_buffer.last_mut().unwrap()
+    }
+
     #[inline(always)]
     pub(crate) fn current_scope(&mut self) -> &mut Scope {
         &mut self.scopes
