@@ -1578,15 +1578,45 @@ impl<'hir> Visitor<'hir> for HirJsPass {
         // Replace the statements and handle nested visiting properly
         block.stmts = new_stmts;
         
-        // After transformation, we need to visit nested structures like function declarations
-        // But we should avoid double-processing let statements that were already transformed
+        // After transformation, we need to visit nested structures in all statements
+        // This ensures that nested loops, blocks, and other complex expressions are processed
         for stmt in &mut block.stmts {
-            match &stmt.kind {
-                // Only visit function declarations to handle their nested content
+            match &mut stmt.kind {
+                // Visit function declarations to handle their nested content
                 hir::StmtKind::FunctionDeclaration(_) => {
                     self.visit_stmt(stmt, ctx);
                 }
-                // Skip other statement types to avoid double processing
+                // Visit expression statements that might contain nested loops or blocks
+                hir::StmtKind::Expr(expr) => {
+                    match &expr.kind {
+                        // Visit loop expressions to ensure their bodies are processed
+                        hir::ExprKind::Loop(_) => {
+                            self.visit_expr(expr, ctx);
+                        }
+                        // Visit block expressions to ensure their contents are processed
+                        hir::ExprKind::Block(_) => {
+                            self.visit_expr(expr, ctx);
+                        }
+                        // Visit other complex expressions that might contain nested structures
+                        hir::ExprKind::IfElse(..) | hir::ExprKind::Match(..) => {
+                            self.visit_expr(expr, ctx);
+                        }
+                        _ => {
+                            // For other expressions, no nested visiting needed
+                        }
+                    }
+                }
+                // Let statements have already been transformed, but they might contain
+                // nested complex expressions in the pattern or value
+                hir::StmtKind::Let(_, expr, _) => {
+                    match &expr.kind {
+                        hir::ExprKind::Loop(_) | hir::ExprKind::Block(_) | hir::ExprKind::IfElse(..) | hir::ExprKind::Match(..) => {
+                            self.visit_expr(expr, ctx);
+                        }
+                        _ => {}
+                    }
+                }
+                // Skip other statement types to avoid unnecessary processing
                 _ => {}
             }
         }
