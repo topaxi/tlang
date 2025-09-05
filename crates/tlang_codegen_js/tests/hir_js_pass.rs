@@ -20,13 +20,9 @@ fn before_all() {
 fn compile(source: &str) -> hir::LowerResult {
     let ast = Parser::from_source(source).parse().unwrap();
     let mut semantic_analyzer = SemanticAnalyzer::default();
-    semantic_analyzer.add_builtin_symbols(&[
-        ("log", SymbolType::Function(u16::MAX)),
-        ("println", SymbolType::Function(u16::MAX)),
-        ("Some", SymbolType::EnumVariant(1)),
-        ("None", SymbolType::EnumVariant(0)),
-        ("Option", SymbolType::Enum),
-    ]);
+    semantic_analyzer.add_builtin_symbols(
+        tlang_codegen_js::generator::CodegenJS::get_standard_library_symbols(),
+    );
     semantic_analyzer.analyze(&ast).unwrap();
     lower_to_hir(
         &ast,
@@ -1990,7 +1986,7 @@ fn test_debug_function_pattern_matching() {
 }
 
 #[test]
-fn test_debug_nested_loop_expressions() {
+fn test_debug_nested_loop_expressions_with_cli_sequence() {
     let source = r#"
         fn nested_loop_expressions() {
             let outer = loop {
@@ -2006,30 +2002,44 @@ fn test_debug_nested_loop_expressions() {
     "#;
 
     let (mut module, meta) = compile(source);
-    let mut ctx = HirOptContext::from(meta);
-    let mut pass = HirJsPass::new();
-
+    
     println!("=== Initial HIR ===");
     println!("{}", pretty_print(&module));
+    
+    // Run the same sequence as the CLI: standard HIR optimizations first
+    let mut optimizer = tlang_hir_opt::HirOptimizer::default();
+    let hir_opt_ctx = HirOptContext::from(meta);
+    optimizer.optimize_hir(&mut module, hir_opt_ctx);
+    
+    println!("\n=== After standard HIR optimizations ===");
+    println!("{}", pretty_print(&module));
+    
+    // Create a fresh context for HIR JS pass (like the CLI does)
+    let mut ctx = HirOptContext {
+        symbols: std::collections::HashMap::new(),
+        hir_id_allocator: tlang_span::HirIdAllocator::default(),
+        current_scope: tlang_span::HirId::new(1),
+    };
+    let mut pass = HirJsPass::new();
 
     // Run the HIR JS pass iteratively and show each iteration
     let mut iterations = 0;
     let max_iterations = 25; // Increase to see if we need more iterations
 
     loop {
-        println!("\n=== Before iteration {} ===", iterations + 1);
+        println!("\n=== Before HIR JS pass iteration {} ===", iterations + 1);
         println!("{}", pretty_print(&module));
         
         let changes_made = pass.optimize_hir(&mut module, &mut ctx);
         iterations += 1;
 
-        println!("Iteration {}: changes_made = {}", iterations, changes_made);
+        println!("HIR JS pass iteration {}: changes_made = {}", iterations, changes_made);
         
         if !changes_made || iterations >= max_iterations {
             break;
         }
     }
     
-    println!("\n=== Final HIR after {} iterations ===", iterations);
+    println!("\n=== Final HIR after {} HIR JS pass iterations ===", iterations);
     println!("{}", pretty_print(&module));
 }
