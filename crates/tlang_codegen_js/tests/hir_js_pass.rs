@@ -39,21 +39,21 @@ fn compile_and_apply_hir_js_pass(source: &str) -> hir::Module {
     let (mut module, meta) = compile(source);
     let mut ctx = HirOptContext::from(meta);
     let mut pass = HirJsPass::new();
-    
+
     // Run the HIR JS pass iteratively until no more changes are made
     // This is necessary for complex nested expressions that require multiple passes
     let mut iterations = 0;
     let max_iterations = 10; // Safety limit to prevent infinite loops
-    
+
     loop {
         let changes_made = pass.optimize_hir(&mut module, &mut ctx);
         iterations += 1;
-        
+
         if !changes_made || iterations >= max_iterations {
             break;
         }
     }
-    
+
     module
 }
 
@@ -767,10 +767,10 @@ fn test_loop_expression_with_complex_break() {
                 let y: unknown = (x * 2);
                 ($hir$0 = (y + 1));
                 break;
-            }
+            };
         };
         let result: unknown = $hir$0;
-        result
+        return result;
     }
     ");
 }
@@ -997,7 +997,7 @@ fn test_nested_loop_with_complex_expressions() {
             if (inner_result > 3) {
                 ($hir$0 = (inner_result + 10));
                 break;
-            }
+            };
         };
         let result: unknown = $hir$0;
         return result;
@@ -1039,7 +1039,7 @@ fn test_for_loop_expression_in_let() {
             result
         }
     "#;
-    
+
     // Debug: Print HIR before and after transformation
     println!("=== DEBUG: FOR LOOP TRANSFORMATION ===");
     let (hir_before, hir_after) = compile_and_apply_hir_js_pass_debug(source);
@@ -1048,7 +1048,7 @@ fn test_for_loop_expression_in_let() {
     println!("\nHIR AFTER:");
     println!("{}", pretty_print(&hir_after));
     println!("=== END DEBUG ===");
-    
+
     let hir = hir_after;
     assert_snapshot!(pretty_print(&hir), @r"
     fn test() -> unknown {
@@ -1421,7 +1421,7 @@ fn test_loop_expression_with_if_else_break() {
             if true {
                 ($hir$0 = 42);
                 break;
-            }
+            };
         };
         let result: unknown = $hir$0;
         return result;
@@ -1447,8 +1447,8 @@ fn test_simple_vs_complex_if_else_transformation() {
         };
     }
     "###);
-    
-    // Complex if-else - SHOULD be transformed by HIR JS pass  
+
+    // Complex if-else - SHOULD be transformed by HIR JS pass
     let complex_source = r#"
         fn main() {
             let result = if true {
@@ -1759,11 +1759,11 @@ fn test_debug_break_expression_hir() {
     let (module, _) = compile(source);
     println!("Debug HIR without HIR JS pass:");
     println!("{}", pretty_print(&module));
-    
+
     let hir = compile_and_apply_hir_js_pass(source);
     println!("Debug HIR with HIR JS pass:");
     println!("{}", pretty_print(&hir));
-    
+
     // Just to satisfy the test, use a dummy assertion for now
     assert!(true);
 }
@@ -1779,15 +1779,14 @@ fn test_debug_simple_break_expression() {
     let (module, _) = compile(source);
     println!("Debug simple HIR without HIR JS pass:");
     println!("{}", pretty_print(&module));
-    
+
     let hir = compile_and_apply_hir_js_pass(source);
     println!("Debug simple HIR with HIR JS pass:");
     println!("{}", pretty_print(&hir));
-    
+
     // Just to satisfy the test, use a dummy assertion for now
     assert!(true);
 }
-
 
 #[test]
 fn test_debug_block_inside_loop() {
@@ -1805,11 +1804,11 @@ fn test_debug_block_inside_loop() {
     let (module, _) = compile(source);
     println!("Debug block inside loop HIR without HIR JS pass:");
     println!("{}", pretty_print(&module));
-    
+
     let hir = compile_and_apply_hir_js_pass(source);
     println!("Debug block inside loop HIR with HIR JS pass:");
     println!("{}", pretty_print(&hir));
-    
+
     // Just to satisfy the test, use a dummy assertion for now
     assert!(true);
 }
@@ -1961,13 +1960,15 @@ fn test_debug_function_pattern_matching() {
         fn factorial(0) { 1 }
         fn factorial(n) { n * factorial(n - 1) }
     "#;
-    
+
     // First, test the HIR lowering to see what's generated
     let mut parser = tlang_parser::Parser::from_source(source);
     let ast = parser.parse().unwrap();
 
     let mut semantic_analyzer = tlang_semantics::SemanticAnalyzer::default();
-    semantic_analyzer.add_builtin_symbols(tlang_codegen_js::generator::CodegenJS::get_standard_library_symbols());
+    semantic_analyzer.add_builtin_symbols(
+        tlang_codegen_js::generator::CodegenJS::get_standard_library_symbols(),
+    );
     semantic_analyzer.analyze(&ast).unwrap();
 
     let (module, _) = tlang_ast_lowering::lower_to_hir(
