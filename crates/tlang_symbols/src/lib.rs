@@ -172,23 +172,20 @@ impl SymbolTable {
     pub fn new() -> Self {
         SymbolTable {
             storage: Some(Rc::new(RefCell::new(SymbolStorage::new()))),
-            scope: Some(SymbolScope::new(0, 0)),
+            scope: Some(SymbolScope::new_empty()), // Start with empty scope
         }
     }
 
     /// Create a child SymbolTable that shares storage with its parent
     pub fn new_child(parent: Rc<RefCell<SymbolTable>>) -> Self {
-        let (storage, start) = {
+        let storage = {
             let parent_borrow = parent.borrow();
-            let storage = parent_borrow.storage.clone();
-            // Child scope starts where the current storage ends, not where parent scope ends
-            let start = storage.as_ref().map_or(0, |s| s.borrow().symbols.len());
-            (storage, start)
+            parent_borrow.storage.clone()
         };
         
         SymbolTable {
             storage,
-            scope: Some(SymbolScope::new(start, 0)),
+            scope: Some(SymbolScope::new_empty()), // Start with empty scope
         }
     }
 
@@ -222,14 +219,6 @@ impl SymbolTable {
         None
     }
 
-    /// Update this scope's size to include all symbols up to the current storage size
-    pub fn update_scope_size_to_storage(&mut self) {
-        if let (Some(storage), Some(scope)) = (&self.storage, &mut self.scope) {
-            let current_storage_size = storage.borrow().symbols.len();
-            scope.size = current_storage_size - scope.start();
-        }
-    }
-
     /// Get the current storage size (for scope management)
     pub fn get_storage_size(&self) -> usize {
         if let Some(storage) = &self.storage {
@@ -249,19 +238,43 @@ impl SymbolTable {
 
     /// Debug method to inspect scope (for testing)
     pub fn debug_scope_info(&self) -> String {
-        if let Some(ref scope) = self.scope {
-            format!("Scope: start={}, size={}", scope.start(), scope.size())
+        if let (Some(storage), Some(scope)) = (&self.storage, &self.scope) {
+            let storage_ref = storage.borrow();
+            format!(
+                "Scope: start={}, size={}, total_symbols={}, symbols_in_scope: {:?}",
+                scope.start(),
+                scope.size(),
+                storage_ref.all().len(),
+                storage_ref.scope_symbols(scope).iter().map(|s| (s.id, &s.name, &s.symbol_type)).collect::<Vec<_>>()
+            )
         } else {
             "No scope (using old pattern)".to_string()
+        }
+    }
+
+    /// Debug method to show all symbols in storage with their indices
+    pub fn debug_all_symbols(&self) -> String {
+        if let Some(storage) = &self.storage {
+            let storage_ref = storage.borrow();
+            let symbols_info: Vec<_> = storage_ref.all()
+                .iter()
+                .enumerate()
+                .map(|(idx, s)| format!("[{}] {} '{}' {:?}", idx, s.symbol_type, s.name, s.node_id))
+                .collect();
+            format!("All symbols: {}", symbols_info.join(", "))
+        } else {
+            "No storage".to_string()
         }
     }
 
     /// Insert a symbol into the storage
     pub fn insert(&mut self, symbol_info: SymbolInfo) -> SymbolId {
         if let (Some(storage), Some(scope)) = (&self.storage, &mut self.scope) {
-            let id = storage.borrow_mut().push(symbol_info);
-            scope.size += 1; // Expand this scope's size
-            debug!("Symbol inserted with ID: {:?}", id);
+            let id = storage.borrow_mut().push(symbol_info.clone());
+            let index = id.as_index();
+            scope.add_symbol_index(index); // Add this symbol's index to the scope
+            debug!("Symbol '{}' inserted with ID: {:?} at index {} into scope with {} symbols", 
+                   symbol_info.name, id, index, scope.size());
             id
         } else {
             panic!("SymbolTable not properly initialized with storage");
@@ -338,7 +351,7 @@ impl SymbolTable {
                 .iter()
                 .filter(|s| s.declared)
                 .filter(|s| predicate(s))
-                .cloned()
+                .map(|s| (*s).clone()) // Dereference and clone
                 .collect();
         }
 
@@ -381,7 +394,7 @@ impl SymbolTable {
                 // They should never be accessible from the program scope
                 
                 // First check if this symbol is within our scope range
-                if !(storage_index >= scope.start() && storage_index < scope.start() + scope.size()) {
+                if !scope.contains_index(storage_index) {
                     return false;
                 }
                 
@@ -472,8 +485,15 @@ impl SymbolTable {
                 return true;
             }
             
-            // 5. For other symbols, use the traditional range check
-            return storage_index >= scope.start() && storage_index < scope.start() + scope.size();
+            // 5. For other symbols, use the new scope membership check
+            return scope.contains_index(storage_index) || {
+                // Allow access to symbols from parent scopes (lower indices)
+                if let Some(min_index) = scope.indices().first() {
+                    storage_index < *min_index
+                } else {
+                    false
+                }
+            };
         }
         false
     }
@@ -629,13 +649,10 @@ impl SymbolTable {
         //       This is used to remove the fn self binding from the table when within an
         //       match arm (during lowering).
         
-        // In the new storage pattern, we need to mark the first symbol in our scope as "removed"
-        // Since we can't actually remove from shared storage, we'll adjust our scope start
+        // In the new storage pattern, we remove the first symbol index from our scope
         if let Some(scope) = &mut self.scope {
-            if scope.size > 0 {
-                // Move the scope start forward by 1, effectively "removing" the first symbol
-                scope.start += 1;
-                scope.size = scope.size.saturating_sub(1);
+            if !scope.symbol_indices.is_empty() {
+                scope.symbol_indices.remove(0);
             }
         }
     }
@@ -690,7 +707,7 @@ impl SymbolTable {
     pub fn get_all_local_symbols(&self) -> Vec<SymbolInfo> {
         if let (Some(storage), Some(scope)) = (&self.storage, &self.scope) {
             let storage_ref = storage.borrow();
-            storage_ref.scope_symbols(scope).to_vec()
+            storage_ref.scope_symbols(scope).into_iter().cloned().collect()
         } else {
             panic!("SymbolTable not properly initialized with storage");
         }
@@ -713,9 +730,14 @@ impl SymbolTable {
     {
         if let (Some(storage), Some(scope)) = (&self.storage, &self.scope) {
             let mut storage_borrow = storage.borrow_mut();
-            let local_symbols = storage_borrow.scope_symbols_mut(scope);
-            for symbol in local_symbols {
-                f(symbol);
+            // Use raw pointer approach to avoid borrow checker issues
+            for &index in scope.indices() {
+                if index < storage_borrow.symbols.len() {
+                    let symbol_ptr = storage_borrow.symbols.as_mut_ptr().wrapping_add(index);
+                    unsafe {
+                        f(&mut *symbol_ptr);
+                    }
+                }
             }
         }
     }
@@ -774,31 +796,56 @@ impl Default for SymbolTable {
 #[derive(Debug, Default, PartialEq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct SymbolScope {
-    /// Starting position of symbols for this scope in the global symbol vec
-    start: usize,
-    /// Number of symbols in this scope
-    size: usize,
+    /// Specific indices of symbols that belong to this scope
+    symbol_indices: Vec<usize>,
 }
 
 impl SymbolScope {
     pub fn new(start: usize, size: usize) -> Self {
-        Self { start, size }
+        // For backward compatibility, create from contiguous range
+        Self {
+            symbol_indices: (start..start + size).collect(),
+        }
     }
 
-    pub fn start(&self) -> usize {
-        self.start
+    pub fn new_empty() -> Self {
+        Self {
+            symbol_indices: Vec::new(),
+        }
     }
 
-    pub fn size(&self) -> usize {
-        self.size
+    /// Add a symbol index to this scope
+    pub fn add_symbol_index(&mut self, index: usize) {
+        self.symbol_indices.push(index);
     }
 
-    pub fn end(&self) -> usize {
-        self.start + self.size
-    }
-
+    /// Check if this scope contains a symbol at the given index
     pub fn contains_index(&self, index: usize) -> bool {
-        index >= self.start && index < self.end()
+        self.symbol_indices.contains(&index)
+    }
+
+    /// Get all symbol indices in this scope
+    pub fn indices(&self) -> &[usize] {
+        &self.symbol_indices
+    }
+
+    /// For backward compatibility - return the minimum index (like start)
+    pub fn start(&self) -> usize {
+        self.symbol_indices.first().copied().unwrap_or(0)
+    }
+
+    /// For backward compatibility - return the number of symbols
+    pub fn size(&self) -> usize {
+        self.symbol_indices.len()
+    }
+
+    /// For backward compatibility - return the end index  
+    pub fn end(&self) -> usize {
+        if self.symbol_indices.is_empty() {
+            0
+        } else {
+            self.symbol_indices.iter().max().unwrap() + 1
+        }
     }
 }
 
@@ -863,15 +910,22 @@ impl SymbolStorage {
         &self.symbols[start..end.min(self.symbols.len())]
     }
 
-    /// Get symbols for a specific scope
-    pub fn scope_symbols(&self, scope: &SymbolScope) -> &[SymbolInfo] {
-        self.range(scope.start(), scope.end())
+    /// Get symbols for a specific scope (returns Vec because indices may be non-contiguous)
+    pub fn scope_symbols(&self, scope: &SymbolScope) -> Vec<&SymbolInfo> {
+        scope.indices()
+            .iter()
+            .filter_map(|&index| self.symbols.get(index))
+            .collect()
     }
 
-    /// Get mutable symbols for a specific scope
-    pub fn scope_symbols_mut(&mut self, scope: &SymbolScope) -> &mut [SymbolInfo] {
-        let start = scope.start();
-        let end = scope.end().min(self.symbols.len());
-        &mut self.symbols[start..end]
+    /// Get mutable symbols for a specific scope - simplified for compilation
+    pub fn scope_symbols_mut(&mut self, scope: &SymbolScope) -> Vec<*mut SymbolInfo> {
+        let mut result = Vec::new();
+        for &index in scope.indices() {
+            if index < self.symbols.len() {
+                result.push(self.symbols.as_mut_ptr().wrapping_add(index));
+            }
+        }
+        result
     }
 }
