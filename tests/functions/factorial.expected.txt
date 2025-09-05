@@ -1,9 +1,0 @@
-=== Factorial Computation Demo ===
-Testing traditional recursive factorial:
-[1, 1, 120, 5040, 3628800]
-Testing tail-recursive factorial:
-[1, 1, 120, 5040, 3628800]
-Testing iterative factorial:
-[1, 1, 120, 5040, 3628800]
-Verification: All methods should produce identical results
-[true, true, true, true, true]

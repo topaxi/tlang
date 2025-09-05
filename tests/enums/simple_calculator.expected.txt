@@ -1,8 +1,0 @@
-=== Simple Calculator Demo ===
-Testing basic expressions:
-42
-15
-21
-10
-Complex expression result:
-50

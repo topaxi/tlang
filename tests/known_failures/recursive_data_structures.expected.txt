@@ -1,5 +1,0 @@
-=== Recursive Data Structures Test ===
-5050
-9
-51
-5
