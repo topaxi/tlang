@@ -305,10 +305,8 @@ impl HirJsPass {
                 
                 // Extract function name and track context for tail call detection
                 let function_name = fn_identifier_to_string(&modified_func.name);
-                eprintln!("DEBUG: Processing function declaration: {}", function_name);
                 
                 self.visit_block_with_function_context(&mut modified_func.body, ctx, Some(&function_name));
-                eprintln!("DEBUG: Finished processing function declaration");
                 
                 // Create the modified function declaration statement
                 let modified_stmt = self.create_stmt_preserving_comments(
@@ -1481,10 +1479,6 @@ impl<'hir> Visitor<'hir> for HirJsPass {
 impl HirJsPass {
     /// Visit a block with optional function context for tail call detection  
     fn visit_block_with_function_context(&mut self, block: &mut hir::Block, ctx: &mut HirOptContext, function_name: Option<&str>) {
-        eprintln!("DEBUG: visit_block called, block has expr: {}, function: {:?}", block.expr.is_some(), function_name);
-        if let Some(ref expr) = block.expr {
-            eprintln!("DEBUG: block completion expression: {:?}", expr.kind);
-        }
         // FIRST: Handle block completion expressions - move loops to statements before processing
         // Visit the block expression if it exists
         if let Some(expr) = &mut block.expr {
@@ -1523,11 +1517,9 @@ impl HirJsPass {
                 }
                 // If-else expressions that cannot be rendered as JavaScript expressions should be transformed
                 hir::ExprKind::IfElse(_condition, _then_branch, else_branches) => {
-                    eprintln!("DEBUG: Processing if-else expression with {} else branches", else_branches.len());
                     // Only transform if-else-if expressions (multiple else branches) as they cannot be ternaries
                     // Simple if-else expressions should be handled by the JavaScript generator if possible
                     if else_branches.len() > 1 {
-                        eprintln!("DEBUG: If-else-if expression - flattening");
                         // Transform if-else-if expressions using the specialized flattening approach
                         let span = expr.span;
                         let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
@@ -1542,14 +1534,42 @@ impl HirJsPass {
                             self.changes_made = true;
                         }
                     } else {
-                        eprintln!("DEBUG: Simple if-else expression - checking tail call position");
                         // For simple if-else expressions, check if they're in tail call position
                         if self.is_in_tail_call_position_stateless(expr, function_name) {
-                            eprintln!("DEBUG: Simple if-else is in tail call position - not flattening");
                             // Don't flatten - let the JavaScript generator handle it for tail call optimization
+                            // Do nothing - skip all processing for this expression
                         } else {
-                            eprintln!("DEBUG: Simple if-else not in tail call position - continue processing");
-                            // Continue to regular processing (which might flatten it if it can't be rendered as JS)
+                            // Continue to regular processing by falling through to the catch-all case
+                            // We need to explicitly handle this case or it will be handled by the catch-all
+                            // Check if this expression can be rendered as JS, and if not, flatten it
+                            if !expr_can_render_as_js_expr(expr) {
+                                let span = expr.span;
+                                let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                                let expr_to_flatten = std::mem::replace(expr, placeholder);
+                                let (flattened_expr, temp_stmts) =
+                                    self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                                *expr = flattened_expr;
+
+                                // If we generated statements for the expression, add them to the block
+                                if !temp_stmts.is_empty() {
+                                    block.stmts.extend(temp_stmts);
+                                    self.changes_made = true;
+                                }
+                            } else {
+                                // Process subexpressions but don't flatten the main expression
+                                let span = expr.span;
+                                let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                                let expr_to_flatten = std::mem::replace(expr, placeholder);
+                                let (flattened_expr, temp_stmts) =
+                                    self.flatten_subexpressions_generically(expr_to_flatten, ctx);
+                                *expr = flattened_expr;
+
+                                // If we generated statements for subexpressions, add them to the block
+                                if !temp_stmts.is_empty() {
+                                    block.stmts.extend(temp_stmts);
+                                    self.changes_made = true;
+                                }
+                            }
                         }
                     }
                 }
@@ -1667,7 +1687,6 @@ impl HirJsPass {
                         // This expression contains tail calls and is in tail position
                         // Don't flatten it to preserve tail call optimization
                         // But still process subexpressions that are not in tail position
-                        eprintln!("DEBUG: Found expression in tail call position, NOT flattening: {:?}", expr.kind);
                         let span = expr.span;
                         let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                         let expr_to_flatten = std::mem::replace(expr, placeholder);
@@ -1682,7 +1701,6 @@ impl HirJsPass {
                         }
                     } else if !expr_can_render_as_js_expr(expr) {
                         // This expression cannot be rendered as JS - transform it to temp variables
-                        eprintln!("DEBUG: Expression cannot be rendered as JS, flattening: {:?}", expr.kind);
                         let span = expr.span;
                         let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                         let expr_to_flatten = std::mem::replace(expr, placeholder);
@@ -1697,7 +1715,6 @@ impl HirJsPass {
                         }
                     } else {
                         // Expression can be rendered as JS, but still process subexpressions
-                        eprintln!("DEBUG: Expression can be rendered as JS, processing subexpressions: {:?}", expr.kind);
                         let span = expr.span;
                         let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                         let expr_to_flatten = std::mem::replace(expr, placeholder);
@@ -1866,12 +1883,8 @@ impl HirJsPass {
     /// This version doesn't rely on function stack state and examines the HIR structure directly
     fn is_in_tail_call_position_stateless(&self, expr: &hir::Expr, current_function_name: Option<&str>) -> bool {
         if let Some(function_name) = current_function_name {
-            eprintln!("DEBUG: Checking tail call position for function '{}', expr: {:?}", function_name, expr.kind);
-            let result = self.is_expr_tail_recursive(function_name, expr);
-            eprintln!("DEBUG: Tail call result: {}", result);
-            result
+            self.is_expr_tail_recursive(function_name, expr)
         } else {
-            eprintln!("DEBUG: No function name provided, not in tail call position");
             false
         }
     }
