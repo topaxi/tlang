@@ -976,9 +976,16 @@ impl HirJsPass {
                 if let Some(completion_expr) = new_then_branch.expr.take() {
                     if use_return_statements {
                         // Use direct return statements instead of temp variable assignments
+                        // First flatten any complex subexpressions in the completion expression
+                        let (flattened_completion, mut completion_stmts) = 
+                            self.flatten_subexpressions_generically(completion_expr, ctx);
+                        
+                        // Add any statements from flattening the completion expression
+                        new_then_branch.stmts.append(&mut completion_stmts);
+                        
                         let return_stmt = hir::Stmt::new(
                             ctx.hir_id_allocator.next_id(),
-                            hir::StmtKind::Return(Some(Box::new(completion_expr))),
+                            hir::StmtKind::Return(Some(Box::new(flattened_completion))),
                             span,
                         );
                         new_then_branch.stmts.push(return_stmt);
@@ -1006,9 +1013,16 @@ impl HirJsPass {
                     if let Some(completion_expr) = new_else_consequence.expr.take() {
                         if use_return_statements {
                             // Use direct return statements instead of temp variable assignments
+                            // First flatten any complex subexpressions in the completion expression
+                            let (flattened_completion, mut completion_stmts) = 
+                                self.flatten_subexpressions_generically(completion_expr, ctx);
+                            
+                            // Add any statements from flattening the completion expression
+                            new_else_consequence.stmts.append(&mut completion_stmts);
+                            
                             let return_stmt = hir::Stmt::new(
                                 ctx.hir_id_allocator.next_id(),
-                                hir::StmtKind::Return(Some(Box::new(completion_expr))),
+                                hir::StmtKind::Return(Some(Box::new(flattened_completion))),
                                 span,
                             );
                             new_else_consequence.stmts.push(return_stmt);
@@ -1080,14 +1094,29 @@ impl HirJsPass {
                             if let hir::ExprKind::TailCall(_) = &completion_expr.kind {
                                 // Mark this TailCall as processed to avoid re-processing
                                 self.processed_tail_calls.insert(completion_expr.hir_id);
+                                
+                                // For TailCall expressions, use them directly in return statements
+                                let return_stmt = hir::Stmt::new(
+                                    ctx.hir_id_allocator.next_id(),
+                                    hir::StmtKind::Return(Some(Box::new(completion_expr))),
+                                    span,
+                                );
+                                new_arm_block.stmts.push(return_stmt);
+                            } else {
+                                // For non-TailCall expressions, flatten subexpressions first
+                                let (flattened_completion, mut completion_stmts) = 
+                                    self.flatten_subexpressions_generically(completion_expr, ctx);
+                                
+                                // Add any statements from flattening the completion expression
+                                new_arm_block.stmts.append(&mut completion_stmts);
+                                
+                                let return_stmt = hir::Stmt::new(
+                                    ctx.hir_id_allocator.next_id(),
+                                    hir::StmtKind::Return(Some(Box::new(flattened_completion))),
+                                    span,
+                                );
+                                new_arm_block.stmts.push(return_stmt);
                             }
-                            
-                            let return_stmt = hir::Stmt::new(
-                                ctx.hir_id_allocator.next_id(),
-                                hir::StmtKind::Return(Some(Box::new(completion_expr))),
-                                span,
-                            );
-                            new_arm_block.stmts.push(return_stmt);
                         } else {
                             // For complex expressions, flatten them first
                             match &completion_expr.kind {
@@ -1727,9 +1756,30 @@ impl<'hir> Visitor<'hir> for HirJsPass {
         // CRITICAL: Transform any remaining loop expressions before visiting children
         match &mut expr.kind {
             hir::ExprKind::Loop(_) => {
-                // Loop expressions should be handled by visit_block logic, not here
-                // If we reach this point, just skip processing to avoid issues
-                // The main visit_block_with_function_context should have already handled this
+                // Loop expressions that reach this point should have been transformed by visit_block
+                // If we reach this point, there's a bug in the transformation logic
+                // For now, skip processing to avoid infinite loops
+                eprintln!("WARNING: Loop expression reached visit_expr - this should have been transformed by visit_block. HIR ID: {:?}", expr.hir_id);
+                return;
+            }
+            hir::ExprKind::FunctionExpression(func_decl) => {
+                // Handle function expressions similarly to function declarations by providing function context
+                let function_name = crate::function_generator::fn_identifier_to_string(&func_decl.name);
+                
+                // Visit function metadata first
+                self.visit_expr(&mut func_decl.name, ctx);
+                self.enter_scope(func_decl.hir_id, ctx);
+                
+                for param in &mut func_decl.parameters {
+                    self.visit_ident(&mut param.name, ctx);
+                    self.visit_ty(&mut param.type_annotation, ctx);
+                }
+                
+                // Visit the function body with function context
+                self.visit_block_with_function_context(&mut func_decl.body, ctx, Some(&function_name));
+                self.leave_scope(func_decl.hir_id, ctx);
+                
+                // Don't call walk_expr to avoid double-processing
             }
             hir::ExprKind::Block(..) | hir::ExprKind::IfElse(..) | hir::ExprKind::Match(..) => {
                 // For complex expressions, first visit their children
