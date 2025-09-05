@@ -263,14 +263,14 @@ fn test_for_loop_expression_in_let() {
         {
             let iterator$$ = iterator.iter([1, 2, 3]);
             let accumulator$$ = 0;
-                let $tmp$0 = iterator$$.next();
-                let i;if ($tmp$0.tag === Option.Some && (i = $tmp$0[0], true)) {
-                    $hir$1 = acc + i;
-                } else if ($tmp$0.tag === Option.None) {
+                let $tmp$0;
+                let $tmp$1 = iterator$$.next();
+                let i;if ($tmp$1.tag === Option.Some && (i = $tmp$1[0], true)) {
+                    $tmp$0 = acc + i;
+                } else if ($tmp$1.tag === Option.None) {
                     $hir$0 = accumulator$$;
                     break;
                 };
-                accumulator$$ = $hir$1;
             }
         };
         let result = $hir$0;

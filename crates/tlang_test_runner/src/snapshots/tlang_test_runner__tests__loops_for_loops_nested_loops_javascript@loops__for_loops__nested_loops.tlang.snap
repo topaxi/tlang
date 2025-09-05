@@ -3,12 +3,12 @@ source: crates/tlang_test_runner/src/main.rs
 expression: apply_redactions(&output)
 input_file: tests/loops/for_loops/nested_loops.tlang
 ---
-[stdin]:300
-            } else if ($tmp$0.tag === Option.None) {
-              ^^^^
-Expression expected
+[stdin]:292
+                    let iterator$$0 = iterator.iter(row);
+                        ^^^^^^^^^^^
+Unexpected token `iterator$$0`. Expected ... , *,  (, [, :, , ?, =, an identifier, public, protected, private, readonly, <.
 
-SyntaxError: Unexpected token 'else'
+SyntaxError: Unexpected identifier 'iterator$$0'
     at makeContextifyScript (node:internal/vm:194:14)
     at compileScript (node:internal/process/execution:393:10)
     at evalTypeScript (node:internal/process/execution:261:22)

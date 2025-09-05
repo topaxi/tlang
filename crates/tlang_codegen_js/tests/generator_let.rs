@@ -84,12 +84,10 @@ fn test_codegen_if_let() {
     let output = compile!("fn main() { if let Some(x) = Some(42) { x } }");
     let expected_output = indoc! {"
         function main() {
-            let $hir$0 = undefined;
             let $tmp$0 = Option.Some(42);
             let x;if ($tmp$0.tag === Option.Some && (x = $tmp$0[0], true)) {
-                $hir$0 = x;
+                return x;
             }
-            return $hir$0;
         }
     "};
     assert_eq!(output, expected_output);
@@ -97,14 +95,12 @@ fn test_codegen_if_let() {
     let output = compile!("fn main() { if let Some(x) = Some(42) { x } else { 0 } }");
     let expected_output = indoc! {"
         function main() {
-            let $hir$0 = undefined;
             let $tmp$0 = Option.Some(42);
             let x;if ($tmp$0.tag === Option.Some && (x = $tmp$0[0], true)) {
-                $hir$0 = x;
+                return x;
             } else {
-                $hir$0 = 0;
+                return 0;
             }
-            return $hir$0;
         }
     "};
     assert_eq!(output, expected_output);

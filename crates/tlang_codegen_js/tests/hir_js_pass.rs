@@ -6,7 +6,6 @@ use tlang_hir_opt::{HirOptContext, HirPass};
 use tlang_hir_pretty::HirPrettyOptions;
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
-use tlang_symbols::SymbolType;
 
 #[ctor::ctor]
 fn before_all() {
@@ -191,7 +190,7 @@ fn test_nested_complex_expressions() {
 fn test_function_call_argument_flattening() {
     let source = r#"
         fn main() {
-            println({
+            log({
                 let x = 1;
                 x + 2
             });
@@ -205,7 +204,7 @@ fn test_function_call_argument_flattening() {
             let x: unknown = 1;
             ($hir$0 = (x + 2));
         };
-        println($hir$0);
+        log($hir$0);
     }
     ");
 }
@@ -508,7 +507,7 @@ fn test_expression_statement_flattening() {
                     let y = 1;
                     y + 2
                 };
-                println(x);
+                log(x);
             };
         }
     "#;
@@ -522,7 +521,7 @@ fn test_expression_statement_flattening() {
                 ($hir$0 = (y + 2));
             };
             let x: unknown = $hir$0;
-            println(x);
+            log(x);
         };
     }
     ");
@@ -679,7 +678,7 @@ fn test_nested_if_else_expressions() {
 fn test_complex_nested_function_calls() {
     let source = r#"
         fn main() {
-            println({
+            log({
                 let a = {
                     let x = 1;
                     x + 1
@@ -711,7 +710,7 @@ fn test_complex_nested_function_calls() {
             let b: unknown = $hir$2;
             ($hir$0 = (a + b));
         };
-        println($hir$0);
+        log($hir$0);
     }
     ");
 }
@@ -764,7 +763,7 @@ fn test_loop_expression_with_complex_break() {
                 let y: unknown = (x * 2);
                 ($hir$0 = (y + 1));
                 break;
-            };
+            }
         };
         let result: unknown = $hir$0;
         return result;
@@ -811,7 +810,7 @@ fn test_nested_loop_expressions() {
 fn test_loop_expression_in_function_argument() {
     let source = r#"
         fn main() {
-            println(loop {
+            log(loop {
                 break 42;
             });
         }
@@ -824,7 +823,7 @@ fn test_loop_expression_in_function_argument() {
             ($hir$0 = 42);
             break;
         };
-        println($hir$0);
+        log($hir$0);
     }
     "###);
 }
@@ -994,7 +993,7 @@ fn test_nested_loop_with_complex_expressions() {
             if (inner_result > 3) {
                 ($hir$0 = (inner_result + 10));
                 break;
-            };
+            }
         };
         let result: unknown = $hir$0;
         return result;
@@ -1055,17 +1054,15 @@ fn test_for_loop_expression_in_let() {
             let accumulator$$: unknown = 0;
             loop {
                 let acc: unknown = accumulator$$;
-                let $hir$1: unknown = _;
-                match iterator$$.next() {
+                (accumulator$$ = match iterator$$.next() {
                     Option::Some { 0: i } => {
-                        ($hir$1 = (acc + i));
+                        (acc + i)
                     },
                     Option::None => {
                         ($hir$0 = accumulator$$);
                         break;
                     },
-                };
-                (accumulator$$ = $hir$1)
+                })
             };
         };
         let result: unknown = $hir$0;
@@ -1110,7 +1107,7 @@ fn test_match_expression_in_function_argument() {
     let source = r#"
         fn main() {
             let value = Some(42);
-            println(match value {
+            log(match value {
                 Some(x) => x,
                 None => 0
             });
@@ -1129,7 +1126,7 @@ fn test_match_expression_in_function_argument() {
                 ($hir$0 = 0);
             },
         };
-        println($hir$0);
+        log($hir$0);
     }
     ");
 }
@@ -1496,7 +1493,7 @@ fn test_complex_nested_all_expression_types() {
                 }
             };
             
-            println({
+            log({
                 let final_check = match result {
                     true => loop { break "success"; },
                     false => { let msg = "failure"; msg }
@@ -1575,7 +1572,7 @@ fn test_complex_nested_all_expression_types() {
             let final_check: unknown = $hir$8;
             ($hir$1 = final_check);
         };
-        println($hir$1);
+        log($hir$1);
     }
     "#);
 }
@@ -1594,10 +1591,7 @@ fn test_break_expression_in_let_statement() {
     assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         loop {
-            let $hir$0: unknown = _;
-            ($hir$0 = 42);
-            break;
-            let x: unknown = $hir$0;
+            let x: unknown = break 42;
             x
         };
     }
@@ -1615,16 +1609,14 @@ fn test_continue_expression_in_let_statement() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         loop {
-            let $hir$0: unknown = _;
-            continue;
-            let x: unknown = $hir$0;
+            let x: unknown = continue;
             x
         };
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -1641,10 +1633,7 @@ fn test_break_expression_in_binary_expression() {
     assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         loop {
-            let $hir$0: unknown = _;
-            ($hir$0 = 42);
-            break;
-            let result: unknown = ($hir$0 + 10);
+            let result: unknown = (break 42 + 10);
             result
         };
     }
@@ -1656,7 +1645,7 @@ fn test_break_expression_in_function_call() {
     let source = r#"
         fn main() {
             loop {
-                let result = println(break "hello");
+                let result = log(break "hello");
                 result
             };
         }
@@ -1665,10 +1654,7 @@ fn test_break_expression_in_function_call() {
     assert_snapshot!(pretty_print(&hir), @r#"
     fn main() -> unknown {
         loop {
-            let $hir$0: unknown = _;
-            ($hir$0 = "hello");
-            break;
-            let result: unknown = println($hir$0);
+            let result: unknown = log(break "hello");
             result
         };
     }
@@ -1692,10 +1678,7 @@ fn test_break_expression_in_list() {
     assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         loop {
-            let $hir$0: unknown = _;
-            ($hir$0 = 42);
-            break;
-            let list: unknown = [1, $hir$0, 3];
+            let list: unknown = [1, break 42, 3];
             list
         };
     }
@@ -1720,19 +1703,11 @@ fn test_nested_break_expressions() {
     assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         loop {
-            let $hir$0: unknown = _;
-            if true {
-                let $hir$1: unknown = _;
-                ($hir$1 = 42);
-                break;
-                ($hir$0 = $hir$1);
+            let result: unknown = if true {
+                break 42
             } else {
-                let $hir$2: unknown = _;
-                ($hir$2 = 24);
-                break;
-                ($hir$0 = $hir$2);
+                break 24
             };
-            let result: unknown = $hir$0;
             result
         };
     }

@@ -4,12 +4,12 @@ description: Known failure - output may not match expected
 expression: apply_redactions(&output)
 input_file: tests/known_failures/error_handling_edge_cases.tlang
 ---
-[stdin]:287
-    return if (b === 0) {
-           ^^
-Expression expected
+[stdin]:300
+    } else if (list.length >= 1 && (x = list[0], true)index === 0) {
+                                                      ^^^^^
+Expected ')', got 'index'
 
-SyntaxError: Unexpected token 'if'
+SyntaxError: Unexpected identifier 'index'
     at makeContextifyScript (node:internal/vm:194:14)
     at compileScript (node:internal/process/execution:393:10)
     at evalTypeScript (node:internal/process/execution:261:22)
