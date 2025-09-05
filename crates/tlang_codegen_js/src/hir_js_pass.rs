@@ -1762,8 +1762,37 @@ impl HirJsPass {
                     } else {
                         // For simple if-else expressions, check if they're in tail call position
                         if self.is_in_tail_call_position_stateless(expr, function_name) {
-                            // Don't flatten - let the JavaScript generator handle it for tail call optimization
-                            // Do nothing - skip all processing for this expression
+                            // If-else in tail call position should be transformed to use return statements
+                            // while preserving any TailCall expressions within the branches
+                            let span = expr.span;
+                            let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                            let expr_to_flatten = std::mem::replace(expr, placeholder);
+                            
+                            // Check if we're in a function completion position - use return statements
+                            let is_function_completion = function_name.is_some();
+                            
+                            if is_function_completion {
+                                // Use direct return statements for function completion
+                                let temp_stmts = self.create_return_statements_for_expr(ctx, expr_to_flatten, span);
+                                
+                                // If we generated statements for the if-else expression, add them to the block
+                                if !temp_stmts.is_empty() {
+                                    block.stmts.extend(temp_stmts);
+                                    self.changes_made = true;
+                                    
+                                    // Clear the completion expression since we moved it to statements
+                                    block.expr = None;
+                                }
+                            } else {
+                                // Not in function completion, use regular flattening
+                                let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                                *expr = flattened_expr;
+                                
+                                if !temp_stmts.is_empty() {
+                                    block.stmts.extend(temp_stmts);
+                                    self.changes_made = true;
+                                }
+                            }
                         } else {
                             // Continue to regular processing by falling through to the catch-all case
                             // We need to explicitly handle this case or it will be handled by the catch-all
@@ -1906,45 +1935,44 @@ impl HirJsPass {
                         self.changes_made = true;
                     }
                 }
-                // TailCall expressions should be converted to return statements in function completion position
-                hir::ExprKind::TailCall(_) => {
-                    // Check if this TailCall has already been processed
-                    if self.processed_tail_calls.contains(&expr.hir_id) {
-                        // Skip processing - this TailCall has already been converted
-                        return;
-                    }
-                    
-                    // Check if we're in a function completion position
-                    let is_function_completion = function_name.is_some();
-                    
-                    if is_function_completion {
-                        // TailCall in function completion position - convert to return statement
-                        let span = expr.span;
-                        
-                        // Mark this TailCall as processed to avoid re-processing
-                        self.processed_tail_calls.insert(expr.hir_id);
-                        
-                        let return_stmt = hir::Stmt::new(
-                            ctx.hir_id_allocator.next_id(),
-                            hir::StmtKind::Return(Some(Box::new(expr.clone()))),
-                            span,
-                        );
-                        
-                        // Add the return statement to the block
-                        block.stmts.push(return_stmt);
-                        
-                        // Clear the completion expression since we moved it to statements
-                        block.expr = None;
-                        
-                        self.changes_made = true;
-                    }
-                    // For non-function completion contexts, leave TailCall as-is
-                    // The JavaScript generator will handle it appropriately
-                }
                 _ => {
                     // For other expressions, check if they need flattening but avoid loop transformation
-                    // CRITICAL: Check if this expression is in tail call position - if so, don't flatten it
-                    if self.is_in_tail_call_position_stateless(expr, function_name) {
+                    // SPECIAL CASE: Handle TailCall expressions directly
+                    if let hir::ExprKind::TailCall(_) = &expr.kind {
+                        // TailCall expressions should be converted to return statements in function completion position
+                        // Check if already processed to avoid infinite loops
+                        if self.processed_tail_calls.contains(&expr.hir_id) {
+                            // Skip processing - this TailCall has already been converted
+                            return;
+                        }
+                        
+                        // Check if we're in a function completion position
+                        let is_function_completion = function_name.is_some();
+                        
+                        if is_function_completion {
+                            // TailCall in function completion position - convert to return statement
+                            let span = expr.span;
+                            
+                            // Mark this TailCall as processed to avoid re-processing
+                            self.processed_tail_calls.insert(expr.hir_id);
+                            
+                            let return_stmt = hir::Stmt::new(
+                                ctx.hir_id_allocator.next_id(),
+                                hir::StmtKind::Return(Some(Box::new(expr.clone()))),
+                                span,
+                            );
+                            
+                            // Add the return statement to the block
+                            block.stmts.push(return_stmt);
+                            
+                            // Clear the completion expression since we moved it to statements
+                            block.expr = None;
+                            
+                            self.changes_made = true;
+                        }
+                        // For non-function completion contexts, leave TailCall as-is
+                        // The JavaScript generator will handle it appropriately
+                    } else if self.is_in_tail_call_position_stateless(expr, function_name) {
                         // This expression contains tail calls and is in tail position
                         // Don't flatten it to preserve tail call optimization
                         // But still process subexpressions that are not in tail position
