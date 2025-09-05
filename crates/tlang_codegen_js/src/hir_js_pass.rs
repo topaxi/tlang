@@ -1727,18 +1727,9 @@ impl<'hir> Visitor<'hir> for HirJsPass {
         // CRITICAL: Transform any remaining loop expressions before visiting children
         match &mut expr.kind {
             hir::ExprKind::Loop(_) => {
-                // Found a loop expression that wasn't caught by other transformations
-                // Transform it immediately using temp variable approach
-                let span = expr.span;
-                let temp_name = self.generate_temp_var_name();
-                let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
-                let loop_expr = std::mem::replace(expr, placeholder);
-                
-                // This will be handled by the calling context that should collect the temp statements
-                // For now, just ensure we don't leave loop expressions untransformed
-                let (transformed_expr, _temp_stmts) = self.flatten_expression_to_temp_var(loop_expr, ctx);
-                *expr = transformed_expr;
-                self.changes_made = true;
+                // Loop expressions should be handled by visit_block logic, not here
+                // If we reach this point, just skip processing to avoid issues
+                // The main visit_block_with_function_context should have already handled this
             }
             hir::ExprKind::Block(..) | hir::ExprKind::IfElse(..) | hir::ExprKind::Match(..) => {
                 // For complex expressions, first visit their children
@@ -2271,9 +2262,10 @@ impl HirJsPass {
         // This ensures that nested loops, blocks, and other complex expressions are processed
         for stmt in &mut block.stmts {
             match &mut stmt.kind {
-                // Visit function declarations to handle their nested content
+                // Function declarations are already processed by flatten_statement_expressions
+                // Don't visit them again to avoid double-processing
                 hir::StmtKind::FunctionDeclaration(_) => {
-                    self.visit_stmt(stmt, ctx);
+                    // Skip - already processed
                 }
                 // Visit expression statements that might contain nested loops or blocks
                 hir::StmtKind::Expr(expr) => {
