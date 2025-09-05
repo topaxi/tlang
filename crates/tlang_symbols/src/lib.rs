@@ -509,6 +509,10 @@ impl SymbolTable {
                         // Parameters can hold function values and should be callable
                         // The arity checking is done at runtime since parameters are dynamically typed
                     }
+                    SymbolType::Variable => {
+                        // Variables can hold function values and should be callable
+                        // The arity checking is done at runtime since variables can hold any value type
+                    }
                     _ => {
                         continue; // Not callable
                     }

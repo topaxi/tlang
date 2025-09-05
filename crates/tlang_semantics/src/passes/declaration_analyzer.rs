@@ -45,14 +45,9 @@ impl DeclarationAnalyzer {
 
         let child_table = self.symbol_table_stack.pop().unwrap();
         
-        // Update parent scope to include symbols added by child
-        if let Some(parent_table) = self.symbol_table_stack.last() {
-            parent_table.borrow_mut().update_scope_size_to_storage();
-            debug!(
-                "Updated parent scope size to include all symbols up to storage size {}", 
-                parent_table.borrow().get_storage_size()
-            );
-        }
+        // Do NOT update parent scope size to include child symbols
+        // This would break scope isolation - child scope symbols should not be
+        // accessible from parent scopes
         
         child_table
     }
