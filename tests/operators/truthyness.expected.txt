@@ -1,7 +1,0 @@
-Truthy values
-============
-[[true, true], [1, true], [[1], true], [Dict { a: 1 }, true]]
-
-Falsy values
-============
-[[nil, false], [false, false], [0, false], [[], false], [Dict { }, false]]
