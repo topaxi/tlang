@@ -167,9 +167,13 @@ impl CodegenJS {
                 );
             }
             hir::ExprKind::Block(block) => self.generate_block(block),
-            hir::ExprKind::Loop(_block) => {
+            hir::ExprKind::Loop(block) => {
+                eprintln!("ERROR: Found loop expression at HIR ID: {:?}", expr.hir_id);
+                eprintln!("Loop block: {:#?}", block);
+                eprintln!("Is in loop context: {}", self.is_in_loop_context());
                 panic!(
-                    "Loop expressions should be transformed to statements by HirJsPass before reaching codegen"
+                    "Loop expressions should be transformed to statements by HirJsPass before reaching codegen. HIR ID: {:?}",
+                    expr.hir_id
                 );
             }
             hir::ExprKind::Break(expr) => {

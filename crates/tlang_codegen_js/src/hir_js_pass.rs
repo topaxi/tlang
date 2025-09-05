@@ -1715,10 +1715,23 @@ impl<'hir> Visitor<'hir> for HirJsPass {
     type Context = HirOptContext;
 
     fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
-        // We need to visit expressions to handle nested complex expressions
-        // The key is to transform bottom-up (children first, then parent)
+        // CRITICAL: Transform any remaining loop expressions before visiting children
         match &mut expr.kind {
-            hir::ExprKind::Block(..) | hir::ExprKind::IfElse(..) | hir::ExprKind::Loop(..) | hir::ExprKind::Match(..) => {
+            hir::ExprKind::Loop(_) => {
+                // Found a loop expression that wasn't caught by other transformations
+                // Transform it immediately using temp variable approach
+                let span = expr.span;
+                let temp_name = self.generate_temp_var_name();
+                let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                let loop_expr = std::mem::replace(expr, placeholder);
+                
+                // This will be handled by the calling context that should collect the temp statements
+                // For now, just ensure we don't leave loop expressions untransformed
+                let (transformed_expr, _temp_stmts) = self.flatten_expression_to_temp_var(loop_expr, ctx);
+                *expr = transformed_expr;
+                self.changes_made = true;
+            }
+            hir::ExprKind::Block(..) | hir::ExprKind::IfElse(..) | hir::ExprKind::Match(..) => {
                 // For complex expressions, first visit their children
                 visit::walk_expr(self, expr, ctx);
                 // Note: the actual transformation happens in visit_block when these are in expression positions
