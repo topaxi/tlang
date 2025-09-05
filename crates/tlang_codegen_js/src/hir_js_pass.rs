@@ -25,6 +25,28 @@ impl HirJsPass {
         }
     }
 
+    /// Check if an expression contains TailCall expressions
+    fn expr_contains_tail_calls(&self, expr: &hir::Expr) -> bool {
+        match &expr.kind {
+            hir::ExprKind::TailCall(_) => true,
+            hir::ExprKind::Match(_, arms) => {
+                arms.iter().any(|arm| {
+                    arm.block.expr.as_ref().map_or(false, |e| self.expr_contains_tail_calls(e))
+                })
+            }
+            hir::ExprKind::IfElse(_, then_branch, else_branches) => {
+                then_branch.expr.as_ref().map_or(false, |e| self.expr_contains_tail_calls(e)) ||
+                else_branches.iter().any(|else_branch| {
+                    else_branch.consequence.expr.as_ref().map_or(false, |e| self.expr_contains_tail_calls(e))
+                })
+            }
+            hir::ExprKind::Block(block) => {
+                block.expr.as_ref().map_or(false, |e| self.expr_contains_tail_calls(e))
+            }
+            _ => false,
+        }
+    }
+
     /// Create a new statement while preserving comments from the original statement
     fn create_stmt_preserving_comments(
         &self,
@@ -1874,14 +1896,15 @@ impl HirJsPass {
                     let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                     let expr_to_flatten = std::mem::replace(expr, placeholder);
                     
-                    // Check if we're in a function completion position - use return statements instead of temp variables
+                    // Check if we're in a function completion position and if the match contains TailCall expressions
                     let is_function_completion = function_name.is_some();
+                    let contains_tail_calls = self.expr_contains_tail_calls(&expr_to_flatten);
                     
-                    let temp_stmts = if is_function_completion {
-                        // Use direct return statements for function completion
+                    let temp_stmts = if is_function_completion && contains_tail_calls {
+                        // Use direct return statements for function completion with tail calls
                         self.create_return_statements_for_expr(ctx, expr_to_flatten, span)
                     } else {
-                        // Use temp variables for other completion positions
+                        // Use temp variables for other cases
                         let (flattened_expr, stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
                         *expr = flattened_expr;
                         stmts
@@ -1893,42 +1916,46 @@ impl HirJsPass {
                         self.changes_made = true;
                         
                         // If we used return statements, clear the completion expression
-                        if is_function_completion {
+                        if is_function_completion && contains_tail_calls {
                             block.expr = None;
                         }
                     }
                 }
                 // If-else expressions that cannot be rendered as JavaScript expressions should be transformed
                 hir::ExprKind::IfElse(_condition, _then_branch, else_branches) => {
-                    // Only transform if-else-if expressions (multiple else branches) as they cannot be ternaries
-                    // Simple if-else expressions should be handled by the JavaScript generator if possible
+                    // Check if we're in a function completion position
+                    let is_function_completion = function_name.is_some();
+                    
                     if else_branches.len() > 1 {
+                        // Complex if-else-if expressions (multiple else branches) should be flattened to temp variables
+                        // even in function completion position, and then returned
                         let span = expr.span;
                         let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                         let expr_to_flatten = std::mem::replace(expr, placeholder);
                         
-                        // Check if we're in a function completion position - use return statements instead of temp variables
-                        let is_function_completion = function_name.is_some();
+                        let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                        *expr = flattened_expr;
+
+                        // If we generated statements for the if-else expression, add them to the block
+                        if !temp_stmts.is_empty() {
+                            block.stmts.extend(temp_stmts);
+                            self.changes_made = true;
+                        }
+                    } else if is_function_completion {
+                        // Simple if-else expressions in function completion position should use return statements
+                        let span = expr.span;
+                        let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                        let expr_to_flatten = std::mem::replace(expr, placeholder);
                         
-                        let temp_stmts = if is_function_completion {
-                            // Use direct return statements for function completion
-                            self.create_return_statements_for_expr(ctx, expr_to_flatten, span)
-                        } else {
-                            // Use temp variables for other completion positions
-                            let (flattened_expr, stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
-                            *expr = flattened_expr;
-                            stmts
-                        };
+                        let temp_stmts = self.create_return_statements_for_expr(ctx, expr_to_flatten, span);
 
                         // If we generated statements for the if-else expression, add them to the block
                         if !temp_stmts.is_empty() {
                             block.stmts.extend(temp_stmts);
                             self.changes_made = true;
                             
-                            // If we used return statements, clear the completion expression
-                            if is_function_completion {
-                                block.expr = None;
-                            }
+                            // Clear the completion expression since we used return statements
+                            block.expr = None;
                         }
                     } else {
                         // For simple if-else expressions, check if they're in tail call position
