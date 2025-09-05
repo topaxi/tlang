@@ -25,28 +25,6 @@ impl HirJsPass {
         }
     }
 
-    /// Check if an expression contains TailCall expressions
-    fn expr_contains_tail_calls(&self, expr: &hir::Expr) -> bool {
-        match &expr.kind {
-            hir::ExprKind::TailCall(_) => true,
-            hir::ExprKind::Match(_, arms) => {
-                arms.iter().any(|arm| {
-                    arm.block.expr.as_ref().map_or(false, |e| self.expr_contains_tail_calls(e))
-                })
-            }
-            hir::ExprKind::IfElse(_, then_branch, else_branches) => {
-                then_branch.expr.as_ref().map_or(false, |e| self.expr_contains_tail_calls(e)) ||
-                else_branches.iter().any(|else_branch| {
-                    else_branch.consequence.expr.as_ref().map_or(false, |e| self.expr_contains_tail_calls(e))
-                })
-            }
-            hir::ExprKind::Block(block) => {
-                block.expr.as_ref().map_or(false, |e| self.expr_contains_tail_calls(e))
-            }
-            _ => false,
-        }
-    }
-
     /// Create a new statement while preserving comments from the original statement
     fn create_stmt_preserving_comments(
         &self,
@@ -701,6 +679,18 @@ impl HirJsPass {
                 // This handles cases like: assignment = { ... }
                 // Similar to loops, this should be handled at a higher level
             }
+            hir::ExprKind::FunctionExpression(func_decl) => {
+                // Function expressions need their bodies processed with function context
+                // This is critical for proper transformation of completion expressions to return statements
+                let function_name = crate::function_generator::fn_identifier_to_string(&func_decl.name);
+                
+                // Process the function body with function context using the same logic as visit_expr
+                self.enter_scope(func_decl.hir_id, ctx);
+                
+                // Visit the function body with function context
+                self.visit_block_with_function_context(&mut func_decl.body, ctx, Some(&function_name));
+                self.leave_scope(func_decl.hir_id, ctx);
+            }
             _ => {
                 // For other expression types, no subexpressions to flatten
             }
@@ -998,19 +988,30 @@ impl HirJsPass {
                 if let Some(completion_expr) = new_then_branch.expr.take() {
                     if use_return_statements {
                         // Use direct return statements instead of temp variable assignments
-                        // First flatten any complex subexpressions in the completion expression
-                        let (flattened_completion, mut completion_stmts) = 
-                            self.flatten_subexpressions_generically(completion_expr, ctx);
-                        
-                        // Add any statements from flattening the completion expression
-                        new_then_branch.stmts.append(&mut completion_stmts);
-                        
-                        let return_stmt = hir::Stmt::new(
-                            ctx.hir_id_allocator.next_id(),
-                            hir::StmtKind::Return(Some(Box::new(flattened_completion))),
-                            span,
-                        );
-                        new_then_branch.stmts.push(return_stmt);
+                        // Only flatten if the completion expression cannot be rendered as JavaScript
+                        if expr_can_render_as_js_expr(&completion_expr) {
+                            // Simple expression - use it directly in return statement
+                            let return_stmt = hir::Stmt::new(
+                                ctx.hir_id_allocator.next_id(),
+                                hir::StmtKind::Return(Some(Box::new(completion_expr))),
+                                span,
+                            );
+                            new_then_branch.stmts.push(return_stmt);
+                        } else {
+                            // Complex expression - need to flatten subexpressions first
+                            let (flattened_completion, mut completion_stmts) = 
+                                self.flatten_subexpressions_generically(completion_expr, ctx);
+                            
+                            // Add any statements from flattening the completion expression
+                            new_then_branch.stmts.append(&mut completion_stmts);
+                            
+                            let return_stmt = hir::Stmt::new(
+                                ctx.hir_id_allocator.next_id(),
+                                hir::StmtKind::Return(Some(Box::new(flattened_completion))),
+                                span,
+                            );
+                            new_then_branch.stmts.push(return_stmt);
+                        }
                     } else {
                         // If the completion expression is an if-else, we need to flatten it too
                         match &completion_expr.kind {
@@ -1035,19 +1036,30 @@ impl HirJsPass {
                     if let Some(completion_expr) = new_else_consequence.expr.take() {
                         if use_return_statements {
                             // Use direct return statements instead of temp variable assignments
-                            // First flatten any complex subexpressions in the completion expression
-                            let (flattened_completion, mut completion_stmts) = 
-                                self.flatten_subexpressions_generically(completion_expr, ctx);
-                            
-                            // Add any statements from flattening the completion expression
-                            new_else_consequence.stmts.append(&mut completion_stmts);
-                            
-                            let return_stmt = hir::Stmt::new(
-                                ctx.hir_id_allocator.next_id(),
-                                hir::StmtKind::Return(Some(Box::new(flattened_completion))),
-                                span,
-                            );
-                            new_else_consequence.stmts.push(return_stmt);
+                            // Only flatten if the completion expression cannot be rendered as JavaScript
+                            if expr_can_render_as_js_expr(&completion_expr) {
+                                // Simple expression - use it directly in return statement
+                                let return_stmt = hir::Stmt::new(
+                                    ctx.hir_id_allocator.next_id(),
+                                    hir::StmtKind::Return(Some(Box::new(completion_expr))),
+                                    span,
+                                );
+                                new_else_consequence.stmts.push(return_stmt);
+                            } else {
+                                // Complex expression - need to flatten subexpressions first
+                                let (flattened_completion, mut completion_stmts) = 
+                                    self.flatten_subexpressions_generically(completion_expr, ctx);
+                                
+                                // Add any statements from flattening the completion expression
+                                new_else_consequence.stmts.append(&mut completion_stmts);
+                                
+                                let return_stmt = hir::Stmt::new(
+                                    ctx.hir_id_allocator.next_id(),
+                                    hir::StmtKind::Return(Some(Box::new(flattened_completion))),
+                                    span,
+                                );
+                                new_else_consequence.stmts.push(return_stmt);
+                            }
                         } else {
                             // If the completion expression is an if-else, we need to flatten it too
                             match &completion_expr.kind {
@@ -1125,19 +1137,30 @@ impl HirJsPass {
                                 );
                                 new_arm_block.stmts.push(return_stmt);
                             } else {
-                                // For non-TailCall expressions, flatten subexpressions first
-                                let (flattened_completion, mut completion_stmts) = 
-                                    self.flatten_subexpressions_generically(completion_expr, ctx);
-                                
-                                // Add any statements from flattening the completion expression
-                                new_arm_block.stmts.append(&mut completion_stmts);
-                                
-                                let return_stmt = hir::Stmt::new(
-                                    ctx.hir_id_allocator.next_id(),
-                                    hir::StmtKind::Return(Some(Box::new(flattened_completion))),
-                                    span,
-                                );
-                                new_arm_block.stmts.push(return_stmt);
+                                // For non-TailCall expressions, only flatten if they cannot be rendered as JavaScript
+                                if expr_can_render_as_js_expr(&completion_expr) {
+                                    // Simple expression - use it directly in return statement
+                                    let return_stmt = hir::Stmt::new(
+                                        ctx.hir_id_allocator.next_id(),
+                                        hir::StmtKind::Return(Some(Box::new(completion_expr))),
+                                        span,
+                                    );
+                                    new_arm_block.stmts.push(return_stmt);
+                                } else {
+                                    // Complex expression - need to flatten subexpressions first
+                                    let (flattened_completion, mut completion_stmts) = 
+                                        self.flatten_subexpressions_generically(completion_expr, ctx);
+                                    
+                                    // Add any statements from flattening the completion expression
+                                    new_arm_block.stmts.append(&mut completion_stmts);
+                                    
+                                    let return_stmt = hir::Stmt::new(
+                                        ctx.hir_id_allocator.next_id(),
+                                        hir::StmtKind::Return(Some(Box::new(flattened_completion))),
+                                        span,
+                                    );
+                                    new_arm_block.stmts.push(return_stmt);
+                                }
                             }
                         } else {
                             // For complex expressions, flatten them first
@@ -1910,12 +1933,11 @@ impl HirJsPass {
                     let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                     let expr_to_flatten = std::mem::replace(expr, placeholder);
                     
-                    // Check if we're in a function completion position and if the match contains TailCall expressions
+                    // Check if we're in a function completion position
                     let is_function_completion = function_name.is_some();
-                    let contains_tail_calls = self.expr_contains_tail_calls(&expr_to_flatten);
                     
-                    let temp_stmts = if is_function_completion && contains_tail_calls {
-                        // Use direct return statements for function completion with tail calls
+                    let temp_stmts = if is_function_completion {
+                        // Use direct return statements for function completion
                         self.create_return_statements_for_expr(ctx, expr_to_flatten, span)
                     } else {
                         // Use temp variables for other cases
@@ -1930,7 +1952,7 @@ impl HirJsPass {
                         self.changes_made = true;
                         
                         // If we used return statements, clear the completion expression
-                        if is_function_completion && contains_tail_calls {
+                        if is_function_completion {
                             block.expr = None;
                         }
                     }
@@ -1941,19 +1963,33 @@ impl HirJsPass {
                     let is_function_completion = function_name.is_some();
                     
                     if else_branches.len() > 1 {
-                        // Complex if-else-if expressions (multiple else branches) should be flattened to temp variables
-                        // even in function completion position, and then returned
+                        // Complex if-else-if expressions (multiple else branches)
                         let span = expr.span;
                         let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                         let expr_to_flatten = std::mem::replace(expr, placeholder);
                         
-                        let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
-                        *expr = flattened_expr;
+                        if is_function_completion {
+                            // In function completion position, use return statements
+                            let temp_stmts = self.create_return_statements_for_expr(ctx, expr_to_flatten, span);
+                            
+                            // If we generated statements for the if-else expression, add them to the block
+                            if !temp_stmts.is_empty() {
+                                block.stmts.extend(temp_stmts);
+                                self.changes_made = true;
+                                
+                                // Clear the completion expression since we used return statements
+                                block.expr = None;
+                            }
+                        } else {
+                            // Not in function completion position, use temp variables
+                            let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                            *expr = flattened_expr;
 
-                        // If we generated statements for the if-else expression, add them to the block
-                        if !temp_stmts.is_empty() {
-                            block.stmts.extend(temp_stmts);
-                            self.changes_made = true;
+                            // If we generated statements for the if-else expression, add them to the block
+                            if !temp_stmts.is_empty() {
+                                block.stmts.extend(temp_stmts);
+                                self.changes_made = true;
+                            }
                         }
                     } else if is_function_completion && 
                               !if_else_can_render_as_ternary_safe(condition, then_branch, else_branches) {

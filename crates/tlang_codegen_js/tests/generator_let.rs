@@ -123,18 +123,16 @@ fn test_codegen_if_let() {
     let expected_output = indoc! {"
         function main() {
             let value = Option.Some(42);
-            let $hir$0 = undefined;
             let $tmp$0;
             let x;if (value.tag === Option.Some && value[0] === 42) {
-                $hir$0 = 9000;
+                return 9000;
             } else if (($tmp$0 = value, true) && $tmp$0.tag === Option.Some && (x = $tmp$0[0], true)) {
-                $hir$0 = x;
+                return x;
             } else if (value === Option.Some(100)) {
-                $hir$0 = 100;
+                return 100;
             } else {
-                $hir$0 = 5;
+                return 5;
             }
-            return $hir$0;
         }
     "};
     assert_eq!(output, expected_output);

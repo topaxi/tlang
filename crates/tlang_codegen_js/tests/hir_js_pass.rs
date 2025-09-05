@@ -1961,6 +1961,38 @@ fn test_debug_function_pattern_matching() {
 }
 
 #[test]
+fn test_function_expression_with_if_else_completion() {
+    let source = r#"
+        fn main() {
+            let factorial_rec = fn rec_helper(n, acc) {
+                if n == 0 {
+                    acc
+                } else {
+                    rec rec_helper(n - 1, n * acc)
+                }
+            };
+            factorial_rec(5, 1)
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    println!("HIR Output with function expression:");
+    println!("{}", pretty_print(&hir));
+    // The if-else expression in the function expression should use return statements
+    assert_snapshot!(pretty_print(&hir), @r#"
+    fn main() -> unknown {
+        let factorial_rec: unknown = fn rec_helper(n: unknown, acc: unknown) -> unknown {
+            if (n == 0) {
+                return acc;
+            } else {
+                return rec rec_helper((n - 1), (n * acc));
+            };
+        };
+        return factorial_rec(5, 1);
+    }
+    "#);
+}
+
+#[test]
 fn test_debug_nested_loop_expressions_with_cli_sequence() {
     let source = r#"
         fn nested_loop_expressions() {
