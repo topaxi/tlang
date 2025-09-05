@@ -1673,10 +1673,19 @@ pub fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
         hir::ExprKind::Continue => false,
         hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
             // If-else can be rendered as a JS expression only if:
-            // 1. It has only one else clause (no if-else-if)
-            // 2. It can be a ternary operator
-            else_branches.len() == 1 
-                && if_else_can_render_as_ternary_safe(condition, then_branch, else_branches)
+            // 1. It has only one else clause (no if-else-if) and can be a ternary operator, OR
+            // 2. It's an if without else clause that contains only control flow (no completion expression)
+            if else_branches.is_empty() {
+                // For if expressions without else clauses, they can be rendered as simple if statements
+                // if the then branch contains only control flow (break/continue/return) or has no completion expression
+                then_branch.expr.is_none()
+            } else if else_branches.len() == 1 {
+                // Simple if-else that can be a ternary
+                if_else_can_render_as_ternary_safe(condition, then_branch, else_branches)
+            } else {
+                // if-else-if expressions cannot be rendered as JS expressions
+                false
+            }
         }
         hir::ExprKind::Match(..) => false,
         hir::ExprKind::Call(call_expr) => {
