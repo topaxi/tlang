@@ -1549,6 +1549,79 @@ fn stmt_can_render_as_js(stmt: &hir::Stmt) -> bool {
     }
 }
 
+/// Check if an expression never completes normally (always breaks, continues, or returns)
+/// These expressions don't need temp variables because they never produce values
+pub fn expr_never_completes_normally(expr: &hir::Expr) -> bool {
+    match &expr.kind {
+        hir::ExprKind::Break(..) => true,
+        hir::ExprKind::Continue => true,
+        hir::ExprKind::IfElse(_condition, then_branch, else_branches) => {
+            // If expression never completes normally if:
+            // 1. The then branch never completes normally, AND
+            // 2. Either there's no else clause, OR all else clauses never complete normally
+            
+            let then_never_completes = block_never_completes_normally(then_branch);
+            
+            if else_branches.is_empty() {
+                // No else clause - if the then branch never completes normally,
+                // the if expression can still complete normally when the condition is false.
+                // However, we need to check if we can determine the condition is always true.
+                // For now, let's be conservative and only consider it never completing 
+                // if the then branch never completes AND we can be sure it always executes.
+                // 
+                // Special case: if the condition is a literal true, then we know the then branch always executes
+                match &_condition.kind {
+                    hir::ExprKind::Literal(literal) => {
+                        match literal.as_ref() {
+                            tlang_ast::token::Literal::Boolean(true) => then_never_completes,
+                            _ => false,
+                        }
+                    }
+                    _ => false, // Conservative: assume it can complete normally
+                }
+            } else {
+                // Has else clauses - all branches must never complete normally
+                then_never_completes && else_branches.iter().all(|else_clause| {
+                    block_never_completes_normally(&else_clause.consequence)
+                })
+            }
+        }
+        hir::ExprKind::Block(block) => block_never_completes_normally(block),
+        hir::ExprKind::Match(_scrutinee, arms) => {
+            // Match never completes normally if all arms never complete normally
+            !arms.is_empty() && arms.iter().all(|arm| block_never_completes_normally(&arm.block))
+        }
+        _ => false,
+    }
+}
+
+/// Check if a block never completes normally
+fn block_never_completes_normally(block: &hir::Block) -> bool {
+    // A block never completes normally if:
+    // 1. Any statement is a break/continue/return, OR
+    // 2. The completion expression never completes normally
+    
+    for stmt in &block.stmts {
+        match &stmt.kind {
+            hir::StmtKind::Return(_) => return true,
+            hir::StmtKind::Expr(expr) => {
+                match &expr.kind {
+                    hir::ExprKind::Break(..) | hir::ExprKind::Continue => return true,
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+    }
+    
+    // Check completion expression
+    if let Some(expr) = &block.expr {
+        expr_never_completes_normally(expr)
+    } else {
+        false
+    }
+}
+
 /// Check if an expression can be rendered as a JavaScript expression (vs statement)
 pub fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
     match &expr.kind {
@@ -1796,8 +1869,34 @@ impl HirJsPass {
                         } else {
                             // Continue to regular processing by falling through to the catch-all case
                             // We need to explicitly handle this case or it will be handled by the catch-all
-                            // Check if this expression can be rendered as JS, and if not, flatten it
-                            if !expr_can_render_as_js_expr(expr) {
+                            // Check if this expression never completes normally - if so, no temp variable needed
+                            if expr_never_completes_normally(expr) {
+                                // Expression never completes normally (always breaks/continues/returns)
+                                // Convert it to a statement without creating a temp variable
+                                let span = expr.span;
+                                let completion_expr = std::mem::replace(
+                                    expr,
+                                    hir::Expr {
+                                        hir_id: ctx.hir_id_allocator.next_id(),
+                                        kind: hir::ExprKind::Literal(Box::new(
+                                            tlang_ast::token::Literal::String("()".into()),
+                                        )),
+                                        span,
+                                    },
+                                );
+
+                                // Convert the completion expression to a statement
+                                let completion_stmt = hir::Stmt::new(
+                                    ctx.hir_id_allocator.next_id(),
+                                    hir::StmtKind::Expr(Box::new(completion_expr)),
+                                    span,
+                                );
+
+                                // Add it as a statement and clear the completion expression
+                                block.stmts.push(completion_stmt);
+                                block.expr = None;
+                                self.changes_made = true;
+                            } else if !expr_can_render_as_js_expr(expr) {
                                 let span = expr.span;
                                 let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                                 let expr_to_flatten = std::mem::replace(expr, placeholder);
@@ -1988,6 +2087,32 @@ impl HirJsPass {
                             block.stmts.extend(temp_stmts);
                             self.changes_made = true;
                         }
+                    } else if expr_never_completes_normally(expr) {
+                        // Expression never completes normally (always breaks/continues/returns)
+                        // Convert it to a statement without creating a temp variable
+                        let span = expr.span;
+                        let completion_expr = std::mem::replace(
+                            expr,
+                            hir::Expr {
+                                hir_id: ctx.hir_id_allocator.next_id(),
+                                kind: hir::ExprKind::Literal(Box::new(
+                                    tlang_ast::token::Literal::String("()".into()),
+                                )),
+                                span,
+                            },
+                        );
+
+                        // Convert the completion expression to a statement
+                        let completion_stmt = hir::Stmt::new(
+                            ctx.hir_id_allocator.next_id(),
+                            hir::StmtKind::Expr(Box::new(completion_expr)),
+                            span,
+                        );
+
+                        // Add it as a statement and clear the completion expression
+                        block.stmts.push(completion_stmt);
+                        block.expr = None;
+                        self.changes_made = true;
                     } else if !expr_can_render_as_js_expr(expr) {
                         let span = expr.span;
                         let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
