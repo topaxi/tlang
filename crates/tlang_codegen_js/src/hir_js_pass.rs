@@ -1782,6 +1782,20 @@ impl<'hir> Visitor<'hir> for HirJsPass {
                 // If we reach this point, there's a bug in the transformation logic
                 // For now, skip processing to avoid infinite loops
                 eprintln!("WARNING: Loop expression reached visit_expr - this should have been transformed by visit_block. HIR ID: {:?}", expr.hir_id);
+                eprintln!("Loop expression context: function expressions should be handled at block level");
+                
+                // Try to transform it here as a fallback
+                let span = expr.span;
+                let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                let expr_to_flatten = std::mem::replace(expr, placeholder);
+                let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                *expr = flattened_expr;
+                
+                if !temp_stmts.is_empty() {
+                    eprintln!("WARNING: Generated {} temp statements but cannot insert them at expression level", temp_stmts.len());
+                    self.changes_made = true;
+                }
+                
                 return;
             }
             hir::ExprKind::FunctionExpression(func_decl) => {
@@ -1876,12 +1890,12 @@ impl HirJsPass {
             match &expr.kind {
                 // Loops in block completion position should be transformed like other expressions
                 hir::ExprKind::Loop(_) => {
-                    // Transform loop expressions using the standard flattening approach
+                    // Transform loop expressions using the full flattening pipeline
                     let span = expr.span;
                     let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                     let expr_to_flatten = std::mem::replace(expr, placeholder);
                     let (flattened_expr, temp_stmts) =
-                        self.flatten_subexpressions_generically(expr_to_flatten, ctx);
+                        self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
                     *expr = flattened_expr;
 
                     // If we generated statements for the loop expression, add them to the block
@@ -1922,7 +1936,7 @@ impl HirJsPass {
                     }
                 }
                 // If-else expressions that cannot be rendered as JavaScript expressions should be transformed
-                hir::ExprKind::IfElse(_condition, _then_branch, else_branches) => {
+                hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
                     // Check if we're in a function completion position
                     let is_function_completion = function_name.is_some();
                     
@@ -1941,8 +1955,9 @@ impl HirJsPass {
                             block.stmts.extend(temp_stmts);
                             self.changes_made = true;
                         }
-                    } else if is_function_completion {
-                        // Simple if-else expressions in function completion position should use return statements
+                    } else if is_function_completion && 
+                              !if_else_can_render_as_ternary_safe(condition, then_branch, else_branches) {
+                        // Simple if-else expressions that can't be ternaries in function completion position should use return statements
                         let span = expr.span;
                         let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                         let expr_to_flatten = std::mem::replace(expr, placeholder);
