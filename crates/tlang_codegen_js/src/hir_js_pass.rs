@@ -118,7 +118,7 @@ impl HirJsPass {
                             true
                         } else {
                             // Simple if-else, only flatten if they cannot be ternaries
-                            !if_else_can_render_as_ternary(condition, then_branch, else_branches)
+                            !if_else_can_render_as_ternary_safe(condition, then_branch, else_branches)
                         }
                     }
                     hir::ExprKind::Match(..) => {
@@ -368,8 +368,19 @@ impl HirJsPass {
                 // Only flatten simple if-else expressions that cannot be rendered as ternaries
                 if else_branches.len() > 1 {
                     true // if-else-if expressions cannot be ternaries, always flatten
+                } else if else_branches.is_empty() {
+                    // For if expressions without else clauses, check if they need flattening
+                    // If the then branch contains only control flow (break/continue/return) or has no completion expression,
+                    // it doesn't need flattening to a temp variable
+                    if then_branch.expr.is_none() {
+                        // No completion expression, can be rendered as a simple if statement
+                        false
+                    } else {
+                        // Has completion expression, check if it can be rendered as JS
+                        !if_else_can_render_as_ternary_safe(condition, then_branch, else_branches)
+                    }
                 } else {
-                    !if_else_can_render_as_ternary(condition, then_branch, else_branches)
+                    !if_else_can_render_as_ternary_safe(condition, then_branch, else_branches)
                 }
             }
             hir::ExprKind::Loop(..) => true,   // Loop expressions need transformation for JavaScript
@@ -1493,6 +1504,30 @@ impl HirJsPass {
     }
 }
 
+/// Safe version of if_else_can_render_as_ternary that handles missing completion expressions
+pub fn if_else_can_render_as_ternary_safe(
+    expr: &hir::Expr,
+    then_branch: &hir::Block,
+    else_branches: &[hir::ElseClause],
+) -> bool {
+    // Check if then branch can be rendered as ternary
+    let then_can_render = then_branch.stmts.is_empty()
+        && expr_can_render_as_js_expr(expr)
+        && then_branch.expr.as_ref().map_or(false, |e| expr_can_render_as_js_expr(e));
+    
+    if !then_can_render {
+        return false;
+    }
+    
+    // Check if all else branches can be rendered as ternary
+    else_branches.iter().all(|else_branch| {
+        else_branch.consequence.stmts.is_empty()
+            && (else_branch.condition.is_none()
+                || expr_can_render_as_js_expr(else_branch.condition.as_ref().unwrap()))
+            && else_branch.consequence.expr.as_ref().map_or(false, |e| expr_can_render_as_js_expr(e))
+    })
+}
+
 /// Check if an if-else expression can be rendered as a ternary operator in JavaScript
 pub fn if_else_can_render_as_ternary(
     expr: &hir::Expr,
@@ -1641,7 +1676,7 @@ pub fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
             // 1. It has only one else clause (no if-else-if)
             // 2. It can be a ternary operator
             else_branches.len() == 1 
-                && if_else_can_render_as_ternary(condition, then_branch, else_branches)
+                && if_else_can_render_as_ternary_safe(condition, then_branch, else_branches)
         }
         hir::ExprKind::Match(..) => false,
         hir::ExprKind::Call(call_expr) => {

@@ -21,6 +21,7 @@ fn compile(source: &str) -> hir::LowerResult {
     let ast = Parser::from_source(source).parse().unwrap();
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.add_builtin_symbols(&[
+        ("log", SymbolType::Function(u16::MAX)),
         ("println", SymbolType::Function(u16::MAX)),
         ("Some", SymbolType::EnumVariant(1)),
         ("None", SymbolType::EnumVariant(0)),
@@ -1986,4 +1987,49 @@ fn test_debug_function_pattern_matching() {
     let hir = compile_and_apply_hir_js_pass(source);
     println!("HIR after JS pass:");
     println!("{}", pretty_print(&hir));
+}
+
+#[test]
+fn test_debug_nested_loop_expressions() {
+    let source = r#"
+        fn nested_loop_expressions() {
+            let outer = loop {
+                let inner = loop {
+                    break 5;
+                };
+                if inner == 5 { break inner * 2; }
+            };
+            outer
+        }
+        
+        nested_loop_expressions() |> log();
+    "#;
+
+    let (mut module, meta) = compile(source);
+    let mut ctx = HirOptContext::from(meta);
+    let mut pass = HirJsPass::new();
+
+    println!("=== Initial HIR ===");
+    println!("{}", pretty_print(&module));
+
+    // Run the HIR JS pass iteratively and show each iteration
+    let mut iterations = 0;
+    let max_iterations = 25; // Increase to see if we need more iterations
+
+    loop {
+        println!("\n=== Before iteration {} ===", iterations + 1);
+        println!("{}", pretty_print(&module));
+        
+        let changes_made = pass.optimize_hir(&mut module, &mut ctx);
+        iterations += 1;
+
+        println!("Iteration {}: changes_made = {}", iterations, changes_made);
+        
+        if !changes_made || iterations >= max_iterations {
+            break;
+        }
+    }
+    
+    println!("\n=== Final HIR after {} iterations ===", iterations);
+    println!("{}", pretty_print(&module));
 }
