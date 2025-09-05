@@ -683,17 +683,14 @@ impl SymbolTable {
 
     /// Apply a function to each local symbol mutably
     /// This is the preferred way to mutate local symbols in the new storage pattern
-    /// Note: "local" here means all symbols accessible from this symbol table's scope,
-    /// not just symbols declared in the current scope
     pub fn for_each_local_symbol_mut<F>(&self, mut f: F)
     where
         F: FnMut(&mut SymbolInfo),
     {
-        if let (Some(storage), Some(_scope)) = (&self.storage, &self.scope) {
+        if let (Some(storage), Some(scope)) = (&self.storage, &self.scope) {
             let mut storage_borrow = storage.borrow_mut();
-            // Iterate over all symbols in the storage, not just current scope
-            // This matches the behavior expected by AST lowering for HIR ID assignment
-            for symbol in storage_borrow.all_mut() {
+            let local_symbols = storage_borrow.scope_symbols_mut(scope);
+            for symbol in local_symbols {
                 f(symbol);
             }
         }
