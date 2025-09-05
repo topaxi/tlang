@@ -847,32 +847,46 @@ impl HirJsPass {
         expr: hir::Expr,
         span: Span,
     ) -> Vec<hir::Stmt> {
+        self.create_temp_var_assignment_for_expr_internal(ctx, temp_name, expr, span, false)
+    }
+
+    fn create_temp_var_assignment_for_expr_internal(
+        &mut self,
+        ctx: &mut HirOptContext,
+        temp_name: &str,
+        expr: hir::Expr,
+        span: Span,
+        use_return_statements: bool,
+    ) -> Vec<hir::Stmt> {
         let mut statements = Vec::new();
 
-        // For all expressions (including loops), create a let declaration with wildcard as initial value
-        let temp_var_decl = hir::Stmt::new(
-            ctx.hir_id_allocator.next_id(),
-            hir::StmtKind::Let(
-                Box::new(hir::Pat {
-                    kind: hir::PatKind::Identifier(
-                        ctx.hir_id_allocator.next_id(),
-                        Box::new(Ident::new(temp_name, span))
-                    ),
-                    span,
-                }),
-                Box::new(hir::Expr {
-                    hir_id: ctx.hir_id_allocator.next_id(),
-                    kind: hir::ExprKind::Wildcard,
-                    span,
-                }),
-                Box::new(hir::Ty {
-                    kind: hir::TyKind::Unknown,
-                    span,
-                }), // Unknown type for now
-            ),
-            span,
-        );
-        statements.push(temp_var_decl);
+        // Only create temp variable declaration if we're not using return statements
+        if !use_return_statements {
+            // For all expressions (including loops), create a let declaration with wildcard as initial value
+            let temp_var_decl = hir::Stmt::new(
+                ctx.hir_id_allocator.next_id(),
+                hir::StmtKind::Let(
+                    Box::new(hir::Pat {
+                        kind: hir::PatKind::Identifier(
+                            ctx.hir_id_allocator.next_id(),
+                            Box::new(Ident::new(temp_name, span))
+                        ),
+                        span,
+                    }),
+                    Box::new(hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::Wildcard,
+                        span,
+                    }),
+                    Box::new(hir::Ty {
+                        kind: hir::TyKind::Unknown,
+                        span,
+                    }), // Unknown type for now
+                ),
+                span,
+            );
+            statements.push(temp_var_decl);
+        }
 
         match &expr.kind {
             hir::ExprKind::Block(block) => {
@@ -928,18 +942,28 @@ impl HirJsPass {
                 // Transform if/else expressions to regular if/else statements
                 let mut new_then_branch = then_branch.as_ref().clone();
                 if let Some(completion_expr) = new_then_branch.expr.take() {
-                    // If the completion expression is an if-else, we need to flatten it too
-                    match &completion_expr.kind {
-                        hir::ExprKind::IfElse(..) => {
-                            // Recursively flatten nested if-else expressions
-                            let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(completion_expr, ctx);
-                            new_then_branch.stmts.extend(temp_stmts);
-                            let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
-                            new_then_branch.stmts.push(assignment_stmt);
-                        }
-                        _ => {
-                            let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
-                            new_then_branch.stmts.push(assignment_stmt);
+                    if use_return_statements {
+                        // Use direct return statements instead of temp variable assignments
+                        let return_stmt = hir::Stmt::new(
+                            ctx.hir_id_allocator.next_id(),
+                            hir::StmtKind::Return(Some(Box::new(completion_expr))),
+                            span,
+                        );
+                        new_then_branch.stmts.push(return_stmt);
+                    } else {
+                        // If the completion expression is an if-else, we need to flatten it too
+                        match &completion_expr.kind {
+                            hir::ExprKind::IfElse(..) => {
+                                // Recursively flatten nested if-else expressions
+                                let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(completion_expr, ctx);
+                                new_then_branch.stmts.extend(temp_stmts);
+                                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
+                                new_then_branch.stmts.push(assignment_stmt);
+                            }
+                            _ => {
+                                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                                new_then_branch.stmts.push(assignment_stmt);
+                            }
                         }
                     }
                 }
@@ -948,18 +972,28 @@ impl HirJsPass {
                 for else_branch in else_branches {
                     let mut new_else_consequence = else_branch.consequence.clone();
                     if let Some(completion_expr) = new_else_consequence.expr.take() {
-                        // If the completion expression is an if-else, we need to flatten it too
-                        match &completion_expr.kind {
-                            hir::ExprKind::IfElse(..) => {
-                                // Recursively flatten nested if-else expressions
-                                let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(completion_expr, ctx);
-                                new_else_consequence.stmts.extend(temp_stmts);
-                                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
-                                new_else_consequence.stmts.push(assignment_stmt);
-                            }
-                            _ => {
-                                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
-                                new_else_consequence.stmts.push(assignment_stmt);
+                        if use_return_statements {
+                            // Use direct return statements instead of temp variable assignments
+                            let return_stmt = hir::Stmt::new(
+                                ctx.hir_id_allocator.next_id(),
+                                hir::StmtKind::Return(Some(Box::new(completion_expr))),
+                                span,
+                            );
+                            new_else_consequence.stmts.push(return_stmt);
+                        } else {
+                            // If the completion expression is an if-else, we need to flatten it too
+                            match &completion_expr.kind {
+                                hir::ExprKind::IfElse(..) => {
+                                    // Recursively flatten nested if-else expressions
+                                    let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(completion_expr, ctx);
+                                    new_else_consequence.stmts.extend(temp_stmts);
+                                    let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
+                                    new_else_consequence.stmts.push(assignment_stmt);
+                                }
+                                _ => {
+                                    let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                                    new_else_consequence.stmts.push(assignment_stmt);
+                                }
                             }
                         }
                     }
@@ -1006,21 +1040,31 @@ impl HirJsPass {
                     // FIRST: Recursively apply HIR JS pass to the arm block to handle nested expressions
                     self.visit_block(&mut new_arm_block, ctx);
                     
-                    // Transform the arm completion expression to assign to temp variable
+                    // Transform the arm completion expression to assign to temp variable or return directly
                     if let Some(completion_expr) = new_arm_block.expr.take() {
-                        // For complex expressions, flatten them first
-                        match &completion_expr.kind {
-                            hir::ExprKind::IfElse(..) | hir::ExprKind::Loop(..) | hir::ExprKind::Match(..) | hir::ExprKind::Block(..) => {
-                                // Recursively flatten nested complex expressions
-                                let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(completion_expr, ctx);
-                                new_arm_block.stmts.extend(temp_stmts);
-                                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
-                                new_arm_block.stmts.push(assignment_stmt);
-                            }
-                            _ => {
-                                // For simple expressions, create direct assignment
-                                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
-                                new_arm_block.stmts.push(assignment_stmt);
+                        if use_return_statements {
+                            // Use direct return statements instead of temp variable assignments
+                            let return_stmt = hir::Stmt::new(
+                                ctx.hir_id_allocator.next_id(),
+                                hir::StmtKind::Return(Some(Box::new(completion_expr))),
+                                span,
+                            );
+                            new_arm_block.stmts.push(return_stmt);
+                        } else {
+                            // For complex expressions, flatten them first
+                            match &completion_expr.kind {
+                                hir::ExprKind::IfElse(..) | hir::ExprKind::Loop(..) | hir::ExprKind::Match(..) | hir::ExprKind::Block(..) => {
+                                    // Recursively flatten nested complex expressions
+                                    let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(completion_expr, ctx);
+                                    new_arm_block.stmts.extend(temp_stmts);
+                                    let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
+                                    new_arm_block.stmts.push(assignment_stmt);
+                                }
+                                _ => {
+                                    // For simple expressions, create direct assignment
+                                    let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                                    new_arm_block.stmts.push(assignment_stmt);
+                                }
                             }
                         }
                     }
@@ -1331,12 +1375,33 @@ impl HirJsPass {
                 statements.push(continue_stmt);
             }
             _ => {
-                // For other expressions, just create a simple assignment
-                statements.push(self.create_assignment_stmt(ctx, temp_name, expr, span));
+                // For other expressions, create assignment or return statement
+                if use_return_statements {
+                    let return_stmt = hir::Stmt::new(
+                        ctx.hir_id_allocator.next_id(),
+                        hir::StmtKind::Return(Some(Box::new(expr))),
+                        span,
+                    );
+                    statements.push(return_stmt);
+                } else {
+                    statements.push(self.create_assignment_stmt(ctx, temp_name, expr, span));
+                }
             }
         }
 
         statements
+    }
+
+    /// Create statements for function completion expressions using direct return statements
+    /// This is used instead of temp variables when we're in a function completion position
+    fn create_return_statements_for_expr(
+        &mut self,
+        ctx: &mut HirOptContext,
+        expr: hir::Expr,
+        span: Span,
+    ) -> Vec<hir::Stmt> {
+        // Use the internal method with return statements enabled
+        self.create_temp_var_assignment_for_expr_internal(ctx, "", expr, span, true)
     }
 }
 
@@ -1501,18 +1566,32 @@ impl HirJsPass {
                 }
                 // Match expressions in block completion position should be transformed to statements
                 hir::ExprKind::Match(..) => {
-                    // Transform match expressions using the specialized flattening approach
                     let span = expr.span;
                     let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                     let expr_to_flatten = std::mem::replace(expr, placeholder);
-                    let (flattened_expr, temp_stmts) =
-                        self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
-                    *expr = flattened_expr;
+                    
+                    // Check if we're in a function completion position - use return statements instead of temp variables
+                    let is_function_completion = function_name.is_some();
+                    
+                    let temp_stmts = if is_function_completion {
+                        // Use direct return statements for function completion
+                        self.create_return_statements_for_expr(ctx, expr_to_flatten, span)
+                    } else {
+                        // Use temp variables for other completion positions
+                        let (flattened_expr, stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                        *expr = flattened_expr;
+                        stmts
+                    };
 
                     // If we generated statements for the match expression, add them to the block
                     if !temp_stmts.is_empty() {
                         block.stmts.extend(temp_stmts);
                         self.changes_made = true;
+                        
+                        // If we used return statements, clear the completion expression
+                        if is_function_completion {
+                            block.expr = None;
+                        }
                     }
                 }
                 // If-else expressions that cannot be rendered as JavaScript expressions should be transformed
@@ -1520,18 +1599,32 @@ impl HirJsPass {
                     // Only transform if-else-if expressions (multiple else branches) as they cannot be ternaries
                     // Simple if-else expressions should be handled by the JavaScript generator if possible
                     if else_branches.len() > 1 {
-                        // Transform if-else-if expressions using the specialized flattening approach
                         let span = expr.span;
                         let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                         let expr_to_flatten = std::mem::replace(expr, placeholder);
-                        let (flattened_expr, temp_stmts) =
-                            self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
-                        *expr = flattened_expr;
+                        
+                        // Check if we're in a function completion position - use return statements instead of temp variables
+                        let is_function_completion = function_name.is_some();
+                        
+                        let temp_stmts = if is_function_completion {
+                            // Use direct return statements for function completion
+                            self.create_return_statements_for_expr(ctx, expr_to_flatten, span)
+                        } else {
+                            // Use temp variables for other completion positions
+                            let (flattened_expr, stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                            *expr = flattened_expr;
+                            stmts
+                        };
 
                         // If we generated statements for the if-else expression, add them to the block
                         if !temp_stmts.is_empty() {
                             block.stmts.extend(temp_stmts);
                             self.changes_made = true;
+                            
+                            // If we used return statements, clear the completion expression
+                            if is_function_completion {
+                                block.expr = None;
+                            }
                         }
                     } else {
                         // For simple if-else expressions, check if they're in tail call position
@@ -1700,18 +1793,32 @@ impl HirJsPass {
                             self.changes_made = true;
                         }
                     } else if !expr_can_render_as_js_expr(expr) {
-                        // This expression cannot be rendered as JS - transform it to temp variables
                         let span = expr.span;
                         let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
                         let expr_to_flatten = std::mem::replace(expr, placeholder);
-                        let (flattened_expr, temp_stmts) =
-                            self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
-                        *expr = flattened_expr;
+                        
+                        // Check if we're in a function completion position - use return statements instead of temp variables
+                        let is_function_completion = function_name.is_some();
+                        
+                        let temp_stmts = if is_function_completion {
+                            // Use direct return statements for function completion
+                            self.create_return_statements_for_expr(ctx, expr_to_flatten, span)
+                        } else {
+                            // Use temp variables for other completion positions
+                            let (flattened_expr, stmts) = self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                            *expr = flattened_expr;
+                            stmts
+                        };
 
                         // If we generated statements for the expression, add them to the block
                         if !temp_stmts.is_empty() {
                             block.stmts.extend(temp_stmts);
                             self.changes_made = true;
+                            
+                            // If we used return statements, clear the completion expression
+                            if is_function_completion {
+                                block.expr = None;
+                            }
                         }
                     } else {
                         // Expression can be rendered as JS, but still process subexpressions
@@ -1729,6 +1836,38 @@ impl HirJsPass {
                         }
                     }
                 }
+            }
+        }
+
+        // Handle simple completion expressions in function context
+        // Convert them to return statements if we're in a function completion position
+        if let Some(expr) = &mut block.expr {
+            if let Some(_function_name) = function_name {
+                // If we're in a function context and we still have a completion expression,
+                // it means it's a simple expression that can be rendered as JS
+                // Convert it to a return statement
+                let completion_expr = std::mem::replace(
+                    expr,
+                    hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::Literal(Box::new(
+                            tlang_ast::token::Literal::String("()".into()),
+                        )),
+                        span: expr.span,
+                    },
+                );
+
+                // Create a return statement
+                let return_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Return(Some(Box::new(completion_expr))),
+                    expr.span,
+                );
+
+                // Add the return statement and clear the completion expression
+                block.stmts.push(return_stmt);
+                block.expr = None;
+                self.changes_made = true;
             }
         }
 

@@ -1840,6 +1840,79 @@ fn test_if_else_if_expression_transformation() {
 }
 
 #[test]
+fn test_fibonacci_pattern_matching_uses_return_statements() {
+    let source = r#"
+        fn fibonacci(n) { fibonacci(n, 0, 1) }
+        fn fibonacci(0, a, _) { a }
+        fn fibonacci(1, _, b) { b }
+        fn fibonacci(n, a, b) { rec fibonacci(n - 1, b, a + b) }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    println!("Fibonacci HIR Output:");
+    println!("{}", pretty_print(&hir));
+    assert_snapshot!(pretty_print(&hir), @r#"
+    fn fibonacci/1(n: unknown) -> unknown {
+        return fibonacci/3(n, 0, 1);
+    }
+    fn fibonacci/3(n: unknown, a: unknown, b: unknown) -> unknown {
+        match [n, a, b] {
+            [0, a, _] => {
+                return a;
+            },
+            [1, _, b] => {
+                return b;
+            },
+            [n, a, b] => {
+                return rec fibonacci/3((n - 1), b, (a + b));
+            },
+        };
+    }
+    dyn fn fibonacci
+        -> fibonacci/1
+        -> fibonacci/3;
+    "#);
+}
+
+#[test]
+fn test_function_with_match_completion_uses_return_statements() {
+    let source = r#"
+        enum Option {
+            Some(value),
+            None,
+        }
+        
+        fn test_func(x) {
+            match x {
+                Option::Some(n) => n + 1,
+                Option::None => 0,
+            }
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    println!("HIR Output with match in completion position:");
+    println!("{}", pretty_print(&hir));
+    assert_snapshot!(pretty_print(&hir), @r#"
+    enum Option {
+        Some {
+            0: value,
+        }
+        None {
+        }
+    }
+    fn test_func(x: unknown) -> unknown {
+        match x {
+            Option::Some { 0: n } => {
+                return (n + 1);
+            },
+            Option::None => {
+                return 0;
+            },
+        };
+    }
+    "#);
+}
+
+#[test]
 fn test_function_declaration_with_match_expressions() {
     let source = r#"
         enum Option {
@@ -1856,6 +1929,8 @@ fn test_function_declaration_with_match_expressions() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
+    println!("Current HIR output:");
+    println!("{}", pretty_print(&hir));
     assert_snapshot!(pretty_print(&hir), @r#"
     enum Option {
         Some {
