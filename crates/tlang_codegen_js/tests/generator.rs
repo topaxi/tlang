@@ -43,7 +43,9 @@ fn test_codegen_function_expression() {
     let output = compile!("fn main() { let foo = fn() { 1 + 2 }; }");
     let expected_output = indoc! {"
         function main() {
-            let foo = () => 3;
+            let foo = function() {
+                return 3;
+            };
         }
     "};
     assert_eq!(output, expected_output);
