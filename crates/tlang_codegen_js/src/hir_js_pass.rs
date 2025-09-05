@@ -9,8 +9,6 @@ use crate::function_generator::fn_identifier_to_string;
 pub struct HirJsPass {
     temp_var_counter: usize,
     changes_made: bool,
-    /// Stack of function contexts to track tail call positions
-    function_stack: Vec<String>,
     /// Debug counter to track pass iterations
     iteration_counter: usize,
 }
@@ -20,7 +18,6 @@ impl HirJsPass {
         Self {
             temp_var_counter: 0,
             changes_made: false,
-            function_stack: Vec::new(),
             iteration_counter: 0,
         }
     }
@@ -462,6 +459,21 @@ impl HirJsPass {
             }
             hir::ExprKind::Call(call_expr) => {
                 // Flatten function arguments
+                for arg in &mut call_expr.arguments {
+                    if !expr_can_render_as_js_expr(arg) {
+                        let span = arg.span;
+                        let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
+                        let expr_to_flatten = std::mem::replace(arg, placeholder);
+                        let (flattened, mut stmts) =
+                            self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
+                        *arg = flattened;
+                        statements.append(&mut stmts);
+                        self.changes_made = true;
+                    }
+                }
+            }
+            hir::ExprKind::TailCall(call_expr) => {
+                // Flatten tail call arguments
                 for arg in &mut call_expr.arguments {
                     if !expr_can_render_as_js_expr(arg) {
                         let span = arg.span;
@@ -1131,12 +1143,46 @@ impl HirJsPass {
                 statements.append(&mut temp_stmts);
 
                 // Now create the assignment with the flattened call expression
-                statements.push(self.create_assignment_stmt(
-                    ctx,
-                    temp_name,
-                    flattened_call_expr,
-                    span,
-                ));
+                if use_return_statements {
+                    let return_stmt = hir::Stmt::new(
+                        ctx.hir_id_allocator.next_id(),
+                        hir::StmtKind::Return(Some(Box::new(flattened_call_expr))),
+                        span,
+                    );
+                    statements.push(return_stmt);
+                } else {
+                    statements.push(self.create_assignment_stmt(
+                        ctx,
+                        temp_name,
+                        flattened_call_expr,
+                        span,
+                    ));
+                }
+            }
+            hir::ExprKind::TailCall(_call_expr) => {
+                // For tail call expressions in function completion position, preserve them without flattening arguments
+                if use_return_statements {
+                    let return_stmt = hir::Stmt::new(
+                        ctx.hir_id_allocator.next_id(),
+                        hir::StmtKind::Return(Some(Box::new(expr))),
+                        span,
+                    );
+                    statements.push(return_stmt);
+                } else {
+                    // For non-function completion contexts, flatten the arguments
+                    let (flattened_call_expr, mut temp_stmts) =
+                        self.flatten_subexpressions_generically(expr, ctx);
+
+                    // Add any statements from flattening the arguments
+                    statements.append(&mut temp_stmts);
+
+                    statements.push(self.create_assignment_stmt(
+                        ctx,
+                        temp_name,
+                        flattened_call_expr,
+                        span,
+                    ));
+                }
             }
             hir::ExprKind::Binary(op_kind, lhs, rhs) => {
                 // Handle short-circuit operators specially
@@ -1952,10 +1998,13 @@ impl HirJsPass {
         match &node.kind {
             hir::ExprKind::TailCall(call_expr) => {
                 // If the function is an identifier, check if it's the same as the current function name.
-                if let hir::ExprKind::Path(_) = &call_expr.callee.kind
-                    && fn_identifier_to_string(&call_expr.callee) == function_name
-                {
-                    return true;
+                if let hir::ExprKind::Path(_) = &call_expr.callee.kind {
+                    let callee_name = fn_identifier_to_string(&call_expr.callee);
+                    if callee_name == function_name {
+                        return true;
+                    } else {
+                        return false;
+                    }
                 }
                 false
             }
@@ -2024,7 +2073,7 @@ impl HirJsPass {
 
     /// Check if we're currently processing a function that could have tail calls
     fn current_function_name(&self) -> Option<&str> {
-        self.function_stack.last().map(|s| s.as_str())
+        None
     }
 
     /// Check if an expression is in tail call position and should not be flattened
