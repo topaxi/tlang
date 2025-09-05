@@ -11,6 +11,8 @@ pub struct HirJsPass {
     changes_made: bool,
     /// Stack of function contexts to track tail call positions
     function_stack: Vec<String>,
+    /// Debug counter to track pass iterations
+    iteration_counter: usize,
 }
 
 impl HirJsPass {
@@ -19,6 +21,7 @@ impl HirJsPass {
             temp_var_counter: 0,
             changes_made: false,
             function_stack: Vec::new(),
+            iteration_counter: 0,
         }
     }
 
@@ -847,7 +850,7 @@ impl HirJsPass {
         expr: hir::Expr,
         span: Span,
     ) -> Vec<hir::Stmt> {
-        self.create_temp_var_assignment_for_expr_internal(ctx, temp_name, expr, span, false)
+        self.create_temp_var_assignment_for_expr_internal(ctx, temp_name, expr, span, false, None)
     }
 
     fn create_temp_var_assignment_for_expr_internal(
@@ -857,6 +860,7 @@ impl HirJsPass {
         expr: hir::Expr,
         span: Span,
         use_return_statements: bool,
+        function_context: Option<&str>,
     ) -> Vec<hir::Stmt> {
         let mut statements = Vec::new();
 
@@ -1034,11 +1038,11 @@ impl HirJsPass {
                 
                 // Transform each arm
                 let mut new_arms = Vec::new();
-                for arm in arms {
+                for (_i, arm) in arms.iter().enumerate() {
                     let mut new_arm_block = arm.block.clone();
                     
-                    // FIRST: Recursively apply HIR JS pass to the arm block to handle nested expressions
-                    self.visit_block(&mut new_arm_block, ctx);
+                    // NOTE: We don't call visit_block here because we want to handle the completion expression ourselves
+                    // The recursive visit would consume the completion expression before we can transform it to return statements
                     
                     // Transform the arm completion expression to assign to temp variable or return directly
                     if let Some(completion_expr) = new_arm_block.expr.take() {
@@ -1098,7 +1102,11 @@ impl HirJsPass {
                 
                 // FIRST: Recursively apply HIR JS pass to all expressions in the loop block
                 // This ensures nested complex expressions (match, block, etc.) are transformed
-                self.visit_block(&mut new_loop_block, ctx);
+                if let Some(function_name) = function_context {
+                    self.visit_block_with_function_context(&mut new_loop_block, ctx, Some(function_name));
+                } else {
+                    self.visit_block(&mut new_loop_block, ctx);
+                }
                 
                 // THEN: Transform break statements in the loop to assign to the temp variable
                 self.transform_break_statements_in_block(&mut new_loop_block, temp_name, ctx);
@@ -1400,8 +1408,8 @@ impl HirJsPass {
         expr: hir::Expr,
         span: Span,
     ) -> Vec<hir::Stmt> {
-        // Use the internal method with return statements enabled
-        self.create_temp_var_assignment_for_expr_internal(ctx, "", expr, span, true)
+        // Use the internal method with return statements enabled and function context
+        self.create_temp_var_assignment_for_expr_internal(ctx, "", expr, span, true, Some("function"))
     }
 }
 
@@ -1504,6 +1512,7 @@ pub fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
 
 impl HirPass for HirJsPass {
     fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
+        self.iteration_counter += 1;
         self.changes_made = false;
         self.visit_module(module, ctx);
         self.changes_made
