@@ -472,20 +472,11 @@ impl HirJsPass {
                     }
                 }
             }
-            hir::ExprKind::TailCall(call_expr) => {
-                // Flatten tail call arguments
-                for arg in &mut call_expr.arguments {
-                    if !expr_can_render_as_js_expr(arg) {
-                        let span = arg.span;
-                        let placeholder = self.create_temp_var_path(ctx, "placeholder", span);
-                        let expr_to_flatten = std::mem::replace(arg, placeholder);
-                        let (flattened, mut stmts) =
-                            self.flatten_expression_to_temp_var(expr_to_flatten, ctx);
-                        *arg = flattened;
-                        statements.append(&mut stmts);
-                        self.changes_made = true;
-                    }
-                }
+            hir::ExprKind::TailCall(_call_expr) => {
+                // TailCall expressions should be handled by the JavaScript codegen for tail call optimization.
+                // The HIR JS pass should not flatten TailCall arguments as this interferes with 
+                // tail call recognition in the codegen phase.
+                // Arguments will be flattened by the JavaScript generator when needed.
             }
             hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
                 // Flatten condition if it's complex
@@ -1588,7 +1579,7 @@ impl<'hir> Visitor<'hir> for HirJsPass {
 
     fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut Self::Context) {
         // Check if this is a return statement with a TailCall - if so, don't process the TailCall further
-        match &stmt.kind {
+        match &mut stmt.kind {
             hir::StmtKind::Return(Some(expr)) => {
                 match &expr.kind {
                     hir::ExprKind::TailCall(_) => {
@@ -1600,6 +1591,30 @@ impl<'hir> Visitor<'hir> for HirJsPass {
                         visit::walk_stmt(self, stmt, ctx);
                     }
                 }
+            }
+            hir::StmtKind::FunctionDeclaration(func_decl) => {
+                // Handle function declarations by providing function context to block visitor
+                let function_name = crate::function_generator::fn_identifier_to_string(&func_decl.name);
+                
+                // Visit function metadata first
+                self.visit_expr(&mut func_decl.name, ctx);
+                self.enter_scope(func_decl.hir_id, ctx);
+                
+                for param in &mut func_decl.parameters {
+                    self.visit_ident(&mut param.name, ctx);
+                    self.visit_ty(&mut param.type_annotation, ctx);
+                }
+                
+                // Visit the function body with function context
+                self.visit_block_with_function_context(&mut func_decl.body, ctx, Some(&function_name));
+                self.leave_scope(func_decl.hir_id, ctx);
+                
+                // Don't call walk_stmt to avoid double-processing
+            }
+            hir::StmtKind::DynFunctionDeclaration(_func_decl) => {
+                // DynFunctionDeclaration doesn't have a body to process, it's just metadata
+                // No need to process it specially
+                visit::walk_stmt(self, stmt, ctx);
             }
             _ => {
                 // Always walk other statements to ensure nested expressions are visited
@@ -1845,6 +1860,31 @@ impl HirJsPass {
 
                         self.changes_made = true;
                     }
+                }
+                // TailCall expressions should be converted to return statements in function completion position
+                hir::ExprKind::TailCall(_) => {
+                    // Check if we're in a function completion position
+                    let is_function_completion = function_name.is_some();
+                    
+                    if is_function_completion {
+                        // TailCall in function completion position - convert to return statement
+                        let span = expr.span;
+                        let return_stmt = hir::Stmt::new(
+                            ctx.hir_id_allocator.next_id(),
+                            hir::StmtKind::Return(Some(Box::new(expr.clone()))),
+                            span,
+                        );
+                        
+                        // Add the return statement to the block
+                        block.stmts.push(return_stmt);
+                        
+                        // Clear the completion expression since we moved it to statements
+                        block.expr = None;
+                        
+                        self.changes_made = true;
+                    }
+                    // For non-function completion contexts, leave TailCall as-is
+                    // The JavaScript generator will handle it appropriately
                 }
                 _ => {
                     // For other expressions, check if they need flattening but avoid loop transformation
