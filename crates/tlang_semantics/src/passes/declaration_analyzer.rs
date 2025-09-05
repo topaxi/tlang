@@ -43,7 +43,18 @@ impl DeclarationAnalyzer {
     fn pop_symbol_table(&mut self) -> Rc<RefCell<SymbolTable>> {
         debug!("Leaving scope");
 
-        self.symbol_table_stack.pop().unwrap()
+        let child_table = self.symbol_table_stack.pop().unwrap();
+        
+        // Update parent scope to include symbols added by child
+        if let Some(parent_table) = self.symbol_table_stack.last() {
+            parent_table.borrow_mut().update_scope_size_to_storage();
+            debug!(
+                "Updated parent scope size to include all symbols up to storage size {}", 
+                parent_table.borrow().get_storage_size()
+            );
+        }
+        
+        child_table
     }
 
     #[inline(always)]

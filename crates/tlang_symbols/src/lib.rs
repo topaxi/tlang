@@ -222,7 +222,22 @@ impl SymbolTable {
         None
     }
 
-    /// Debug method to inspect storage (for testing)
+    /// Update this scope's size to include all symbols up to the current storage size
+    pub fn update_scope_size_to_storage(&mut self) {
+        if let (Some(storage), Some(scope)) = (&self.storage, &mut self.scope) {
+            let current_storage_size = storage.borrow().symbols.len();
+            scope.size = current_storage_size - scope.start();
+        }
+    }
+
+    /// Get the current storage size (for scope management)
+    pub fn get_storage_size(&self) -> usize {
+        if let Some(storage) = &self.storage {
+            storage.borrow().symbols.len()
+        } else {
+            0
+        }
+    }
     pub fn debug_storage_info(&self) -> String {
         if let Some(storage_ref) = &self.storage {
             let storage = storage_ref.borrow();
@@ -396,45 +411,50 @@ impl SymbolTable {
             
             // For non-FunctionSelfRef symbols:
             // 1. Symbols from parent scopes (storage_index < scope.start) are accessible
-            //    BUT only if they were declared before this scope started
+            //    from module scope, but function scopes have special rules
             if storage_index < scope.start() {
-                // We need to determine if we're in a function scope or just a statement scope
-                // Check if the symbol immediately before our scope start is a function
-                let is_function_scope = if scope.start() > 0 {
-                    if let Some(storage) = &self.storage {
-                        let storage_ref = storage.borrow();
-                        if let Some(prev_symbol) = storage_ref.all().get(scope.start() - 1) {
-                            matches!(prev_symbol.symbol_type, SymbolType::FunctionSelfRef(_))
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
+                // Determine if we're in a function scope by checking if our current scope
+                // contains a FunctionSelfRef symbol
+                let is_function_scope = if let Some(storage) = &self.storage {
+                    let storage_ref = storage.borrow();
+                    
+                    // Check if our current scope contains any FunctionSelfRef symbols
+                    (scope.start()..scope.start() + scope.size())
+                        .any(|i| {
+                            if let Some(sym) = storage_ref.all().get(i) {
+                                matches!(sym.symbol_type, SymbolType::FunctionSelfRef(_))
+                            } else {
+                                false
+                            }
+                        })
                 } else {
                     false
                 };
                 
                 if is_function_scope {
-                    // This is a function scope. We need to get the function's declaration span
+                    // This is a function scope. We need to get our function's declaration span
                     // to compare with the symbol's declaration span.
-                    // Variables should not be accessible if they are declared after the function.
                     
-                    // Get our function's declaration from storage
+                    // Find the FunctionSelfRef symbol in our scope to get the function's declaration span
                     if let Some(storage) = &self.storage {
                         let storage_ref = storage.borrow();
-                        // The function symbol should be at storage_index = scope.start - 1
-                        if let Some(function_symbol) = storage_ref.all().get(scope.start() - 1) {
-                            // If the symbol we're checking was declared after our function,
-                            // it should not be accessible
-                            if symbol.defined_at.start > function_symbol.defined_at.start {
-                                return false;
+                        
+                        for i in scope.start()..scope.start() + scope.size() {
+                            if let Some(function_symbol) = storage_ref.all().get(i) {
+                                if matches!(function_symbol.symbol_type, SymbolType::FunctionSelfRef(_)) {
+                                    // If the symbol we're checking was declared after our function,
+                                    // it should not be accessible
+                                    if symbol.defined_at.start > function_symbol.defined_at.start {
+                                        return false;
+                                    }
+                                    break;
+                                }
                             }
                         }
                     }
                 }
                 
-                return true; // Parent scope symbol that was declared before us (or we're not in a function scope)
+                return true; // Parent scope symbol that was declared before our function (or we're in module scope)
             }
             
             // 2. Function symbols are accessible to all scopes (but still subject to declaration order)
