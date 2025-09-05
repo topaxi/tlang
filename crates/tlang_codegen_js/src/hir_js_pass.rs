@@ -1160,8 +1160,10 @@ impl HirJsPass {
                 }
             }
             hir::ExprKind::TailCall(_call_expr) => {
-                // For tail call expressions in function completion position, preserve them without flattening arguments
+                // For tail call expressions, treat them differently based on context
                 if use_return_statements {
+                    // In function completion contexts, preserve TailCall arguments as-is
+                    // Let the JavaScript generator handle complex arguments
                     let return_stmt = hir::Stmt::new(
                         ctx.hir_id_allocator.next_id(),
                         hir::StmtKind::Return(Some(Box::new(expr))),
@@ -1585,9 +1587,25 @@ impl<'hir> Visitor<'hir> for HirJsPass {
     }
 
     fn visit_stmt(&mut self, stmt: &'hir mut hir::Stmt, ctx: &mut Self::Context) {
-        // Always walk the statement to ensure nested expressions are visited
-        // The actual statement transformation happens in visit_block()
-        visit::walk_stmt(self, stmt, ctx);
+        // Check if this is a return statement with a TailCall - if so, don't process the TailCall further
+        match &stmt.kind {
+            hir::StmtKind::Return(Some(expr)) => {
+                match &expr.kind {
+                    hir::ExprKind::TailCall(_) => {
+                        // Don't walk into TailCall expressions in return statements to preserve them
+                        return;
+                    }
+                    _ => {
+                        // For other expressions in return statements, continue normal processing
+                        visit::walk_stmt(self, stmt, ctx);
+                    }
+                }
+            }
+            _ => {
+                // Always walk other statements to ensure nested expressions are visited
+                visit::walk_stmt(self, stmt, ctx);
+            }
+        }
     }
 
     fn visit_block(&mut self, block: &'hir mut hir::Block, ctx: &mut Self::Context) {
@@ -2072,12 +2090,6 @@ impl HirJsPass {
     }
 
     /// Check if we're currently processing a function that could have tail calls
-    fn current_function_name(&self) -> Option<&str> {
-        None
-    }
-
-    /// Check if an expression is in tail call position and should not be flattened
-    /// This version doesn't rely on function stack state and examines the HIR structure directly
     fn is_in_tail_call_position_stateless(&self, expr: &hir::Expr, current_function_name: Option<&str>) -> bool {
         if let Some(function_name) = current_function_name {
             self.is_expr_tail_recursive(function_name, expr)
