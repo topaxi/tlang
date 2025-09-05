@@ -11,6 +11,8 @@ pub struct HirJsPass {
     changes_made: bool,
     /// Debug counter to track pass iterations
     iteration_counter: usize,
+    /// Track TailCall expressions that have been processed to avoid re-processing
+    processed_tail_calls: std::collections::HashSet<HirId>,
 }
 
 impl HirJsPass {
@@ -19,6 +21,7 @@ impl HirJsPass {
             temp_var_counter: 0,
             changes_made: false,
             iteration_counter: 0,
+            processed_tail_calls: std::collections::HashSet::new(),
         }
     }
 
@@ -177,7 +180,12 @@ impl HirJsPass {
             }
             // Handle return statements with complex expressions
             hir::StmtKind::Return(Some(expr)) => {
-                if !expr_can_render_as_js_expr(&expr) {
+                // Special handling for TailCall expressions - don't flatten them
+                if let hir::ExprKind::TailCall(_) = &expr.kind {
+                    // TailCall expressions in return statements should be preserved
+                    // Return the original statement without any changes
+                    (original_stmt, temp_stmts)
+                } else if !expr_can_render_as_js_expr(&expr) {
                     // Use generic flattening for the expression
                     let (flattened_expr, mut temp_var_stmts) =
                         self.flatten_expression_to_temp_var(*expr, ctx);
@@ -473,6 +481,12 @@ impl HirJsPass {
                 }
             }
             hir::ExprKind::TailCall(_call_expr) => {
+                // Check if this TailCall has already been processed
+                if self.processed_tail_calls.contains(&expr.hir_id) {
+                    // Skip processing this TailCall to avoid infinite loops
+                    return (expr, statements);
+                }
+                
                 // TailCall expressions should be handled by the JavaScript codegen for tail call optimization.
                 // The HIR JS pass should not flatten TailCall arguments as this interferes with 
                 // tail call recognition in the codegen phase.
@@ -1051,6 +1065,12 @@ impl HirJsPass {
                     if let Some(completion_expr) = new_arm_block.expr.take() {
                         if use_return_statements {
                             // Use direct return statements instead of temp variable assignments
+                            // Check if the completion expression is a TailCall and mark it as processed
+                            if let hir::ExprKind::TailCall(_) = &completion_expr.kind {
+                                // Mark this TailCall as processed to avoid re-processing
+                                self.processed_tail_calls.insert(completion_expr.hir_id);
+                            }
+                            
                             let return_stmt = hir::Stmt::new(
                                 ctx.hir_id_allocator.next_id(),
                                 hir::StmtKind::Return(Some(Box::new(completion_expr))),
@@ -1060,6 +1080,19 @@ impl HirJsPass {
                         } else {
                             // For complex expressions, flatten them first
                             match &completion_expr.kind {
+                                hir::ExprKind::TailCall(_) => {
+                                    // For TailCall expressions, check if already processed
+                                    if self.processed_tail_calls.contains(&completion_expr.hir_id) {
+                                        // Already processed - create a simple assignment
+                                        let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                                        new_arm_block.stmts.push(assignment_stmt);
+                                    } else {
+                                        // Handle TailCall with special care to avoid infinite loops
+                                        let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                                        new_arm_block.stmts.push(assignment_stmt);
+                                        // Don't mark as processed here since we're not in function completion context
+                                    }
+                                }
                                 hir::ExprKind::IfElse(..) | hir::ExprKind::Loop(..) | hir::ExprKind::Match(..) | hir::ExprKind::Block(..) => {
                                     // Recursively flatten nested complex expressions
                                     let (flattened_expr, temp_stmts) = self.flatten_expression_to_temp_var(completion_expr, ctx);
@@ -1153,8 +1186,10 @@ impl HirJsPass {
             hir::ExprKind::TailCall(_call_expr) => {
                 // For tail call expressions, treat them differently based on context
                 if use_return_statements {
-                    // In function completion contexts, preserve TailCall arguments as-is
-                    // Let the JavaScript generator handle complex arguments
+                    // In function completion contexts, preserve TailCall as-is and mark as processed
+                    // Mark this TailCall as processed to avoid re-processing in future iterations
+                    self.processed_tail_calls.insert(expr.hir_id);
+                    
                     let return_stmt = hir::Stmt::new(
                         ctx.hir_id_allocator.next_id(),
                         hir::StmtKind::Return(Some(Box::new(expr))),
@@ -1162,19 +1197,25 @@ impl HirJsPass {
                     );
                     statements.push(return_stmt);
                 } else {
-                    // For non-function completion contexts, flatten the arguments
-                    let (flattened_call_expr, mut temp_stmts) =
-                        self.flatten_subexpressions_generically(expr, ctx);
+                    // For non-function completion contexts, check if already processed
+                    if self.processed_tail_calls.contains(&expr.hir_id) {
+                        // Already processed - create a simple assignment to avoid infinite loops
+                        statements.push(self.create_assignment_stmt(ctx, temp_name, expr, span));
+                    } else {
+                        // Flatten the arguments but preserve the TailCall structure
+                        let (flattened_call_expr, mut temp_stmts) =
+                            self.flatten_subexpressions_generically(expr, ctx);
 
-                    // Add any statements from flattening the arguments
-                    statements.append(&mut temp_stmts);
+                        // Add any statements from flattening the arguments
+                        statements.append(&mut temp_stmts);
 
-                    statements.push(self.create_assignment_stmt(
-                        ctx,
-                        temp_name,
-                        flattened_call_expr,
-                        span,
-                    ));
+                        statements.push(self.create_assignment_stmt(
+                            ctx,
+                            temp_name,
+                            flattened_call_expr,
+                            span,
+                        ));
+                    }
                 }
             }
             hir::ExprKind::Binary(op_kind, lhs, rhs) => {
@@ -1553,6 +1594,10 @@ impl HirPass for HirJsPass {
     fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
         self.iteration_counter += 1;
         self.changes_made = false;
+        
+        // Don't reset processed_tail_calls - let it persist across iterations
+        // This prevents TailCall expressions from being re-processed
+        
         self.visit_module(module, ctx);
         self.changes_made
     }
@@ -1863,12 +1908,22 @@ impl HirJsPass {
                 }
                 // TailCall expressions should be converted to return statements in function completion position
                 hir::ExprKind::TailCall(_) => {
+                    // Check if this TailCall has already been processed
+                    if self.processed_tail_calls.contains(&expr.hir_id) {
+                        // Skip processing - this TailCall has already been converted
+                        return;
+                    }
+                    
                     // Check if we're in a function completion position
                     let is_function_completion = function_name.is_some();
                     
                     if is_function_completion {
                         // TailCall in function completion position - convert to return statement
                         let span = expr.span;
+                        
+                        // Mark this TailCall as processed to avoid re-processing
+                        self.processed_tail_calls.insert(expr.hir_id);
+                        
                         let return_stmt = hir::Stmt::new(
                             ctx.hir_id_allocator.next_id(),
                             hir::StmtKind::Return(Some(Box::new(expr.clone()))),
