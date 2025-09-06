@@ -1023,6 +1023,7 @@ impl<'src> Parser<'src> {
             TokenKind::Keyword(Keyword::Loop) => self.parse_loop(),
             TokenKind::Keyword(Keyword::For) => self.parse_for_loop(),
             TokenKind::Keyword(Keyword::Break) => self.parse_break_expr(),
+            TokenKind::Keyword(Keyword::Continue) => self.parse_continue_expr(),
             TokenKind::Keyword(Keyword::Rec) => self.parse_recursive_call(),
             TokenKind::Keyword(Keyword::Match) => self.parse_match_expression(),
             TokenKind::Keyword(Keyword::Underscore) => self.parse_wildcard(),
@@ -1786,5 +1787,10 @@ impl<'src> Parser<'src> {
             Some(Box::new(expr))
         };
         node::expr!(self.unique_id(), Break(expr))
+    }
+
+    fn parse_continue_expr(&mut self) -> Expr {
+        self.advance();
+        node::expr!(self.unique_id(), Continue)
     }
 }

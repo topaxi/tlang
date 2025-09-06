@@ -5,8 +5,8 @@ use crate::js;
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Scope {
     parent: Option<Box<Scope>>,
-
     variables: HashMap<String, String>,
+    latest_temp_var: Option<String>,
 }
 
 impl Scope {
@@ -14,6 +14,7 @@ impl Scope {
         Self {
             parent,
             variables: HashMap::new(),
+            latest_temp_var: None,
         }
     }
 
@@ -67,6 +68,11 @@ impl Scope {
 
     pub(crate) fn declare_variable_alias(&mut self, from: &str, to: &str) {
         self.insert_variable(from, to);
+
+        // If this is a temp variable alias, update the latest temp variable tracking
+        if from.starts_with("$tmp$") && from == to {
+            self.latest_temp_var = Some(from.to_string());
+        }
     }
 
     fn get_unique_variable_name(&self, prefix: &str) -> String {
@@ -88,7 +94,19 @@ impl Scope {
         let tmp_var_name = self.get_unique_variable_name(prefix);
         self.variables
             .insert(tmp_var_name.clone(), tmp_var_name.clone());
+
+        // Track the latest temp variable if it's a $tmp$ variable
+        if prefix == "$tmp$" {
+            self.latest_temp_var = Some(tmp_var_name.clone());
+        }
+
         tmp_var_name
+    }
+
+    pub(crate) fn get_latest_temp_variable(&self) -> String {
+        self.latest_temp_var
+            .clone()
+            .unwrap_or_else(|| "$tmp$0".to_string())
     }
 
     #[inline(always)]
@@ -142,6 +160,7 @@ impl Default for Scope {
                 ("math::random".to_string(), "Math.random".to_string()),
                 ("random_int".to_string(), "random_int".to_string()),
             ]),
+            latest_temp_var: None,
         }
     }
 }

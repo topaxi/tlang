@@ -1,8 +1,8 @@
 use tlang_hir::hir;
 
-use crate::expr_generator::expr_can_render_as_js_expr;
 use crate::generator::{BlockContext, CodegenJS, FunctionContext};
 use crate::js;
+use crate::js_expr_utils::expr_can_render_as_js_expr;
 
 impl CodegenJS {
     fn generate_function_param(&mut self, param: &hir::FunctionParameter, is_self: bool) {
@@ -85,6 +85,7 @@ impl CodegenJS {
             &declaration.parameters,
             &[],
             is_tail_recursive,
+            false, // Function declaration
         );
 
         let is_method = matches!(declaration.name.kind, hir::ExprKind::FieldAccess(_, _));
@@ -183,6 +184,7 @@ impl CodegenJS {
             &declaration.parameters,
             &[],
             is_tail_recursive,
+            true, // Function expression
         );
 
         if generate_arrow {

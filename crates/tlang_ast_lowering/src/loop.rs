@@ -81,16 +81,26 @@ impl LoweringContext {
     fn create_iterator_value(&mut self, for_loop: &ast::node::ForLoop) -> hir::Expr {
         let hir_id = self.unique_id();
         let iter_expr = self.lower_expr(&for_loop.iter);
-        let iterator_binding_call = self.expr(
-            for_loop.iter.span,
-            hir::ExprKind::FieldAccess(Box::new(iter_expr), Ident::new("iter", Default::default())),
+
+        let iterator_path = hir::Path::new(
+            vec![
+                hir::PathSegment::new(Ident::new("iterator", Default::default())),
+                hir::PathSegment::new(Ident::new("iter", Default::default())),
+            ],
+            Default::default(),
         );
+
+        let iterator_fn_call = self.expr(
+            for_loop.iter.span,
+            hir::ExprKind::Path(Box::new(iterator_path)),
+        );
+
         self.expr(
             for_loop.iter.span,
             hir::ExprKind::Call(Box::new(hir::CallExpression {
                 hir_id,
-                callee: iterator_binding_call,
-                arguments: vec![],
+                callee: iterator_fn_call,
+                arguments: vec![iter_expr],
             })),
         )
     }

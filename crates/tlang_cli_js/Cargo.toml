@@ -12,6 +12,7 @@ tlang_hir_opt = { path = "../tlang_hir_opt" }
 tlang_codegen_js = { path = "../tlang_codegen_js" }
 tlang_semantics = { path = "../tlang_semantics" }
 tlang_interpreter = { path = "../tlang_runtime/tlang_interpreter" }
+tlang_span = { path = "../tlang_span" }
 ron = { workspace = true }
 clap = { version = "4", features = ["cargo"] }
 indoc = { workspace = true }

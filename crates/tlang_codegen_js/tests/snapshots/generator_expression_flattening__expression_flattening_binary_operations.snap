@@ -1,0 +1,23 @@
+---
+source: crates/tlang_codegen_js/tests/generator_expression_flattening.rs
+expression: output
+---
+function test_complex_binary_operations() {
+    let $hir$0 = undefined;
+    if (true) {
+        let x = 10;
+        $hir$0 = 15;
+    } else {
+        let y = 20;
+        $hir$0 = 15;
+    }
+    let $hir$1 = undefined;
+    if (false) {
+        let a = 3;
+        $hir$1 = 6;
+    } else {
+        let b = 4;
+        $hir$1 = 4 / 2;
+    }
+    return $hir$0 + $hir$1;
+}

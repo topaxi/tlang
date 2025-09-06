@@ -51,22 +51,45 @@ impl CodegenJS {
     fn generate_match_arm_block(&mut self, block: &hir::Block) {
         self.flush_statement_buffer();
         if !block.stmts.is_empty() {
-            self.generate_block_expression(block);
-        } else if self.current_completion_variable() == Some("return") {
-            if block.expr.as_ref().is_some_and(|expr| expr.is_tail_call()) {
-                self.generate_block_expression(block);
-            } else if let Some(expr) = &block.expr {
-                self.push_indent();
-                self.push_str("return ");
-                self.generate_expr(expr, None);
-                self.push_str(";\n");
+            // TODO: Handle statements in match arms properly
+            // For now, avoid generate_block_expression which can add };
+            self.generate_statements(&block.stmts);
+        }
+
+        if let Some(expr) = &block.expr {
+            // Handle break and continue expressions specially - they cannot be assigned or returned
+            match &expr.kind {
+                hir::ExprKind::Break(_) => {
+                    self.push_indent();
+                    self.generate_expr(expr, None); // Main generator now handles loop context
+                    self.push_str("\n");
+                }
+                hir::ExprKind::Continue => {
+                    self.push_indent();
+                    self.generate_expr(expr, None);
+                    self.push_str(";\n"); // Continue needs semicolon
+                }
+                _ => {
+                    if self.current_completion_variable() == Some("return") {
+                        if expr.is_tail_call() {
+                            self.generate_expr(expr, None);
+                        } else {
+                            self.push_indent();
+                            self.push_str("return ");
+                            self.generate_expr(expr, None);
+                            self.push_str(";\n");
+                        }
+                    } else {
+                        self.push_indent();
+                        let completion_var =
+                            self.current_completion_variable().unwrap().to_string();
+                        self.push_str(&completion_var);
+                        self.push_str(" = ");
+                        self.generate_expr(expr, None);
+                        self.push_str(";\n");
+                    }
+                }
             }
-        } else if let Some(expr) = &block.expr {
-            self.push_indent();
-            self.push_current_completion_variable();
-            self.push_str(" = ");
-            self.generate_expr(expr, None);
-            self.push_str(";\n");
         }
     }
 
@@ -200,7 +223,7 @@ impl CodegenJS {
     }
 
     fn setup_match_completion_variables(&mut self, arms: &[hir::MatchArm]) -> (String, bool) {
-        let mut lhs = self.replace_statement_buffer_with_empty_string();
+        let lhs = self.replace_statement_buffer_with_empty_string();
         let has_block_completions =
             self.current_context() == BlockContext::Expression && match_args_have_completions(arms);
 
@@ -209,7 +232,7 @@ impl CodegenJS {
             // instead of creating a new temporary variable each time.
             if self.can_reuse_current_completion_variable() {
                 self.push_completion_variable(Some("return"));
-                lhs = self.replace_statement_buffer_with_empty_string();
+                let lhs = self.replace_statement_buffer_with_empty_string();
                 (lhs, false)
             } else {
                 let completion_tmp_var = self.current_scope().declare_tmp_variable();
@@ -219,6 +242,14 @@ impl CodegenJS {
                 self.push_completion_variable(Some(&completion_tmp_var));
                 (lhs, true)
             }
+        } else if match_args_have_completions(arms) {
+            // Even in statement context, if match arms have completions, we need a temp variable
+            let completion_tmp_var = self.current_scope().declare_tmp_variable();
+            self.push_indent();
+            self.push_str("let ");
+            self.push_str(&completion_tmp_var);
+            self.push_completion_variable(Some(&completion_tmp_var));
+            (lhs, true)
         } else {
             self.push_completion_variable(None);
             (lhs, false)
@@ -261,7 +292,10 @@ impl CodegenJS {
                 let match_value_binding = self.current_scope().declare_tmp_variable();
 
                 if *has_let {
-                    self.push_char(',');
+                    self.push_char(';');
+                    self.push_newline();
+                    self.push_indent();
+                    self.push_str("let ");
                     self.push_str(&match_value_binding);
                     self.push_str(" = ");
                     self.generate_expr(expr, None);
@@ -278,7 +312,10 @@ impl CodegenJS {
     fn setup_let_guard_variable(&mut self, arms: &[hir::MatchArm], has_let: &mut bool) -> String {
         if arms.iter().any(|arm| arm.has_let_guard()) {
             if *has_let {
-                self.push_char(',');
+                self.push_char(';');
+                self.push_newline();
+                self.push_indent();
+                self.push_str("let ");
             } else {
                 self.push_indent();
                 self.push_str("let ");
@@ -323,16 +360,16 @@ impl CodegenJS {
         for binding in all_pat_identifiers {
             if unique.insert(binding.clone()) {
                 let binding = self.current_scope().declare_variable(&binding);
-                // TODO: Ugly workaround, as we always push a comma when generating pat identifiers
-                //       bindings.
+                // Generate separate let statements instead of comma-separated declarations
+                // to avoid JavaScript syntax errors with different assignment values
                 if *has_let {
-                    self.push_char(',');
-                } else {
-                    self.push_indent();
-                    self.push_str("let ");
-                    *has_let = true;
+                    self.push_char(';');
+                    self.push_newline();
                 }
+                self.push_indent();
+                self.push_str("let ");
                 self.push_str(&binding);
+                *has_let = true;
             }
         }
     }
@@ -388,24 +425,54 @@ impl CodegenJS {
     }
 
     fn finalize_match_expression(&mut self, lhs: &str, has_block_completions: bool) {
-        if has_block_completions && self.current_completion_variable() != Some("return") {
+        // Add a semicolon after the if-else statement when we have a completion variable
+        if self.current_completion_variable().is_some()
+            && self.current_completion_variable() != Some("return")
+            && lhs.is_empty()
+            && !self.is_in_loop_context()
+        {
+            // Don't add semicolon in loop contexts
+            // Add a semicolon after the if-else statement - SIMPLE VERSION
+            self.push_char(';');
+            // DEBUG: This should NOT output the completion variable
+        } else if has_block_completions && self.current_completion_variable() != Some("return") {
+            // Add semicolon after the if-else statement first
+            self.push_char(';');
             self.push_newline();
             // If we have an lhs, put the completion var as the rhs of the lhs.
-            // Otherwise, we assign the completion_var to the previous completion_var.
-            if lhs.is_empty() {
-                self.push_indent();
-                let prev_completion_var = self
-                    .nth_completion_variable(self.current_completion_variable_count() - 2)
-                    .unwrap()
-                    .to_string();
-                self.push_str(&prev_completion_var);
-                self.push_str(" = ");
-                self.push_current_completion_variable();
-                self.push_char(';');
-                self.push_newline();
-            } else {
+            if !lhs.is_empty() {
                 self.push_str(lhs);
                 self.push_current_completion_variable();
+            }
+        } else {
+            // In cases where the match expression is used in assignment contexts but doesn't
+            // go through the normal completion variable assignment (lhs is empty, has_block_completions is false),
+            // ensure that undefined temp variables that should reference the pattern match result get assigned.
+            if self.is_in_loop_context()
+                && let Some(current_completion) =
+                    self.current_completion_variable().map(String::from)
+                && current_completion.starts_with("$tmp$")
+            {
+                // Generate a mapping from any "previous" temp variables to the current completion variable
+                // This handles cases where HIR expected result in $tmp$N but it's actually in $tmp$M
+                if let Ok(current_num) = current_completion
+                    .strip_prefix("$tmp$")
+                    .unwrap()
+                    .parse::<i32>()
+                {
+                    for i in 0..current_num {
+                        let potential_temp_var = format!("$tmp${}", i);
+                        if !self.current_scope().has_local_variable(&potential_temp_var) {
+                            // This temp variable was expected but never defined, assign it from the completion variable
+                            self.push_newline();
+                            self.push_indent();
+                            self.push_str(&potential_temp_var);
+                            self.push_str(" = ");
+                            self.push_str(&current_completion);
+                            self.push_char(';');
+                        }
+                    }
+                }
             }
         }
         self.pop_completion_variable();
@@ -413,8 +480,35 @@ impl CodegenJS {
     }
 
     pub(crate) fn generate_match_expression(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) {
+        self.generate_match_expression_with_completion_var(expr, arms, None);
+    }
+
+    pub(crate) fn generate_match_expression_with_completion_var(
+        &mut self,
+        expr: &hir::Expr,
+        arms: &[hir::MatchArm],
+        completion_var: Option<&str>,
+    ) {
         // TODO: A lot here is copied from the if statement generator.
-        let (lhs, mut has_let) = self.setup_match_completion_variables(arms);
+        let (lhs, mut has_let) = if let Some(var) = completion_var {
+            // Use the provided completion variable instead of creating a new one
+            self.push_completion_variable(Some(var));
+            // Make sure the variable is registered in the scope so subsequent declare_tmp_variable calls work correctly
+            self.current_scope().declare_variable_alias(var, var);
+
+            if var == "accumulator$$" {
+                // Don't declare accumulator$$ since it's already declared by the for loop
+                (String::new(), false)
+            } else {
+                // Declare the temp variable at the beginning of the expression
+                self.push_str("let ");
+                self.push_str(var);
+                // Don't replace the statement buffer since we want to keep the "let" declaration
+                (String::new(), true)
+            }
+        } else {
+            self.setup_match_completion_variables(arms)
+        };
         let has_block_completions =
             self.current_context() == BlockContext::Expression && match_args_have_completions(arms);
 

@@ -6,9 +6,10 @@ use std::{
 
 use clap::{ArgMatches, arg, command};
 use tlang_ast_lowering::lower_to_hir;
+use tlang_codegen_js::create_hir_js_opt_group;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_hir::hir;
-use tlang_hir_opt::HirOptimizer;
+use tlang_hir_opt::{HirOptContext, HirOptimizer, HirPass};
 use tlang_parser::error::ParseIssue;
 use tlang_semantics::{SemanticAnalyzer, diagnostic::Diagnostic};
 
@@ -83,6 +84,9 @@ fn get_args() -> Args {
 
 fn compile_standard_library() -> Result<String, ParserError> {
     let mut js = compile_to_js(&CodegenJS::get_standard_library_source(), false)?;
+
+    // Add JavaScript helpers
+    js.insert_str(0, &format!("{}\n", CodegenJS::get_javascript_helpers()));
 
     js.push_str("\nfunction panic(msg) { throw new Error(msg); }\n");
 
@@ -203,7 +207,21 @@ fn compile_to_hir(source: &str, show_warnings: bool) -> Result<hir::Module, Pars
     );
 
     let mut optimizer = HirOptimizer::default();
-    optimizer.optimize_hir(&mut module, meta.into());
+    let hir_opt_ctx = meta.into();
+
+    // Run standard HIR optimizations first
+    optimizer.optimize_hir(&mut module, hir_opt_ctx);
+
+    // Run HIR JS pass separately to avoid infinite loops with other optimizations
+    let mut hir_js_opt_ctx = HirOptContext {
+        symbols: std::collections::HashMap::new(),
+        hir_id_allocator: tlang_span::HirIdAllocator::default(),
+        current_scope: tlang_span::HirId::new(1),
+    };
+    let mut hir_js_opt_group = create_hir_js_opt_group();
+
+    // Run HIR JS optimization group
+    hir_js_opt_group.optimize_hir(&mut module, &mut hir_js_opt_ctx);
 
     Ok(module)
 }

@@ -1,5 +1,6 @@
+use tlang_codegen_js::create_hir_js_opt_group;
 use tlang_codegen_js::generator::CodegenJS;
-use tlang_hir_opt::HirOptimizer;
+use tlang_hir_opt::{HirOptContext, HirOptimizer, HirPass};
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
 use tlang_symbols::SymbolType;
@@ -14,7 +15,6 @@ fn before_all() {
 }
 
 pub struct CodegenOptions<'a> {
-    pub render_ternary: bool,
     pub builtin_symbols: Vec<(&'a str, SymbolType)>,
     pub optimize: bool,
 }
@@ -22,7 +22,6 @@ pub struct CodegenOptions<'a> {
 impl Default for CodegenOptions<'_> {
     fn default() -> Self {
         Self {
-            render_ternary: true,
             builtin_symbols: CodegenJS::get_standard_library_symbols().to_vec(),
             optimize: true,
         }
@@ -30,12 +29,6 @@ impl Default for CodegenOptions<'_> {
 }
 
 impl CodegenOptions<'_> {
-    #[allow(dead_code)]
-    pub fn render_ternary(mut self, render_ternary: bool) -> Self {
-        self.render_ternary = render_ternary;
-        self
-    }
-
     #[allow(dead_code)]
     pub fn optimize(mut self, optimize: bool) -> Self {
         self.optimize = optimize;
@@ -70,13 +63,27 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
                 semantic_analyzer.symbol_tables().clone(),
             );
 
+            let mut optimizer = HirOptimizer::default();
+
             if options.optimize {
-                let mut optimizer = HirOptimizer::default();
+                // Run standard HIR optimizations first
                 optimizer.optimize_hir(&mut module, meta.into());
             }
 
+            // Always apply JavaScript-specific HIR transformations
+            // This ensures expressions that cannot be expressed as expressions in modern JavaScript
+            // are properly transformed to statements, regardless of optimization level
+            let mut hir_js_opt_group = create_hir_js_opt_group();
+            let mut js_ctx = HirOptContext {
+                symbols: std::collections::HashMap::new(),
+                hir_id_allocator: tlang_span::HirIdAllocator::new(1000), // Start with a high number to avoid conflicts
+                current_scope: module.hir_id,
+            };
+
+            // Run HIR JS optimization group
+            hir_js_opt_group.optimize_hir(&mut module, &mut js_ctx);
+
             let mut codegen = CodegenJS::default();
-            codegen.set_render_ternary(options.render_ternary);
             codegen.generate_code(&module);
             codegen.get_output().to_string()
         }

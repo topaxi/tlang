@@ -46,7 +46,8 @@ fn test_option_unwrap() {
     let none_val = Option::None;
     
     some_val.unwrap() |> log();
-    none_val.unwrap() |> log(); // This should panic
+    // This should panic
+    none_val.unwrap() |> log();
 }
 
 // Test Result error propagation

@@ -7,6 +7,7 @@ use crate::binary_operator_generator::{
 };
 use crate::generator::{BlockContext, CodegenJS};
 use crate::js;
+use crate::js_expr_utils::if_else_can_render_as_ternary;
 
 impl CodegenJS {
     /// Generates blocks in expression position.
@@ -79,7 +80,13 @@ impl CodegenJS {
         if !has_completion_var {
             self.dec_indent();
             self.push_indent();
-            self.push_str("};\n");
+            // Don't add }; in expression context - let the caller handle statement termination
+            if self.current_context() == BlockContext::Statement {
+                self.push_str("};\n");
+            } else {
+                self.push_char('}');
+                self.push_newline();
+            }
             self.flush_statement_buffer();
             self.push_str(&lhs);
             self.push_str(completion_tmp_var.as_str());
@@ -110,12 +117,35 @@ impl CodegenJS {
     }
 
     fn generate_block(&mut self, block: &hir::Block) {
+        // When generating a block in statement context, wrap it in braces
+        if self.current_context() == BlockContext::Statement {
+            self.push_str("{\n");
+            self.inc_indent();
+        }
+
         self.push_scope();
 
         self.generate_statements(&block.stmts);
-        self.generate_optional_expr(block.expr.as_ref(), None);
+
+        // Special handling for loop expressions in block completion position
+        if let Some(expr) = block.expr.as_ref() {
+            if let hir::ExprKind::Loop(loop_block) = &expr.kind {
+                // Generate the loop as a statement instead of an expression
+                self.push_indent();
+                self.generate_loop_statement(loop_block);
+                self.push_newline();
+            } else {
+                self.generate_optional_expr(block.expr.as_ref(), None);
+            }
+        }
 
         self.pop_scope();
+
+        if self.current_context() == BlockContext::Statement {
+            self.dec_indent();
+            self.push_indent();
+            self.push_str("}");
+        }
     }
 
     #[inline(always)]
@@ -131,51 +161,47 @@ impl CodegenJS {
 
     pub(crate) fn generate_expr(&mut self, expr: &hir::Expr, parent_op: Option<hir::BinaryOpKind>) {
         match &expr.kind {
-            hir::ExprKind::Block(block) if self.current_context() == BlockContext::Expression => {
-                self.generate_block_expression(block);
+            hir::ExprKind::Block(_block) if self.current_context() == BlockContext::Expression => {
+                panic!(
+                    "Block expressions should be transformed to statements by HirJsPass before reaching codegen"
+                );
             }
             hir::ExprKind::Block(block) => self.generate_block(block),
             hir::ExprKind::Loop(block) => {
-                self.push_str("(() => {");
-                self.push_newline();
-                self.inc_indent();
-                self.push_indent();
-
-                self.push_indent();
-                self.push_str("for (;;) {");
-                self.push_newline();
-                self.inc_indent();
-
-                for stmt in &block.stmts {
-                    self.generate_stmt(stmt);
-                }
-
-                if block.has_completion() {
-                    self.generate_expr(block.expr.as_ref().unwrap(), None);
-                    self.push_char(';');
-                    self.push_newline();
-                }
-
-                self.dec_indent();
-                self.push_indent();
-                self.push_char('}');
-                self.push_newline();
-
-                self.dec_indent();
-                self.push_indent();
-                self.push_str("})()");
+                eprintln!("ERROR: Found loop expression at HIR ID: {:?}", expr.hir_id);
+                eprintln!("Loop block: {:#?}", block);
+                eprintln!("Is in loop context: {}", self.is_in_loop_context());
+                panic!(
+                    "Loop expressions should be transformed to statements by HirJsPass before reaching codegen. HIR ID: {:?}",
+                    expr.hir_id
+                );
             }
             hir::ExprKind::Break(expr) => {
-                self.push_str("return");
-
-                if let Some(expr) = expr {
-                    self.push_char(' ');
-                    self.generate_expr(expr, parent_op);
+                // In loop contexts, generate proper break; otherwise, generate return
+                // However, if we're inside a function expression (even if nested in a loop), generate return
+                if self.is_in_loop_context()
+                    && self
+                        .get_function_context()
+                        .is_none_or(|ctx| !ctx.is_expression)
+                {
+                    // In JavaScript loops, break cannot have a value
+                    // For loops with accumulators, we just generate 'break' and handle the return value elsewhere
+                    self.push_str("break");
+                    // Note: expr value is ignored in JavaScript loop context
+                    // The accumulator value should be handled by the loop return logic
+                } else {
+                    self.push_str("return");
+                    if let Some(expr) = expr {
+                        self.push_char(' ');
+                        self.generate_expr(expr, parent_op);
+                    }
                 }
-
                 self.push_char(';');
             }
-            hir::ExprKind::Continue => self.push_str("continue"),
+            hir::ExprKind::Continue => {
+                self.push_str("continue");
+                self.push_char(';');
+            }
             hir::ExprKind::Call(expr) => self.generate_call_expression(expr),
             hir::ExprKind::TailCall(expr) => self.generate_recursive_call_expression(expr),
             hir::ExprKind::Cast(expr, _) => {
@@ -196,13 +222,25 @@ impl CodegenJS {
             hir::ExprKind::Binary(op, lhs, rhs) => {
                 self.generate_binary_op(*op, lhs, rhs, parent_op);
             }
-            hir::ExprKind::Match(expr, arms) => self.generate_match_expression(expr, arms),
+            hir::ExprKind::Match(_expr, _arms) => {
+                if self.current_context() == BlockContext::Expression {
+                    panic!(
+                        "Match expressions should be transformed to statements by HirJsPass before reaching codegen"
+                    );
+                } else {
+                    self.generate_match_expression(_expr, _arms);
+                }
+            }
             hir::ExprKind::IfElse(expr, then_branch, else_branches) => {
                 self.generate_if_else(expr, then_branch, else_branches, parent_op);
             }
             hir::ExprKind::FunctionExpression(decl) => self.generate_function_expression(decl),
             hir::ExprKind::Range(_) => todo!("Range expression not implemented yet."),
-            hir::ExprKind::Wildcard => {}
+            hir::ExprKind::Wildcard => {
+                // Wildcard expressions should be rendered as 'undefined' in JavaScript
+                // This is used for temp variable initialization in the HIR JS pass
+                self.push_str("undefined");
+            }
         }
     }
 
@@ -328,8 +366,9 @@ impl CodegenJS {
         then_branch: &hir::Block,
         else_branches: &[hir::ElseClause],
     ) -> bool {
-        self.get_render_ternary()
-            && self.current_context() == BlockContext::Expression
+        (self.current_context() == BlockContext::Expression
+            || self.current_completion_variable() == Some("return") // Also allow ternary in return statements
+            || self.current_context() == BlockContext::Statement) // Allow ternary in statement context for assignments
             && else_branches.len() == 1 // Let's not nest ternary expressions for now.
             && if_else_can_render_as_ternary(expr, then_branch, else_branches)
     }
@@ -351,32 +390,25 @@ impl CodegenJS {
             return;
         }
 
-        let mut lhs = String::new();
-        // TODO: Potentially in a return position or other expression, before we generate the if
-        //       statement, replace the current statement buffer with a new one, generate the if
-        //       statement, and then swap the statement buffer back.
-        //       Similar to how we generate blocks in expression position.
-        // TODO: Find a way to do this generically for all expressions which are represented as
-        //       statements in JavaScript.
-        // TODO: In case of recursive calls in tail position, we'll want to omit lhs.
-        let has_block_completions =
-            self.current_context() == BlockContext::Expression && then_branch.has_completion();
-        if has_block_completions {
-            // Note: We check if we can reuse the existing completion variable ("return")
-            // instead of creating a new temporary variable each time.
-            if self.can_reuse_current_completion_variable() {
-                self.push_completion_variable(Some("return"));
-                lhs = self.replace_statement_buffer_with_empty_string();
-                self.push_indent();
-            } else {
-                lhs = self.replace_statement_buffer_with_empty_string();
-                let completion_tmp_var = self.current_scope().declare_tmp_variable();
-                self.push_let_declaration(&completion_tmp_var);
-                self.push_completion_variable(Some(&completion_tmp_var));
-            }
-        } else {
-            self.push_completion_variable(None);
+        // If we reach here, the if-else cannot be rendered as a ternary expression
+        // In most expression contexts, this should have been handled by HIR JS pass
+        // For now, allow fallback to completion variable handling for complex cases
+        // TODO: Expand HIR JS pass to handle all remaining cases
+        if self.current_context() == BlockContext::Expression
+            && self.current_completion_variable() != Some("return")
+        {
+            // For debugging: log when we hit complex cases that could be improved
+            eprintln!(
+                "Info: Complex if-else expression in expression context using completion variables. \
+                This could potentially be handled by HIR JS pass instead. \
+                Context: {:?}, Completion variable: {:?}",
+                self.current_context(),
+                self.current_completion_variable()
+            );
         }
+
+        // Handle if-else in statement context (simple case without completion variables)
+        self.push_completion_variable(None);
         self.push_str("if (");
         let indent_level = self.current_indent();
         self.set_indent(0);
@@ -410,26 +442,7 @@ impl CodegenJS {
 
         self.push_indent();
         self.push_char('}');
-        if has_block_completions && self.current_completion_variable() != Some("return") {
-            self.push_newline();
 
-            // If we have an lhs, put the completion var as the rhs of the lhs.
-            // Otherwise, we assign the completion_var to the previous completion_var.
-            if lhs.is_empty() {
-                self.push_indent();
-                let prev_completion_var = self
-                    .nth_completion_variable(self.current_completion_variable_count() - 2)
-                    .unwrap()
-                    .to_string();
-                self.push_str(&prev_completion_var);
-                self.push_str(" = ");
-                self.push_current_completion_variable();
-                self.push_str(";\n");
-            } else {
-                self.push_str(&lhs);
-                self.push_current_completion_variable();
-            }
-        }
         self.pop_completion_variable();
     }
 
@@ -482,6 +495,8 @@ impl CodegenJS {
     }
 
     pub(crate) fn generate_call_expression(&mut self, call_expr: &hir::CallExpression) {
+        // Legacy temp var handling removed - HIR JS pass now handles complex expressions with wildcards
+
         // TODO: If the call is to a struct, we instead call it with `new` and map the fields to
         // the positional arguments of the constructor.
 
@@ -506,55 +521,5 @@ impl CodegenJS {
         }
 
         self.push_char(')');
-    }
-}
-
-fn if_else_can_render_as_ternary(
-    expr: &hir::Expr,
-    then_branch: &hir::Block,
-    else_branches: &[hir::ElseClause],
-) -> bool {
-    then_branch.stmts.is_empty()
-        && expr_can_render_as_js_expr(expr)
-        && expr_can_render_as_js_expr(then_branch.expr.as_ref().unwrap())
-        && else_branches.iter().all(|else_branch| {
-            else_branch.consequence.stmts.is_empty()
-                && (else_branch.condition.is_none()
-                    || expr_can_render_as_js_expr(else_branch.condition.as_ref().unwrap()))
-                && expr_can_render_as_js_expr(else_branch.consequence.expr.as_ref().unwrap())
-        })
-}
-
-pub(crate) fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
-    match &expr.kind {
-        hir::ExprKind::Path(..) => true,
-        hir::ExprKind::Let(..) => false,
-        hir::ExprKind::Literal(..) => true,
-        hir::ExprKind::Binary(_, lhs, rhs) => {
-            expr_can_render_as_js_expr(lhs) && expr_can_render_as_js_expr(rhs)
-        }
-        hir::ExprKind::Unary(_, expr) => expr_can_render_as_js_expr(expr),
-        hir::ExprKind::Block(..) => false,
-        hir::ExprKind::Loop(..) => false,
-        hir::ExprKind::Break(..) => false,
-        hir::ExprKind::Continue => false,
-        hir::ExprKind::IfElse(..) => false,
-        hir::ExprKind::Match(..) => false,
-        hir::ExprKind::Call(call_expr) => {
-            call_expr.arguments.iter().all(expr_can_render_as_js_expr)
-        }
-        hir::ExprKind::Cast(expr, _) => expr_can_render_as_js_expr(expr),
-        hir::ExprKind::FieldAccess(base, _) => expr_can_render_as_js_expr(base),
-        hir::ExprKind::IndexAccess(base, index) => {
-            expr_can_render_as_js_expr(base) && expr_can_render_as_js_expr(index)
-        }
-        hir::ExprKind::TailCall(_) => false,
-        hir::ExprKind::List(exprs) => exprs.iter().all(expr_can_render_as_js_expr),
-        hir::ExprKind::Dict(exprs) => exprs
-            .iter()
-            .all(|kv| expr_can_render_as_js_expr(&kv.0) && expr_can_render_as_js_expr(&kv.1)),
-        hir::ExprKind::FunctionExpression(..) => true,
-        hir::ExprKind::Range(..) => true,
-        hir::ExprKind::Wildcard => true,
     }
 }

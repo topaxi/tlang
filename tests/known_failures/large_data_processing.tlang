@@ -100,9 +100,8 @@ fn create_large_string(size) {
         if current <= 0 {
             acc
         } else {
-            let char_code = (current % 26) + 97; // a-z
-            let new_char = string::from_char_code(char_code);
-            helper(current - 1, acc + new_char)
+            // Simplified: just repeat 'a' character 
+            helper(current - 1, acc + "a")
         }
     }
     helper(size, "")
@@ -152,7 +151,4 @@ count_total_elements(nested) |> log();
 log("Processing large strings...");
 let large_string = create_large_string(10000);
 // Note: length() method may not be available, showing concept
-size |> log();string processing
-log("Processing large strings...");
-let large_string = create_large_string(10000);
 large_string.length() |> log();

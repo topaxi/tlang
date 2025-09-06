@@ -1,0 +1,12 @@
+fn main() {
+    let result = for n in [1, 2, 3, 4] with [even, odd] = [[], []] {
+        if n % 2 == 0 {
+            [[...even, n], odd]
+        } else {
+            [even, [...odd, n]]
+        }
+    };
+    log(result);
+}
+
+main();
