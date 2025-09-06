@@ -10,6 +10,56 @@ use crate::js;
 use crate::js_expr_utils::if_else_can_render_as_ternary;
 
 impl CodegenJS {
+    /// Check if a completion variable reference should be omitted
+    /// This happens when all execution paths in the block end with return statements
+    fn should_omit_completion_var_reference(&self, block: &hir::Block, completion_var: &str) -> bool {
+        // Skip if not a temp variable
+        if !completion_var.starts_with("$hir$") {
+            return false;
+        }
+        
+        // Check if all statements in the block end with return statements
+        // This indicates the completion variable is never reached
+        let result = self.block_all_paths_return(block);
+        
+        // Debug output
+        eprintln!("DEBUG: should_omit_completion_var_reference: {} -> {}", completion_var, result);
+        
+        result
+    }
+    
+    /// Check if all execution paths in a block end with return statements
+    fn block_all_paths_return(&self, block: &hir::Block) -> bool {
+        // If the block has no completion expression, check if the last statement is a return
+        if block.expr.is_none() {
+            if let Some(last_stmt) = block.stmts.last() {
+                return matches!(last_stmt.kind, hir::StmtKind::Return(_));
+            }
+            return false;
+        }
+        
+        // If the block has a completion expression, check if it's unreachable due to returns
+        for stmt in &block.stmts {
+            if let hir::StmtKind::Expr(expr) = &stmt.kind {
+                if let hir::ExprKind::Match(_, arms) = &expr.kind {
+                    // Check if all match arms end with return statements
+                    let all_arms_return = arms.iter().all(|arm| {
+                        if let Some(last_stmt) = arm.block.stmts.last() {
+                            matches!(last_stmt.kind, hir::StmtKind::Return(_))
+                        } else {
+                            false
+                        }
+                    });
+                    if all_arms_return {
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        false
+    }
+
     /// Generates blocks in expression position.
     pub(crate) fn generate_block_expression(&mut self, block: &hir::Block) {
         let has_completion_var = self.current_completion_variable().is_some();
@@ -89,7 +139,15 @@ impl CodegenJS {
             }
             self.flush_statement_buffer();
             self.push_str(&lhs);
-            self.push_str(completion_tmp_var.as_str());
+            
+            // Only output the completion variable reference if it's actually reachable
+            eprintln!("DEBUG: About to check completion var reference: {}", completion_tmp_var);
+            if !self.should_omit_completion_var_reference(block, &completion_tmp_var) {
+                eprintln!("DEBUG: Outputting completion var reference: {}", completion_tmp_var);
+                self.push_str(completion_tmp_var.as_str());
+            } else {
+                eprintln!("DEBUG: Omitting completion var reference: {}", completion_tmp_var);
+            }
         }
         self.flush_statement_buffer();
         self.pop_scope();

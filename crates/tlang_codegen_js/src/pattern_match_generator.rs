@@ -47,6 +47,19 @@ fn match_args_have_completions(arms: &[hir::MatchArm]) -> bool {
     arms.iter().any(|arm| arm.block.has_completion())
 }
 
+/// Check if all match arms end with return statements
+/// This helps detect when completion variables become unnecessary
+fn all_match_arms_have_return_statements(arms: &[hir::MatchArm]) -> bool {
+    arms.iter().all(|arm| {
+        // Check if the last statement in the arm is a return statement
+        if let Some(last_stmt) = arm.block.stmts.last() {
+            matches!(last_stmt.kind, hir::StmtKind::Return(_))
+        } else {
+            false
+        }
+    })
+}
+
 impl CodegenJS {
     fn generate_match_arm_block(&mut self, block: &hir::Block) {
         self.flush_statement_buffer();
@@ -226,6 +239,12 @@ impl CodegenJS {
         let lhs = self.replace_statement_buffer_with_empty_string();
         let has_block_completions =
             self.current_context() == BlockContext::Expression && match_args_have_completions(arms);
+
+        // Check if all match arms have return statements - if so, no completion variable is needed
+        if all_match_arms_have_return_statements(arms) {
+            self.push_completion_variable(Some("return"));
+            return (lhs, false);
+        }
 
         if has_block_completions {
             // Note: We check if we can reuse the existing completion variable ("return")

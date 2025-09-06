@@ -140,12 +140,29 @@ impl SimplifiedHirJsPass {
                 all_stmts.extend(statements);
                 (temp_ref, all_stmts)
             }
-            hir::ExprKind::Match(..) => {
-                // For match expressions, transform to proper statements
-                let statements = self.transform_match_to_statements(expr, &temp_name, ctx);
-                let mut all_stmts = vec![temp_declaration];
-                all_stmts.extend(statements);
-                (temp_ref, all_stmts)
+            hir::ExprKind::Match(_, arms) => {
+                // Check if all arms have return statements - if so, no temp variable is needed
+                let all_arms_have_returns = arms.iter().all(|arm| {
+                    if let Some(last_stmt) = arm.block.stmts.last() {
+                        matches!(last_stmt.kind, hir::StmtKind::Return(_))
+                    } else {
+                        false
+                    }
+                });
+
+                if all_arms_have_returns {
+                    // No temp variable needed, just return the match expression as statements
+                    let statements = self.transform_match_to_statements(expr, &temp_name, ctx);
+                    // Return a dummy temp ref (won't be used) and no temp declaration
+                    let dummy_temp_ref = self.create_temp_var_path(ctx, &temp_name, span);
+                    (dummy_temp_ref, statements)
+                } else {
+                    // For match expressions, transform to proper statements
+                    let statements = self.transform_match_to_statements(expr, &temp_name, ctx);
+                    let mut all_stmts = vec![temp_declaration];
+                    all_stmts.extend(statements);
+                    (temp_ref, all_stmts)
+                }
             }
             hir::ExprKind::IfElse(..) => {
                 // For if-else expressions, transform to proper statements
@@ -494,6 +511,30 @@ impl SimplifiedHirJsPass {
     ) -> Vec<hir::Stmt> {
         let span = expr.span;
         if let hir::ExprKind::Match(scrutinee, arms) = expr.kind {
+            // Check if all arms already have return statements (from ReturnStatementPass)
+            let all_arms_have_returns = arms.iter().all(|arm| {
+                if let Some(last_stmt) = arm.block.stmts.last() {
+                    matches!(last_stmt.kind, hir::StmtKind::Return(_))
+                } else {
+                    false
+                }
+            });
+
+            // If all arms have return statements, don't create assignment statements
+            if all_arms_have_returns {
+                // Just create the match statement without temp variable assignments
+                let match_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::Match(scrutinee, arms),
+                        span,
+                    })),
+                    span,
+                );
+                return vec![match_stmt];
+            }
+
             // Transform each arm to assign to temp variable
             let mut transformed_arms = Vec::new();
 
