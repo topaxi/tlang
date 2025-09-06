@@ -9,6 +9,8 @@ pub struct ReturnStatementPass {
     changes_made: bool,
     /// Track which functions we're currently inside
     function_stack: Vec<HirId>,
+    /// Track which blocks are function body blocks (should have completion transformed)
+    function_body_blocks: std::collections::HashSet<HirId>,
 }
 
 impl ReturnStatementPass {
@@ -16,6 +18,7 @@ impl ReturnStatementPass {
         Self {
             changes_made: false,
             function_stack: Vec::new(),
+            function_body_blocks: std::collections::HashSet::new(),
         }
     }
 
@@ -24,13 +27,14 @@ impl ReturnStatementPass {
         !self.function_stack.is_empty()
     }
 
-    /// Transform a block completion expression to use return statements if in function context
+    /// Transform a block completion expression to use return statements if this is a function body block
     fn transform_completion_to_return(
         &mut self,
         block: &mut hir::Block,
         ctx: &mut HirOptContext,
     ) {
-        if !self.is_in_function_context() {
+        // Only transform completion expressions in function body blocks, not nested blocks like loops
+        if !self.function_body_blocks.contains(&block.hir_id) {
             return;
         }
 
@@ -241,6 +245,7 @@ impl HirPass for ReturnStatementPass {
     fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
         self.changes_made = false;
         self.function_stack.clear();
+        self.function_body_blocks.clear();
         
         self.visit_module(module, ctx);
         
@@ -256,12 +261,14 @@ impl<'hir> Visitor<'hir> for ReturnStatementPass {
             hir::StmtKind::FunctionDeclaration(func) => {
                 // Enter function context
                 self.function_stack.push(func.hir_id);
+                self.function_body_blocks.insert(func.body.hir_id);
                 
                 // Visit the function body
                 self.visit_block(&mut func.body, ctx);
                 
                 // Exit function context
                 self.function_stack.pop();
+                self.function_body_blocks.remove(&func.body.hir_id);
             }
             hir::StmtKind::DynFunctionDeclaration(_func) => {
                 // DynFunctionDeclaration doesn't have a body to visit
@@ -279,12 +286,14 @@ impl<'hir> Visitor<'hir> for ReturnStatementPass {
             hir::ExprKind::FunctionExpression(func) => {
                 // Enter function context
                 self.function_stack.push(func.hir_id);
+                self.function_body_blocks.insert(func.body.hir_id);
                 
                 // Visit the function body
                 self.visit_block(&mut func.body, ctx);
                 
                 // Exit function context
                 self.function_stack.pop();
+                self.function_body_blocks.remove(&func.body.hir_id);
             }
             _ => {
                 walk_expr(self, expr, ctx);

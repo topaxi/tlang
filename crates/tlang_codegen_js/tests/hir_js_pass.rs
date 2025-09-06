@@ -1404,7 +1404,7 @@ fn test_loop_expression_with_if_else_break() {
             if true {
                 ($hir$0 = 42);
                 break;
-            };
+            }
         };
         let result: unknown = $hir$0;
         return result;

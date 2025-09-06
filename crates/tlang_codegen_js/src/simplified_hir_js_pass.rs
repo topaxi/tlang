@@ -365,7 +365,7 @@ impl SimplifiedHirJsPass {
                     if let hir::ExprKind::Loop(..) = &expr.kind {
                         // Special handling for loop expressions
                         let (flattened_expr, mut temp_stmts) = 
-                            self.transform_loop_expression(*expr.clone(), ctx);
+                            self.transform_loop_expression((**expr).clone(), ctx);
                         
                         additional_stmts.append(&mut temp_stmts);
                         **expr = flattened_expr;
@@ -373,7 +373,51 @@ impl SimplifiedHirJsPass {
                     } else {
                         // General flattening for other complex expressions
                         let (flattened_expr, mut temp_stmts) = 
-                            self.flatten_expression_to_temp_var(*expr.clone(), ctx);
+                            self.flatten_expression_to_temp_var((**expr).clone(), ctx);
+                        
+                        additional_stmts.append(&mut temp_stmts);
+                        **expr = flattened_expr;
+                        self.changes_made = true;
+                    }
+                }
+            }
+            hir::StmtKind::Expr(expr) => {
+                // Handle complex expressions in expression statements
+                if !self.can_render_as_js_expr(expr) {
+                    if let hir::ExprKind::Loop(..) = &expr.kind {
+                        // Special handling for loop expressions
+                        let (flattened_expr, mut temp_stmts) = 
+                            self.transform_loop_expression((**expr).clone(), ctx);
+                        
+                        additional_stmts.append(&mut temp_stmts);
+                        **expr = flattened_expr;
+                        self.changes_made = true;
+                    } else if let hir::ExprKind::Block(..) | hir::ExprKind::Match(..) | hir::ExprKind::IfElse(..) = &expr.kind {
+                        // These complex expressions need to be flattened
+                        let (flattened_expr, mut temp_stmts) = 
+                            self.flatten_expression_to_temp_var((**expr).clone(), ctx);
+                        
+                        additional_stmts.append(&mut temp_stmts);
+                        **expr = flattened_expr;
+                        self.changes_made = true;
+                    }
+                }
+            }
+            hir::StmtKind::Return(Some(expr)) => {
+                // Handle complex expressions in return statements
+                if !self.can_render_as_js_expr(expr) {
+                    if let hir::ExprKind::Loop(..) = &expr.kind {
+                        // Special handling for loop expressions
+                        let (flattened_expr, mut temp_stmts) = 
+                            self.transform_loop_expression((**expr).clone(), ctx);
+                        
+                        additional_stmts.append(&mut temp_stmts);
+                        **expr = flattened_expr;
+                        self.changes_made = true;
+                    } else {
+                        // General flattening for other complex expressions
+                        let (flattened_expr, mut temp_stmts) = 
+                            self.flatten_expression_to_temp_var((**expr).clone(), ctx);
                         
                         additional_stmts.append(&mut temp_stmts);
                         **expr = flattened_expr;
@@ -385,6 +429,65 @@ impl SimplifiedHirJsPass {
         }
 
         additional_stmts
+    }
+
+    /// Flatten subexpressions that cannot be rendered as JavaScript expressions
+    fn flatten_subexpressions_if_needed(&mut self, expr: &mut hir::Expr, ctx: &mut HirOptContext) {
+        match &mut expr.kind {
+            hir::ExprKind::Call(call) => {
+                // Flatten complex arguments
+                for arg in &mut call.arguments {
+                    if !self.can_render_as_js_expr(arg) {
+                        let (temp_ref, temp_stmts) = self.flatten_expression_to_temp_var(arg.clone(), ctx);
+                        // For now, we can't easily insert statements here in expression context
+                        // This will need to be handled at a higher level (block context)
+                        *arg = temp_ref;
+                        self.changes_made = true;
+                    }
+                }
+            }
+            hir::ExprKind::Binary(_, lhs, rhs) => {
+                // Flatten complex operands
+                if !self.can_render_as_js_expr(lhs) {
+                    let (temp_ref, _temp_stmts) = self.flatten_expression_to_temp_var(*lhs.clone(), ctx);
+                    **lhs = temp_ref;
+                    self.changes_made = true;
+                }
+                if !self.can_render_as_js_expr(rhs) {
+                    let (temp_ref, _temp_stmts) = self.flatten_expression_to_temp_var(*rhs.clone(), ctx);
+                    **rhs = temp_ref;
+                    self.changes_made = true;
+                }
+            }
+            hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
+                // Only flatten if this is a complex if-else that can't be rendered as ternary
+                if !self.can_render_if_else_as_ternary(condition, then_branch, else_branches) {
+                    // This if-else should be transformed to statements, but we can't do that here
+                    // It should be handled at the block level
+                }
+            }
+            hir::ExprKind::List(elements) => {
+                // Flatten complex list elements
+                for element in elements {
+                    if !self.can_render_as_js_expr(element) {
+                        let (temp_ref, _temp_stmts) = self.flatten_expression_to_temp_var(element.clone(), ctx);
+                        *element = temp_ref;
+                        self.changes_made = true;
+                    }
+                }
+            }
+            hir::ExprKind::FieldAccess(obj, _field) => {
+                // Flatten complex object expressions
+                if !self.can_render_as_js_expr(obj) {
+                    let (temp_ref, _temp_stmts) = self.flatten_expression_to_temp_var(*obj.clone(), ctx);
+                    **obj = temp_ref;
+                    self.changes_made = true;
+                }
+            }
+            _ => {
+                // Other expression types don't need special handling here
+            }
+        }
     }
 }
 
@@ -408,6 +511,9 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
         block: &'hir mut hir::Block,
         ctx: &mut Self::Context,
     ) {
+        // First visit nested structures
+        walk_block(self, block, ctx);
+        
         let mut new_stmts = Vec::new();
 
         for stmt in &mut block.stmts {
@@ -421,9 +527,29 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
             new_stmts.push(stmt.clone());
         }
 
-        block.stmts = new_stmts;
+        // Handle completion expression
+        if let Some(completion_expr) = &mut block.expr {
+            if !self.can_render_as_js_expr(completion_expr) {
+                if let hir::ExprKind::Loop(..) = &completion_expr.kind {
+                    // Special handling for loop expressions
+                    let (flattened_expr, mut temp_stmts) = 
+                        self.transform_loop_expression(completion_expr.clone(), ctx);
+                    
+                    new_stmts.append(&mut temp_stmts);
+                    *completion_expr = flattened_expr;
+                    self.changes_made = true;
+                } else {
+                    // General flattening for other complex expressions
+                    let (flattened_expr, mut temp_stmts) = 
+                        self.flatten_expression_to_temp_var(completion_expr.clone(), ctx);
+                    
+                    new_stmts.append(&mut temp_stmts);
+                    *completion_expr = flattened_expr;
+                    self.changes_made = true;
+                }
+            }
+        }
 
-        // Continue visiting nested structures
-        walk_block(self, block, ctx);
+        block.stmts = new_stmts;
     }
 }
