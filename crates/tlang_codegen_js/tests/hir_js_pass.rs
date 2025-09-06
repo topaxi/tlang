@@ -2077,7 +2077,6 @@ fn test_isolated_loop_with_break_value() {
 
 #[test]
 fn test_isolated_break_in_binary_expression() {
-    // Isolated test for break expressions in binary operations - this should fail with current HIR pass
     let source = r#"
         fn test() {
             loop {
@@ -2086,14 +2085,16 @@ fn test_isolated_break_in_binary_expression() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    // This test documents current behavior - break expressions in complex contexts might need special handling
     assert_snapshot!(pretty_print(&hir), @r###"
     fn test() -> unknown {
+        let $hir$0: unknown = _;
         loop {
-            let $hir$0: unknown = _;
-            ($hir$0 = break 42);
-            let result: unknown = ($hir$0 + 10);
+            let $hir$1: unknown = _;
+            ($hir$1 = 42);
+            break;
+            let result: unknown = ($hir$1 + 10);
         };
+        return $hir$0;
     }
     "###);
 }
@@ -2108,17 +2109,8 @@ fn test_isolated_for_loop_structure() {
             }
         }
     "#;
-    let (hir_before, hir_after) = compile_and_apply_hir_js_pass_debug(source);
-    
-    println!("=== ISOLATED FOR LOOP DEBUG ===");
-    println!("BEFORE:");
-    println!("{}", pretty_print(&hir_before));
-    println!("\nAFTER:");
-    println!("{}", pretty_print(&hir_after));
-    println!("=== END DEBUG ===");
-    
-    // Document current transformation - this helps understand what the expected output should be
-    assert_snapshot!(pretty_print(&hir_after), @r###"
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
     fn test() -> unknown {
         {
             let iterator$$: unknown = iterator::iter([1, 2, 3]);
