@@ -90,15 +90,17 @@ fn test_block_expression_flattening() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r"
+    assert_snapshot!(pretty_print(&hir), @r###"
     fn main() -> unknown {
         let $hir$0: unknown = _;
-        let y: unknown = 1;
-        ($hir$0 = (y + 2));
+        {
+            let y: unknown = 1;
+            ($hir$0 = (y + 2));
+        };
         let x: unknown = $hir$0;
         return x;
     }
-    ");
+    "###);
 }
 
 #[test]
@@ -176,14 +178,16 @@ fn test_function_call_argument_flattening() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r"
+    assert_snapshot!(pretty_print(&hir), @r###"
     fn main() -> unknown {
         let $hir$0: unknown = _;
-        let x: unknown = 1;
-        ($hir$0 = (x + 2));
+        {
+            let x: unknown = 1;
+            ($hir$0 = (x + 2));
+        };
         log($hir$0);
     }
-    ");
+    "###);
 }
 
 #[test]
@@ -201,18 +205,22 @@ fn test_binary_expression_with_complex_operands() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r"
+    assert_snapshot!(pretty_print(&hir), @r###"
     fn main() -> unknown {
         let $hir$0: unknown = _;
-        let a: unknown = 1;
-        ($hir$0 = (a + 1));
+        {
+            let a: unknown = 1;
+            ($hir$0 = (a + 1));
+        };
         let $hir$1: unknown = _;
-        let b: unknown = 2;
-        ($hir$1 = (b * 2));
+        {
+            let b: unknown = 2;
+            ($hir$1 = (b * 2));
+        };
         let x: unknown = ($hir$0 + $hir$1);
         return x;
     }
-    ");
+    "###);
 }
 
 #[test]
@@ -402,15 +410,17 @@ fn test_unary_expression_flattening() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r"
+    assert_snapshot!(pretty_print(&hir), @r###"
     fn main() -> unknown {
         let $hir$0: unknown = _;
-        let a: unknown = true;
-        ($hir$0 = a);
+        {
+            let a: unknown = true;
+            ($hir$0 = a);
+        };
         let x: unknown = !$hir$0;
         return x;
     }
-    ");
+    "###);
 }
 
 #[test]
