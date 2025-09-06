@@ -172,6 +172,20 @@ impl SimplifiedHirJsPass {
         }
     }
 
+    /// Check if an expression is a temp variable that we created
+    fn is_temp_variable(&self, expr: &hir::Expr) -> bool {
+        match &expr.kind {
+            hir::ExprKind::Path(path) => {
+                if let Some(first_segment) = path.segments.first() {
+                    first_segment.ident.as_str().starts_with("$hir$")
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
     /// Check if an if-else expression can be rendered as a ternary operator
     fn can_render_if_else_as_ternary(
         &self,
@@ -360,6 +374,11 @@ impl SimplifiedHirJsPass {
 
         match &mut stmt.kind {
             hir::StmtKind::Let(_, expr, _) => {
+                // Skip temp variables that we created
+                if self.is_temp_variable(expr) {
+                    return additional_stmts;
+                }
+                
                 if !self.can_render_as_js_expr(expr) {
                     // For complex expressions in let statements, flatten them
                     if let hir::ExprKind::Loop(..) = &expr.kind {
@@ -511,9 +530,6 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
         block: &'hir mut hir::Block,
         ctx: &mut Self::Context,
     ) {
-        // First visit nested structures
-        walk_block(self, block, ctx);
-        
         let mut new_stmts = Vec::new();
 
         for stmt in &mut block.stmts {
