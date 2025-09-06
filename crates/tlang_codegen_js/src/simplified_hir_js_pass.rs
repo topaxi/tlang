@@ -1,5 +1,5 @@
 use tlang_ast::node::Ident;
-use tlang_hir::{Visitor, hir, visit::{walk_block, walk_expr}};
+use tlang_hir::{Visitor, hir, visit::walk_expr};
 use tlang_hir_opt::{HirOptContext, HirPass};
 use tlang_span::Span;
 
@@ -181,6 +181,32 @@ impl SimplifiedHirJsPass {
                 } else {
                     false
                 }
+            }
+            _ => false,
+        }
+    }
+
+    /// Check if an expression contains temp variables (for more comprehensive detection)
+    fn contains_temp_variables(&self, expr: &hir::Expr) -> bool {
+        if self.is_temp_variable(expr) {
+            return true;
+        }
+        
+        match &expr.kind {
+            hir::ExprKind::Binary(_, lhs, rhs) => {
+                self.contains_temp_variables(lhs) || self.contains_temp_variables(rhs)
+            }
+            hir::ExprKind::Unary(_, operand) => {
+                self.contains_temp_variables(operand)
+            }
+            hir::ExprKind::Call(call) => {
+                call.arguments.iter().any(|arg| self.contains_temp_variables(arg))
+            }
+            hir::ExprKind::List(elements) => {
+                elements.iter().any(|elem| self.contains_temp_variables(elem))
+            }
+            hir::ExprKind::FieldAccess(obj, _) => {
+                self.contains_temp_variables(obj)
             }
             _ => false,
         }
@@ -375,7 +401,7 @@ impl SimplifiedHirJsPass {
         match &mut stmt.kind {
             hir::StmtKind::Let(_, expr, _) => {
                 // Skip temp variables that we created
-                if self.is_temp_variable(expr) {
+                if self.is_temp_variable(expr) || self.contains_temp_variables(expr) {
                     return additional_stmts;
                 }
                 
@@ -424,7 +450,14 @@ impl SimplifiedHirJsPass {
             }
             hir::StmtKind::Return(Some(expr)) => {
                 // Handle complex expressions in return statements
+                // NOTE: TailCall expressions in return statements should be left as-is
+                // since they will be handled by the JavaScript generator's tail call optimization
                 if !self.can_render_as_js_expr(expr) {
+                    // Skip TailCall expressions in return statements - they're handled by codegen
+                    if let hir::ExprKind::TailCall(..) = &expr.kind {
+                        return additional_stmts;
+                    }
+                    
                     if let hir::ExprKind::Loop(..) = &expr.kind {
                         // Special handling for loop expressions
                         let (flattened_expr, mut temp_stmts) = 
@@ -457,7 +490,7 @@ impl SimplifiedHirJsPass {
                 // Flatten complex arguments
                 for arg in &mut call.arguments {
                     if !self.can_render_as_js_expr(arg) {
-                        let (temp_ref, temp_stmts) = self.flatten_expression_to_temp_var(arg.clone(), ctx);
+                        let (temp_ref, _temp_stmts) = self.flatten_expression_to_temp_var(arg.clone(), ctx);
                         // For now, we can't easily insert statements here in expression context
                         // This will need to be handled at a higher level (block context)
                         *arg = temp_ref;
@@ -567,5 +600,28 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
         }
 
         block.stmts = new_stmts;
+        
+        // Use the default walking behavior to visit nested structures
+        for stmt in &mut block.stmts {
+            match &mut stmt.kind {
+                hir::StmtKind::FunctionDeclaration(decl) => {
+                    // Visit function body recursively
+                    self.visit_block(&mut decl.body, ctx);
+                }
+                hir::StmtKind::Expr(expr) => {
+                    // Visit expressions that might contain blocks
+                    self.visit_expr(expr, ctx);
+                }
+                hir::StmtKind::Let(_, expr, _) => {
+                    // Visit let expressions that might contain blocks
+                    self.visit_expr(expr, ctx);
+                }
+                hir::StmtKind::Return(Some(expr)) => {
+                    // Visit return expressions that might contain blocks
+                    self.visit_expr(expr, ctx);
+                }
+                _ => {}
+            }
+        }
     }
 }
