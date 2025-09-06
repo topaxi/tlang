@@ -9,6 +9,7 @@ use tlang_span::Span;
 pub struct SimplifiedHirJsPass {
     temp_var_counter: usize,
     changes_made: bool,
+    iteration_count: usize,
 }
 
 impl SimplifiedHirJsPass {
@@ -16,6 +17,7 @@ impl SimplifiedHirJsPass {
         Self {
             temp_var_counter: 0,
             changes_made: false,
+            iteration_count: 0,
         }
     }
 
@@ -549,6 +551,13 @@ impl HirPass for SimplifiedHirJsPass {
     }
 
     fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
+        self.iteration_count += 1;
+        
+        // Prevent infinite loops by limiting the number of changes this pass can make
+        if self.iteration_count > 8 {
+            return false;
+        }
+        
         self.changes_made = false;
         self.visit_module(module, ctx);
         self.changes_made
