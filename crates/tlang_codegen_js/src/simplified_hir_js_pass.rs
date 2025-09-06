@@ -117,13 +117,45 @@ impl SimplifiedHirJsPass {
         // Create temp variable declaration
         let temp_declaration = self.create_temp_var_declaration(ctx, &temp_name, span);
         
-        // Create assignment statement
-        let assignment_stmt = self.create_assignment_stmt(ctx, &temp_name, expr, span);
-        
         // Create temp variable reference
         let temp_ref = self.create_temp_var_path(ctx, &temp_name, span);
 
-        (temp_ref, vec![temp_declaration, assignment_stmt])
+        // Handle complex expressions specially
+        match &expr.kind {
+            hir::ExprKind::Block(_block) => {
+                // For block expressions, transform the block to assign to temp variable
+                let statements = self.transform_block_to_statements(expr, &temp_name, ctx);
+                let mut all_stmts = vec![temp_declaration];
+                all_stmts.extend(statements);
+                (temp_ref, all_stmts)
+            }
+            hir::ExprKind::Loop(..) => {
+                // For loop expressions, use specialized loop transformation
+                let (_, statements) = self.transform_loop_expression(expr, ctx);
+                let mut all_stmts = vec![temp_declaration];
+                all_stmts.extend(statements);
+                (temp_ref, all_stmts)
+            }
+            hir::ExprKind::Match(..) => {
+                // For match expressions, transform to proper statements
+                let statements = self.transform_match_to_statements(expr, &temp_name, ctx);
+                let mut all_stmts = vec![temp_declaration];
+                all_stmts.extend(statements);
+                (temp_ref, all_stmts)
+            }
+            hir::ExprKind::IfElse(..) => {
+                // For if-else expressions, transform to proper statements
+                let statements = self.transform_if_else_to_statements(expr, &temp_name, ctx);
+                let mut all_stmts = vec![temp_declaration];
+                all_stmts.extend(statements);
+                (temp_ref, all_stmts)
+            }
+            _ => {
+                // For simple expressions, create assignment statement
+                let assignment_stmt = self.create_assignment_stmt(ctx, &temp_name, expr, span);
+                (temp_ref, vec![temp_declaration, assignment_stmt])
+            }
+        }
     }
 
     /// Check if an expression can be represented as a JavaScript expression
@@ -389,6 +421,120 @@ impl SimplifiedHirJsPass {
                 // For other expression types, use the visitor to walk through them
                 walk_expr(self, expr, ctx);
             }
+        }
+    }
+
+    /// Transform a block expression to statements that assign completion value to temp variable
+    fn transform_block_to_statements(
+        &mut self,
+        expr: hir::Expr,
+        temp_name: &str,
+        ctx: &mut HirOptContext,
+    ) -> Vec<hir::Stmt> {
+        let span = expr.span;
+        if let hir::ExprKind::Block(block) = expr.kind {
+            let mut statements = Vec::new();
+            
+            // Add all statements from the block
+            statements.extend((*block).stmts);
+            
+            // Handle completion expression
+            if let Some(completion_expr) = (*block).expr {
+                // Create assignment to temp variable
+                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                statements.push(assignment_stmt);
+            }
+            
+            statements
+        } else {
+            // Fallback: create a simple assignment statement
+            vec![self.create_assignment_stmt(ctx, temp_name, expr, span)]
+        }
+    }
+
+    /// Transform a match expression to statements that assign results to temp variable
+    fn transform_match_to_statements(
+        &mut self,
+        expr: hir::Expr,
+        temp_name: &str,
+        ctx: &mut HirOptContext,
+    ) -> Vec<hir::Stmt> {
+        let span = expr.span;
+        if let hir::ExprKind::Match(scrutinee, arms) = expr.kind {
+            // Transform each arm to assign to temp variable
+            let mut transformed_arms = Vec::new();
+            
+            for arm in arms {
+                let mut new_arm = arm;
+                
+                // Transform the completion expression in each arm
+                if let Some(completion_expr) = new_arm.block.expr.take() {
+                    let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                    new_arm.block.stmts.push(assignment_stmt);
+                }
+                
+                transformed_arms.push(new_arm);
+            }
+            
+            // Create the match statement
+            let match_stmt = hir::Stmt::new(
+                ctx.hir_id_allocator.next_id(),
+                hir::StmtKind::Expr(Box::new(hir::Expr {
+                    hir_id: ctx.hir_id_allocator.next_id(),
+                    kind: hir::ExprKind::Match(scrutinee, transformed_arms),
+                    span,
+                })),
+                span,
+            );
+            
+            vec![match_stmt]
+        } else {
+            // Fallback: create a simple assignment statement
+            vec![self.create_assignment_stmt(ctx, temp_name, expr, span)]
+        }
+    }
+
+    /// Transform an if-else expression to statements that assign results to temp variable
+    fn transform_if_else_to_statements(
+        &mut self,
+        expr: hir::Expr,
+        temp_name: &str,
+        ctx: &mut HirOptContext,
+    ) -> Vec<hir::Stmt> {
+        let span = expr.span;
+        if let hir::ExprKind::IfElse(condition, then_branch, else_branches) = expr.kind {
+            // Transform branches to assign to temp variable
+            let mut new_then_branch = *then_branch;
+            if let Some(completion_expr) = new_then_branch.expr.take() {
+                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                new_then_branch.stmts.push(assignment_stmt);
+            }
+            
+            let mut new_else_branches = Vec::new();
+            for else_branch in else_branches {
+                let mut new_else_branch = else_branch;
+                if let Some(completion_expr) = new_else_branch.consequence.expr.take() {
+                    let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                    new_else_branch.consequence.stmts.push(assignment_stmt);
+                }
+                new_else_branches.push(new_else_branch);
+            }
+            
+            // Create the if-else statement
+            let if_else_stmt = hir::Stmt::new(
+                ctx.hir_id_allocator.next_id(),
+                hir::StmtKind::Expr(Box::new(hir::Expr {
+                    hir_id: ctx.hir_id_allocator.next_id(),
+                    kind: hir::ExprKind::IfElse(condition, Box::new(new_then_branch), new_else_branches),
+                    span,
+                })),
+                span,
+            );
+            
+            vec![if_else_stmt]
+        } else {
+            // Fallback: create a simple assignment statement
+            vec![self.create_assignment_stmt(ctx, temp_name, expr, span)]
         }
     }
 
