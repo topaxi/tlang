@@ -2090,7 +2090,7 @@ fn test_isolated_break_in_binary_expression() {
         let $hir$0: unknown = _;
         loop {
             let $hir$1: unknown = _;
-            ($hir$1 = 42 + 10);
+            ($hir$1 = (42 + 10));
             break;
             let result: unknown = $hir$1;
         };

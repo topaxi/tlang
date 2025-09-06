@@ -171,6 +171,39 @@ impl SimplifiedHirJsPass {
                 all_stmts.extend(statements);
                 (temp_ref, all_stmts)
             }
+            hir::ExprKind::Break(Some(break_value)) => {
+                // For break expressions with values, transform specially:
+                // let result = break value; -> temp_var = value; break; let result = temp_var;
+                
+                // Extract the break value without extra wrapping
+                let value_expr = *break_value.clone();
+                let assignment_stmt = self.create_assignment_stmt(ctx, &temp_name, value_expr, span);
+                
+                // Create plain break statement
+                let plain_break = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::Break(None),
+                        span,
+                    })),
+                    span,
+                );
+                
+                (temp_ref, vec![temp_declaration, assignment_stmt, plain_break])
+            }
+            hir::ExprKind::Break(None) => {
+                // For break expressions without values, just create the break statement
+                let plain_break = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(expr)),
+                    span,
+                );
+                
+                // Return a dummy temp ref (won't be used) and no temp declaration
+                let dummy_temp_ref = self.create_temp_var_path(ctx, &temp_name, span);
+                (dummy_temp_ref, vec![plain_break])
+            }
             _ => {
                 // For simple expressions, create assignment statement
                 let assignment_stmt = self.create_assignment_stmt(ctx, &temp_name, expr, span);
