@@ -182,7 +182,7 @@ fn test_function_expression_completion() {
     let hir = compile_and_apply_return_statement_pass(source);
     assert_snapshot!(pretty_print(&hir), @r###"
     let f: unknown = fn anonymous(x: unknown) -> unknown {
-        return (x * 2);
+        (x * 2)
     };
     "###);
 }
@@ -201,7 +201,7 @@ fn test_nested_functions_isolated() {
     assert_snapshot!(pretty_print(&hir), @r###"
     fn outer() -> unknown {
         let inner: unknown = fn anonymous(x: unknown) -> unknown {
-            return (x + 1);
+            (x + 1)
         };
         return inner(42);
     }
