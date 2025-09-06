@@ -25,9 +25,9 @@ pub fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
             expr_can_render_as_js_expr(obj) && expr_can_render_as_js_expr(index)
         }
 
-        hir::ExprKind::Dict(pairs) => pairs
-            .iter()
-            .all(|(key, value)| expr_can_render_as_js_expr(key) && expr_can_render_as_js_expr(value)),
+        hir::ExprKind::Dict(pairs) => pairs.iter().all(|(key, value)| {
+            expr_can_render_as_js_expr(key) && expr_can_render_as_js_expr(value)
+        }),
 
         // These expressions cannot be rendered as JavaScript expressions
         hir::ExprKind::Block(..)
@@ -59,21 +59,10 @@ pub fn expr_can_render_as_assignment_rhs(expr: &hir::Expr) -> bool {
             .all(|(_, value)| expr_can_render_as_js_expr(value)),
 
         // Simple block expressions can potentially be directly assigned
-        hir::ExprKind::Block(block) => {
-            // Allow simple blocks with no statements and only a completion expression
-            // that can be rendered as a JavaScript expression
-            if block.stmts.is_empty() {
-                if let Some(completion_expr) = &block.expr {
-                    expr_can_render_as_js_expr(completion_expr)
-                } else {
-                    // Empty block {} can be represented as undefined
-                    true
-                }
-            } else {
-                // Blocks with statements need more complex handling
-                // For now, flatten these to maintain current behavior
-                false
-            }
+        hir::ExprKind::Block(_block) => {
+            // For now, be conservative and flatten all blocks to temp variables
+            // This ensures consistency with expected behavior
+            false
         }
 
         // These still need flattening

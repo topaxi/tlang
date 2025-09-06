@@ -205,7 +205,11 @@ impl SimplifiedHirJsPass {
     }
 
     /// Process sub-expressions that might need flattening before processing the containing expression
-    fn process_sub_expressions(&mut self, expr: &mut hir::Expr, ctx: &mut HirOptContext) -> Vec<hir::Stmt> {
+    fn process_sub_expressions(
+        &mut self,
+        expr: &mut hir::Expr,
+        ctx: &mut HirOptContext,
+    ) -> Vec<hir::Stmt> {
         let mut additional_stmts = Vec::new();
 
         match &mut expr.kind {
@@ -253,7 +257,9 @@ impl SimplifiedHirJsPass {
             hir::ExprKind::List(elements) => {
                 // Process list elements
                 for element in elements {
-                    if !self.can_render_as_js_expr(element) && !self.contains_temp_variables(element) {
+                    if !self.can_render_as_js_expr(element)
+                        && !self.contains_temp_variables(element)
+                    {
                         let (flattened_expr, mut temp_stmts) =
                             self.flatten_expression_to_temp_var(element.clone(), ctx);
                         additional_stmts.append(&mut temp_stmts);
@@ -281,7 +287,7 @@ impl SimplifiedHirJsPass {
                     **obj = flattened_expr;
                     self.changes_made = true;
                 }
-                
+
                 // Process index expression
                 if !self.can_render_as_js_expr(index) && !self.contains_temp_variables(index) {
                     let (flattened_expr, mut temp_stmts) =
@@ -444,20 +450,35 @@ impl SimplifiedHirJsPass {
     ) -> Vec<hir::Stmt> {
         let span = expr.span;
         if let hir::ExprKind::Block(block) = expr.kind {
-            let mut statements = Vec::new();
+            // Preserve block structure by creating a block statement
+            let mut block_stmts = block.stmts;
 
-            // Add all statements from the block
-            statements.extend(block.stmts);
-
-            // Handle completion expression
+            // Handle completion expression by adding assignment within the block
             if let Some(completion_expr) = block.expr {
-                // Create assignment to temp variable
                 let assignment_stmt =
                     self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
-                statements.push(assignment_stmt);
+                block_stmts.push(assignment_stmt);
             }
 
-            statements
+            // Create a new block with the modified statements and wrap it in a block expression statement
+            let modified_block = hir::Block::new(
+                ctx.hir_id_allocator.next_id(),
+                block_stmts,
+                None, // No completion expression since we converted it to assignment
+                span,
+            );
+
+            let block_expr_stmt = hir::Stmt::new(
+                ctx.hir_id_allocator.next_id(),
+                hir::StmtKind::Expr(Box::new(hir::Expr {
+                    hir_id: ctx.hir_id_allocator.next_id(),
+                    kind: hir::ExprKind::Block(Box::new(modified_block)),
+                    span,
+                })),
+                span,
+            );
+
+            vec![block_expr_stmt]
         } else {
             // Fallback: create a simple assignment statement
             vec![self.create_assignment_stmt(ctx, temp_name, expr, span)]
@@ -520,7 +541,9 @@ impl SimplifiedHirJsPass {
             let mut new_then_branch = *then_branch;
             if let Some(completion_expr) = new_then_branch.expr.take() {
                 // If the completion expression is complex, flatten it first
-                if !self.can_render_as_js_expr(&completion_expr) && !self.contains_temp_variables(&completion_expr) {
+                if !self.can_render_as_js_expr(&completion_expr)
+                    && !self.contains_temp_variables(&completion_expr)
+                {
                     if let hir::ExprKind::Block(block) = completion_expr.kind {
                         // For block expressions, flatten the contents directly into the branch
                         new_then_branch.stmts.extend(block.stmts);
@@ -551,13 +574,19 @@ impl SimplifiedHirJsPass {
                 let mut new_else_branch = else_branch;
                 if let Some(completion_expr) = new_else_branch.consequence.expr.take() {
                     // If the completion expression is complex, flatten it first
-                    if !self.can_render_as_js_expr(&completion_expr) && !self.contains_temp_variables(&completion_expr) {
+                    if !self.can_render_as_js_expr(&completion_expr)
+                        && !self.contains_temp_variables(&completion_expr)
+                    {
                         if let hir::ExprKind::Block(block) = completion_expr.kind {
                             // For block expressions, flatten the contents directly into the branch
                             new_else_branch.consequence.stmts.extend(block.stmts);
                             if let Some(block_completion) = block.expr {
-                                let assignment_stmt =
-                                    self.create_assignment_stmt(ctx, temp_name, block_completion, span);
+                                let assignment_stmt = self.create_assignment_stmt(
+                                    ctx,
+                                    temp_name,
+                                    block_completion,
+                                    span,
+                                );
                                 new_else_branch.consequence.stmts.push(assignment_stmt);
                             }
                         } else {
@@ -725,7 +754,7 @@ impl HirPass for SimplifiedHirJsPass {
         if self.iteration_count > 0 {
             return false;
         }
-        
+
         self.iteration_count += 1;
         self.changes_made = false;
         self.visit_module(module, ctx);
@@ -809,10 +838,10 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
             hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
                 // Visit condition first
                 self.visit_expr(condition, ctx);
-                
+
                 // Visit then branch
                 self.visit_block(then_branch, ctx);
-                
+
                 // Visit else branches
                 for else_clause in else_branches {
                     if let Some(condition) = &mut else_clause.condition {
@@ -824,14 +853,14 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
             hir::ExprKind::Match(scrutinee, arms) => {
                 // Visit scrutinee
                 self.visit_expr(scrutinee, ctx);
-                
+
                 // Visit each match arm
                 for arm in arms {
                     // Visit guard if present
                     if let Some(guard) = &mut arm.guard {
                         self.visit_expr(guard, ctx);
                     }
-                    
+
                     // Visit arm body
                     self.visit_block(&mut arm.block, ctx);
                 }

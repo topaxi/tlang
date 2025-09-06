@@ -161,21 +161,10 @@ impl CodegenJS {
 
     pub(crate) fn generate_expr(&mut self, expr: &hir::Expr, parent_op: Option<hir::BinaryOpKind>) {
         match &expr.kind {
-            hir::ExprKind::Block(block) if self.current_context() == BlockContext::Expression => {
-                // Handle simple block expressions that can be rendered as JavaScript expressions
-                if block.stmts.is_empty() {
-                    if let Some(completion_expr) = &block.expr {
-                        // Simple block with only completion expression: { expr } -> expr
-                        self.generate_expr(completion_expr, parent_op);
-                    } else {
-                        // Empty block: {} -> undefined
-                        self.push_str("undefined");
-                    }
-                } else {
-                    panic!(
-                        "Complex block expressions should be transformed to statements by HirJsPass before reaching codegen"
-                    );
-                }
+            hir::ExprKind::Block(_block) if self.current_context() == BlockContext::Expression => {
+                panic!(
+                    "Block expressions should be transformed to statements by HirJsPass before reaching codegen"
+                );
             }
             hir::ExprKind::Block(block) => self.generate_block(block),
             hir::ExprKind::Loop(block) => {
