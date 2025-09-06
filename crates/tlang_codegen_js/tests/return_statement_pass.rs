@@ -92,9 +92,7 @@ fn test_function_with_if_else_completion() {
 
 #[test]
 fn test_function_with_match_completion() {
-    // Note: This test shows that the current ReturnStatementPass implementation
-    // does not transform match expressions to use return statements in each arm.
-    // This behavior may need to be addressed in a future iteration.
+    // Match expressions in function completion position should have return statements in each arm
     let source = r#"
         enum Option {
             Some(value),
@@ -120,10 +118,10 @@ fn test_function_with_match_completion() {
     fn test(opt: unknown) -> unknown {
         match opt {
             Option::Some { 0: val } => {
-                (val + 1)
+                return (val + 1);
             },
             Option::None => {
-                0
+                return 0;
             },
         };
     }
@@ -298,10 +296,10 @@ fn test_multiple_functions_isolated() {
     fn third() -> unknown {
         match true {
             true => {
-                "match_true"
+                return "match_true";
             },
             false => {
-                "match_false"
+                return "match_false";
             },
         };
     }
@@ -323,6 +321,109 @@ fn test_function_with_statements_and_completion() {
         let x: unknown = 10;
         let y: unknown = 20;
         return (x + y);
+    }
+    "###);
+}
+
+#[test]
+fn test_nested_match_expressions() {
+    // Nested match expressions should have return statements in their arms
+    let source = r#"
+        enum Option {
+            Some(value),
+            None,
+        }
+        
+        enum Result {
+            Ok(value),
+            Err(msg),
+        }
+        
+        fn test(opt) {
+            match opt {
+                Option::Some(val) => match val {
+                    Result::Ok(x) => x * 2,
+                    Result::Err(_) => -1,
+                },
+                Option::None => 0,
+            }
+        }
+    "#;
+    let hir = compile_and_apply_return_statement_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    enum Option {
+        Some {
+            0: value,
+        }
+        None {
+        }
+    }
+    enum Result {
+        Ok {
+            0: value,
+        }
+        Err {
+            0: msg,
+        }
+    }
+    fn test(opt: unknown) -> unknown {
+        match opt {
+            Option::Some { 0: val } => {
+                return match val {
+                    Result::Ok { 0: x } => {
+                        return (x * 2);
+                    },
+                    Result::Err { 0: _ } => {
+                        return -1;
+                    },
+                };
+            },
+            Option::None => {
+                return 0;
+            },
+        };
+    }
+    "###);
+}
+
+#[test]
+fn test_function_with_match_and_complex_arms() {
+    // Match expressions with complex arms (containing statements) should still use return statements
+    let source = r#"
+        enum Option {
+            Some(value),
+            None,
+        }
+        
+        fn test(opt) {
+            match opt {
+                Option::Some(val) => {
+                    let doubled = val * 2;
+                    doubled + 1
+                },
+                Option::None => 0,
+            }
+        }
+    "#;
+    let hir = compile_and_apply_return_statement_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    enum Option {
+        Some {
+            0: value,
+        }
+        None {
+        }
+    }
+    fn test(opt: unknown) -> unknown {
+        match opt {
+            Option::Some { 0: val } => {
+                let doubled: unknown = (val * 2);
+                return (doubled + 1);
+            },
+            Option::None => {
+                return 0;
+            },
+        };
     }
     "###);
 }
