@@ -427,3 +427,83 @@ fn test_function_with_match_and_complex_arms() {
     }
     "###);
 }
+
+#[test]
+fn test_isolated_tail_call_in_if_else() {
+    // Isolated test for tail calls in if-else expressions - the core fix
+    let source = r#"
+        fn factorial(n, acc) {
+            if n <= 1 {
+                acc
+            } else {
+                rec factorial(n - 1, n * acc)
+            }
+        }
+    "#;
+    let hir = compile_and_apply_return_statement_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn factorial(n: unknown, acc: unknown) -> unknown {
+        if (n <= 1) {
+            return acc;
+        } else {
+            return rec factorial((n - 1), (n * acc));
+        };
+    }
+    "###);
+}
+
+#[test]
+fn test_isolated_simple_if_else_without_tail_calls() {
+    // Ensure simple if-else without tail calls still work correctly
+    let source = r#"
+        fn test(x) {
+            if x > 0 {
+                "positive"
+            } else {
+                "negative"
+            }
+        }
+    "#;
+    let hir = compile_and_apply_return_statement_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn test(x: unknown) -> unknown {
+        return if (x > 0) {
+            "positive"
+        } else {
+            "negative"
+        };
+    }
+    "###);
+}
+
+#[test]
+fn test_isolated_nested_tail_calls() {
+    // Test nested tail calls in complex if-else structures
+    let source = r#"
+        fn nested_recursive(x, y) {
+            if x > 0 {
+                if y > 0 {
+                    rec nested_recursive(x - 1, y)
+                } else {
+                    rec nested_recursive(x, y + 1)
+                }
+            } else {
+                x + y
+            }
+        }
+    "#;
+    let hir = compile_and_apply_return_statement_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn nested_recursive(x: unknown, y: unknown) -> unknown {
+        if (x > 0) {
+            return if (y > 0) {
+                rec nested_recursive((x - 1), y)
+            } else {
+                rec nested_recursive(x, (y + 1))
+            };
+        } else {
+            return (x + y);
+        };
+    }
+    "###);
+}

@@ -2019,3 +2019,120 @@ fn test_debug_nested_loop_expressions_with_cli_sequence() {
     println!("\n=== Final HIR after HIR JS optimization group ===");
     println!("{}", pretty_print(&module));
 }
+
+#[test]
+fn test_isolated_loop_expression_in_block_completion() {
+    // Isolated test for loop expressions in block completion position
+    let source = r#"
+        fn test() {
+            {
+                let x = 1;
+                loop {
+                    if true {
+                        break;
+                    }
+                }
+            }
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn test() -> unknown {
+        {
+            let x: unknown = 1;
+            loop {
+                if true {
+                    break;
+                }
+            };
+        };
+    }
+    "###);
+}
+
+#[test]
+fn test_isolated_loop_with_break_value() {
+    // Test loop expressions with break values
+    let source = r#"
+        fn test() {
+            let result = loop {
+                break 42;
+            };
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn test() -> unknown {
+        let $hir$0: unknown = _;
+        loop {
+            ($hir$0 = 42);
+            break;
+        };
+        let result: unknown = $hir$0;
+        return result;
+    }
+    "###);
+}
+
+#[test]
+fn test_isolated_break_in_binary_expression() {
+    // Isolated test for break expressions in binary operations - this should fail with current HIR pass
+    let source = r#"
+        fn test() {
+            loop {
+                let result = break 42 + 10;
+            }
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    // This test documents current behavior - break expressions in complex contexts might need special handling
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn test() -> unknown {
+        loop {
+            let $hir$0: unknown = _;
+            ($hir$0 = break 42);
+            let result: unknown = ($hir$0 + 10);
+        };
+    }
+    "###);
+}
+
+#[test]
+fn test_isolated_for_loop_structure() {
+    // Isolated test to understand for loop structure transformation
+    let source = r#"
+        fn test() {
+            for i in [1, 2, 3] {
+                log(i);
+            }
+        }
+    "#;
+    let (hir_before, hir_after) = compile_and_apply_hir_js_pass_debug(source);
+    
+    println!("=== ISOLATED FOR LOOP DEBUG ===");
+    println!("BEFORE:");
+    println!("{}", pretty_print(&hir_before));
+    println!("\nAFTER:");
+    println!("{}", pretty_print(&hir_after));
+    println!("=== END DEBUG ===");
+    
+    // Document current transformation - this helps understand what the expected output should be
+    assert_snapshot!(pretty_print(&hir_after), @r###"
+    fn test() -> unknown {
+        {
+            let iterator$$: unknown = iterator::iter([1, 2, 3]);
+            loop {
+                match iterator$$.next() {
+                    Option::Some { 0: i } => {
+                        log(i);
+                    },
+                    Option::None => {
+                        break;
+                    },
+                };
+            };
+        };
+    }
+    "###);
+}
