@@ -744,7 +744,7 @@ fn test_loop_expression_with_complex_break() {
                 let y: unknown = (x * 2);
                 ($hir$0 = (y + 1));
                 break;
-            }
+            };
         };
         let result: unknown = $hir$0;
         return result;
@@ -779,7 +779,7 @@ fn test_nested_loop_expressions() {
             if (inner == 5) {
                 ($hir$0 = (inner * 2));
                 break;
-            }
+            };
         };
         let outer: unknown = $hir$0;
         return outer;
