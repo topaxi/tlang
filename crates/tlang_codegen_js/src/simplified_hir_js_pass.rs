@@ -204,6 +204,101 @@ impl SimplifiedHirJsPass {
         }
     }
 
+    /// Process sub-expressions that might need flattening before processing the containing expression
+    fn process_sub_expressions(&mut self, expr: &mut hir::Expr, ctx: &mut HirOptContext) -> Vec<hir::Stmt> {
+        let mut additional_stmts = Vec::new();
+
+        match &mut expr.kind {
+            hir::ExprKind::Binary(_, lhs, rhs) => {
+                // Process left operand
+                if !self.can_render_as_js_expr(lhs) && !self.contains_temp_variables(lhs) {
+                    let (flattened_expr, mut temp_stmts) =
+                        self.flatten_expression_to_temp_var((**lhs).clone(), ctx);
+                    additional_stmts.append(&mut temp_stmts);
+                    **lhs = flattened_expr;
+                    self.changes_made = true;
+                }
+
+                // Process right operand
+                if !self.can_render_as_js_expr(rhs) && !self.contains_temp_variables(rhs) {
+                    let (flattened_expr, mut temp_stmts) =
+                        self.flatten_expression_to_temp_var((**rhs).clone(), ctx);
+                    additional_stmts.append(&mut temp_stmts);
+                    **rhs = flattened_expr;
+                    self.changes_made = true;
+                }
+            }
+            hir::ExprKind::Unary(_, operand) => {
+                // Process operand
+                if !self.can_render_as_js_expr(operand) && !self.contains_temp_variables(operand) {
+                    let (flattened_expr, mut temp_stmts) =
+                        self.flatten_expression_to_temp_var((**operand).clone(), ctx);
+                    additional_stmts.append(&mut temp_stmts);
+                    **operand = flattened_expr;
+                    self.changes_made = true;
+                }
+            }
+            hir::ExprKind::Call(call) => {
+                // Process function call arguments
+                for arg in &mut call.arguments {
+                    if !self.can_render_as_js_expr(arg) && !self.contains_temp_variables(arg) {
+                        let (flattened_expr, mut temp_stmts) =
+                            self.flatten_expression_to_temp_var(arg.clone(), ctx);
+                        additional_stmts.append(&mut temp_stmts);
+                        *arg = flattened_expr;
+                        self.changes_made = true;
+                    }
+                }
+            }
+            hir::ExprKind::List(elements) => {
+                // Process list elements
+                for element in elements {
+                    if !self.can_render_as_js_expr(element) && !self.contains_temp_variables(element) {
+                        let (flattened_expr, mut temp_stmts) =
+                            self.flatten_expression_to_temp_var(element.clone(), ctx);
+                        additional_stmts.append(&mut temp_stmts);
+                        *element = flattened_expr;
+                        self.changes_made = true;
+                    }
+                }
+            }
+            hir::ExprKind::FieldAccess(obj, _) => {
+                // Process object expression
+                if !self.can_render_as_js_expr(obj) && !self.contains_temp_variables(obj) {
+                    let (flattened_expr, mut temp_stmts) =
+                        self.flatten_expression_to_temp_var((**obj).clone(), ctx);
+                    additional_stmts.append(&mut temp_stmts);
+                    **obj = flattened_expr;
+                    self.changes_made = true;
+                }
+            }
+            hir::ExprKind::IndexAccess(obj, index) => {
+                // Process object expression
+                if !self.can_render_as_js_expr(obj) && !self.contains_temp_variables(obj) {
+                    let (flattened_expr, mut temp_stmts) =
+                        self.flatten_expression_to_temp_var((**obj).clone(), ctx);
+                    additional_stmts.append(&mut temp_stmts);
+                    **obj = flattened_expr;
+                    self.changes_made = true;
+                }
+                
+                // Process index expression
+                if !self.can_render_as_js_expr(index) && !self.contains_temp_variables(index) {
+                    let (flattened_expr, mut temp_stmts) =
+                        self.flatten_expression_to_temp_var((**index).clone(), ctx);
+                    additional_stmts.append(&mut temp_stmts);
+                    **index = flattened_expr;
+                    self.changes_made = true;
+                }
+            }
+            _ => {
+                // For other expressions, no sub-expression processing needed
+            }
+        }
+
+        additional_stmts
+    }
+
     /// Transform loop expressions to use temp variables
     fn transform_loop_expression(
         &mut self,
@@ -424,18 +519,62 @@ impl SimplifiedHirJsPass {
             // Transform branches to assign to temp variable
             let mut new_then_branch = *then_branch;
             if let Some(completion_expr) = new_then_branch.expr.take() {
-                let assignment_stmt =
-                    self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
-                new_then_branch.stmts.push(assignment_stmt);
+                // If the completion expression is complex, flatten it first
+                if !self.can_render_as_js_expr(&completion_expr) && !self.contains_temp_variables(&completion_expr) {
+                    if let hir::ExprKind::Block(block) = completion_expr.kind {
+                        // For block expressions, flatten the contents directly into the branch
+                        new_then_branch.stmts.extend(block.stmts);
+                        if let Some(block_completion) = block.expr {
+                            let assignment_stmt =
+                                self.create_assignment_stmt(ctx, temp_name, block_completion, span);
+                            new_then_branch.stmts.push(assignment_stmt);
+                        }
+                    } else {
+                        // For other complex expressions, create a nested flattening
+                        let (flattened_expr, temp_stmts) =
+                            self.flatten_expression_to_temp_var(completion_expr, ctx);
+                        new_then_branch.stmts.extend(temp_stmts);
+                        let assignment_stmt =
+                            self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
+                        new_then_branch.stmts.push(assignment_stmt);
+                    }
+                } else {
+                    // For simple expressions, create assignment directly
+                    let assignment_stmt =
+                        self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                    new_then_branch.stmts.push(assignment_stmt);
+                }
             }
 
             let mut new_else_branches = Vec::new();
             for else_branch in else_branches {
                 let mut new_else_branch = else_branch;
                 if let Some(completion_expr) = new_else_branch.consequence.expr.take() {
-                    let assignment_stmt =
-                        self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
-                    new_else_branch.consequence.stmts.push(assignment_stmt);
+                    // If the completion expression is complex, flatten it first
+                    if !self.can_render_as_js_expr(&completion_expr) && !self.contains_temp_variables(&completion_expr) {
+                        if let hir::ExprKind::Block(block) = completion_expr.kind {
+                            // For block expressions, flatten the contents directly into the branch
+                            new_else_branch.consequence.stmts.extend(block.stmts);
+                            if let Some(block_completion) = block.expr {
+                                let assignment_stmt =
+                                    self.create_assignment_stmt(ctx, temp_name, block_completion, span);
+                                new_else_branch.consequence.stmts.push(assignment_stmt);
+                            }
+                        } else {
+                            // For other complex expressions, create a nested flattening
+                            let (flattened_expr, temp_stmts) =
+                                self.flatten_expression_to_temp_var(completion_expr, ctx);
+                            new_else_branch.consequence.stmts.extend(temp_stmts);
+                            let assignment_stmt =
+                                self.create_assignment_stmt(ctx, temp_name, flattened_expr, span);
+                            new_else_branch.consequence.stmts.push(assignment_stmt);
+                        }
+                    } else {
+                        // For simple expressions, create assignment directly
+                        let assignment_stmt =
+                            self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                        new_else_branch.consequence.stmts.push(assignment_stmt);
+                    }
                 }
                 new_else_branches.push(new_else_branch);
             }
@@ -473,7 +612,11 @@ impl SimplifiedHirJsPass {
                     return additional_stmts;
                 }
 
-                // Use assignment-specific logic for let statements
+                // First, recursively process sub-expressions
+                let mut temp_stmts = self.process_sub_expressions(expr, ctx);
+                additional_stmts.append(&mut temp_stmts);
+
+                // Then check if the expression itself needs flattening
                 if !expr_can_render_as_assignment_rhs(expr) && !self.contains_temp_variables(expr) {
                     // For complex expressions in let statements, flatten them
                     if let hir::ExprKind::Loop(..) = &expr.kind {
@@ -500,6 +643,10 @@ impl SimplifiedHirJsPass {
                 if self.is_temp_variable(expr) || self.contains_temp_variables(expr) {
                     return additional_stmts;
                 }
+
+                // First, recursively process sub-expressions
+                let mut temp_stmts = self.process_sub_expressions(expr, ctx);
+                additional_stmts.append(&mut temp_stmts);
 
                 // Handle complex expressions in expression statements
                 // Use statement-specific logic for standalone expressions
@@ -528,6 +675,10 @@ impl SimplifiedHirJsPass {
                 if self.is_temp_variable(expr) || self.contains_temp_variables(expr) {
                     return additional_stmts;
                 }
+
+                // First, recursively process sub-expressions
+                let mut temp_stmts = self.process_sub_expressions(expr, ctx);
+                additional_stmts.append(&mut temp_stmts);
 
                 // Handle complex expressions in return statements
                 // NOTE: TailCall expressions in return statements should be left as-is

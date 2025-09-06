@@ -93,10 +93,8 @@ fn test_block_expression_flattening() {
     assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         let $hir$0: unknown = _;
-        {
-            let y: unknown = 1;
-            ($hir$0 = (y + 2));
-        };
+        let y: unknown = 1;
+        ($hir$0 = (y + 2));
         let x: unknown = $hir$0;
         return x;
     }
@@ -155,19 +153,11 @@ fn test_nested_complex_expressions() {
     fn main() -> unknown {
         let $hir$0: unknown = _;
         if true {
-            let $hir$1: unknown = _;
-            {
-                let a: unknown = 1;
-                ($hir$1 = (a + 2));
-            };
-            ($hir$0 = $hir$1);
+            let a: unknown = 1;
+            ($hir$0 = (a + 2));
         } else {
-            let $hir$2: unknown = _;
-            {
-                let b: unknown = 3;
-                ($hir$2 = (b * 2));
-            };
-            ($hir$0 = $hir$2);
+            let b: unknown = 3;
+            ($hir$0 = (b * 2));
         };
         let x: unknown = $hir$0;
         return x;
@@ -189,10 +179,8 @@ fn test_function_call_argument_flattening() {
     assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         let $hir$0: unknown = _;
-        {
-            let x: unknown = 1;
-            ($hir$0 = (x + 2));
-        };
+        let x: unknown = 1;
+        ($hir$0 = (x + 2));
         log($hir$0);
     }
     ");
@@ -216,15 +204,11 @@ fn test_binary_expression_with_complex_operands() {
     assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         let $hir$0: unknown = _;
-        {
-            let a: unknown = 1;
-            ($hir$0 = (a + 1));
-        };
+        let a: unknown = 1;
+        ($hir$0 = (a + 1));
         let $hir$1: unknown = _;
-        {
-            let b: unknown = 2;
-            ($hir$1 = (b * 2));
-        };
+        let b: unknown = 2;
+        ($hir$1 = (b * 2));
         let x: unknown = ($hir$0 + $hir$1);
         return x;
     }
@@ -421,10 +405,8 @@ fn test_unary_expression_flattening() {
     assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         let $hir$0: unknown = _;
-        {
-            let a: unknown = true;
-            ($hir$0 = a);
-        };
+        let a: unknown = true;
+        ($hir$0 = a);
         let x: unknown = !$hir$0;
         return x;
     }
