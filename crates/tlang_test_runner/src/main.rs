@@ -1,5 +1,3 @@
-
-
 fn main() {
     println!("Test runner now uses insta snapshots.");
     println!("Recommended: Use 'make test' to run all tests.");
@@ -21,7 +19,8 @@ mod tests {
 
     // Test all .tlang files using insta's glob functionality
     static THREAD_PANIC_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"thread '(\w+)' \(\d+\) (panicked at|has overflowed its stack)").expect("Failed to compile regex")
+        Regex::new(r"thread '(\w+)' \(\d+\) (panicked at|has overflowed its stack)")
+            .expect("Failed to compile regex")
     });
 
     static TIMESTAMP_RE: LazyLock<Regex> = LazyLock::new(|| {
@@ -73,7 +72,7 @@ mod tests {
                 Backend::JavaScript => "javascript",
             }
         }
-    
+
         fn values() -> impl Iterator<Item = Backend> {
             [Backend::Interpreter, Backend::JavaScript].into_iter()
         }
@@ -213,19 +212,19 @@ mod tests {
 
     fn apply_redactions(output: &str) -> String {
         let mut result = output.to_string();
-    
+
         // Redact log timestamps that may vary between runs
         result = TIMESTAMP_RE
             .replace_all(&result, "[TIMESTAMP] $1")
             .into_owned();
-    
+
         // Redact the entire stack backtrace section (including header) that may or may not be present
         // Some environments show backtraces, others don't - remove the section entirely if present
         result = BACKTRACE_SECTION_RE.replace_all(&result, "").into_owned();
-    
+
         // Redact numbered stack trace lines that appear with RUST_BACKTRACE=1
         result = NUMBERED_TRACE_RE.replace_all(&result, "").into_owned();
-    
+
         // Normalize backtrace notes that may vary between environments
         result = NOTE_RE
             .replace_all(
@@ -233,20 +232,20 @@ mod tests {
                 "note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace",
             )
             .into_owned();
-    
+
         // Redact internal compiler symbol dumps that contain varying identifiers
         result = SYMBOL_DUMP_RE
             .replace_all(&result, "Available symbols: [INTERNAL_SYMBOL_TABLE]")
             .into_owned();
-    
+
         // Redact memory state dumps in panic messages that contain varying data structures
         result = MEMORY_DUMP_RE
             .replace_all(&result, "Current scope: [INTERNAL_MEMORY_STATE]")
             .into_owned();
-    
+
         // Redact specific internal IDs that may vary between runs
         result = ID_TAG_RE.replace_all(&result, "$1([ID])").into_owned();
-    
+
         result
     }
 
@@ -273,7 +272,7 @@ mod tests {
                     .with_extension("")
                     .to_string_lossy()
                     .replace(['/', '\\'], "_");
-                
+
                 // Shorten test names to avoid filesystem filename length limits
                 // Some filesystems or git configurations have issues with very long filenames
                 let test_name = if path_str.len() > 40 {
@@ -281,17 +280,17 @@ mod tests {
                     // while keeping the name readable
                     use std::collections::hash_map::DefaultHasher;
                     use std::hash::{Hash, Hasher};
-                    
+
                     let mut hasher = DefaultHasher::new();
                     path_str.hash(&mut hasher);
                     let hash = hasher.finish();
-                    
+
                     // Keep the last part of the path (usually the test name) and add hash
                     let parts: Vec<&str> = path_str.split('_').collect();
                     let last_part = parts.last().unwrap_or(&"test");
                     format!("{}_{:x}_{}", last_part, hash & 0xFFFF, backend.as_str())
                 } else {
-                    format!("{}_{}",path_str, backend.as_str())
+                    format!("{}_{}", path_str, backend.as_str())
                 };
 
                 let is_known_failure = path.to_string_lossy().contains("known_failures");

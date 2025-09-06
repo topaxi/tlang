@@ -3,7 +3,9 @@ use tlang_hir::{Visitor, hir, visit::walk_expr};
 use tlang_hir_opt::{HirOptContext, HirPass};
 use tlang_span::Span;
 
-use crate::js_expr_utils::{expr_can_render_as_js_expr, expr_can_render_as_assignment_rhs, expr_can_render_as_js_stmt};
+use crate::js_expr_utils::{
+    expr_can_render_as_assignment_rhs, expr_can_render_as_js_expr, expr_can_render_as_js_stmt,
+};
 
 /// A simplified HIR JS pass that focuses on flattening expressions that can't be represented in JavaScript
 /// This pass assumes that return statements have already been handled by ReturnStatementPass
@@ -118,7 +120,7 @@ impl SimplifiedHirJsPass {
 
         // Create temp variable declaration
         let temp_declaration = self.create_temp_var_declaration(ctx, &temp_name, span);
-        
+
         // Create temp variable reference
         let temp_ref = self.create_temp_var_path(ctx, &temp_name, span);
 
@@ -184,23 +186,20 @@ impl SimplifiedHirJsPass {
         if self.is_temp_variable(expr) {
             return true;
         }
-        
+
         match &expr.kind {
             hir::ExprKind::Binary(_, lhs, rhs) => {
                 self.contains_temp_variables(lhs) || self.contains_temp_variables(rhs)
             }
-            hir::ExprKind::Unary(_, operand) => {
-                self.contains_temp_variables(operand)
-            }
-            hir::ExprKind::Call(call) => {
-                call.arguments.iter().any(|arg| self.contains_temp_variables(arg))
-            }
-            hir::ExprKind::List(elements) => {
-                elements.iter().any(|elem| self.contains_temp_variables(elem))
-            }
-            hir::ExprKind::FieldAccess(obj, _) => {
-                self.contains_temp_variables(obj)
-            }
+            hir::ExprKind::Unary(_, operand) => self.contains_temp_variables(operand),
+            hir::ExprKind::Call(call) => call
+                .arguments
+                .iter()
+                .any(|arg| self.contains_temp_variables(arg)),
+            hir::ExprKind::List(elements) => elements
+                .iter()
+                .any(|elem| self.contains_temp_variables(elem)),
+            hir::ExprKind::FieldAccess(obj, _) => self.contains_temp_variables(obj),
             _ => false,
         }
     }
@@ -245,18 +244,19 @@ impl SimplifiedHirJsPass {
     ) {
         // Transform statements that contain break expressions
         let mut new_stmts = Vec::new();
-        
+
         for stmt in &mut block.stmts {
             match &mut stmt.kind {
                 hir::StmtKind::Expr(expr) => {
                     if let hir::ExprKind::Break(Some(break_expr)) = &expr.kind {
                         // Transform: break value; -> temp_var = value; break;
                         let span = expr.span;
-                        
+
                         // Add assignment statement
-                        let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, *break_expr.clone(), span);
+                        let assignment_stmt =
+                            self.create_assignment_stmt(ctx, temp_name, *break_expr.clone(), span);
                         new_stmts.push(assignment_stmt);
-                        
+
                         // Add plain break statement
                         let plain_break = hir::Stmt::new(
                             ctx.hir_id_allocator.next_id(),
@@ -279,16 +279,17 @@ impl SimplifiedHirJsPass {
                 }
             }
         }
-        
+
         block.stmts = new_stmts;
-        
+
         // Also check the block's completion expression for break statements
         if let Some(ref mut expr) = block.expr {
             if let hir::ExprKind::Break(Some(break_expr)) = &expr.kind {
                 // Transform break in completion position -> temp_var = value; block.expr = None
-                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, *break_expr.clone(), expr.span);
+                let assignment_stmt =
+                    self.create_assignment_stmt(ctx, temp_name, *break_expr.clone(), expr.span);
                 block.stmts.push(assignment_stmt);
-                
+
                 // Add plain break and clear completion expression
                 let plain_break = hir::Stmt::new(
                     ctx.hir_id_allocator.next_id(),
@@ -325,7 +326,11 @@ impl SimplifiedHirJsPass {
                     if let Some(ref mut cond) = else_branch.condition {
                         self.transform_break_statements_in_expr(cond, temp_name, ctx);
                     }
-                    self.transform_break_statements_in_block(&mut else_branch.consequence, temp_name, ctx);
+                    self.transform_break_statements_in_block(
+                        &mut else_branch.consequence,
+                        temp_name,
+                        ctx,
+                    );
                 }
             }
             _ => {
@@ -345,17 +350,18 @@ impl SimplifiedHirJsPass {
         let span = expr.span;
         if let hir::ExprKind::Block(block) = expr.kind {
             let mut statements = Vec::new();
-            
+
             // Add all statements from the block
-            statements.extend((*block).stmts);
-            
+            statements.extend(block.stmts);
+
             // Handle completion expression
-            if let Some(completion_expr) = (*block).expr {
+            if let Some(completion_expr) = block.expr {
                 // Create assignment to temp variable
-                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                let assignment_stmt =
+                    self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
                 statements.push(assignment_stmt);
             }
-            
+
             statements
         } else {
             // Fallback: create a simple assignment statement
@@ -374,19 +380,20 @@ impl SimplifiedHirJsPass {
         if let hir::ExprKind::Match(scrutinee, arms) = expr.kind {
             // Transform each arm to assign to temp variable
             let mut transformed_arms = Vec::new();
-            
+
             for arm in arms {
                 let mut new_arm = arm;
-                
+
                 // Transform the completion expression in each arm
                 if let Some(completion_expr) = new_arm.block.expr.take() {
-                    let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                    let assignment_stmt =
+                        self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
                     new_arm.block.stmts.push(assignment_stmt);
                 }
-                
+
                 transformed_arms.push(new_arm);
             }
-            
+
             // Create the match statement
             let match_stmt = hir::Stmt::new(
                 ctx.hir_id_allocator.next_id(),
@@ -397,7 +404,7 @@ impl SimplifiedHirJsPass {
                 })),
                 span,
             );
-            
+
             vec![match_stmt]
         } else {
             // Fallback: create a simple assignment statement
@@ -417,31 +424,37 @@ impl SimplifiedHirJsPass {
             // Transform branches to assign to temp variable
             let mut new_then_branch = *then_branch;
             if let Some(completion_expr) = new_then_branch.expr.take() {
-                let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                let assignment_stmt =
+                    self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
                 new_then_branch.stmts.push(assignment_stmt);
             }
-            
+
             let mut new_else_branches = Vec::new();
             for else_branch in else_branches {
                 let mut new_else_branch = else_branch;
                 if let Some(completion_expr) = new_else_branch.consequence.expr.take() {
-                    let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                    let assignment_stmt =
+                        self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
                     new_else_branch.consequence.stmts.push(assignment_stmt);
                 }
                 new_else_branches.push(new_else_branch);
             }
-            
+
             // Create the if-else statement
             let if_else_stmt = hir::Stmt::new(
                 ctx.hir_id_allocator.next_id(),
                 hir::StmtKind::Expr(Box::new(hir::Expr {
                     hir_id: ctx.hir_id_allocator.next_id(),
-                    kind: hir::ExprKind::IfElse(condition, Box::new(new_then_branch), new_else_branches),
+                    kind: hir::ExprKind::IfElse(
+                        condition,
+                        Box::new(new_then_branch),
+                        new_else_branches,
+                    ),
                     span,
                 })),
                 span,
             );
-            
+
             vec![if_else_stmt]
         } else {
             // Fallback: create a simple assignment statement
@@ -450,11 +463,7 @@ impl SimplifiedHirJsPass {
     }
 
     /// Process statements and flatten complex expressions in let statements
-    fn process_stmt(
-        &mut self,
-        stmt: &mut hir::Stmt,
-        ctx: &mut HirOptContext,
-    ) -> Vec<hir::Stmt> {
+    fn process_stmt(&mut self, stmt: &mut hir::Stmt, ctx: &mut HirOptContext) -> Vec<hir::Stmt> {
         let mut additional_stmts = Vec::new();
 
         match &mut stmt.kind {
@@ -463,23 +472,23 @@ impl SimplifiedHirJsPass {
                 if self.is_temp_variable(expr) || self.contains_temp_variables(expr) {
                     return additional_stmts;
                 }
-                
+
                 // Use assignment-specific logic for let statements
-                if !expr_can_render_as_assignment_rhs(expr) {
+                if !expr_can_render_as_assignment_rhs(expr) && !self.contains_temp_variables(expr) {
                     // For complex expressions in let statements, flatten them
                     if let hir::ExprKind::Loop(..) = &expr.kind {
                         // Special handling for loop expressions
-                        let (flattened_expr, mut temp_stmts) = 
+                        let (flattened_expr, mut temp_stmts) =
                             self.transform_loop_expression((**expr).clone(), ctx);
-                        
+
                         additional_stmts.append(&mut temp_stmts);
                         **expr = flattened_expr;
                         self.changes_made = true;
                     } else {
                         // General flattening for other complex expressions
-                        let (flattened_expr, mut temp_stmts) = 
+                        let (flattened_expr, mut temp_stmts) =
                             self.flatten_expression_to_temp_var((**expr).clone(), ctx);
-                        
+
                         additional_stmts.append(&mut temp_stmts);
                         **expr = flattened_expr;
                         self.changes_made = true;
@@ -487,22 +496,27 @@ impl SimplifiedHirJsPass {
                 }
             }
             hir::StmtKind::Expr(expr) => {
+                // Skip temp variables that we created
+                if self.is_temp_variable(expr) || self.contains_temp_variables(expr) {
+                    return additional_stmts;
+                }
+
                 // Handle complex expressions in expression statements
                 // Use statement-specific logic for standalone expressions
-                if !expr_can_render_as_js_stmt(expr) {
+                if !expr_can_render_as_js_stmt(expr) && !self.contains_temp_variables(expr) {
                     if let hir::ExprKind::Loop(..) = &expr.kind {
                         // Special handling for loop expressions
-                        let (flattened_expr, mut temp_stmts) = 
+                        let (flattened_expr, mut temp_stmts) =
                             self.transform_loop_expression((**expr).clone(), ctx);
-                        
+
                         additional_stmts.append(&mut temp_stmts);
                         **expr = flattened_expr;
                         self.changes_made = true;
                     } else if let hir::ExprKind::Block(..) | hir::ExprKind::Match(..) = &expr.kind {
                         // These complex expressions need to be flattened
-                        let (flattened_expr, mut temp_stmts) = 
+                        let (flattened_expr, mut temp_stmts) =
                             self.flatten_expression_to_temp_var((**expr).clone(), ctx);
-                        
+
                         additional_stmts.append(&mut temp_stmts);
                         **expr = flattened_expr;
                         self.changes_made = true;
@@ -510,28 +524,33 @@ impl SimplifiedHirJsPass {
                 }
             }
             hir::StmtKind::Return(Some(expr)) => {
+                // Skip temp variables that we created
+                if self.is_temp_variable(expr) || self.contains_temp_variables(expr) {
+                    return additional_stmts;
+                }
+
                 // Handle complex expressions in return statements
                 // NOTE: TailCall expressions in return statements should be left as-is
                 // since they will be handled by the JavaScript generator's tail call optimization
-                if !self.can_render_as_js_expr(expr) {
+                if !self.can_render_as_js_expr(expr) && !self.contains_temp_variables(expr) {
                     // Skip TailCall expressions in return statements - they're handled by codegen
                     if let hir::ExprKind::TailCall(..) = &expr.kind {
                         return additional_stmts;
                     }
-                    
+
                     if let hir::ExprKind::Loop(..) = &expr.kind {
                         // Special handling for loop expressions
-                        let (flattened_expr, mut temp_stmts) = 
+                        let (flattened_expr, mut temp_stmts) =
                             self.transform_loop_expression((**expr).clone(), ctx);
-                        
+
                         additional_stmts.append(&mut temp_stmts);
                         **expr = flattened_expr;
                         self.changes_made = true;
                     } else {
                         // General flattening for other complex expressions
-                        let (flattened_expr, mut temp_stmts) = 
+                        let (flattened_expr, mut temp_stmts) =
                             self.flatten_expression_to_temp_var((**expr).clone(), ctx);
-                        
+
                         additional_stmts.append(&mut temp_stmts);
                         **expr = flattened_expr;
                         self.changes_made = true;
@@ -543,7 +562,6 @@ impl SimplifiedHirJsPass {
 
         additional_stmts
     }
-
 }
 
 impl HirPass for SimplifiedHirJsPass {
@@ -553,12 +571,13 @@ impl HirPass for SimplifiedHirJsPass {
 
     fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
         self.iteration_count += 1;
-        
-        // Prevent infinite loops by limiting the number of changes this pass can make
-        if self.iteration_count > 8 {
+
+        // Prevent infinite loops by limiting the number of iterations
+        // Allow more iterations to handle complex nested structures
+        if self.iteration_count > 5 {
             return false;
         }
-        
+
         self.changes_made = false;
         self.visit_module(module, ctx);
         self.changes_made
@@ -568,49 +587,46 @@ impl HirPass for SimplifiedHirJsPass {
 impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
     type Context = HirOptContext;
 
-    fn visit_block(
-        &mut self,
-        block: &'hir mut hir::Block,
-        ctx: &mut Self::Context,
-    ) {
+    fn visit_block(&mut self, block: &'hir mut hir::Block, ctx: &mut Self::Context) {
         let mut new_stmts = Vec::new();
 
         for stmt in &mut block.stmts {
             // Process the statement and get any additional statements needed
             let additional_stmts = self.process_stmt(stmt, ctx);
-            
+
             // Add the additional statements first
             new_stmts.extend(additional_stmts);
-            
+
             // Then add the (possibly modified) original statement
             new_stmts.push(stmt.clone());
         }
 
         // Handle completion expression
-        if let Some(completion_expr) = &mut block.expr {
-            if !self.can_render_as_js_expr(completion_expr) {
-                if let hir::ExprKind::Loop(..) = &completion_expr.kind {
-                    // Special handling for loop expressions
-                    let (flattened_expr, mut temp_stmts) = 
-                        self.transform_loop_expression(completion_expr.clone(), ctx);
-                    
-                    new_stmts.append(&mut temp_stmts);
-                    *completion_expr = flattened_expr;
-                    self.changes_made = true;
-                } else {
-                    // General flattening for other complex expressions
-                    let (flattened_expr, mut temp_stmts) = 
-                        self.flatten_expression_to_temp_var(completion_expr.clone(), ctx);
-                    
-                    new_stmts.append(&mut temp_stmts);
-                    *completion_expr = flattened_expr;
-                    self.changes_made = true;
-                }
+        if let Some(completion_expr) = &mut block.expr
+            && !self.can_render_as_js_expr(completion_expr)
+            && !self.contains_temp_variables(completion_expr)
+        {
+            if let hir::ExprKind::Loop(..) = &completion_expr.kind {
+                // Special handling for loop expressions
+                let (flattened_expr, mut temp_stmts) =
+                    self.transform_loop_expression(completion_expr.clone(), ctx);
+
+                new_stmts.append(&mut temp_stmts);
+                *completion_expr = flattened_expr;
+                self.changes_made = true;
+            } else {
+                // General flattening for other complex expressions
+                let (flattened_expr, mut temp_stmts) =
+                    self.flatten_expression_to_temp_var(completion_expr.clone(), ctx);
+
+                new_stmts.append(&mut temp_stmts);
+                *completion_expr = flattened_expr;
+                self.changes_made = true;
             }
         }
 
         block.stmts = new_stmts;
-        
+
         // Use the default walking behavior to visit nested structures
         for stmt in &mut block.stmts {
             match &mut stmt.kind {
@@ -631,6 +647,62 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                     self.visit_expr(expr, ctx);
                 }
                 _ => {}
+            }
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
+        match &mut expr.kind {
+            hir::ExprKind::FunctionExpression(func_expr) => {
+                // Visit function body recursively to handle nested loops
+                self.visit_block(&mut func_expr.body, ctx);
+            }
+            hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
+                // Visit condition first
+                self.visit_expr(condition, ctx);
+                
+                // Visit then branch
+                self.visit_block(then_branch, ctx);
+                
+                // Visit else branches
+                for else_clause in else_branches {
+                    match else_clause {
+                        hir::ElseClause::ElseIf { condition, body } => {
+                            self.visit_expr(condition, ctx);
+                            self.visit_block(body, ctx);
+                        }
+                        hir::ElseClause::Else { body } => {
+                            self.visit_block(body, ctx);
+                        }
+                    }
+                }
+            }
+            hir::ExprKind::Match(scrutinee, arms) => {
+                // Visit scrutinee
+                self.visit_expr(scrutinee, ctx);
+                
+                // Visit each match arm
+                for arm in arms {
+                    // Visit guard if present
+                    if let Some(guard) = &mut arm.guard {
+                        self.visit_expr(guard, ctx);
+                    }
+                    
+                    // Visit arm body
+                    self.visit_block(&mut arm.block, ctx);
+                }
+            }
+            hir::ExprKind::Loop(loop_body) => {
+                // Visit loop body to catch nested expressions
+                self.visit_block(loop_body, ctx);
+            }
+            hir::ExprKind::Block(block) => {
+                // Visit block content
+                self.visit_block(block, ctx);
+            }
+            _ => {
+                // Use default walking behavior for other expressions
+                walk_expr(self, expr, ctx);
             }
         }
     }

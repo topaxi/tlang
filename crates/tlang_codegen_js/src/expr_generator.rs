@@ -6,8 +6,8 @@ use crate::binary_operator_generator::{
     JSAssociativity, JSOperatorInfo, map_operator_info, should_wrap_with_parentheses,
 };
 use crate::generator::{BlockContext, CodegenJS};
-use crate::js_expr_utils::if_else_can_render_as_ternary;
 use crate::js;
+use crate::js_expr_utils::if_else_can_render_as_ternary;
 
 impl CodegenJS {
     /// Generates blocks in expression position.
@@ -182,7 +182,7 @@ impl CodegenJS {
                 if self.is_in_loop_context()
                     && self
                         .get_function_context()
-                        .map_or(true, |ctx| !ctx.is_expression)
+                        .is_none_or(|ctx| !ctx.is_expression)
                 {
                     // In JavaScript loops, break cannot have a value
                     // For loops with accumulators, we just generate 'break' and handle the return value elsewhere
@@ -394,8 +394,9 @@ impl CodegenJS {
         // In most expression contexts, this should have been handled by HIR JS pass
         // For now, allow fallback to completion variable handling for complex cases
         // TODO: Expand HIR JS pass to handle all remaining cases
-        if self.current_context() == BlockContext::Expression 
-            && self.current_completion_variable() != Some("return") {
+        if self.current_context() == BlockContext::Expression
+            && self.current_completion_variable() != Some("return")
+        {
             // For debugging: log when we hit complex cases that could be improved
             eprintln!(
                 "Info: Complex if-else expression in expression context using completion variables. \
@@ -441,7 +442,7 @@ impl CodegenJS {
 
         self.push_indent();
         self.push_char('}');
-        
+
         self.pop_completion_variable();
     }
 
@@ -495,7 +496,7 @@ impl CodegenJS {
 
     pub(crate) fn generate_call_expression(&mut self, call_expr: &hir::CallExpression) {
         // Legacy temp var handling removed - HIR JS pass now handles complex expressions with wildcards
-        
+
         // TODO: If the call is to a struct, we instead call it with `new` and map the fields to
         // the positional arguments of the constructor.
 
@@ -521,5 +522,4 @@ impl CodegenJS {
 
         self.push_char(')');
     }
-
 }

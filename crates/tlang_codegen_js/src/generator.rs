@@ -73,8 +73,6 @@ impl CodegenJS {
         }
     }
 
-
-
     pub fn get_standard_library_source() -> String {
         include_str!("../std/lib.tlang").to_string()
     }
@@ -201,8 +199,6 @@ impl CodegenJS {
         self.statement_buffer.last_mut().unwrap().clear();
     }
 
-
-
     #[inline(always)]
     pub(crate) fn current_scope(&mut self) -> &mut Scope {
         &mut self.scopes
@@ -306,8 +302,6 @@ impl CodegenJS {
         self.completion_variables.last().unwrap().as_deref()
     }
 
-
-
     #[inline(always)]
     pub(crate) fn push_current_completion_variable(&mut self) {
         let current_completion_variable = self.pop_completion_variable();
@@ -355,22 +349,19 @@ impl CodegenJS {
 
         // In loop contexts, if the expression is a temp variable reference that doesn't exist,
         // try to use the latest temp variable that actually holds a meaningful result
-        if self.is_in_loop_context() {
-            if let hir::ExprKind::Path(path) = &expr.kind {
-                if path.segments.len() == 1 {
-                    let var_name = path.segments[0].ident.as_str();
-                    if var_name.starts_with("$tmp$")
-                        && !self.current_scope().has_local_variable(var_name)
-                    {
-                        // This temp variable doesn't exist, use the latest one that does
-                        let latest_temp_var = self.current_scope().get_latest_temp_variable();
-                        if latest_temp_var != var_name
-                            && self.current_scope().has_local_variable(&latest_temp_var)
-                        {
-                            self.push_str(&latest_temp_var);
-                            return;
-                        }
-                    }
+        if self.is_in_loop_context()
+            && let hir::ExprKind::Path(path) = &expr.kind
+            && path.segments.len() == 1
+        {
+            let var_name = path.segments[0].ident.as_str();
+            if var_name.starts_with("$tmp$") && !self.current_scope().has_local_variable(var_name) {
+                // This temp variable doesn't exist, use the latest one that does
+                let latest_temp_var = self.current_scope().get_latest_temp_variable();
+                if latest_temp_var != var_name
+                    && self.current_scope().has_local_variable(&latest_temp_var)
+                {
+                    self.push_str(&latest_temp_var);
+                    return;
                 }
             }
         }

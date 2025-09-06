@@ -1998,18 +1998,18 @@ fn test_debug_nested_loop_expressions_with_cli_sequence() {
     "#;
 
     let (mut module, meta) = compile(source);
-    
+
     println!("=== Initial HIR ===");
     println!("{}", pretty_print(&module));
-    
+
     // Run the same sequence as the CLI: standard HIR optimizations first
     let mut optimizer = tlang_hir_opt::HirOptimizer::default();
     let hir_opt_ctx = HirOptContext::from(meta);
     optimizer.optimize_hir(&mut module, hir_opt_ctx);
-    
+
     println!("\n=== After standard HIR optimizations ===");
     println!("{}", pretty_print(&module));
-    
+
     // Create a fresh context for HIR JS optimization group (like the CLI does)
     let mut ctx = HirOptContext {
         symbols: std::collections::HashMap::new(),
@@ -2021,9 +2021,9 @@ fn test_debug_nested_loop_expressions_with_cli_sequence() {
     // Run the HIR JS optimization group
     println!("\n=== Before HIR JS optimization group ===");
     println!("{}", pretty_print(&module));
-    
+
     hir_js_opt_group.optimize_hir(&mut module, &mut ctx);
-    
+
     println!("\n=== Final HIR after HIR JS optimization group ===");
     println!("{}", pretty_print(&module));
 }

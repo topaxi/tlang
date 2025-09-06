@@ -208,10 +208,10 @@ fn compile_to_hir(source: &str, show_warnings: bool) -> Result<hir::Module, Pars
 
     let mut optimizer = HirOptimizer::default();
     let hir_opt_ctx = meta.into();
-    
+
     // Run standard HIR optimizations first
     optimizer.optimize_hir(&mut module, hir_opt_ctx);
-    
+
     // Run HIR JS pass separately to avoid infinite loops with other optimizations
     let mut hir_js_opt_ctx = HirOptContext {
         symbols: std::collections::HashMap::new(),
@@ -219,7 +219,7 @@ fn compile_to_hir(source: &str, show_warnings: bool) -> Result<hir::Module, Pars
         current_scope: tlang_span::HirId::new(1),
     };
     let mut hir_js_opt_group = create_hir_js_opt_group();
-    
+
     // Run HIR JS optimization group
     hir_js_opt_group.optimize_hir(&mut module, &mut hir_js_opt_ctx);
 

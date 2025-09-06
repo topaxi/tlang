@@ -1,6 +1,6 @@
-use tlang_codegen_js::generator::CodegenJS;
 use tlang_codegen_js::create_hir_js_opt_group;
-use tlang_hir_opt::{HirOptimizer, HirPass, HirOptContext};
+use tlang_codegen_js::generator::CodegenJS;
+use tlang_hir_opt::{HirOptContext, HirOptimizer, HirPass};
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
 use tlang_symbols::SymbolType;
@@ -64,12 +64,12 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
             );
 
             let mut optimizer = HirOptimizer::default();
-                
+
             if options.optimize {
                 // Run standard HIR optimizations first
                 optimizer.optimize_hir(&mut module, meta.into());
             }
-            
+
             // Always apply JavaScript-specific HIR transformations
             // This ensures expressions that cannot be expressed as expressions in modern JavaScript
             // are properly transformed to statements, regardless of optimization level
@@ -79,7 +79,7 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
                 hir_id_allocator: tlang_span::HirIdAllocator::new(1000), // Start with a high number to avoid conflicts
                 current_scope: module.hir_id,
             };
-            
+
             // Run HIR JS optimization group
             hir_js_opt_group.optimize_hir(&mut module, &mut js_ctx);
 
