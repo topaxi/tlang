@@ -95,9 +95,7 @@ fn test_block_expression() {
     let output = compile!("let one = { 1 };");
     let expected_output = indoc! {"
         let $hir$0 = undefined;
-        {
-            $hir$0 = 1;
-        };
+        $hir$0 = 1;
         let one = $hir$0;
     "};
     assert_eq!(output, expected_output);
@@ -111,10 +109,8 @@ fn test_block_expression_with_statements() {
     );
     let expected_output = indoc! {"
         let $hir$0 = undefined;
-        {
-            let x = 1;
-            $hir$0 = x;
-        };
+        let x = 1;
+        $hir$0 = x;
         let one = $hir$0;
     "};
     assert_eq!(output, expected_output);

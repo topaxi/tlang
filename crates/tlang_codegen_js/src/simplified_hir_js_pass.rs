@@ -3,7 +3,7 @@ use tlang_hir::{Visitor, hir, visit::walk_expr};
 use tlang_hir_opt::{HirOptContext, HirPass};
 use tlang_span::Span;
 
-use crate::js_expr_utils::expr_can_render_as_js_expr;
+use crate::js_expr_utils::{expr_can_render_as_js_expr, expr_can_render_as_assignment_rhs, expr_can_render_as_js_stmt};
 
 /// A simplified HIR JS pass that focuses on flattening expressions that can't be represented in JavaScript
 /// This pass assumes that return statements have already been handled by ReturnStatementPass
@@ -464,7 +464,8 @@ impl SimplifiedHirJsPass {
                     return additional_stmts;
                 }
                 
-                if !self.can_render_as_js_expr(expr) {
+                // Use assignment-specific logic for let statements
+                if !expr_can_render_as_assignment_rhs(expr) {
                     // For complex expressions in let statements, flatten them
                     if let hir::ExprKind::Loop(..) = &expr.kind {
                         // Special handling for loop expressions
@@ -487,7 +488,8 @@ impl SimplifiedHirJsPass {
             }
             hir::StmtKind::Expr(expr) => {
                 // Handle complex expressions in expression statements
-                if !self.can_render_as_js_expr(expr) {
+                // Use statement-specific logic for standalone expressions
+                if !expr_can_render_as_js_stmt(expr) {
                     if let hir::ExprKind::Loop(..) = &expr.kind {
                         // Special handling for loop expressions
                         let (flattened_expr, mut temp_stmts) = 
@@ -496,7 +498,7 @@ impl SimplifiedHirJsPass {
                         additional_stmts.append(&mut temp_stmts);
                         **expr = flattened_expr;
                         self.changes_made = true;
-                    } else if let hir::ExprKind::Block(..) | hir::ExprKind::Match(..) | hir::ExprKind::IfElse(..) = &expr.kind {
+                    } else if let hir::ExprKind::Block(..) | hir::ExprKind::Match(..) = &expr.kind {
                         // These complex expressions need to be flattened
                         let (flattened_expr, mut temp_stmts) = 
                             self.flatten_expression_to_temp_var((**expr).clone(), ctx);
