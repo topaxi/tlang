@@ -826,12 +826,15 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
             && !self.contains_temp_variables(completion_expr)
         {
             if let hir::ExprKind::Loop(..) = &completion_expr.kind {
-                // Special handling for loop expressions
-                let (flattened_expr, mut temp_stmts) =
-                    self.transform_loop_expression(completion_expr.clone(), ctx);
-
-                new_stmts.append(&mut temp_stmts);
-                *completion_expr = flattened_expr;
+                // Special handling for loop expressions in block completion position
+                // Loops should become statements, not be assigned to temp variables
+                let loop_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(completion_expr.clone())),
+                    completion_expr.span,
+                );
+                new_stmts.push(loop_stmt);
+                block.expr = None; // Remove the completion expression since it's now a statement
                 self.changes_made = true;
             } else {
                 // General flattening for other complex expressions

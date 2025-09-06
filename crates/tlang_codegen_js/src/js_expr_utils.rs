@@ -104,9 +104,11 @@ pub fn expr_can_render_as_js_stmt(expr: &hir::Expr) -> bool {
         // Function calls can be statements
         hir::ExprKind::Call(..) => true,
 
+        // Block expressions can be rendered as JavaScript statements
+        hir::ExprKind::Block(block) => block_can_render_as_js_stmt_block(block),
+
         // These expressions cannot be rendered as JavaScript statements
-        hir::ExprKind::Block(..)
-        | hir::ExprKind::Loop(..)
+        hir::ExprKind::Loop(..)
         | hir::ExprKind::Break(..)
         | hir::ExprKind::Continue
         | hir::ExprKind::Match(..)
@@ -147,9 +149,16 @@ fn block_can_render_as_js_stmt_block(block: &hir::Block) -> bool {
         }
     }
 
-    // Completion expression (if any) must be simple
+    // Completion expression (if any) must be simple, except for loop expressions
+    // which can be converted to statements within the block
     if let Some(completion_expr) = &block.expr {
-        expr_can_render_as_js_expr(completion_expr)
+        match &completion_expr.kind {
+            hir::ExprKind::Loop(..) => {
+                // Loop expressions in block completion position can be converted to statements
+                true
+            }
+            _ => expr_can_render_as_js_expr(completion_expr),
+        }
     } else {
         true
     }

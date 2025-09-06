@@ -36,18 +36,34 @@ impl ReturnStatementPass {
 
         if let Some(completion_expr) = &mut block.expr {
             match &completion_expr.kind {
-                hir::ExprKind::IfElse(_, _, _else_branches) => {
-                    // For simple if-else expressions that were not flattened by SimplifiedHirJsPass,
-                    // they can remain as completion expressions and be rendered as ternaries
-                    // Only transform to return statement
-                    let return_stmt = hir::Stmt::new(
-                        ctx.hir_id_allocator.next_id(),
-                        hir::StmtKind::Return(Some(Box::new(completion_expr.clone()))),
-                        completion_expr.span,
-                    );
-                    block.stmts.push(return_stmt);
-                    block.expr = None;
-                    self.changes_made = true;
+                hir::ExprKind::IfElse(_condition, then_branch, else_branches) => {
+                    // Check if any branch contains tail calls - if so, transform to use return statements
+                    let has_tail_calls = self.if_else_contains_tail_calls(then_branch, else_branches);
+                    
+                    if has_tail_calls {
+                        // Transform the if-else to use return statements in each branch
+                        self.transform_if_else_to_returns(completion_expr, ctx);
+                        
+                        // Move the transformed if-else to statements and clear completion
+                        let if_else_stmt = hir::Stmt::new(
+                            ctx.hir_id_allocator.next_id(),
+                            hir::StmtKind::Expr(Box::new(completion_expr.clone())),
+                            completion_expr.span,
+                        );
+                        block.stmts.push(if_else_stmt);
+                        block.expr = None;
+                        self.changes_made = true;
+                    } else {
+                        // For simple if-else expressions without tail calls, wrap in return statement
+                        let return_stmt = hir::Stmt::new(
+                            ctx.hir_id_allocator.next_id(),
+                            hir::StmtKind::Return(Some(Box::new(completion_expr.clone()))),
+                            completion_expr.span,
+                        );
+                        block.stmts.push(return_stmt);
+                        block.expr = None;
+                        self.changes_made = true;
+                    }
                 }
                 hir::ExprKind::Match(..) => {
                     // Always transform match expressions to use return statements in each arm
@@ -98,6 +114,92 @@ impl ReturnStatementPass {
                     block.expr = None;
                     self.changes_made = true;
                 }
+            }
+        }
+    }
+
+    /// Check if an if-else expression contains tail calls in any branch
+    fn if_else_contains_tail_calls(
+        &self,
+        then_branch: &hir::Block,
+        else_branches: &[hir::ElseClause],
+    ) -> bool {
+        // Check then branch for tail calls
+        if self.block_contains_tail_calls(then_branch) {
+            return true;
+        }
+
+        // Check else branches for tail calls
+        for else_clause in else_branches {
+            if self.block_contains_tail_calls(&else_clause.consequence) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Check if a block contains tail calls in its completion expression
+    fn block_contains_tail_calls(&self, block: &hir::Block) -> bool {
+        if let Some(completion_expr) = &block.expr {
+            self.expr_contains_tail_calls(completion_expr)
+        } else {
+            false
+        }
+    }
+
+    /// Check if an expression contains tail calls (recursively)
+    fn expr_contains_tail_calls(&self, expr: &hir::Expr) -> bool {
+        match &expr.kind {
+            hir::ExprKind::TailCall(..) => true,
+            hir::ExprKind::IfElse(_, then_branch, else_branches) => {
+                self.if_else_contains_tail_calls(then_branch, else_branches)
+            }
+            hir::ExprKind::Match(_, arms) => {
+                arms.iter().any(|arm| self.block_contains_tail_calls(&arm.block))
+            }
+            hir::ExprKind::Block(block) => self.block_contains_tail_calls(block),
+            _ => false,
+        }
+    }
+
+    /// Transform if-else expression to use return statements in branches that contain tail calls
+    fn transform_if_else_to_returns(&mut self, expr: &mut hir::Expr, ctx: &mut HirOptContext) {
+        if let hir::ExprKind::IfElse(_, then_branch, else_branches) = &mut expr.kind {
+            // Transform then branch
+            self.transform_branch_to_return(then_branch, ctx);
+
+            // Transform else branches
+            for else_clause in else_branches {
+                self.transform_branch_to_return(&mut else_clause.consequence, ctx);
+            }
+        }
+    }
+
+    /// Transform a branch block to use return statements for completion expressions
+    fn transform_branch_to_return(&mut self, block: &mut hir::Block, ctx: &mut HirOptContext) {
+        if let Some(completion_expr) = &mut block.expr {
+            // If the completion expression contains tail calls, transform it
+            if self.expr_contains_tail_calls(completion_expr) {
+                // Create return statement for completion expression
+                let return_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Return(Some(Box::new(completion_expr.clone()))),
+                    completion_expr.span,
+                );
+                block.stmts.push(return_stmt);
+                block.expr = None;
+                self.changes_made = true;
+            } else {
+                // For non-tail-call expressions, still create return statements
+                let return_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Return(Some(Box::new(completion_expr.clone()))),
+                    completion_expr.span,
+                );
+                block.stmts.push(return_stmt);
+                block.expr = None;
+                self.changes_made = true;
             }
         }
     }
