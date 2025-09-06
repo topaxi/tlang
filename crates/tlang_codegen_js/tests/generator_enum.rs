@@ -139,8 +139,7 @@ fn test_maximum_depth_tree() {
         }
         function maximum_depth(tree) {
             let $hir$0 = undefined;
-            let left;
-            let right;if (tree.tag === Tree.Leaf) {
+            let left,right;if (tree.tag === Tree.Leaf) {
                 return 1;
             } else if (tree.tag === Tree.Node && (left = tree.left, true) && (right = tree.right, true)) {
                 return 1 + Math.max(maximum_depth(left), maximum_depth(right));
@@ -181,8 +180,7 @@ fn test_maximum_depth_tree_positional() {
         }
         function maximum_depth(tree) {
             let $hir$0 = undefined;
-            let left;
-            let right;if (tree.tag === Tree.Leaf) {
+            let left,right;if (tree.tag === Tree.Leaf) {
                 return 1;
             } else if (tree.tag === Tree.Node && (left = tree[0], true) && (right = tree[1], true)) {
                 return 1 + Math.max(maximum_depth(left), maximum_depth(right));

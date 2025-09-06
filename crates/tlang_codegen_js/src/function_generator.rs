@@ -177,7 +177,7 @@ impl CodegenJS {
         let is_anonymous = name_as_str == "anonymous";
         let is_tail_recursive =
             !is_anonymous && is_function_body_tail_recursive_block(&name_as_str, &declaration.body);
-        let generate_arrow = is_anonymous && declaration.body.stmts.is_empty();
+        let generate_arrow = is_anonymous;
 
         self.push_function_context(
             &name_as_str,

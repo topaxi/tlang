@@ -357,20 +357,33 @@ impl CodegenJS {
             _ => {}
         }
 
-        for binding in all_pat_identifiers {
-            if unique.insert(binding.clone()) {
-                let binding = self.current_scope().declare_variable(&binding);
-                // Generate separate let statements instead of comma-separated declarations
-                // to avoid JavaScript syntax errors with different assignment values
-                if *has_let {
-                    self.push_char(';');
-                    self.push_newline();
+        // Collect unique bindings
+        let unique_bindings: Vec<String> = all_pat_identifiers
+            .into_iter()
+            .filter_map(|binding| {
+                if unique.insert(binding.clone()) {
+                    Some(self.current_scope().declare_variable(&binding))
+                } else {
+                    None
                 }
-                self.push_indent();
-                self.push_str("let ");
-                self.push_str(&binding);
-                *has_let = true;
+            })
+            .collect();
+
+        // Generate joined let statement if we have bindings
+        if !unique_bindings.is_empty() {
+            if *has_let {
+                self.push_char(';');
+                self.push_newline();
             }
+            self.push_indent();
+            self.push_str("let ");
+            for (i, binding) in unique_bindings.iter().enumerate() {
+                if i > 0 {
+                    self.push_char(',');
+                }
+                self.push_str(binding);
+            }
+            *has_let = true;
         }
     }
 

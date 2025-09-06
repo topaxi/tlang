@@ -43,7 +43,7 @@ fn test_codegen_function_expression() {
     let output = compile!("fn main() { let foo = fn() { 1 + 2 }; }");
     let expected_output = indoc! {"
         function main() {
-            let foo = function() {
+            let foo = () => {
                 return 3;
             };
         }
@@ -489,39 +489,4 @@ fn test_dict_literal_shorthand() {
     assert_eq!(output, expected_output);
 }
 
-#[cfg(test)]
-mod debug_tests {
-    use crate::common::{CodegenOptions, compile_src};
-    use indoc::indoc;
 
-    #[test]
-    fn debug_simple_if_else() {
-        let output = compile_src(
-            indoc! {"
-            fn main() {
-                let x = if true { 1 } else { 2 };
-            }
-        "},
-            &CodegenOptions::default(),
-        );
-        println!("Simple if-else output:\n{}", output);
-    }
-
-    #[test]
-    fn debug_nested_if_else() {
-        let output = compile_src(
-            indoc! {"
-            fn main() {
-                let result = if true {
-                    let x = if true { 1 } else { 2 };
-                    if x == 1 { 3 } else { 4 }
-                } else {
-                    5
-                };
-            }
-        "},
-            &CodegenOptions::default(),
-        );
-        println!("Nested if-else output:\n{}", output);
-    }
-}
