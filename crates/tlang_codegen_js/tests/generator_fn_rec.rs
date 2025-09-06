@@ -176,8 +176,7 @@ fn test_foldl_impl() {
     let expected_output = indoc! {"
         function foldl(arg0, acc, f) {
             rec:while (true) {
-                let x;
-                let xs;if (arg0.length === 0) {
+                let x,xs;if (arg0.length === 0) {
                     return acc;
                 } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true)) {
                     let $tmp$0 = xs;
@@ -222,8 +221,7 @@ fn test_partition_impl() {
         // partition(a[], fn(a) -> bool, a[], a[]) -> (a[], a[])
         function partition$$4(list, predicate, satisfies, doesNotSatisfy) {
             rec:while (true) {
-                let x;
-                let xs;if (list.length === 0) {
+                let x,xs;if (list.length === 0) {
                     // partition(a[], fn(a) -> bool, a[], a[]) -> (a[], a[])
                     return [satisfies, doesNotSatisfy];
                 } else if (list.length >= 1 && (x = list[0], true) && (xs = list.slice(1), true)) {
@@ -270,8 +268,7 @@ fn test_all_impl() {
         // all(a[], fn(a) -> bool, bool) -> bool
         function all$$3(list, predicate, acc) {
             rec:while (true) {
-                let x;
-                let xs;if (list.length === 0) {
+                let x,xs;if (list.length === 0) {
                     // all(a[], fn(a) -> bool, bool) -> bool
                     return acc;
                 } else if (list.length >= 1 && (x = list[0], true) && !predicate(x)) {
