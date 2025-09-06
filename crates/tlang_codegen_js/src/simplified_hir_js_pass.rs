@@ -145,14 +145,9 @@ impl SimplifiedHirJsPass {
                 call.arguments.iter().all(|arg| self.can_render_as_js_expr(arg))
             }
             
-            // Simple if-else can be rendered as ternary
+            // If-else can be rendered as ternary if conditions are met
             hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
-                // Only simple if-else (no else-if) with simple expressions can be ternary
-                else_branches.len() == 1 && 
-                else_branches[0].condition.is_none() &&
-                self.can_render_as_js_expr(condition) &&
-                self.can_render_as_simple_block_expr(then_branch) &&
-                self.can_render_as_simple_block_expr(&else_branches[0].consequence)
+                self.can_render_if_else_as_ternary(condition, then_branch, else_branches)
             }
             
             // These expressions cannot be rendered as JavaScript expressions
@@ -175,6 +170,48 @@ impl SimplifiedHirJsPass {
             // Other cases default to false for safety
             _ => false,
         }
+    }
+
+    /// Check if an if-else expression can be rendered as a ternary operator
+    fn can_render_if_else_as_ternary(
+        &self,
+        condition: &hir::Expr,
+        then_branch: &hir::Block,
+        else_branches: &[hir::ElseClause],
+    ) -> bool {
+        // Must be a simple if-else (no else-if chains)
+        if else_branches.len() != 1 {
+            return false;
+        }
+        
+        let else_branch = &else_branches[0];
+        
+        // Must not have an else-if condition
+        if else_branch.condition.is_some() {
+            return false;
+        }
+        
+        // Condition must be simple
+        if !self.can_render_as_js_expr(condition) {
+            return false;
+        }
+        
+        // Both branches must have no statements and simple completion expressions
+        if !then_branch.stmts.is_empty() || !else_branch.consequence.stmts.is_empty() {
+            return false;
+        }
+        
+        // Both branches must have completion expressions that can be rendered
+        let then_expr = match &then_branch.expr {
+            Some(expr) => expr,
+            None => return false,
+        };
+        let else_expr = match &else_branch.consequence.expr {
+            Some(expr) => expr,
+            None => return false,
+        };
+        
+        self.can_render_as_js_expr(then_expr) && self.can_render_as_js_expr(else_expr)
     }
 
     /// Check if a block contains only a simple expression that can be rendered

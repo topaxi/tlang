@@ -36,14 +36,13 @@ impl ReturnStatementPass {
 
         if let Some(completion_expr) = &mut block.expr {
             match &completion_expr.kind {
-                hir::ExprKind::IfElse(_, _, _) => {
-                    // Transform if-else expressions in function completion position to use return statements
-                    self.transform_if_else_to_returns(completion_expr, ctx);
-                    
-                    // Move the transformed if-else to statements and clear completion
+                hir::ExprKind::IfElse(_, _, _else_branches) => {
+                    // For simple if-else expressions that were not flattened by SimplifiedHirJsPass,
+                    // they can remain as completion expressions and be rendered as ternaries
+                    // Only transform to return statement
                     let return_stmt = hir::Stmt::new(
                         ctx.hir_id_allocator.next_id(),
-                        hir::StmtKind::Expr(Box::new(completion_expr.clone())),
+                        hir::StmtKind::Return(Some(Box::new(completion_expr.clone()))),
                         completion_expr.span,
                     );
                     block.stmts.push(return_stmt);
@@ -51,7 +50,8 @@ impl ReturnStatementPass {
                     self.changes_made = true;
                 }
                 hir::ExprKind::Match(..) => {
-                    // Transform match expressions to use return statements in each arm
+                    // Always transform match expressions to use return statements in each arm
+                    // Match expressions cannot be rendered as simple JavaScript expressions
                     self.transform_match_to_returns(completion_expr, ctx);
                     
                     // Move the transformed match to statements and clear completion
@@ -75,31 +75,129 @@ impl ReturnStatementPass {
                     block.expr = None;
                     self.changes_made = true;
                 }
+                hir::ExprKind::Block(..) => {
+                    // Transform block expressions that cannot be rendered as JavaScript expressions
+                    let return_stmt = hir::Stmt::new(
+                        ctx.hir_id_allocator.next_id(),
+                        hir::StmtKind::Return(Some(Box::new(completion_expr.clone()))),
+                        completion_expr.span,
+                    );
+                    block.stmts.push(return_stmt);
+                    block.expr = None;
+                    self.changes_made = true;
+                }
                 _ => {
-                    // For simple expressions, convert to return statement
-                    if self.should_convert_to_return(completion_expr) {
-                        let return_stmt = hir::Stmt::new(
-                            ctx.hir_id_allocator.next_id(),
-                            hir::StmtKind::Return(Some(Box::new(completion_expr.clone()))),
-                            completion_expr.span,
-                        );
-                        block.stmts.push(return_stmt);
-                        block.expr = None;
-                        self.changes_made = true;
-                    }
+                    // For other expressions, always convert simple completion expressions to return statements
+                    // This ensures function completion expressions become return statements
+                    let return_stmt = hir::Stmt::new(
+                        ctx.hir_id_allocator.next_id(),
+                        hir::StmtKind::Return(Some(Box::new(completion_expr.clone()))),
+                        completion_expr.span,
+                    );
+                    block.stmts.push(return_stmt);
+                    block.expr = None;
+                    self.changes_made = true;
                 }
             }
         }
     }
 
-    /// Check if a completion expression should be converted to a return statement
-    fn should_convert_to_return(&self, expr: &hir::Expr) -> bool {
+    /// Check if an if-else expression should be transformed to use return statements
+    /// Only transform complex if-else expressions that cannot be ternaries
+    fn should_transform_if_else_to_statements(&self, expr: &hir::Expr) -> bool {
+        if let hir::ExprKind::IfElse(condition, then_branch, else_branches) = &expr.kind {
+            // Transform if any of these conditions are true:
+            // 1. Multiple else-if branches (cannot be ternary)
+            if else_branches.len() > 1 {
+                return true;
+            }
+            
+            // 2. Any branch contains statements (not just simple expressions)
+            if !then_branch.stmts.is_empty() {
+                return true;
+            }
+            
+            if let Some(else_branch) = else_branches.first() {
+                if !else_branch.consequence.stmts.is_empty() {
+                    return true;
+                }
+            }
+            
+            // 3. Condition is complex and cannot be easily rendered
+            if !self.is_simple_expression(condition) {
+                return true;
+            }
+            
+            // 4. Any branch expression is complex
+            if let Some(then_expr) = &then_branch.expr {
+                if !self.is_simple_expression(then_expr) {
+                    return true;
+                }
+            }
+            
+            if let Some(else_branch) = else_branches.first() {
+                if let Some(else_expr) = &else_branch.consequence.expr {
+                    if !self.is_simple_expression(else_expr) {
+                        return true;
+                    }
+                }
+            }
+            
+            // If all branches are simple, keep as completion expression for ternary generation
+            false
+        } else {
+            false
+        }
+    }
+
+    /// Check if an expression is simple enough to be rendered directly in JavaScript
+    fn is_simple_expression(&self, expr: &hir::Expr) -> bool {
+        match &expr.kind {
+            // These are simple and can be rendered directly
+            hir::ExprKind::Literal(..) |
+            hir::ExprKind::Path(..) |
+            hir::ExprKind::Wildcard => true,
+            
+            // Simple binary operations with simple operands
+            hir::ExprKind::Binary(_, lhs, rhs) => {
+                self.is_simple_expression(lhs) && self.is_simple_expression(rhs)
+            }
+            
+            // Simple unary operations
+            hir::ExprKind::Unary(_, operand) => self.is_simple_expression(operand),
+            
+            // Simple function calls with simple arguments
+            hir::ExprKind::Call(call) => {
+                call.arguments.iter().all(|arg| self.is_simple_expression(arg))
+            }
+            
+            // These expressions are complex and need statement processing
+            hir::ExprKind::Block(..) |
+            hir::ExprKind::Loop(..) |
+            hir::ExprKind::Match(..) |
+            hir::ExprKind::Break(..) |
+            hir::ExprKind::Continue |
+            hir::ExprKind::TailCall(..) |
+            hir::ExprKind::FunctionExpression(..) => false,
+            
+            // Nested if-else expressions are complex
+            hir::ExprKind::IfElse(..) => false,
+            
+            // Other cases default to false for safety
+            _ => false,
+        }
+    }
+
+    /// Check if a complex expression should be converted to a return statement
+    fn should_convert_complex_expr_to_return(&self, expr: &hir::Expr) -> bool {
         match &expr.kind {
             // Break and continue statements should not be wrapped
             hir::ExprKind::Break(..) | hir::ExprKind::Continue => false,
-            // Blocks should be handled recursively, not wrapped
+            // Blocks should be handled separately
             hir::ExprKind::Block(..) => false,
-            // All other expressions should be converted to returns in function context
+            // Simple expressions should be left as completion expressions
+            _ if self.is_simple_expression(expr) => false,
+            // Complex expressions should be converted to return statements
             _ => true,
         }
     }
