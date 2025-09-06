@@ -20,12 +20,7 @@ impl CodegenJS {
         
         // Check if all statements in the block end with return statements
         // This indicates the completion variable is never reached
-        let result = self.block_all_paths_return(block);
-        
-        // Debug output
-        eprintln!("DEBUG: should_omit_completion_var_reference: {} -> {}", completion_var, result);
-        
-        result
+        self.block_all_paths_return(block)
     }
     
     /// Check if all execution paths in a block end with return statements
@@ -141,12 +136,8 @@ impl CodegenJS {
             self.push_str(&lhs);
             
             // Only output the completion variable reference if it's actually reachable
-            eprintln!("DEBUG: About to check completion var reference: {}", completion_tmp_var);
             if !self.should_omit_completion_var_reference(block, &completion_tmp_var) {
-                eprintln!("DEBUG: Outputting completion var reference: {}", completion_tmp_var);
                 self.push_str(completion_tmp_var.as_str());
-            } else {
-                eprintln!("DEBUG: Omitting completion var reference: {}", completion_tmp_var);
             }
         }
         self.flush_statement_buffer();
