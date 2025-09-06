@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use tlang_ast::node::{self as ast};
-use tlang_codegen_js::HirJsPass;
+use tlang_codegen_js::create_hir_js_opt_group;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_hir::hir;
 use tlang_hir_opt::HirOptimizer;
@@ -188,7 +188,7 @@ impl Tlang {
             let mut optimizer = HirOptimizer::default();
 
             if self.runner == Runner::JavaScript {
-                optimizer.add_pass(Box::new(HirJsPass::default()));
+                optimizer.add_pass(Box::new(create_hir_js_opt_group()));
             }
 
             optimizer.optimize_hir(&mut module, meta.into());

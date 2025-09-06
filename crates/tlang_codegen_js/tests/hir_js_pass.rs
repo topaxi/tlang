@@ -1,6 +1,6 @@
 use insta::assert_snapshot;
 use tlang_ast_lowering::lower_to_hir;
-use tlang_codegen_js::hir_js_pass::HirJsPass;
+use tlang_codegen_js::create_hir_js_opt_group;
 use tlang_hir::hir;
 use tlang_hir_opt::{HirOptContext, HirPass};
 use tlang_hir_pretty::HirPrettyOptions;
@@ -34,21 +34,10 @@ fn compile(source: &str) -> hir::LowerResult {
 fn compile_and_apply_hir_js_pass(source: &str) -> hir::Module {
     let (mut module, meta) = compile(source);
     let mut ctx = HirOptContext::from(meta);
-    let mut pass = HirJsPass::new();
+    let mut hir_js_opt_group = create_hir_js_opt_group();
 
-    // Run the HIR JS pass iteratively until no more changes are made
-    // This is necessary for complex nested expressions that require multiple passes
-    let mut iterations = 0;
-    let max_iterations = 10; // Safety limit to prevent infinite loops
-
-    loop {
-        let changes_made = pass.optimize_hir(&mut module, &mut ctx);
-        iterations += 1;
-
-        if !changes_made || iterations >= max_iterations {
-            break;
-        }
-    }
+    // Run the HIR JS optimization group
+    hir_js_opt_group.optimize_hir(&mut module, &mut ctx);
 
     module
 }
@@ -57,8 +46,8 @@ fn compile_and_apply_hir_js_pass_debug(source: &str) -> (hir::Module, hir::Modul
     let (mut module, meta) = compile(source);
     let module_before = module.clone();
     let mut ctx = HirOptContext::from(meta);
-    let mut pass = HirJsPass::new();
-    pass.optimize_hir(&mut module, &mut ctx);
+    let mut hir_js_opt_group = create_hir_js_opt_group();
+    hir_js_opt_group.optimize_hir(&mut module, &mut ctx);
     (module_before, module)
 }
 
@@ -2021,32 +2010,20 @@ fn test_debug_nested_loop_expressions_with_cli_sequence() {
     println!("\n=== After standard HIR optimizations ===");
     println!("{}", pretty_print(&module));
     
-    // Create a fresh context for HIR JS pass (like the CLI does)
+    // Create a fresh context for HIR JS optimization group (like the CLI does)
     let mut ctx = HirOptContext {
         symbols: std::collections::HashMap::new(),
         hir_id_allocator: tlang_span::HirIdAllocator::default(),
         current_scope: tlang_span::HirId::new(1),
     };
-    let mut pass = HirJsPass::new();
+    let mut hir_js_opt_group = create_hir_js_opt_group();
 
-    // Run the HIR JS pass iteratively and show each iteration
-    let mut iterations = 0;
-    let max_iterations = 25; // Increase to see if we need more iterations
-
-    loop {
-        println!("\n=== Before HIR JS pass iteration {} ===", iterations + 1);
-        println!("{}", pretty_print(&module));
-        
-        let changes_made = pass.optimize_hir(&mut module, &mut ctx);
-        iterations += 1;
-
-        println!("HIR JS pass iteration {}: changes_made = {}", iterations, changes_made);
-        
-        if !changes_made || iterations >= max_iterations {
-            break;
-        }
-    }
+    // Run the HIR JS optimization group
+    println!("\n=== Before HIR JS optimization group ===");
+    println!("{}", pretty_print(&module));
     
-    println!("\n=== Final HIR after {} HIR JS pass iterations ===", iterations);
+    hir_js_opt_group.optimize_hir(&mut module, &mut ctx);
+    
+    println!("\n=== Final HIR after HIR JS optimization group ===");
     println!("{}", pretty_print(&module));
 }

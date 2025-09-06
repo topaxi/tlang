@@ -6,7 +6,7 @@ use std::{
 
 use clap::{ArgMatches, arg, command};
 use tlang_ast_lowering::lower_to_hir;
-use tlang_codegen_js::HirJsPass;
+use tlang_codegen_js::create_hir_js_opt_group;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_hir::hir;
 use tlang_hir_opt::{HirOptContext, HirOptimizer, HirPass};
@@ -218,17 +218,10 @@ fn compile_to_hir(source: &str, show_warnings: bool) -> Result<hir::Module, Pars
         hir_id_allocator: tlang_span::HirIdAllocator::default(),
         current_scope: tlang_span::HirId::new(1),
     };
-    let mut hir_js_pass = HirJsPass::default();
+    let mut hir_js_opt_group = create_hir_js_opt_group();
     
-    // Run HIR JS pass iteratively until no more changes are made
-    let mut max_iterations = 10; // Prevent infinite loops
-    while max_iterations > 0 {
-        let changes_made = hir_js_pass.optimize_hir(&mut module, &mut hir_js_opt_ctx);
-        if !changes_made {
-            break;
-        }
-        max_iterations -= 1;
-    }
+    // Run HIR JS optimization group
+    hir_js_opt_group.optimize_hir(&mut module, &mut hir_js_opt_ctx);
 
     Ok(module)
 }

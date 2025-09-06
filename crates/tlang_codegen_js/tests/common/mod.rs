@@ -1,5 +1,5 @@
 use tlang_codegen_js::generator::CodegenJS;
-use tlang_codegen_js::HirJsPass;
+use tlang_codegen_js::create_hir_js_opt_group;
 use tlang_hir_opt::{HirOptimizer, HirPass, HirOptContext};
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
@@ -73,22 +73,15 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
             // Always apply JavaScript-specific HIR transformations
             // This ensures expressions that cannot be expressed as expressions in modern JavaScript
             // are properly transformed to statements, regardless of optimization level
-            let mut js_pass = HirJsPass::new();
+            let mut hir_js_opt_group = create_hir_js_opt_group();
             let mut js_ctx = HirOptContext {
                 symbols: std::collections::HashMap::new(),
                 hir_id_allocator: tlang_span::HirIdAllocator::new(1000), // Start with a high number to avoid conflicts
                 current_scope: module.hir_id,
             };
             
-            // Run HIR JS pass iteratively until no more changes are made
-            let mut max_iterations = 10; // Prevent infinite loops
-            while max_iterations > 0 {
-                let changes_made = js_pass.optimize_hir(&mut module, &mut js_ctx);
-                if !changes_made {
-                    break;
-                }
-                max_iterations -= 1;
-            }
+            // Run HIR JS optimization group
+            hir_js_opt_group.optimize_hir(&mut module, &mut js_ctx);
 
             let mut codegen = CodegenJS::default();
             codegen.generate_code(&module);
