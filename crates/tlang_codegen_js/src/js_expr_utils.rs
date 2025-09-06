@@ -29,14 +29,15 @@ pub fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
             expr_can_render_as_js_expr(key) && expr_can_render_as_js_expr(value)
         }),
 
+        hir::ExprKind::FunctionExpression(..) => true,
+
         // These expressions cannot be rendered as JavaScript expressions
         hir::ExprKind::Block(..)
         | hir::ExprKind::Loop(..)
         | hir::ExprKind::Break(..)
         | hir::ExprKind::Continue
         | hir::ExprKind::Match(..)
-        | hir::ExprKind::TailCall(..)
-        | hir::ExprKind::FunctionExpression(..) => false,
+        | hir::ExprKind::TailCall(..) => false,
 
         _ => false,
     }
