@@ -570,14 +570,12 @@ impl HirPass for SimplifiedHirJsPass {
     }
 
     fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
-        self.iteration_count += 1;
-
-        // Prevent infinite loops by limiting the number of iterations
-        // Allow more iterations to handle complex nested structures
-        if self.iteration_count > 5 {
+        // Only run once - this pass should be idempotent and complete its work in one pass
+        if self.iteration_count > 0 {
             return false;
         }
-
+        
+        self.iteration_count += 1;
         self.changes_made = false;
         self.visit_module(module, ctx);
         self.changes_made
@@ -666,15 +664,10 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                 
                 // Visit else branches
                 for else_clause in else_branches {
-                    match else_clause {
-                        hir::ElseClause::ElseIf { condition, body } => {
-                            self.visit_expr(condition, ctx);
-                            self.visit_block(body, ctx);
-                        }
-                        hir::ElseClause::Else { body } => {
-                            self.visit_block(body, ctx);
-                        }
+                    if let Some(condition) = &mut else_clause.condition {
+                        self.visit_expr(condition, ctx);
                     }
+                    self.visit_block(&mut else_clause.consequence, ctx);
                 }
             }
             hir::ExprKind::Match(scrutinee, arms) => {
