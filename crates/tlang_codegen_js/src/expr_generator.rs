@@ -6,7 +6,7 @@ use crate::binary_operator_generator::{
     JSAssociativity, JSOperatorInfo, map_operator_info, should_wrap_with_parentheses,
 };
 use crate::generator::{BlockContext, CodegenJS};
-use crate::hir_js_pass::if_else_can_render_as_ternary;
+use crate::js_expr_utils::if_else_can_render_as_ternary;
 use crate::js;
 
 impl CodegenJS {

@@ -3,6 +3,8 @@ use tlang_hir::{Visitor, hir, visit::walk_expr};
 use tlang_hir_opt::{HirOptContext, HirPass};
 use tlang_span::Span;
 
+use crate::js_expr_utils::expr_can_render_as_js_expr;
+
 /// A simplified HIR JS pass that focuses on flattening expressions that can't be represented in JavaScript
 /// This pass assumes that return statements have already been handled by ReturnStatementPass
 #[derive(Debug, Default)]
@@ -160,50 +162,7 @@ impl SimplifiedHirJsPass {
 
     /// Check if an expression can be represented as a JavaScript expression
     fn can_render_as_js_expr(&self, expr: &hir::Expr) -> bool {
-        match &expr.kind {
-            // Simple expressions that can be rendered directly
-            hir::ExprKind::Literal(..) |
-            hir::ExprKind::Path(..) |
-            hir::ExprKind::Wildcard => true,
-            
-            // Binary operations can usually be rendered
-            hir::ExprKind::Binary(_, lhs, rhs) => {
-                self.can_render_as_js_expr(lhs) && self.can_render_as_js_expr(rhs)
-            }
-            
-            // Unary operations can usually be rendered
-            hir::ExprKind::Unary(_, operand) => self.can_render_as_js_expr(operand),
-            
-            // Function calls can be rendered if arguments can be rendered
-            hir::ExprKind::Call(call) => {
-                call.arguments.iter().all(|arg| self.can_render_as_js_expr(arg))
-            }
-            
-            // If-else can be rendered as ternary if conditions are met
-            hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
-                self.can_render_if_else_as_ternary(condition, then_branch, else_branches)
-            }
-            
-            // These expressions cannot be rendered as JavaScript expressions
-            hir::ExprKind::Block(..) |
-            hir::ExprKind::Loop(..) |
-            hir::ExprKind::Match(..) |
-            hir::ExprKind::Break(..) |
-            hir::ExprKind::Continue |
-            hir::ExprKind::TailCall(..) |
-            hir::ExprKind::FunctionExpression(..) => false,
-            
-            // List literals can be rendered if all elements can be rendered
-            hir::ExprKind::List(elements) => {
-                elements.iter().all(|elem| self.can_render_as_js_expr(elem))
-            }
-            
-            // Field access can be rendered if the object can be rendered
-            hir::ExprKind::FieldAccess(obj, _) => self.can_render_as_js_expr(obj),
-            
-            // Other cases default to false for safety
-            _ => false,
-        }
+        expr_can_render_as_js_expr(expr)
     }
 
     /// Check if an expression is a temp variable that we created
@@ -244,54 +203,6 @@ impl SimplifiedHirJsPass {
             }
             _ => false,
         }
-    }
-
-    /// Check if an if-else expression can be rendered as a ternary operator
-    fn can_render_if_else_as_ternary(
-        &self,
-        condition: &hir::Expr,
-        then_branch: &hir::Block,
-        else_branches: &[hir::ElseClause],
-    ) -> bool {
-        // Must be a simple if-else (no else-if chains)
-        if else_branches.len() != 1 {
-            return false;
-        }
-        
-        let else_branch = &else_branches[0];
-        
-        // Must not have an else-if condition
-        if else_branch.condition.is_some() {
-            return false;
-        }
-        
-        // Condition must be simple
-        if !self.can_render_as_js_expr(condition) {
-            return false;
-        }
-        
-        // Both branches must have no statements and simple completion expressions
-        if !then_branch.stmts.is_empty() || !else_branch.consequence.stmts.is_empty() {
-            return false;
-        }
-        
-        // Both branches must have completion expressions that can be rendered
-        let then_expr = match &then_branch.expr {
-            Some(expr) => expr,
-            None => return false,
-        };
-        let else_expr = match &else_branch.consequence.expr {
-            Some(expr) => expr,
-            None => return false,
-        };
-        
-        self.can_render_as_js_expr(then_expr) && self.can_render_as_js_expr(else_expr)
-    }
-
-    /// Check if a block contains only a simple expression that can be rendered
-    fn can_render_as_simple_block_expr(&self, block: &hir::Block) -> bool {
-        block.stmts.is_empty() && 
-        block.expr.as_ref().map_or(false, |expr| self.can_render_as_js_expr(expr))
     }
 
     /// Transform loop expressions to use temp variables
@@ -631,64 +542,6 @@ impl SimplifiedHirJsPass {
         additional_stmts
     }
 
-    /// Flatten subexpressions that cannot be rendered as JavaScript expressions
-    fn flatten_subexpressions_if_needed(&mut self, expr: &mut hir::Expr, ctx: &mut HirOptContext) {
-        match &mut expr.kind {
-            hir::ExprKind::Call(call) => {
-                // Flatten complex arguments
-                for arg in &mut call.arguments {
-                    if !self.can_render_as_js_expr(arg) {
-                        let (temp_ref, _temp_stmts) = self.flatten_expression_to_temp_var(arg.clone(), ctx);
-                        // For now, we can't easily insert statements here in expression context
-                        // This will need to be handled at a higher level (block context)
-                        *arg = temp_ref;
-                        self.changes_made = true;
-                    }
-                }
-            }
-            hir::ExprKind::Binary(_, lhs, rhs) => {
-                // Flatten complex operands
-                if !self.can_render_as_js_expr(lhs) {
-                    let (temp_ref, _temp_stmts) = self.flatten_expression_to_temp_var(*lhs.clone(), ctx);
-                    **lhs = temp_ref;
-                    self.changes_made = true;
-                }
-                if !self.can_render_as_js_expr(rhs) {
-                    let (temp_ref, _temp_stmts) = self.flatten_expression_to_temp_var(*rhs.clone(), ctx);
-                    **rhs = temp_ref;
-                    self.changes_made = true;
-                }
-            }
-            hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
-                // Only flatten if this is a complex if-else that can't be rendered as ternary
-                if !self.can_render_if_else_as_ternary(condition, then_branch, else_branches) {
-                    // This if-else should be transformed to statements, but we can't do that here
-                    // It should be handled at the block level
-                }
-            }
-            hir::ExprKind::List(elements) => {
-                // Flatten complex list elements
-                for element in elements {
-                    if !self.can_render_as_js_expr(element) {
-                        let (temp_ref, _temp_stmts) = self.flatten_expression_to_temp_var(element.clone(), ctx);
-                        *element = temp_ref;
-                        self.changes_made = true;
-                    }
-                }
-            }
-            hir::ExprKind::FieldAccess(obj, _field) => {
-                // Flatten complex object expressions
-                if !self.can_render_as_js_expr(obj) {
-                    let (temp_ref, _temp_stmts) = self.flatten_expression_to_temp_var(*obj.clone(), ctx);
-                    **obj = temp_ref;
-                    self.changes_made = true;
-                }
-            }
-            _ => {
-                // Other expression types don't need special handling here
-            }
-        }
-    }
 }
 
 impl HirPass for SimplifiedHirJsPass {
