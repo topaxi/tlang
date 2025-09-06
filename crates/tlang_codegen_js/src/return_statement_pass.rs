@@ -5,6 +5,8 @@ use tlang_hir::{
 use tlang_hir_opt::{HirOptContext, HirPass};
 use tlang_span::HirId;
 
+use crate::expr_can_render_as_js_expr;
+
 /// A pass that transforms function completion expressions into explicit return statements
 /// This simplifies the main HIR JS pass by ensuring all function completions use return statements
 #[derive(Debug, Default)]
@@ -177,6 +179,14 @@ impl<'hir> Visitor<'hir> for ReturnStatementPass {
     fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
         match &mut expr.kind {
             hir::ExprKind::FunctionExpression(func) => {
+                if func.body.stmts.is_empty()
+                    && let Some(expr) = &func.body.expr
+                    && expr_can_render_as_js_expr(expr)
+                {
+                    // Single expression within arrow function which can be rendered as JS expression
+                    return;
+                }
+
                 // Enter function context
                 self.function_stack.push(func.hir_id);
                 self.function_body_blocks.insert(func.body.hir_id);
