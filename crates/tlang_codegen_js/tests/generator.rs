@@ -93,11 +93,7 @@ fn test_codegen_operator_precedence() {
 #[test]
 fn test_block_expression() {
     let output = compile!("let one = { 1 };");
-    let expected_output = indoc! {"
-        let $hir$0 = undefined;
-        $hir$0 = 1;
-        let one = $hir$0;
-    "};
+    let expected_output = "let one = 1;\n";
     assert_eq!(output, expected_output);
 }
 
