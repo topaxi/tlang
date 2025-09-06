@@ -25,6 +25,10 @@ pub fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
             expr_can_render_as_js_expr(obj) && expr_can_render_as_js_expr(index)
         }
 
+        hir::ExprKind::Dict(pairs) => pairs
+            .iter()
+            .all(|(key, value)| expr_can_render_as_js_expr(key) && expr_can_render_as_js_expr(value)),
+
         // These expressions cannot be rendered as JavaScript expressions
         hir::ExprKind::Block(..)
         | hir::ExprKind::Loop(..)
