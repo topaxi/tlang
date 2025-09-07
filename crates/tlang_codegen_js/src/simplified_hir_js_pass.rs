@@ -284,6 +284,42 @@ impl SimplifiedHirJsPass {
                 .iter()
                 .any(|elem| self.contains_temp_variables(elem)),
             hir::ExprKind::FieldAccess(obj, _) => self.contains_temp_variables(obj),
+            hir::ExprKind::Loop(block) => {
+                // Check if the loop body contains temp variables
+                self.block_contains_temp_variables(block)
+            }
+            hir::ExprKind::Block(block) => {
+                // Check if the block contains temp variables
+                self.block_contains_temp_variables(block)
+            }
+            _ => false,
+        }
+    }
+
+    fn block_contains_temp_variables(&self, block: &hir::Block) -> bool {
+        // Check statements for temp variables
+        for stmt in &block.stmts {
+            if self.stmt_contains_temp_variables(stmt) {
+                return true;
+            }
+        }
+
+        // Check completion expression
+        if let Some(ref expr) = block.expr {
+            if self.contains_temp_variables(expr) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn stmt_contains_temp_variables(&self, stmt: &hir::Stmt) -> bool {
+        match &stmt.kind {
+            hir::StmtKind::Let(_, expr, _) => self.contains_temp_variables(expr),
+            hir::StmtKind::Expr(expr) => self.contains_temp_variables(expr),
+            hir::StmtKind::Return(Some(expr)) => self.contains_temp_variables(expr),
+            hir::StmtKind::Return(None) => false,
             _ => false,
         }
     }
@@ -788,15 +824,7 @@ impl SimplifiedHirJsPass {
                 // Handle complex expressions in expression statements
                 // Use statement-specific logic for standalone expressions
                 if !expr_can_render_as_js_stmt(expr) && !self.contains_temp_variables(expr) {
-                    if let hir::ExprKind::Loop(..) = &expr.kind {
-                        // Special handling for loop expressions
-                        let (flattened_expr, mut temp_stmts) =
-                            self.transform_loop_expression((**expr).clone(), ctx);
-
-                        additional_stmts.append(&mut temp_stmts);
-                        **expr = flattened_expr;
-                        self.changes_made = true;
-                    } else if let hir::ExprKind::Block(..) | hir::ExprKind::Match(..) = &expr.kind {
+                    if let hir::ExprKind::Block(..) | hir::ExprKind::Match(..) = &expr.kind {
                         // These complex expressions need to be flattened
                         let (flattened_expr, mut temp_stmts) =
                             self.flatten_expression_to_temp_var((**expr).clone(), ctx);
@@ -804,6 +832,15 @@ impl SimplifiedHirJsPass {
                         additional_stmts.append(&mut temp_stmts);
                         **expr = flattened_expr;
                         self.changes_made = true;
+                    }
+                }
+
+                // Always process loop expressions in expression statements, even if they can render as JS statements
+                // because they may contain break/continue expressions that need transformation
+                if let hir::ExprKind::Loop(..) = &expr.kind {
+                    if !self.contains_temp_variables(expr) {
+                        // Visit the loop body to transform any break/continue expressions
+                        self.visit_expr(expr, ctx);
                     }
                 }
             }
@@ -983,6 +1020,11 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
             hir::ExprKind::Block(block) => {
                 // Visit block content
                 self.visit_block(block, ctx);
+            }
+            hir::ExprKind::Break(_) | hir::ExprKind::Continue => {
+                // Break and continue expressions will be handled by flatten_expression_to_temp_var
+                // when they're encountered in expression contexts
+                // No additional processing needed here
             }
             _ => {
                 // Use default walking behavior for other expressions

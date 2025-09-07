@@ -1572,7 +1572,10 @@ fn test_break_expression_in_let_statement() {
     assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         loop {
-            let x: unknown = break 42;
+            let $hir$0: unknown = _;
+            ($hir$0 = 42);
+            break;
+            let x: unknown = $hir$0;
             x
         };
     }
@@ -1615,7 +1618,10 @@ fn test_break_expression_in_binary_expression() {
     assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         loop {
-            let result: unknown = (break 42 + 10);
+            let $hir$0: unknown = _;
+            ($hir$0 = 42);
+            break;
+            let result: unknown = ($hir$0 + 10);
             result
         };
     }
@@ -1636,7 +1642,10 @@ fn test_break_expression_in_function_call() {
     assert_snapshot!(pretty_print(&hir), @r#"
     fn main() -> unknown {
         loop {
-            let result: unknown = log(break "hello");
+            let $hir$0: unknown = _;
+            ($hir$0 = "hello");
+            break;
+            let result: unknown = log($hir$0);
             result
         };
     }
@@ -1660,7 +1669,10 @@ fn test_break_expression_in_list() {
     assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         loop {
-            let list: unknown = [1, break 42, 3];
+            let $hir$0: unknown = _;
+            ($hir$0 = 42);
+            break;
+            let list: unknown = [1, $hir$0, 3];
             list
         };
     }
