@@ -1041,11 +1041,14 @@ fn test_for_loop_expression_in_let() {
                         ($hir$2 = (acc + i));
                     },
                     Option::None => {
-                        ($hir$2 = accumulator$$);
+                        let $hir$1: unknown = _;
+                        ($hir$1 = accumulator$$);
                         break;
+                        ($hir$2 = $hir$1);
                     },
                 };
-                ($hir$2);
+                (accumulator$$ = $hir$2);
+                $hir$2
             };
         };
         let result: unknown = $hir$0;
