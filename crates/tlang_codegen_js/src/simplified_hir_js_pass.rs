@@ -399,6 +399,130 @@ impl SimplifiedHirJsPass {
 
                 (wildcard_expr, vec![plain_continue])
             }
+            hir::ExprKind::Binary(hir::BinaryOpKind::Or, lhs, rhs) => {
+                // Transform: a || b -> if a { temp = a; } else { temp = b; }
+                // Need to flatten both operands first if they're complex
+                let mut all_stmts = vec![temp_declaration];
+                
+                // Flatten left operand if needed
+                let (left_expr, mut left_stmts) = if !self.can_render_as_js_expr(lhs) {
+                    self.flatten_expression_to_temp_var((**lhs).clone(), ctx)
+                } else {
+                    ((**lhs).clone(), vec![])
+                };
+                all_stmts.extend(left_stmts);
+                
+                // Flatten right operand if needed
+                let (right_expr, mut right_stmts) = if !self.can_render_as_js_expr(rhs) {
+                    self.flatten_expression_to_temp_var((**rhs).clone(), ctx)
+                } else {
+                    ((**rhs).clone(), vec![])
+                };
+                
+                // Create if-else structure: if left { temp = left; } else { right_stmts; temp = right; }
+                let then_block = hir::Block::new(
+                    ctx.hir_id_allocator.next_id(),
+                    vec![self.create_assignment_stmt(ctx, &temp_name, left_expr.clone(), span)],
+                    None,
+                    span,
+                );
+                
+                let mut else_stmts = right_stmts;
+                else_stmts.push(self.create_assignment_stmt(ctx, &temp_name, right_expr, span));
+                let else_block = hir::Block::new(
+                    ctx.hir_id_allocator.next_id(),
+                    else_stmts,
+                    None,
+                    span,
+                );
+                
+                let if_else_expr = hir::Expr {
+                    hir_id: ctx.hir_id_allocator.next_id(),
+                    kind: hir::ExprKind::IfElse(
+                        Box::new(left_expr),
+                        Box::new(then_block),
+                        vec![hir::ElseClause {
+                            condition: None,
+                            consequence: else_block,
+                        }],
+                    ),
+                    span,
+                };
+                
+                let if_else_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(if_else_expr)),
+                    span,
+                );
+                all_stmts.push(if_else_stmt);
+                
+                (temp_ref, all_stmts)
+            }
+            hir::ExprKind::Binary(hir::BinaryOpKind::And, lhs, rhs) => {
+                // Transform: a && b -> if a { temp = b; } else { temp = false; }
+                // Need to flatten both operands first if they're complex
+                let mut all_stmts = vec![temp_declaration];
+                
+                // Flatten left operand if needed
+                let (left_expr, mut left_stmts) = if !self.can_render_as_js_expr(lhs) {
+                    self.flatten_expression_to_temp_var((**lhs).clone(), ctx)
+                } else {
+                    ((**lhs).clone(), vec![])
+                };
+                all_stmts.extend(left_stmts);
+                
+                // Flatten right operand if needed
+                let (right_expr, mut right_stmts) = if !self.can_render_as_js_expr(rhs) {
+                    self.flatten_expression_to_temp_var((**rhs).clone(), ctx)
+                } else {
+                    ((**rhs).clone(), vec![])
+                };
+                
+                // Create if-else structure: if left { right_stmts; temp = right; } else { temp = false; }
+                let mut then_stmts = right_stmts;
+                then_stmts.push(self.create_assignment_stmt(ctx, &temp_name, right_expr, span));
+                let then_block = hir::Block::new(
+                    ctx.hir_id_allocator.next_id(),
+                    then_stmts,
+                    None,
+                    span,
+                );
+                
+                let false_expr = hir::Expr {
+                    hir_id: ctx.hir_id_allocator.next_id(),
+                    kind: hir::ExprKind::Literal(Box::new(tlang_ast::token::Literal::Boolean(false))),
+                    span,
+                };
+                
+                let else_block = hir::Block::new(
+                    ctx.hir_id_allocator.next_id(),
+                    vec![self.create_assignment_stmt(ctx, &temp_name, false_expr, span)],
+                    None,
+                    span,
+                );
+                
+                let if_else_expr = hir::Expr {
+                    hir_id: ctx.hir_id_allocator.next_id(),
+                    kind: hir::ExprKind::IfElse(
+                        Box::new(left_expr),
+                        Box::new(then_block),
+                        vec![hir::ElseClause {
+                            condition: None,
+                            consequence: else_block,
+                        }],
+                    ),
+                    span,
+                };
+                
+                let if_else_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(if_else_expr)),
+                    span,
+                );
+                all_stmts.push(if_else_stmt);
+                
+                (temp_ref, all_stmts)
+            }
             _ => {
                 // For simple expressions, create assignment statement
                 let assignment_stmt = self.create_assignment_stmt(ctx, &temp_name, expr, span);
@@ -502,23 +626,57 @@ impl SimplifiedHirJsPass {
         let mut additional_stmts = Vec::new();
 
         match &mut expr.kind {
-            hir::ExprKind::Binary(_op_kind, lhs, rhs) => {
-                // Process left operand
-                if !self.can_render_as_js_expr(lhs) && !self.contains_temp_variables(lhs) {
-                    let (flattened_expr, mut temp_stmts) =
-                        self.flatten_expression_to_temp_var((**lhs).clone(), ctx);
-                    additional_stmts.append(&mut temp_stmts);
-                    **lhs = flattened_expr;
-                    self.changes_made = true;
-                }
+            hir::ExprKind::Binary(op_kind, lhs, rhs) => {
+                // Special handling for short-circuit operators
+                match op_kind {
+                    hir::BinaryOpKind::Or | hir::BinaryOpKind::And => {
+                        // Short-circuit operators need special handling when operands are complex
+                        // Transform: a || b -> if a { temp = a; } else { temp = b; }
+                        // Transform: a && b -> if a { temp = b; } else { temp = false; }
+                        if (!self.can_render_as_js_expr(lhs) && !self.contains_temp_variables(lhs))
+                            || (!self.can_render_as_js_expr(rhs) && !self.contains_temp_variables(rhs))
+                        {
+                            // We have complex operands, so transform the entire expression to if-else
+                            // Mark the entire expression as needing transformation by returning
+                            // empty additional_stmts - the parent will call flatten_expression_to_temp_var
+                            return additional_stmts;
+                        }
+                        
+                        // Process operands normally if both are simple
+                        if !self.can_render_as_js_expr(lhs) && !self.contains_temp_variables(lhs) {
+                            let (flattened_expr, mut temp_stmts) =
+                                self.flatten_expression_to_temp_var((**lhs).clone(), ctx);
+                            additional_stmts.append(&mut temp_stmts);
+                            **lhs = flattened_expr;
+                            self.changes_made = true;
+                        }
 
-                // Process right operand
-                if !self.can_render_as_js_expr(rhs) && !self.contains_temp_variables(rhs) {
-                    let (flattened_expr, mut temp_stmts) =
-                        self.flatten_expression_to_temp_var((**rhs).clone(), ctx);
-                    additional_stmts.append(&mut temp_stmts);
-                    **rhs = flattened_expr;
-                    self.changes_made = true;
+                        if !self.can_render_as_js_expr(rhs) && !self.contains_temp_variables(rhs) {
+                            let (flattened_expr, mut temp_stmts) =
+                                self.flatten_expression_to_temp_var((**rhs).clone(), ctx);
+                            additional_stmts.append(&mut temp_stmts);
+                            **rhs = flattened_expr;
+                            self.changes_made = true;
+                        }
+                    }
+                    _ => {
+                        // Regular binary operators - process operands normally
+                        if !self.can_render_as_js_expr(lhs) && !self.contains_temp_variables(lhs) {
+                            let (flattened_expr, mut temp_stmts) =
+                                self.flatten_expression_to_temp_var((**lhs).clone(), ctx);
+                            additional_stmts.append(&mut temp_stmts);
+                            **lhs = flattened_expr;
+                            self.changes_made = true;
+                        }
+
+                        if !self.can_render_as_js_expr(rhs) && !self.contains_temp_variables(rhs) {
+                            let (flattened_expr, mut temp_stmts) =
+                                self.flatten_expression_to_temp_var((**rhs).clone(), ctx);
+                            additional_stmts.append(&mut temp_stmts);
+                            **rhs = flattened_expr;
+                            self.changes_made = true;
+                        }
+                    }
                 }
             }
             hir::ExprKind::Unary(_, operand) => {
@@ -578,37 +736,47 @@ impl SimplifiedHirJsPass {
             hir::ExprKind::IndexAccess(obj, index) => {
                 // Process object expression
                 if !self.can_render_as_js_expr(obj) && !self.contains_temp_variables(obj) {
-                    // Skip break/continue expressions - they should not be flattened to temp variables
-                    match &obj.kind {
-                        hir::ExprKind::Break(..) | hir::ExprKind::Continue => {
-                            // Leave break/continue expressions as-is
-                        }
-                        _ => {
-                            let (flattened_expr, mut temp_stmts) =
-                                self.flatten_expression_to_temp_var((**obj).clone(), ctx);
-                            additional_stmts.append(&mut temp_stmts);
-                            **obj = flattened_expr;
-                            self.changes_made = true;
-                        }
-                    }
+                    let (flattened_expr, mut temp_stmts) =
+                        self.flatten_expression_to_temp_var((**obj).clone(), ctx);
+                    additional_stmts.append(&mut temp_stmts);
+                    **obj = flattened_expr;
+                    self.changes_made = true;
                 }
 
                 // Process index expression
                 if !self.can_render_as_js_expr(index) && !self.contains_temp_variables(index) {
-                    // Skip break/continue expressions - they should not be flattened to temp variables
-                    match &index.kind {
-                        hir::ExprKind::Break(..) | hir::ExprKind::Continue => {
-                            // Leave break/continue expressions as-is
-                        }
-                        _ => {
-                            let (flattened_expr, mut temp_stmts) =
-                                self.flatten_expression_to_temp_var((**index).clone(), ctx);
-                            additional_stmts.append(&mut temp_stmts);
-                            **index = flattened_expr;
-                            self.changes_made = true;
-                        }
-                    }
+                    let (flattened_expr, mut temp_stmts) =
+                        self.flatten_expression_to_temp_var((**index).clone(), ctx);
+                    additional_stmts.append(&mut temp_stmts);
+                    **index = flattened_expr;
+                    self.changes_made = true;
                 }
+            }
+            hir::ExprKind::IfElse(condition, _then_branch, _else_branches) => {
+                // Process condition first (it might contain complex expressions like loops)
+                if !self.can_render_as_js_expr(condition) && !self.contains_temp_variables(condition) {
+                    let (flattened_expr, mut temp_stmts) =
+                        self.flatten_expression_to_temp_var((**condition).clone(), ctx);
+                    additional_stmts.append(&mut temp_stmts);
+                    **condition = flattened_expr;
+                    self.changes_made = true;
+                }
+                
+                // Note: then_branch and else_branches are processed by the visitor pattern
+                // if they contain nested expressions that need processing
+            }
+            hir::ExprKind::Match(scrutinee, _arms) => {
+                // Process scrutinee first (it might contain complex expressions like loops)
+                if !self.can_render_as_js_expr(scrutinee) && !self.contains_temp_variables(scrutinee) {
+                    let (flattened_expr, mut temp_stmts) =
+                        self.flatten_expression_to_temp_var((**scrutinee).clone(), ctx);
+                    additional_stmts.append(&mut temp_stmts);
+                    **scrutinee = flattened_expr;
+                    self.changes_made = true;
+                }
+                
+                // Note: match arms are processed by the visitor pattern
+                // if they contain nested expressions that need processing
             }
             _ => {
                 // For other expressions, no sub-expression processing needed
