@@ -1036,18 +1036,16 @@ fn test_for_loop_expression_in_let() {
             loop {
                 let acc: unknown = accumulator$$;
                 let $hir$2: unknown = _;
-                ($hir$2 = (accumulator$$ = match iterator$$.next() {
+                match iterator$$.next() {
                     Option::Some { 0: i } => {
-                        (acc + i)
+                        ($hir$2 = (acc + i));
                     },
                     Option::None => {
-                        let $hir$1: unknown = _;
-                        ($hir$1 = accumulator$$);
+                        ($hir$2 = accumulator$$);
                         break;
-                        $hir$1
                     },
-                }));
-                $hir$2
+                };
+                ($hir$2);
             };
         };
         let result: unknown = $hir$0;
