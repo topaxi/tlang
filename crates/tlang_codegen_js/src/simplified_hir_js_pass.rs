@@ -107,12 +107,8 @@ impl SimplifiedHirJsPass {
 
     /// Check if a loop expression contains break statements with values
     fn loop_has_break_with_value(&self, expr: &hir::Expr) -> bool {
-        if let hir::ExprKind::Loop(_body) = &expr.kind {
-            // For now, disable loop transformation for all loops to fix for-loop issues
-            // TODO: Implement proper for-loop detection that distinguishes between:
-            // - For-loops (which should generate JavaScript for-loops with break as control flow)
-            // - Generic loop expressions (which may need break value transformation)
-            return false;
+        if let hir::ExprKind::Loop(body) = &expr.kind {
+            self.block_has_break_with_value(body)
         } else {
             false
         }
@@ -778,6 +774,18 @@ impl SimplifiedHirJsPass {
                     );
                 }
             }
+            hir::ExprKind::Match(scrutinee, arms) => {
+                // Transform break statements in match scrutinee
+                self.transform_break_statements_in_expr(scrutinee, temp_name, ctx);
+                
+                // Transform break statements in each match arm
+                for arm in arms {
+                    if let Some(ref mut guard) = arm.guard {
+                        self.transform_break_statements_in_expr(guard, temp_name, ctx);
+                    }
+                    self.transform_break_statements_in_block(&mut arm.block, temp_name, ctx);
+                }
+            }
             _ => {
                 // For other expression types, use the visitor to walk through them
                 walk_expr(self, expr, ctx);
@@ -1317,8 +1325,62 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
 
         // Handle completion expression
         if let Some(completion_expr) = &mut block.expr {
+            // First, check if this is a loop expression - handle it before other special cases
+            if let hir::ExprKind::Loop(..) = &completion_expr.kind {
+                if !self.can_render_as_js_expr(completion_expr)
+                    && !self.contains_temp_variables(completion_expr)
+                {
+                    // Check if this loop has break statements with values
+                    if self.loop_has_break_with_value(completion_expr) {
+                        // Loop expressions with break values need temp variables to capture the break value
+                        let temp_name = self.generate_temp_var_name();
+                        let span = completion_expr.span;
+
+                        // Create temp variable declaration
+                        let temp_declaration = self.create_temp_var_declaration(ctx, &temp_name, span);
+                        new_stmts.push(temp_declaration);
+
+                        // Transform the loop body to assign to temp variable on break
+                        let mut transformed_loop = completion_expr.clone();
+                        if let hir::ExprKind::Loop(body) = &mut transformed_loop.kind {
+                            self.transform_break_statements_in_block(body, &temp_name, ctx);
+                        }
+
+                        // Create loop statement (not assigned to anything)
+                        let loop_stmt = hir::Stmt::new(
+                            ctx.hir_id_allocator.next_id(),
+                            hir::StmtKind::Expr(Box::new(transformed_loop)),
+                            span,
+                        );
+                        new_stmts.push(loop_stmt);
+
+                        // Replace completion expression with temp variable reference
+                        *completion_expr = self.create_temp_var_path(ctx, &temp_name, span);
+                        self.changes_made = true;
+                    } else {
+                        // Loop without break values - convert to statement and set completion to undefined
+                        let span = completion_expr.span;
+                        
+                        // Create loop statement (not assigned to anything)
+                        let loop_stmt = hir::Stmt::new(
+                            ctx.hir_id_allocator.next_id(),
+                            hir::StmtKind::Expr(Box::new(completion_expr.clone())),
+                            span,
+                        );
+                        new_stmts.push(loop_stmt);
+
+                        // Replace completion expression with wildcard (undefined)
+                        *completion_expr = hir::Expr {
+                            hir_id: ctx.hir_id_allocator.next_id(),
+                            kind: hir::ExprKind::Wildcard,
+                            span,
+                        };
+                        self.changes_made = true;
+                    }
+                }
+            }
             // Special handling for assignment expressions with match on RHS (even if they contain temp vars)
-            if let hir::ExprKind::Binary(hir::BinaryOpKind::Assign, lhs, rhs) =
+            else if let hir::ExprKind::Binary(hir::BinaryOpKind::Assign, lhs, rhs) =
                 &completion_expr.kind
             {
                 if let hir::ExprKind::Match(..) = &rhs.kind {
@@ -1361,36 +1423,13 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
             } else if !self.can_render_as_js_expr(completion_expr)
                 && !self.contains_temp_variables(completion_expr)
             {
-                if let hir::ExprKind::Loop(..) = &completion_expr.kind {
-                    // For now, disable loop transformation for all loops to fix for-loop issues
-                    
-                    // Loop without transformation - convert to statement and set completion to undefined
-                    let span = completion_expr.span;
-                    
-                    // Create loop statement (not assigned to anything)
-                    let loop_stmt = hir::Stmt::new(
-                        ctx.hir_id_allocator.next_id(),
-                        hir::StmtKind::Expr(Box::new(completion_expr.clone())),
-                        span,
-                    );
-                    new_stmts.push(loop_stmt);
+                // General flattening for other complex expressions
+                let (flattened_expr, mut temp_stmts) =
+                    self.flatten_expression_to_temp_var(completion_expr.clone(), ctx);
 
-                    // Replace completion expression with wildcard (undefined)
-                    *completion_expr = hir::Expr {
-                        hir_id: ctx.hir_id_allocator.next_id(),
-                        kind: hir::ExprKind::Wildcard,
-                        span,
-                    };
-                    self.changes_made = true;
-                } else {
-                    // General flattening for other complex expressions
-                    let (flattened_expr, mut temp_stmts) =
-                        self.flatten_expression_to_temp_var(completion_expr.clone(), ctx);
-
-                    new_stmts.append(&mut temp_stmts);
-                    *completion_expr = flattened_expr;
-                    self.changes_made = true;
-                }
+                new_stmts.append(&mut temp_stmts);
+                *completion_expr = flattened_expr;
+                self.changes_made = true;
             }
         }
 
