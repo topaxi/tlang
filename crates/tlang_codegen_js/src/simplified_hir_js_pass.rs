@@ -134,10 +134,25 @@ impl SimplifiedHirJsPass {
                 (temp_ref, all_stmts)
             }
             hir::ExprKind::Loop(..) => {
-                // For loop expressions, use specialized loop transformation
-                let (_, statements) = self.transform_loop_expression(expr, ctx);
-                let mut all_stmts = vec![temp_declaration];
-                all_stmts.extend(statements);
+                // For loop expressions, inline the transformation instead of using transform_loop_expression
+                // We need to handle the break statements and make the loop a statement
+                let loop_temp_name = self.generate_temp_var_name();
+                let span = expr.span;
+
+                // Transform the loop body to assign to temp variable on break
+                let mut transformed_loop = expr.clone();
+                if let hir::ExprKind::Loop(body) = &mut transformed_loop.kind {
+                    self.transform_break_statements_in_block(body, &loop_temp_name, ctx);
+                }
+
+                // Create loop statement (not assigned to anything)
+                let loop_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(transformed_loop)),
+                    span,
+                );
+
+                let all_stmts = vec![temp_declaration, loop_stmt];
                 (temp_ref, all_stmts)
             }
             hir::ExprKind::Match(_, arms) => {
@@ -425,36 +440,6 @@ impl SimplifiedHirJsPass {
         additional_stmts
     }
 
-    /// Transform loop expressions to use temp variables
-    fn transform_loop_expression(
-        &mut self,
-        loop_expr: hir::Expr,
-        ctx: &mut HirOptContext,
-    ) -> (hir::Expr, Vec<hir::Stmt>) {
-        let temp_name = self.generate_temp_var_name();
-        let span = loop_expr.span;
-
-        // Create temp variable declaration
-        let temp_declaration = self.create_temp_var_declaration(ctx, &temp_name, span);
-
-        // Transform the loop body to assign to temp variable on break
-        let mut transformed_loop = loop_expr.clone();
-        if let hir::ExprKind::Loop(body) = &mut transformed_loop.kind {
-            self.transform_break_statements_in_block(body, &temp_name, ctx);
-        }
-
-        // Create loop statement
-        let loop_stmt = hir::Stmt::new(
-            ctx.hir_id_allocator.next_id(),
-            hir::StmtKind::Expr(Box::new(transformed_loop)),
-            span,
-        );
-
-        // Create temp variable reference
-        let temp_ref = self.create_temp_var_path(ctx, &temp_name, span);
-
-        (temp_ref, vec![temp_declaration, loop_stmt])
-    }
 
     /// Transform break statements in a block to assign to temp variable
     fn transform_break_statements_in_block(
@@ -575,9 +560,27 @@ impl SimplifiedHirJsPass {
 
             // Handle completion expression by adding assignment within the block
             if let Some(completion_expr) = block.expr {
-                let assignment_stmt =
-                    self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
-                block_stmts.push(assignment_stmt);
+                if let hir::ExprKind::Loop(_) = &completion_expr.kind {
+                    // For loop expressions in completion position, we need special handling
+                    // Transform the loop body to assign to temp variable on break
+                    let mut transformed_loop = completion_expr.clone();
+                    if let hir::ExprKind::Loop(body) = &mut transformed_loop.kind {
+                        self.transform_break_statements_in_block(body, temp_name, ctx);
+                    }
+
+                    // Add the loop as a statement (not assigned to anything)
+                    let loop_stmt = hir::Stmt::new(
+                        ctx.hir_id_allocator.next_id(),
+                        hir::StmtKind::Expr(Box::new(transformed_loop)),
+                        span,
+                    );
+                    block_stmts.push(loop_stmt);
+                } else {
+                    // For other expressions, create assignment as before
+                    let assignment_stmt =
+                        self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                    block_stmts.push(assignment_stmt);
+                }
             }
 
             // Create a new block with the modified statements and wrap it in a block expression statement
@@ -793,12 +796,32 @@ impl SimplifiedHirJsPass {
                 if !expr_can_render_as_assignment_rhs(expr) && !self.contains_temp_variables(expr) {
                     // For complex expressions in let statements, flatten them
                     if let hir::ExprKind::Loop(..) = &expr.kind {
-                        // Special handling for loop expressions
-                        let (flattened_expr, mut temp_stmts) =
-                            self.transform_loop_expression((**expr).clone(), ctx);
+                        // Special handling for loop expressions - they need to become statements
+                        // The loop cannot be assigned to a variable, so we transform break statements
+                        // to assign to a temp variable and make the loop a statement
+                        let temp_name = self.generate_temp_var_name();
+                        let span = expr.span;
 
-                        additional_stmts.append(&mut temp_stmts);
-                        **expr = flattened_expr;
+                        // Create temp variable declaration
+                        let temp_declaration = self.create_temp_var_declaration(ctx, &temp_name, span);
+                        additional_stmts.push(temp_declaration);
+
+                        // Transform the loop body to assign to temp variable on break
+                        let mut transformed_loop = (**expr).clone();
+                        if let hir::ExprKind::Loop(body) = &mut transformed_loop.kind {
+                            self.transform_break_statements_in_block(body, &temp_name, ctx);
+                        }
+
+                        // Create loop statement (not assigned to anything)
+                        let loop_stmt = hir::Stmt::new(
+                            ctx.hir_id_allocator.next_id(),
+                            hir::StmtKind::Expr(Box::new(transformed_loop)),
+                            span,
+                        );
+                        additional_stmts.push(loop_stmt);
+
+                        // Replace the loop expression with temp variable reference
+                        **expr = self.create_temp_var_path(ctx, &temp_name, span);
                         self.changes_made = true;
                     } else {
                         // General flattening for other complex expressions
@@ -864,12 +887,30 @@ impl SimplifiedHirJsPass {
                     }
 
                     if let hir::ExprKind::Loop(..) = &expr.kind {
-                        // Special handling for loop expressions
-                        let (flattened_expr, mut temp_stmts) =
-                            self.transform_loop_expression((**expr).clone(), ctx);
+                        // Special handling for loop expressions in return statements
+                        let temp_name = self.generate_temp_var_name();
+                        let span = expr.span;
 
-                        additional_stmts.append(&mut temp_stmts);
-                        **expr = flattened_expr;
+                        // Create temp variable declaration
+                        let temp_declaration = self.create_temp_var_declaration(ctx, &temp_name, span);
+                        additional_stmts.push(temp_declaration);
+
+                        // Transform the loop body to assign to temp variable on break
+                        let mut transformed_loop = (**expr).clone();
+                        if let hir::ExprKind::Loop(body) = &mut transformed_loop.kind {
+                            self.transform_break_statements_in_block(body, &temp_name, ctx);
+                        }
+
+                        // Create loop statement (not assigned to anything)
+                        let loop_stmt = hir::Stmt::new(
+                            ctx.hir_id_allocator.next_id(),
+                            hir::StmtKind::Expr(Box::new(transformed_loop)),
+                            span,
+                        );
+                        additional_stmts.push(loop_stmt);
+
+                        // Replace the loop expression with temp variable reference
+                        **expr = self.create_temp_var_path(ctx, &temp_name, span);
                         self.changes_made = true;
                     } else {
                         // General flattening for other complex expressions
@@ -931,14 +972,30 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
         {
             if let hir::ExprKind::Loop(..) = &completion_expr.kind {
                 // Special handling for loop expressions in block completion position
-                // Loops should become statements, not be assigned to temp variables
+                // Loops need to provide a value through break statements and become statements
+                let temp_name = self.generate_temp_var_name();
+                let span = completion_expr.span;
+
+                // Create temp variable declaration
+                let temp_declaration = self.create_temp_var_declaration(ctx, &temp_name, span);
+                new_stmts.push(temp_declaration);
+
+                // Transform the loop body to assign to temp variable on break
+                let mut transformed_loop = completion_expr.clone();
+                if let hir::ExprKind::Loop(body) = &mut transformed_loop.kind {
+                    self.transform_break_statements_in_block(body, &temp_name, ctx);
+                }
+
+                // Create loop statement (not assigned to anything)
                 let loop_stmt = hir::Stmt::new(
                     ctx.hir_id_allocator.next_id(),
-                    hir::StmtKind::Expr(Box::new(completion_expr.clone())),
-                    completion_expr.span,
+                    hir::StmtKind::Expr(Box::new(transformed_loop)),
+                    span,
                 );
                 new_stmts.push(loop_stmt);
-                block.expr = None; // Remove the completion expression since it's now a statement
+
+                // Replace completion expression with temp variable reference
+                *completion_expr = self.create_temp_var_path(ctx, &temp_name, span);
                 self.changes_made = true;
             } else {
                 // General flattening for other complex expressions
