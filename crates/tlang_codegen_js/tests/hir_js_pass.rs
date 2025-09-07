@@ -1592,13 +1592,11 @@ fn test_continue_expression_in_let_statement() {
     let hir = compile_and_apply_hir_js_pass(source);
     assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
-        let $hir$0: unknown = _;
         loop {
             continue;
             let x: unknown = _;
             x
         };
-        $hir$0;
     }
     ");
 }
@@ -2131,5 +2129,3 @@ fn test_isolated_for_loop_structure() {
     }
     "###);
 }
-
-

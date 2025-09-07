@@ -38,12 +38,13 @@ impl ReturnStatementPass {
             match &completion_expr.kind {
                 hir::ExprKind::IfElse(_condition, then_branch, else_branches) => {
                     // Check if any branch contains tail calls - if so, transform to use return statements
-                    let has_tail_calls = self.if_else_contains_tail_calls(then_branch, else_branches);
-                    
+                    let has_tail_calls =
+                        self.if_else_contains_tail_calls(then_branch, else_branches);
+
                     if has_tail_calls {
                         // Transform the if-else to use return statements in each branch
                         self.transform_if_else_to_returns(completion_expr, ctx);
-                        
+
                         // Move the transformed if-else to statements and clear completion
                         let if_else_stmt = hir::Stmt::new(
                             ctx.hir_id_allocator.next_id(),
@@ -155,9 +156,9 @@ impl ReturnStatementPass {
             hir::ExprKind::IfElse(_, then_branch, else_branches) => {
                 self.if_else_contains_tail_calls(then_branch, else_branches)
             }
-            hir::ExprKind::Match(_, arms) => {
-                arms.iter().any(|arm| self.block_contains_tail_calls(&arm.block))
-            }
+            hir::ExprKind::Match(_, arms) => arms
+                .iter()
+                .any(|arm| self.block_contains_tail_calls(&arm.block)),
             hir::ExprKind::Block(block) => self.block_contains_tail_calls(block),
             _ => false,
         }

@@ -142,10 +142,10 @@ fn test_function_with_tail_call_completion() {
     let hir = compile_and_apply_return_statement_pass(source);
     assert_snapshot!(pretty_print(&hir), @r###"
     fn factorial(n: unknown, acc: unknown) -> unknown {
-        return if (n <= 1) {
-            acc
+        if (n <= 1) {
+            return acc;
         } else {
-            rec factorial((n - 1), (n * acc))
+            return rec factorial((n - 1), (n * acc));
         };
     }
     "###);

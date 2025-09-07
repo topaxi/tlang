@@ -174,11 +174,12 @@ impl SimplifiedHirJsPass {
             hir::ExprKind::Break(Some(break_value)) => {
                 // For break expressions with values, transform to:
                 // let result = break value; -> temp_var = value; break; let result = temp_var;
-                
+
                 // Extract the break value
                 let value_expr = *break_value.clone();
-                let assignment_stmt = self.create_assignment_stmt(ctx, &temp_name, value_expr, span);
-                
+                let assignment_stmt =
+                    self.create_assignment_stmt(ctx, &temp_name, value_expr, span);
+
                 // Create plain break statement
                 let plain_break = hir::Stmt::new(
                     ctx.hir_id_allocator.next_id(),
@@ -189,8 +190,11 @@ impl SimplifiedHirJsPass {
                     })),
                     span,
                 );
-                
-                (temp_ref, vec![temp_declaration, assignment_stmt, plain_break])
+
+                (
+                    temp_ref,
+                    vec![temp_declaration, assignment_stmt, plain_break],
+                )
             }
             hir::ExprKind::Break(None) => {
                 // For break expressions without values, move to statement position
@@ -203,14 +207,14 @@ impl SimplifiedHirJsPass {
                     })),
                     span,
                 );
-                
+
                 // Return wildcard expression (since code after break is dead)
                 let wildcard_expr = hir::Expr {
                     hir_id: ctx.hir_id_allocator.next_id(),
                     kind: hir::ExprKind::Wildcard,
                     span,
                 };
-                
+
                 (wildcard_expr, vec![plain_break])
             }
             hir::ExprKind::Continue => {
@@ -224,14 +228,14 @@ impl SimplifiedHirJsPass {
                     })),
                     span,
                 );
-                
+
                 // Return wildcard expression (since code after continue is dead)
                 let wildcard_expr = hir::Expr {
                     hir_id: ctx.hir_id_allocator.next_id(),
                     kind: hir::ExprKind::Wildcard,
                     span,
                 };
-                
+
                 (wildcard_expr, vec![plain_continue])
             }
             _ => {

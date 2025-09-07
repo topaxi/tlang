@@ -12,17 +12,21 @@ use crate::js_expr_utils::if_else_can_render_as_ternary;
 impl CodegenJS {
     /// Check if a completion variable reference should be omitted
     /// This happens when all execution paths in the block end with return statements
-    fn should_omit_completion_var_reference(&self, block: &hir::Block, completion_var: &str) -> bool {
+    fn should_omit_completion_var_reference(
+        &self,
+        block: &hir::Block,
+        completion_var: &str,
+    ) -> bool {
         // Skip if not a temp variable
         if !completion_var.starts_with("$hir$") {
             return false;
         }
-        
+
         // Check if all statements in the block end with return statements
         // This indicates the completion variable is never reached
         self.block_all_paths_return(block)
     }
-    
+
     /// Check if all execution paths in a block end with return statements
     fn block_all_paths_return(&self, block: &hir::Block) -> bool {
         // If the block has no completion expression, check if the last statement is a return
@@ -32,26 +36,26 @@ impl CodegenJS {
             }
             return false;
         }
-        
+
         // If the block has a completion expression, check if it's unreachable due to returns
         for stmt in &block.stmts {
-            if let hir::StmtKind::Expr(expr) = &stmt.kind {
-                if let hir::ExprKind::Match(_, arms) = &expr.kind {
-                    // Check if all match arms end with return statements
-                    let all_arms_return = arms.iter().all(|arm| {
-                        if let Some(last_stmt) = arm.block.stmts.last() {
-                            matches!(last_stmt.kind, hir::StmtKind::Return(_))
-                        } else {
-                            false
-                        }
-                    });
-                    if all_arms_return {
-                        return true;
+            if let hir::StmtKind::Expr(expr) = &stmt.kind
+                && let hir::ExprKind::Match(_, arms) = &expr.kind
+            {
+                // Check if all match arms end with return statements
+                let all_arms_return = arms.iter().all(|arm| {
+                    if let Some(last_stmt) = arm.block.stmts.last() {
+                        matches!(last_stmt.kind, hir::StmtKind::Return(_))
+                    } else {
+                        false
                     }
+                });
+                if all_arms_return {
+                    return true;
                 }
             }
         }
-        
+
         false
     }
 
@@ -134,7 +138,7 @@ impl CodegenJS {
             }
             self.flush_statement_buffer();
             self.push_str(&lhs);
-            
+
             // Only output the completion variable reference if it's actually reachable
             if !self.should_omit_completion_var_reference(block, &completion_tmp_var) {
                 self.push_str(completion_tmp_var.as_str());

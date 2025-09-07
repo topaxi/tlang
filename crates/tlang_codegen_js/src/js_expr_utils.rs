@@ -107,9 +107,11 @@ pub fn expr_can_render_as_js_stmt(expr: &hir::Expr) -> bool {
         // Block expressions can be rendered as JavaScript statements
         hir::ExprKind::Block(block) => block_can_render_as_js_stmt_block(block),
 
+        // Loop expressions can be rendered as JavaScript statements when in statement position
+        hir::ExprKind::Loop(..) => true,
+
         // These expressions cannot be rendered as JavaScript statements
-        hir::ExprKind::Loop(..)
-        | hir::ExprKind::Break(..)
+        hir::ExprKind::Break(..)
         | hir::ExprKind::Continue
         | hir::ExprKind::Match(..)
         | hir::ExprKind::TailCall(..)

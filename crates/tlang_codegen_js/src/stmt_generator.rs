@@ -70,17 +70,17 @@ impl CodegenJS {
                 } else {
                     // Check if this is a standalone HIR temp variable reference in a function context
                     // These often become unreachable when match arms use return statements
-                    if let hir::ExprKind::Path(path) = &expr.kind {
-                        if let Some(first_segment) = path.segments.first() {
-                            let var_name = first_segment.ident.as_str();
-                            if var_name.starts_with("$hir$") && self.get_function_context().is_some() {
-                                // Skip generating standalone HIR temp variable references in functions
-                                // These are typically completion variables that became unreachable
-                                return;
-                            }
+                    if let hir::ExprKind::Path(path) = &expr.kind
+                        && let Some(first_segment) = path.segments.first()
+                    {
+                        let var_name = first_segment.ident.as_str();
+                        if var_name.starts_with("$hir$") && self.get_function_context().is_some() {
+                            // Skip generating standalone HIR temp variable references in functions
+                            // These are typically completion variables that became unreachable
+                            return;
                         }
                     }
-                    
+
                     self.push_indent();
                     self.push_context(BlockContext::Statement);
                     self.generate_expr(expr, None);
