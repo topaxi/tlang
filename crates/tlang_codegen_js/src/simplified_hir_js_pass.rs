@@ -405,7 +405,7 @@ impl SimplifiedHirJsPass {
                 let mut all_stmts = vec![temp_declaration];
                 
                 // Flatten left operand if needed
-                let (left_expr, mut left_stmts) = if !self.can_render_as_js_expr(lhs) {
+                let (left_expr, left_stmts) = if !self.can_render_as_js_expr(lhs) {
                     self.flatten_expression_to_temp_var((**lhs).clone(), ctx)
                 } else {
                     ((**lhs).clone(), vec![])
@@ -413,7 +413,7 @@ impl SimplifiedHirJsPass {
                 all_stmts.extend(left_stmts);
                 
                 // Flatten right operand if needed
-                let (right_expr, mut right_stmts) = if !self.can_render_as_js_expr(rhs) {
+                let (right_expr, right_stmts) = if !self.can_render_as_js_expr(rhs) {
                     self.flatten_expression_to_temp_var((**rhs).clone(), ctx)
                 } else {
                     ((**rhs).clone(), vec![])
@@ -464,7 +464,7 @@ impl SimplifiedHirJsPass {
                 let mut all_stmts = vec![temp_declaration];
                 
                 // Flatten left operand if needed
-                let (left_expr, mut left_stmts) = if !self.can_render_as_js_expr(lhs) {
+                let (left_expr, left_stmts) = if !self.can_render_as_js_expr(lhs) {
                     self.flatten_expression_to_temp_var((**lhs).clone(), ctx)
                 } else {
                     ((**lhs).clone(), vec![])
@@ -472,7 +472,7 @@ impl SimplifiedHirJsPass {
                 all_stmts.extend(left_stmts);
                 
                 // Flatten right operand if needed
-                let (right_expr, mut right_stmts) = if !self.can_render_as_js_expr(rhs) {
+                let (right_expr, right_stmts) = if !self.can_render_as_js_expr(rhs) {
                     self.flatten_expression_to_temp_var((**rhs).clone(), ctx)
                 } else {
                     ((**rhs).clone(), vec![])

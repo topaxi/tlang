@@ -241,22 +241,22 @@ fn test_short_circuit_operators_special_handling() {
     assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         let $hir$0: unknown = _;
+        let $hir$1: unknown = _;
         {
             let a: unknown = true;
-            ($hir$0 = a);
+            ($hir$1 = a);
         };
-        let $hir$1: unknown = _;
-        if $hir$0 {
+        if $hir$1 {
             let $hir$2: unknown = _;
             {
                 let b: unknown = false;
                 ($hir$2 = b);
             };
-            ($hir$1 = $hir$2);
+            ($hir$0 = $hir$2);
         } else {
-            ($hir$1 = $hir$0);
+            ($hir$0 = false);
         };
-        let x: unknown = $hir$1;
+        let x: unknown = $hir$0;
         return x;
     }
     ");
@@ -1315,16 +1315,16 @@ fn test_shortcut_operators_with_match_expressions() {
         let value1: unknown = Some(true);
         let value2: unknown = Some(false);
         let $hir$0: unknown = _;
+        let $hir$1: unknown = _;
         match value1 {
             Some { 0: x } => {
-                ($hir$0 = x);
+                ($hir$1 = x);
             },
             None => {
-                ($hir$0 = false);
+                ($hir$1 = false);
             },
         };
-        let $hir$1: unknown = _;
-        if $hir$0 {
+        if $hir$1 {
             let $hir$2: unknown = _;
             match value2 {
                 Some { 0: y } => {
@@ -1334,11 +1334,11 @@ fn test_shortcut_operators_with_match_expressions() {
                     ($hir$2 = true);
                 },
             };
-            ($hir$1 = $hir$2);
+            ($hir$0 = $hir$2);
         } else {
-            ($hir$1 = $hir$0);
+            ($hir$0 = false);
         };
-        let result: unknown = $hir$1;
+        let result: unknown = $hir$0;
         return result;
     }
     ");
@@ -1362,22 +1362,22 @@ fn test_shortcut_operators_with_block_expressions() {
     assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         let $hir$0: unknown = _;
+        let $hir$1: unknown = _;
         {
             let x: unknown = 5;
-            ($hir$0 = (x > 3));
+            ($hir$1 = (x > 3));
         };
-        let $hir$1: unknown = _;
-        if $hir$0 {
-            ($hir$1 = $hir$0);
+        if $hir$1 {
+            ($hir$0 = $hir$1);
         } else {
             let $hir$2: unknown = _;
             {
                 let y: unknown = 2;
                 ($hir$2 = (y < 1));
             };
-            ($hir$1 = $hir$2);
+            ($hir$0 = $hir$2);
         };
-        let result: unknown = $hir$1;
+        let result: unknown = $hir$0;
         return result;
     }
     ");
@@ -2145,4 +2145,137 @@ fn test_isolated_for_loop_structure() {
         };
     }
     "###);
+}
+
+#[test]
+fn test_simple_and_operator_with_literals() {
+    let source = r#"
+        fn main() {
+            let result = true && false;
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r"
+    fn main() -> unknown {
+        let result: unknown = (true && false);
+        return result;
+    }
+    ");
+}
+
+#[test]
+fn test_simple_or_operator_with_literals() {
+    let source = r#"
+        fn main() {
+            let result = false || true;
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r"
+    fn main() -> unknown {
+        let result: unknown = (false || true);
+        return result;
+    }
+    ");
+}
+
+#[test]
+fn test_nested_short_circuit_operators() {
+    let source = r#"
+        fn main() {
+            let result = (true && false) || (false && true);
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r"
+    fn main() -> unknown {
+        let result: unknown = ((true && false) || (false && true));
+        return result;
+    }
+    ");
+}
+
+#[test]
+fn test_short_circuit_with_function_calls() {
+    let source = r#"
+        fn check1() { true }
+        fn check2() { false }
+        fn main() {
+            let result = check1() && check2();
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r"
+    fn check1() -> unknown {
+        return true;
+    }
+    fn check2() -> unknown {
+        return false;
+    }
+    fn main() -> unknown {
+        let result: unknown = (check1() && check2());
+        return result;
+    }
+    ");
+}
+
+#[test]
+fn test_short_circuit_in_if_condition() {
+    let source = r#"
+        fn main() {
+            if true && false {
+                log("yes");
+            } else {
+                log("no");
+            };
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r###"
+    fn main() -> unknown {
+        if (true && false) {
+            log("yes");
+        } else {
+            log("no");
+        };
+    }
+    "###);
+}
+
+#[test]
+fn test_short_circuit_with_break_expressions() {
+    let source = r#"
+        fn main() {
+            let result = loop {
+                let check = (break true) && false;
+                check
+            };
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r"
+    fn main() -> unknown {
+        let $hir$0: unknown = _;
+        loop {
+            let $hir$1: unknown = _;
+            let $hir$2: unknown = _;
+            ($hir$2 = true);
+            break;
+            if $hir$2 {
+                ($hir$1 = false);
+            } else {
+                ($hir$1 = false);
+            };
+            let check: unknown = $hir$1;
+            check
+        };
+        let result: unknown = $hir$0;
+        return result;
+    }
+    ");
 }
