@@ -284,13 +284,11 @@ impl SimplifiedHirJsPass {
             hir::ExprKind::Loop(..) => {
                 // For loop expressions, inline the transformation instead of using transform_loop_expression
                 // We need to handle the break statements and make the loop a statement
-                let loop_temp_name = self.generate_temp_var_name();
-                let span = expr.span;
-
+                
                 // Transform the loop body to assign to temp variable on break
                 let mut transformed_loop = expr.clone();
                 if let hir::ExprKind::Loop(body) = &mut transformed_loop.kind {
-                    self.transform_break_statements_in_block(body, &loop_temp_name, ctx);
+                    self.transform_break_statements_in_block(body, &temp_name, ctx);
                 }
 
                 // Create loop statement (not assigned to anything)
@@ -507,73 +505,41 @@ impl SimplifiedHirJsPass {
             hir::ExprKind::Binary(_op_kind, lhs, rhs) => {
                 // Process left operand
                 if !self.can_render_as_js_expr(lhs) && !self.contains_temp_variables(lhs) {
-                    // Skip break/continue expressions - they should not be flattened to temp variables
-                    match &lhs.kind {
-                        hir::ExprKind::Break(..) | hir::ExprKind::Continue => {
-                            // Leave break/continue expressions as-is
-                        }
-                        _ => {
-                            let (flattened_expr, mut temp_stmts) =
-                                self.flatten_expression_to_temp_var((**lhs).clone(), ctx);
-                            additional_stmts.append(&mut temp_stmts);
-                            **lhs = flattened_expr;
-                            self.changes_made = true;
-                        }
-                    }
+                    let (flattened_expr, mut temp_stmts) =
+                        self.flatten_expression_to_temp_var((**lhs).clone(), ctx);
+                    additional_stmts.append(&mut temp_stmts);
+                    **lhs = flattened_expr;
+                    self.changes_made = true;
                 }
 
                 // Process right operand
                 if !self.can_render_as_js_expr(rhs) && !self.contains_temp_variables(rhs) {
-                    // Skip break/continue expressions - they should not be flattened to temp variables
-                    match &rhs.kind {
-                        hir::ExprKind::Break(..) | hir::ExprKind::Continue => {
-                            // Leave break/continue expressions as-is
-                        }
-                        _ => {
-                            let (flattened_expr, mut temp_stmts) =
-                                self.flatten_expression_to_temp_var((**rhs).clone(), ctx);
-                            additional_stmts.append(&mut temp_stmts);
-                            **rhs = flattened_expr;
-                            self.changes_made = true;
-                        }
-                    }
+                    let (flattened_expr, mut temp_stmts) =
+                        self.flatten_expression_to_temp_var((**rhs).clone(), ctx);
+                    additional_stmts.append(&mut temp_stmts);
+                    **rhs = flattened_expr;
+                    self.changes_made = true;
                 }
             }
             hir::ExprKind::Unary(_, operand) => {
                 // Process operand
                 if !self.can_render_as_js_expr(operand) && !self.contains_temp_variables(operand) {
-                    // Skip break/continue expressions - they should not be flattened to temp variables
-                    match &operand.kind {
-                        hir::ExprKind::Break(..) | hir::ExprKind::Continue => {
-                            // Leave break/continue expressions as-is
-                        }
-                        _ => {
-                            let (flattened_expr, mut temp_stmts) =
-                                self.flatten_expression_to_temp_var((**operand).clone(), ctx);
-                            additional_stmts.append(&mut temp_stmts);
-                            **operand = flattened_expr;
-                            self.changes_made = true;
-                        }
-                    }
+                    let (flattened_expr, mut temp_stmts) =
+                        self.flatten_expression_to_temp_var((**operand).clone(), ctx);
+                    additional_stmts.append(&mut temp_stmts);
+                    **operand = flattened_expr;
+                    self.changes_made = true;
                 }
             }
             hir::ExprKind::Call(call) => {
                 // Process function call arguments
                 for arg in &mut call.arguments {
                     if !self.can_render_as_js_expr(arg) && !self.contains_temp_variables(arg) {
-                        // Skip break/continue expressions - they should not be flattened to temp variables
-                        match &arg.kind {
-                            hir::ExprKind::Break(..) | hir::ExprKind::Continue => {
-                                // Leave break/continue expressions as-is
-                            }
-                            _ => {
-                                let (flattened_expr, mut temp_stmts) =
-                                    self.flatten_expression_to_temp_var(arg.clone(), ctx);
-                                additional_stmts.append(&mut temp_stmts);
-                                *arg = flattened_expr;
-                                self.changes_made = true;
-                            }
-                        }
+                        let (flattened_expr, mut temp_stmts) =
+                            self.flatten_expression_to_temp_var(arg.clone(), ctx);
+                        additional_stmts.append(&mut temp_stmts);
+                        *arg = flattened_expr;
+                        self.changes_made = true;
                     }
                 }
             }
@@ -583,19 +549,11 @@ impl SimplifiedHirJsPass {
                     if !self.can_render_as_js_expr(element)
                         && !self.contains_temp_variables(element)
                     {
-                        // Skip break/continue expressions - they should not be flattened to temp variables
-                        match &element.kind {
-                            hir::ExprKind::Break(..) | hir::ExprKind::Continue => {
-                                // Leave break/continue expressions as-is
-                            }
-                            _ => {
-                                let (flattened_expr, mut temp_stmts) =
-                                    self.flatten_expression_to_temp_var(element.clone(), ctx);
-                                additional_stmts.append(&mut temp_stmts);
-                                *element = flattened_expr;
-                                self.changes_made = true;
-                            }
-                        }
+                        let (flattened_expr, mut temp_stmts) =
+                            self.flatten_expression_to_temp_var(element.clone(), ctx);
+                        additional_stmts.append(&mut temp_stmts);
+                        *element = flattened_expr;
+                        self.changes_made = true;
                     }
                 }
             }
