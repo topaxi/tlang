@@ -5,7 +5,6 @@ use tlang_hir::hir;
 use tlang_hir_opt::{HirOptContext, HirPass};
 use tlang_hir_pretty::HirPrettyOptions;
 use tlang_parser::Parser;
-use tlang_codegen_js::{return_statement_pass::ReturnStatementPass, simplified_hir_js_pass::SimplifiedHirJsPass};
 use tlang_semantics::SemanticAnalyzer;
 
 #[ctor::ctor]
@@ -50,14 +49,6 @@ fn compile_and_apply_hir_js_pass_debug(source: &str) -> (hir::Module, hir::Modul
     let mut hir_js_opt_group = create_hir_js_opt_group();
     hir_js_opt_group.optimize_hir(&mut module, &mut ctx);
     (module_before, module)
-}
-
-fn compile_and_apply_return_pass_only(source: &str) -> hir::Module {
-    let (mut module, meta) = compile(source);
-    let mut ctx = HirOptContext::from(meta);
-    let mut return_pass = ReturnStatementPass::new();
-    return_pass.optimize_hir(&mut module, &mut ctx);
-    module
 }
 
 fn pretty_print(module: &hir::Module) -> String {
@@ -1601,11 +1592,13 @@ fn test_continue_expression_in_let_statement() {
     let hir = compile_and_apply_hir_js_pass(source);
     assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
+        let $hir$0: unknown = _;
         loop {
             continue;
             let x: unknown = _;
             x
         };
+        $hir$0;
     }
     ");
 }
@@ -2140,52 +2133,3 @@ fn test_isolated_for_loop_structure() {
 }
 
 
-#[test]
-fn test_debug_continue_return_pass_only() {
-    let source = r#"
-        fn main() {
-            loop {
-                let x = continue;
-                x
-            };
-        }
-    "#;
-    let hir = compile_and_apply_return_pass_only(source);
-    println!("=== AFTER RETURN STATEMENT PASS ONLY ===");
-    println!("{}", pretty_print(&hir));
-}
-
-
-#[test]
-fn test_debug_continue_simple_js_pass_only() {
-    let source = r#"
-        fn main() {
-            loop {
-                let x = continue;
-                x
-            };
-        }
-    "#;
-    let (mut module, meta) = compile(source);
-    let mut ctx = HirOptContext::from(meta);
-    let mut simplified_pass = SimplifiedHirJsPass::new();
-    simplified_pass.optimize_hir(&mut module, &mut ctx);
-    println!("=== AFTER SIMPLIFIED HIR JS PASS ONLY ===");
-    println!("{}", pretty_print(&module));
-}
-
-
-#[test]
-fn test_debug_continue_original_hir() {
-    let source = r#"
-        fn main() {
-            loop {
-                let x = continue;
-                x
-            };
-        }
-    "#;
-    let (module, _meta) = compile(source);
-    println!("=== ORIGINAL HIR ===");
-    println!("{}", pretty_print(&module));
-}
