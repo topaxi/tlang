@@ -204,6 +204,18 @@ impl SimplifiedHirJsPass {
                 let dummy_temp_ref = self.create_temp_var_path(ctx, &temp_name, span);
                 (dummy_temp_ref, vec![plain_break])
             }
+            hir::ExprKind::Continue => {
+                // For continue expressions, just create the continue statement
+                let plain_continue = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(expr)),
+                    span,
+                );
+                
+                // Return a dummy temp ref (won't be used) and no temp declaration
+                let dummy_temp_ref = self.create_temp_var_path(ctx, &temp_name, span);
+                (dummy_temp_ref, vec![plain_continue])
+            }
             _ => {
                 // For simple expressions, create assignment statement
                 let assignment_stmt = self.create_assignment_stmt(ctx, &temp_name, expr, span);
