@@ -1450,26 +1450,18 @@ impl HirPass for SimplifiedHirJsPass {
     }
 
     fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
-        // For functions with only match expressions with all return statements, 
-        // we only need one iteration to avoid temp variable accumulation
+        // Simple approach: only run one iteration to fix temp variable accumulation issue
+        // that was caused by statement buffer removal from codegen
         
+        if self.iteration_count > 0 {
+            return false;
+        }
+        
+        self.iteration_count += 1;
         self.changes_made = false;
         self.visit_module(module, ctx);
         
-        // Only return true for the first change to avoid multiple iterations
-        // for simple cases like match expressions with all return statements
-        if self.iteration_count == 0 && self.changes_made {
-            self.iteration_count += 1;
-            return true;
-        }
-        
-        // For complex cases that need multiple iterations
-        const MAX_ITERATIONS: usize = 5;
-        if self.iteration_count < MAX_ITERATIONS && self.changes_made {
-            self.iteration_count += 1;
-            return true;
-        }
-        
+        // Don't return changes_made to prevent additional iterations that create extra temp vars
         false
     }
 }
