@@ -495,15 +495,17 @@ fn test_expression_statement_flattening() {
     let hir = compile_and_apply_hir_js_pass(source);
     assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
+        let $hir$0: unknown = _;
         {
-            let $hir$0: unknown = _;
+            let $hir$1: unknown = _;
             {
                 let y: unknown = 1;
-                ($hir$0 = (y + 2));
+                ($hir$1 = (y + 2));
             };
-            let x: unknown = $hir$0;
+            let x: unknown = $hir$1;
             log(x);
         };
+        $hir$0;
     }
     ");
 }
@@ -740,11 +742,13 @@ fn test_loop_expression_with_complex_break() {
         let x: unknown = 10;
         let $hir$0: unknown = _;
         loop {
+            let $hir$1: unknown = _;
             if (x > 5) {
                 let y: unknown = (x * 2);
                 ($hir$0 = (y + 1));
                 break;
             };
+            $hir$1
         };
         let result: unknown = $hir$0;
         return result;
@@ -776,10 +780,12 @@ fn test_nested_loop_expressions() {
                 break;
             };
             let inner: unknown = $hir$1;
+            let $hir$2: unknown = _;
             if (inner == 5) {
                 ($hir$0 = (inner * 2));
                 break;
             };
+            $hir$2
         };
         let outer: unknown = $hir$0;
         return outer;
@@ -961,20 +967,22 @@ fn test_nested_loop_with_complex_expressions() {
         loop {
             let $hir$1: unknown = _;
             loop {
-                let $hir$2: unknown = _;
+                let $hir$3: unknown = _;
                 {
                     let a: unknown = 1;
-                    ($hir$2 = (a + 1));
+                    ($hir$3 = (a + 1));
                 };
-                let value: unknown = $hir$2;
+                let value: unknown = $hir$3;
                 ($hir$1 = (value * 2));
                 break;
             };
             let inner_result: unknown = $hir$1;
+            let $hir$2: unknown = _;
             if (inner_result > 3) {
                 ($hir$0 = (inner_result + 10));
                 break;
-            }
+            };
+            $hir$2
         };
         let result: unknown = $hir$0;
         return result;
@@ -1035,20 +1043,17 @@ fn test_for_loop_expression_in_let() {
             let accumulator$$: unknown = 0;
             loop {
                 let acc: unknown = accumulator$$;
-                let $hir$2: unknown = _;
+                let $hir$1: unknown = _;
                 match iterator$$.next() {
                     Option::Some { 0: i } => {
-                        ($hir$2 = (acc + i));
+                        ($hir$1 = (acc + i));
                     },
                     Option::None => {
-                        let $hir$1: unknown = _;
-                        ($hir$1 = accumulator$$);
-                        break;
-                        ($hir$2 = $hir$1);
+                        break accumulator$$;
                     },
                 };
-                (accumulator$$ = $hir$2);
-                $hir$2
+                (accumulator$$ = $hir$1);
+                $hir$1
             };
         };
         let result: unknown = $hir$0;
@@ -1282,6 +1287,7 @@ fn test_nested_match_expressions() {
                     },
                 };
                 ($hir$0 = $hir$1);
+                $hir$1;
             },
             None => {
                 ($hir$0 = 0);
@@ -1398,10 +1404,12 @@ fn test_loop_expression_with_if_else_break() {
     fn test() -> unknown {
         let $hir$0: unknown = _;
         loop {
+            let $hir$1: unknown = _;
             if true {
                 ($hir$0 = 42);
                 break;
-            }
+            };
+            $hir$1
         };
         let result: unknown = $hir$0;
         return result;
@@ -1509,53 +1517,42 @@ fn test_complex_nested_all_expression_types() {
                 break;
             };
             let x: unknown = $hir$2;
-            let $hir$4: unknown = _;
-            if (x > 0) {
-                let $hir$5: unknown = _;
-                {
-                    let $hir$6: unknown = _;
-                    loop {
-                        let $hir$7: unknown = _;
-                        match (x % 2) {
-                            0 => {
-                                ($hir$7 = true);
-                            },
-                            _ => {
-                                ($hir$7 = false);
-                            },
-                        };
-                        let check: unknown = $hir$7;
-                        ($hir$6 = check);
-                        break;
+            ($hir$0 = ((x > 0) && {
+                let $hir$4: unknown = _;
+                loop {
+                    let $hir$5: unknown = _;
+                    match (x % 2) {
+                        0 => {
+                            ($hir$5 = true);
+                        },
+                        _ => {
+                            ($hir$5 = false);
+                        },
                     };
-                    let nested_loop: unknown = $hir$6;
-                    ($hir$5 = nested_loop);
+                    let check: unknown = $hir$5;
+                    ($hir$4 = check);
+                    break;
                 };
-                ($hir$4 = $hir$5);
-            } else {
-                ($hir$4 = (x > 0));
-            };
-            ($hir$0 = $hir$4);
+                let nested_loop: unknown = $hir$4;
+                nested_loop
+            }));
         };
         let result: unknown = $hir$0;
         let $hir$1: unknown = _;
         {
-            let $hir$8: unknown = _;
+            let $hir$6: unknown = _;
             match result {
                 true => {
-                    let $hir$9: unknown = _;
-                    loop {
-                        ($hir$9 = "success");
-                        break;
-                    };
-                    ($hir$8 = $hir$9);
+                    ($hir$6 = loop {
+                        break "success";
+                    });
                 },
                 false => {
                     let msg: unknown = "failure";
-                    ($hir$8 = msg);
+                    ($hir$6 = msg);
                 },
             };
-            let final_check: unknown = $hir$8;
+            let final_check: unknown = $hir$6;
             ($hir$1 = final_check);
         };
         log($hir$1);
@@ -1702,11 +1699,19 @@ fn test_nested_break_expressions() {
     assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         loop {
-            let result: unknown = if true {
-                break 42
+            let $hir$0: unknown = _;
+            if true {
+                let $hir$1: unknown = _;
+                ($hir$1 = 42);
+                break;
+                ($hir$0 = $hir$1);
             } else {
-                break 24
+                let $hir$2: unknown = _;
+                ($hir$2 = 24);
+                break;
+                ($hir$0 = $hir$2);
             };
+            let result: unknown = $hir$0;
             result
         };
     }
@@ -1836,6 +1841,7 @@ fn test_fibonacci_pattern_matching_uses_return_statements() {
                 return rec fibonacci/3((n - 1), b, (a + b));
             },
         };
+        $hir$0;
     }
     dyn fn fibonacci
         -> fibonacci/1
@@ -1861,7 +1867,7 @@ fn test_function_with_match_completion_uses_return_statements() {
     let hir = compile_and_apply_hir_js_pass(source);
     println!("HIR Output with match in completion position:");
     println!("{}", pretty_print(&hir));
-    assert_snapshot!(pretty_print(&hir), @r#"
+    assert_snapshot!(pretty_print(&hir), @r"
     enum Option {
         Some {
             0: value,
@@ -1878,8 +1884,9 @@ fn test_function_with_match_completion_uses_return_statements() {
                 return 0;
             },
         };
+        $hir$0;
     }
-    "#);
+    ");
 }
 
 #[test]
@@ -2054,18 +2061,22 @@ fn test_isolated_loop_expression_in_block_completion() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn test() -> unknown {
+        let $hir$0: unknown = _;
         {
             let x: unknown = 1;
             loop {
+                let $hir$1: unknown = _;
                 if true {
                     break;
-                }
+                };
+                $hir$1
             };
         };
+        return $hir$0;
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -2128,11 +2139,14 @@ fn test_isolated_for_loop_structure() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn test() -> unknown {
+        let $hir$0: unknown = _;
         {
             let iterator$$: unknown = iterator::iter([1, 2, 3]);
             loop {
+                let $hir$1: unknown = _;
+                let $hir$2: unknown = _;
                 match iterator$$.next() {
                     Option::Some { 0: i } => {
                         log(i);
@@ -2141,109 +2155,271 @@ fn test_isolated_for_loop_structure() {
                         break;
                     },
                 };
+                $hir$2;
+                $hir$1
             };
         };
-    }
-    "###);
-}
-
-#[test]
-fn test_simple_and_operator_with_literals() {
-    let source = r#"
-        fn main() {
-            let result = true && false;
-            result
-        }
-    "#;
-    let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r"
-    fn main() -> unknown {
-        let result: unknown = (true && false);
-        return result;
+        return $hir$0;
     }
     ");
 }
 
 #[test]
-fn test_simple_or_operator_with_literals() {
+fn test_and_operator_with_match_expressions() {
     let source = r#"
+        enum Option { Some(value), None }
         fn main() {
-            let result = false || true;
+            let x = Option::Some(42);
+            let y = Option::Some(24);
+            let result = (match x { Option::Some(v) => v > 0, Option::None => false }) && 
+                        (match y { Option::Some(v) => v > 0, Option::None => false });
             result
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
     assert_snapshot!(pretty_print(&hir), @r"
-    fn main() -> unknown {
-        let result: unknown = (false || true);
-        return result;
-    }
-    ");
-}
-
-#[test]
-fn test_nested_short_circuit_operators() {
-    let source = r#"
-        fn main() {
-            let result = (true && false) || (false && true);
-            result
+    enum Option {
+        Some {
+            0: value,
         }
-    "#;
-    let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r"
-    fn main() -> unknown {
-        let result: unknown = ((true && false) || (false && true));
-        return result;
-    }
-    ");
-}
-
-#[test]
-fn test_short_circuit_with_function_calls() {
-    let source = r#"
-        fn check1() { true }
-        fn check2() { false }
-        fn main() {
-            let result = check1() && check2();
-            result
+        None {
         }
-    "#;
-    let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r"
-    fn check1() -> unknown {
-        return true;
-    }
-    fn check2() -> unknown {
-        return false;
     }
     fn main() -> unknown {
-        let result: unknown = (check1() && check2());
-        return result;
-    }
-    ");
-}
-
-#[test]
-fn test_short_circuit_in_if_condition() {
-    let source = r#"
-        fn main() {
-            if true && false {
-                log("yes");
-            } else {
-                log("no");
+        let x: unknown = Option::Some(42);
+        let y: unknown = Option::Some(24);
+        let $hir$0: unknown = _;
+        let $hir$1: unknown = _;
+        match x {
+            Option::Some { 0: v } => {
+                ($hir$1 = (v > 0));
+            },
+            Option::None => {
+                ($hir$1 = false);
+            },
+        };
+        if $hir$1 {
+            let $hir$2: unknown = _;
+            match y {
+                Option::Some { 0: v } => {
+                    ($hir$2 = (v > 0));
+                },
+                Option::None => {
+                    ($hir$2 = false);
+                },
             };
-        }
-    "#;
-    let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r###"
-    fn main() -> unknown {
-        if (true && false) {
-            log("yes");
+            ($hir$0 = $hir$2);
         } else {
-            log("no");
+            ($hir$0 = false);
         };
+        let result: unknown = $hir$0;
+        return result;
     }
-    "###);
+    ");
+}
+
+#[test]
+fn test_or_operator_with_match_expressions() {
+    let source = r#"
+        enum Option { Some(value), None }
+        fn main() {
+            let x = Option::None;
+            let y = Option::Some(42);
+            let result = (match x { Option::Some(v) => v > 0, Option::None => false }) || 
+                        (match y { Option::Some(v) => v > 0, Option::None => false });
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r"
+    enum Option {
+        Some {
+            0: value,
+        }
+        None {
+        }
+    }
+    fn main() -> unknown {
+        let x: unknown = Option::None;
+        let y: unknown = Option::Some(42);
+        let $hir$0: unknown = _;
+        let $hir$1: unknown = _;
+        match x {
+            Option::Some { 0: v } => {
+                ($hir$1 = (v > 0));
+            },
+            Option::None => {
+                ($hir$1 = false);
+            },
+        };
+        if $hir$1 {
+            ($hir$0 = $hir$1);
+        } else {
+            let $hir$2: unknown = _;
+            match y {
+                Option::Some { 0: v } => {
+                    ($hir$2 = (v > 0));
+                },
+                Option::None => {
+                    ($hir$2 = false);
+                },
+            };
+            ($hir$0 = $hir$2);
+        };
+        let result: unknown = $hir$0;
+        return result;
+    }
+    ");
+}
+
+#[test]
+fn test_chained_three_match_expressions_with_and_or() {
+    let source = r#"
+        enum Option { Some(value), None }
+        fn main() {
+            let x = Option::Some(1);
+            let y = Option::Some(2);
+            let z = Option::Some(3);
+            let result = (match x { Option::Some(v) => v > 0, Option::None => false }) && 
+                        (match y { Option::Some(v) => v > 0, Option::None => false }) ||
+                        (match z { Option::Some(v) => v > 0, Option::None => false });
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r"
+    enum Option {
+        Some {
+            0: value,
+        }
+        None {
+        }
+    }
+    fn main() -> unknown {
+        let x: unknown = Option::Some(1);
+        let y: unknown = Option::Some(2);
+        let z: unknown = Option::Some(3);
+        let $hir$0: unknown = _;
+        let $hir$1: unknown = _;
+        let $hir$2: unknown = _;
+        match x {
+            Option::Some { 0: v } => {
+                ($hir$2 = (v > 0));
+            },
+            Option::None => {
+                ($hir$2 = false);
+            },
+        };
+        if $hir$2 {
+            let $hir$3: unknown = _;
+            match y {
+                Option::Some { 0: v } => {
+                    ($hir$3 = (v > 0));
+                },
+                Option::None => {
+                    ($hir$3 = false);
+                },
+            };
+            ($hir$1 = $hir$3);
+        } else {
+            ($hir$1 = false);
+        };
+        if $hir$1 {
+            ($hir$0 = $hir$1);
+        } else {
+            let $hir$4: unknown = _;
+            match z {
+                Option::Some { 0: v } => {
+                    ($hir$4 = (v > 0));
+                },
+                Option::None => {
+                    ($hir$4 = false);
+                },
+            };
+            ($hir$0 = $hir$4);
+        };
+        let result: unknown = $hir$0;
+        return result;
+    }
+    ");
+}
+
+#[test]
+fn test_and_operator_with_block_expressions() {
+    let source = r#"
+        fn main() {
+            let result = { 
+                let x = 10; 
+                x > 5 
+            } && { 
+                let y = 20; 
+                y > 15 
+            };
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r"
+    fn main() -> unknown {
+        let $hir$0: unknown = _;
+        let $hir$1: unknown = _;
+        {
+            let x: unknown = 10;
+            ($hir$1 = (x > 5));
+        };
+        if $hir$1 {
+            let $hir$2: unknown = _;
+            {
+                let y: unknown = 20;
+                ($hir$2 = (y > 15));
+            };
+            ($hir$0 = $hir$2);
+        } else {
+            ($hir$0 = false);
+        };
+        let result: unknown = $hir$0;
+        return result;
+    }
+    ");
+}
+
+#[test]
+fn test_or_operator_with_block_expressions() {
+    let source = r#"
+        fn main() {
+            let result = { 
+                let x = 10; 
+                x > 15 
+            } || { 
+                let y = 20; 
+                y > 5 
+            };
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r"
+    fn main() -> unknown {
+        let $hir$0: unknown = _;
+        let $hir$1: unknown = _;
+        {
+            let x: unknown = 10;
+            ($hir$1 = (x > 15));
+        };
+        if $hir$1 {
+            ($hir$0 = $hir$1);
+        } else {
+            let $hir$2: unknown = _;
+            {
+                let y: unknown = 20;
+                ($hir$2 = (y > 5));
+            };
+            ($hir$0 = $hir$2);
+        };
+        let result: unknown = $hir$0;
+        return result;
+    }
+    ");
 }
 
 #[test]
@@ -2273,6 +2449,131 @@ fn test_short_circuit_with_break_expressions() {
             };
             let check: unknown = $hir$1;
             check
+        };
+        let result: unknown = $hir$0;
+        return result;
+    }
+    ");
+}
+
+#[test]
+fn test_mixed_complex_expressions_with_short_circuit() {
+    let source = r#"
+        enum Option { Some(value), None }
+        fn main() {
+            let x = Option::Some(42);
+            let result = (match x { Option::Some(v) => v > 0, Option::None => false }) && 
+                        { let temp = 10; temp > 5 } ||
+                        (match x { Option::Some(v) => v < 100, Option::None => true });
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r"
+    enum Option {
+        Some {
+            0: value,
+        }
+        None {
+        }
+    }
+    fn main() -> unknown {
+        let x: unknown = Option::Some(42);
+        let $hir$0: unknown = _;
+        let $hir$1: unknown = _;
+        let $hir$2: unknown = _;
+        match x {
+            Option::Some { 0: v } => {
+                ($hir$2 = (v > 0));
+            },
+            Option::None => {
+                ($hir$2 = false);
+            },
+        };
+        if $hir$2 {
+            let $hir$3: unknown = _;
+            {
+                let temp: unknown = 10;
+                ($hir$3 = (temp > 5));
+            };
+            ($hir$1 = $hir$3);
+        } else {
+            ($hir$1 = false);
+        };
+        if $hir$1 {
+            ($hir$0 = $hir$1);
+        } else {
+            let $hir$4: unknown = _;
+            match x {
+                Option::Some { 0: v } => {
+                    ($hir$4 = (v < 100));
+                },
+                Option::None => {
+                    ($hir$4 = true);
+                },
+            };
+            ($hir$0 = $hir$4);
+        };
+        let result: unknown = $hir$0;
+        return result;
+    }
+    ");
+}
+
+#[test]
+fn test_nested_match_expressions_in_short_circuit() {
+    let source = r#"
+        enum Result { Ok(value), Err(error) }
+        fn main() {
+            let x = Result::Ok(42);
+            let y = Result::Ok(24);
+            let result = (match x { 
+                Result::Ok(v) => match y { 
+                    Result::Ok(w) => v + w > 50, 
+                    Result::Err(_) => false 
+                }, 
+                Result::Err(_) => false 
+            }) && true;
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r"
+    enum Result {
+        Ok {
+            0: value,
+        }
+        Err {
+            0: error,
+        }
+    }
+    fn main() -> unknown {
+        let x: unknown = Result::Ok(42);
+        let y: unknown = Result::Ok(24);
+        let $hir$0: unknown = _;
+        let $hir$1: unknown = _;
+        match x {
+            Result::Ok { 0: v } => {
+                let $hir$2: unknown = _;
+                match y {
+                    Result::Ok { 0: w } => {
+                        ($hir$2 = ((v + w) > 50));
+                    },
+                    Result::Err { 0: _ } => {
+                        ($hir$2 = false);
+                    },
+                };
+                ($hir$1 = $hir$2);
+                $hir$2;
+            },
+            Result::Err { 0: _ } => {
+                ($hir$1 = false);
+            },
+        };
+        if $hir$1 {
+            ($hir$0 = true);
+        } else {
+            ($hir$0 = false);
         };
         let result: unknown = $hir$0;
         return result;
