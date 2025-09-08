@@ -131,6 +131,25 @@ impl SimplifiedHirJsPass {
         false
     }
 
+    /// Check if a block contains return statements
+    fn block_has_return_statements(&self, block: &hir::Block) -> bool {
+        // Check statements
+        for stmt in &block.stmts {
+            if self.stmt_has_return(stmt) {
+                return true;
+            }
+        }
+
+        // Check completion expression
+        if let Some(expr) = &block.expr {
+            if self.expr_has_return(expr) {
+                return true;
+            }
+        }
+
+        false
+    }
+
     /// Check if a statement contains break expressions with values
     fn stmt_has_break_with_value(&self, stmt: &hir::Stmt) -> bool {
         match &stmt.kind {
@@ -165,6 +184,43 @@ impl SimplifiedHirJsPass {
             hir::ExprKind::FieldAccess(obj, _) => self.expr_has_break_with_value(obj),
             hir::ExprKind::IndexAccess(obj, index) => {
                 self.expr_has_break_with_value(obj) || self.expr_has_break_with_value(index)
+            }
+            _ => false,
+        }
+    }
+
+    /// Check if a statement contains return statements
+    fn stmt_has_return(&self, stmt: &hir::Stmt) -> bool {
+        match &stmt.kind {
+            hir::StmtKind::Return(_) => true,
+            hir::StmtKind::Expr(expr) => self.expr_has_return(expr),
+            hir::StmtKind::Let(_, expr, _) => self.expr_has_return(expr),
+            _ => false,
+        }
+    }
+
+    /// Check if an expression contains return statements
+    fn expr_has_return(&self, expr: &hir::Expr) -> bool {
+        match &expr.kind {
+            hir::ExprKind::Block(block) => self.block_has_return_statements(block),
+            hir::ExprKind::IfElse(cond, then_branch, else_branches) => {
+                self.expr_has_return(cond)
+                    || self.block_has_return_statements(then_branch)
+                    || else_branches.iter().any(|clause| self.block_has_return_statements(&clause.consequence))
+            }
+            hir::ExprKind::Match(scrutinee, arms) => {
+                self.expr_has_return(scrutinee)
+                    || arms.iter().any(|arm| self.block_has_return_statements(&arm.block))
+            }
+            hir::ExprKind::Binary(_, lhs, rhs) => {
+                self.expr_has_return(lhs) || self.expr_has_return(rhs)
+            }
+            hir::ExprKind::Unary(_, operand) => self.expr_has_return(operand),
+            hir::ExprKind::Call(call) => call.arguments.iter().any(|arg| self.expr_has_return(arg)),
+            hir::ExprKind::List(elements) => elements.iter().any(|elem| self.expr_has_return(elem)),
+            hir::ExprKind::FieldAccess(obj, _) => self.expr_has_return(obj),
+            hir::ExprKind::IndexAccess(obj, index) => {
+                self.expr_has_return(obj) || self.expr_has_return(index)
             }
             _ => false,
         }
@@ -903,10 +959,29 @@ impl SimplifiedHirJsPass {
                     );
                     block_stmts.push(loop_stmt);
                 } else {
-                    // For other expressions, create assignment as before
-                    let assignment_stmt =
-                        self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
-                    block_stmts.push(assignment_stmt);
+                    // Check if the block has return statements that would make the completion assignment unreachable
+                    let block_ref = hir::Block::new(
+                        ctx.hir_id_allocator.next_id(),
+                        block_stmts.clone(),
+                        Some(completion_expr.clone()),
+                        span,
+                    );
+                    
+                    if self.block_has_return_statements(&block_ref) {
+                        // Block has return statements, so completion expression assignment would be stray
+                        // Just add the completion expression as a statement without assignment
+                        let expr_stmt = hir::Stmt::new(
+                            ctx.hir_id_allocator.next_id(),
+                            hir::StmtKind::Expr(Box::new(completion_expr)),
+                            span,
+                        );
+                        block_stmts.push(expr_stmt);
+                    } else {
+                        // No return statements, create assignment as before
+                        let assignment_stmt =
+                            self.create_assignment_stmt(ctx, temp_name, completion_expr, span);
+                        block_stmts.push(assignment_stmt);
+                    }
                 }
             }
 
