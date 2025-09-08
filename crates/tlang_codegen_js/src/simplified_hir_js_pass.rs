@@ -1135,8 +1135,8 @@ impl SimplifiedHirJsPass {
                 if !expr_can_render_as_assignment_rhs(expr) {
                     // For complex expressions in let statements, flatten them
                     if let hir::ExprKind::Loop(..) = &expr.kind {
-                        // Check if this loop has break statements with values or temp assignments from break values
-                        if self.loop_has_break_with_value(expr) || self.contains_temp_variables(expr) {
+                        // Check if this loop has break statements with values but hasn't been transformed yet
+                        if self.loop_has_break_with_value(expr) && !self.contains_temp_variables(expr) {
                             // Special handling for loop expressions with break values - they need temp variables
                             // to capture the break value as the "return" value of the loop
                             let temp_name = self.generate_temp_var_name();
@@ -1290,8 +1290,8 @@ impl SimplifiedHirJsPass {
                     }
 
                     if let hir::ExprKind::Loop(..) = &expr.kind {
-                        // Check if this loop has break statements with values or temp assignments from break values
-                        if self.loop_has_break_with_value(expr) || self.contains_temp_variables(expr) {
+                        // Check if this loop has break statements with values but hasn't been transformed yet
+                        if self.loop_has_break_with_value(expr) && !self.contains_temp_variables(expr) {
                             // Special handling for loop expressions with break values in return statements
                             let temp_name = self.generate_temp_var_name();
                             let span = expr.span;
@@ -1363,9 +1363,11 @@ impl HirPass for SimplifiedHirJsPass {
     }
 
     fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
+        // Conservative approach: only run one iteration to prevent infinite loops
         self.changes_made = false;
         self.visit_module(module, ctx);
-        self.changes_made
+        // Return false to prevent additional iterations by the optimizer
+        false
     }
 }
 
@@ -1392,8 +1394,8 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
             if let hir::ExprKind::Loop(..) = &completion_expr.kind {
                 if !self.can_render_as_js_expr(completion_expr)
                 {
-                    // Check if this loop has break statements with values or temp assignments from break values
-                    if self.loop_has_break_with_value(completion_expr) || self.contains_temp_variables(completion_expr) {
+                    // Check if this loop has break statements with values but hasn't been transformed yet
+                    if self.loop_has_break_with_value(completion_expr) && !self.contains_temp_variables(completion_expr) {
                         // Loop expressions with break values need temp variables to capture the break value
                         let temp_name = self.generate_temp_var_name();
                         let span = completion_expr.span;
