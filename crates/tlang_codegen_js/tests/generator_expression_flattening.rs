@@ -9,13 +9,13 @@ fn test_expression_flattening_function_arguments() {
         fn some_function(a, b) {
             return a + b;
         }
-        
+
         fn test_complex_function_args() {
             let result = some_function(
-                if true { 
+                if true {
                     let x = 42;
                     x * 2
-                } else { 
+                } else {
                     let y = 10;
                     y + 5
                 },
@@ -39,10 +39,10 @@ fn test_expression_flattening_function_arguments() {
 fn test_expression_flattening_return_statement() {
     let source = indoc! {r#"
         fn test_return_complex() {
-            return if true { 
+            return if true {
                 let x = 42;
                 x > 0
-            } else { 
+            } else {
                 let y = 0;
                 y == 0
             };
@@ -57,10 +57,10 @@ fn test_expression_flattening_return_statement() {
 fn test_expression_flattening_binary_operations() {
     let source = indoc! {r#"
         fn test_complex_binary_operations() {
-            return (if true { 
+            return (if true {
                 let x = 10;
                 x + 5
-            } else { 
+            } else {
                 let y = 20;
                 y - 5
             }) + (if false {
@@ -81,10 +81,10 @@ fn test_expression_flattening_binary_operations() {
 fn test_expression_flattening_nested_conditions() {
     let source = indoc! {r#"
         fn test_nested_complex_expression() {
-            return if (if true { 
+            return if (if true {
                 let x = 42;
                 x > 0
-            } else { 
+            } else {
                 let y = 0;
                 y == 0
             }) { "positive" } else { "negative" };
@@ -99,10 +99,10 @@ fn test_expression_flattening_nested_conditions() {
 fn test_expression_flattening_let_statements() {
     let source = indoc! {r#"
         fn test_let_complex() {
-            let result = if true { 
+            let result = if true {
                 let x = 42;
                 x * 2
-            } else { 
+            } else {
                 let y = 10;
                 y + 5
             };
@@ -120,7 +120,7 @@ fn test_simple_expressions_preserved() {
         fn test_simple_if() {
             return if true { 42 } else { 24 };
         }
-        
+
         fn test_simple_nested() {
             return if (if true { true } else { false }) { "yes" } else { "no" };
         }
