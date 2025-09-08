@@ -520,13 +520,19 @@ impl SimplifiedHirJsPass {
         // Check for match expressions that have been transformed with return statements or control flow statements
         // These can be rendered as JavaScript statements and don't need further transformation
         if let hir::ExprKind::Match(_, arms) = &expr.kind {
-            // If all arms have return statements or control flow statements, this match can be rendered as JS
-            let all_arms_have_control_flow = arms.iter().all(|arm| {
+            // If all arms have return statements or plain control flow statements (break without values), 
+            // this match can be rendered as JS. However, break statements with values need transformation
+            // to assign to temp variables, so they don't qualify.
+            let all_arms_have_simple_control_flow = arms.iter().all(|arm| {
                 if let Some(last_stmt) = arm.block.stmts.last() {
                     match &last_stmt.kind {
                         hir::StmtKind::Return(_) => true,
                         hir::StmtKind::Expr(expr) => {
-                            matches!(expr.kind, hir::ExprKind::Break(_) | hir::ExprKind::Continue)
+                            match &expr.kind {
+                                hir::ExprKind::Break(None) | hir::ExprKind::Continue => true,
+                                hir::ExprKind::Break(Some(_)) => false, // Break with value needs transformation
+                                _ => false,
+                            }
                         }
                         _ => false,
                     }
@@ -535,7 +541,7 @@ impl SimplifiedHirJsPass {
                 }
             });
             
-            if all_arms_have_control_flow {
+            if all_arms_have_simple_control_flow {
                 return true;
             }
         }
@@ -1024,15 +1030,17 @@ impl SimplifiedHirJsPass {
         let span = expr.span;
         if let hir::ExprKind::Match(scrutinee, arms) = expr.kind {
             // Check if all arms already have return statements (from ReturnStatementPass)
-            // or control flow statements (break/continue)
-            let all_arms_have_control_flow = arms.iter().all(|arm| {
+            // or simple control flow statements (break without values / continue)
+            let all_arms_have_simple_control_flow = arms.iter().all(|arm| {
                 // Check last statement
                 if let Some(last_stmt) = arm.block.stmts.last() {
                     match &last_stmt.kind {
                         hir::StmtKind::Return(_) => return true,
                         hir::StmtKind::Expr(expr) => {
-                            if matches!(expr.kind, hir::ExprKind::Break(_) | hir::ExprKind::Continue) {
-                                return true;
+                            match &expr.kind {
+                                hir::ExprKind::Break(None) | hir::ExprKind::Continue => return true,
+                                hir::ExprKind::Break(Some(_)) => return false, // Break with value needs transformation
+                                _ => {}
                             }
                         }
                         _ => {}
@@ -1042,7 +1050,8 @@ impl SimplifiedHirJsPass {
                 // Check completion expression
                 if let Some(completion_expr) = &arm.block.expr {
                     match &completion_expr.kind {
-                        hir::ExprKind::Break(_) | hir::ExprKind::Continue => return true,
+                        hir::ExprKind::Break(None) | hir::ExprKind::Continue => return true,
+                        hir::ExprKind::Break(Some(_)) => return false, // Break with value needs transformation
                         _ => {}
                     }
                 }
@@ -1050,8 +1059,8 @@ impl SimplifiedHirJsPass {
                 false
             });
 
-            // If all arms have control flow statements or temp_name is empty, don't create assignment statements
-            if all_arms_have_control_flow || temp_name.is_empty() {
+            // If all arms have simple control flow statements or temp_name is empty, don't create assignment statements
+            if all_arms_have_simple_control_flow || temp_name.is_empty() {
                 // Just create the match statement without temp variable assignments
                 let match_stmt = hir::Stmt::new(
                     ctx.hir_id_allocator.next_id(),
