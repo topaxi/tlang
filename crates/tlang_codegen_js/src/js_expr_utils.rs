@@ -111,11 +111,18 @@ pub fn expr_can_render_as_js_stmt(expr: &hir::Expr) -> bool {
         hir::ExprKind::Loop(..) => true,
 
         // Match expressions can be rendered as JavaScript statements if all arms have return statements
+        // or if all arms end with control flow statements (break/continue)
         hir::ExprKind::Match(_, arms) => {
-            // If all arms have return statements, this match can be rendered as a JS statement
+            // If all arms have return statements or control flow statements, this match can be rendered as a JS statement
             arms.iter().all(|arm| {
                 if let Some(last_stmt) = arm.block.stmts.last() {
-                    matches!(last_stmt.kind, hir::StmtKind::Return(_))
+                    match &last_stmt.kind {
+                        hir::StmtKind::Return(_) => true,
+                        hir::StmtKind::Expr(expr) => {
+                            matches!(expr.kind, hir::ExprKind::Break(_) | hir::ExprKind::Continue)
+                        }
+                        _ => false,
+                    }
                 } else {
                     false
                 }

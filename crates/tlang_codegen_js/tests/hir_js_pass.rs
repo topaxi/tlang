@@ -2148,7 +2148,30 @@ fn test_handwritten_for_loop() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    assert_snapshot!(pretty_print(&hir), @r"");
+    assert_snapshot!(pretty_print(&hir), @r"
+fn test() -> unknown {
+    let $hir$0: unknown = _;
+    {
+        let list_iterator: unknown = iterator::iter([1, 2, 3]);
+        let list_accumulator: unknown = 0;
+        loop {
+            let sum: unknown = list_accumulator;
+            let $hir$1: unknown = _;
+            match list_iterator.next() {
+                Option::Some { 0: a } => {
+                    ($hir$1 = (sum + a));
+                },
+                Option::None => {
+                    break list_accumulator;
+                },
+            };
+            (list_accumulator = $hir$1);
+            $hir$1
+        };
+    };
+    let sum: unknown = $hir$0;
+}
+");
 }
 
 #[test]
@@ -2169,17 +2192,17 @@ fn test_isolated_for_loop_structure() {
             let iterator$$: unknown = iterator::iter([1, 2, 3]);
             loop {
                 let $hir$1: unknown = _;
-                let $hir$2: unknown = _;
                 match iterator$$.next() {
                     Option::Some { 0: i } => {
                         log(i);
                     },
                     Option::None => {
                         break;
+                        ($hir$1 = _);
                     },
                 };
-                $hir$2;
-                $hir$1
+                $hir$1;
+                _
             };
         };
         return $hir$0;
