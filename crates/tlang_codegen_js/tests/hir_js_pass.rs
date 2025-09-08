@@ -2127,6 +2127,31 @@ fn test_isolated_break_in_binary_expression() {
 }
 
 #[test]
+fn test_handwritten_for_loop() {
+    let source = r#"
+        fn test() {
+            let sum = {
+                let list_iterator = iterator::iter([1, 2, 3]);
+                let list_accumulator = 0;
+                loop {
+                    let sum = list_accumulator;
+                    (list_accumulator = match list_iterator.next() {
+                        Option::Some(a) => {
+                            (sum + a)
+                        },
+                        Option::None => {
+                            break list_accumulator
+                        },
+                    })
+                }
+            };
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r"");
+}
+
+#[test]
 fn test_isolated_for_loop_structure() {
     // Isolated test to understand for loop structure transformation
     let source = r#"
