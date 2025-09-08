@@ -61,90 +61,8 @@ impl CodegenJS {
 
     /// Generates blocks in expression position.
     pub(crate) fn generate_block_expression(&mut self, block: &hir::Block) {
-        let has_completion_var = self.current_completion_variable().is_some();
-        let completion_tmp_var = if block.has_completion() {
-            self.current_completion_variable()
-                .map(str::to_string)
-                .unwrap_or_else(|| self.current_scope().declare_tmp_variable())
-        } else {
-            String::new()
-        };
-
         self.push_scope();
-
-        // In a case of `let a = { 1 }`, we want to render the expression as a statement.
-        // At this state, we should have `let a = ` in the statement buffer.
-        // We do this by temporarily swapping the statement buffer, generating the
-        // expression as an statement, and then swapping the statement buffer back.
-        let lhs = if has_completion_var {
-            String::new()
-        } else {
-            self.replace_statement_buffer_with_empty_string()
-        };
-
-        if block.has_completion() {
-            if has_completion_var {
-                // Halp I made a mess
-            } else {
-                self.push_indent();
-                self.push_let_declaration(&completion_tmp_var);
-                self.push_str("{\n");
-                self.inc_indent();
-            }
-        }
-
-        self.push_completion_variable(None);
         self.generate_statements(&block.stmts);
-        self.pop_completion_variable();
-
-        if !block.has_completion() {
-            self.push_statement_buffer();
-            self.push_str(&lhs);
-            self.flush_statement_buffer();
-            self.pop_statement_buffer();
-            self.flush_statement_buffer();
-            self.pop_scope();
-            return;
-        }
-
-        let completion = block.expr.as_ref().unwrap();
-        if completion_tmp_var == "return" {
-            if self.is_self_referencing_tail_call(completion) {
-                self.generate_expr(completion, None);
-            } else {
-                self.push_indent();
-                self.push_str("return ");
-                self.generate_expr(completion, None);
-                self.push_char(';');
-                self.push_newline();
-            }
-        } else {
-            self.push_indent();
-            self.push_str(&completion_tmp_var);
-            self.push_str(" = ");
-            self.generate_expr(completion, None);
-            self.push_char(';');
-            self.push_newline();
-        }
-        if !has_completion_var {
-            self.dec_indent();
-            self.push_indent();
-            // Don't add }; in expression context - let the caller handle statement termination
-            if self.current_context() == BlockContext::Statement {
-                self.push_str("};\n");
-            } else {
-                self.push_char('}');
-                self.push_newline();
-            }
-            self.flush_statement_buffer();
-            self.push_str(&lhs);
-
-            // Only output the completion variable reference if it's actually reachable
-            if !self.should_omit_completion_var_reference(block, &completion_tmp_var) {
-                self.push_str(completion_tmp_var.as_str());
-            }
-        }
-        self.flush_statement_buffer();
         self.pop_scope();
     }
 
@@ -420,7 +338,6 @@ impl CodegenJS {
         else_branches: &[hir::ElseClause],
     ) -> bool {
         (self.current_context() == BlockContext::Expression
-            || self.current_completion_variable() == Some("return") // Also allow ternary in return statements
             || self.current_context() == BlockContext::Statement) // Allow ternary in statement context for assignments
             && else_branches.len() == 1 // Let's not nest ternary expressions for now.
             && if_else_can_render_as_ternary(expr, then_branch, else_branches)
@@ -443,25 +360,6 @@ impl CodegenJS {
             return;
         }
 
-        // If we reach here, the if-else cannot be rendered as a ternary expression
-        // In most expression contexts, this should have been handled by HIR JS pass
-        // For now, allow fallback to completion variable handling for complex cases
-        // TODO: Expand HIR JS pass to handle all remaining cases
-        if self.current_context() == BlockContext::Expression
-            && self.current_completion_variable() != Some("return")
-        {
-            // For debugging: log when we hit complex cases that could be improved
-            eprintln!(
-                "Info: Complex if-else expression in expression context using completion variables. \
-                This could potentially be handled by HIR JS pass instead. \
-                Context: {:?}, Completion variable: {:?}",
-                self.current_context(),
-                self.current_completion_variable()
-            );
-        }
-
-        // Handle if-else in statement context (simple case without completion variables)
-        self.push_completion_variable(None);
         self.push_str("if (");
         let indent_level = self.current_indent();
         self.set_indent(0);
@@ -469,7 +367,6 @@ impl CodegenJS {
         self.set_indent(indent_level);
         self.push_str(") {\n");
         self.inc_indent();
-        self.flush_statement_buffer();
         self.generate_block_expression(then_branch);
         self.dec_indent();
 
@@ -488,15 +385,12 @@ impl CodegenJS {
 
             self.push_str(" {\n");
             self.inc_indent();
-            self.flush_statement_buffer();
             self.generate_block_expression(&else_branch.consequence);
             self.dec_indent();
         }
 
         self.push_indent();
         self.push_char('}');
-
-        self.pop_completion_variable();
     }
 
     fn generate_partial_application(

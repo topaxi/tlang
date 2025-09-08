@@ -186,8 +186,7 @@ fn test_function_declarations_with_if_let_guard() {
     "});
     let expected_output = indoc! {"
         function filter_map(arg0, f) {
-            let $tmp$0;
-            let x,xs,y;if (arg0.length === 0) {
+            let $tmp$0,x,xs,y;if (arg0.length === 0) {
                 return [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && ($tmp$0 = f(x), true) && (y = $tmp$0, true)) {
                 return [y, ...filter_map(xs, f)];
@@ -208,8 +207,7 @@ fn test_function_declarations_with_if_let_guard_enum() {
     "});
     let expected_output = indoc! {"
         function filter_map(arg0, f) {
-            let $tmp$0;
-            let x,xs,y;if (arg0.length === 0) {
+            let $tmp$0,x,xs,y;if (arg0.length === 0) {
                 return [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && ($tmp$0 = f(x), true) && $tmp$0.tag === Option.Some && (y = $tmp$0[0], true)) {
                 return [y, ...filter_map(xs, f)];
@@ -230,8 +228,7 @@ fn test_function_declarations_with_if_let_guard_named_fields_enum() {
     "});
     let expected_output = indoc! {"
         function filter_map(arg0, f) {
-            let $tmp$0;
-            let x,xs,value;if (arg0.length === 0) {
+            let $tmp$0,x,xs,value;if (arg0.length === 0) {
                 return [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && ($tmp$0 = f(x), true) && $tmp$0.tag === Option.Some && (value = $tmp$0.value, true)) {
                 return [value, ...filter_map(xs, f)];
@@ -258,8 +255,7 @@ fn test_function_declarations_with_comments_inbetween() {
         // Comment 2
         // Comment 3
         function filter_map(arg0, f) {
-            let $tmp$0;
-            let x,xs,value;if (arg0.length === 0) {
+            let $tmp$0,x,xs,value;if (arg0.length === 0) {
                 // Comment 1
                 return [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && ($tmp$0 = f(x), true) && $tmp$0.tag === Option.Some && (value = $tmp$0.value, true)) {

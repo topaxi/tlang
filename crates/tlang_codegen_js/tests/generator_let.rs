@@ -84,8 +84,7 @@ fn test_codegen_if_let() {
     let output = compile!("fn main() { if let Some(x) = Some(42) { x } }");
     let expected_output = indoc! {"
         function main() {
-            let $tmp$0 = Option.Some(42);
-            let x;if ($tmp$0.tag === Option.Some && (x = $tmp$0[0], true)) {
+            let $tmp$0 = Option.Some(42),x;if ($tmp$0.tag === Option.Some && (x = $tmp$0[0], true)) {
                 return x;
             }
         }
@@ -95,8 +94,7 @@ fn test_codegen_if_let() {
     let output = compile!("fn main() { if let Some(x) = Some(42) { x } else { 0 } }");
     let expected_output = indoc! {"
         function main() {
-            let $tmp$0 = Option.Some(42);
-            let x;if ($tmp$0.tag === Option.Some && (x = $tmp$0[0], true)) {
+            let $tmp$0 = Option.Some(42),x;if ($tmp$0.tag === Option.Some && (x = $tmp$0[0], true)) {
                 return x;
             } else {
                 return 0;
@@ -123,8 +121,7 @@ fn test_codegen_if_let() {
     let expected_output = indoc! {"
         function main() {
             let value = Option.Some(42);
-            let $tmp$0;
-            let x;if (value.tag === Option.Some && value[0] === 42) {
+            let $tmp$0,x;if (value.tag === Option.Some && value[0] === 42) {
                 return 9000;
             } else if (($tmp$0 = value, true) && $tmp$0.tag === Option.Some && (x = $tmp$0[0], true)) {
                 return x;

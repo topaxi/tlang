@@ -111,7 +111,6 @@ impl CodegenJS {
     pub(crate) fn generate_statements(&mut self, statements: &[hir::Stmt]) {
         for statement in statements {
             self.generate_stmt(statement);
-            self.flush_statement_buffer();
         }
     }
 
@@ -472,9 +471,6 @@ impl CodegenJS {
                     self.push_str(";");
                     self.push_newline();
 
-                    // Force flush the statement buffer
-                    self.flush_statement_buffer();
-
                     continue;
                 }
                 // Fallback to normal statement generation
@@ -499,9 +495,6 @@ impl CodegenJS {
         self.push_str("for (;;) {");
         self.push_newline();
         self.inc_indent();
-
-        // Force flush to ensure for loop wrapper appears
-        self.flush_statement_buffer();
 
         // Set loop context for break statements
         self.push_context(BlockContext::Loop);

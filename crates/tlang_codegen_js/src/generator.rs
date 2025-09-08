@@ -49,8 +49,6 @@ pub struct CodegenJS {
     context_stack: Vec<BlockContext>,
     function_context_stack: Vec<FunctionContext>,
     pub(crate) match_context_stack: MatchContextStack,
-    statement_buffer: Vec<String>,
-    completion_variables: Vec<Option<Box<str>>>,
 }
 
 impl Default for CodegenJS {
@@ -68,8 +66,6 @@ impl CodegenJS {
             context_stack: vec![BlockContext::Program],
             function_context_stack: vec![],
             match_context_stack: MatchContextStack::default(),
-            statement_buffer: vec![String::with_capacity(STATEMENT_BUFFER_CAPACITY)],
-            completion_variables: vec![None],
         }
     }
 
@@ -119,40 +115,14 @@ impl CodegenJS {
         ]
     }
 
-    pub(crate) fn push_statement_buffer(&mut self) {
-        self.statement_buffer
-            .push(String::with_capacity(STATEMENT_BUFFER_CAPACITY));
-    }
-
-    #[must_use]
-    pub(crate) fn replace_statement_buffer(&mut self, buffer: String) -> String {
-        let buf = self.statement_buffer.pop();
-        self.statement_buffer.push(buffer);
-        buf.unwrap()
-    }
-
-    #[must_use]
-    pub(crate) fn replace_statement_buffer_with_empty_string(&mut self) -> String {
-        self.replace_statement_buffer(String::with_capacity(STATEMENT_BUFFER_CAPACITY))
-    }
-
-    pub(crate) fn pop_statement_buffer(&mut self) -> String {
-        debug_assert!(
-            self.statement_buffer.len() != 1,
-            "Cannot pop last statement buffer."
-        );
-
-        self.statement_buffer.pop().unwrap()
-    }
-
     #[inline(always)]
     pub(crate) fn push_str(&mut self, str: &str) {
-        self.statement_buffer.last_mut().unwrap().push_str(str);
+        self.output.push_str(str);
     }
 
     #[inline(always)]
     pub(crate) fn push_char(&mut self, char: char) {
-        self.statement_buffer.last_mut().unwrap().push(char);
+        self.output.push(char);
     }
 
     #[inline(always)]
@@ -166,7 +136,7 @@ impl CodegenJS {
         // plus some extra space for the statement.
         let reserve = self.indent_level * 4 + STATEMENT_RESERVE_SIZE;
 
-        self.statement_buffer.last_mut().unwrap().reserve(reserve);
+        self.output.reserve(reserve);
 
         for _ in 0..self.indent_level {
             self.push_str("    ");
@@ -191,12 +161,6 @@ impl CodegenJS {
     #[inline(always)]
     pub(crate) fn set_indent(&mut self, indent: usize) {
         self.indent_level = indent;
-    }
-
-    #[inline(always)]
-    pub(crate) fn flush_statement_buffer(&mut self) {
-        self.output.push_str(self.statement_buffer.last().unwrap());
-        self.statement_buffer.last_mut().unwrap().clear();
     }
 
     #[inline(always)]
@@ -287,52 +251,10 @@ impl CodegenJS {
         self.function_context_stack.pop();
     }
 
-    #[inline(always)]
-    pub(crate) fn push_completion_variable(&mut self, name: Option<&str>) {
-        self.completion_variables.push(name.map(|name| name.into()));
-    }
-
-    #[inline(always)]
-    pub(crate) fn pop_completion_variable(&mut self) -> Option<Box<str>> {
-        self.completion_variables.pop()?
-    }
-
-    #[inline(always)]
-    pub(crate) fn current_completion_variable(&self) -> Option<&str> {
-        self.completion_variables.last().unwrap().as_deref()
-    }
-
-    #[inline(always)]
-    pub(crate) fn push_current_completion_variable(&mut self) {
-        let current_completion_variable = self.pop_completion_variable();
-
-        if let Some(str) = &current_completion_variable {
-            // For loop contexts, check if the completion variable exists and prefer latest temp variable
-            if self.is_in_loop_context() && str.starts_with("$tmp$") {
-                let latest_temp_var = self.current_scope().get_latest_temp_variable();
-                if latest_temp_var != str.as_ref() {
-                    // Use the latest temp variable instead of the potentially stale completion variable
-                    self.push_str(&latest_temp_var);
-                } else {
-                    self.push_str(str);
-                }
-            } else {
-                self.push_str(str);
-            }
+    fn push_open_let_declaration(&mut self, name: &str) {
+        if self.current_context() != BlockContext::Statement {
+            self.push_indent();
         }
-
-        self.completion_variables.push(current_completion_variable);
-    }
-
-    pub(crate) fn push_let_declaration(&mut self, name: &str) {
-        self.push_indent();
-        self.push_str("let ");
-        self.push_str(name);
-        self.push_char(';');
-    }
-
-    pub(crate) fn push_open_let_declaration(&mut self, name: &str) {
-        self.push_indent();
         self.push_str("let ");
         self.push_str(name);
         self.push_str(" = ");
@@ -367,12 +289,6 @@ impl CodegenJS {
         }
 
         self.generate_expr(expr, None);
-    }
-
-    /// Returns true if the current completion variable can be reused (i.e., it's "return").
-    /// This is a helper to check if we should reuse existing completion vars.
-    pub(crate) fn can_reuse_current_completion_variable(&self) -> bool {
-        matches!(self.current_completion_variable(), Some("return"))
     }
 
     pub(crate) fn generate_comment(&mut self, comment: &Token) {

@@ -96,7 +96,6 @@ impl CodegenJS {
         self.push_scope();
         self.generate_function_parameter_list(&declaration.parameters, is_method);
         self.push_str(" {\n");
-        self.flush_statement_buffer();
         self.inc_indent();
         self.generate_function_body(&declaration.body, is_tail_recursive);
         self.dec_indent();
@@ -210,7 +209,6 @@ impl CodegenJS {
         } else {
             self.push_str(" {\n");
             self.inc_indent();
-            self.flush_statement_buffer();
             self.generate_function_body(&declaration.body, is_tail_recursive);
             self.dec_indent();
             self.push_indent();
@@ -236,12 +234,10 @@ impl CodegenJS {
     }
 
     fn generate_function_body_block(&mut self, block: &hir::Block) {
-        self.flush_statement_buffer();
         self.generate_statements(&block.stmts);
 
         if block.has_completion() {
             self.generate_return_statement(block.expr.as_ref());
-            self.flush_statement_buffer();
         }
     }
 
@@ -270,9 +266,7 @@ impl CodegenJS {
 
         if let Some(expr) = expr {
             self.push_char(' ');
-            self.push_completion_variable(Some("return"));
             self.generate_expr(expr, None);
-            self.pop_completion_variable();
         }
 
         if self.needs_semicolon(expr) {
@@ -296,15 +290,6 @@ impl CodegenJS {
         }
     }
 
-    pub(crate) fn is_self_referencing_tail_call(&self, expr: &hir::Expr) -> bool {
-        if let hir::ExprKind::TailCall(call_expr) = &expr.kind {
-            self.get_self_referencing_tail_call_function_context(call_expr)
-                .is_some()
-        } else {
-            false
-        }
-    }
-
     pub(crate) fn generate_recursive_call_expression(&mut self, expr: &hir::CallExpression) {
         // If call expression is referencing the current function, all we do is update the arguments,
         // as we are in a while loop.
@@ -317,6 +302,7 @@ impl CodegenJS {
                 .collect::<Vec<_>>();
 
             for (i, arg) in expr.arguments.iter().enumerate() {
+                self.push_indent();
                 self.push_let_declaration_to_expr(&tmp_vars[i], arg);
                 self.push_str(";\n");
             }
