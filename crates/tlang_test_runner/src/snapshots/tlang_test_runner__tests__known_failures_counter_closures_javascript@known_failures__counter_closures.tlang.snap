@@ -4,19 +4,19 @@ description: Known failure - output may not match expected
 expression: apply_redactions(&output)
 input_file: tests/known_failures/counter_closures.tlang
 ---
-[stdin]:295
-    return if (times > 0) {
-           ^^
-Expression expected
-
-SyntaxError: Unexpected token 'if'
-    at makeContextifyScript (node:internal/vm:194:14)
-    at compileScript (node:internal/process/execution:393:10)
-    at evalTypeScript (node:internal/process/execution:261:22)
-    at node:internal/main/eval_stdin:51:5
-    at Socket.<anonymous> (node:internal/process/execution:206:5)
-    at Socket.emit (node:events:519:35)
-    at endReadableNT (node:internal/streams/readable:1701:12)
-    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
-
-Node.js v24.0.2
+=== Counter and State Management Demo ===
+Basic counter starting from 10:
+11
+12
+13
+14
+15
+First 8 Fibonacci numbers:
+0
+1
+1
+2
+3
+5
+8
+13

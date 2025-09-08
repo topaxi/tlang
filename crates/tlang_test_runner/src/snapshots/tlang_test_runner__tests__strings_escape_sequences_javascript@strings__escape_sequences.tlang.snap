@@ -3,7 +3,7 @@ source: crates/tlang_test_runner/src/main.rs
 expression: apply_redactions(&output)
 input_file: tests/strings/escape_sequences.tlang
 ---
-[stdin]:287
+[stdin]:276
     let quotes = "Quote: "Hello"";
                           ^^^^^
 Expected ';', '}' or <eof>

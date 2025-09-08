@@ -10,10 +10,6 @@ Processing small dataset...
 Processing medium dataset...
 0
 Processing large dataset...
-0
-Computing deep fibonacci...
-832040
-Computing primes...
 
 [TIMESTAMP] WARN  tlang_hir_opt::symbol_resolution::identifier_resolver] No symbols found for path 'head' on line 87:36. Available symbols: [INTERNAL_SYMBOL_TABLE]
 [TIMESTAMP] WARN  tlang_hir_opt::symbol_resolution::identifier_resolver] No symbols found for path 'head' on line 89:43. Available symbols: [INTERNAL_SYMBOL_TABLE]
@@ -22,6 +18,5 @@ Computing primes...
 [TIMESTAMP] WARN  tlang_hir_opt::slot_allocation::slot_allocator] Unable to assign slot for path 'head' on line 89:43, as it has not been resolved
 [TIMESTAMP] WARN  tlang_hir_opt::slot_allocation::slot_allocator] Unable to assign slot for path 'tail' on line 91:47, as it has not been resolved
 
-thread 'main' panicked at crates/tlang_runtime/tlang_memory/src/value/mod.rs:138:38:
-Cannot convert object to primitive
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+thread 'main' has overflowed its stack
+fatal runtime error: stack overflow, aborting

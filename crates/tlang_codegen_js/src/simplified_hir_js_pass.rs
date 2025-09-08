@@ -1187,12 +1187,11 @@ impl SimplifiedHirJsPass {
                 additional_stmts.append(&mut temp_stmts);
 
                 // Then check if the expression itself needs flattening
-                if !expr_can_render_as_assignment_rhs(expr) && !self.contains_temp_variables(expr) {
+                if !expr_can_render_as_assignment_rhs(expr) {
                     // For complex expressions in let statements, flatten them
                     if let hir::ExprKind::Loop(..) = &expr.kind {
-                        // Check if this loop has break statements with values
-                        // If it doesn't, we can convert it to a statement directly
-                        if self.loop_has_break_with_value(expr) {
+                        // Check if this loop has break statements with values or temp assignments from break values
+                        if self.loop_has_break_with_value(expr) || self.contains_temp_variables(expr) {
                             // Special handling for loop expressions with break values - they need temp variables
                             // to capture the break value as the "return" value of the loop
                             let temp_name = self.generate_temp_var_name();
@@ -1340,15 +1339,15 @@ impl SimplifiedHirJsPass {
                 // Handle complex expressions in return statements
                 // NOTE: TailCall expressions in return statements should be left as-is
                 // since they will be handled by the JavaScript generator's tail call optimization
-                if !self.can_render_as_js_expr(expr) && !self.contains_temp_variables(expr) {
+                if !self.can_render_as_js_expr(expr) {
                     // Skip TailCall expressions in return statements - they're handled by codegen
                     if let hir::ExprKind::TailCall(..) = &expr.kind {
                         return additional_stmts;
                     }
 
                     if let hir::ExprKind::Loop(..) = &expr.kind {
-                        // Check if this loop has break statements with values
-                        if self.loop_has_break_with_value(expr) {
+                        // Check if this loop has break statements with values or temp assignments from break values
+                        if self.loop_has_break_with_value(expr) || self.contains_temp_variables(expr) {
                             // Special handling for loop expressions with break values in return statements
                             let temp_name = self.generate_temp_var_name();
                             let span = expr.span;
@@ -1420,14 +1419,18 @@ impl HirPass for SimplifiedHirJsPass {
     }
 
     fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
-        // Only run once - this pass should be idempotent and complete its work in one pass
-        if self.iteration_count > 0 {
+        // Run multiple times until no more changes are made to handle nested transformations
+        const MAX_ITERATIONS: usize = 5; // Prevent infinite loops
+        
+        if self.iteration_count >= MAX_ITERATIONS {
             return false;
         }
 
         self.iteration_count += 1;
         self.changes_made = false;
         self.visit_module(module, ctx);
+        
+        // Return true if changes were made to trigger another iteration
         self.changes_made
     }
 }
@@ -1454,10 +1457,9 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
             // First, check if this is a loop expression - handle it before other special cases
             if let hir::ExprKind::Loop(..) = &completion_expr.kind {
                 if !self.can_render_as_js_expr(completion_expr)
-                    && !self.contains_temp_variables(completion_expr)
                 {
-                    // Check if this loop has break statements with values
-                    if self.loop_has_break_with_value(completion_expr) {
+                    // Check if this loop has break statements with values or temp assignments from break values
+                    if self.loop_has_break_with_value(completion_expr) || self.contains_temp_variables(completion_expr) {
                         // Loop expressions with break values need temp variables to capture the break value
                         let temp_name = self.generate_temp_var_name();
                         let span = completion_expr.span;

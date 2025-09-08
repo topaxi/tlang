@@ -3,7 +3,7 @@ source: crates/tlang_test_runner/src/main.rs
 expression: apply_redactions(&output)
 input_file: tests/loops/for_loops/with_accumulator.tlang
 ---
-[stdin]:294
+[stdin]:281
                 break;
                 ^^^^^
 Expression expected
