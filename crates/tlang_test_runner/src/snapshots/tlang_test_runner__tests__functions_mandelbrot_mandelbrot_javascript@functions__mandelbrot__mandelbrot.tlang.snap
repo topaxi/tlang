@@ -3,20 +3,20 @@ source: crates/tlang_test_runner/src/main.rs
 expression: apply_redactions(&output)
 input_file: tests/functions/mandelbrot/mandelbrot.tlang
 ---
-[stdin]:356
+[stdin]:373
 console.log(map(range$$2(0, 9), (y) => map(range$$2(0, 19), (x) => mandelbrot$$3(c_real, c_imag, 50))));
                                                                                  ^
 
 ReferenceError: c_real is not defined
-    at [stdin]:356:82
-    at apply_map ([stdin]:288:21)
-    at [stdin]:291:38
-    at foldl ([stdin]:278:26)
-    at map ([stdin]:291:12)
-    at [stdin]:356:40
-    at apply_map ([stdin]:288:21)
-    at [stdin]:291:38
-    at foldl ([stdin]:278:26)
-    at map ([stdin]:291:12)
+    at [stdin]:373:82
+    at apply_map ([stdin]:303:21)
+    at [stdin]:306:38
+    at foldl ([stdin]:293:26)
+    at map ([stdin]:306:12)
+    at [stdin]:373:40
+    at apply_map ([stdin]:303:21)
+    at [stdin]:306:38
+    at foldl ([stdin]:293:26)
+    at map ([stdin]:306:12)
 
 Node.js v24.0.2

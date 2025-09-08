@@ -3,7 +3,7 @@ source: crates/tlang_test_runner/src/main.rs
 expression: apply_redactions(&output)
 input_file: tests/strings/invalid_escape_sequences.tlang
 ---
-[stdin]:277
+[stdin]:291
     let invalid2 = "Another bad: \x";
                                  ^^^^
 Bad character escape sequence, expected 2 hex characters
