@@ -63,25 +63,14 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
                 semantic_analyzer.symbol_tables().clone(),
             );
 
-            let mut optimizer = HirOptimizer::default();
-
-            if options.optimize {
-                // Run standard HIR optimizations first
-                optimizer.optimize_hir(&mut module, meta.into());
-            }
-
-            // Always apply JavaScript-specific HIR transformations
-            // This ensures expressions that cannot be expressed as expressions in modern JavaScript
-            // are properly transformed to statements, regardless of optimization level
-            let mut hir_js_opt_group = create_hir_js_opt_group();
-            let mut js_ctx = HirOptContext {
-                symbols: std::collections::HashMap::new(),
-                hir_id_allocator: tlang_span::HirIdAllocator::new(1000), // Start with a high number to avoid conflicts
-                current_scope: module.hir_id,
+            let mut optimizer = if options.optimize {
+                HirOptimizer::default()
+            } else {
+                HirOptimizer::new(vec![])
             };
 
-            // Run HIR JS optimization group
-            hir_js_opt_group.optimize_hir(&mut module, &mut js_ctx);
+            optimizer.add_pass(Box::new(create_hir_js_opt_group()));
+            optimizer.optimize_hir(&mut module, meta.into());
 
             let mut codegen = CodegenJS::default();
             codegen.generate_code(&module);
