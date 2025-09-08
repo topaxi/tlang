@@ -994,9 +994,20 @@ impl SimplifiedHirJsPass {
                                 new_arm.block.stmts.append(&mut sub_stmts);
                             }
 
-                            let assignment_stmt =
-                                self.create_assignment_stmt(ctx, temp_name, flattened_completion, span);
-                            new_arm.block.stmts.push(assignment_stmt);
+                            // Only create assignment if temp_name is provided
+                            if !temp_name.is_empty() {
+                                let assignment_stmt =
+                                    self.create_assignment_stmt(ctx, temp_name, flattened_completion, span);
+                                new_arm.block.stmts.push(assignment_stmt);
+                            } else {
+                                // If no temp_name, add the expression as a statement
+                                let expr_stmt = hir::Stmt::new(
+                                    ctx.hir_id_allocator.next_id(),
+                                    hir::StmtKind::Expr(Box::new(flattened_completion)),
+                                    span,
+                                );
+                                new_arm.block.stmts.push(expr_stmt);
+                            }
                         }
                     }
                 }
@@ -1502,19 +1513,19 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                     self.changes_made = true;
                 }
             } else if let hir::ExprKind::Match(..) = &completion_expr.kind {
-                // Special handling for match expressions in statement context
-                // Transform arm completion expressions to statements but don't create temp variables for the overall match
-                let span = completion_expr.span;
+                // Special handling for match expressions in completion context
+                // Always transform to statements, but only create temp variables if the value is needed
                 
-                // Transform the match expression in place to convert arm completion expressions to statements
+                // Check if we're in a loop body where the completion value is typically not used
+                // In this case, transform to statements without temp variables
                 let match_statements = self.transform_match_to_statements(completion_expr.clone(), "", ctx);
                 new_stmts.extend(match_statements);
                 
-                // Replace completion expression with wildcard since the match is now in statement form
+                // Remove the completion expression since it's now in statement form
                 *completion_expr = hir::Expr {
                     hir_id: ctx.hir_id_allocator.next_id(),
                     kind: hir::ExprKind::Wildcard,
-                    span,
+                    span: completion_expr.span,
                 };
                 self.changes_made = true;
             } else if !self.can_render_as_js_expr(completion_expr)
