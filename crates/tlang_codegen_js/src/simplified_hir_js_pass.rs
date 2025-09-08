@@ -453,9 +453,32 @@ impl SimplifiedHirJsPass {
         }
     }
 
-    /// Check if an expression can be represented as a JavaScript expression
+    /// Check if an expression can be represented as a JavaScript expression or statement
+    /// This is more comprehensive than the basic check and accounts for transformed expressions
     fn can_render_as_js_expr(&self, expr: &hir::Expr) -> bool {
-        expr_can_render_as_js_expr(expr)
+        // First check the basic JS expression rules
+        if expr_can_render_as_js_expr(expr) {
+            return true;
+        }
+        
+        // Check for match expressions that have been transformed with return statements
+        // These can be rendered as JavaScript statements and don't need further transformation
+        if let hir::ExprKind::Match(_, arms) = &expr.kind {
+            // If all arms have return statements, this match can be rendered as JS
+            let all_arms_have_returns = arms.iter().all(|arm| {
+                if let Some(last_stmt) = arm.block.stmts.last() {
+                    matches!(last_stmt.kind, hir::StmtKind::Return(_))
+                } else {
+                    false
+                }
+            });
+            
+            if all_arms_have_returns {
+                return true;
+            }
+        }
+        
+        false
     }
 
     /// Check if an expression is a temp variable that we created
@@ -472,20 +495,6 @@ impl SimplifiedHirJsPass {
         }
     }
 
-    /// Check if expression is a match with all return statements
-    fn is_match_with_all_returns(&self, expr: &hir::Expr) -> bool {
-        if let hir::ExprKind::Match(_, arms) = &expr.kind {
-            arms.iter().all(|arm| {
-                if let Some(last_stmt) = arm.block.stmts.last() {
-                    matches!(last_stmt.kind, hir::StmtKind::Return(_))
-                } else {
-                    false
-                }
-            })
-        } else {
-            false
-        }
-    }
 
     /// Check if an expression contains temp variables (for more comprehensive detection)
     fn contains_temp_variables(&self, expr: &hir::Expr) -> bool {
@@ -1364,10 +1373,10 @@ impl HirPass for SimplifiedHirJsPass {
     }
 
     fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
-        // Conservative approach: only run one iteration to prevent infinite loops
         self.changes_made = false;
         self.visit_module(module, ctx);
         // Return false to prevent additional iterations by the optimizer
+        // The pass should be idempotent - not create changes on subsequent runs
         false
     }
 }
@@ -1488,7 +1497,6 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                 }
             } else if !self.can_render_as_js_expr(completion_expr)
                 && !self.contains_temp_variables(completion_expr)
-                && !self.is_match_with_all_returns(completion_expr)
             {
                 // General flattening for other complex expressions
                 let (flattened_expr, mut temp_stmts) =
