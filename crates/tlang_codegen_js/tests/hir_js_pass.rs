@@ -2582,3 +2582,35 @@ fn test_nested_match_expressions_in_short_circuit() {
     }
     ");
 }
+#[test]
+fn test_simple_nested_loop_hir_transformation() {
+    let source = r#"
+        fn simple_nested_loop() {
+            let outer = loop {
+                let inner = loop {
+                    break 5;
+                };
+                break inner * 2;
+            };
+            outer
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    assert_snapshot!(pretty_print(&hir), @r"
+    fn simple_nested_loop() -> unknown {
+        let $hir$0: unknown = _;
+        loop {
+            let $hir$1: unknown = _;
+            loop {
+                ($hir$1 = 5);
+                break;
+            };
+            let inner: unknown = $hir$1;
+            ($hir$0 = (inner * 2));
+            break;
+        };
+        let outer: unknown = $hir$0;
+        return outer;
+    }
+    ");
+}

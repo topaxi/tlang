@@ -13,7 +13,6 @@ use crate::js_expr_utils::{
 pub struct SimplifiedHirJsPass {
     temp_var_counter: usize,
     changes_made: bool,
-    iteration_count: usize,
 }
 
 impl SimplifiedHirJsPass {
@@ -21,7 +20,6 @@ impl SimplifiedHirJsPass {
         Self {
             temp_var_counter: 0,
             changes_made: false,
-            iteration_count: 0,
         }
     }
 
@@ -47,77 +45,6 @@ impl SimplifiedHirJsPass {
             kind: hir::ExprKind::Path(Box::new(path)),
             span,
         }
-    }
-
-    fn create_accumulator_path(
-        &mut self,
-        ctx: &mut HirOptContext,
-        span: Span,
-    ) -> hir::Expr {
-        self.create_temp_var_path(ctx, "accumulator$$", span)
-    }
-
-    /// Transform break statements in for-loop patterns
-    /// For-loops need special handling where break statements in Option::None cases
-    /// should assign the accumulator value to the temp variable before breaking
-    fn transform_for_loop_break_statements(
-        &mut self,
-        block: &mut hir::Block,
-        temp_name: &str,
-        ctx: &mut HirOptContext,
-    ) {
-        // First do the standard break statement transformation
-        self.transform_break_statements_in_block(block, temp_name, ctx);
-        
-        // Then add special handling for Option::None match cases
-        for stmt in &mut block.stmts {
-            if let hir::StmtKind::Expr(expr) = &mut stmt.kind {
-                if let hir::ExprKind::Match(_, arms) = &mut expr.kind {
-                    for arm in arms {
-                        // Check if this is an Option::None arm
-                        if self.is_option_none_arm(arm) {
-                            // Look for break statements in this arm and add accumulator assignment before them
-                            self.add_accumulator_assignment_before_breaks(&mut arm.block, temp_name, ctx);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /// Check if a match arm is for Option::None pattern
-    fn is_option_none_arm(&self, arm: &hir::MatchArm) -> bool {
-        matches!(&arm.pat.kind, 
-            hir::PatKind::Enum(path, _) if 
-            path.segments.len() >= 2 && 
-            path.segments[0].ident.as_str() == "Option" &&
-            path.segments[1].ident.as_str() == "None"
-        )
-    }
-
-    /// Add accumulator assignment before break statements in a block
-    fn add_accumulator_assignment_before_breaks(
-        &mut self,
-        block: &mut hir::Block,
-        temp_name: &str,
-        ctx: &mut HirOptContext,
-    ) {
-        let mut new_stmts = Vec::new();
-        
-        for stmt in &block.stmts {
-            if let hir::StmtKind::Expr(expr) = &stmt.kind {
-                if let hir::ExprKind::Break(None) = &expr.kind {
-                    // Add accumulator assignment before the break
-                    let span = expr.span;
-                    let accumulator_path = self.create_accumulator_path(ctx, span);
-                    let assignment_stmt = self.create_assignment_stmt(ctx, temp_name, accumulator_path, span);
-                    new_stmts.push(assignment_stmt);
-                }
-            }
-            new_stmts.push(stmt.clone());
-        }
-        
-        block.stmts = new_stmts;
     }
 
     fn create_assignment_stmt(
@@ -176,99 +103,13 @@ impl SimplifiedHirJsPass {
         )
     }
 
-    /// Check if a loop expression contains break statements with values or is a for-loop pattern
+    /// Check if a loop expression contains break statements with values
     fn loop_has_break_with_value(&self, expr: &hir::Expr) -> bool {
         if let hir::ExprKind::Loop(body) = &expr.kind {
-            // For-loops always need completion values (accumulator value)
-            self.block_has_break_with_value(body) || self.is_for_loop_pattern(body)
+            self.block_has_break_with_value(body)
         } else {
             false
         }
-    }
-
-    /// Check if a block represents a for-loop pattern (iterator$$, next(), Option matching)
-    /// Currently unused - reserved for future intelligent for-loop detection
-    fn is_for_loop_pattern(&self, block: &hir::Block) -> bool {
-        // Look for iterator$$ variable references and Option::Some/None patterns
-        // This is a heuristic to detect for-loops vs generic loops
-        for stmt in &block.stmts {
-            if self.stmt_contains_iterator_pattern(stmt) {
-                return true;
-            }
-        }
-        
-        if let Some(expr) = &block.expr {
-            if self.expr_contains_iterator_pattern(expr) {
-                return true;
-            }
-        }
-        
-        false
-    }
-
-    /// Check if a statement contains iterator pattern (iterator$$, next(), Option matching)
-    fn stmt_contains_iterator_pattern(&self, stmt: &hir::Stmt) -> bool {
-        match &stmt.kind {
-            hir::StmtKind::Expr(expr) => self.expr_contains_iterator_pattern(expr),
-            hir::StmtKind::Let(_, expr, _) => {
-                self.expr_contains_iterator_pattern(expr) || 
-                self.expr_contains_iterator_call(expr)
-            },
-            _ => false,
-        }
-    }
-
-    /// Check if an expression contains iterator pattern
-    fn expr_contains_iterator_pattern(&self, expr: &hir::Expr) -> bool {
-        match &expr.kind {
-            hir::ExprKind::Match(scrutinee, arms) => {
-                // Check for Option::Some/Option::None pattern matching
-                let has_option_patterns = arms.iter().any(|arm| {
-                    matches!(&arm.pat.kind, 
-                        hir::PatKind::Enum(path, _) if 
-                        path.segments.len() >= 2 && 
-                        path.segments[0].ident.as_str() == "Option" &&
-                        (path.segments[1].ident.as_str() == "Some" || path.segments[1].ident.as_str() == "None")
-                    )
-                });
-                
-                has_option_patterns || self.expr_contains_iterator_call(scrutinee)
-            }
-            hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
-                self.expr_contains_iterator_pattern(condition) ||
-                self.block_contains_iterator_pattern(then_branch) ||
-                else_branches.iter().any(|clause| self.block_contains_iterator_pattern(&clause.consequence))
-            }
-            _ => self.expr_contains_iterator_call(expr),
-        }
-    }
-
-    /// Check if an expression contains iterator$$ method calls
-    fn expr_contains_iterator_call(&self, expr: &hir::Expr) -> bool {
-        match &expr.kind {
-            hir::ExprKind::Call(call) => {
-                // Check for iterator$$.next() pattern
-                if let hir::ExprKind::FieldAccess(obj, field) = &call.callee.kind {
-                    if let hir::ExprKind::Path(path) = &obj.kind {
-                        return path.segments.len() == 1 && 
-                               path.segments[0].ident.as_str() == "iterator$$" &&
-                               field.as_str() == "next";
-                    }
-                }
-                false
-            }
-            hir::ExprKind::Path(path) => {
-                // Check for iterator$$ variable references
-                path.segments.len() == 1 && path.segments[0].ident.as_str() == "iterator$$"
-            }
-            _ => false,
-        }
-    }
-
-    /// Check if a block contains iterator pattern
-    fn block_contains_iterator_pattern(&self, block: &hir::Block) -> bool {
-        block.stmts.iter().any(|stmt| self.stmt_contains_iterator_pattern(stmt)) ||
-        block.expr.as_ref().map_or(false, |expr| self.expr_contains_iterator_pattern(expr))
     }
 
     /// Check if a block contains break statements with values
@@ -432,12 +273,7 @@ impl SimplifiedHirJsPass {
                         // Transform the loop body to assign to temp variable on break
                         let mut transformed_loop = expr.clone();
                         if let hir::ExprKind::Loop(body) = &mut transformed_loop.kind {
-                            // Check if this is a for-loop pattern and transform accordingly
-                            if self.is_for_loop_pattern(body) {
-                                self.transform_for_loop_break_statements(body, &temp_name, ctx);
-                            } else {
-                                self.transform_break_statements_in_block(body, &temp_name, ctx);
-                            }
+                            self.transform_break_statements_in_block(body, &temp_name, ctx);
                         }
 
                         // Create loop statement (not assigned to anything)
@@ -1527,19 +1363,9 @@ impl HirPass for SimplifiedHirJsPass {
     }
 
     fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
-        // Simple approach: only run one iteration to fix temp variable accumulation issue
-        // that was caused by statement buffer removal from codegen
-        
-        if self.iteration_count > 0 {
-            return false;
-        }
-        
-        self.iteration_count += 1;
         self.changes_made = false;
         self.visit_module(module, ctx);
-        
-        // Don't return changes_made to prevent additional iterations that create extra temp vars
-        false
+        self.changes_made
     }
 }
 
@@ -1579,12 +1405,7 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                         // Transform the loop body to assign to temp variable on break
                         let mut transformed_loop = completion_expr.clone();
                         if let hir::ExprKind::Loop(body) = &mut transformed_loop.kind {
-                            // Check if this is a for-loop pattern and transform accordingly
-                            if self.is_for_loop_pattern(body) {
-                                self.transform_for_loop_break_statements(body, &temp_name, ctx);
-                            } else {
-                                self.transform_break_statements_in_block(body, &temp_name, ctx);
-                            }
+                            self.transform_break_statements_in_block(body, &temp_name, ctx);
                         }
 
                         // Create loop statement (not assigned to anything)
@@ -1594,12 +1415,6 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                             span,
                         );
                         new_stmts.push(loop_stmt);
-
-                        // For for-loop patterns, add accumulator assignment after the loop
-                        // TEMPORARY DEBUG: Always add assignment for any loop
-                        let accumulator_path = self.create_accumulator_path(ctx, span);
-                        let assignment_stmt = self.create_assignment_stmt(ctx, &temp_name, accumulator_path, span);
-                        new_stmts.push(assignment_stmt);
 
                         // Replace completion expression with temp variable reference
                         *completion_expr = self.create_temp_var_path(ctx, &temp_name, span);
