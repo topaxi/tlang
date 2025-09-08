@@ -263,46 +263,12 @@ impl SimplifiedHirJsPass {
         expr: hir::Expr,
         ctx: &mut HirOptContext,
     ) -> (hir::Expr, Vec<hir::Stmt>) {
-        let temp_name = self.generate_temp_var_name();
         let span = expr.span;
 
-        // Create temp variable declaration
-        let temp_declaration = self.create_temp_var_declaration(ctx, &temp_name, span);
-
-        // Create temp variable reference
-        let temp_ref = self.create_temp_var_path(ctx, &temp_name, span);
-
-        // Handle complex expressions specially
+        // Handle complex expressions specially - only generate temp variables when actually needed
         match &expr.kind {
-            hir::ExprKind::Block(_block) => {
-                // For block expressions, transform the block to assign to temp variable
-                let statements = self.transform_block_to_statements(expr, &temp_name, ctx);
-                let mut all_stmts = vec![temp_declaration];
-                all_stmts.extend(statements);
-                (temp_ref, all_stmts)
-            }
-            hir::ExprKind::Loop(..) => {
-                // For loop expressions, inline the transformation instead of using transform_loop_expression
-                // We need to handle the break statements and make the loop a statement
-                
-                // Transform the loop body to assign to temp variable on break
-                let mut transformed_loop = expr.clone();
-                if let hir::ExprKind::Loop(body) = &mut transformed_loop.kind {
-                    self.transform_break_statements_in_block(body, &temp_name, ctx);
-                }
-
-                // Create loop statement (not assigned to anything)
-                let loop_stmt = hir::Stmt::new(
-                    ctx.hir_id_allocator.next_id(),
-                    hir::StmtKind::Expr(Box::new(transformed_loop)),
-                    span,
-                );
-
-                let all_stmts = vec![temp_declaration, loop_stmt];
-                (temp_ref, all_stmts)
-            }
             hir::ExprKind::Match(_, arms) => {
-                // Check if all arms have return statements - if so, no temp variable is needed
+                // Check if all arms have return statements - if so, no temp variable assignment is needed
                 let all_arms_have_returns = arms.iter().all(|arm| {
                     if let Some(last_stmt) = arm.block.stmts.last() {
                         matches!(last_stmt.kind, hir::StmtKind::Return(_))
@@ -312,50 +278,24 @@ impl SimplifiedHirJsPass {
                 });
 
                 if all_arms_have_returns {
-                    // No temp variable needed, just return the match expression as statements
-                    let statements = self.transform_match_to_statements(expr, &temp_name, ctx);
-                    // Return a dummy temp ref (won't be used) and no temp declaration
-                    let dummy_temp_ref = self.create_temp_var_path(ctx, &temp_name, span);
-                    (dummy_temp_ref, statements)
+                    // Create temp variable but don't assign to it (since all arms return)
+                    let temp_name = self.generate_temp_var_name();
+                    let temp_declaration = self.create_temp_var_declaration(ctx, &temp_name, span);
+                    let temp_ref = self.create_temp_var_path(ctx, &temp_name, span);
+                    let statements = self.transform_match_to_statements(expr, "", ctx);
+                    let mut all_stmts = vec![temp_declaration];
+                    all_stmts.extend(statements);
+                    (temp_ref, all_stmts)
                 } else {
-                    // For match expressions, transform to proper statements
+                    // For match expressions, generate temp variable and transform to proper statements
+                    let temp_name = self.generate_temp_var_name();
+                    let temp_declaration = self.create_temp_var_declaration(ctx, &temp_name, span);
+                    let temp_ref = self.create_temp_var_path(ctx, &temp_name, span);
                     let statements = self.transform_match_to_statements(expr, &temp_name, ctx);
                     let mut all_stmts = vec![temp_declaration];
                     all_stmts.extend(statements);
                     (temp_ref, all_stmts)
                 }
-            }
-            hir::ExprKind::IfElse(..) => {
-                // For if-else expressions, transform to proper statements
-                let statements = self.transform_if_else_to_statements(expr, &temp_name, ctx);
-                let mut all_stmts = vec![temp_declaration];
-                all_stmts.extend(statements);
-                (temp_ref, all_stmts)
-            }
-            hir::ExprKind::Break(Some(break_value)) => {
-                // For break expressions with values, transform to:
-                // let result = break value; -> temp_var = value; break; let result = temp_var;
-
-                // Extract the break value
-                let value_expr = *break_value.clone();
-                let assignment_stmt =
-                    self.create_assignment_stmt(ctx, &temp_name, value_expr, span);
-
-                // Create plain break statement
-                let plain_break = hir::Stmt::new(
-                    ctx.hir_id_allocator.next_id(),
-                    hir::StmtKind::Expr(Box::new(hir::Expr {
-                        hir_id: ctx.hir_id_allocator.next_id(),
-                        kind: hir::ExprKind::Break(None),
-                        span,
-                    })),
-                    span,
-                );
-
-                (
-                    temp_ref,
-                    vec![temp_declaration, assignment_stmt, plain_break],
-                )
             }
             hir::ExprKind::Break(None) => {
                 // For break expressions without values, move to statement position
@@ -399,134 +339,202 @@ impl SimplifiedHirJsPass {
 
                 (wildcard_expr, vec![plain_continue])
             }
-            hir::ExprKind::Binary(hir::BinaryOpKind::Or, lhs, rhs) => {
-                // Transform: a || b -> if a { temp = a; } else { temp = b; }
-                // Need to flatten both operands first if they're complex
-                let mut all_stmts = vec![temp_declaration];
-                
-                // Flatten left operand if needed
-                let (left_expr, left_stmts) = if !self.can_render_as_js_expr(lhs) {
-                    self.flatten_expression_to_temp_var((**lhs).clone(), ctx)
-                } else {
-                    ((**lhs).clone(), vec![])
-                };
-                all_stmts.extend(left_stmts);
-                
-                // Flatten right operand if needed
-                let (right_expr, right_stmts) = if !self.can_render_as_js_expr(rhs) {
-                    self.flatten_expression_to_temp_var((**rhs).clone(), ctx)
-                } else {
-                    ((**rhs).clone(), vec![])
-                };
-                
-                // Create if-else structure: if left { temp = left; } else { right_stmts; temp = right; }
-                let then_block = hir::Block::new(
-                    ctx.hir_id_allocator.next_id(),
-                    vec![self.create_assignment_stmt(ctx, &temp_name, left_expr.clone(), span)],
-                    None,
-                    span,
-                );
-                
-                let mut else_stmts = right_stmts;
-                else_stmts.push(self.create_assignment_stmt(ctx, &temp_name, right_expr, span));
-                let else_block = hir::Block::new(
-                    ctx.hir_id_allocator.next_id(),
-                    else_stmts,
-                    None,
-                    span,
-                );
-                
-                let if_else_expr = hir::Expr {
-                    hir_id: ctx.hir_id_allocator.next_id(),
-                    kind: hir::ExprKind::IfElse(
-                        Box::new(left_expr),
-                        Box::new(then_block),
-                        vec![hir::ElseClause {
-                            condition: None,
-                            consequence: else_block,
-                        }],
-                    ),
-                    span,
-                };
-                
-                let if_else_stmt = hir::Stmt::new(
-                    ctx.hir_id_allocator.next_id(),
-                    hir::StmtKind::Expr(Box::new(if_else_expr)),
-                    span,
-                );
-                all_stmts.push(if_else_stmt);
-                
-                (temp_ref, all_stmts)
-            }
-            hir::ExprKind::Binary(hir::BinaryOpKind::And, lhs, rhs) => {
-                // Transform: a && b -> if a { temp = b; } else { temp = false; }
-                // Need to flatten both operands first if they're complex
-                let mut all_stmts = vec![temp_declaration];
-                
-                // Flatten left operand if needed
-                let (left_expr, left_stmts) = if !self.can_render_as_js_expr(lhs) {
-                    self.flatten_expression_to_temp_var((**lhs).clone(), ctx)
-                } else {
-                    ((**lhs).clone(), vec![])
-                };
-                all_stmts.extend(left_stmts);
-                
-                // Flatten right operand if needed
-                let (right_expr, right_stmts) = if !self.can_render_as_js_expr(rhs) {
-                    self.flatten_expression_to_temp_var((**rhs).clone(), ctx)
-                } else {
-                    ((**rhs).clone(), vec![])
-                };
-                
-                // Create if-else structure: if left { right_stmts; temp = right; } else { temp = false; }
-                let mut then_stmts = right_stmts;
-                then_stmts.push(self.create_assignment_stmt(ctx, &temp_name, right_expr, span));
-                let then_block = hir::Block::new(
-                    ctx.hir_id_allocator.next_id(),
-                    then_stmts,
-                    None,
-                    span,
-                );
-                
-                let false_expr = hir::Expr {
-                    hir_id: ctx.hir_id_allocator.next_id(),
-                    kind: hir::ExprKind::Literal(Box::new(tlang_ast::token::Literal::Boolean(false))),
-                    span,
-                };
-                
-                let else_block = hir::Block::new(
-                    ctx.hir_id_allocator.next_id(),
-                    vec![self.create_assignment_stmt(ctx, &temp_name, false_expr, span)],
-                    None,
-                    span,
-                );
-                
-                let if_else_expr = hir::Expr {
-                    hir_id: ctx.hir_id_allocator.next_id(),
-                    kind: hir::ExprKind::IfElse(
-                        Box::new(left_expr),
-                        Box::new(then_block),
-                        vec![hir::ElseClause {
-                            condition: None,
-                            consequence: else_block,
-                        }],
-                    ),
-                    span,
-                };
-                
-                let if_else_stmt = hir::Stmt::new(
-                    ctx.hir_id_allocator.next_id(),
-                    hir::StmtKind::Expr(Box::new(if_else_expr)),
-                    span,
-                );
-                all_stmts.push(if_else_stmt);
-                
-                (temp_ref, all_stmts)
-            }
             _ => {
-                // For simple expressions, create assignment statement
-                let assignment_stmt = self.create_assignment_stmt(ctx, &temp_name, expr, span);
-                (temp_ref, vec![temp_declaration, assignment_stmt])
+                // For all other cases, generate temp variable normally
+                let temp_name = self.generate_temp_var_name();
+                let temp_declaration = self.create_temp_var_declaration(ctx, &temp_name, span);
+                let temp_ref = self.create_temp_var_path(ctx, &temp_name, span);
+
+                match &expr.kind {
+                    hir::ExprKind::Block(_block) => {
+                        // For block expressions, transform the block to assign to temp variable
+                        let statements = self.transform_block_to_statements(expr, &temp_name, ctx);
+                        let mut all_stmts = vec![temp_declaration];
+                        all_stmts.extend(statements);
+                        (temp_ref, all_stmts)
+                    }
+                    hir::ExprKind::Loop(..) => {
+                        // For loop expressions, inline the transformation instead of using transform_loop_expression
+                        // We need to handle the break statements and make the loop a statement
+                        
+                        // Transform the loop body to assign to temp variable on break
+                        let mut transformed_loop = expr.clone();
+                        if let hir::ExprKind::Loop(body) = &mut transformed_loop.kind {
+                            self.transform_break_statements_in_block(body, &temp_name, ctx);
+                        }
+
+                        // Create loop statement (not assigned to anything)
+                        let loop_stmt = hir::Stmt::new(
+                            ctx.hir_id_allocator.next_id(),
+                            hir::StmtKind::Expr(Box::new(transformed_loop)),
+                            span,
+                        );
+
+                        let all_stmts = vec![temp_declaration, loop_stmt];
+                        (temp_ref, all_stmts)
+                    }
+                    hir::ExprKind::IfElse(..) => {
+                        // For if-else expressions, transform to proper statements
+                        let statements = self.transform_if_else_to_statements(expr, &temp_name, ctx);
+                        let mut all_stmts = vec![temp_declaration];
+                        all_stmts.extend(statements);
+                        (temp_ref, all_stmts)
+                    }
+                    hir::ExprKind::Break(Some(break_value)) => {
+                        // For break expressions with values, transform to:
+                        // let result = break value; -> temp_var = value; break; let result = temp_var;
+
+                        // Extract the break value
+                        let value_expr = *break_value.clone();
+                        let assignment_stmt =
+                            self.create_assignment_stmt(ctx, &temp_name, value_expr, span);
+
+                        // Create plain break statement
+                        let plain_break = hir::Stmt::new(
+                            ctx.hir_id_allocator.next_id(),
+                            hir::StmtKind::Expr(Box::new(hir::Expr {
+                                hir_id: ctx.hir_id_allocator.next_id(),
+                                kind: hir::ExprKind::Break(None),
+                                span,
+                            })),
+                            span,
+                        );
+
+                        (
+                            temp_ref,
+                            vec![temp_declaration, assignment_stmt, plain_break],
+                        )
+                    }
+                    hir::ExprKind::Binary(hir::BinaryOpKind::Or, lhs, rhs) => {
+                        // Transform: a || b -> if a { temp = a; } else { temp = b; }
+                        // Need to flatten both operands first if they're complex
+                        let mut all_stmts = vec![temp_declaration];
+                        
+                        // Flatten left operand if needed
+                        let (left_expr, left_stmts) = if !self.can_render_as_js_expr(lhs) {
+                            self.flatten_expression_to_temp_var((**lhs).clone(), ctx)
+                        } else {
+                            ((**lhs).clone(), vec![])
+                        };
+                        all_stmts.extend(left_stmts);
+                        
+                        // Flatten right operand if needed
+                        let (right_expr, right_stmts) = if !self.can_render_as_js_expr(rhs) {
+                            self.flatten_expression_to_temp_var((**rhs).clone(), ctx)
+                        } else {
+                            ((**rhs).clone(), vec![])
+                        };
+                        
+                        // Create if-else structure: if left { temp = left; } else { right_stmts; temp = right; }
+                        let then_block = hir::Block::new(
+                            ctx.hir_id_allocator.next_id(),
+                            vec![self.create_assignment_stmt(ctx, &temp_name, left_expr.clone(), span)],
+                            None,
+                            span,
+                        );
+                        
+                        let mut else_stmts = right_stmts;
+                        else_stmts.push(self.create_assignment_stmt(ctx, &temp_name, right_expr, span));
+                        let else_block = hir::Block::new(
+                            ctx.hir_id_allocator.next_id(),
+                            else_stmts,
+                            None,
+                            span,
+                        );
+                        
+                        let if_else_expr = hir::Expr {
+                            hir_id: ctx.hir_id_allocator.next_id(),
+                            kind: hir::ExprKind::IfElse(
+                                Box::new(left_expr),
+                                Box::new(then_block),
+                                vec![hir::ElseClause {
+                                    condition: None,
+                                    consequence: else_block,
+                                }],
+                            ),
+                            span,
+                        };
+                        
+                        let if_else_stmt = hir::Stmt::new(
+                            ctx.hir_id_allocator.next_id(),
+                            hir::StmtKind::Expr(Box::new(if_else_expr)),
+                            span,
+                        );
+                        all_stmts.push(if_else_stmt);
+                        
+                        (temp_ref, all_stmts)
+                    }
+                    hir::ExprKind::Binary(hir::BinaryOpKind::And, lhs, rhs) => {
+                        // Transform: a && b -> if a { temp = b; } else { temp = false; }
+                        // Need to flatten both operands first if they're complex
+                        let mut all_stmts = vec![temp_declaration];
+                        
+                        // Flatten left operand if needed
+                        let (left_expr, left_stmts) = if !self.can_render_as_js_expr(lhs) {
+                            self.flatten_expression_to_temp_var((**lhs).clone(), ctx)
+                        } else {
+                            ((**lhs).clone(), vec![])
+                        };
+                        all_stmts.extend(left_stmts);
+                        
+                        // Flatten right operand if needed
+                        let (right_expr, right_stmts) = if !self.can_render_as_js_expr(rhs) {
+                            self.flatten_expression_to_temp_var((**rhs).clone(), ctx)
+                        } else {
+                            ((**rhs).clone(), vec![])
+                        };
+                        
+                        // Create if-else structure: if left { right_stmts; temp = right; } else { temp = false; }
+                        let mut then_stmts = right_stmts;
+                        then_stmts.push(self.create_assignment_stmt(ctx, &temp_name, right_expr, span));
+                        let then_block = hir::Block::new(
+                            ctx.hir_id_allocator.next_id(),
+                            then_stmts,
+                            None,
+                            span,
+                        );
+                        
+                        let false_expr = hir::Expr {
+                            hir_id: ctx.hir_id_allocator.next_id(),
+                            kind: hir::ExprKind::Literal(Box::new(tlang_ast::token::Literal::Boolean(false))),
+                            span,
+                        };
+                        
+                        let else_block = hir::Block::new(
+                            ctx.hir_id_allocator.next_id(),
+                            vec![self.create_assignment_stmt(ctx, &temp_name, false_expr, span)],
+                            None,
+                            span,
+                        );
+                        
+                        let if_else_expr = hir::Expr {
+                            hir_id: ctx.hir_id_allocator.next_id(),
+                            kind: hir::ExprKind::IfElse(
+                                Box::new(left_expr),
+                                Box::new(then_block),
+                                vec![hir::ElseClause {
+                                    condition: None,
+                                    consequence: else_block,
+                                }],
+                            ),
+                            span,
+                        };
+                        
+                        let if_else_stmt = hir::Stmt::new(
+                            ctx.hir_id_allocator.next_id(),
+                            hir::StmtKind::Expr(Box::new(if_else_expr)),
+                            span,
+                        );
+                        all_stmts.push(if_else_stmt);
+                        
+                        (temp_ref, all_stmts)
+                    }
+                    _ => {
+                        // For simple expressions, create assignment statement
+                        let assignment_stmt = self.create_assignment_stmt(ctx, &temp_name, expr, span);
+                        (temp_ref, vec![temp_declaration, assignment_stmt])
+                    }
+                }
             }
         }
     }
@@ -547,6 +555,21 @@ impl SimplifiedHirJsPass {
                 }
             }
             _ => false,
+        }
+    }
+
+    /// Check if expression is a match with all return statements
+    fn is_match_with_all_returns(&self, expr: &hir::Expr) -> bool {
+        if let hir::ExprKind::Match(_, arms) = &expr.kind {
+            arms.iter().all(|arm| {
+                if let Some(last_stmt) = arm.block.stmts.last() {
+                    matches!(last_stmt.kind, hir::StmtKind::Return(_))
+                } else {
+                    false
+                }
+            })
+        } else {
+            false
         }
     }
 
@@ -996,8 +1019,8 @@ impl SimplifiedHirJsPass {
                 }
             });
 
-            // If all arms have return statements, don't create assignment statements
-            if all_arms_have_returns {
+            // If all arms have return statements or temp_name is empty, don't create assignment statements
+            if all_arms_have_returns || temp_name.is_empty() {
                 // Just create the match statement without temp variable assignments
                 let match_stmt = hir::Stmt::new(
                     ctx.hir_id_allocator.next_id(),
@@ -1064,8 +1087,17 @@ impl SimplifiedHirJsPass {
 
             vec![match_stmt]
         } else {
-            // Fallback: create a simple assignment statement
-            vec![self.create_assignment_stmt(ctx, temp_name, expr, span)]
+            // Fallback: create a simple assignment statement if temp_name is provided
+            if !temp_name.is_empty() {
+                vec![self.create_assignment_stmt(ctx, temp_name, expr, span)]
+            } else {
+                // No temp variable, just wrap in an expression statement
+                vec![hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(expr)),
+                    span,
+                )]
+            }
         }
     }
 
@@ -1256,7 +1288,6 @@ impl SimplifiedHirJsPass {
                 if let hir::ExprKind::Binary(hir::BinaryOpKind::Assign, lhs, rhs) = &expr.kind
                     && let hir::ExprKind::Match(..) = &rhs.kind
                 {
-                    eprintln!("DEBUG: Found assignment with match!");
                     // Transform assignment with match: lhs = match ... ->
                     // temp_var = ...; match { arms assign to temp_var }; lhs = temp_var
                     let temp_name = self.generate_temp_var_name();
@@ -1419,19 +1450,27 @@ impl HirPass for SimplifiedHirJsPass {
     }
 
     fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
-        // Run multiple times until no more changes are made to handle nested transformations
-        const MAX_ITERATIONS: usize = 5; // Prevent infinite loops
+        // For functions with only match expressions with all return statements, 
+        // we only need one iteration to avoid temp variable accumulation
         
-        if self.iteration_count >= MAX_ITERATIONS {
-            return false;
-        }
-
-        self.iteration_count += 1;
         self.changes_made = false;
         self.visit_module(module, ctx);
         
-        // Return true if changes were made to trigger another iteration
-        self.changes_made
+        // Only return true for the first change to avoid multiple iterations
+        // for simple cases like match expressions with all return statements
+        if self.iteration_count == 0 && self.changes_made {
+            self.iteration_count += 1;
+            return true;
+        }
+        
+        // For complex cases that need multiple iterations
+        const MAX_ITERATIONS: usize = 5;
+        if self.iteration_count < MAX_ITERATIONS && self.changes_made {
+            self.iteration_count += 1;
+            return true;
+        }
+        
+        false
     }
 }
 
@@ -1550,6 +1589,7 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                 }
             } else if !self.can_render_as_js_expr(completion_expr)
                 && !self.contains_temp_variables(completion_expr)
+                && !self.is_match_with_all_returns(completion_expr)
             {
                 // General flattening for other complex expressions
                 let (flattened_expr, mut temp_stmts) =
