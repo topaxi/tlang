@@ -1595,6 +1595,12 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                         );
                         new_stmts.push(loop_stmt);
 
+                        // For for-loop patterns, add accumulator assignment after the loop
+                        // TEMPORARY DEBUG: Always add assignment for any loop
+                        let accumulator_path = self.create_accumulator_path(ctx, span);
+                        let assignment_stmt = self.create_assignment_stmt(ctx, &temp_name, accumulator_path, span);
+                        new_stmts.push(assignment_stmt);
+
                         // Replace completion expression with temp variable reference
                         *completion_expr = self.create_temp_var_path(ctx, &temp_name, span);
                         self.changes_made = true;
