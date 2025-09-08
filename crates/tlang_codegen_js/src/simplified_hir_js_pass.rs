@@ -481,6 +481,13 @@ impl SimplifiedHirJsPass {
         false
     }
 
+    /// Check if an expression can be handled directly as a statement without temp variables
+    /// This is for expressions that appear in statement context where we don't need their value
+    fn can_render_as_js_stmt(&self, expr: &hir::Expr) -> bool {
+        // Use the utility function which handles most cases correctly
+        expr_can_render_as_js_stmt(expr)
+    }
+
     /// Check if an expression is a temp variable that we created
     fn is_temp_variable(&self, expr: &hir::Expr) -> bool {
         match &expr.kind {
@@ -1453,9 +1460,8 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                         self.changes_made = true;
                     }
                 }
-            }
             // Special handling for assignment expressions with match on RHS (even if they contain temp vars)
-            else if let hir::ExprKind::Binary(hir::BinaryOpKind::Assign, lhs, rhs) =
+            } else if let hir::ExprKind::Binary(hir::BinaryOpKind::Assign, lhs, rhs) =
                 &completion_expr.kind
             {
                 if let hir::ExprKind::Match(..) = &rhs.kind {
@@ -1495,10 +1501,27 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                     *completion_expr = temp_ref;
                     self.changes_made = true;
                 }
+            } else if let hir::ExprKind::Match(..) = &completion_expr.kind {
+                // Special handling for match expressions in statement context
+                // Transform arm completion expressions to statements but don't create temp variables for the overall match
+                let span = completion_expr.span;
+                
+                // Transform the match expression in place to convert arm completion expressions to statements
+                let match_statements = self.transform_match_to_statements(completion_expr.clone(), "", ctx);
+                new_stmts.extend(match_statements);
+                
+                // Replace completion expression with wildcard since the match is now in statement form
+                *completion_expr = hir::Expr {
+                    hir_id: ctx.hir_id_allocator.next_id(),
+                    kind: hir::ExprKind::Wildcard,
+                    span,
+                };
+                self.changes_made = true;
             } else if !self.can_render_as_js_expr(completion_expr)
+                && !self.can_render_as_js_stmt(completion_expr)
                 && !self.contains_temp_variables(completion_expr)
             {
-                // General flattening for other complex expressions
+                // General flattening for other complex expressions that can't be rendered as statements
                 let (flattened_expr, mut temp_stmts) =
                     self.flatten_expression_to_temp_var(completion_expr.clone(), ctx);
 
@@ -1571,7 +1594,9 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                 }
             }
             hir::ExprKind::Loop(loop_body) => {
-                // Visit loop body to catch nested expressions
+                // Visit loop body to catch nested expressions that need transformation
+                // This is necessary to handle break/continue expressions and ensure match 
+                // expressions are properly structured for JavaScript generation
                 self.visit_block(loop_body, ctx);
             }
             hir::ExprKind::Block(block) => {
