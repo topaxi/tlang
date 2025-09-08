@@ -4,20 +4,12 @@ expression: output
 ---
 function test_nested_complex_expression() {
     let $hir$0 = undefined;
-    if (if (true) {
-        let $tmp$0;{
+    if (true) {
         let x = 42;
-        $tmp$0 = 42 > 0;
-    };
-$tmp$0} else {
-        let $tmp$1;{
-        let y = 0;
-        $tmp$1 = 0 === 0;
-    };
-$tmp$1}) {
-        $hir$0 = "positive";
+        $hir$0 = 42 > 0;
     } else {
-        $hir$0 = "negative";
+        let y = 0;
+        $hir$0 = 0 === 0;
     }
-    return $hir$0;
+    return $hir$0 ? "positive" : "negative";
 }

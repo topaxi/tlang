@@ -24,16 +24,19 @@ fn test_for_loop_simple_iteration() {
         let sum = 0;
         {
             let iterator$$ = iterator.iter([1, 2, 3, 4, 5]);
-            for (;;) {
-                let $tmp$0;
-                let $tmp$1 = iterator$$.next();
-                let i;if ($tmp$1.tag === Option.Some && (i = $tmp$1[0], true)) {
+                let $tmp$0 = iterator$$.next();
+                let i;if ($tmp$0.tag === Option.Some && (i = $tmp$0[0], true)) {
                     sum = sum + i;
-                } else if ($tmp$1.tag === Option.None) {
+                } else if ($tmp$0.tag === Option.None) {
                     break;
                 };
+                $hir$4;
+                $hir$3;
+                $hir$2;
+                $hir$1;
+                $hir$0;
             }
-        }
+    undefined    };
         return sum;
     }
     ");
@@ -52,14 +55,23 @@ fn test_for_loop_with_accumulator_simple() {
     // Expected: Should generate JavaScript that accumulates values and returns final result
     assert_snapshot!(output, @r"
     function test_sum() {
-                let $tmp$0;
-                let $tmp$1 = iterator$$.next();
-                let i;if ($tmp$1.tag === Option.Some && (i = $tmp$1[0], true)) {
-                    $tmp$0 = sum + i;
-                } else if ($tmp$1.tag === Option.None) {
+        let $hir$0 = undefined;
+        {
+            let iterator$$ = iterator.iter([1, 2, 3, 4, 5]);
+            let accumulator$$ = 0;
+            let $hir$1 = undefined;
+            for (;;) {
+                let $tmp$0 = iterator$$.next();
+                let i;if ($tmp$0.tag === Option.Some && (i = $tmp$0[0], true)) {
+                    $hir$1 = sum + i;
+                } else if ($tmp$0.tag === Option.None) {
                     break;
                 };
-            }    }
+                accumulator$$ = $hir$1;
+            }
+            ($hir$0 = $hir$1);
+        };
+        return $hir$0;
     }
     ");
 }
@@ -81,14 +93,22 @@ fn test_for_loop_with_accumulator_pattern() {
     // Expected: Should handle destructuring pattern in accumulator
     assert_snapshot!(output, @r"
     function separate_even_odd() {
-                let $tmp$0;
-                let $tmp$1 = iterator$$.next();
-                let n;if ($tmp$1.tag === Option.Some && (n = $tmp$1[0], true)) {
-                    $tmp$0 = n % 2 === 0 ? [[...even, n], odd] : [even, [...odd, n]];
-                } else if ($tmp$1.tag === Option.None) {
+        let $hir$0 = undefined;
+        {
+            let iterator$$ = iterator.iter([1, 2, 3, 4]);
+            let accumulator$$ = [[], []];
+            for (;;) {
+                let $tmp$0 = iterator$$.next();
+                let n;if ($tmp$0.tag === Option.Some && (n = $tmp$0[0], true)) {
+                    $hir$1 = (n % 2 === 0 ? [[...even, n], odd] : [even, [...odd, n]]);
+                } else if ($tmp$0.tag === Option.None) {
                     break;
                 };
-            }    }
+                accumulator$$ = $hir$1;
+                $hir$1;
+            }
+        };
+        return $hir$0;
     }
     ");
 }
@@ -114,27 +134,25 @@ fn test_for_loop_nested() {
         {
             let iterator$$ = iterator.iter([[1, 2], [3, 4]]);
             for (;;) {
-                let $tmp$0;
-                let $tmp$1 = iterator$$.next();
-                let row;if ($tmp$1.tag === Option.Some && (row = $tmp$1[0], true)) {
-                    $tmp$0 = {
-                        let iterator$$ = iterator.iter(row);
-                            let $tmp$2;
-                            let $tmp$3 = iterator$$.next();
-                            let val;if ($tmp$3.tag === Option.Some && (val = $tmp$3[0], true)) {
-                                $tmp$2 = total = total + val;
-                            } else if ($tmp$3.tag === Option.None) {
+                let $tmp$0 = iterator$$.next();
+                let row;if ($tmp$0.tag === Option.Some && (row = $tmp$0[0], true)) {
+                    $hir$0 = {
+                        let iterator$$0 = iterator.iter(row);
+                            let $tmp$1 = iterator$$0.next();
+                            let val;if ($tmp$1.tag === Option.Some && (val = $tmp$1[0], true)) {
+                                $hir$1 = (total = total + val);
+                            } else if ($tmp$1.tag === Option.None) {
                                 break;
-                            }
-                            $tmp$0 = $tmp$2;
-                            $tmp$1 = $tmp$2;;
+                            };
+                            $hir$1;
                         }
-                    };
-                } else if ($tmp$1.tag === Option.None) {
+    undefined                };
+                } else if ($tmp$0.tag === Option.None) {
                     break;
                 };
+                $hir$0;
             }
-        }
+    undefined    };
         return total;
     }
     ");
@@ -151,18 +169,25 @@ fn test_for_loop_with_string_iteration() {
     "#});
 
     // Expected: Should handle string iteration (may need special handling)
-    assert_snapshot!(output, @r"
+    assert_snapshot!(output, @r#"
     function char_count() {
-                let $tmp$0;
-                let $tmp$1 = iterator$$.next();
-                let char;if ($tmp$1.tag === Option.Some && (char = $tmp$1[0], true)) {
-                    $tmp$0 = count + 1;
-                } else if ($tmp$1.tag === Option.None) {
+        let $hir$0 = undefined;
+        {
+            let iterator$$ = iterator.iter("hello");
+            let accumulator$$ = 0;
+                let $tmp$0 = iterator$$.next();
+                let char;if ($tmp$0.tag === Option.Some && (char = $tmp$0[0], true)) {
+                    $hir$1 = count + 1;
+                } else if ($tmp$0.tag === Option.None) {
                     break;
                 };
-            }    }
+                accumulator$$ = $hir$1;
+                $hir$1;
+            }
+        };
+        return $hir$0;
     }
-    ");
+    "#);
 }
 
 #[test]
@@ -178,14 +203,21 @@ fn test_for_loop_with_range() {
     // Expected: Should handle range iteration
     assert_snapshot!(output, @r"
     function range_sum() {
-                let $tmp$0;
-                let $tmp$1 = iterator$$.next();
-                let i;if ($tmp$1.tag === Option.Some && (i = $tmp$1[0], true)) {
-                    $tmp$0 = sum + i;
-                } else if ($tmp$1.tag === Option.None) {
+        let $hir$0 = undefined;
+        {
+            let iterator$$ = iterator.iter(0);
+            let accumulator$$ = 0;
+                let $tmp$0 = iterator$$.next();
+                let i;if ($tmp$0.tag === Option.Some && (i = $tmp$0[0], true)) {
+                    $hir$1 = sum + i;
+                } else if ($tmp$0.tag === Option.None) {
                     break;
                 };
-            }    }
+                accumulator$$ = $hir$1;
+                $hir$1;
+            }
+        };
+        return $hir$0;
     }
     ");
 }
@@ -203,14 +235,21 @@ fn test_for_loop_with_variable_iterable() {
     // Expected: Should handle variable as iterable
     assert_snapshot!(output, @r"
     function sum_list(list) {
-                let $tmp$0;
-                let $tmp$1 = iterator$$.next();
-                let item;if ($tmp$1.tag === Option.Some && (item = $tmp$1[0], true)) {
-                    $tmp$0 = sum + item;
-                } else if ($tmp$1.tag === Option.None) {
+        let $hir$0 = undefined;
+        {
+            let iterator$$ = iterator.iter(list);
+            let accumulator$$ = 0;
+                let $tmp$0 = iterator$$.next();
+                let item;if ($tmp$0.tag === Option.Some && (item = $tmp$0[0], true)) {
+                    $hir$1 = sum + item;
+                } else if ($tmp$0.tag === Option.None) {
                     break;
                 };
-            }    }
+                accumulator$$ = $hir$1;
+                $hir$1;
+            }
+        };
+        return $hir$0;
     }
     ");
 }
@@ -233,14 +272,21 @@ fn test_for_loop_with_function_call_iterable() {
         return [1, 2, 3];
     }
     function sum_from_function() {
-                let $tmp$0;
-                let $tmp$1 = iterator$$.next();
-                let num;if ($tmp$1.tag === Option.Some && (num = $tmp$1[0], true)) {
-                    $tmp$0 = sum + num;
-                } else if ($tmp$1.tag === Option.None) {
+        let $hir$0 = undefined;
+        {
+            let iterator$$ = iterator.iter(get_numbers());
+            let accumulator$$ = 0;
+                let $tmp$0 = iterator$$.next();
+                let num;if ($tmp$0.tag === Option.Some && (num = $tmp$0[0], true)) {
+                    $hir$1 = sum + num;
+                } else if ($tmp$0.tag === Option.None) {
                     break;
                 };
-            }    }
+                accumulator$$ = $hir$1;
+                $hir$1;
+            }
+        };
+        return $hir$0;
     }
     ");
 }
@@ -263,14 +309,14 @@ fn test_for_loop_expression_in_let() {
         {
             let iterator$$ = iterator.iter([1, 2, 3]);
             let accumulator$$ = 0;
-                let $tmp$0;
-                let $tmp$1 = iterator$$.next();
-                let i;if ($tmp$1.tag === Option.Some && (i = $tmp$1[0], true)) {
-                    $tmp$0 = acc + i;
-                } else if ($tmp$1.tag === Option.None) {
-                    $hir$0 = accumulator$$;
+                let $tmp$0 = iterator$$.next();
+                let i;if ($tmp$0.tag === Option.Some && (i = $tmp$0[0], true)) {
+                    $hir$1 = acc + i;
+                } else if ($tmp$0.tag === Option.None) {
                     break;
                 };
+                accumulator$$ = $hir$1;
+                $hir$1;
             }
         };
         let result = $hir$0;
@@ -292,14 +338,21 @@ fn test_for_loop_expression_in_return() {
     // Expected: Should handle for loop as expression in return
     assert_snapshot!(output, @r"
     function test() {
-                let $tmp$0;
-                let $tmp$1 = iterator$$.next();
-                let i;if ($tmp$1.tag === Option.Some && (i = $tmp$1[0], true)) {
-                    $tmp$0 = acc + i;
-                } else if ($tmp$1.tag === Option.None) {
+        let $hir$0 = undefined;
+        {
+            let iterator$$ = iterator.iter([1, 2, 3]);
+            let accumulator$$ = 0;
+                let $tmp$0 = iterator$$.next();
+                let i;if ($tmp$0.tag === Option.Some && (i = $tmp$0[0], true)) {
+                    $hir$1 = acc + i;
+                } else if ($tmp$0.tag === Option.None) {
                     break;
                 };
-            }    }
+                accumulator$$ = $hir$1;
+                $hir$1;
+            }
+        };
+        return $hir$0;
     }
     ");
 }
@@ -317,15 +370,21 @@ fn test_for_loop_with_complex_pattern() {
     // Expected: Should handle complex destructuring pattern in for loop
     assert_snapshot!(output, @r"
     function process_pairs() {
-                let $tmp$0;
-                let $tmp$1 = iterator$$.next();
-                let a;
-                let b;if ($tmp$1.tag === Option.Some && $tmp$1[0].length >= 2 && (a = $tmp$1[0][0], true) && (b = $tmp$1[0][1], true)) {
-                    $tmp$0 = sum + a + b;
-                } else if ($tmp$1.tag === Option.None) {
+        let $hir$0 = undefined;
+        {
+            let iterator$$ = iterator.iter([[1, 2], [3, 4], [5, 6]]);
+            let accumulator$$ = 0;
+                let $tmp$0 = iterator$$.next();
+                let a,b;if ($tmp$0.tag === Option.Some && $tmp$0[0].length >= 2 && (a = $tmp$0[0][0], true) && (b = $tmp$0[0][1], true)) {
+                    $hir$1 = sum + a + b;
+                } else if ($tmp$0.tag === Option.None) {
                     break;
                 };
-            }    }
+                accumulator$$ = $hir$1;
+                $hir$1;
+            }
+        };
+        return $hir$0;
     }
     ");
 }
@@ -347,14 +406,21 @@ fn test_for_loop_with_guards() {
     // Expected: Should handle conditional logic within for loop body
     assert_snapshot!(output, @r"
     function sum_evens() {
-                let $tmp$0;
-                let $tmp$1 = iterator$$.next();
-                let i;if ($tmp$1.tag === Option.Some && (i = $tmp$1[0], true)) {
-                    $tmp$0 = i % 2 === 0 ? sum + i : sum;
-                } else if ($tmp$1.tag === Option.None) {
+        let $hir$0 = undefined;
+        {
+            let iterator$$ = iterator.iter([1, 2, 3, 4, 5, 6]);
+            let accumulator$$ = 0;
+                let $tmp$0 = iterator$$.next();
+                let i;if ($tmp$0.tag === Option.Some && (i = $tmp$0[0], true)) {
+                    $hir$1 = (i % 2 === 0 ? sum + i : sum);
+                } else if ($tmp$0.tag === Option.None) {
                     break;
                 };
-            }    }
+                accumulator$$ = $hir$1;
+                $hir$1;
+            }
+        };
+        return $hir$0;
     }
     ");
 }
