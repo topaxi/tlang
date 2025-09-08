@@ -3,8 +3,7 @@ use insta::assert_snapshot;
 
 mod common;
 
-// Note: These tests may initially fail as for loop codegen is not yet implemented
-// They serve as specifications for the expected JavaScript output
+// For loops are lowered to normal loop expressions in HIR and should generate correct JavaScript
 
 #[test]
 fn test_for_loop_simple_iteration() {
