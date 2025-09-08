@@ -1830,7 +1830,6 @@ fn test_fibonacci_pattern_matching_uses_return_statements() {
         return fibonacci/3(n, 0, 1);
     }
     fn fibonacci/3(n: unknown, a: unknown, b: unknown) -> unknown {
-        let $hir$0: unknown = _;
         match [n, a, b] {
             [0, a, _] => {
                 return a;
@@ -1842,7 +1841,6 @@ fn test_fibonacci_pattern_matching_uses_return_statements() {
                 return rec fibonacci/3((n - 1), b, (a + b));
             },
         };
-        $hir$0;
     }
     dyn fn fibonacci
         -> fibonacci/1
@@ -1877,7 +1875,6 @@ fn test_function_with_match_completion_uses_return_statements() {
         }
     }
     fn test_func(x: unknown) -> unknown {
-        let $hir$0: unknown = _;
         match x {
             Option::Some { 0: n } => {
                 return (n + 1);
@@ -1886,7 +1883,6 @@ fn test_function_with_match_completion_uses_return_statements() {
                 return 0;
             },
         };
-        $hir$0;
     }
     ");
 }
