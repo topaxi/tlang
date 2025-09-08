@@ -1,5 +1,5 @@
-// Tests that fail in JavaScript backend due to if expression handling
-// This demonstrates a limitation in the JavaScript code generation
+// Tests for if expressions in return statements and recursion
+// Demonstrates proper if expression handling in both interpreter and JavaScript backends
 
 fn test_return_if(times) {
     return if (times > 0) {
@@ -16,9 +16,9 @@ fn countdown_recursive(times) {
     }
 }
 
-log("=== JavaScript Backend Failures ===");
+log("=== If Expression Tests ===");
 
-// These should work in interpreter but fail in JavaScript
+// These work correctly in both interpreter and JavaScript backends
 test_return_if(3) |> log();
 test_return_if(-1) |> log();
 
