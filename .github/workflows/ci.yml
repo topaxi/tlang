@@ -72,7 +72,7 @@ jobs:
       - name: cargo-nextest
         run: cargo nextest run --profile=ci
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '24.0.2'
           cache: 'npm'
