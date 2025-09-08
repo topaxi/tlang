@@ -192,6 +192,7 @@ impl SimplifiedHirJsPass {
 
                 if all_arms_have_returns {
                     // Create temp variable but don't assign to it (since all arms return)
+                    // This maintains the expected HIR structure for functions with completion expressions
                     let temp_name = self.generate_temp_var_name();
                     let temp_declaration = self.create_temp_var_declaration(ctx, &temp_name, span);
                     let temp_ref = self.create_temp_var_path(ctx, &temp_name, span);
@@ -1390,6 +1391,7 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
 
         // Handle completion expression
         if let Some(completion_expr) = &mut block.expr {
+            
             // First, check if this is a loop expression - handle it before other special cases
             if let hir::ExprKind::Loop(..) = &completion_expr.kind {
                 if !self.can_render_as_js_expr(completion_expr)

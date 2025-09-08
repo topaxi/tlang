@@ -8,8 +8,6 @@ use tlang_symbols::SymbolType;
 // we are done generating the code.
 const STATEMENT_RESERVE_SIZE: usize = 128;
 
-// When we create a new statement buffer, we reserve a certain amount of space for the statements.
-const STATEMENT_BUFFER_CAPACITY: usize = 512;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum BlockContext {
