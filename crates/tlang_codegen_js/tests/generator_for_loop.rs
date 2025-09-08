@@ -221,7 +221,7 @@ fn test_for_loop_with_variable_iterable() {
                     break;
                 };
                 accumulator$$ = $hir$1;
-                ($hir0$ = $hir$1);
+                ($hir$0 = $hir$1);
             }
         };
         return $hir$0;
