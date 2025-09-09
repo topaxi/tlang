@@ -120,13 +120,56 @@ pub fn expr_can_render_as_js_stmt(expr: &hir::Expr) -> bool {
             block_can_render_as_js_stmt_block(loop_body)
         }
 
-        // Match expressions can be rendered as JavaScript statements if all arms have return statements
-        // or if all arms end with control flow statements (break/continue)
-        hir::ExprKind::Match(_, _) => {
-            // Match expressions always need transformation to ensure proper block structure
-            // Even if arms contain simple break/continue statements, they need to be moved
-            // to statement position for JavaScript generation (block.expr = None)
-            false
+        // Match expressions can be rendered as JavaScript statements if all arms can be rendered
+        // as simple JavaScript statements (return statements, simple expressions, or control flow)
+        hir::ExprKind::Match(_, arms) => {
+            // Check if all arms can be rendered as simple JavaScript
+            arms.iter().all(|arm| {
+                // All statements in the arm must be simple
+                for stmt in &arm.block.stmts {
+                    match &stmt.kind {
+                        hir::StmtKind::Return(_) => {} // Returns are fine
+                        hir::StmtKind::Expr(expr) => {
+                            // Allow simple expressions and control flow
+                            match &expr.kind {
+                                hir::ExprKind::Break(None) => {} // break without value
+                                hir::ExprKind::Continue => {}
+                                hir::ExprKind::Break(Some(break_value)) => {
+                                    // break with simple value that can be rendered as JS expression
+                                    if !expr_can_render_as_js_expr(break_value) {
+                                        return false;
+                                    }
+                                }
+                                // Allow simple assignments and expressions
+                                _ if expr_can_render_as_js_expr(expr) => {}
+                                _ => return false,
+                            }
+                        }
+                        hir::StmtKind::Let(_, rhs, _) => {
+                            // Let statements with simple right-hand sides are fine
+                            if !expr_can_render_as_assignment_rhs(rhs) {
+                                return false;
+                            }
+                        }
+                        _ => return false,
+                    }
+                }
+
+                // Check completion expression if present
+                if let Some(completion_expr) = &arm.block.expr {
+                    match &completion_expr.kind {
+                        hir::ExprKind::Break(None) => true, // break without value
+                        hir::ExprKind::Continue => true,
+                        hir::ExprKind::Break(Some(break_value)) => {
+                            // break with simple value that can be rendered as JS expression
+                            expr_can_render_as_js_expr(break_value)
+                        }
+                        _ => expr_can_render_as_js_expr(completion_expr),
+                    }
+                } else {
+                    true // No completion expression is fine
+                }
+            })
         }
 
         // These expressions cannot be rendered as JavaScript statements
