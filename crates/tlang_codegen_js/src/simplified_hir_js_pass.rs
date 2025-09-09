@@ -956,16 +956,32 @@ impl SimplifiedHirJsPass {
             if let Some(completion_expr) = block.expr {
                 // Special handling for loop expressions - they can't be on the RHS of assignments
                 if let hir::ExprKind::Loop(..) = &completion_expr.kind {
-                    // For loop expressions, add them as statements and handle their result separately
+                    // Create temp variable for loop completion
+                    let loop_temp_name = self.generate_temp_var_name();
+                    let loop_span = completion_expr.span;
+                    
+                    // Create temp variable declaration for loop result
+                    let loop_temp_declaration = self.create_temp_var_declaration(ctx, &loop_temp_name, loop_span);
+                    block_stmts.push(loop_temp_declaration);
+                    
+                    // Transform the loop to assign to temp variable on break
+                    let mut transformed_loop = completion_expr;
+                    if let hir::ExprKind::Loop(body) = &mut transformed_loop.kind {
+                        self.transform_break_statements_in_block(body, &loop_temp_name, ctx);
+                    }
+                    
+                    // Add loop as statement
                     let loop_stmt = hir::Stmt::new(
                         ctx.hir_id_allocator.next_id(),
-                        hir::StmtKind::Expr(Box::new(completion_expr)),
-                        span,
+                        hir::StmtKind::Expr(Box::new(transformed_loop)),
+                        loop_span,
                     );
                     block_stmts.push(loop_stmt);
                     
-                    // The loop result will be captured by break statements inside the loop
-                    // For now, don't add an additional assignment since the loop should handle its own completion
+                    // Add assignment to capture loop result for block completion
+                    let loop_temp_ref = self.create_temp_var_path(ctx, &loop_temp_name, loop_span);
+                    let block_completion_assignment = self.create_assignment_stmt(ctx, temp_name, loop_temp_ref, loop_span);
+                    block_stmts.push(block_completion_assignment);
                 } else {
                     // Check if the block has return statements that would make the completion assignment unreachable
                     let block_ref = hir::Block::new(
@@ -1278,11 +1294,6 @@ impl SimplifiedHirJsPass {
 
         match &mut stmt.kind {
             hir::StmtKind::Let(_, expr, _) => {
-                // Skip temp variables that we created
-                if self.is_temp_variable(expr) || self.contains_temp_variables(expr) {
-                    return additional_stmts;
-                }
-
                 // First, recursively process sub-expressions
                 let mut temp_stmts = self.process_sub_expressions(expr, ctx);
                 additional_stmts.append(&mut temp_stmts);
@@ -1321,7 +1332,7 @@ impl SimplifiedHirJsPass {
                             **expr = self.create_temp_var_path(ctx, &temp_name, span);
                             self.changes_made = true;
                         } else {
-                            // Loop without break values - can be converted to statement directly
+                            // Loop without break values or already processed - can be converted to statement directly
                             // Replace with wildcard since the loop doesn't produce a value
                             let span = expr.span;
                             
@@ -1342,13 +1353,16 @@ impl SimplifiedHirJsPass {
                             self.changes_made = true;
                         }
                     } else {
-                        // General flattening for other complex expressions
-                        let (flattened_expr, mut temp_stmts) =
-                            self.flatten_expression_to_temp_var((**expr).clone(), ctx);
+                        // General flattening for other complex expressions (including blocks)
+                        // Skip temp variables that we created, but process blocks even if they contain temp variables
+                        if !(self.is_temp_variable(expr) || (self.contains_temp_variables(expr) && !matches!(&expr.kind, hir::ExprKind::Block(_)))) {
+                            let (flattened_expr, mut temp_stmts) =
+                                self.flatten_expression_to_temp_var((**expr).clone(), ctx);
 
-                        additional_stmts.append(&mut temp_stmts);
-                        **expr = flattened_expr;
-                        self.changes_made = true;
+                            additional_stmts.append(&mut temp_stmts);
+                            **expr = flattened_expr;
+                            self.changes_made = true;
+                        }
                     }
                 }
             }
@@ -1565,8 +1579,14 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                             *completion_expr = self.create_temp_var_path(ctx, &temp_name, span);
                             self.changes_made = true;
                         } else {
-                            // Loop already contains temp variables but still needs to be moved to statement position
+                            // Loop already contains temp variables but still needs loop completion variable
+                            // This happens when the loop body was processed first and added temp variables
+                            let temp_name = self.generate_temp_var_name();
                             let span = completion_expr.span;
+                            
+                            // Create temp variable declaration for loop completion
+                            let temp_declaration = self.create_temp_var_declaration(ctx, &temp_name, span);
+                            new_stmts.push(temp_declaration);
                             
                             // Create loop statement (not assigned to anything)
                             let loop_stmt = hir::Stmt::new(
@@ -1576,12 +1596,8 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                             );
                             new_stmts.push(loop_stmt);
 
-                            // Replace completion expression with wildcard (undefined) since we can't determine the final value
-                            *completion_expr = hir::Expr {
-                                hir_id: ctx.hir_id_allocator.next_id(),
-                                kind: hir::ExprKind::Wildcard,
-                                span,
-                            };
+                            // Replace completion expression with temp variable reference
+                            *completion_expr = self.create_temp_var_path(ctx, &temp_name, span);
                             self.changes_made = true;
                         }
                     } else {
