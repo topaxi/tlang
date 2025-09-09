@@ -75,8 +75,6 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: '24.0.2'
-          cache: 'npm'
-          cache-dependency-path: package-lock.json
 
       - name: Test Runner
         run: make test
