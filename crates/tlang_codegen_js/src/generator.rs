@@ -8,7 +8,6 @@ use tlang_symbols::SymbolType;
 // we are done generating the code.
 const STATEMENT_RESERVE_SIZE: usize = 128;
 
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum BlockContext {
     // Are we in a top level Program?
@@ -266,8 +265,6 @@ impl CodegenJS {
             self.push_str("undefined");
             return;
         }
-
-
 
         self.generate_expr(expr, None);
     }

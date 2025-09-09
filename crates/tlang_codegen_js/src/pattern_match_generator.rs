@@ -229,9 +229,11 @@ impl CodegenJS {
             let binding = self.current_scope().declare_tmp_variable();
             if !*has_let {
                 self.push_str("let ");
-                self.push_str(&binding);
                 *has_let = true;
+            } else {
+                self.push_char(',');
             }
+            self.push_str(&binding);
             binding
         } else {
             String::new()

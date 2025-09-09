@@ -98,7 +98,11 @@ impl SimplifiedHirJsPass {
 
         hir::Stmt::new(
             hir_id,
-            hir::StmtKind::Let(Box::new(pattern), Box::new(wildcard_expr), Box::new(default_ty)),
+            hir::StmtKind::Let(
+                Box::new(pattern),
+                Box::new(wildcard_expr),
+                Box::new(default_ty),
+            ),
             span,
         )
     }
@@ -169,18 +173,27 @@ impl SimplifiedHirJsPass {
             hir::ExprKind::IfElse(cond, then_branch, else_branches) => {
                 self.expr_has_break_with_value(cond)
                     || self.block_has_break_with_value(then_branch)
-                    || else_branches.iter().any(|clause| self.block_has_break_with_value(&clause.consequence))
+                    || else_branches
+                        .iter()
+                        .any(|clause| self.block_has_break_with_value(&clause.consequence))
             }
             hir::ExprKind::Match(scrutinee, arms) => {
                 self.expr_has_break_with_value(scrutinee)
-                    || arms.iter().any(|arm| self.block_has_break_with_value(&arm.block))
+                    || arms
+                        .iter()
+                        .any(|arm| self.block_has_break_with_value(&arm.block))
             }
             hir::ExprKind::Binary(_, lhs, rhs) => {
                 self.expr_has_break_with_value(lhs) || self.expr_has_break_with_value(rhs)
             }
             hir::ExprKind::Unary(_, operand) => self.expr_has_break_with_value(operand),
-            hir::ExprKind::Call(call) => call.arguments.iter().any(|arg| self.expr_has_break_with_value(arg)),
-            hir::ExprKind::List(elements) => elements.iter().any(|elem| self.expr_has_break_with_value(elem)),
+            hir::ExprKind::Call(call) => call
+                .arguments
+                .iter()
+                .any(|arg| self.expr_has_break_with_value(arg)),
+            hir::ExprKind::List(elements) => elements
+                .iter()
+                .any(|elem| self.expr_has_break_with_value(elem)),
             hir::ExprKind::FieldAccess(obj, _) => self.expr_has_break_with_value(obj),
             hir::ExprKind::IndexAccess(obj, index) => {
                 self.expr_has_break_with_value(obj) || self.expr_has_break_with_value(index)
@@ -206,11 +219,15 @@ impl SimplifiedHirJsPass {
             hir::ExprKind::IfElse(cond, then_branch, else_branches) => {
                 self.expr_has_return(cond)
                     || self.block_has_return_statements(then_branch)
-                    || else_branches.iter().any(|clause| self.block_has_return_statements(&clause.consequence))
+                    || else_branches
+                        .iter()
+                        .any(|clause| self.block_has_return_statements(&clause.consequence))
             }
             hir::ExprKind::Match(scrutinee, arms) => {
                 self.expr_has_return(scrutinee)
-                    || arms.iter().any(|arm| self.block_has_return_statements(&arm.block))
+                    || arms
+                        .iter()
+                        .any(|arm| self.block_has_return_statements(&arm.block))
             }
             hir::ExprKind::Binary(_, lhs, rhs) => {
                 self.expr_has_return(lhs) || self.expr_has_return(rhs)
@@ -326,7 +343,7 @@ impl SimplifiedHirJsPass {
                     hir::ExprKind::Loop(..) => {
                         // For loop expressions, inline the transformation instead of using transform_loop_expression
                         // We need to handle the break statements and make the loop a statement
-                        
+
                         // Transform the loop body to assign to temp variable on break
                         let mut transformed_loop = expr.clone();
                         if let hir::ExprKind::Loop(body) = &mut transformed_loop.kind {
@@ -345,7 +362,8 @@ impl SimplifiedHirJsPass {
                     }
                     hir::ExprKind::IfElse(..) => {
                         // For if-else expressions, transform to proper statements
-                        let statements = self.transform_if_else_to_statements(expr, &temp_name, ctx);
+                        let statements =
+                            self.transform_if_else_to_statements(expr, &temp_name, ctx);
                         let mut all_stmts = vec![temp_declaration];
                         all_stmts.extend(statements);
                         (temp_ref, all_stmts)
@@ -379,7 +397,7 @@ impl SimplifiedHirJsPass {
                         // Transform: a || b -> if a { temp = a; } else { temp = b; }
                         // Need to flatten both operands first if they're complex
                         let mut all_stmts = vec![temp_declaration];
-                        
+
                         // Flatten left operand if needed
                         let (left_expr, left_stmts) = if !self.can_render_as_js_expr(lhs) {
                             self.flatten_expression_to_temp_var((**lhs).clone(), ctx)
@@ -387,31 +405,33 @@ impl SimplifiedHirJsPass {
                             ((**lhs).clone(), vec![])
                         };
                         all_stmts.extend(left_stmts);
-                        
+
                         // Flatten right operand if needed
                         let (right_expr, right_stmts) = if !self.can_render_as_js_expr(rhs) {
                             self.flatten_expression_to_temp_var((**rhs).clone(), ctx)
                         } else {
                             ((**rhs).clone(), vec![])
                         };
-                        
+
                         // Create if-else structure: if left { temp = left; } else { right_stmts; temp = right; }
                         let then_block = hir::Block::new(
                             ctx.hir_id_allocator.next_id(),
-                            vec![self.create_assignment_stmt(ctx, &temp_name, left_expr.clone(), span)],
+                            vec![self.create_assignment_stmt(
+                                ctx,
+                                &temp_name,
+                                left_expr.clone(),
+                                span,
+                            )],
                             None,
                             span,
                         );
-                        
+
                         let mut else_stmts = right_stmts;
-                        else_stmts.push(self.create_assignment_stmt(ctx, &temp_name, right_expr, span));
-                        let else_block = hir::Block::new(
-                            ctx.hir_id_allocator.next_id(),
-                            else_stmts,
-                            None,
-                            span,
-                        );
-                        
+                        else_stmts
+                            .push(self.create_assignment_stmt(ctx, &temp_name, right_expr, span));
+                        let else_block =
+                            hir::Block::new(ctx.hir_id_allocator.next_id(), else_stmts, None, span);
+
                         let if_else_expr = hir::Expr {
                             hir_id: ctx.hir_id_allocator.next_id(),
                             kind: hir::ExprKind::IfElse(
@@ -424,21 +444,21 @@ impl SimplifiedHirJsPass {
                             ),
                             span,
                         };
-                        
+
                         let if_else_stmt = hir::Stmt::new(
                             ctx.hir_id_allocator.next_id(),
                             hir::StmtKind::Expr(Box::new(if_else_expr)),
                             span,
                         );
                         all_stmts.push(if_else_stmt);
-                        
+
                         (temp_ref, all_stmts)
                     }
                     hir::ExprKind::Binary(hir::BinaryOpKind::And, lhs, rhs) => {
                         // Transform: a && b -> if a { temp = b; } else { temp = false; }
                         // Need to flatten both operands first if they're complex
                         let mut all_stmts = vec![temp_declaration];
-                        
+
                         // Flatten left operand if needed
                         let (left_expr, left_stmts) = if !self.can_render_as_js_expr(lhs) {
                             self.flatten_expression_to_temp_var((**lhs).clone(), ctx)
@@ -446,37 +466,36 @@ impl SimplifiedHirJsPass {
                             ((**lhs).clone(), vec![])
                         };
                         all_stmts.extend(left_stmts);
-                        
+
                         // Flatten right operand if needed
                         let (right_expr, right_stmts) = if !self.can_render_as_js_expr(rhs) {
                             self.flatten_expression_to_temp_var((**rhs).clone(), ctx)
                         } else {
                             ((**rhs).clone(), vec![])
                         };
-                        
+
                         // Create if-else structure: if left { right_stmts; temp = right; } else { temp = false; }
                         let mut then_stmts = right_stmts;
-                        then_stmts.push(self.create_assignment_stmt(ctx, &temp_name, right_expr, span));
-                        let then_block = hir::Block::new(
-                            ctx.hir_id_allocator.next_id(),
-                            then_stmts,
-                            None,
-                            span,
-                        );
-                        
+                        then_stmts
+                            .push(self.create_assignment_stmt(ctx, &temp_name, right_expr, span));
+                        let then_block =
+                            hir::Block::new(ctx.hir_id_allocator.next_id(), then_stmts, None, span);
+
                         let false_expr = hir::Expr {
                             hir_id: ctx.hir_id_allocator.next_id(),
-                            kind: hir::ExprKind::Literal(Box::new(tlang_ast::token::Literal::Boolean(false))),
+                            kind: hir::ExprKind::Literal(Box::new(
+                                tlang_ast::token::Literal::Boolean(false),
+                            )),
                             span,
                         };
-                        
+
                         let else_block = hir::Block::new(
                             ctx.hir_id_allocator.next_id(),
                             vec![self.create_assignment_stmt(ctx, &temp_name, false_expr, span)],
                             None,
                             span,
                         );
-                        
+
                         let if_else_expr = hir::Expr {
                             hir_id: ctx.hir_id_allocator.next_id(),
                             kind: hir::ExprKind::IfElse(
@@ -489,19 +508,20 @@ impl SimplifiedHirJsPass {
                             ),
                             span,
                         };
-                        
+
                         let if_else_stmt = hir::Stmt::new(
                             ctx.hir_id_allocator.next_id(),
                             hir::StmtKind::Expr(Box::new(if_else_expr)),
                             span,
                         );
                         all_stmts.push(if_else_stmt);
-                        
+
                         (temp_ref, all_stmts)
                     }
                     _ => {
                         // For simple expressions, create assignment statement
-                        let assignment_stmt = self.create_assignment_stmt(ctx, &temp_name, expr, span);
+                        let assignment_stmt =
+                            self.create_assignment_stmt(ctx, &temp_name, expr, span);
                         (temp_ref, vec![temp_declaration, assignment_stmt])
                     }
                 }
@@ -516,11 +536,11 @@ impl SimplifiedHirJsPass {
         if expr_can_render_as_js_expr(expr) {
             return true;
         }
-        
+
         // Check for match expressions that have been transformed with return statements or control flow statements
         // These can be rendered as JavaScript statements and don't need further transformation
         if let hir::ExprKind::Match(_, arms) = &expr.kind {
-            // If all arms have return statements or plain control flow statements (break without values), 
+            // If all arms have return statements or plain control flow statements (break without values),
             // this match can be rendered as JS. However, break statements with values need transformation
             // to assign to temp variables, so they don't qualify.
             let all_arms_have_simple_control_flow = arms.iter().all(|arm| {
@@ -540,12 +560,12 @@ impl SimplifiedHirJsPass {
                     false
                 }
             });
-            
+
             if all_arms_have_simple_control_flow {
                 return true;
             }
         }
-        
+
         false
     }
 
@@ -569,7 +589,6 @@ impl SimplifiedHirJsPass {
             _ => false,
         }
     }
-
 
     /// Check if an expression contains temp variables (for more comprehensive detection)
     fn contains_temp_variables(&self, expr: &hir::Expr) -> bool {
@@ -655,14 +674,15 @@ impl SimplifiedHirJsPass {
                         // Transform: a || b -> if a { temp = a; } else { temp = b; }
                         // Transform: a && b -> if a { temp = b; } else { temp = false; }
                         if (!self.can_render_as_js_expr(lhs) && !self.contains_temp_variables(lhs))
-                            || (!self.can_render_as_js_expr(rhs) && !self.contains_temp_variables(rhs))
+                            || (!self.can_render_as_js_expr(rhs)
+                                && !self.contains_temp_variables(rhs))
                         {
                             // We have complex operands, so transform the entire expression to if-else
                             // Mark the entire expression as needing transformation by returning
                             // empty additional_stmts - the parent will call flatten_expression_to_temp_var
                             return additional_stmts;
                         }
-                        
+
                         // Process operands normally if both are simple
                         if !self.can_render_as_js_expr(lhs) && !self.contains_temp_variables(lhs) {
                             let (flattened_expr, mut temp_stmts) =
@@ -775,27 +795,31 @@ impl SimplifiedHirJsPass {
             }
             hir::ExprKind::IfElse(condition, _then_branch, _else_branches) => {
                 // Process condition first (it might contain complex expressions like loops)
-                if !self.can_render_as_js_expr(condition) && !self.contains_temp_variables(condition) {
+                if !self.can_render_as_js_expr(condition)
+                    && !self.contains_temp_variables(condition)
+                {
                     let (flattened_expr, mut temp_stmts) =
                         self.flatten_expression_to_temp_var((**condition).clone(), ctx);
                     additional_stmts.append(&mut temp_stmts);
                     **condition = flattened_expr;
                     self.changes_made = true;
                 }
-                
+
                 // Note: then_branch and else_branches are processed by the visitor pattern
                 // if they contain nested expressions that need processing
             }
             hir::ExprKind::Match(scrutinee, _arms) => {
                 // Process scrutinee first (it might contain complex expressions like loops)
-                if !self.can_render_as_js_expr(scrutinee) && !self.contains_temp_variables(scrutinee) {
+                if !self.can_render_as_js_expr(scrutinee)
+                    && !self.contains_temp_variables(scrutinee)
+                {
                     let (flattened_expr, mut temp_stmts) =
                         self.flatten_expression_to_temp_var((**scrutinee).clone(), ctx);
                     additional_stmts.append(&mut temp_stmts);
                     **scrutinee = flattened_expr;
                     self.changes_made = true;
                 }
-                
+
                 // Note: match arms are processed by the visitor pattern
                 // if they contain nested expressions that need processing
             }
@@ -924,7 +948,7 @@ impl SimplifiedHirJsPass {
             hir::ExprKind::Match(scrutinee, arms) => {
                 // Transform break statements in match scrutinee
                 self.transform_break_statements_in_expr(scrutinee, temp_name, ctx);
-                
+
                 // Transform break statements in each match arm
                 for arm in arms {
                     if let Some(ref mut guard) = arm.guard {
@@ -959,38 +983,39 @@ impl SimplifiedHirJsPass {
                     // Create temp variable for loop completion
                     let loop_temp_name = self.generate_temp_var_name();
                     let loop_span = completion_expr.span;
-                    
+
                     // Create temp variable declaration for loop result
-                    let loop_temp_declaration = self.create_temp_var_declaration(ctx, &loop_temp_name, loop_span);
+                    let loop_temp_declaration =
+                        self.create_temp_var_declaration(ctx, &loop_temp_name, loop_span);
                     block_stmts.push(loop_temp_declaration);
-                    
+
                     // Transform the loop to assign to temp variable on break
                     let mut transformed_loop = completion_expr;
                     if let hir::ExprKind::Loop(body) = &mut transformed_loop.kind {
                         // First, visit the loop body to process any complex expressions
                         self.visit_block(body, ctx);
-                        
+
                         // Then transform break statements to assign to temp variable
                         self.transform_break_statements_in_block(body, &loop_temp_name, ctx);
-                        
+
                         // Finally, ensure loop body completion assigns to loop completion variable
                         if let Some(ref mut completion_expr) = body.expr {
                             // If completion is a temp variable reference, convert to assignment
                             if self.is_temp_variable(completion_expr) {
                                 let completion_assignment = self.create_assignment_stmt(
-                                    ctx, 
-                                    &loop_temp_name, 
-                                    completion_expr.clone(), 
-                                    completion_expr.span
+                                    ctx,
+                                    &loop_temp_name,
+                                    completion_expr.clone(),
+                                    completion_expr.span,
                                 );
                                 body.stmts.push(completion_assignment);
-                                
+
                                 // Set completion to None since it's now captured in statement
                                 body.expr = None;
                             }
                         }
                     }
-                    
+
                     // Add loop as statement
                     let loop_stmt = hir::Stmt::new(
                         ctx.hir_id_allocator.next_id(),
@@ -998,10 +1023,11 @@ impl SimplifiedHirJsPass {
                         loop_span,
                     );
                     block_stmts.push(loop_stmt);
-                    
+
                     // Add assignment to capture loop result for block completion
                     let loop_temp_ref = self.create_temp_var_path(ctx, &loop_temp_name, loop_span);
-                    let block_completion_assignment = self.create_assignment_stmt(ctx, temp_name, loop_temp_ref, loop_span);
+                    let block_completion_assignment =
+                        self.create_assignment_stmt(ctx, temp_name, loop_temp_ref, loop_span);
                     block_stmts.push(block_completion_assignment);
                 } else {
                     // Check if the block has return statements that would make the completion assignment unreachable
@@ -1011,7 +1037,7 @@ impl SimplifiedHirJsPass {
                         Some(completion_expr.clone()),
                         span,
                     );
-                    
+
                     if self.block_has_return_statements(&block_ref) {
                         // Block has return statements, so completion expression assignment would be stray
                         // Just add the completion expression as a statement without assignment
@@ -1055,8 +1081,6 @@ impl SimplifiedHirJsPass {
         }
     }
 
-
-
     /// Transform a match expression to statements that assign results to temp variable
     fn transform_match_to_statements(
         &mut self,
@@ -1075,7 +1099,9 @@ impl SimplifiedHirJsPass {
                         hir::StmtKind::Return(_) => return true,
                         hir::StmtKind::Expr(expr) => {
                             match &expr.kind {
-                                hir::ExprKind::Break(None) | hir::ExprKind::Continue => return true,
+                                hir::ExprKind::Break(None) | hir::ExprKind::Continue => {
+                                    return true;
+                                }
                                 hir::ExprKind::Break(Some(_)) => return false, // Break with value needs transformation
                                 _ => {}
                             }
@@ -1083,7 +1109,7 @@ impl SimplifiedHirJsPass {
                         _ => {}
                     }
                 }
-                
+
                 // Check completion expression
                 if let Some(completion_expr) = &arm.block.expr {
                     match &completion_expr.kind {
@@ -1092,7 +1118,7 @@ impl SimplifiedHirJsPass {
                         _ => {}
                     }
                 }
-                
+
                 false
             });
 
@@ -1123,8 +1149,12 @@ impl SimplifiedHirJsPass {
                     match &completion_expr.kind {
                         hir::ExprKind::Break(Some(break_value)) => {
                             // For break with value: temp_var = value; break;
-                            let assignment_stmt =
-                                self.create_assignment_stmt(ctx, temp_name, (**break_value).clone(), span);
+                            let assignment_stmt = self.create_assignment_stmt(
+                                ctx,
+                                temp_name,
+                                (**break_value).clone(),
+                                span,
+                            );
                             new_arm.block.stmts.push(assignment_stmt);
 
                             // Add plain break statement
@@ -1161,8 +1191,12 @@ impl SimplifiedHirJsPass {
 
                             // Only create assignment if temp_name is provided
                             if !temp_name.is_empty() {
-                                let assignment_stmt =
-                                    self.create_assignment_stmt(ctx, temp_name, flattened_completion, span);
+                                let assignment_stmt = self.create_assignment_stmt(
+                                    ctx,
+                                    temp_name,
+                                    flattened_completion,
+                                    span,
+                                );
                                 new_arm.block.stmts.push(assignment_stmt);
                             } else {
                                 // If no temp_name, add the expression as a statement
@@ -1324,7 +1358,9 @@ impl SimplifiedHirJsPass {
                     // For complex expressions in let statements, flatten them
                     if let hir::ExprKind::Loop(..) = &expr.kind {
                         // Check if this loop has break statements with values but hasn't been transformed yet
-                        if self.loop_has_break_with_value(expr) && !self.contains_temp_variables(expr) {
+                        if self.loop_has_break_with_value(expr)
+                            && !self.contains_temp_variables(expr)
+                        {
                             // Special handling for loop expressions with break values - they need temp variables
                             // to capture the break value as the "return" value of the loop
                             let temp_name = self.generate_temp_var_name();
@@ -1356,7 +1392,7 @@ impl SimplifiedHirJsPass {
                             // Loop without break values or already processed - can be converted to statement directly
                             // Replace with wildcard since the loop doesn't produce a value
                             let span = expr.span;
-                            
+
                             // Create loop statement (not assigned to anything)
                             let loop_stmt = hir::Stmt::new(
                                 ctx.hir_id_allocator.next_id(),
@@ -1376,7 +1412,10 @@ impl SimplifiedHirJsPass {
                     } else {
                         // General flattening for other complex expressions (including blocks)
                         // Skip temp variables that we created, but process blocks even if they contain temp variables
-                        if !(self.is_temp_variable(expr) || (self.contains_temp_variables(expr) && !matches!(&expr.kind, hir::ExprKind::Block(_)))) {
+                        if !(self.is_temp_variable(expr)
+                            || (self.contains_temp_variables(expr)
+                                && !matches!(&expr.kind, hir::ExprKind::Block(_))))
+                        {
                             let (flattened_expr, mut temp_stmts) =
                                 self.flatten_expression_to_temp_var((**expr).clone(), ctx);
 
@@ -1465,7 +1504,9 @@ impl SimplifiedHirJsPass {
 
                     if let hir::ExprKind::Loop(..) = &expr.kind {
                         // Check if this loop has break statements with values but hasn't been transformed yet
-                        if self.loop_has_break_with_value(expr) && !self.contains_temp_variables(expr) {
+                        if self.loop_has_break_with_value(expr)
+                            && !self.contains_temp_variables(expr)
+                        {
                             // Special handling for loop expressions with break values in return statements
                             let temp_name = self.generate_temp_var_name();
                             let span = expr.span;
@@ -1496,7 +1537,7 @@ impl SimplifiedHirJsPass {
                             // Loop without break values - this is unusual in return context
                             // but handle it by returning undefined after the loop
                             let span = expr.span;
-                            
+
                             // Create loop statement (not assigned to anything)
                             let loop_stmt = hir::Stmt::new(
                                 ctx.hir_id_allocator.next_id(),
@@ -1564,11 +1605,9 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
 
         // Handle completion expression
         if let Some(completion_expr) = &mut block.expr {
-            
             // First, check if this is a loop expression - handle it before other special cases
             if let hir::ExprKind::Loop(..) = &completion_expr.kind {
-                if !self.can_render_as_js_expr(completion_expr)
-                {
+                if !self.can_render_as_js_expr(completion_expr) {
                     // Check if this loop has break statements with values
                     if self.loop_has_break_with_value(completion_expr) {
                         // If it already contains temp variables, it may have been partially processed
@@ -1579,7 +1618,8 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                             let span = completion_expr.span;
 
                             // Create temp variable declaration
-                            let temp_declaration = self.create_temp_var_declaration(ctx, &temp_name, span);
+                            let temp_declaration =
+                                self.create_temp_var_declaration(ctx, &temp_name, span);
                             new_stmts.push(temp_declaration);
 
                             // Transform the loop body to assign to temp variable on break
@@ -1604,11 +1644,12 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                             // This happens when the loop body was processed first and added temp variables
                             let temp_name = self.generate_temp_var_name();
                             let span = completion_expr.span;
-                            
+
                             // Create temp variable declaration for loop completion
-                            let temp_declaration = self.create_temp_var_declaration(ctx, &temp_name, span);
+                            let temp_declaration =
+                                self.create_temp_var_declaration(ctx, &temp_name, span);
                             new_stmts.push(temp_declaration);
-                            
+
                             // Create loop statement (not assigned to anything)
                             let loop_stmt = hir::Stmt::new(
                                 ctx.hir_id_allocator.next_id(),
@@ -1624,7 +1665,7 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                     } else {
                         // Loop without break values - convert to statement and set completion to undefined
                         let span = completion_expr.span;
-                        
+
                         // Create loop statement (not assigned to anything)
                         let loop_stmt = hir::Stmt::new(
                             ctx.hir_id_allocator.next_id(),
@@ -1686,12 +1727,13 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
             } else if let hir::ExprKind::Match(..) = &completion_expr.kind {
                 // Special handling for match expressions in completion context
                 // Always transform to statements, but only create temp variables if the value is needed
-                
+
                 // Check if we're in a loop body where the completion value is typically not used
                 // In this case, transform to statements without temp variables
-                let match_statements = self.transform_match_to_statements(completion_expr.clone(), "", ctx);
+                let match_statements =
+                    self.transform_match_to_statements(completion_expr.clone(), "", ctx);
                 new_stmts.extend(match_statements);
-                
+
                 // Remove the completion expression since it's now in statement form
                 *completion_expr = hir::Expr {
                     hir_id: ctx.hir_id_allocator.next_id(),
@@ -1777,7 +1819,7 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
             }
             hir::ExprKind::Loop(loop_body) => {
                 // Visit loop body to catch nested expressions that need transformation
-                // This is necessary to handle break/continue expressions and ensure match 
+                // This is necessary to handle break/continue expressions and ensure match
                 // expressions are properly structured for JavaScript generation
                 self.visit_block(loop_body, ctx);
             }

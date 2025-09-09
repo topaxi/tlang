@@ -2670,7 +2670,7 @@ fn test_simple_nested_loop_hir_transformation() {
 fn test_ternary_operator_with_complex_branches_requiring_transformation() {
     // Test that verifies current constraint where if-else with multiple branches
     // or statements in branches cannot be rendered as ternary and requires transformation.
-    // This constraint could potentially be relaxed in the future if all conditions 
+    // This constraint could potentially be relaxed in the future if all conditions
     // and branches can be expressed as simple JS expressions.
     let source = r#"
         fn test_complex_ternary() {
