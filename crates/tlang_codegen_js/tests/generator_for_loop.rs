@@ -59,6 +59,7 @@ fn test_for_loop_with_accumulator_simple() {
                 let $tmp$0 = iterator$$.next(),i;if ($tmp$0.tag === Option.Some && (i = $tmp$0[0], true)) {
                     $hir$1 = sum + i;
                 } else if ($tmp$0.tag === Option.None) {
+                    $hir$1 = accumulator$$;
                     break;
                 };
                 accumulator$$ = $hir$1;
@@ -97,6 +98,7 @@ fn test_for_loop_with_accumulator_pattern() {
                 let $tmp$0 = iterator$$.next(),n;if ($tmp$0.tag === Option.Some && (n = $tmp$0[0], true)) {
                     $hir$1 = (n % 2 === 0 ? [[...even, n], odd] : [even, [...odd, n]]);
                 } else if ($tmp$0.tag === Option.None) {
+                    $hir$1 = accumulator$$;
                     break;
                 };
                 accumulator$$ = $hir$1;
@@ -149,6 +151,7 @@ fn test_for_loop_with_string_iteration() {
                 let $tmp$0 = iterator$$.next(),char;if ($tmp$0.tag === Option.Some && (char = $tmp$0[0], true)) {
                     $hir$1 = count + 1;
                 } else if ($tmp$0.tag === Option.None) {
+                    $hir$1 = accumulator$$;
                     break;
                 };
                 accumulator$$ = $hir$1;
@@ -183,6 +186,7 @@ fn test_for_loop_with_range() {
                 let $tmp$0 = iterator$$.next(),i;if ($tmp$0.tag === Option.Some && (i = $tmp$0[0], true)) {
                     $hir$1 = sum + i;
                 } else if ($tmp$0.tag === Option.None) {
+                    $hir$1 = accumulator$$;
                     break;
                 };
                 accumulator$$ = $hir$1;
@@ -217,6 +221,7 @@ fn test_for_loop_with_variable_iterable() {
                 let $tmp$0 = iterator$$.next(),item;if ($tmp$0.tag === Option.Some && (item = $tmp$0[0], true)) {
                     $hir$1 = sum + item;
                 } else if ($tmp$0.tag === Option.None) {
+                    $hir$1 = accumulator$$;
                     break;
                 };
                 accumulator$$ = $hir$1;
@@ -256,6 +261,7 @@ fn test_for_loop_with_function_call_iterable() {
                 let $tmp$0 = iterator$$.next(),num;if ($tmp$0.tag === Option.Some && (num = $tmp$0[0], true)) {
                     $hir$1 = sum + num;
                 } else if ($tmp$0.tag === Option.None) {
+                    $hir$1 = accumulator$$;
                     break;
                 };
                 accumulator$$ = $hir$1;
@@ -291,6 +297,7 @@ fn test_for_loop_expression_in_let() {
                 let $tmp$0 = iterator$$.next(),i;if ($tmp$0.tag === Option.Some && (i = $tmp$0[0], true)) {
                     $hir$1 = acc + i;
                 } else if ($tmp$0.tag === Option.None) {
+                    $hir$1 = accumulator$$;
                     break;
                 };
                 accumulator$$ = $hir$1;
@@ -326,6 +333,7 @@ fn test_for_loop_expression_in_return() {
                 let $tmp$0 = iterator$$.next(),i;if ($tmp$0.tag === Option.Some && (i = $tmp$0[0], true)) {
                     $hir$1 = acc + i;
                 } else if ($tmp$0.tag === Option.None) {
+                    $hir$1 = accumulator$$;
                     break;
                 };
                 accumulator$$ = $hir$1;
@@ -360,6 +368,7 @@ fn test_for_loop_with_complex_pattern() {
                 let $tmp$0 = iterator$$.next(),a,b;if ($tmp$0.tag === Option.Some && $tmp$0[0].length >= 2 && (a = $tmp$0[0][0], true) && (b = $tmp$0[0][1], true)) {
                     $hir$1 = sum + a + b;
                 } else if ($tmp$0.tag === Option.None) {
+                    $hir$1 = accumulator$$;
                     break;
                 };
                 accumulator$$ = $hir$1;
@@ -398,6 +407,7 @@ fn test_for_loop_with_guards() {
                 let $tmp$0 = iterator$$.next(),i;if ($tmp$0.tag === Option.Some && (i = $tmp$0[0], true)) {
                     $hir$1 = (i % 2 === 0 ? sum + i : sum);
                 } else if ($tmp$0.tag === Option.None) {
+                    $hir$1 = accumulator$$;
                     break;
                 };
                 accumulator$$ = $hir$1;

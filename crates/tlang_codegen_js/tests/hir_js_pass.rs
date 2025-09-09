@@ -1049,7 +1049,8 @@ fn test_for_loop_expression_in_let() {
                         ($hir$1 = (acc + i));
                     },
                     Option::None => {
-                        break accumulator$$;
+                        ($hir$1 = accumulator$$);
+                        break;
                     },
                 };
                 (accumulator$$ = $hir$1);
@@ -1287,7 +1288,6 @@ fn test_nested_match_expressions() {
                     },
                 };
                 ($hir$0 = $hir$1);
-                $hir$1;
             },
             None => {
                 ($hir$0 = 0);
@@ -2149,29 +2149,32 @@ fn test_handwritten_for_loop() {
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
     assert_snapshot!(pretty_print(&hir), @r"
-fn test() -> unknown {
-    let $hir$0: unknown = _;
-    {
-        let list_iterator: unknown = iterator::iter([1, 2, 3]);
-        let list_accumulator: unknown = 0;
-        loop {
-            let sum: unknown = list_accumulator;
+    fn test() -> unknown {
+        let $hir$0: unknown = _;
+        {
+            let list_iterator: unknown = iterator::iter([1, 2, 3]);
+            let list_accumulator: unknown = 0;
             let $hir$1: unknown = _;
-            match list_iterator.next() {
-                Option::Some { 0: a } => {
-                    ($hir$1 = (sum + a));
-                },
-                Option::None => {
-                    break list_accumulator;
-                },
+            loop {
+                let sum: unknown = list_accumulator;
+                let $hir$2: unknown = _;
+                match list_iterator.next() {
+                    Option::Some { 0: a } => {
+                        ($hir$2 = (sum + a));
+                    },
+                    Option::None => {
+                        ($hir$2 = list_accumulator);
+                        break;
+                    },
+                };
+                (list_accumulator = $hir$2);
+                ($hir$1 = $hir$2);
             };
-            (list_accumulator = $hir$1);
-            $hir$1
+            ($hir$0 = $hir$1);
         };
-    };
-    let sum: unknown = $hir$0;
-}
-");
+        let sum: unknown = $hir$0;
+    }
+    ");
 }
 
 #[test]
@@ -2610,7 +2613,6 @@ fn test_nested_match_expressions_in_short_circuit() {
                     },
                 };
                 ($hir$1 = $hir$2);
-                $hir$2;
             },
             Result::Err { 0: _ } => {
                 ($hir$1 = false);
