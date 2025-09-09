@@ -967,7 +967,28 @@ impl SimplifiedHirJsPass {
                     // Transform the loop to assign to temp variable on break
                     let mut transformed_loop = completion_expr;
                     if let hir::ExprKind::Loop(body) = &mut transformed_loop.kind {
+                        // First, visit the loop body to process any complex expressions
+                        self.visit_block(body, ctx);
+                        
+                        // Then transform break statements to assign to temp variable
                         self.transform_break_statements_in_block(body, &loop_temp_name, ctx);
+                        
+                        // Finally, ensure loop body completion assigns to loop completion variable
+                        if let Some(ref mut completion_expr) = body.expr {
+                            // If completion is a temp variable reference, convert to assignment
+                            if self.is_temp_variable(completion_expr) {
+                                let completion_assignment = self.create_assignment_stmt(
+                                    ctx, 
+                                    &loop_temp_name, 
+                                    completion_expr.clone(), 
+                                    completion_expr.span
+                                );
+                                body.stmts.push(completion_assignment);
+                                
+                                // Set completion to None since it's now captured in statement
+                                body.expr = None;
+                            }
+                        }
                     }
                     
                     // Add loop as statement
