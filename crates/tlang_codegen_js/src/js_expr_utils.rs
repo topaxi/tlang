@@ -45,7 +45,10 @@ pub fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
 
 /// Check if an expression can be handled directly in assignment context (like let statements)
 /// This is less restrictive than expr_can_render_as_js_expr because some constructs
-/// can be handled directly as assignments even if they're not valid JS expressions
+/// can be handled directly as assignments even if they're not valid JS expressions.
+///
+/// Example: Function expressions like `fn(x) { x + 1 }` cannot be rendered as JS expressions
+/// in all contexts, but can be directly assigned: `let f = function(x) { return x + 1; }`
 pub fn expr_can_render_as_assignment_rhs(expr: &hir::Expr) -> bool {
     match &expr.kind {
         // All JS expressions can be assigned
@@ -77,8 +80,14 @@ pub fn expr_can_render_as_assignment_rhs(expr: &hir::Expr) -> bool {
     }
 }
 
-/// Check if an expression can be rendered as a JavaScript statement
-/// This is for expressions that appear as standalone statements
+/// Check if an expression can be rendered as a JavaScript statement.
+/// This is for expressions that appear as standalone statements in statement position.
+/// 
+/// This function determines if the entire expression can be skipped for HIR JS pass transformation.
+/// If this function returns true, the whole expression can be skipped for transformation.
+///
+/// Example: Simple expressions like `x + y` can be rendered directly as `x + y;` statements,
+/// but complex expressions like `match x { ... }` need transformation to if-else statements.
 pub fn expr_can_render_as_js_stmt(expr: &hir::Expr) -> bool {
     match &expr.kind {
         // All JS expressions can be statements
@@ -139,7 +148,13 @@ pub fn expr_can_render_as_js_stmt(expr: &hir::Expr) -> bool {
     }
 }
 
-/// Check if a block can be rendered as a JavaScript statement block
+/// Check if a block can be rendered as a JavaScript statement block.
+/// 
+/// A block might not be renderable in statement position if it contains complex expressions
+/// that need transformation (like match expressions or loop expressions with break values).
+///
+/// Example: `{ let x = 1; x + 1 }` can be rendered directly, but 
+/// `{ let x = match y { ... }; x }` needs transformation if the match expression is complex.
 fn block_can_render_as_js_stmt_block(block: &hir::Block) -> bool {
     // All statements in the block must be simple
     for stmt in &block.stmts {

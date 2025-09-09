@@ -2658,3 +2658,69 @@ fn test_simple_nested_loop_hir_transformation() {
     }
     ");
 }
+#[test]
+fn test_ternary_operator_with_complex_branches_requiring_transformation() {
+    // Test that verifies current constraint where if-else with multiple branches
+    // or statements in branches cannot be rendered as ternary and requires transformation.
+    // This constraint could potentially be relaxed in the future if all conditions 
+    // and branches can be expressed as simple JS expressions.
+    let source = r#"
+        fn test_complex_ternary() {
+            let x = 5;
+            let y = Option::Some(10);
+            let z = Option::Some(20);
+            let result = if x > 0 {
+                match y {
+                    Option::Some(v) => v,
+                    Option::None => 0,
+                }
+            } else if x < 0 {
+                match z {
+                    Option::Some(v) => v * 2,
+                    Option::None => -1,
+                }
+            } else {
+                42
+            };
+            result
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    // This should be transformed to if-else statements, not ternary operator
+    // because it has multiple else-if branches and complex expressions
+    assert_snapshot!(pretty_print(&hir), @r"
+    fn test_complex_ternary() -> unknown {
+        let x: unknown = 5;
+        let y: unknown = Option::Some(10);
+        let z: unknown = Option::Some(20);
+        let $hir$0: unknown = _;
+        if (x > 0) {
+            let $hir$1: unknown = _;
+            match y {
+                Option::Some { 0: v } => {
+                    ($hir$1 = v);
+                },
+                Option::None => {
+                    ($hir$1 = 0);
+                },
+            };
+            ($hir$0 = $hir$1);
+        } else if (x < 0) {
+            let $hir$2: unknown = _;
+            match z {
+                Option::Some { 0: v } => {
+                    ($hir$2 = (v * 2));
+                },
+                Option::None => {
+                    ($hir$2 = -1);
+                },
+            };
+            ($hir$0 = $hir$2);
+        } else {
+            ($hir$0 = 42);
+        };
+        let result: unknown = $hir$0;
+        return result;
+    }
+    ");
+}
