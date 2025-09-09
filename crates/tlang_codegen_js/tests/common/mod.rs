@@ -1,6 +1,6 @@
 use tlang_codegen_js::create_hir_js_opt_group;
 use tlang_codegen_js::generator::CodegenJS;
-use tlang_hir_opt::{HirOptContext, HirOptimizer, HirPass};
+use tlang_hir_opt::HirOptimizer;
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
 use tlang_symbols::SymbolType;

@@ -50,6 +50,7 @@ impl CodegenJS {
                         false
                     }
                 });
+
                 if all_arms_return {
                     return true;
                 }

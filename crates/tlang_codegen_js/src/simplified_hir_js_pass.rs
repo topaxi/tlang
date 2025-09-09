@@ -1134,12 +1134,28 @@ impl SimplifiedHirJsPass {
 
             // If all arms have simple control flow statements or temp_name is empty, don't create assignment statements
             if all_arms_have_simple_control_flow || temp_name.is_empty() {
-                // Just create the match statement without temp variable assignments
+                // Even when not creating temp variable assignments, we still need to ensure
+                // match arm completion expressions are moved to statement position for JavaScript generation
+                let mut processed_arms = Vec::new();
+                for mut arm in arms {
+                    // Move any completion expression to statement position
+                    if let Some(completion_expr) = arm.block.expr.take() {
+                        let completion_stmt = hir::Stmt::new(
+                            ctx.hir_id_allocator.next_id(),
+                            hir::StmtKind::Expr(Box::new(completion_expr)),
+                            span,
+                        );
+                        arm.block.stmts.push(completion_stmt);
+                    }
+                    processed_arms.push(arm);
+                }
+                
+                // Create the match statement with processed arms
                 let match_stmt = hir::Stmt::new(
                     ctx.hir_id_allocator.next_id(),
                     hir::StmtKind::Expr(Box::new(hir::Expr {
                         hir_id: ctx.hir_id_allocator.next_id(),
-                        kind: hir::ExprKind::Match(scrutinee, arms),
+                        kind: hir::ExprKind::Match(scrutinee, processed_arms),
                         span,
                     })),
                     span,
@@ -1837,6 +1853,36 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
 
                     // Visit arm body
                     self.visit_block(&mut arm.block, ctx);
+                    
+                    // After visiting, ensure match arm completion expressions are moved to statement position
+                    // This is required for JavaScript generation since the pattern match generator
+                    // expects all match arm blocks to have block.expr = None
+                    if let Some(completion_expr) = &mut arm.block.expr {
+                        match &completion_expr.kind {
+                            // Break and continue statements should be moved to statement position, not assignments
+                            hir::ExprKind::Break(..) | hir::ExprKind::Continue => {
+                                let control_flow_stmt = hir::Stmt::new(
+                                    ctx.hir_id_allocator.next_id(),
+                                    hir::StmtKind::Expr(Box::new(completion_expr.clone())),
+                                    completion_expr.span,
+                                );
+                                arm.block.stmts.push(control_flow_stmt);
+                                arm.block.expr = None;
+                                self.changes_made = true;
+                            }
+                            // All other expressions get moved to statement position
+                            _ => {
+                                let completion_stmt = hir::Stmt::new(
+                                    ctx.hir_id_allocator.next_id(),
+                                    hir::StmtKind::Expr(Box::new(completion_expr.clone())),
+                                    completion_expr.span,
+                                );
+                                arm.block.stmts.push(completion_stmt);
+                                arm.block.expr = None;
+                                self.changes_made = true;
+                            }
+                        }
+                    }
                 }
             }
             hir::ExprKind::Loop(loop_body) => {
