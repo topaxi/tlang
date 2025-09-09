@@ -17,7 +17,6 @@ fn test_for_loop_simple_iteration() {
         }
     "});
 
-    // Expected: Should generate JavaScript for loop or for...of with proper iteration
     assert_snapshot!(output, @r"
     function test_sum() {
         let sum = 0;
