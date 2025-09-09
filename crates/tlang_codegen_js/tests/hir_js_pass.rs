@@ -2199,9 +2199,6 @@ fn test_isolated_for_loop_structure() {
             let iterator$$: unknown = iterator::iter([1, 2, 3]);
             let $hir$1: unknown = _;
             loop {
-                let $hir$2: unknown = _;
-                let $hir$3: unknown = _;
-                let $hir$4: unknown = _;
                 match iterator$$.next() {
                     Option::Some { 0: i } => {
                         log(i);
@@ -2210,9 +2207,6 @@ fn test_isolated_for_loop_structure() {
                         break;
                     },
                 };
-                $hir$4;
-                $hir$3;
-                ($hir$1 = $hir$2);
             };
             ($hir$0 = $hir$1);
         };
