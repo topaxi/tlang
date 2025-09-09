@@ -1817,6 +1817,11 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                 _ => {}
             }
         }
+
+        // Visit the completion expression if it exists
+        if let Some(completion_expr) = &mut block.expr {
+            self.visit_expr(completion_expr, ctx);
+        }
     }
 
     fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
