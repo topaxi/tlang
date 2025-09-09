@@ -1766,7 +1766,7 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
             if matches!(completion_expr.kind, hir::ExprKind::Wildcard) {
                 // Check if this wildcard was created by a previous transformation 
                 // and no other logic depends on it
-                let has_dependent_logic = block.stmts.iter().any(|stmt| {
+                let has_dependent_logic = block.stmts.iter().any(|_stmt| {
                     // Check if any statements reference this completion expression
                     // For now, we'll be conservative and only remove standalone wildcards
                     false
