@@ -228,7 +228,7 @@ impl ReturnStatementPass {
                         hir::ExprKind::Match(..) => {
                             // Recursively transform nested match expressions
                             self.transform_match_to_returns(completion_expr, ctx);
-                            
+
                             // After transformation, move the match to statement position
                             let match_stmt = hir::Stmt::new(
                                 ctx.hir_id_allocator.next_id(),

@@ -2742,13 +2742,13 @@ fn test_simple_for_loop_without_completion_values() {
         }
     "#;
     let (before, after) = compile_and_apply_hir_js_pass_debug(source);
-    
+
     // Print the HIR before and after optimization for debugging
     println!("=== HIR BEFORE OPTIMIZATION ===");
     println!("{}", pretty_print(&before));
     println!("=== HIR AFTER OPTIMIZATION ===");
     println!("{}", pretty_print(&after));
-    
+
     // The HIR JS pass should NOT create temp variables for simple loops without completion values
     assert_snapshot!(pretty_print(&after), @r"
     fn test_sum() -> unknown {
@@ -2770,4 +2770,3 @@ fn test_simple_for_loop_without_completion_values() {
     }
     ");
 }
-

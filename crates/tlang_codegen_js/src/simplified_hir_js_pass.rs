@@ -126,10 +126,10 @@ impl SimplifiedHirJsPass {
         }
 
         // Check completion expression
-        if let Some(expr) = &block.expr {
-            if self.expr_has_break_with_value(expr) {
-                return true;
-            }
+        if let Some(expr) = &block.expr
+            && self.expr_has_break_with_value(expr)
+        {
+            return true;
         }
 
         false
@@ -145,10 +145,10 @@ impl SimplifiedHirJsPass {
         }
 
         // Check completion expression
-        if let Some(expr) = &block.expr {
-            if self.expr_has_return(expr) {
-                return true;
-            }
+        if let Some(expr) = &block.expr
+            && self.expr_has_return(expr)
+        {
+            return true;
         }
 
         false
@@ -1149,7 +1149,7 @@ impl SimplifiedHirJsPass {
                     }
                     processed_arms.push(arm);
                 }
-                
+
                 // Create the match statement with processed arms
                 let match_stmt = hir::Stmt::new(
                     ctx.hir_id_allocator.next_id(),
@@ -1635,37 +1635,14 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
             // This ensures that match expressions inside loops get their completion expressions
             // moved to statement position before we do our own transformations
             self.visit_expr(completion_expr, ctx);
-            
-            // Check for specific pattern: match expression in completion position that should be moved to statement position
-            // This is needed for simple for-loop patterns where the match is pure control flow
+
+            // After visiting, check if the match expression should be moved to statement position
+            // This happens when the match expression has been fully transformed (all arms have block.expr = None)
             if let hir::ExprKind::Match(_, arms) = &completion_expr.kind {
-                // Check if this is a simple control-flow match pattern (like for-loops)
-                // where some arms have control flow statements and others have regular statements
-                let is_for_loop_pattern = arms.len() == 2 && {
-                    // Check if one arm ends with break/continue and the other has regular statements
-                    let has_control_flow_arm = arms.iter().any(|arm| {
-                        if let Some(last_stmt) = arm.block.stmts.last() {
-                            if let hir::StmtKind::Expr(expr) = &last_stmt.kind {
-                                matches!(expr.kind, hir::ExprKind::Break(None) | hir::ExprKind::Continue)
-                            } else {
-                                false
-                            }
-                        } else {
-                            // Check completion expression if no statements
-                            if let Some(completion_expr) = &arm.block.expr {
-                                matches!(completion_expr.kind, hir::ExprKind::Break(None) | hir::ExprKind::Continue)
-                            } else {
-                                false
-                            }
-                        }
-                    });
-                    
-                    // Check if this looks like a for-loop iterator pattern
-                    // (has control flow and no break values)
-                    has_control_flow_arm && !self.expr_has_break_with_value(completion_expr)
-                };
-                
-                if is_for_loop_pattern {
+                // Check if all arms have been transformed to contain only statements
+                let all_arms_are_statements = arms.iter().all(|arm| arm.block.expr.is_none());
+
+                if all_arms_are_statements {
                     // Move the match expression to statement position
                     let match_stmt = hir::Stmt::new(
                         ctx.hir_id_allocator.next_id(),
@@ -1673,17 +1650,17 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                         completion_expr.span,
                     );
                     new_stmts.push(match_stmt);
-                    
+
                     // Set completion expression to None since we moved it to statement position
                     block.expr = None;
                     self.changes_made = true;
-                    
+
                     // Early return to avoid double processing
                     block.stmts = new_stmts;
                     return;
                 }
             }
-            
+
             // First, check if this is a loop expression - handle it before other special cases
             if let hir::ExprKind::Loop(..) = &completion_expr.kind {
                 // For loop expressions in completion position, check if they can be rendered as statements
@@ -1842,14 +1819,14 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
             // If completion expression is a wildcard and no temp variables or other logic depend on it,
             // remove it entirely as per @topaxi's suggestion to use None instead
             if matches!(completion_expr.kind, hir::ExprKind::Wildcard) {
-                // Check if this wildcard was created by a previous transformation 
+                // Check if this wildcard was created by a previous transformation
                 // and no other logic depends on it
                 let has_dependent_logic = block.stmts.iter().any(|_stmt| {
                     // Check if any statements reference this completion expression
                     // For now, we'll be conservative and only remove standalone wildcards
                     false
                 });
-                
+
                 if !has_dependent_logic {
                     block.expr = None;
                     self.changes_made = true;
@@ -1915,7 +1892,7 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
 
                     // Visit arm body
                     self.visit_block(&mut arm.block, ctx);
-                    
+
                     // After visiting, ensure match arm completion expressions are moved to statement position
                     // This is required for JavaScript generation since the pattern match generator
                     // expects all match arm blocks to have block.expr = None
