@@ -10,6 +10,7 @@ use crate::js;
 use crate::js_expr_utils::if_else_can_render_as_ternary;
 
 impl CodegenJS {
+    #[allow(dead_code)]
     /// Check if a completion variable reference should be omitted
     /// This happens when all execution paths in the block end with return statements
     fn should_omit_completion_var_reference(
@@ -27,6 +28,7 @@ impl CodegenJS {
         self.block_all_paths_return(block)
     }
 
+    #[allow(dead_code)]
     /// Check if all execution paths in a block end with return statements
     fn block_all_paths_return(&self, block: &hir::Block) -> bool {
         // If the block has no completion expression, check if the last statement is a return

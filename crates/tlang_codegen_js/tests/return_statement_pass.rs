@@ -369,7 +369,7 @@ fn test_nested_match_expressions() {
     fn test(opt: unknown) -> unknown {
         match opt {
             Option::Some { 0: val } => {
-                return match val {
+                match val {
                     Result::Ok { 0: x } => {
                         return (x * 2);
                     },

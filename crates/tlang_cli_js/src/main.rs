@@ -9,7 +9,7 @@ use tlang_ast_lowering::lower_to_hir;
 use tlang_codegen_js::create_hir_js_opt_group;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_hir::hir;
-use tlang_hir_opt::{HirOptimizer, HirPass};
+use tlang_hir_opt::HirOptimizer;
 use tlang_parser::error::ParseIssue;
 use tlang_semantics::{SemanticAnalyzer, diagnostic::Diagnostic};
 

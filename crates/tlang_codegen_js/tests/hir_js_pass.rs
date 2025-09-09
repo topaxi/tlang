@@ -2200,17 +2200,19 @@ fn test_isolated_for_loop_structure() {
             let $hir$1: unknown = _;
             loop {
                 let $hir$2: unknown = _;
+                let $hir$3: unknown = _;
+                let $hir$4: unknown = _;
                 match iterator$$.next() {
                     Option::Some { 0: i } => {
                         log(i);
                     },
                     Option::None => {
                         break;
-                        ($hir$2 = _);
                     },
                 };
-                $hir$2;
-                _
+                $hir$4;
+                $hir$3;
+                ($hir$1 = $hir$2);
             };
             ($hir$0 = $hir$1);
         };
