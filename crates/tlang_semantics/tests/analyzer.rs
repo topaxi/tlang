@@ -554,3 +554,152 @@ fn test_variable_usage_validator_undeclared_variable() {
     assert!(diagnostics[0].message().contains("similar_name"));
     assert!(diagnostics[0].is_error());
 }
+
+#[test]
+fn test_tail_call_position_validator_debug_let_binding() {
+    let source = indoc! {r#"
+        fn test(x) {
+            let y = rec test(x - 1);
+            y
+        }
+    "#};
+    
+    let diagnostics = analyze_diag!(source);
+    
+    println!("All diagnostics: {:?}", diagnostics);
+    
+    // Filter for tail call position errors
+    let tail_call_errors: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.message().contains("not in tail position"))
+        .collect();
+    
+    assert!(
+        !tail_call_errors.is_empty(),
+        "Should have tail call position errors for let binding case, but got none"
+    );
+}
+
+#[test]
+fn test_tail_call_position_validator_debug_not_at_end() {
+    let source = indoc! {r#"
+        fn test(x) {
+            rec test(x - 1);
+            42
+        }
+    "#};
+    
+    let diagnostics = analyze_diag!(source);
+    
+    println!("All diagnostics: {:?}", diagnostics);
+    
+    // Filter for tail call position errors
+    let tail_call_errors: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.message().contains("not in tail position"))
+        .collect();
+    
+    assert!(
+        !tail_call_errors.is_empty(),
+        "Should have tail call position errors for non-tail position case, but got none"
+    );
+}
+
+#[test]
+fn test_tail_call_position_validator_valid_cases() {
+    // Test valid tail call positions
+    let test_cases = vec![
+        // Valid: tail call at end of function
+        indoc! {r#"
+            fn fib(n) { rec fib(n - 1) }
+        "#},
+        // Valid: tail call in if-else expression
+        indoc! {r#"
+            fn test(x) { if x > 0 { rec test(x - 1) } else { 0 } }
+        "#},
+        // Valid: tail call in match arm
+        indoc! {r#"
+            fn test(0) { 0 }
+            fn test(n) { rec test(n - 1) }
+        "#},
+        // Valid: tail call after return
+        indoc! {r#"
+            fn test(x) { return rec test(x - 1); }
+        "#},
+        // Valid: tail call in block at end of function
+        indoc! {r#"
+            fn test(x) {
+                let y = x + 1;
+                rec test(y)
+            }
+        "#},
+    ];
+
+    for (i, test_case) in test_cases.iter().enumerate() {
+        let diagnostics = analyze_diag!(test_case);
+        
+        // Filter for tail call position errors
+        let tail_call_errors: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.message().contains("not in tail position"))
+            .collect();
+        
+        assert!(
+            tail_call_errors.is_empty(),
+            "Test case {} should not have tail call position errors, but got: {:?}",
+            i,
+            tail_call_errors
+        );
+    }
+}
+
+#[test]
+fn test_tail_call_position_validator_invalid_cases() {
+    // Test invalid tail call positions
+    let test_cases = vec![
+        // Invalid: tail call in binary operation
+        indoc! {r#"
+            fn test(x) { 1 + rec test(x - 1) }
+        "#},
+        // Invalid: tail call as function argument  
+        indoc! {r#"
+            fn test(x) { test(rec test(x - 1)) }
+        "#},
+        // Invalid: tail call in let binding
+        indoc! {r#"
+            fn test(x) {
+                let y = rec test(x - 1);
+                y
+            }
+        "#},
+        // Invalid: tail call not at end of block
+        indoc! {r#"
+            fn test(x) {
+                rec test(x - 1);
+                42
+            }
+        "#},
+    ];
+
+    for (i, test_case) in test_cases.iter().enumerate() {
+        let diagnostics = analyze_diag!(test_case);
+        
+        // Filter for tail call position errors
+        let tail_call_errors: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.message().contains("not in tail position"))
+            .collect();
+        
+        assert!(
+            !tail_call_errors.is_empty(),
+            "Test case {} should have tail call position errors, but got none. All diagnostics: {:?}",
+            i,
+            diagnostics
+        );
+        
+        assert!(
+            tail_call_errors[0].is_error(),
+            "Tail call position validation should be an error"
+        );
+    }
+}
