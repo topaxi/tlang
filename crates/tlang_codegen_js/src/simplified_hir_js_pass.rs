@@ -1617,7 +1617,8 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
         if let Some(completion_expr) = &mut block.expr {
             // First, check if this is a loop expression - handle it before other special cases
             if let hir::ExprKind::Loop(..) = &completion_expr.kind {
-                if !self.can_render_as_js_expr(completion_expr) {
+                // For loop expressions in completion position, check if they can be rendered as statements
+                if !expr_can_render_as_js_stmt(completion_expr) {
                     // Check if this loop has break statements with values
                     if self.loop_has_break_with_value(completion_expr) {
                         // If it already contains temp variables, it may have been partially processed
@@ -1673,7 +1674,7 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                             self.changes_made = true;
                         }
                     } else {
-                        // Loop without break values - convert to statement and set completion to undefined
+                        // Loop without break values - convert to statement and set completion to None
                         let span = completion_expr.span;
 
                         // Create loop statement (not assigned to anything)
@@ -1684,13 +1685,10 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                         );
                         new_stmts.push(loop_stmt);
 
-                        // Replace completion expression with wildcard (undefined)
-                        *completion_expr = hir::Expr {
-                            hir_id: ctx.hir_id_allocator.next_id(),
-                            kind: hir::ExprKind::Wildcard,
-                            span,
-                        };
+                        // Set completion expression to None instead of wildcard
+                        block.expr = None;
                         self.changes_made = true;
+                        return; // Early return since we've removed the completion expression
                     }
                 }
             // Special handling for assignment expressions with match on RHS (even if they contain temp vars)

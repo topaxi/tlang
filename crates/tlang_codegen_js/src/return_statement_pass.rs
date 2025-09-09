@@ -212,20 +212,35 @@ impl ReturnStatementPass {
             for arm in arms {
                 // Transform the completion expression in each arm to a return statement
                 if let Some(completion_expr) = &mut arm.block.expr {
-                    // Check if the completion expression is itself a match that needs transformation
-                    if let hir::ExprKind::Match(..) = &completion_expr.kind {
-                        // Recursively transform nested match expressions
-                        self.transform_match_to_returns(completion_expr, ctx);
+                    match &completion_expr.kind {
+                        // Break and continue statements should be moved to statement position, not wrapped in return
+                        hir::ExprKind::Break(..) | hir::ExprKind::Continue => {
+                            let control_flow_stmt = hir::Stmt::new(
+                                ctx.hir_id_allocator.next_id(),
+                                hir::StmtKind::Expr(Box::new(completion_expr.clone())),
+                                completion_expr.span,
+                            );
+                            arm.block.stmts.push(control_flow_stmt);
+                            arm.block.expr = None;
+                            self.changes_made = true;
+                        }
+                        // Match expressions need recursive transformation
+                        hir::ExprKind::Match(..) => {
+                            // Recursively transform nested match expressions
+                            self.transform_match_to_returns(completion_expr, ctx);
+                        }
+                        // All other expressions get wrapped in return statements
+                        _ => {
+                            let return_stmt = hir::Stmt::new(
+                                ctx.hir_id_allocator.next_id(),
+                                hir::StmtKind::Return(Some(Box::new(completion_expr.clone()))),
+                                completion_expr.span,
+                            );
+                            arm.block.stmts.push(return_stmt);
+                            arm.block.expr = None;
+                            self.changes_made = true;
+                        }
                     }
-
-                    let return_stmt = hir::Stmt::new(
-                        ctx.hir_id_allocator.next_id(),
-                        hir::StmtKind::Return(Some(Box::new(completion_expr.clone()))),
-                        completion_expr.span,
-                    );
-                    arm.block.stmts.push(return_stmt);
-                    arm.block.expr = None;
-                    self.changes_made = true;
                 }
 
                 // Also apply standard completion transformation for nested complex expressions
