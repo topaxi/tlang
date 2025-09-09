@@ -1082,10 +1082,28 @@ impl SimplifiedHirJsPass {
 
                 // Transform the completion expression in each arm
                 if let Some(completion_expr) = new_arm.block.expr.take() {
-                    // Handle break/continue expressions specially - don't create assignments for them
+                    // Handle break/continue expressions specially
                     match &completion_expr.kind {
-                        hir::ExprKind::Break(..) | hir::ExprKind::Continue => {
-                            // For break/continue expressions, add them as statements directly
+                        hir::ExprKind::Break(Some(break_value)) => {
+                            // For break with value: temp_var = value; break;
+                            let assignment_stmt =
+                                self.create_assignment_stmt(ctx, temp_name, (**break_value).clone(), span);
+                            new_arm.block.stmts.push(assignment_stmt);
+
+                            // Add plain break statement
+                            let plain_break = hir::Stmt::new(
+                                ctx.hir_id_allocator.next_id(),
+                                hir::StmtKind::Expr(Box::new(hir::Expr {
+                                    hir_id: ctx.hir_id_allocator.next_id(),
+                                    kind: hir::ExprKind::Break(None),
+                                    span,
+                                })),
+                                span,
+                            );
+                            new_arm.block.stmts.push(plain_break);
+                        }
+                        hir::ExprKind::Break(None) | hir::ExprKind::Continue => {
+                            // For break/continue without value, add them as statements directly
                             let stmt = hir::Stmt::new(
                                 ctx.hir_id_allocator.next_id(),
                                 hir::StmtKind::Expr(Box::new(completion_expr)),
@@ -1336,7 +1354,7 @@ impl SimplifiedHirJsPass {
             }
             hir::StmtKind::Expr(expr) => {
                 // Special handling for assignment expressions with match on RHS (even if they contain temp vars)
-                if let hir::ExprKind::Binary(hir::BinaryOpKind::Assign, lhs, rhs) = &expr.kind
+                if let hir::ExprKind::Binary(hir::BinaryOpKind::Assign, _lhs, rhs) = &mut expr.kind
                     && let hir::ExprKind::Match(..) = &rhs.kind
                 {
                     // Transform assignment with match: lhs = match ... ->
@@ -1353,26 +1371,9 @@ impl SimplifiedHirJsPass {
                         self.transform_match_to_statements((**rhs).clone(), &temp_name, ctx);
                     additional_stmts.extend(match_statements);
 
-                    // Create assignment: lhs = temp_var
+                    // Update the RHS of the assignment to use the temp variable
                     let temp_ref = self.create_temp_var_path(ctx, &temp_name, span);
-                    let final_assignment = hir::Expr {
-                        hir_id: ctx.hir_id_allocator.next_id(),
-                        kind: hir::ExprKind::Binary(
-                            hir::BinaryOpKind::Assign,
-                            Box::new((**lhs).clone()),
-                            Box::new(temp_ref.clone()),
-                        ),
-                        span,
-                    };
-                    let final_assignment_stmt = hir::Stmt::new(
-                        ctx.hir_id_allocator.next_id(),
-                        hir::StmtKind::Expr(Box::new(final_assignment)),
-                        span,
-                    );
-                    additional_stmts.push(final_assignment_stmt);
-
-                    // Replace the original expression with temp variable reference
-                    **expr = temp_ref;
+                    **rhs = temp_ref;
                     self.changes_made = true;
                     return additional_stmts;
                 }

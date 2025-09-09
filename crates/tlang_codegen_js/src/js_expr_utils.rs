@@ -47,15 +47,12 @@ pub fn expr_can_render_as_js_expr(expr: &hir::Expr) -> bool {
 /// This is less restrictive than expr_can_render_as_js_expr because some constructs
 /// can be handled directly as assignments even if they're not valid JS expressions.
 ///
-/// Example: Function expressions like `fn(x) { x + 1 }` cannot be rendered as JS expressions
-/// in all contexts, but can be directly assigned: `let f = function(x) { return x + 1; }`
+/// Example: Dictionary literals with complex values that need transformation
+/// can still be assigned directly in some cases.
 pub fn expr_can_render_as_assignment_rhs(expr: &hir::Expr) -> bool {
     match &expr.kind {
         // All JS expressions can be assigned
         _ if expr_can_render_as_js_expr(expr) => true,
-
-        // Function expressions can be directly assigned
-        hir::ExprKind::FunctionExpression(..) => true,
 
         // Dictionary literals can be directly assigned
         hir::ExprKind::Dict(pairs) => pairs
