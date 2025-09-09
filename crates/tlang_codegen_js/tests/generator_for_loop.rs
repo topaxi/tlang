@@ -53,18 +53,20 @@ fn test_for_loop_with_accumulator_simple() {
         {
             let iterator$$ = iterator.iter([1, 2, 3, 4, 5]);
             let accumulator$$ = 0;
+            let $hir$1 = undefined;
             for (;;) {
                 let sum = accumulator$$;
-                let $hir$1 = undefined;
+                let $hir$2 = undefined;
                 let $tmp$0 = iterator$$.next(),i;if ($tmp$0.tag === Option.Some && (i = $tmp$0[0], true)) {
-                    $hir$1 = sum + i;
+                    $hir$2 = sum + i;
                 } else if ($tmp$0.tag === Option.None) {
-                    $hir$1 = accumulator$$;
+                    $hir$2 = accumulator$$;
                     break;
                 };
-                accumulator$$ = $hir$1;
-                ($hir$0 = $hir$1);
+                accumulator$$ = $hir$2;
+                $hir$1 = $hir$2;
             }
+            $hir$0 = $hir$1;
         };
         return $hir$0;
     }
@@ -92,18 +94,20 @@ fn test_for_loop_with_accumulator_pattern() {
         {
             let iterator$$ = iterator.iter([1, 2, 3, 4]);
             let accumulator$$ = [[], []];
+            let $hir$1 = undefined;
             for (;;) {
                 let [even, odd] = accumulator$$;
-                let $hir$1 = undefined;
+                let $hir$2 = undefined;
                 let $tmp$0 = iterator$$.next(),n;if ($tmp$0.tag === Option.Some && (n = $tmp$0[0], true)) {
-                    $hir$1 = (n % 2 === 0 ? [[...even, n], odd] : [even, [...odd, n]]);
+                    $hir$2 = (n % 2 === 0 ? [[...even, n], odd] : [even, [...odd, n]]);
                 } else if ($tmp$0.tag === Option.None) {
-                    $hir$1 = accumulator$$;
+                    $hir$2 = accumulator$$;
                     break;
                 };
-                accumulator$$ = $hir$1;
-                ($hir$0 = $hir$1);
+                accumulator$$ = $hir$2;
+                $hir$1 = $hir$2;
             }
+            $hir$0 = $hir$1;
         };
         return $hir$0;
     }
@@ -145,18 +149,20 @@ fn test_for_loop_with_string_iteration() {
         {
             let iterator$$ = iterator.iter("hello");
             let accumulator$$ = 0;
+            let $hir$1 = undefined;
             for (;;) {
                 let count = accumulator$$;
-                let $hir$1 = undefined;
+                let $hir$2 = undefined;
                 let $tmp$0 = iterator$$.next(),char;if ($tmp$0.tag === Option.Some && (char = $tmp$0[0], true)) {
-                    $hir$1 = count + 1;
+                    $hir$2 = count + 1;
                 } else if ($tmp$0.tag === Option.None) {
-                    $hir$1 = accumulator$$;
+                    $hir$2 = accumulator$$;
                     break;
                 };
-                accumulator$$ = $hir$1;
-                ($hir$0 = $hir$1);
+                accumulator$$ = $hir$2;
+                $hir$1 = $hir$2;
             }
+            $hir$0 = $hir$1;
         };
         return $hir$0;
     }
@@ -180,18 +186,20 @@ fn test_for_loop_with_range() {
         {
             let iterator$$ = iterator.iter(0);
             let accumulator$$ = 0;
+            let $hir$1 = undefined;
             for (;;) {
                 let sum = accumulator$$;
-                let $hir$1 = undefined;
+                let $hir$2 = undefined;
                 let $tmp$0 = iterator$$.next(),i;if ($tmp$0.tag === Option.Some && (i = $tmp$0[0], true)) {
-                    $hir$1 = sum + i;
+                    $hir$2 = sum + i;
                 } else if ($tmp$0.tag === Option.None) {
-                    $hir$1 = accumulator$$;
+                    $hir$2 = accumulator$$;
                     break;
                 };
-                accumulator$$ = $hir$1;
-                ($hir$0 = $hir$1);
+                accumulator$$ = $hir$2;
+                $hir$1 = $hir$2;
             }
+            $hir$0 = $hir$1;
         };
         return $hir$0;
     }
@@ -215,18 +223,20 @@ fn test_for_loop_with_variable_iterable() {
         {
             let iterator$$ = iterator.iter(list);
             let accumulator$$ = 0;
+            let $hir$1 = undefined;
             for (;;) {
                 let sum = accumulator$$;
-                let $hir$1 = undefined;
+                let $hir$2 = undefined;
                 let $tmp$0 = iterator$$.next(),item;if ($tmp$0.tag === Option.Some && (item = $tmp$0[0], true)) {
-                    $hir$1 = sum + item;
+                    $hir$2 = sum + item;
                 } else if ($tmp$0.tag === Option.None) {
-                    $hir$1 = accumulator$$;
+                    $hir$2 = accumulator$$;
                     break;
                 };
-                accumulator$$ = $hir$1;
-                ($hir$0 = $hir$1);
+                accumulator$$ = $hir$2;
+                $hir$1 = $hir$2;
             }
+            $hir$0 = $hir$1;
         };
         return $hir$0;
     }
@@ -255,18 +265,20 @@ fn test_for_loop_with_function_call_iterable() {
         {
             let iterator$$ = iterator.iter(get_numbers());
             let accumulator$$ = 0;
+            let $hir$1 = undefined;
             for (;;) {
                 let sum = accumulator$$;
-                let $hir$1 = undefined;
+                let $hir$2 = undefined;
                 let $tmp$0 = iterator$$.next(),num;if ($tmp$0.tag === Option.Some && (num = $tmp$0[0], true)) {
-                    $hir$1 = sum + num;
+                    $hir$2 = sum + num;
                 } else if ($tmp$0.tag === Option.None) {
-                    $hir$1 = accumulator$$;
+                    $hir$2 = accumulator$$;
                     break;
                 };
-                accumulator$$ = $hir$1;
-                ($hir$0 = $hir$1);
+                accumulator$$ = $hir$2;
+                $hir$1 = $hir$2;
             }
+            $hir$0 = $hir$1;
         };
         return $hir$0;
     }
@@ -291,18 +303,20 @@ fn test_for_loop_expression_in_let() {
         {
             let iterator$$ = iterator.iter([1, 2, 3]);
             let accumulator$$ = 0;
+            let $hir$1 = undefined;
             for (;;) {
                 let acc = accumulator$$;
-                let $hir$1 = undefined;
+                let $hir$2 = undefined;
                 let $tmp$0 = iterator$$.next(),i;if ($tmp$0.tag === Option.Some && (i = $tmp$0[0], true)) {
-                    $hir$1 = acc + i;
+                    $hir$2 = acc + i;
                 } else if ($tmp$0.tag === Option.None) {
-                    $hir$1 = accumulator$$;
+                    $hir$2 = accumulator$$;
                     break;
                 };
-                accumulator$$ = $hir$1;
-                ($hir$0 = $hir$1);
+                accumulator$$ = $hir$2;
+                $hir$1 = $hir$2;
             }
+            $hir$0 = $hir$1;
         };
         let result = $hir$0;
         return result;
@@ -327,18 +341,20 @@ fn test_for_loop_expression_in_return() {
         {
             let iterator$$ = iterator.iter([1, 2, 3]);
             let accumulator$$ = 0;
+            let $hir$1 = undefined;
             for (;;) {
                 let acc = accumulator$$;
-                let $hir$1 = undefined;
+                let $hir$2 = undefined;
                 let $tmp$0 = iterator$$.next(),i;if ($tmp$0.tag === Option.Some && (i = $tmp$0[0], true)) {
-                    $hir$1 = acc + i;
+                    $hir$2 = acc + i;
                 } else if ($tmp$0.tag === Option.None) {
-                    $hir$1 = accumulator$$;
+                    $hir$2 = accumulator$$;
                     break;
                 };
-                accumulator$$ = $hir$1;
-                ($hir$0 = $hir$1);
+                accumulator$$ = $hir$2;
+                $hir$1 = $hir$2;
             }
+            $hir$0 = $hir$1;
         };
         return $hir$0;
     }
@@ -362,18 +378,20 @@ fn test_for_loop_with_complex_pattern() {
         {
             let iterator$$ = iterator.iter([[1, 2], [3, 4], [5, 6]]);
             let accumulator$$ = 0;
+            let $hir$1 = undefined;
             for (;;) {
                 let sum = accumulator$$;
-                let $hir$1 = undefined;
+                let $hir$2 = undefined;
                 let $tmp$0 = iterator$$.next(),a,b;if ($tmp$0.tag === Option.Some && $tmp$0[0].length >= 2 && (a = $tmp$0[0][0], true) && (b = $tmp$0[0][1], true)) {
-                    $hir$1 = sum + a + b;
+                    $hir$2 = sum + a + b;
                 } else if ($tmp$0.tag === Option.None) {
-                    $hir$1 = accumulator$$;
+                    $hir$2 = accumulator$$;
                     break;
                 };
-                accumulator$$ = $hir$1;
-                ($hir$0 = $hir$1);
+                accumulator$$ = $hir$2;
+                $hir$1 = $hir$2;
             }
+            $hir$0 = $hir$1;
         };
         return $hir$0;
     }
@@ -401,18 +419,20 @@ fn test_for_loop_with_guards() {
         {
             let iterator$$ = iterator.iter([1, 2, 3, 4, 5, 6]);
             let accumulator$$ = 0;
+            let $hir$1 = undefined;
             for (;;) {
                 let sum = accumulator$$;
-                let $hir$1 = undefined;
+                let $hir$2 = undefined;
                 let $tmp$0 = iterator$$.next(),i;if ($tmp$0.tag === Option.Some && (i = $tmp$0[0], true)) {
-                    $hir$1 = (i % 2 === 0 ? sum + i : sum);
+                    $hir$2 = (i % 2 === 0 ? sum + i : sum);
                 } else if ($tmp$0.tag === Option.None) {
-                    $hir$1 = accumulator$$;
+                    $hir$2 = accumulator$$;
                     break;
                 };
-                accumulator$$ = $hir$1;
-                ($hir$0 = $hir$1);
+                accumulator$$ = $hir$2;
+                $hir$1 = $hir$2;
             }
+            $hir$0 = $hir$1;
         };
         return $hir$0;
     }

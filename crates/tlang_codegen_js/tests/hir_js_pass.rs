@@ -1041,21 +1041,23 @@ fn test_for_loop_expression_in_let() {
         {
             let iterator$$: unknown = iterator::iter([1, 2, 3]);
             let accumulator$$: unknown = 0;
+            let $hir$1: unknown = _;
             loop {
                 let acc: unknown = accumulator$$;
-                let $hir$1: unknown = _;
+                let $hir$2: unknown = _;
                 match iterator$$.next() {
                     Option::Some { 0: i } => {
-                        ($hir$1 = (acc + i));
+                        ($hir$2 = (acc + i));
                     },
                     Option::None => {
-                        ($hir$1 = accumulator$$);
+                        ($hir$2 = accumulator$$);
                         break;
                     },
                 };
-                (accumulator$$ = $hir$1);
-                $hir$1
+                (accumulator$$ = $hir$2);
+                ($hir$1 = $hir$2);
             };
+            ($hir$0 = $hir$1);
         };
         let result: unknown = $hir$0;
         return result;
@@ -2064,13 +2066,15 @@ fn test_isolated_loop_expression_in_block_completion() {
         let $hir$0: unknown = _;
         {
             let x: unknown = 1;
+            let $hir$1: unknown = _;
             loop {
-                let $hir$1: unknown = _;
+                let $hir$2: unknown = _;
                 if true {
                     break;
                 };
-                $hir$1
+                ($hir$1 = $hir$2);
             };
+            ($hir$0 = $hir$1);
         };
         return $hir$0;
     }
@@ -2193,20 +2197,22 @@ fn test_isolated_for_loop_structure() {
         let $hir$0: unknown = _;
         {
             let iterator$$: unknown = iterator::iter([1, 2, 3]);
+            let $hir$1: unknown = _;
             loop {
-                let $hir$1: unknown = _;
+                let $hir$2: unknown = _;
                 match iterator$$.next() {
                     Option::Some { 0: i } => {
                         log(i);
                     },
                     Option::None => {
                         break;
-                        ($hir$1 = _);
+                        ($hir$2 = _);
                     },
                 };
-                $hir$1;
+                $hir$2;
                 _
             };
+            ($hir$0 = $hir$1);
         };
         return $hir$0;
     }
