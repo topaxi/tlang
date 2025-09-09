@@ -117,20 +117,28 @@ pub fn expr_can_render_as_js_stmt(expr: &hir::Expr) -> bool {
         hir::ExprKind::Loop(..) => true,
 
         // Match expressions can be rendered as JavaScript statements if all arms have return statements
-        // or if all arms end with control flow statements (break/continue)
+        // or if all arms end with control flow statements (break/continue) or simple statements
         hir::ExprKind::Match(_, arms) => {
-            // If all arms have return statements or control flow statements, this match can be rendered as a JS statement
+            // If all arms can be rendered as JavaScript statements, this match can be rendered as a JS statement
             arms.iter().all(|arm| {
+                // Check if the last statement is a return, control flow, or simple statement
                 if let Some(last_stmt) = arm.block.stmts.last() {
                     match &last_stmt.kind {
                         hir::StmtKind::Return(_) => true,
                         hir::StmtKind::Expr(expr) => {
+                            // Control flow statements or simple expressions that can be rendered as statements
                             matches!(expr.kind, hir::ExprKind::Break(_) | hir::ExprKind::Continue)
+                                || expr_can_render_as_js_expr(expr) // Simple expressions like assignments
                         }
                         _ => false,
                     }
                 } else {
-                    false
+                    // No statements, check if the completion expression is a control flow statement
+                    if let Some(completion_expr) = &arm.block.expr {
+                        matches!(completion_expr.kind, hir::ExprKind::Break(_) | hir::ExprKind::Continue)
+                    } else {
+                        false
+                    }
                 }
             })
         }

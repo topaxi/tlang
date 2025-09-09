@@ -544,6 +544,7 @@ impl SimplifiedHirJsPass {
             // this match can be rendered as JS. However, break statements with values need transformation
             // to assign to temp variables, so they don't qualify.
             let all_arms_have_simple_control_flow = arms.iter().all(|arm| {
+                // Check if the last statement is a return or control flow statement
                 if let Some(last_stmt) = arm.block.stmts.last() {
                     match &last_stmt.kind {
                         hir::StmtKind::Return(_) => true,
@@ -557,7 +558,16 @@ impl SimplifiedHirJsPass {
                         _ => false,
                     }
                 } else {
-                    false
+                    // No statements, check if the completion expression is a simple control flow statement
+                    if let Some(completion_expr) = &arm.block.expr {
+                        match &completion_expr.kind {
+                            hir::ExprKind::Break(None) | hir::ExprKind::Continue => true,
+                            hir::ExprKind::Break(Some(_)) => false, // Break with value needs transformation
+                            _ => false,
+                        }
+                    } else {
+                        false
+                    }
                 }
             });
 

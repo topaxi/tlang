@@ -2732,3 +2732,48 @@ fn test_ternary_operator_with_complex_branches_requiring_transformation() {
     }
     ");
 }
+#[test]
+fn test_simple_for_loop_without_completion_values() {
+    // This test verifies that simple for-loops without break values or completion values
+    // do not generate unnecessary temp variables and can be converted to statements
+    let source = r#"
+        fn test_sum() {
+            let sum = 0;
+            for i in [1, 2, 3, 4, 5] {
+                sum = sum + i;
+            }
+            sum
+        }
+    "#;
+    let (before, after) = compile_and_apply_hir_js_pass_debug(source);
+    
+    // Print the HIR before and after optimization for debugging
+    println!("=== HIR BEFORE OPTIMIZATION ===");
+    println!("{}", pretty_print(&before));
+    println!("=== HIR AFTER OPTIMIZATION ===");
+    println!("{}", pretty_print(&after));
+    
+    // The HIR JS pass should NOT create temp variables for simple loops without completion values
+    assert_snapshot!(pretty_print(&after), @r"
+    fn test_sum() -> unknown {
+        let sum: unknown = 0;
+        {
+            let iterator$$: unknown = iterator::iter([1, 2, 3, 4, 5]);
+            loop {
+                match iterator$$.next() {
+                    Option::Some { 0: i } => {
+                        (sum = (sum + i));
+                    },
+                    Option::None => {
+                        break;
+                        _
+                    },
+                };
+                _
+            };
+            _
+        };
+        return sum;
+    }
+    ");
+}
