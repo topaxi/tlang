@@ -54,6 +54,7 @@ impl VariableUsageValidator {
         let symbol_table = symbol_table.borrow();
         let unused_symbols = symbol_table
             .get_all_declared_local_symbols()
+            .into_iter()
             .filter(|symbol| !symbol.used)
             .filter(|symbol| !symbol.is_builtin())
             // Do not report the binding introduced within function bodies to reference to
@@ -229,7 +230,8 @@ impl VariableUsageValidator {
         symbol_table: &Rc<RefCell<SymbolTable>>,
         ctx: &mut SemanticAnalysisContext,
     ) {
-        let did_you_mean = did_you_mean(name, &symbol_table.borrow().get_all_declared_symbols());
+        let all_symbols = symbol_table.borrow().get_all_declared_symbols();
+        let did_you_mean = did_you_mean(name, &all_symbols);
 
         if let Some(suggestion) = did_you_mean {
             ctx.add_diagnostic(diagnostic::error_at!(
