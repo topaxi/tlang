@@ -113,33 +113,20 @@ pub fn expr_can_render_as_js_stmt(expr: &hir::Expr) -> bool {
         // Block expressions can be rendered as JavaScript statements
         hir::ExprKind::Block(block) => block_can_render_as_js_stmt_block(block),
 
-        // Loop expressions can be rendered as JavaScript statements when in statement position
-        hir::ExprKind::Loop(..) => true,
+        // Loop expressions can be rendered as JavaScript statements if their bodies
+        // don't contain complex expressions that need transformation
+        hir::ExprKind::Loop(loop_body) => {
+            // Check if the loop body contains complex expressions
+            block_can_render_as_js_stmt_block(loop_body)
+        }
 
         // Match expressions can be rendered as JavaScript statements if all arms have return statements
         // or if all arms end with control flow statements (break/continue)
-        hir::ExprKind::Match(_, arms) => {
-            // If all arms have return statements or control flow statements, this match can be rendered as a JS statement
-            arms.iter().all(|arm| {
-                // Check if the last statement is a return, control flow, or simple statement
-                if let Some(last_stmt) = arm.block.stmts.last() {
-                    match &last_stmt.kind {
-                        hir::StmtKind::Return(_) => true,
-                        hir::StmtKind::Expr(expr) => {
-                            // Control flow statements only (not simple expressions)
-                            matches!(expr.kind, hir::ExprKind::Break(_) | hir::ExprKind::Continue)
-                        }
-                        _ => false,
-                    }
-                } else {
-                    // No statements, check if the completion expression is a control flow statement
-                    if let Some(completion_expr) = &arm.block.expr {
-                        matches!(completion_expr.kind, hir::ExprKind::Break(_) | hir::ExprKind::Continue)
-                    } else {
-                        false
-                    }
-                }
-            })
+        hir::ExprKind::Match(_, _) => {
+            // Match expressions always need transformation to ensure proper block structure
+            // Even if arms contain simple break/continue statements, they need to be moved
+            // to statement position for JavaScript generation (block.expr = None)
+            false
         }
 
         // These expressions cannot be rendered as JavaScript statements

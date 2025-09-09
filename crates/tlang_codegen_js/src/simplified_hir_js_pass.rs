@@ -108,6 +108,81 @@ impl SimplifiedHirJsPass {
     }
 
     /// Check if a loop expression contains break statements with values
+    fn loop_has_break_statements(&self, expr: &hir::Expr) -> bool {
+        if let hir::ExprKind::Loop(body) = &expr.kind {
+            self.block_has_break_statements(body)
+        } else {
+            false
+        }
+    }
+
+    /// Check if a block contains any break statements (with or without values)
+    fn block_has_break_statements(&self, block: &hir::Block) -> bool {
+        // Check statements
+        for stmt in &block.stmts {
+            if self.stmt_has_break_statements(stmt) {
+                return true;
+            }
+        }
+
+        // Check completion expression
+        if let Some(expr) = &block.expr {
+            if self.expr_has_break_statements(expr) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Check if a statement contains any break statements
+    fn stmt_has_break_statements(&self, stmt: &hir::Stmt) -> bool {
+        match &stmt.kind {
+            hir::StmtKind::Expr(expr) => self.expr_has_break_statements(expr),
+            hir::StmtKind::Let(_, expr, _) => self.expr_has_break_statements(expr),
+            hir::StmtKind::Return(Some(expr)) => self.expr_has_break_statements(expr),
+            _ => false,
+        }
+    }
+
+    /// Check if an expression contains any break expressions (with or without values)
+    fn expr_has_break_statements(&self, expr: &hir::Expr) -> bool {
+        match &expr.kind {
+            hir::ExprKind::Break(_) => true, // Any break statement
+            hir::ExprKind::Continue => false, // Continue is not break
+            hir::ExprKind::Block(block) => self.block_has_break_statements(block),
+            hir::ExprKind::IfElse(cond, then_branch, else_branches) => {
+                self.expr_has_break_statements(cond)
+                    || self.block_has_break_statements(then_branch)
+                    || else_branches
+                        .iter()
+                        .any(|clause| self.block_has_break_statements(&clause.consequence))
+            }
+            hir::ExprKind::Match(scrutinee, arms) => {
+                self.expr_has_break_statements(scrutinee)
+                    || arms
+                        .iter()
+                        .any(|arm| self.block_has_break_statements(&arm.block))
+            }
+            hir::ExprKind::Binary(_, lhs, rhs) => {
+                self.expr_has_break_statements(lhs) || self.expr_has_break_statements(rhs)
+            }
+            hir::ExprKind::Unary(_, operand) => self.expr_has_break_statements(operand),
+            hir::ExprKind::Call(call) => call
+                .arguments
+                .iter()
+                .any(|arg| self.expr_has_break_statements(arg)),
+            hir::ExprKind::List(elements) => elements
+                .iter()
+                .any(|elem| self.expr_has_break_statements(elem)),
+            hir::ExprKind::FieldAccess(obj, _) => self.expr_has_break_statements(obj),
+            hir::ExprKind::IndexAccess(obj, index) => {
+                self.expr_has_break_statements(obj) || self.expr_has_break_statements(index)
+            }
+            _ => false,
+        }
+    }
+
     fn loop_has_break_with_value(&self, expr: &hir::Expr) -> bool {
         if let hir::ExprKind::Loop(body) = &expr.kind {
             self.block_has_break_with_value(body)
@@ -1690,21 +1765,46 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                             self.changes_made = true;
                         }
                     } else {
-                        // Loop without break values - convert to statement and set completion to None
-                        let span = completion_expr.span;
+                        // Loop without break values - check if it has any break statements at all
+                        if self.loop_has_break_statements(completion_expr) {
+                            // Loop has break statements but no break values (e.g., for-loops)
+                            // Need to transform internal match expressions but no temp variables needed
+                            let span = completion_expr.span;
+                            
+                            // Visit the loop body to transform any match expressions
+                            if let hir::ExprKind::Loop(loop_body) = &mut completion_expr.kind {
+                                self.visit_block(loop_body, ctx);
+                            }
 
-                        // Create loop statement (not assigned to anything)
-                        let loop_stmt = hir::Stmt::new(
-                            ctx.hir_id_allocator.next_id(),
-                            hir::StmtKind::Expr(Box::new(completion_expr.clone())),
-                            span,
-                        );
-                        new_stmts.push(loop_stmt);
+                            // Create loop statement (not assigned to anything)
+                            let loop_stmt = hir::Stmt::new(
+                                ctx.hir_id_allocator.next_id(),
+                                hir::StmtKind::Expr(Box::new(completion_expr.clone())),
+                                span,
+                            );
+                            new_stmts.push(loop_stmt);
 
-                        // Set completion expression to None instead of wildcard
-                        block.expr = None;
-                        self.changes_made = true;
-                        return; // Early return since we've removed the completion expression
+                            // Set completion expression to None instead of wildcard
+                            block.expr = None;
+                            self.changes_made = true;
+                            return; // Early return since we've removed the completion expression
+                        } else {
+                            // Loop without any break statements - convert to statement and set completion to None
+                            let span = completion_expr.span;
+
+                            // Create loop statement (not assigned to anything)
+                            let loop_stmt = hir::Stmt::new(
+                                ctx.hir_id_allocator.next_id(),
+                                hir::StmtKind::Expr(Box::new(completion_expr.clone())),
+                                span,
+                            );
+                            new_stmts.push(loop_stmt);
+
+                            // Set completion expression to None instead of wildcard
+                            block.expr = None;
+                            self.changes_made = true;
+                            return; // Early return since we've removed the completion expression
+                        }
                     }
                 }
             // Special handling for assignment expressions with match on RHS (even if they contain temp vars)
