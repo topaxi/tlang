@@ -295,6 +295,9 @@ impl CodegenJS {
                 }
                 self.push_str(binding);
             }
+        }
+
+        if *has_let {
             self.push_char(';');
         }
     }
