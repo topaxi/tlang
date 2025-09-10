@@ -37,15 +37,10 @@ impl RefactoredHirJsPass {
 
     /// Check if an expression contains loops that need transformation
     fn expression_contains_loop_needing_transformation(expr: &hir::Expr) -> bool {
-        eprintln!("DEBUG: Checking if expression contains loop needing transformation: {:?} (HIR ID: {:?})", 
-            std::mem::discriminant(&expr.kind), expr.hir_id);
-        
         let result = match &expr.kind {
             hir::ExprKind::Loop(body) => {
-                eprintln!("DEBUG: Found loop expression (HIR ID: {:?})", expr.hir_id);
                 // Check if this loop needs transformation
                 let needs_transformation = ExpressionAnalyzer::contains_break_with_value(expr);
-                eprintln!("DEBUG: Loop needs transformation: {}", needs_transformation);
                 needs_transformation
             }
             _ => {
@@ -54,7 +49,6 @@ impl RefactoredHirJsPass {
             }
         };
         
-        eprintln!("DEBUG: Expression contains loop needing transformation: {} (HIR ID: {:?})", result, expr.hir_id);
         result
     }
 
@@ -66,12 +60,9 @@ impl RefactoredHirJsPass {
                 ExpressionAnalyzer::contains_break_with_value(expr)
             }
             hir::ExprKind::Cast(inner_expr, _) => {
-                eprintln!("DEBUG: Found cast expression, checking inner: {:?}", std::mem::discriminant(&inner_expr.kind));
                 Self::deep_search_for_loops(inner_expr)
             }
             hir::ExprKind::Binary(_, lhs, rhs) => {
-                eprintln!("DEBUG: Found binary expression, checking operands (LHS: {:?}, RHS: {:?})", 
-                    lhs.hir_id, rhs.hir_id);
                 Self::deep_search_for_loops(lhs) || Self::deep_search_for_loops(rhs)
             }
             hir::ExprKind::Unary(_, operand) => {
@@ -83,7 +74,6 @@ impl RefactoredHirJsPass {
                 call.arguments.iter().any(|arg| Self::deep_search_for_loops(arg))
             }
             hir::ExprKind::Block(block) => {
-                eprintln!("DEBUG: Found block expression, checking statements and completion");
                 block.stmts.iter().any(|stmt| {
                     match &stmt.kind {
                         hir::StmtKind::Let(_, expr, _) | hir::StmtKind::Expr(expr) | hir::StmtKind::Return(Some(expr)) => {
@@ -94,7 +84,6 @@ impl RefactoredHirJsPass {
                 }) || block.expr.as_ref().map_or(false, |expr| Self::deep_search_for_loops(expr))
             }
             hir::ExprKind::FunctionExpression(func_expr) => {
-                eprintln!("DEBUG: Found function expression, checking body");
                 func_expr.body.stmts.iter().any(|stmt| {
                     match &stmt.kind {
                         hir::StmtKind::Let(_, expr, _) | hir::StmtKind::Expr(expr) | hir::StmtKind::Return(Some(expr)) => {
@@ -105,7 +94,6 @@ impl RefactoredHirJsPass {
                 }) || func_expr.body.expr.as_ref().map_or(false, |expr| Self::deep_search_for_loops(expr))
             }
             hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
-                eprintln!("DEBUG: Found if-else expression, checking branches");
                 Self::deep_search_for_loops(condition) ||
                 then_branch.stmts.iter().any(|stmt| {
                     match &stmt.kind {
@@ -130,7 +118,6 @@ impl RefactoredHirJsPass {
                 })
             }
             hir::ExprKind::Match(scrutinee, arms) => {
-                eprintln!("DEBUG: Found match expression, checking arms");
                 Self::deep_search_for_loops(scrutinee) ||
                 arms.iter().any(|arm| {
                     arm.guard.as_ref().map_or(false, |guard| Self::deep_search_for_loops(guard)) ||
@@ -146,15 +133,12 @@ impl RefactoredHirJsPass {
                 })
             }
             hir::ExprKind::List(elements) => {
-                eprintln!("DEBUG: Found list expression, checking elements");
                 elements.iter().any(|element| Self::deep_search_for_loops(element))
             }
             hir::ExprKind::FieldAccess(obj, _) => {
-                eprintln!("DEBUG: Found field access expression, checking object");
                 Self::deep_search_for_loops(obj)
             }
             hir::ExprKind::IndexAccess(obj, index) => {
-                eprintln!("DEBUG: Found index access expression, checking object and index");
                 Self::deep_search_for_loops(obj) || Self::deep_search_for_loops(index)
             }
             _ => false,
@@ -378,37 +362,25 @@ impl RefactoredHirJsPass {
     /// Process statements and flatten complex expressions in let statements
     fn process_stmt(&mut self, stmt: &mut hir::Stmt, ctx: &mut HirOptContext) -> Vec<hir::Stmt> {
         let mut additional_stmts = Vec::new();
-        eprintln!("DEBUG: Processing statement type: {:?} ID: {:?}", 
-            std::mem::discriminant(&stmt.kind), stmt.hir_id);
 
         match &mut stmt.kind {
             hir::StmtKind::Let(_, expr, _) => {
-                eprintln!("DEBUG: Processing let statement: {:?}, expr: {:?} (kind: {:?})", 
-                    stmt.hir_id, expr.hir_id, std::mem::discriminant(&expr.kind));
                 // First, recursively process sub-expressions
                 let mut temp_stmts = self.process_sub_expressions(expr, ctx);
                 additional_stmts.append(&mut temp_stmts);
 
                 // Then check if the expression itself needs flattening
-                eprintln!("DEBUG: Checking if expr {:?} can render as assignment RHS", expr.hir_id);
-                eprintln!("DEBUG: Expression kind: {:?}", expr.kind);
-                eprintln!("DEBUG: First checking if expr can render as JS expr...");
                 let can_render_js = ExpressionAnalyzer::can_render_as_js_expr(expr);
-                eprintln!("DEBUG: expr_can_render_as_js_expr: {}", can_render_js);
                 let can_render = expr_can_render_as_assignment_rhs(expr);
-                eprintln!("DEBUG: expr_can_render_as_assignment_rhs: {}", can_render);
                 
                 if !can_render {
                     // For complex expressions in let statements, flatten them
                     if let hir::ExprKind::Loop(body) = &expr.kind {
-                        eprintln!("DEBUG: Found loop in let statement: {:?}", expr.hir_id);
                         // Check if this loop needs transformation 
                         // (has break values)
                         let needs_transformation = ExpressionAnalyzer::contains_break_with_value(expr);
                             
-                        eprintln!("DEBUG: Loop needs transformation: {}", needs_transformation);
                         if needs_transformation && !ExpressionAnalyzer::contains_any_temp_variables(expr) {
-                            eprintln!("DEBUG: Transforming loop in let statement");
                             // Transform using the appropriate strategy
                             let result =
                                 self.transformer.transform_expression((**expr).clone(), ctx);
@@ -453,13 +425,20 @@ impl RefactoredHirJsPass {
                 }
             }
             hir::StmtKind::Expr(expr) => {
-                eprintln!("DEBUG: Processing expression statement: {:?}", expr.hir_id);
-                // Skip temp variables that we created
-                if self.transformer.temp_var_manager().is_temp_var(expr)
+                // Check if this is a temp variable assignment we should allow
+                let is_temp_assignment = match &expr.kind {
+                    hir::ExprKind::Binary(hir::BinaryOpKind::Assign, lhs, _rhs) => {
+                        self.transformer.temp_var_manager().is_temp_var(lhs)
+                    }
+                    _ => false,
+                };
+                
+                // Skip temp variables that we created (except for assignments to temp variables)
+                if !is_temp_assignment && (self.transformer.temp_var_manager().is_temp_var(expr)
                     || ExpressionAnalyzer::contains_temp_variables(
                         expr,
                         self.transformer.temp_var_manager(),
-                    )
+                    ))
                 {
                     return additional_stmts;
                 }
@@ -592,7 +571,6 @@ impl HirPass for RefactoredHirJsPass {
         self.changes_made = false;
         self.visit_module(module, ctx);
         
-        eprintln!("DEBUG: RefactoredHirJsPass completed, changes_made: {}", self.changes_made);
         
         // Return false to prevent infinite loops - let a single pass handle all transformations
         false
@@ -618,11 +596,9 @@ impl<'hir> Visitor<'hir> for RefactoredHirJsPass {
 
         // Handle completion expression
         if let Some(completion_expr) = &mut block.expr {
-            eprintln!("DEBUG: Processing block completion expression: {:?}, kind: {:?}", completion_expr.hir_id, std::mem::discriminant(&completion_expr.kind));
             
             // Check if the expression contains loops that need transformation
             if Self::expression_contains_loop_needing_transformation(completion_expr) {
-                eprintln!("DEBUG: Completion expression contains loop needing transformation");
                 let result = self
                     .transformer
                     .transform_expression(completion_expr.clone(), ctx);
@@ -636,7 +612,6 @@ impl<'hir> Visitor<'hir> for RefactoredHirJsPass {
                     && !ExpressionAnalyzer::contains_any_temp_variables(completion_expr)
                     && !matches!(completion_expr.kind, hir::ExprKind::Break(_))
                 {
-                    eprintln!("DEBUG: Block completion expression needs transformation: {:?}", completion_expr.hir_id);
                     // Transform before visiting nested structures
                     let result = self
                         .transformer
@@ -645,13 +620,7 @@ impl<'hir> Visitor<'hir> for RefactoredHirJsPass {
                     *completion_expr = result.expr;
                     self.changes_made = true;
                 } else {
-                    eprintln!("DEBUG: Block completion expression not transformed: {:?} (js_expr: {}, js_stmt: {}, temp_vars: {}, is_break: {})",
-                        completion_expr.hir_id,
-                        ExpressionAnalyzer::can_render_as_js_expr(completion_expr),
-                        ExpressionAnalyzer::can_render_as_js_stmt(completion_expr),
-                        ExpressionAnalyzer::contains_any_temp_variables(completion_expr),
-                        matches!(completion_expr.kind, hir::ExprKind::Break(_))
-                    );
+                    // Completion expression doesn't need transformation
                 }
             }
         }
@@ -750,16 +719,11 @@ impl<'hir> Visitor<'hir> for RefactoredHirJsPass {
                 let has_breaks = ExpressionAnalyzer::block_contains_break_with_value(loop_body);
                 let needs_transformation = has_breaks;
                     
-                eprintln!("DEBUG: Found loop in visit_expr (HIR ID: {:?}), needs transformation: {} (breaks: {})", 
-                    hir_id, needs_transformation, has_breaks);
-                    
                 if needs_transformation {
                     // Transform the loop expression right here
-                    eprintln!("DEBUG: Transforming loop in visit_expr (HIR ID: {:?})", hir_id);
                     
                     // We can't transform in place during visiting, so we need to mark this as an error
                     // The real fix is to make sure the transformation happens earlier
-                    eprintln!("WARNING: Loop expression should have been transformed earlier. HIR ID: {:?}", hir_id);
                     
                     // For now, visit the loop body but mark that this is an issue
                     self.visit_block(loop_body, ctx);

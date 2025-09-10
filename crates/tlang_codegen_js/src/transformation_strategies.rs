@@ -427,7 +427,9 @@ impl BlockExpressionStrategy {
                     span,
                 );
 
-                if ExpressionAnalyzer::block_contains_return_statements(&block_ref) {
+                let has_return_statements = ExpressionAnalyzer::block_contains_return_statements(&block_ref);
+
+                if has_return_statements {
                     // Block has return statements, so completion expression assignment would be stray
                     let expr_stmt = hir::Stmt::new(
                         ctx.hir_id_allocator.next_id(),
