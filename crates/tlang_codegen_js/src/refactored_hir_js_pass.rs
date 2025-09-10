@@ -37,48 +37,130 @@ impl RefactoredHirJsPass {
 
     /// Check if an expression contains loops that need transformation
     fn expression_contains_loop_needing_transformation(expr: &hir::Expr) -> bool {
-        eprintln!("DEBUG: Checking if expression contains loop needing transformation: {:?}", std::mem::discriminant(&expr.kind));
+        eprintln!("DEBUG: Checking if expression contains loop needing transformation: {:?} (HIR ID: {:?})", 
+            std::mem::discriminant(&expr.kind), expr.hir_id);
         
         let result = match &expr.kind {
             hir::ExprKind::Loop(body) => {
-                eprintln!("DEBUG: Found loop expression");
+                eprintln!("DEBUG: Found loop expression (HIR ID: {:?})", expr.hir_id);
                 // Check if this loop needs transformation
                 let needs_transformation = ExpressionAnalyzer::contains_break_with_value(expr) 
                     || crate::transformation_strategies::LoopExpressionStrategy::is_for_loop_with_accumulator(body);
                 eprintln!("DEBUG: Loop needs transformation: {}", needs_transformation);
                 needs_transformation
             }
+            _ => {
+                // Comprehensive recursive search for loops in all possible expression types
+                Self::deep_search_for_loops(expr)
+            }
+        };
+        
+        eprintln!("DEBUG: Expression contains loop needing transformation: {} (HIR ID: {:?})", result, expr.hir_id);
+        result
+    }
+
+    /// Deep recursive search for loops in any expression structure
+    fn deep_search_for_loops(expr: &hir::Expr) -> bool {
+        match &expr.kind {
+            hir::ExprKind::Loop(body) => {
+                // Found a loop - check if it needs transformation
+                ExpressionAnalyzer::contains_break_with_value(expr) 
+                    || crate::transformation_strategies::LoopExpressionStrategy::is_for_loop_with_accumulator(body)
+            }
             hir::ExprKind::Cast(inner_expr, _) => {
                 eprintln!("DEBUG: Found cast expression, checking inner: {:?}", std::mem::discriminant(&inner_expr.kind));
-                // Check the inner expression
-                Self::expression_contains_loop_needing_transformation(inner_expr)
+                Self::deep_search_for_loops(inner_expr)
             }
             hir::ExprKind::Binary(_, lhs, rhs) => {
-                eprintln!("DEBUG: Found binary expression, checking operands");
-                Self::expression_contains_loop_needing_transformation(lhs) 
-                    || Self::expression_contains_loop_needing_transformation(rhs)
+                eprintln!("DEBUG: Found binary expression, checking operands (LHS: {:?}, RHS: {:?})", 
+                    lhs.hir_id, rhs.hir_id);
+                Self::deep_search_for_loops(lhs) || Self::deep_search_for_loops(rhs)
             }
             hir::ExprKind::Unary(_, operand) => {
-                Self::expression_contains_loop_needing_transformation(operand)
+                Self::deep_search_for_loops(operand)
             }
             hir::ExprKind::Call(call) => {
-                call.arguments.iter().any(|arg| Self::expression_contains_loop_needing_transformation(arg))
+                // Check callee and arguments
+                Self::deep_search_for_loops(&call.callee) ||
+                call.arguments.iter().any(|arg| Self::deep_search_for_loops(arg))
             }
             hir::ExprKind::Block(block) => {
+                eprintln!("DEBUG: Found block expression, checking statements and completion");
                 block.stmts.iter().any(|stmt| {
                     match &stmt.kind {
                         hir::StmtKind::Let(_, expr, _) | hir::StmtKind::Expr(expr) | hir::StmtKind::Return(Some(expr)) => {
-                            Self::expression_contains_loop_needing_transformation(expr)
+                            Self::deep_search_for_loops(expr)
                         }
                         _ => false,
                     }
-                }) || block.expr.as_ref().map_or(false, |expr| Self::expression_contains_loop_needing_transformation(expr))
+                }) || block.expr.as_ref().map_or(false, |expr| Self::deep_search_for_loops(expr))
+            }
+            hir::ExprKind::FunctionExpression(func_expr) => {
+                eprintln!("DEBUG: Found function expression, checking body");
+                func_expr.body.stmts.iter().any(|stmt| {
+                    match &stmt.kind {
+                        hir::StmtKind::Let(_, expr, _) | hir::StmtKind::Expr(expr) | hir::StmtKind::Return(Some(expr)) => {
+                            Self::deep_search_for_loops(expr)
+                        }
+                        _ => false,
+                    }
+                }) || func_expr.body.expr.as_ref().map_or(false, |expr| Self::deep_search_for_loops(expr))
+            }
+            hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
+                eprintln!("DEBUG: Found if-else expression, checking branches");
+                Self::deep_search_for_loops(condition) ||
+                then_branch.stmts.iter().any(|stmt| {
+                    match &stmt.kind {
+                        hir::StmtKind::Let(_, expr, _) | hir::StmtKind::Expr(expr) | hir::StmtKind::Return(Some(expr)) => {
+                            Self::deep_search_for_loops(expr)
+                        }
+                        _ => false,
+                    }
+                }) ||
+                then_branch.expr.as_ref().map_or(false, |expr| Self::deep_search_for_loops(expr)) ||
+                else_branches.iter().any(|else_clause| {
+                    else_clause.condition.as_ref().map_or(false, |cond| Self::deep_search_for_loops(cond)) ||
+                    else_clause.consequence.stmts.iter().any(|stmt| {
+                        match &stmt.kind {
+                            hir::StmtKind::Let(_, expr, _) | hir::StmtKind::Expr(expr) | hir::StmtKind::Return(Some(expr)) => {
+                                Self::deep_search_for_loops(expr)
+                            }
+                            _ => false,
+                        }
+                    }) ||
+                    else_clause.consequence.expr.as_ref().map_or(false, |expr| Self::deep_search_for_loops(expr))
+                })
+            }
+            hir::ExprKind::Match(scrutinee, arms) => {
+                eprintln!("DEBUG: Found match expression, checking arms");
+                Self::deep_search_for_loops(scrutinee) ||
+                arms.iter().any(|arm| {
+                    arm.guard.as_ref().map_or(false, |guard| Self::deep_search_for_loops(guard)) ||
+                    arm.block.stmts.iter().any(|stmt| {
+                        match &stmt.kind {
+                            hir::StmtKind::Let(_, expr, _) | hir::StmtKind::Expr(expr) | hir::StmtKind::Return(Some(expr)) => {
+                                Self::deep_search_for_loops(expr)
+                            }
+                            _ => false,
+                        }
+                    }) ||
+                    arm.block.expr.as_ref().map_or(false, |expr| Self::deep_search_for_loops(expr))
+                })
+            }
+            hir::ExprKind::List(elements) => {
+                eprintln!("DEBUG: Found list expression, checking elements");
+                elements.iter().any(|element| Self::deep_search_for_loops(element))
+            }
+            hir::ExprKind::FieldAccess(obj, _) => {
+                eprintln!("DEBUG: Found field access expression, checking object");
+                Self::deep_search_for_loops(obj)
+            }
+            hir::ExprKind::IndexAccess(obj, index) => {
+                eprintln!("DEBUG: Found index access expression, checking object and index");
+                Self::deep_search_for_loops(obj) || Self::deep_search_for_loops(index)
             }
             _ => false,
-        };
-        
-        eprintln!("DEBUG: Expression contains loop needing transformation: {}", result);
-        result
+        }
     }
 
     /// Process sub-expressions that might need flattening before processing the containing expression
@@ -505,7 +587,10 @@ impl HirPass for RefactoredHirJsPass {
     fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
         self.changes_made = false;
         self.visit_module(module, ctx);
-        // Return false to prevent additional iterations by the optimizer
+        
+        eprintln!("DEBUG: RefactoredHirJsPass completed, changes_made: {}", self.changes_made);
+        
+        // Return false to prevent infinite loops - let a single pass handle all transformations
         false
     }
 }
@@ -655,9 +740,31 @@ impl<'hir> Visitor<'hir> for RefactoredHirJsPass {
                 }
             }
             hir::ExprKind::Loop(loop_body) => {
-                // Only visit loop body for control flow handling
-                // Loop transformation should have been handled earlier in the pipeline
-                self.visit_block(loop_body, ctx);
+                // Check if this loop needs transformation
+                // This can happen when loops are generated during the transformation process
+                let hir_id = expr.hir_id;
+                let has_breaks = ExpressionAnalyzer::block_contains_break_with_value(loop_body);
+                let has_accumulator = crate::transformation_strategies::LoopExpressionStrategy::is_for_loop_with_accumulator(loop_body);
+                let needs_transformation = has_breaks || has_accumulator;
+                    
+                eprintln!("DEBUG: Found loop in visit_expr (HIR ID: {:?}), needs transformation: {} (breaks: {}, accumulator: {})", 
+                    hir_id, needs_transformation, has_breaks, has_accumulator);
+                    
+                if needs_transformation {
+                    // Transform the loop expression right here
+                    eprintln!("DEBUG: Transforming loop in visit_expr (HIR ID: {:?})", hir_id);
+                    
+                    // We can't transform in place during visiting, so we need to mark this as an error
+                    // The real fix is to make sure the transformation happens earlier
+                    eprintln!("WARNING: Loop expression should have been transformed earlier. HIR ID: {:?}", hir_id);
+                    
+                    // For now, visit the loop body but mark that this is an issue
+                    self.visit_block(loop_body, ctx);
+                    self.changes_made = true; // Mark that we found an issue
+                } else {
+                    // Visit loop body for control flow handling only
+                    self.visit_block(loop_body, ctx);
+                }
             }
             hir::ExprKind::Block(block) => {
                 // Visit block content
