@@ -1793,9 +1793,11 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                 } else if let hir::ExprKind::Match(_, arms) = &completion_expr.kind {
                     // Handle match expressions specially - transform them if they have completion expressions
                     // that need to be moved to statement position for the JavaScript generator
-                    let has_completion_expressions = arms.iter().any(|arm| arm.block.expr.is_some());
+                    let has_completion_expressions =
+                        arms.iter().any(|arm| arm.block.expr.is_some());
                     if has_completion_expressions {
-                        let statements = self.transform_match_to_statements(completion_expr.clone(), "", ctx);
+                        let statements =
+                            self.transform_match_to_statements(completion_expr.clone(), "", ctx);
                         new_stmts.extend(statements);
                         // Set completion expression to None since we moved it to statement position
                         block.expr = None;

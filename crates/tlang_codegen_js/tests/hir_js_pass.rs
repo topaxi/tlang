@@ -42,15 +42,6 @@ fn compile_and_apply_hir_js_pass(source: &str) -> hir::Module {
     module
 }
 
-fn compile_and_apply_hir_js_pass_debug(source: &str) -> (hir::Module, hir::Module) {
-    let (mut module, meta) = compile(source);
-    let module_before = module.clone();
-    let mut ctx = HirOptContext::from(meta);
-    let mut hir_js_opt_group = create_hir_js_opt_group();
-    hir_js_opt_group.optimize_hir(&mut module, &mut ctx);
-    (module_before, module)
-}
-
 fn pretty_print(module: &hir::Module) -> String {
     let options = HirPrettyOptions {
         mark_unresolved: false,
@@ -1025,16 +1016,7 @@ fn test_for_loop_expression_in_let() {
         }
     "#;
 
-    // Debug: Print HIR before and after transformation
-    println!("=== DEBUG: FOR LOOP TRANSFORMATION ===");
-    let (hir_before, hir_after) = compile_and_apply_hir_js_pass_debug(source);
-    println!("HIR BEFORE:");
-    println!("{}", pretty_print(&hir_before));
-    println!("\nHIR AFTER:");
-    println!("{}", pretty_print(&hir_after));
-    println!("=== END DEBUG ===");
-
-    let hir = hir_after;
+    let hir = compile_and_apply_hir_js_pass(source);
     assert_snapshot!(pretty_print(&hir), @r"
     fn test() -> unknown {
         let $hir$0: unknown = _;
@@ -1725,73 +1707,6 @@ fn test_nested_break_expressions() {
 // This test was attempting to use continue as an expression in an if-else branch.
 
 #[test]
-fn test_debug_break_expression_hir() {
-    let source = r#"
-        fn main() {
-            loop {
-                let x = break 42;
-                x
-            };
-        }
-    "#;
-    let (module, _) = compile(source);
-    println!("Debug HIR without HIR JS pass:");
-    println!("{}", pretty_print(&module));
-
-    let hir = compile_and_apply_hir_js_pass(source);
-    println!("Debug HIR with HIR JS pass:");
-    println!("{}", pretty_print(&hir));
-
-    // Just to satisfy the test, use a dummy assertion for now
-    assert!(true);
-}
-
-#[test]
-fn test_debug_simple_break_expression() {
-    let source = r#"
-        fn main() {
-            let x = break 42;
-            x
-        }
-    "#;
-    let (module, _) = compile(source);
-    println!("Debug simple HIR without HIR JS pass:");
-    println!("{}", pretty_print(&module));
-
-    let hir = compile_and_apply_hir_js_pass(source);
-    println!("Debug simple HIR with HIR JS pass:");
-    println!("{}", pretty_print(&hir));
-
-    // Just to satisfy the test, use a dummy assertion for now
-    assert!(true);
-}
-
-#[test]
-fn test_debug_block_inside_loop() {
-    let source = r#"
-        fn main() {
-            loop {
-                let x = {
-                    let y = 1;
-                    y + 2
-                };
-                x
-            };
-        }
-    "#;
-    let (module, _) = compile(source);
-    println!("Debug block inside loop HIR without HIR JS pass:");
-    println!("{}", pretty_print(&module));
-
-    let hir = compile_and_apply_hir_js_pass(source);
-    println!("Debug block inside loop HIR with HIR JS pass:");
-    println!("{}", pretty_print(&hir));
-
-    // Just to satisfy the test, use a dummy assertion for now
-    assert!(true);
-}
-
-#[test]
 fn test_if_else_if_expression_transformation() {
     let source = r#"
         fn main() {
@@ -1825,8 +1740,6 @@ fn test_fibonacci_pattern_matching_uses_return_statements() {
         fn fibonacci(n, a, b) { rec fibonacci(n - 1, b, a + b) }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    println!("Fibonacci HIR Output:");
-    println!("{}", pretty_print(&hir));
     assert_snapshot!(pretty_print(&hir), @r"
     fn fibonacci/1(n: unknown) -> unknown {
         return fibonacci/3(n, 0, 1);
@@ -1866,8 +1779,6 @@ fn test_function_with_match_completion_uses_return_statements() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    println!("HIR Output with match in completion position:");
-    println!("{}", pretty_print(&hir));
     assert_snapshot!(pretty_print(&hir), @r"
     enum Option {
         Some {
@@ -1906,8 +1817,6 @@ fn test_function_declaration_with_match_expressions() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    println!("Current HIR output:");
-    println!("{}", pretty_print(&hir));
     assert_snapshot!(pretty_print(&hir), @r"
     enum Option {
         Some {
@@ -1933,40 +1842,6 @@ fn test_function_declaration_with_match_expressions() {
 }
 
 #[test]
-fn test_debug_function_pattern_matching() {
-    let source = r#"
-        fn factorial(0) { 1 }
-        fn factorial(n) { n * factorial(n - 1) }
-    "#;
-
-    // First, test the HIR lowering to see what's generated
-    let mut parser = tlang_parser::Parser::from_source(source);
-    let ast = parser.parse().unwrap();
-
-    let mut semantic_analyzer = tlang_semantics::SemanticAnalyzer::default();
-    semantic_analyzer.add_builtin_symbols(
-        tlang_codegen_js::generator::CodegenJS::get_standard_library_symbols(),
-    );
-    semantic_analyzer.analyze(&ast).unwrap();
-
-    let (module, _) = tlang_ast_lowering::lower_to_hir(
-        &ast,
-        semantic_analyzer.symbol_id_allocator(),
-        semantic_analyzer.root_symbol_table(),
-        semantic_analyzer.symbol_tables().clone(),
-    );
-
-    println!("HIR before JS pass:");
-    println!("{}", pretty_print(&module));
-    println!("=====================================");
-
-    // Now test HIR JS pass
-    let hir = compile_and_apply_hir_js_pass(source);
-    println!("HIR after JS pass:");
-    println!("{}", pretty_print(&hir));
-}
-
-#[test]
 fn test_function_expression_with_if_else_completion() {
     let source = r#"
         fn main() {
@@ -1981,8 +1856,6 @@ fn test_function_expression_with_if_else_completion() {
         }
     "#;
     let hir = compile_and_apply_hir_js_pass(source);
-    println!("HIR Output with function expression:");
-    println!("{}", pretty_print(&hir));
     // The if-else expression in the function expression should use return statements
     assert_snapshot!(pretty_print(&hir), @r#"
     fn main() -> unknown {
@@ -1996,53 +1869,6 @@ fn test_function_expression_with_if_else_completion() {
         return factorial_rec(5, 1);
     }
     "#);
-}
-
-#[test]
-fn test_debug_nested_loop_expressions_with_cli_sequence() {
-    let source = r#"
-        fn nested_loop_expressions() {
-            let outer = loop {
-                let inner = loop {
-                    break 5;
-                };
-                if inner == 5 { break inner * 2; }
-            };
-            outer
-        }
-        
-        nested_loop_expressions() |> log();
-    "#;
-
-    let (mut module, meta) = compile(source);
-
-    println!("=== Initial HIR ===");
-    println!("{}", pretty_print(&module));
-
-    // Run the same sequence as the CLI: standard HIR optimizations first
-    let mut optimizer = tlang_hir_opt::HirOptimizer::default();
-    let hir_opt_ctx = HirOptContext::from(meta);
-    optimizer.optimize_hir(&mut module, hir_opt_ctx);
-
-    println!("\n=== After standard HIR optimizations ===");
-    println!("{}", pretty_print(&module));
-
-    // Create a fresh context for HIR JS optimization group (like the CLI does)
-    let mut ctx = HirOptContext {
-        symbols: std::collections::HashMap::new(),
-        hir_id_allocator: tlang_span::HirIdAllocator::default(),
-        current_scope: tlang_span::HirId::new(1),
-    };
-    let mut hir_js_opt_group = create_hir_js_opt_group();
-
-    // Run the HIR JS optimization group
-    println!("\n=== Before HIR JS optimization group ===");
-    println!("{}", pretty_print(&module));
-
-    hir_js_opt_group.optimize_hir(&mut module, &mut ctx);
-
-    println!("\n=== Final HIR after HIR JS optimization group ===");
-    println!("{}", pretty_print(&module));
 }
 
 #[test]
@@ -2741,16 +2567,10 @@ fn test_simple_for_loop_without_completion_values() {
             sum
         }
     "#;
-    let (before, after) = compile_and_apply_hir_js_pass_debug(source);
-
-    // Print the HIR before and after optimization for debugging
-    println!("=== HIR BEFORE OPTIMIZATION ===");
-    println!("{}", pretty_print(&before));
-    println!("=== HIR AFTER OPTIMIZATION ===");
-    println!("{}", pretty_print(&after));
+    let hir = compile_and_apply_hir_js_pass(source);
 
     // The HIR JS pass should NOT create temp variables for simple loops without completion values
-    assert_snapshot!(pretty_print(&after), @r"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn test_sum() -> unknown {
         let sum: unknown = 0;
         {
@@ -2769,24 +2589,4 @@ fn test_simple_for_loop_without_completion_values() {
         return sum;
     }
     ");
-}
-
-#[test]
-fn test_nested_for_loop_hir_transformation() {
-    let source = r#"
-        fn matrix_sum() {
-            let total = 0;
-            for row in [[1, 2], [3, 4]] {
-                for val in row {
-                    total = total + val
-                }
-            }
-            total
-        }
-    "#;
-    let hir = compile_and_apply_hir_js_pass(source);
-    println!("=== NESTED FOR LOOP HIR ===");
-    println!("{}", pretty_print(&hir));
-    println!("=== END ===");
-    // For now, just check that it doesn't panic
 }

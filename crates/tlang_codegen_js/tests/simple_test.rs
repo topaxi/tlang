@@ -3,7 +3,7 @@ use indoc::indoc;
 fn main() {
     // Let's compile this problematic case and see what specific HIR is being generated
     println!("Testing nested for-loop compilation...");
-    
+
     let result = std::panic::catch_unwind(|| {
         let output = compile!(indoc! {"
             fn matrix_sum() {
@@ -16,14 +16,16 @@ fn main() {
                 total
             }
         "});
-        
+
         println!("JavaScript output:");
         println!("{}", output);
     });
-    
+
     match result {
         Ok(_) => println!("✅ SUCCESS: JavaScript was generated"),
-        Err(_) => println!("❌ FAILED: Got the 'Match arm expressions should be transformed to statements' error"),
+        Err(_) => println!(
+            "❌ FAILED: Got the 'Match arm expressions should be transformed to statements' error"
+        ),
     }
 }
 
