@@ -1,0 +1,662 @@
+use tlang_hir::hir;
+use tlang_hir_opt::HirOptContext;
+
+use crate::expression_transformer::{
+    ExpressionAnalyzer, StatementBuilder, TransformResult, TransformationStrategy,
+};
+
+/// Strategy for transforming match expressions to statements
+#[derive(Debug)]
+pub struct MatchExpressionStrategy;
+
+impl TransformationStrategy for MatchExpressionStrategy {
+    fn should_transform(&self, expr: &hir::Expr) -> bool {
+        matches!(expr.kind, hir::ExprKind::Match(..))
+    }
+
+    fn transform(
+        &mut self,
+        expr: hir::Expr,
+        ctx: &mut HirOptContext,
+        stmt_builder: &mut StatementBuilder,
+    ) -> TransformResult {
+        let span = expr.span;
+        
+        if let hir::ExprKind::Match(scrutinee, arms) = expr.kind {
+            let temp_var_manager = stmt_builder.temp_var_manager();
+            let temp_name = temp_var_manager.generate_name();
+            let temp_declaration = temp_var_manager.create_declaration(ctx, &temp_name, span);
+            let temp_ref = temp_var_manager.create_path(ctx, &temp_name, span);
+
+            // Check if all arms have return statements
+            let all_arms_have_returns = arms.iter().all(|arm| {
+                if let Some(last_stmt) = arm.block.stmts.last() {
+                    matches!(last_stmt.kind, hir::StmtKind::Return(_))
+                } else {
+                    false
+                }
+            });
+
+            let statements = if all_arms_have_returns {
+                // Don't assign to temp variable since all arms return
+                let match_statements = Self::transform_match_to_statements(
+                    hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::Match(scrutinee, arms),
+                        span,
+                    },
+                    "",
+                    ctx,
+                    stmt_builder,
+                );
+                let mut all_stmts = vec![temp_declaration];
+                all_stmts.extend(match_statements);
+                all_stmts
+            } else {
+                let match_statements = Self::transform_match_to_statements(
+                    hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::Match(scrutinee, arms),
+                        span,
+                    },
+                    &temp_name,
+                    ctx,
+                    stmt_builder,
+                );
+                let mut all_stmts = vec![temp_declaration];
+                all_stmts.extend(match_statements);
+                all_stmts
+            };
+
+            TransformResult {
+                expr: temp_ref,
+                statements,
+            }
+        } else {
+            // Should not happen if should_transform is correct
+            TransformResult {
+                expr,
+                statements: Vec::new(),
+            }
+        }
+    }
+}
+
+impl MatchExpressionStrategy {
+    fn transform_match_to_statements(
+        expr: hir::Expr,
+        temp_name: &str,
+        ctx: &mut HirOptContext,
+        stmt_builder: &mut StatementBuilder,
+    ) -> Vec<hir::Stmt> {
+        let span = expr.span;
+        if let hir::ExprKind::Match(scrutinee, arms) = expr.kind {
+            let mut transformed_arms = Vec::new();
+
+            for arm in arms {
+                let mut new_arm = arm;
+
+                // Transform the completion expression in each arm
+                if let Some(completion_expr) = new_arm.block.expr.take() {
+                    match &completion_expr.kind {
+                        hir::ExprKind::Break(Some(break_value)) => {
+                            // For break with value: temp_var = value; break;
+                            if !temp_name.is_empty() {
+                                let assignment_stmt = stmt_builder.create_assignment(
+                                    ctx,
+                                    temp_name,
+                                    (**break_value).clone(),
+                                    span,
+                                );
+                                new_arm.block.stmts.push(assignment_stmt);
+                            }
+
+                            // Add plain break statement
+                            let plain_break = hir::Stmt::new(
+                                ctx.hir_id_allocator.next_id(),
+                                hir::StmtKind::Expr(Box::new(hir::Expr {
+                                    hir_id: ctx.hir_id_allocator.next_id(),
+                                    kind: hir::ExprKind::Break(None),
+                                    span,
+                                })),
+                                span,
+                            );
+                            new_arm.block.stmts.push(plain_break);
+                        }
+                        hir::ExprKind::Break(None) | hir::ExprKind::Continue => {
+                            // For break/continue without value, add them as statements directly
+                            let stmt = hir::Stmt::new(
+                                ctx.hir_id_allocator.next_id(),
+                                hir::StmtKind::Expr(Box::new(completion_expr)),
+                                span,
+                            );
+                            new_arm.block.stmts.push(stmt);
+                        }
+                        _ => {
+                            // For other expressions, process normally
+                            if !temp_name.is_empty() {
+                                let assignment_stmt = stmt_builder.create_assignment(
+                                    ctx,
+                                    temp_name,
+                                    completion_expr,
+                                    span,
+                                );
+                                new_arm.block.stmts.push(assignment_stmt);
+                            } else {
+                                // If no temp_name, add the expression as a statement
+                                let expr_stmt = hir::Stmt::new(
+                                    ctx.hir_id_allocator.next_id(),
+                                    hir::StmtKind::Expr(Box::new(completion_expr)),
+                                    span,
+                                );
+                                new_arm.block.stmts.push(expr_stmt);
+                            }
+                        }
+                    }
+                }
+
+                transformed_arms.push(new_arm);
+            }
+
+            // Create the match statement
+            let match_stmt = hir::Stmt::new(
+                ctx.hir_id_allocator.next_id(),
+                hir::StmtKind::Expr(Box::new(hir::Expr {
+                    hir_id: ctx.hir_id_allocator.next_id(),
+                    kind: hir::ExprKind::Match(scrutinee, transformed_arms),
+                    span,
+                })),
+                span,
+            );
+
+            vec![match_stmt]
+        } else {
+            // Fallback: create a simple assignment statement if temp_name is provided
+            if !temp_name.is_empty() {
+                vec![stmt_builder.create_assignment(ctx, temp_name, expr, span)]
+            } else {
+                // No temp variable, just wrap in an expression statement
+                vec![hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(expr)),
+                    span,
+                )]
+            }
+        }
+    }
+}
+
+/// Strategy for transforming if-else expressions to statements
+#[derive(Debug)]
+pub struct IfElseExpressionStrategy;
+
+impl TransformationStrategy for IfElseExpressionStrategy {
+    fn should_transform(&self, expr: &hir::Expr) -> bool {
+        matches!(expr.kind, hir::ExprKind::IfElse(..))
+            && !ExpressionAnalyzer::can_render_as_js_expr(expr)
+    }
+
+    fn transform(
+        &mut self,
+        expr: hir::Expr,
+        ctx: &mut HirOptContext,
+        stmt_builder: &mut StatementBuilder,
+    ) -> TransformResult {
+        let span = expr.span;
+        let temp_var_manager = stmt_builder.temp_var_manager();
+        let temp_name = temp_var_manager.generate_name();
+        let temp_declaration = temp_var_manager.create_declaration(ctx, &temp_name, span);
+        let temp_ref = temp_var_manager.create_path(ctx, &temp_name, span);
+
+        let statements = Self::transform_if_else_to_statements(expr, &temp_name, ctx, stmt_builder);
+        let mut all_stmts = vec![temp_declaration];
+        all_stmts.extend(statements);
+
+        TransformResult {
+            expr: temp_ref,
+            statements: all_stmts,
+        }
+    }
+}
+
+impl IfElseExpressionStrategy {
+    fn transform_if_else_to_statements(
+        expr: hir::Expr,
+        temp_name: &str,
+        ctx: &mut HirOptContext,
+        stmt_builder: &mut StatementBuilder,
+    ) -> Vec<hir::Stmt> {
+        let span = expr.span;
+        if let hir::ExprKind::IfElse(condition, then_branch, else_branches) = expr.kind {
+            // Transform branches to assign to temp variable
+            let mut new_then_branch = *then_branch;
+            if let Some(completion_expr) = new_then_branch.expr.take() {
+                let assignment_stmt =
+                    stmt_builder.create_assignment(ctx, temp_name, completion_expr, span);
+                new_then_branch.stmts.push(assignment_stmt);
+            }
+
+            let mut new_else_branches = Vec::new();
+            for else_branch in else_branches {
+                let mut new_else_branch = else_branch;
+                if let Some(completion_expr) = new_else_branch.consequence.expr.take() {
+                    let assignment_stmt =
+                        stmt_builder.create_assignment(ctx, temp_name, completion_expr, span);
+                    new_else_branch.consequence.stmts.push(assignment_stmt);
+                }
+                new_else_branches.push(new_else_branch);
+            }
+
+            // Create the if-else statement
+            let if_else_stmt = hir::Stmt::new(
+                ctx.hir_id_allocator.next_id(),
+                hir::StmtKind::Expr(Box::new(hir::Expr {
+                    hir_id: ctx.hir_id_allocator.next_id(),
+                    kind: hir::ExprKind::IfElse(
+                        condition,
+                        Box::new(new_then_branch),
+                        new_else_branches,
+                    ),
+                    span,
+                })),
+                span,
+            );
+
+            vec![if_else_stmt]
+        } else {
+            // Fallback: create a simple assignment statement
+            vec![stmt_builder.create_assignment(ctx, temp_name, expr, span)]
+        }
+    }
+}
+
+/// Strategy for transforming block expressions
+#[derive(Debug)]
+pub struct BlockExpressionStrategy;
+
+impl TransformationStrategy for BlockExpressionStrategy {
+    fn should_transform(&self, expr: &hir::Expr) -> bool {
+        matches!(expr.kind, hir::ExprKind::Block(..))
+            && !ExpressionAnalyzer::can_render_as_js_expr(expr)
+    }
+
+    fn transform(
+        &mut self,
+        expr: hir::Expr,
+        ctx: &mut HirOptContext,
+        stmt_builder: &mut StatementBuilder,
+    ) -> TransformResult {
+        let span = expr.span;
+        let temp_var_manager = stmt_builder.temp_var_manager();
+        let temp_name = temp_var_manager.generate_name();
+        let temp_declaration = temp_var_manager.create_declaration(ctx, &temp_name, span);
+        let temp_ref = temp_var_manager.create_path(ctx, &temp_name, span);
+
+        let statements = Self::transform_block_to_statements(expr, &temp_name, ctx, stmt_builder);
+        let mut all_stmts = vec![temp_declaration];
+        all_stmts.extend(statements);
+
+        TransformResult {
+            expr: temp_ref,
+            statements: all_stmts,
+        }
+    }
+}
+
+impl BlockExpressionStrategy {
+    fn transform_block_to_statements(
+        expr: hir::Expr,
+        temp_name: &str,
+        ctx: &mut HirOptContext,
+        stmt_builder: &mut StatementBuilder,
+    ) -> Vec<hir::Stmt> {
+        let span = expr.span;
+        if let hir::ExprKind::Block(block) = expr.kind {
+            let mut block_stmts = block.stmts;
+
+            // Handle completion expression by adding assignment within the block
+            if let Some(completion_expr) = block.expr {
+                // Check if the block has return statements that would make the completion assignment unreachable
+                let block_ref = hir::Block::new(
+                    ctx.hir_id_allocator.next_id(),
+                    block_stmts.clone(),
+                    Some(completion_expr.clone()),
+                    span,
+                );
+
+                if ExpressionAnalyzer::block_contains_return_statements(&block_ref) {
+                    // Block has return statements, so completion expression assignment would be stray
+                    let expr_stmt = hir::Stmt::new(
+                        ctx.hir_id_allocator.next_id(),
+                        hir::StmtKind::Expr(Box::new(completion_expr)),
+                        span,
+                    );
+                    block_stmts.push(expr_stmt);
+                } else {
+                    // No return statements, create assignment as before
+                    let assignment_stmt =
+                        stmt_builder.create_assignment(ctx, temp_name, completion_expr, span);
+                    block_stmts.push(assignment_stmt);
+                }
+            }
+
+            // Create a new block with the modified statements and wrap it in a block expression statement
+            let modified_block = hir::Block::new(
+                ctx.hir_id_allocator.next_id(),
+                block_stmts,
+                None, // No completion expression since we converted it to assignment
+                span,
+            );
+
+            let block_expr_stmt = hir::Stmt::new(
+                ctx.hir_id_allocator.next_id(),
+                hir::StmtKind::Expr(Box::new(hir::Expr {
+                    hir_id: ctx.hir_id_allocator.next_id(),
+                    kind: hir::ExprKind::Block(Box::new(modified_block)),
+                    span,
+                })),
+                span,
+            );
+
+            vec![block_expr_stmt]
+        } else {
+            // Fallback: create a simple assignment statement
+            vec![stmt_builder.create_assignment(ctx, temp_name, expr, span)]
+        }
+    }
+}
+
+/// Strategy for transforming loop expressions
+#[derive(Debug)]
+pub struct LoopExpressionStrategy;
+
+impl TransformationStrategy for LoopExpressionStrategy {
+    fn should_transform(&self, expr: &hir::Expr) -> bool {
+        matches!(expr.kind, hir::ExprKind::Loop(..))
+    }
+
+    fn transform(
+        &mut self,
+        expr: hir::Expr,
+        ctx: &mut HirOptContext,
+        stmt_builder: &mut StatementBuilder,
+    ) -> TransformResult {
+        let span = expr.span;
+        let temp_var_manager = stmt_builder.temp_var_manager();
+        let temp_name = temp_var_manager.generate_name();
+        let temp_declaration = temp_var_manager.create_declaration(ctx, &temp_name, span);
+        let temp_ref = temp_var_manager.create_path(ctx, &temp_name, span);
+
+        // Transform the loop body to assign to temp variable on break
+        let mut transformed_loop = expr.clone();
+        if let hir::ExprKind::Loop(body) = &mut transformed_loop.kind {
+            Self::transform_break_statements_in_block(body, &temp_name, ctx, stmt_builder);
+        }
+
+        // Create loop statement (not assigned to anything)
+        let loop_stmt = hir::Stmt::new(
+            ctx.hir_id_allocator.next_id(),
+            hir::StmtKind::Expr(Box::new(transformed_loop)),
+            span,
+        );
+
+        let all_stmts = vec![temp_declaration, loop_stmt];
+
+        TransformResult {
+            expr: temp_ref,
+            statements: all_stmts,
+        }
+    }
+}
+
+impl LoopExpressionStrategy {
+    fn transform_break_statements_in_block(
+        block: &mut hir::Block,
+        temp_name: &str,
+        ctx: &mut HirOptContext,
+        stmt_builder: &mut StatementBuilder,
+    ) {
+        // Transform statements that contain break expressions
+        let mut new_stmts = Vec::new();
+
+        for stmt in &mut block.stmts {
+            match &mut stmt.kind {
+                hir::StmtKind::Expr(expr) => {
+                    if let hir::ExprKind::Break(Some(break_expr)) = &expr.kind {
+                        // Transform: break value; -> temp_var = value; break;
+                        let span = expr.span;
+
+                        // Add assignment statement
+                        let assignment_stmt = stmt_builder.create_assignment(
+                            ctx,
+                            temp_name,
+                            *break_expr.clone(),
+                            span,
+                        );
+                        new_stmts.push(assignment_stmt);
+
+                        // Add plain break statement
+                        let plain_break = hir::Stmt::new(
+                            ctx.hir_id_allocator.next_id(),
+                            hir::StmtKind::Expr(Box::new(hir::Expr {
+                                hir_id: ctx.hir_id_allocator.next_id(),
+                                kind: hir::ExprKind::Break(None),
+                                span,
+                            })),
+                            span,
+                        );
+                        new_stmts.push(plain_break);
+                    } else if let hir::ExprKind::Break(None) = &expr.kind {
+                        // Plain break without value - just add it as-is, no temp variable assignment needed
+                        new_stmts.push(stmt.clone());
+                    } else {
+                        // For other expressions, recursively transform
+                        Self::transform_break_statements_in_expr(expr, temp_name, ctx, stmt_builder);
+                        new_stmts.push(stmt.clone());
+                    }
+                }
+                _ => {
+                    new_stmts.push(stmt.clone());
+                }
+            }
+        }
+
+        block.stmts = new_stmts;
+
+        // Also check the block's completion expression for break statements
+        if let Some(ref mut expr) = block.expr {
+            if let hir::ExprKind::Break(Some(break_expr)) = &expr.kind {
+                // Transform break in completion position -> temp_var = value; block.expr = None
+                let assignment_stmt = stmt_builder.create_assignment(
+                    ctx,
+                    temp_name,
+                    *break_expr.clone(),
+                    expr.span,
+                );
+                block.stmts.push(assignment_stmt);
+
+                // Add plain break and clear completion expression
+                let plain_break = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::Break(None),
+                        span: expr.span,
+                    })),
+                    expr.span,
+                );
+                block.stmts.push(plain_break);
+                block.expr = None;
+            } else if let hir::ExprKind::Break(None) = &expr.kind {
+                // Plain break without value in completion position - convert to statement
+                let plain_break = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::Break(None),
+                        span: expr.span,
+                    })),
+                    expr.span,
+                );
+                block.stmts.push(plain_break);
+                block.expr = None;
+            } else {
+                Self::transform_break_statements_in_expr(expr, temp_name, ctx, stmt_builder);
+            }
+        }
+    }
+
+    fn transform_break_statements_in_expr(
+        expr: &mut hir::Expr,
+        temp_name: &str,
+        ctx: &mut HirOptContext,
+        stmt_builder: &mut StatementBuilder,
+    ) {
+        match &mut expr.kind {
+            hir::ExprKind::Block(block) => {
+                Self::transform_break_statements_in_block(block, temp_name, ctx, stmt_builder);
+            }
+            hir::ExprKind::IfElse(condition, then_branch, else_branches) => {
+                Self::transform_break_statements_in_expr(condition, temp_name, ctx, stmt_builder);
+                Self::transform_break_statements_in_block(then_branch, temp_name, ctx, stmt_builder);
+                for else_branch in else_branches {
+                    if let Some(ref mut cond) = else_branch.condition {
+                        Self::transform_break_statements_in_expr(cond, temp_name, ctx, stmt_builder);
+                    }
+                    Self::transform_break_statements_in_block(
+                        &mut else_branch.consequence,
+                        temp_name,
+                        ctx,
+                        stmt_builder,
+                    );
+                }
+            }
+            hir::ExprKind::Match(scrutinee, arms) => {
+                // Transform break statements in match scrutinee
+                Self::transform_break_statements_in_expr(scrutinee, temp_name, ctx, stmt_builder);
+
+                // Transform break statements in each match arm
+                for arm in arms {
+                    if let Some(ref mut guard) = arm.guard {
+                        Self::transform_break_statements_in_expr(guard, temp_name, ctx, stmt_builder);
+                    }
+                    Self::transform_break_statements_in_block(&mut arm.block, temp_name, ctx, stmt_builder);
+                }
+            }
+            _ => {
+                // For other expression types, use the visitor to walk through them
+                // Note: This is a simplified approach - a full implementation would need
+                // a proper visitor that handles HIR transformation context
+            }
+        }
+    }
+}
+
+/// Strategy for transforming break and continue expressions
+#[derive(Debug)]
+pub struct BreakContinueStrategy;
+
+impl TransformationStrategy for BreakContinueStrategy {
+    fn should_transform(&self, expr: &hir::Expr) -> bool {
+        matches!(
+            expr.kind,
+            hir::ExprKind::Break(_) | hir::ExprKind::Continue
+        )
+    }
+
+    fn transform(
+        &mut self,
+        expr: hir::Expr,
+        ctx: &mut HirOptContext,
+        stmt_builder: &mut StatementBuilder,
+    ) -> TransformResult {
+        let span = expr.span;
+
+        match &expr.kind {
+            hir::ExprKind::Break(None) => {
+                // For break expressions without values, move to statement position
+                let plain_break = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::Break(None),
+                        span,
+                    })),
+                    span,
+                );
+
+                // Return wildcard expression (since code after break is dead)
+                let wildcard_expr = hir::Expr {
+                    hir_id: ctx.hir_id_allocator.next_id(),
+                    kind: hir::ExprKind::Wildcard,
+                    span,
+                };
+
+                TransformResult {
+                    expr: wildcard_expr,
+                    statements: vec![plain_break],
+                }
+            }
+            hir::ExprKind::Continue => {
+                // For continue expressions, move to statement position
+                let plain_continue = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::Continue,
+                        span,
+                    })),
+                    span,
+                );
+
+                // Return wildcard expression (since code after continue is dead)
+                let wildcard_expr = hir::Expr {
+                    hir_id: ctx.hir_id_allocator.next_id(),
+                    kind: hir::ExprKind::Wildcard,
+                    span,
+                };
+
+                TransformResult {
+                    expr: wildcard_expr,
+                    statements: vec![plain_continue],
+                }
+            }
+            hir::ExprKind::Break(Some(break_value)) => {
+                // For break expressions with values, transform to:
+                // let result = break value; -> temp_var = value; break; let result = temp_var;
+                let temp_var_manager = stmt_builder.temp_var_manager();
+                let temp_name = temp_var_manager.generate_name();
+                let temp_declaration = temp_var_manager.create_declaration(ctx, &temp_name, span);
+                let temp_ref = temp_var_manager.create_path(ctx, &temp_name, span);
+
+                // Extract the break value
+                let value_expr = *break_value.clone();
+                let assignment_stmt =
+                    stmt_builder.create_assignment(ctx, &temp_name, value_expr, span);
+
+                // Create plain break statement
+                let plain_break = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::Break(None),
+                        span,
+                    })),
+                    span,
+                );
+
+                TransformResult {
+                    expr: temp_ref,
+                    statements: vec![temp_declaration, assignment_stmt, plain_break],
+                }
+            }
+            _ => {
+                // Should not happen if should_transform is correct
+                TransformResult {
+                    expr,
+                    statements: Vec::new(),
+                }
+            }
+        }
+    }
+}
