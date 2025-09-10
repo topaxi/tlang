@@ -1790,9 +1790,11 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                     // Actually, let's remove the completion expression entirely by setting it to None
                     // But since we can't set it to None here, we'll mark it for removal
                     self.changes_made = true;
-                } else if let hir::ExprKind::Match(_, _) = &completion_expr.kind {
-                    // Handle match expressions specially - transform them instead of flattening
-                    if !self.can_render_as_js_stmt(completion_expr) {
+                } else if let hir::ExprKind::Match(_, arms) = &completion_expr.kind {
+                    // Handle match expressions specially - transform them if they have completion expressions
+                    // that need to be moved to statement position for the JavaScript generator
+                    let has_completion_expressions = arms.iter().any(|arm| arm.block.expr.is_some());
+                    if has_completion_expressions {
                         let statements = self.transform_match_to_statements(completion_expr.clone(), "", ctx);
                         new_stmts.extend(statements);
                         // Set completion expression to None since we moved it to statement position

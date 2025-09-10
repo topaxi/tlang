@@ -134,6 +134,7 @@ fn test_for_loop_nested() {
         {
             let iterator$$ = iterator.iter([[1, 2], [3, 4]]);
             for (;;) {
+                let $hir$0 = undefined;
                 let $tmp$0 = iterator$$.next(),row;if ($tmp$0.tag === Option.Some && (row = $tmp$0[0], true)) {
                     {
                         let iterator$$ = iterator.iter(row);
@@ -148,6 +149,7 @@ fn test_for_loop_nested() {
                 } else if ($tmp$0.tag === Option.None) {
                     break;
                 };
+                $hir$0;
             }
         }
         return total;
