@@ -1,6 +1,6 @@
 use insta::assert_snapshot;
 use tlang_ast_lowering::lower_to_hir;
-use tlang_codegen_js::create_refactored_hir_js_opt_group;
+use tlang_codegen_js::create_hir_js_opt_group;
 use tlang_hir::hir;
 use tlang_hir_opt::{HirOptContext, HirPass};
 use tlang_hir_pretty::HirPrettyOptions;
@@ -34,7 +34,7 @@ fn compile(source: &str) -> hir::LowerResult {
 fn compile_and_apply_refactored_hir_js_pass(source: &str) -> hir::Module {
     let (mut module, meta) = compile(source);
     let mut ctx = HirOptContext::from(meta);
-    let mut hir_js_opt_group = create_refactored_hir_js_opt_group();
+    let mut hir_js_opt_group = create_hir_js_opt_group();
 
     // Run the refactored HIR JS optimization group
     hir_js_opt_group.optimize_hir(&mut module, &mut ctx);
