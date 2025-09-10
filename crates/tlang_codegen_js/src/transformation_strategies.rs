@@ -85,50 +85,26 @@ impl TransformationStrategy for MatchExpressionStrategy {
 impl MatchExpressionStrategy {
     /// Check if an expression needs transformation (especially loops)
     fn expression_needs_transformation(expr: &hir::Expr) -> bool {
-        eprintln!("DEBUG: MatchExpressionStrategy::expression_needs_transformation checking: {:?} (HIR ID: {:?})", 
-            std::mem::discriminant(&expr.kind), expr.hir_id);
-            
-        let result = match &expr.kind {
+        match &expr.kind {
             hir::ExprKind::Loop(body) => {
-                eprintln!("DEBUG: Found loop expression in match arm");
                 // Check if this loop needs transformation
-                let needs_transform = ExpressionAnalyzer::contains_break_with_value(expr) 
-                    || LoopExpressionStrategy::is_for_loop_with_accumulator(body);
-                eprintln!("DEBUG: Loop needs transformation: {}", needs_transform);
-                needs_transform
+                ExpressionAnalyzer::contains_break_with_value(expr) 
+                    || LoopExpressionStrategy::is_for_loop_with_accumulator(body)
             }
-            hir::ExprKind::Match(..) => {
-                eprintln!("DEBUG: Found nested match expression");
-                true
-            }
-            hir::ExprKind::IfElse(..) => {
-                eprintln!("DEBUG: Found if-else expression");
-                true
-            }
-            hir::ExprKind::Block(..) => {
-                eprintln!("DEBUG: Found block expression");
-                true
-            }
+            hir::ExprKind::Match(..) => true,
+            hir::ExprKind::IfElse(..) => true,
+            hir::ExprKind::Block(..) => true,
             hir::ExprKind::Binary(..) => {
                 // Check if any operands need transformation
                 if let hir::ExprKind::Binary(_, lhs, rhs) = &expr.kind {
-                    eprintln!("DEBUG: Found binary expression, checking operands");
-                    let needs_transform = !ExpressionAnalyzer::can_render_as_js_expr(lhs) 
-                        || !ExpressionAnalyzer::can_render_as_js_expr(rhs);
-                    eprintln!("DEBUG: Binary expression needs transformation: {}", needs_transform);
-                    needs_transform
+                    !ExpressionAnalyzer::can_render_as_js_expr(lhs) 
+                        || !ExpressionAnalyzer::can_render_as_js_expr(rhs)
                 } else {
                     false
                 }
             }
-            _ => {
-                eprintln!("DEBUG: Other expression type, no transformation needed");
-                false
-            }
-        };
-        
-        eprintln!("DEBUG: expression_needs_transformation result: {}", result);
-        result
+            _ => false,
+        }
     }
 
     fn transform_match_to_statements(
@@ -390,6 +366,30 @@ impl TransformationStrategy for BlockExpressionStrategy {
 }
 
 impl BlockExpressionStrategy {
+    /// Check if an expression needs transformation (especially loops)
+    fn expression_needs_transformation(expr: &hir::Expr) -> bool {
+        match &expr.kind {
+            hir::ExprKind::Loop(body) => {
+                // Check if this loop needs transformation
+                ExpressionAnalyzer::contains_break_with_value(expr) 
+                    || LoopExpressionStrategy::is_for_loop_with_accumulator(body)
+            }
+            hir::ExprKind::Match(..) => true,
+            hir::ExprKind::IfElse(..) => true,
+            hir::ExprKind::Block(..) => true,
+            hir::ExprKind::Binary(..) => {
+                // Check if any operands need transformation
+                if let hir::ExprKind::Binary(_, lhs, rhs) = &expr.kind {
+                    !ExpressionAnalyzer::can_render_as_js_expr(lhs) 
+                        || !ExpressionAnalyzer::can_render_as_js_expr(rhs)
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
     fn transform_block_to_statements(
         expr: hir::Expr,
         temp_name: &str,
@@ -402,11 +402,30 @@ impl BlockExpressionStrategy {
 
             // Handle completion expression by adding assignment within the block
             if let Some(completion_expr) = block.expr {
+                // Check if the completion expression needs transformation first
+                let processed_completion_expr = if Self::expression_needs_transformation(&completion_expr) {
+                    // Create a temporary transformer to handle nested expressions
+                    let mut temp_transformer = crate::expression_transformer::ExpressionTransformer::new();
+                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BreakContinueStrategy));
+                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::MatchExpressionStrategy));
+                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::IfElseExpressionStrategy));
+                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BlockExpressionStrategy));
+                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BinaryExpressionStrategy));
+                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
+                    
+                    let result = temp_transformer.transform_expression(completion_expr, ctx);
+                    // Add any statements from the nested transformation to the block
+                    block_stmts.extend(result.statements);
+                    result.expr
+                } else {
+                    completion_expr
+                };
+                
                 // Check if the block has return statements that would make the completion assignment unreachable
                 let block_ref = hir::Block::new(
                     ctx.hir_id_allocator.next_id(),
                     block_stmts.clone(),
-                    Some(completion_expr.clone()),
+                    Some(processed_completion_expr.clone()),
                     span,
                 );
 
@@ -414,14 +433,14 @@ impl BlockExpressionStrategy {
                     // Block has return statements, so completion expression assignment would be stray
                     let expr_stmt = hir::Stmt::new(
                         ctx.hir_id_allocator.next_id(),
-                        hir::StmtKind::Expr(Box::new(completion_expr)),
+                        hir::StmtKind::Expr(Box::new(processed_completion_expr)),
                         span,
                     );
                     block_stmts.push(expr_stmt);
                 } else {
                     // No return statements, create assignment as before
                     let assignment_stmt =
-                        stmt_builder.create_assignment(ctx, temp_name, completion_expr, span);
+                        stmt_builder.create_assignment(ctx, temp_name, processed_completion_expr, span);
                     block_stmts.push(assignment_stmt);
                 }
             }

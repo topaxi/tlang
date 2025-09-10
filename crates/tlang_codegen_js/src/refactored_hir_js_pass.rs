@@ -385,13 +385,22 @@ impl RefactoredHirJsPass {
 
         match &mut stmt.kind {
             hir::StmtKind::Let(_, expr, _) => {
-                eprintln!("DEBUG: Processing let statement: {:?}", stmt.hir_id);
+                eprintln!("DEBUG: Processing let statement: {:?}, expr: {:?} (kind: {:?})", 
+                    stmt.hir_id, expr.hir_id, std::mem::discriminant(&expr.kind));
                 // First, recursively process sub-expressions
                 let mut temp_stmts = self.process_sub_expressions(expr, ctx);
                 additional_stmts.append(&mut temp_stmts);
 
                 // Then check if the expression itself needs flattening
-                if !expr_can_render_as_assignment_rhs(expr) {
+                eprintln!("DEBUG: Checking if expr {:?} can render as assignment RHS", expr.hir_id);
+                eprintln!("DEBUG: Expression kind: {:?}", expr.kind);
+                eprintln!("DEBUG: First checking if expr can render as JS expr...");
+                let can_render_js = ExpressionAnalyzer::can_render_as_js_expr(expr);
+                eprintln!("DEBUG: expr_can_render_as_js_expr: {}", can_render_js);
+                let can_render = expr_can_render_as_assignment_rhs(expr);
+                eprintln!("DEBUG: expr_can_render_as_assignment_rhs: {}", can_render);
+                
+                if !can_render {
                     // For complex expressions in let statements, flatten them
                     if let hir::ExprKind::Loop(body) = &expr.kind {
                         eprintln!("DEBUG: Found loop in let statement: {:?}", expr.hir_id);
