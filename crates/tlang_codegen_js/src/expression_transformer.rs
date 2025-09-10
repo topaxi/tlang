@@ -419,13 +419,20 @@ impl ExpressionTransformer {
         expr: hir::Expr,
         ctx: &mut HirOptContext,
     ) -> TransformResult {
+        eprintln!("DEBUG: ExpressionTransformer::transform_expression called for HIR ID: {:?}, kind: {:?}", 
+            expr.hir_id, std::mem::discriminant(&expr.kind));
+            
         // Find the first strategy that can handle this expression
-        for strategy in &mut self.strategies {
-            if strategy.should_transform(&expr) {
+        for (i, strategy) in self.strategies.iter_mut().enumerate() {
+            let should_transform = strategy.should_transform(&expr);
+            eprintln!("DEBUG: Strategy {} should_transform: {}", i, should_transform);
+            if should_transform {
+                eprintln!("DEBUG: Using strategy {} to transform expression", i);
                 return strategy.transform(expr, ctx, &mut self.stmt_builder);
             }
         }
 
+        eprintln!("DEBUG: No strategy matched, returning expression as-is");
         // Default: no transformation needed
         TransformResult {
             expr,

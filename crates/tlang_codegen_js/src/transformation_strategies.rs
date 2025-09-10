@@ -83,6 +83,54 @@ impl TransformationStrategy for MatchExpressionStrategy {
 }
 
 impl MatchExpressionStrategy {
+    /// Check if an expression needs transformation (especially loops)
+    fn expression_needs_transformation(expr: &hir::Expr) -> bool {
+        eprintln!("DEBUG: MatchExpressionStrategy::expression_needs_transformation checking: {:?} (HIR ID: {:?})", 
+            std::mem::discriminant(&expr.kind), expr.hir_id);
+            
+        let result = match &expr.kind {
+            hir::ExprKind::Loop(body) => {
+                eprintln!("DEBUG: Found loop expression in match arm");
+                // Check if this loop needs transformation
+                let needs_transform = ExpressionAnalyzer::contains_break_with_value(expr) 
+                    || LoopExpressionStrategy::is_for_loop_with_accumulator(body);
+                eprintln!("DEBUG: Loop needs transformation: {}", needs_transform);
+                needs_transform
+            }
+            hir::ExprKind::Match(..) => {
+                eprintln!("DEBUG: Found nested match expression");
+                true
+            }
+            hir::ExprKind::IfElse(..) => {
+                eprintln!("DEBUG: Found if-else expression");
+                true
+            }
+            hir::ExprKind::Block(..) => {
+                eprintln!("DEBUG: Found block expression");
+                true
+            }
+            hir::ExprKind::Binary(..) => {
+                // Check if any operands need transformation
+                if let hir::ExprKind::Binary(_, lhs, rhs) = &expr.kind {
+                    eprintln!("DEBUG: Found binary expression, checking operands");
+                    let needs_transform = !ExpressionAnalyzer::can_render_as_js_expr(lhs) 
+                        || !ExpressionAnalyzer::can_render_as_js_expr(rhs);
+                    eprintln!("DEBUG: Binary expression needs transformation: {}", needs_transform);
+                    needs_transform
+                } else {
+                    false
+                }
+            }
+            _ => {
+                eprintln!("DEBUG: Other expression type, no transformation needed");
+                false
+            }
+        };
+        
+        eprintln!("DEBUG: expression_needs_transformation result: {}", result);
+        result
+    }
+
     fn transform_match_to_statements(
         expr: hir::Expr,
         temp_name: &str,
@@ -133,20 +181,58 @@ impl MatchExpressionStrategy {
                             new_arm.block.stmts.push(stmt);
                         }
                         _ => {
-                            // For other expressions, process normally
+                            // For other expressions, check if they need transformation first
                             if !temp_name.is_empty() {
+                                // Check if the completion expression needs transformation
+                                let processed_expr = if Self::expression_needs_transformation(&completion_expr) {
+                                    // Create a temporary transformer to handle nested expressions
+                                    let mut temp_transformer = crate::expression_transformer::ExpressionTransformer::new();
+                                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BreakContinueStrategy));
+                                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::MatchExpressionStrategy));
+                                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::IfElseExpressionStrategy));
+                                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BlockExpressionStrategy));
+                                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BinaryExpressionStrategy));
+                                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
+                                    
+                                    let result = temp_transformer.transform_expression(completion_expr, ctx);
+                                    // Add any statements from the nested transformation
+                                    new_arm.block.stmts.extend(result.statements);
+                                    result.expr
+                                } else {
+                                    completion_expr
+                                };
+                                
                                 let assignment_stmt = stmt_builder.create_assignment(
                                     ctx,
                                     temp_name,
-                                    completion_expr,
+                                    processed_expr,
                                     span,
                                 );
                                 new_arm.block.stmts.push(assignment_stmt);
                             } else {
-                                // If no temp_name, add the expression as a statement
+                                // If no temp_name, check if transformation is needed
+                                let processed_expr = if Self::expression_needs_transformation(&completion_expr) {
+                                    // Create a temporary transformer to handle nested expressions
+                                    let mut temp_transformer = crate::expression_transformer::ExpressionTransformer::new();
+                                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BreakContinueStrategy));
+                                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::MatchExpressionStrategy));
+                                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::IfElseExpressionStrategy));
+                                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BlockExpressionStrategy));
+                                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BinaryExpressionStrategy));
+                                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
+                                    
+                                    let result = temp_transformer.transform_expression(completion_expr, ctx);
+                                    // Add any statements from the nested transformation
+                                    new_arm.block.stmts.extend(result.statements);
+                                    result.expr
+                                } else {
+                                    completion_expr
+                                };
+                                
+                                // Add the expression as a statement
                                 let expr_stmt = hir::Stmt::new(
                                     ctx.hir_id_allocator.next_id(),
-                                    hir::StmtKind::Expr(Box::new(completion_expr)),
+                                    hir::StmtKind::Expr(Box::new(processed_expr)),
                                     span,
                                 );
                                 new_arm.block.stmts.push(expr_stmt);
