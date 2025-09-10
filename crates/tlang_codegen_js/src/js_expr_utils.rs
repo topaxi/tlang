@@ -117,9 +117,9 @@ pub fn expr_can_render_as_js_stmt(expr: &hir::Expr) -> bool {
         hir::ExprKind::Loop(..) => true,
 
         // Match expressions can be rendered as JavaScript statements if all arms have return statements
-        // or if all arms end with control flow statements (break/continue)
+        // or if all arms end with control flow statements (break/continue) or simple expressions
         hir::ExprKind::Match(_, arms) => {
-            // If all arms have return statements or control flow statements, this match can be rendered as a JS statement
+            // If all arms have return statements, control flow statements, or simple expressions, this match can be rendered as a JS statement
             arms.iter().all(|arm| {
                 // Check if the last statement is a return, control flow, or simple statement
                 if let Some(last_stmt) = arm.block.stmts.last() {
@@ -142,7 +142,8 @@ pub fn expr_can_render_as_js_stmt(expr: &hir::Expr) -> bool {
                             _ => expr_can_render_as_js_expr(completion_expr), // Allow simple expressions
                         }
                     } else {
-                        false
+                        // No completion expression is fine - the arm is empty
+                        true
                     }
                 }
             })

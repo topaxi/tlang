@@ -1790,19 +1790,21 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                     // Actually, let's remove the completion expression entirely by setting it to None
                     // But since we can't set it to None here, we'll mark it for removal
                     self.changes_made = true;
+                } else if let hir::ExprKind::Match(_, _) = &completion_expr.kind {
+                    // Handle match expressions specially - transform them instead of flattening
+                    if !self.can_render_as_js_stmt(completion_expr) {
+                        let statements = self.transform_match_to_statements(completion_expr.clone(), "", ctx);
+                        new_stmts.extend(statements);
+                        // Set completion expression to None since we moved it to statement position
+                        block.expr = None;
+                        self.changes_made = true;
+                    }
                 } else if !self.can_render_as_js_expr(completion_expr)
                     && !self.can_render_as_js_stmt(completion_expr)
                     && !self.contains_temp_variables(completion_expr)
+                    && !matches!(completion_expr.kind, hir::ExprKind::Break(_))
                 {
-                    let (flattened_expr, mut temp_stmts) =
-                        self.flatten_expression_to_temp_var(completion_expr.clone(), ctx);
-                    new_stmts.append(&mut temp_stmts);
-                    *completion_expr = flattened_expr;
-                    self.changes_made = true;
-                } else if !self.can_render_as_js_expr(completion_expr)
-                    && !self.can_render_as_js_stmt(completion_expr)
-                    && !self.contains_temp_variables(completion_expr)
-                {
+                    // Skip flattening break expressions - they will be handled by match transformation
                     let (flattened_expr, mut temp_stmts) =
                         self.flatten_expression_to_temp_var(completion_expr.clone(), ctx);
                     new_stmts.append(&mut temp_stmts);

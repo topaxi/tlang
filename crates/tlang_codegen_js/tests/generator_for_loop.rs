@@ -29,7 +29,7 @@ fn test_for_loop_simple_iteration() {
                     break;
                 };
             }
-        };
+        }
         return sum;
     }
     ");
@@ -128,7 +128,35 @@ fn test_for_loop_nested() {
     "});
 
     // Expected: Should handle nested for loops correctly
-    assert_snapshot!(output, @r"");
+    assert_snapshot!(output, @r"
+    function matrix_sum() {
+        let total = 0;
+        {
+            let iterator$$ = iterator.iter([[1, 2], [3, 4]]);
+            for (;;) {
+                let $tmp$0 = iterator$$.next(),row;if ($tmp$0.tag === Option.Some && (row = $tmp$0[0], true)) {
+                    {
+                        let iterator$$ = iterator.iter(row);
+                        for (;;) {
+                            let $hir$0 = undefined;
+                            let $hir$1 = undefined;
+                            let $tmp$1 = iterator$$.next(),val;if ($tmp$1.tag === Option.Some && (val = $tmp$1[0], true)) {
+                                total = total + val;
+                            } else if ($tmp$1.tag === Option.None) {
+                                break;
+                            };
+                            $hir$1;
+                            $hir$0;
+                        }
+                    }
+                } else if ($tmp$0.tag === Option.None) {
+                    break;
+                };
+            }
+        }
+        return total;
+    }
+    ");
 }
 
 #[test]

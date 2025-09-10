@@ -2770,3 +2770,23 @@ fn test_simple_for_loop_without_completion_values() {
     }
     ");
 }
+
+#[test]
+fn test_nested_for_loop_hir_transformation() {
+    let source = r#"
+        fn matrix_sum() {
+            let total = 0;
+            for row in [[1, 2], [3, 4]] {
+                for val in row {
+                    total = total + val
+                }
+            }
+            total
+        }
+    "#;
+    let hir = compile_and_apply_hir_js_pass(source);
+    println!("=== NESTED FOR LOOP HIR ===");
+    println!("{}", pretty_print(&hir));
+    println!("=== END ===");
+    // For now, just check that it doesn't panic
+}
