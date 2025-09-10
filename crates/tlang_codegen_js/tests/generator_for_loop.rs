@@ -138,15 +138,11 @@ fn test_for_loop_nested() {
                     {
                         let iterator$$ = iterator.iter(row);
                         for (;;) {
-                            let $hir$0 = undefined;
-                            let $hir$1 = undefined;
                             let $tmp$1 = iterator$$.next(),val;if ($tmp$1.tag === Option.Some && (val = $tmp$1[0], true)) {
                                 total = total + val;
                             } else if ($tmp$1.tag === Option.None) {
                                 break;
                             };
-                            $hir$1;
-                            $hir$0;
                         }
                     }
                 } else if ($tmp$0.tag === Option.None) {
