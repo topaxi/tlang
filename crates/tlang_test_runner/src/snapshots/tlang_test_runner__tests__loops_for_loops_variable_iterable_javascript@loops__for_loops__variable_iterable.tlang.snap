@@ -1,0 +1,6 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: apply_redactions(&output)
+input_file: tests/loops/for_loops/variable_iterable.tlang
+---
+60

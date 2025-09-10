@@ -9,15 +9,18 @@ tlang_hir = { path = "../tlang_hir" }
 tlang_hir_opt = { path = "../tlang_hir_opt" }
 tlang_parser = { path = "../tlang_parser" }
 tlang_semantics = { path = "../tlang_semantics" }
+tlang_span = { path = "../tlang_span" }
 tlang_symbols = { path = "../tlang_symbols" }
 
 [dev-dependencies]
 tlang_ast_lowering = { path = "../tlang_ast_lowering" }
+tlang_hir_pretty = { path = "../tlang_hir_pretty" }
 ctor = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
 indoc = { workspace = true }
 pretty_assertions = { workspace = true }
+insta = { workspace = true }
 
 [lints]
 workspace = true

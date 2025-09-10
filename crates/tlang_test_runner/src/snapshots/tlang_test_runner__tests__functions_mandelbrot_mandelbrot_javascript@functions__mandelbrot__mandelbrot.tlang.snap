@@ -3,50 +3,20 @@ source: crates/tlang_test_runner/src/main.rs
 expression: apply_redactions(&output)
 input_file: tests/functions/mandelbrot/mandelbrot.tlang
 ---
-[
-  [
-     1, 1, 1, 1, 1, 2, 3,
-     3, 3, 3, 3, 4, 4, 6,
-    11, 4, 3, 3, 2
-  ],
-  [
-    1, 1, 1, 1, 2, 3, 3,
-    3, 3, 4, 4, 5, 6, 0,
-    0, 6, 5, 3, 3
-  ],
-  [
-    1, 1,  1, 1,  3,  3, 3,
-    3, 4,  5, 6, 14, 26, 0,
-    0, 0, 15, 5,  3
-  ],
-  [
-     1, 1, 1, 1, 3, 3, 4,
-    10, 7, 7, 8, 0, 0, 0,
-     0, 0, 0, 7, 3
-  ],
-  [
-     1, 1, 1,  3, 4, 5, 5,
-    12, 0, 0, 16, 0, 0, 0,
-     0, 0, 0,  6, 4
-  ],
-  [
-    1, 1,  1, 0, 0, 0, 0,
-    0, 0,  0, 0, 0, 0, 0,
-    0, 0, 12, 5, 4
-  ],
-  [
-     1, 1, 1,  3, 4, 5, 5,
-    12, 0, 0, 16, 0, 0, 0,
-     0, 0, 0,  6, 4
-  ],
-  [
-     1, 1, 1, 1, 3, 3, 4,
-    10, 7, 7, 8, 0, 0, 0,
-     0, 0, 0, 7, 3
-  ],
-  [
-    1, 1,  1, 1,  3,  3, 3,
-    3, 4,  5, 6, 14, 26, 0,
-    0, 0, 15, 5,  3
-  ]
-]
+[stdin]:355
+console.log(map(range$$2(0, 9), (y) => map(range$$2(0, 19), (x) => mandelbrot$$3(c_real, c_imag, 50))));
+                                                                                 ^
+
+ReferenceError: c_real is not defined
+    at [stdin]:355:82
+    at apply_map ([stdin]:287:21)
+    at [stdin]:290:38
+    at foldl ([stdin]:277:26)
+    at map ([stdin]:290:12)
+    at [stdin]:355:40
+    at apply_map ([stdin]:287:21)
+    at [stdin]:290:38
+    at foldl ([stdin]:277:26)
+    at map ([stdin]:290:12)
+
+Node.js v24.0.2

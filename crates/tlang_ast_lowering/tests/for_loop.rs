@@ -16,10 +16,10 @@ fn test_lower_for_loop_on_list_simple() {
         "#,
     );
 
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         {
-            let iterator$$: unknown = [1, 2, 3].iter();
+            let iterator$$: unknown = iterator::iter([1, 2, 3]);
             loop {
                 match iterator$$.next() {
                     Option::Some { 0: i } => {
@@ -32,7 +32,7 @@ fn test_lower_for_loop_on_list_simple() {
             }
         }
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -49,10 +49,10 @@ fn test_lower_for_loop_on_list_with_accumulator() {
         "#,
     );
 
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         let sum: unknown = {
-            let iterator$$: unknown = [1, 2, 3].iter();
+            let iterator$$: unknown = iterator::iter([1, 2, 3]);
             let accumulator$$: unknown = 0;
             loop {
                 let acc: unknown = accumulator$$;
@@ -68,7 +68,7 @@ fn test_lower_for_loop_on_list_with_accumulator() {
         };
         log(sum);
     }
-    "###);
+    ");
 }
 
 #[test]
@@ -88,10 +88,10 @@ fn test_lower_for_loop_on_list_with_accumulator_pat() {
         "#,
     );
 
-    assert_snapshot!(pretty_print(&hir), @r###"
+    assert_snapshot!(pretty_print(&hir), @r"
     fn main() -> unknown {
         let even_odd: unknown = {
-            let iterator$$: unknown = [1, 2, 3, 4].iter();
+            let iterator$$: unknown = iterator::iter([1, 2, 3, 4]);
             let accumulator$$: unknown = [[], []];
             loop {
                 let [even, odd]: unknown = accumulator$$;
@@ -111,5 +111,5 @@ fn test_lower_for_loop_on_list_with_accumulator_pat() {
         };
         log(even_odd);
     }
-    "###);
+    ");
 }

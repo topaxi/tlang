@@ -1,0 +1,11 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: apply_redactions(&output)
+input_file: tests/expressions/if_expressions.tlang
+---
+=== If Expression Tests ===
+positive
+zero or negative
+3
+2
+1

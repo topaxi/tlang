@@ -1,7 +1,38 @@
 ---
 source: crates/tlang_test_runner/src/main.rs
 description: Known failure - output may not match expected
-expression: output
+expression: apply_redactions(&output)
 input_file: tests/known_failures/large_data_processing.tlang
 ---
+=== Large Data Processing Test ===
+Processing small dataset...
+0
+Processing medium dataset...
+0
+Processing large dataset...
+0
+Computing deep fibonacci...
+832040
+Computing primes...
+25
+Creating large nested structure...
+15625
+Processing large strings...
 
+[stdin]:354
+        return current <= 0 ? acc : helper(current - 1, acc + "a");
+        ^
+
+RangeError: Maximum call stack size exceeded
+    at helper ([stdin]:354:9)
+    at helper ([stdin]:354:37)
+    at helper ([stdin]:354:37)
+    at helper ([stdin]:354:37)
+    at helper ([stdin]:354:37)
+    at helper ([stdin]:354:37)
+    at helper ([stdin]:354:37)
+    at helper ([stdin]:354:37)
+    at helper ([stdin]:354:37)
+    at helper ([stdin]:354:37)
+
+Node.js v24.0.2

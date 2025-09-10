@@ -1,0 +1,12 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: apply_redactions(&output)
+input_file: tests/loops/for_loops/variable_iterable.tlang
+---
+thread 'main' panicked at crates/tlang_runtime/tlang_memory/src/state.rs:328:9:
+Expected iterable struct, got Object(23)
+  at function sum_list:1:17
+  at function main:8:27
+  at root 12:1
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

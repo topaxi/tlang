@@ -1,0 +1,11 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: apply_redactions(&output)
+input_file: tests/loops/for_loops/nested_loops.tlang
+---
+thread 'main' panicked at crates/tlang_runtime/tlang_memory/src/state.rs:328:9:
+Expected iterable struct, got U64(0)
+  at function main:2:20
+  at root 9:1
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

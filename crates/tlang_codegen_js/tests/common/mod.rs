@@ -1,3 +1,4 @@
+use tlang_codegen_js::create_hir_js_opt_group;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_hir_opt::HirOptimizer;
 use tlang_parser::Parser;
@@ -14,7 +15,6 @@ fn before_all() {
 }
 
 pub struct CodegenOptions<'a> {
-    pub render_ternary: bool,
     pub builtin_symbols: Vec<(&'a str, SymbolType)>,
     pub optimize: bool,
 }
@@ -22,7 +22,6 @@ pub struct CodegenOptions<'a> {
 impl Default for CodegenOptions<'_> {
     fn default() -> Self {
         Self {
-            render_ternary: true,
             builtin_symbols: CodegenJS::get_standard_library_symbols().to_vec(),
             optimize: true,
         }
@@ -30,12 +29,6 @@ impl Default for CodegenOptions<'_> {
 }
 
 impl CodegenOptions<'_> {
-    #[allow(dead_code)]
-    pub fn render_ternary(mut self, render_ternary: bool) -> Self {
-        self.render_ternary = render_ternary;
-        self
-    }
-
     #[allow(dead_code)]
     pub fn optimize(mut self, optimize: bool) -> Self {
         self.optimize = optimize;
@@ -70,13 +63,16 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
                 semantic_analyzer.symbol_tables().clone(),
             );
 
-            if options.optimize {
-                let mut optimizer = HirOptimizer::default();
-                optimizer.optimize_hir(&mut module, meta.into());
-            }
+            let mut optimizer = if options.optimize {
+                HirOptimizer::default()
+            } else {
+                HirOptimizer::new(vec![])
+            };
+
+            optimizer.add_pass(Box::new(create_hir_js_opt_group()));
+            optimizer.optimize_hir(&mut module, meta.into());
 
             let mut codegen = CodegenJS::default();
-            codegen.set_render_ternary(options.render_ternary);
             codegen.generate_code(&module);
             codegen.get_output().to_string()
         }

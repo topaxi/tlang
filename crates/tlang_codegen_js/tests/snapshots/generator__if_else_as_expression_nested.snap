@@ -1,0 +1,14 @@
+---
+source: crates/tlang_codegen_js/tests/generator.rs
+expression: output
+---
+function main() {
+    let $hir$0 = undefined;
+    if (true) {
+        let x = true ? 1 : 2;
+        $hir$0 = (x === 1 ? 3 : 4);
+    } else {
+        $hir$0 = 5;
+    }
+    let result = $hir$0;
+}

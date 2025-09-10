@@ -6,6 +6,7 @@ use std::{
 
 use clap::{ArgMatches, arg, command};
 use tlang_ast_lowering::lower_to_hir;
+use tlang_codegen_js::create_hir_js_opt_group;
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_hir::hir;
 use tlang_hir_opt::HirOptimizer;
@@ -83,6 +84,9 @@ fn get_args() -> Args {
 
 fn compile_standard_library() -> Result<String, ParserError> {
     let mut js = compile_to_js(&CodegenJS::get_standard_library_source(), false)?;
+
+    // Add JavaScript helpers
+    js.insert_str(0, &format!("{}\n", CodegenJS::get_javascript_helpers()));
 
     js.push_str("\nfunction panic(msg) { throw new Error(msg); }\n");
 
@@ -203,6 +207,7 @@ fn compile_to_hir(source: &str, show_warnings: bool) -> Result<hir::Module, Pars
     );
 
     let mut optimizer = HirOptimizer::default();
+    optimizer.add_pass(Box::new(create_hir_js_opt_group()));
     optimizer.optimize_hir(&mut module, meta.into());
 
     Ok(module)

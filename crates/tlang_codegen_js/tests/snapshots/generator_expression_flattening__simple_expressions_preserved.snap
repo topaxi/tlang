@@ -1,0 +1,10 @@
+---
+source: crates/tlang_codegen_js/tests/generator_expression_flattening.rs
+expression: output
+---
+function test_simple_if() {
+    return true ? 42 : 24;
+}
+function test_simple_nested() {
+    return true ? true : false ? "yes" : "no";
+}

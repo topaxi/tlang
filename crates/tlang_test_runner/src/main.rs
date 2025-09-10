@@ -17,9 +17,10 @@ mod tests {
 
     use regex::Regex;
 
-    // Static regex patterns for redactions
+    // Test all .tlang files using insta's glob functionality
     static THREAD_PANIC_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"thread '(\w+)' \(\d+\) panicked at").expect("Failed to compile regex")
+        Regex::new(r"thread '(\w+)' \(\d+\) (panicked at|has overflowed its stack)")
+            .expect("Failed to compile regex")
     });
 
     static TIMESTAMP_RE: LazyLock<Regex> = LazyLock::new(|| {
@@ -200,11 +201,13 @@ mod tests {
     }
 
     fn normalize_output(output: &str) -> std::borrow::Cow<'_, str> {
-        // Normalize rust panic message from
+        // Normalize rust panic/stack overflow messages from
         // thread 'main' (6734) panicked at...
+        // thread 'main' (6734) has overflowed its stack
         // to
         // thread 'main' panicked at...
-        THREAD_PANIC_RE.replace_all(output, "thread '$1' panicked at")
+        // thread 'main' has overflowed its stack
+        THREAD_PANIC_RE.replace_all(output, "thread '$1' $2")
     }
 
     fn apply_redactions(output: &str) -> String {

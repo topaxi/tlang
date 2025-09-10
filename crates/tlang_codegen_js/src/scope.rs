@@ -5,7 +5,6 @@ use crate::js;
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Scope {
     parent: Option<Box<Scope>>,
-
     variables: HashMap<String, String>,
 }
 
@@ -88,6 +87,7 @@ impl Scope {
         let tmp_var_name = self.get_unique_variable_name(prefix);
         self.variables
             .insert(tmp_var_name.clone(), tmp_var_name.clone());
+
         tmp_var_name
     }
 

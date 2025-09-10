@@ -1,0 +1,16 @@
+---
+source: crates/tlang_codegen_js/tests/generator_expression_flattening.rs
+expression: output
+---
+function test_let_complex() {
+    let $hir$0 = undefined;
+    if (true) {
+        let x = 42;
+        $hir$0 = 84;
+    } else {
+        let y = 10;
+        $hir$0 = 15;
+    }
+    let result = $hir$0;
+    return result;
+}
