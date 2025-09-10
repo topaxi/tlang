@@ -372,7 +372,14 @@ pub struct LoopExpressionStrategy;
 
 impl TransformationStrategy for LoopExpressionStrategy {
     fn should_transform(&self, expr: &hir::Expr) -> bool {
-        matches!(expr.kind, hir::ExprKind::Loop(..))
+        match &expr.kind {
+            hir::ExprKind::Loop(body) => {
+                // Only transform loops that have break statements with values
+                // Loops without break values or with only plain breaks can remain as loop statements
+                ExpressionAnalyzer::block_contains_break_with_value(body)
+            }
+            _ => false,
+        }
     }
 
     fn transform(
@@ -389,6 +396,8 @@ impl TransformationStrategy for LoopExpressionStrategy {
 
         // Transform the loop body to assign to temp variable on break
         let mut transformed_loop = expr.clone();
+        // Give the transformed loop a new HIR ID to avoid confusion
+        transformed_loop.hir_id = ctx.hir_id_allocator.next_id();
         if let hir::ExprKind::Loop(body) = &mut transformed_loop.kind {
             Self::transform_break_statements_in_block(body, &temp_name, ctx, stmt_builder);
         }
@@ -656,6 +665,167 @@ impl TransformationStrategy for BreakContinueStrategy {
                     expr,
                     statements: Vec::new(),
                 }
+            }
+        }
+    }
+}
+
+/// Strategy for transforming complex binary expressions that contain non-JS expressions
+#[derive(Debug)]
+pub struct BinaryExpressionStrategy;
+
+impl TransformationStrategy for BinaryExpressionStrategy {
+    fn should_transform(&self, expr: &hir::Expr) -> bool {
+        match &expr.kind {
+            hir::ExprKind::Binary(_, lhs, rhs) => {
+                // Transform binary expressions if either operand contains complex expressions
+                // that can't be rendered as JS
+                !ExpressionAnalyzer::can_render_as_js_expr(lhs) 
+                    || !ExpressionAnalyzer::can_render_as_js_expr(rhs)
+                    || ExpressionAnalyzer::contains_break_with_value(lhs)
+                    || ExpressionAnalyzer::contains_break_with_value(rhs)
+            }
+            _ => false,
+        }
+    }
+
+    fn transform(
+        &mut self,
+        expr: hir::Expr,
+        ctx: &mut HirOptContext,
+        stmt_builder: &mut StatementBuilder,
+    ) -> TransformResult {
+        let span = expr.span;
+        
+        if let hir::ExprKind::Binary(op_kind, lhs, rhs) = expr.kind {
+            let temp_var_manager = stmt_builder.temp_var_manager();
+            let temp_name = temp_var_manager.generate_name();
+            let temp_declaration = temp_var_manager.create_declaration(ctx, &temp_name, span);
+            let temp_ref = temp_var_manager.create_path(ctx, &temp_name, span);
+
+            let statements = Self::transform_binary_to_statements(
+                *lhs, 
+                op_kind, 
+                *rhs, 
+                &temp_name, 
+                ctx, 
+                stmt_builder, 
+                span
+            );
+            let mut all_stmts = vec![temp_declaration];
+            all_stmts.extend(statements);
+
+            TransformResult {
+                expr: temp_ref,
+                statements: all_stmts,
+            }
+        } else {
+            // Should not happen if should_transform is correct
+            TransformResult {
+                expr,
+                statements: Vec::new(),
+            }
+        }
+    }
+}
+
+impl BinaryExpressionStrategy {
+    fn transform_binary_to_statements(
+        lhs: hir::Expr,
+        op_kind: hir::BinaryOpKind,
+        rhs: hir::Expr,
+        temp_name: &str,
+        ctx: &mut HirOptContext,
+        stmt_builder: &mut StatementBuilder,
+        span: tlang_span::Span,
+    ) -> Vec<hir::Stmt> {
+        // For assignment operations, we need special handling
+        match op_kind {
+            hir::BinaryOpKind::Assign => {
+                // This is an assignment: lhs = rhs
+                // If RHS contains complex expressions, we need to flatten them first
+                if !ExpressionAnalyzer::can_render_as_js_expr(&rhs) {
+                    // Create a temporary transformer to handle the RHS
+                    let mut temp_transformer = crate::expression_transformer::ExpressionTransformer::new();
+                    
+                    // Add strategies for the nested expressions
+                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BreakContinueStrategy));
+                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::MatchExpressionStrategy));
+                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::IfElseExpressionStrategy));
+                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BlockExpressionStrategy));
+                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
+                    
+                    // Transform the RHS
+                    let rhs_result = temp_transformer.transform_expression(rhs, ctx);
+                    
+                    // Create the assignment with the transformed RHS
+                    let assignment_expr = hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::Binary(
+                            hir::BinaryOpKind::Assign,
+                            Box::new(lhs.clone()),
+                            Box::new(rhs_result.expr),
+                        ),
+                        span,
+                    };
+                    
+                    let assignment_stmt = hir::Stmt::new(
+                        ctx.hir_id_allocator.next_id(),
+                        hir::StmtKind::Expr(Box::new(assignment_expr)),
+                        span,
+                    );
+                    
+                    // Add final assignment to temp variable
+                    let final_assignment = stmt_builder.create_assignment(
+                        ctx,
+                        temp_name,
+                        lhs, // The result of the assignment is the LHS value
+                        span,
+                    );
+                    
+                    let mut all_stmts = rhs_result.statements;
+                    all_stmts.push(assignment_stmt);
+                    all_stmts.push(final_assignment);
+                    all_stmts
+                } else {
+                    // Simple assignment - create the statement directly
+                    let assignment_expr = hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::Binary(
+                            hir::BinaryOpKind::Assign,
+                            Box::new(lhs.clone()),
+                            Box::new(rhs),
+                        ),
+                        span,
+                    };
+                    
+                    let assignment_stmt = hir::Stmt::new(
+                        ctx.hir_id_allocator.next_id(),
+                        hir::StmtKind::Expr(Box::new(assignment_expr)),
+                        span,
+                    );
+                    
+                    // Add final assignment to temp variable  
+                    let final_assignment = stmt_builder.create_assignment(
+                        ctx,
+                        temp_name,
+                        lhs, // The result of the assignment is the LHS value
+                        span,
+                    );
+                    
+                    vec![assignment_stmt, final_assignment]
+                }
+            }
+            _ => {
+                // For other binary operations, just flatten complex operands and create the expression
+                // This is a simplified approach - a full implementation would handle more cases
+                let binary_expr = hir::Expr {
+                    hir_id: ctx.hir_id_allocator.next_id(),
+                    kind: hir::ExprKind::Binary(op_kind, Box::new(lhs), Box::new(rhs)),
+                    span,
+                };
+                
+                vec![stmt_builder.create_assignment(ctx, temp_name, binary_expr, span)]
             }
         }
     }

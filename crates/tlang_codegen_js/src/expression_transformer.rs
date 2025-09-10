@@ -87,6 +87,20 @@ impl TempVarManager {
             _ => false,
         }
     }
+
+    /// Check if any variable name in the expression starts with $hir$ (global temp var detection)
+    pub fn is_any_temp_var(expr: &hir::Expr) -> bool {
+        match &expr.kind {
+            hir::ExprKind::Path(path) => {
+                if let Some(first_segment) = path.segments.first() {
+                    first_segment.ident.as_str().starts_with("$hir$")
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
 }
 
 /// Shared utilities for building statements
@@ -274,37 +288,63 @@ impl ExpressionAnalyzer {
             return true;
         }
 
+        Self::contains_any_temp_variables(expr)
+    }
+
+    /// Check if expression contains any temp variables (global detection)
+    pub fn contains_any_temp_variables(expr: &hir::Expr) -> bool {
+        if TempVarManager::is_any_temp_var(expr) {
+            return true;
+        }
+
         match &expr.kind {
             hir::ExprKind::Binary(_, lhs, rhs) => {
-                Self::contains_temp_variables(lhs, temp_var_manager)
-                    || Self::contains_temp_variables(rhs, temp_var_manager)
+                Self::contains_any_temp_variables(lhs) || Self::contains_any_temp_variables(rhs)
             }
-            hir::ExprKind::Unary(_, operand) => {
-                Self::contains_temp_variables(operand, temp_var_manager)
-            }
+            hir::ExprKind::Unary(_, operand) => Self::contains_any_temp_variables(operand),
             hir::ExprKind::Call(call) => call
                 .arguments
                 .iter()
-                .any(|arg| Self::contains_temp_variables(arg, temp_var_manager)),
+                .any(|arg| Self::contains_any_temp_variables(arg)),
             hir::ExprKind::List(elements) => elements
                 .iter()
-                .any(|elem| Self::contains_temp_variables(elem, temp_var_manager)),
-            hir::ExprKind::FieldAccess(obj, _) => {
-                Self::contains_temp_variables(obj, temp_var_manager)
-            }
-            hir::ExprKind::Loop(block) => {
-                Self::block_contains_temp_variables(block, temp_var_manager)
-            }
-            hir::ExprKind::Block(block) => {
-                Self::block_contains_temp_variables(block, temp_var_manager)
-            }
+                .any(|elem| Self::contains_any_temp_variables(elem)),
+            hir::ExprKind::FieldAccess(obj, _) => Self::contains_any_temp_variables(obj),
+            hir::ExprKind::Loop(block) => Self::block_contains_any_temp_variables(block),
+            hir::ExprKind::Block(block) => Self::block_contains_any_temp_variables(block),
             hir::ExprKind::Match(scrutinee, arms) => {
-                if Self::contains_temp_variables(scrutinee, temp_var_manager) {
+                if Self::contains_any_temp_variables(scrutinee) {
                     return true;
                 }
                 arms.iter()
-                    .any(|arm| Self::block_contains_temp_variables(&arm.block, temp_var_manager))
+                    .any(|arm| Self::block_contains_any_temp_variables(&arm.block))
             }
+            _ => false,
+        }
+    }
+
+    pub fn block_contains_any_temp_variables(block: &hir::Block) -> bool {
+        for stmt in &block.stmts {
+            if Self::stmt_contains_any_temp_variables(stmt) {
+                return true;
+            }
+        }
+
+        if let Some(ref expr) = block.expr {
+            if Self::contains_any_temp_variables(expr) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub fn stmt_contains_any_temp_variables(stmt: &hir::Stmt) -> bool {
+        match &stmt.kind {
+            hir::StmtKind::Let(_, expr, _) => Self::contains_any_temp_variables(expr),
+            hir::StmtKind::Expr(expr) => Self::contains_any_temp_variables(expr),
+            hir::StmtKind::Return(Some(expr)) => Self::contains_any_temp_variables(expr),
+            hir::StmtKind::Return(None) => false,
             _ => false,
         }
     }

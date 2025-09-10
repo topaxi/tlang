@@ -3,8 +3,8 @@ use tlang_hir_opt::{HirOptContext, HirPass};
 
 use crate::expression_transformer::{ExpressionAnalyzer, ExpressionTransformer};
 use crate::transformation_strategies::{
-    BlockExpressionStrategy, BreakContinueStrategy, IfElseExpressionStrategy,
-    LoopExpressionStrategy, MatchExpressionStrategy,
+    BinaryExpressionStrategy, BlockExpressionStrategy, BreakContinueStrategy, 
+    IfElseExpressionStrategy, LoopExpressionStrategy, MatchExpressionStrategy,
 };
 use crate::js_expr_utils::{expr_can_render_as_assignment_rhs, expr_can_render_as_js_stmt};
 
@@ -26,6 +26,7 @@ impl RefactoredHirJsPass {
         transformer.add_strategy(Box::new(MatchExpressionStrategy));
         transformer.add_strategy(Box::new(IfElseExpressionStrategy));
         transformer.add_strategy(Box::new(BlockExpressionStrategy));
+        transformer.add_strategy(Box::new(BinaryExpressionStrategy));
         transformer.add_strategy(Box::new(LoopExpressionStrategy));
 
         Self {
@@ -262,20 +263,38 @@ impl RefactoredHirJsPass {
                 if !expr_can_render_as_assignment_rhs(expr) {
                     // For complex expressions in let statements, flatten them
                     if let hir::ExprKind::Loop(..) = &expr.kind {
+                        eprintln!("DEBUG: Found loop in let statement (before check): {:?}", expr.hir_id);
+                        eprintln!("DEBUG: Loop has break with value: {}", ExpressionAnalyzer::contains_break_with_value(expr));
+                        eprintln!("DEBUG: Loop has any temp variables: {}", ExpressionAnalyzer::contains_any_temp_variables(expr));
                         // Check if this loop has break statements with values but hasn't been transformed yet
                         if ExpressionAnalyzer::contains_break_with_value(expr)
-                            && !ExpressionAnalyzer::contains_temp_variables(
-                                expr,
-                                self.transformer.temp_var_manager(),
-                            )
+                            && !ExpressionAnalyzer::contains_any_temp_variables(expr)
                         {
+                            eprintln!("DEBUG: Transforming loop in let statement: {:?}", expr.hir_id);
                             // Transform using the loop strategy
                             let result =
                                 self.transformer.transform_expression((**expr).clone(), ctx);
+                            eprintln!("DEBUG: Got {} additional statements and expr {:?}", result.statements.len(), result.expr.hir_id);
                             additional_stmts.extend(result.statements);
                             **expr = result.expr;
                             self.changes_made = true;
                         } else {
+                            eprintln!("DEBUG: Loop in let statement not transformed: {:?} (has_break: {}, has_temp: {})", 
+                                expr.hir_id,
+                                ExpressionAnalyzer::contains_break_with_value(expr),
+                                ExpressionAnalyzer::contains_temp_variables(expr, self.transformer.temp_var_manager())
+                            );
+                            
+                            // Debug the temp variable detection
+                            if let hir::ExprKind::Loop(loop_body) = &expr.kind {
+                                eprintln!("DEBUG: Loop body has {} statements", loop_body.stmts.len());
+                                for (i, stmt) in loop_body.stmts.iter().enumerate() {
+                                    eprintln!("DEBUG: Statement {}: {:?}", i, stmt.hir_id);
+                                    if ExpressionAnalyzer::stmt_contains_temp_variables(stmt, self.transformer.temp_var_manager()) {
+                                        eprintln!("DEBUG: Statement {} contains temp variables", i);
+                                    }
+                                }
+                            }
                             // Loop without break values or already processed - can be converted to statement directly
                             let span = expr.span;
 
