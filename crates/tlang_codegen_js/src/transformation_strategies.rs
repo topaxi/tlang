@@ -161,7 +161,8 @@ impl MatchExpressionStrategy {
                                 // Check if the completion expression needs transformation
                                 let processed_expr = if Self::expression_needs_transformation(&completion_expr) {
                                     // Create a temporary transformer to handle nested expressions
-                                    let mut temp_transformer = crate::expression_transformer::ExpressionTransformer::new();
+                                    let current_counter = stmt_builder.temp_var_manager().current_counter();
+                                    let mut temp_transformer = crate::expression_transformer::ExpressionTransformer::new_with_counter(current_counter);
                                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BreakContinueStrategy));
                                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::MatchExpressionStrategy));
                                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::IfElseExpressionStrategy));
@@ -170,6 +171,8 @@ impl MatchExpressionStrategy {
                                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
                                     
                                     let result = temp_transformer.transform_expression(completion_expr, ctx);
+                                    // Synchronize the counter
+                                    stmt_builder.temp_var_manager().set_counter(temp_transformer.current_counter());
                                     // Add any statements from the nested transformation
                                     new_arm.block.stmts.extend(result.statements);
                                     result.expr
