@@ -374,9 +374,10 @@ impl TransformationStrategy for LoopExpressionStrategy {
     fn should_transform(&self, expr: &hir::Expr) -> bool {
         match &expr.kind {
             hir::ExprKind::Loop(body) => {
-                // Only transform loops that have break statements with values
-                // Loops without break values or with only plain breaks can remain as loop statements
-                ExpressionAnalyzer::block_contains_break_with_value(body)
+                // Transform loops that:
+                // 1. Have break statements with values, OR
+                // 2. Are for loops with accumulators (which have implicit break with value)
+                ExpressionAnalyzer::block_contains_break_with_value(body) || Self::is_for_loop_with_accumulator(body)
             }
             _ => false,
         }
@@ -394,31 +395,160 @@ impl TransformationStrategy for LoopExpressionStrategy {
         let temp_declaration = temp_var_manager.create_declaration(ctx, &temp_name, span);
         let temp_ref = temp_var_manager.create_path(ctx, &temp_name, span);
 
-        // Transform the loop body to assign to temp variable on break
-        let mut transformed_loop = expr.clone();
-        // Give the transformed loop a new HIR ID to avoid confusion
-        transformed_loop.hir_id = ctx.hir_id_allocator.next_id();
-        if let hir::ExprKind::Loop(body) = &mut transformed_loop.kind {
-            Self::transform_break_statements_in_block(body, &temp_name, ctx, stmt_builder);
-        }
+        if let hir::ExprKind::Loop(body) = &expr.kind {
+            let has_explicit_breaks = ExpressionAnalyzer::block_contains_break_with_value(body);
+            let is_accumulator_loop = Self::is_for_loop_with_accumulator(body);
 
-        // Create loop statement (not assigned to anything)
-        let loop_stmt = hir::Stmt::new(
-            ctx.hir_id_allocator.next_id(),
-            hir::StmtKind::Expr(Box::new(transformed_loop)),
-            span,
-        );
+            if is_accumulator_loop && !has_explicit_breaks {
+                // Handle for loop with accumulator - extract the accumulator variable
+                let accumulator_variable = Self::find_accumulator_variable(body);
+                
+                // Transform the loop body but don't change break statements since there aren't any
+                let mut transformed_loop = expr.clone();
+                transformed_loop.hir_id = ctx.hir_id_allocator.next_id();
+                
+                // Create loop statement
+                let loop_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(transformed_loop)),
+                    span,
+                );
+                
+                // Add assignment after the loop to capture the accumulator value
+                let final_assignment = if let Some(acc_var) = accumulator_variable {
+                    stmt_builder.create_assignment(ctx, &temp_name, acc_var, span)
+                } else {
+                    // Fallback - assign undefined 
+                    let wildcard_expr = hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::Wildcard,
+                        span,
+                    };
+                    stmt_builder.create_assignment(ctx, &temp_name, wildcard_expr, span)
+                };
+                
+                let all_stmts = vec![temp_declaration, loop_stmt, final_assignment];
+                
+                TransformResult {
+                    expr: temp_ref,
+                    statements: all_stmts,
+                }
+            } else {
+                // Handle regular loop with explicit break statements
+                let mut transformed_loop = expr.clone();
+                transformed_loop.hir_id = ctx.hir_id_allocator.next_id();
+                if let hir::ExprKind::Loop(body) = &mut transformed_loop.kind {
+                    Self::transform_break_statements_in_block(body, &temp_name, ctx, stmt_builder);
+                }
 
-        let all_stmts = vec![temp_declaration, loop_stmt];
+                // Create loop statement (not assigned to anything)
+                let loop_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(transformed_loop)),
+                    span,
+                );
 
-        TransformResult {
-            expr: temp_ref,
-            statements: all_stmts,
+                let all_stmts = vec![temp_declaration, loop_stmt];
+
+                TransformResult {
+                    expr: temp_ref,
+                    statements: all_stmts,
+                }
+            }
+        } else {
+            // Should not happen if should_transform is correct
+            TransformResult {
+                expr,
+                statements: Vec::new(),
+            }
         }
     }
 }
 
 impl LoopExpressionStrategy {
+    /// Find the accumulator variable in a for loop with accumulator
+    fn find_accumulator_variable(body: &hir::Block) -> Option<hir::Expr> {
+        // Look for variables that reference the accumulator
+        // In for loops with accumulators, the final accumulator value is typically
+        // the variable being updated throughout the loop
+        
+        // Look for variables that are being assigned the accumulator value
+        // Typically, this will be a let statement that assigns the accumulator$$ to a local variable
+        for stmt in &body.stmts {
+            if let hir::StmtKind::Let(pat, expr, _) = &stmt.kind {
+                if let hir::PatKind::Identifier(_, ident) = &pat.kind {
+                    if Self::expr_contains_accumulator_reference(expr) {
+                        // This variable is assigned from the accumulator
+                        // Create a path reference to this variable using the existing HIR allocator from context
+                        // We'll need to pass the ctx parameter to this function
+                        // For now, return a simplified approach - look for the variable in block completion
+                        if let Some(completion_expr) = &body.expr {
+                            return Some(completion_expr.clone());
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Fallback: use the block completion expression if it exists
+        body.expr.clone()
+    }
+
+    /// Check if this is a for loop with accumulator pattern
+    /// For loops with accumulators have specific structure in HIR after lowering
+    pub fn is_for_loop_with_accumulator(body: &hir::Block) -> bool {
+        // Look for pattern where the loop has statements that indicate accumulator usage
+        // This includes let statements that assign accumulator variables and 
+        // a completion expression that references the accumulator
+        
+        // Check if there are accumulator-related variable names or patterns
+        let has_accumulator = body.stmts.iter().any(|stmt| {
+            if let hir::StmtKind::Let(_, expr, _) = &stmt.kind {
+                // Look for paths that contain "accumulator$$" which is generated by the parser
+                Self::expr_contains_accumulator_reference(expr)
+            } else {
+                false
+            }
+        }) || body.expr.as_ref().map_or(false, |expr| {
+            Self::expr_contains_accumulator_reference(expr)
+        });
+        
+        eprintln!("DEBUG: is_for_loop_with_accumulator = {}", has_accumulator);
+        has_accumulator
+    }
+    
+    /// Check if an expression contains references to accumulator variables
+    fn expr_contains_accumulator_reference(expr: &hir::Expr) -> bool {
+        match &expr.kind {
+            hir::ExprKind::Path(path) => {
+                path.segments.iter().any(|segment| {
+                    segment.ident.as_str().contains("accumulator$$")
+                })
+            }
+            hir::ExprKind::Binary(_, lhs, rhs) => {
+                Self::expr_contains_accumulator_reference(lhs) 
+                    || Self::expr_contains_accumulator_reference(rhs)
+            }
+            hir::ExprKind::Unary(_, operand) => {
+                Self::expr_contains_accumulator_reference(operand)
+            }
+            hir::ExprKind::Call(call) => {
+                call.arguments.iter().any(|arg| Self::expr_contains_accumulator_reference(arg))
+            }
+            hir::ExprKind::Block(block) => {
+                block.stmts.iter().any(|stmt| {
+                    match &stmt.kind {
+                        hir::StmtKind::Let(_, expr, _) | hir::StmtKind::Expr(expr) | hir::StmtKind::Return(Some(expr)) => {
+                            Self::expr_contains_accumulator_reference(expr)
+                        }
+                        _ => false,
+                    }
+                }) || block.expr.as_ref().map_or(false, |expr| Self::expr_contains_accumulator_reference(expr))
+            }
+            _ => false,
+        }
+    }
+
     fn transform_break_statements_in_block(
         block: &mut hir::Block,
         temp_name: &str,
