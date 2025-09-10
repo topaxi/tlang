@@ -123,6 +123,28 @@ impl StatementBuilder {
         value_expr: hir::Expr,
         span: Span,
     ) -> hir::Stmt {
+        // Check if this would create a self-assignment (e.g., $hir$0 = $hir$0)
+        // If so, create a no-op statement instead
+        if Self::is_self_assignment(var_name, &value_expr) {
+            // Return a no-op expression statement instead of a self-assignment
+            let noop_expr = hir::Expr {
+                hir_id: ctx.hir_id_allocator.next_id(),
+                kind: hir::ExprKind::Path(Box::new(hir::Path::new(
+                    vec![hir::PathSegment { 
+                        ident: tlang_ast::node::Ident::new("undefined", span) 
+                    }],
+                    span,
+                ))),
+                span,
+            };
+            
+            return hir::Stmt::new(
+                ctx.hir_id_allocator.next_id(),
+                hir::StmtKind::Expr(Box::new(noop_expr)),
+                span,
+            );
+        }
+
         let hir_id = ctx.hir_id_allocator.next_id();
         let temp_path = self.temp_var_manager.create_path(ctx, var_name, span);
 
@@ -137,6 +159,20 @@ impl StatementBuilder {
         };
 
         hir::Stmt::new(hir_id, hir::StmtKind::Expr(Box::new(assignment_expr)), span)
+    }
+
+    /// Check if an assignment would be a self-assignment (var = var)
+    fn is_self_assignment(var_name: &str, value_expr: &hir::Expr) -> bool {
+        match &value_expr.kind {
+            hir::ExprKind::Path(path) => {
+                if path.segments.len() == 1 {
+                    path.segments[0].ident.as_str() == var_name
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
     }
 
     pub fn temp_var_manager(&mut self) -> &mut TempVarManager {

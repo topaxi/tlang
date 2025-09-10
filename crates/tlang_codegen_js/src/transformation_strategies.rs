@@ -289,21 +289,79 @@ impl IfElseExpressionStrategy {
     ) -> Vec<hir::Stmt> {
         let span = expr.span;
         if let hir::ExprKind::IfElse(condition, then_branch, else_branches) = expr.kind {
+            let mut hoisted_declarations = Vec::new();
+            
             // Transform branches to assign to temp variable
             let mut new_then_branch = *then_branch;
             if let Some(completion_expr) = new_then_branch.expr.take() {
-                let assignment_stmt =
-                    stmt_builder.create_assignment(ctx, temp_name, completion_expr, span);
-                new_then_branch.stmts.push(assignment_stmt);
+                // Check if completion expression needs transformation and hoist declarations
+                if BlockExpressionStrategy::expression_needs_transformation(&completion_expr) {
+                    let mut temp_transformer = crate::expression_transformer::ExpressionTransformer::new();
+                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BreakContinueStrategy));
+                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::MatchExpressionStrategy));
+                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::IfElseExpressionStrategy));
+                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BlockExpressionStrategy));
+                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BinaryExpressionStrategy));
+                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
+                    
+                    let result = temp_transformer.transform_expression(completion_expr, ctx);
+                    
+                    // Extract temp variable declarations
+                    for stmt in &result.statements {
+                        if BlockExpressionStrategy::is_temp_var_declaration(stmt) {
+                            hoisted_declarations.push(stmt.clone());
+                        } else {
+                            new_then_branch.stmts.push(stmt.clone());
+                        }
+                    }
+                    
+                    if !BlockExpressionStrategy::is_temp_var_reference(&result.expr, temp_name) {
+                        let assignment_stmt =
+                            stmt_builder.create_assignment(ctx, temp_name, result.expr, span);
+                        new_then_branch.stmts.push(assignment_stmt);
+                    }
+                } else {
+                    let assignment_stmt =
+                        stmt_builder.create_assignment(ctx, temp_name, completion_expr, span);
+                    new_then_branch.stmts.push(assignment_stmt);
+                }
             }
 
             let mut new_else_branches = Vec::new();
             for else_branch in else_branches {
                 let mut new_else_branch = else_branch;
                 if let Some(completion_expr) = new_else_branch.consequence.expr.take() {
-                    let assignment_stmt =
-                        stmt_builder.create_assignment(ctx, temp_name, completion_expr, span);
-                    new_else_branch.consequence.stmts.push(assignment_stmt);
+                    // Check if completion expression needs transformation and hoist declarations
+                    if BlockExpressionStrategy::expression_needs_transformation(&completion_expr) {
+                        let mut temp_transformer = crate::expression_transformer::ExpressionTransformer::new();
+                        temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BreakContinueStrategy));
+                        temp_transformer.add_strategy(Box::new(crate::transformation_strategies::MatchExpressionStrategy));
+                        temp_transformer.add_strategy(Box::new(crate::transformation_strategies::IfElseExpressionStrategy));
+                        temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BlockExpressionStrategy));
+                        temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BinaryExpressionStrategy));
+                        temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
+                        
+                        let result = temp_transformer.transform_expression(completion_expr, ctx);
+                        
+                        // Extract temp variable declarations
+                        for stmt in &result.statements {
+                            if BlockExpressionStrategy::is_temp_var_declaration(stmt) {
+                                hoisted_declarations.push(stmt.clone());
+                            } else {
+                                new_else_branch.consequence.stmts.push(stmt.clone());
+                            }
+                        }
+                        
+                        if !BlockExpressionStrategy::is_temp_var_reference(&result.expr, temp_name) {
+                            let assignment_stmt =
+                                stmt_builder.create_assignment(ctx, temp_name, result.expr, span);
+                            new_else_branch.consequence.stmts.push(assignment_stmt);
+                        }
+                    } else {
+                        let assignment_stmt =
+                            stmt_builder.create_assignment(ctx, temp_name, completion_expr, span);
+                        new_else_branch.consequence.stmts.push(assignment_stmt);
+                    }
                 }
                 new_else_branches.push(new_else_branch);
             }
@@ -323,7 +381,10 @@ impl IfElseExpressionStrategy {
                 span,
             );
 
-            vec![if_else_stmt]
+            // Return hoisted declarations first, then the if-else statement
+            let mut all_stmts = hoisted_declarations;
+            all_stmts.push(if_else_stmt);
+            all_stmts
         } else {
             // Fallback: create a simple assignment statement
             vec![stmt_builder.create_assignment(ctx, temp_name, expr, span)]
@@ -407,6 +468,55 @@ impl BlockExpressionStrategy {
         }
     }
 
+    /// Recursively extract temp variable declarations from nested structures
+    fn extract_nested_temp_declarations(stmt: hir::Stmt) -> (Vec<hir::Stmt>, hir::Stmt) {
+        match &stmt.kind {
+            hir::StmtKind::Expr(expr) => {
+                match &expr.kind {
+                    hir::ExprKind::Block(block) => {
+                        // Extract temp declarations from nested block
+                        let mut hoisted_declarations = Vec::new();
+                        let mut new_block_stmts = Vec::new();
+                        
+                        for nested_stmt in &block.stmts {
+                            if Self::is_temp_var_declaration(nested_stmt) {
+                                hoisted_declarations.push(nested_stmt.clone());
+                            } else {
+                                let (nested_hoisted, final_stmt) = Self::extract_nested_temp_declarations(nested_stmt.clone());
+                                hoisted_declarations.extend(nested_hoisted);
+                                new_block_stmts.push(final_stmt);
+                            }
+                        }
+                        
+                        // Create new block with remaining statements
+                        let new_block = hir::Block::new(
+                            block.hir_id,
+                            new_block_stmts,
+                            block.expr.clone(),
+                            block.span,
+                        );
+                        
+                        let new_expr = hir::Expr {
+                            hir_id: expr.hir_id,
+                            kind: hir::ExprKind::Block(Box::new(new_block)),
+                            span: expr.span,
+                        };
+                        
+                        let new_stmt = hir::Stmt::new(
+                            stmt.hir_id,
+                            hir::StmtKind::Expr(Box::new(new_expr)),
+                            stmt.span,
+                        );
+                        
+                        (hoisted_declarations, new_stmt)
+                    }
+                    _ => (Vec::new(), stmt)
+                }
+            }
+            _ => (Vec::new(), stmt)
+        }
+    }
+
     /// Check if an expression needs transformation (especially loops)
     fn expression_needs_transformation(expr: &hir::Expr) -> bool {
         match &expr.kind {
@@ -467,8 +577,20 @@ impl BlockExpressionStrategy {
                         }
                     }
                     
-                    // Add non-declaration statements to the block
-                    block_stmts.extend(remaining_statements);
+                    // Also check for nested temp variable declarations in remaining statements
+                    let mut additional_hoisted = Vec::new();
+                    let mut final_statements = Vec::new();
+                    
+                    for stmt in remaining_statements {
+                        let (nested_hoisted, final_stmt) = Self::extract_nested_temp_declarations(stmt);
+                        additional_hoisted.extend(nested_hoisted);
+                        final_statements.push(final_stmt);
+                    }
+                    
+                    hoisted_declarations.extend(additional_hoisted);
+                    
+                    // Add final statements to the block
+                    block_stmts.extend(final_statements);
                     (result.expr, hoisted_declarations)
                 } else {
                     (completion_expr, Vec::new())
