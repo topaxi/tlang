@@ -555,7 +555,9 @@ impl BlockExpressionStrategy {
                 // Check if the completion expression needs transformation first
                 let (processed_completion_expr, hoisted_declarations) = if Self::expression_needs_transformation(&completion_expr) {
                     // Create a temporary transformer to handle nested expressions
-                    let mut temp_transformer = crate::expression_transformer::ExpressionTransformer::new();
+                    // Use the current counter to avoid temp variable name collisions
+                    let current_counter = stmt_builder.temp_var_manager().current_counter();
+                    let mut temp_transformer = crate::expression_transformer::ExpressionTransformer::new_with_counter(current_counter);
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BreakContinueStrategy));
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::MatchExpressionStrategy));
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::IfElseExpressionStrategy));
@@ -564,6 +566,9 @@ impl BlockExpressionStrategy {
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
                     
                     let result = temp_transformer.transform_expression(completion_expr, ctx);
+                    
+                    // Synchronize the counter to avoid future collisions
+                    stmt_builder.temp_var_manager().set_counter(temp_transformer.current_counter());
                     
                     // Extract temp variable declarations that need to be hoisted
                     let mut hoisted_declarations = Vec::new();

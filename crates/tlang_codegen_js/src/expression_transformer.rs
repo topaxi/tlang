@@ -26,6 +26,18 @@ impl TempVarManager {
         Self { counter: 0 }
     }
 
+    pub fn new_with_counter(starting_counter: usize) -> Self {
+        Self { counter: starting_counter }
+    }
+
+    pub fn current_counter(&self) -> usize {
+        self.counter
+    }
+
+    pub fn set_counter(&mut self, counter: usize) {
+        self.counter = counter;
+    }
+
     pub fn generate_name(&mut self) -> String {
         let name = format!("$hir${}", self.counter);
         self.counter += 1;
@@ -113,6 +125,12 @@ impl StatementBuilder {
     pub fn new() -> Self {
         Self {
             temp_var_manager: TempVarManager::new(),
+        }
+    }
+
+    pub fn new_with_counter(starting_counter: usize) -> Self {
+        Self {
+            temp_var_manager: TempVarManager::new_with_counter(starting_counter),
         }
     }
 
@@ -446,8 +464,21 @@ impl ExpressionTransformer {
         }
     }
 
+    /// Create a new ExpressionTransformer with a specific starting counter
+    /// This ensures nested transformers don't reuse temp variable names
+    pub fn new_with_counter(starting_counter: usize) -> Self {
+        Self {
+            strategies: Vec::new(),
+            stmt_builder: StatementBuilder::new_with_counter(starting_counter),
+        }
+    }
+
     pub fn add_strategy(&mut self, strategy: Box<dyn TransformationStrategy>) {
         self.strategies.push(strategy);
+    }
+
+    pub fn current_counter(&self) -> usize {
+        self.stmt_builder.temp_var_manager.current_counter()
     }
 
     pub fn transform_expression(
@@ -455,15 +486,10 @@ impl ExpressionTransformer {
         expr: hir::Expr,
         ctx: &mut HirOptContext,
     ) -> TransformResult {
-        eprintln!("DEBUG: ExpressionTransformer::transform_expression called for HIR ID: {:?}, kind: {:?}", 
-            expr.hir_id, std::mem::discriminant(&expr.kind));
             
         // Find the first strategy that can handle this expression
         for (i, strategy) in self.strategies.iter_mut().enumerate() {
-            let should_transform = strategy.should_transform(&expr);
-            eprintln!("DEBUG: Strategy {} should_transform: {}", i, should_transform);
-            if should_transform {
-                eprintln!("DEBUG: Using strategy {} to transform expression", i);
+            if strategy.should_transform(&expr) {
                 return strategy.transform(expr, ctx, &mut self.stmt_builder);
             }
         }
