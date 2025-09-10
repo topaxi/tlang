@@ -44,8 +44,7 @@ impl RefactoredHirJsPass {
             hir::ExprKind::Loop(body) => {
                 eprintln!("DEBUG: Found loop expression (HIR ID: {:?})", expr.hir_id);
                 // Check if this loop needs transformation
-                let needs_transformation = ExpressionAnalyzer::contains_break_with_value(expr) 
-                    || crate::transformation_strategies::LoopExpressionStrategy::is_for_loop_with_accumulator(body);
+                let needs_transformation = ExpressionAnalyzer::contains_break_with_value(expr);
                 eprintln!("DEBUG: Loop needs transformation: {}", needs_transformation);
                 needs_transformation
             }
@@ -64,8 +63,7 @@ impl RefactoredHirJsPass {
         match &expr.kind {
             hir::ExprKind::Loop(body) => {
                 // Found a loop - check if it needs transformation
-                ExpressionAnalyzer::contains_break_with_value(expr) 
-                    || crate::transformation_strategies::LoopExpressionStrategy::is_for_loop_with_accumulator(body)
+                ExpressionAnalyzer::contains_break_with_value(expr)
             }
             hir::ExprKind::Cast(inner_expr, _) => {
                 eprintln!("DEBUG: Found cast expression, checking inner: {:?}", std::mem::discriminant(&inner_expr.kind));
@@ -405,9 +403,8 @@ impl RefactoredHirJsPass {
                     if let hir::ExprKind::Loop(body) = &expr.kind {
                         eprintln!("DEBUG: Found loop in let statement: {:?}", expr.hir_id);
                         // Check if this loop needs transformation 
-                        // (either has break values OR is for loop with accumulator)
-                        let needs_transformation = ExpressionAnalyzer::contains_break_with_value(expr) 
-                            || crate::transformation_strategies::LoopExpressionStrategy::is_for_loop_with_accumulator(body);
+                        // (has break values)
+                        let needs_transformation = ExpressionAnalyzer::contains_break_with_value(expr);
                             
                         eprintln!("DEBUG: Loop needs transformation: {}", needs_transformation);
                         if needs_transformation && !ExpressionAnalyzer::contains_any_temp_variables(expr) {
@@ -493,8 +490,7 @@ impl RefactoredHirJsPass {
                     && !ExpressionAnalyzer::contains_any_temp_variables(expr)
                 {
                     // Check if the loop needs transformation
-                    let needs_transformation = ExpressionAnalyzer::contains_break_with_value(expr) 
-                        || crate::transformation_strategies::LoopExpressionStrategy::is_for_loop_with_accumulator(body);
+                    let needs_transformation = ExpressionAnalyzer::contains_break_with_value(expr);
                         
                     if needs_transformation {
                         // Transform the loop to capture break values or accumulator
@@ -532,8 +528,7 @@ impl RefactoredHirJsPass {
 
                     if let hir::ExprKind::Loop(body) = &expr.kind {
                         // Transform loop expressions in return context
-                        let needs_transformation = ExpressionAnalyzer::contains_break_with_value(expr) 
-                            || crate::transformation_strategies::LoopExpressionStrategy::is_for_loop_with_accumulator(body);
+                        let needs_transformation = ExpressionAnalyzer::contains_break_with_value(expr);
                             
                         if needs_transformation
                             && !ExpressionAnalyzer::contains_temp_variables(
@@ -753,11 +748,10 @@ impl<'hir> Visitor<'hir> for RefactoredHirJsPass {
                 // This can happen when loops are generated during the transformation process
                 let hir_id = expr.hir_id;
                 let has_breaks = ExpressionAnalyzer::block_contains_break_with_value(loop_body);
-                let has_accumulator = crate::transformation_strategies::LoopExpressionStrategy::is_for_loop_with_accumulator(loop_body);
-                let needs_transformation = has_breaks || has_accumulator;
+                let needs_transformation = has_breaks;
                     
-                eprintln!("DEBUG: Found loop in visit_expr (HIR ID: {:?}), needs transformation: {} (breaks: {}, accumulator: {})", 
-                    hir_id, needs_transformation, has_breaks, has_accumulator);
+                eprintln!("DEBUG: Found loop in visit_expr (HIR ID: {:?}), needs transformation: {} (breaks: {})", 
+                    hir_id, needs_transformation, has_breaks);
                     
                 if needs_transformation {
                     // Transform the loop expression right here
