@@ -2761,9 +2761,9 @@ fn test_simple_for_loop_without_completion_values() {
                         (sum = (sum + i));
                     },
                     Option::None => {
-                        break
+                        break;
                     },
-                }
+                };
             }
         };
         return sum;

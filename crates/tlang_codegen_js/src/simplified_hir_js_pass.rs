@@ -1893,13 +1893,13 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                     // Visit arm body
                     self.visit_block(&mut arm.block, ctx);
 
-                    // After visiting, ensure match arm completion expressions are moved to statement position
-                    // This is required for JavaScript generation since the pattern match generator
-                    // expects all match arm blocks to have block.expr = None
+                    // Only move break/continue statements to statement position automatically
+                    // Other completion expressions will be handled by transform_match_to_statements when needed
                     if let Some(completion_expr) = &mut arm.block.expr {
                         match &completion_expr.kind {
-                            // Break and continue statements should be moved to statement position, not assignments
-                            hir::ExprKind::Break(..) | hir::ExprKind::Continue => {
+                            // Break and continue statements should be moved to statement position
+                            // for semantic correctness (they can't be in expression position)
+                            hir::ExprKind::Break(None) | hir::ExprKind::Continue => {
                                 let control_flow_stmt = hir::Stmt::new(
                                     ctx.hir_id_allocator.next_id(),
                                     hir::StmtKind::Expr(Box::new(completion_expr.clone())),
@@ -1909,16 +1909,9 @@ impl<'hir> Visitor<'hir> for SimplifiedHirJsPass {
                                 arm.block.expr = None;
                                 self.changes_made = true;
                             }
-                            // All other expressions get moved to statement position
+                            // Leave other expressions for transform_match_to_statements to handle
                             _ => {
-                                let completion_stmt = hir::Stmt::new(
-                                    ctx.hir_id_allocator.next_id(),
-                                    hir::StmtKind::Expr(Box::new(completion_expr.clone())),
-                                    completion_expr.span,
-                                );
-                                arm.block.stmts.push(completion_stmt);
-                                arm.block.expr = None;
-                                self.changes_made = true;
+                                // Don't automatically move to statement position - let the transform handle it
                             }
                         }
                     }
