@@ -252,9 +252,12 @@ impl RefactoredHirJsPass {
     /// Process statements and flatten complex expressions in let statements
     fn process_stmt(&mut self, stmt: &mut hir::Stmt, ctx: &mut HirOptContext) -> Vec<hir::Stmt> {
         let mut additional_stmts = Vec::new();
+        eprintln!("DEBUG: Processing statement type: {:?} ID: {:?}", 
+            std::mem::discriminant(&stmt.kind), stmt.hir_id);
 
         match &mut stmt.kind {
             hir::StmtKind::Let(_, expr, _) => {
+                eprintln!("DEBUG: Processing let statement: {:?}", stmt.hir_id);
                 // First, recursively process sub-expressions
                 let mut temp_stmts = self.process_sub_expressions(expr, ctx);
                 additional_stmts.append(&mut temp_stmts);
@@ -263,38 +266,17 @@ impl RefactoredHirJsPass {
                 if !expr_can_render_as_assignment_rhs(expr) {
                     // For complex expressions in let statements, flatten them
                     if let hir::ExprKind::Loop(..) = &expr.kind {
-                        eprintln!("DEBUG: Found loop in let statement (before check): {:?}", expr.hir_id);
-                        eprintln!("DEBUG: Loop has break with value: {}", ExpressionAnalyzer::contains_break_with_value(expr));
-                        eprintln!("DEBUG: Loop has any temp variables: {}", ExpressionAnalyzer::contains_any_temp_variables(expr));
                         // Check if this loop has break statements with values but hasn't been transformed yet
                         if ExpressionAnalyzer::contains_break_with_value(expr)
                             && !ExpressionAnalyzer::contains_any_temp_variables(expr)
                         {
-                            eprintln!("DEBUG: Transforming loop in let statement: {:?}", expr.hir_id);
                             // Transform using the loop strategy
                             let result =
                                 self.transformer.transform_expression((**expr).clone(), ctx);
-                            eprintln!("DEBUG: Got {} additional statements and expr {:?}", result.statements.len(), result.expr.hir_id);
                             additional_stmts.extend(result.statements);
                             **expr = result.expr;
                             self.changes_made = true;
                         } else {
-                            eprintln!("DEBUG: Loop in let statement not transformed: {:?} (has_break: {}, has_temp: {})", 
-                                expr.hir_id,
-                                ExpressionAnalyzer::contains_break_with_value(expr),
-                                ExpressionAnalyzer::contains_temp_variables(expr, self.transformer.temp_var_manager())
-                            );
-                            
-                            // Debug the temp variable detection
-                            if let hir::ExprKind::Loop(loop_body) = &expr.kind {
-                                eprintln!("DEBUG: Loop body has {} statements", loop_body.stmts.len());
-                                for (i, stmt) in loop_body.stmts.iter().enumerate() {
-                                    eprintln!("DEBUG: Statement {}: {:?}", i, stmt.hir_id);
-                                    if ExpressionAnalyzer::stmt_contains_temp_variables(stmt, self.transformer.temp_var_manager()) {
-                                        eprintln!("DEBUG: Statement {} contains temp variables", i);
-                                    }
-                                }
-                            }
                             // Loop without break values or already processed - can be converted to statement directly
                             let span = expr.span;
 
@@ -332,6 +314,7 @@ impl RefactoredHirJsPass {
                 }
             }
             hir::StmtKind::Expr(expr) => {
+                eprintln!("DEBUG: Processing expression statement: {:?}", expr.hir_id);
                 // Skip temp variables that we created
                 if self.transformer.temp_var_manager().is_temp_var(expr)
                     || ExpressionAnalyzer::contains_temp_variables(
@@ -365,13 +348,19 @@ impl RefactoredHirJsPass {
 
                 // Always process loop expressions in expression statements
                 if let hir::ExprKind::Loop(..) = &expr.kind
-                    && !ExpressionAnalyzer::contains_temp_variables(
-                        expr,
-                        self.transformer.temp_var_manager(),
-                    )
+                    && !ExpressionAnalyzer::contains_any_temp_variables(expr)
                 {
-                    // Visit the loop body to transform any break/continue expressions
-                    self.visit_expr(expr, ctx);
+                    // If the loop has break with value, it needs to be transformed
+                    if ExpressionAnalyzer::contains_break_with_value(expr) {
+                        // Transform the loop to capture break values
+                        let result = self.transformer.transform_expression((**expr).clone(), ctx);
+                        additional_stmts.extend(result.statements);
+                        **expr = result.expr;
+                        self.changes_made = true;
+                    } else {
+                        // Visit the loop body to transform any break/continue expressions
+                        self.visit_expr(expr, ctx);
+                    }
                 }
             }
             hir::StmtKind::Return(Some(expr)) => {
@@ -483,26 +472,34 @@ impl<'hir> Visitor<'hir> for RefactoredHirJsPass {
 
         // Handle completion expression
         if let Some(completion_expr) = &mut block.expr {
-            // First, visit the completion expression to process any nested structures
-            self.visit_expr(completion_expr, ctx);
-
-            // Check for expressions that need transformation
+            eprintln!("DEBUG: Processing block completion expression: {:?}", completion_expr.hir_id);
+            
+            // Check for expressions that need transformation FIRST
             if !ExpressionAnalyzer::can_render_as_js_expr(completion_expr)
                 && !ExpressionAnalyzer::can_render_as_js_stmt(completion_expr)
-                && !ExpressionAnalyzer::contains_temp_variables(
-                    completion_expr,
-                    self.transformer.temp_var_manager(),
-                )
+                && !ExpressionAnalyzer::contains_any_temp_variables(completion_expr)
                 && !matches!(completion_expr.kind, hir::ExprKind::Break(_))
             {
-                // Skip flattening break expressions - they will be handled by match transformation
+                eprintln!("DEBUG: Block completion expression needs transformation: {:?}", completion_expr.hir_id);
+                // Transform before visiting nested structures
                 let result = self
                     .transformer
                     .transform_expression(completion_expr.clone(), ctx);
                 new_stmts.extend(result.statements);
                 *completion_expr = result.expr;
                 self.changes_made = true;
+            } else {
+                eprintln!("DEBUG: Block completion expression not transformed: {:?} (js_expr: {}, js_stmt: {}, temp_vars: {}, is_break: {})",
+                    completion_expr.hir_id,
+                    ExpressionAnalyzer::can_render_as_js_expr(completion_expr),
+                    ExpressionAnalyzer::can_render_as_js_stmt(completion_expr),
+                    ExpressionAnalyzer::contains_any_temp_variables(completion_expr),
+                    matches!(completion_expr.kind, hir::ExprKind::Break(_))
+                );
             }
+            
+            // Then visit the completion expression to process any remaining nested structures
+            self.visit_expr(completion_expr, ctx);
         }
 
         block.stmts = new_stmts;
@@ -532,6 +529,14 @@ impl<'hir> Visitor<'hir> for RefactoredHirJsPass {
     }
 
     fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
+        // Check if this is a loop that needs transformation before matching
+        let is_loop_needing_transformation = if let hir::ExprKind::Loop(_) = &expr.kind {
+            ExpressionAnalyzer::contains_break_with_value(expr)
+                && !ExpressionAnalyzer::contains_any_temp_variables(expr)
+        } else {
+            false
+        };
+        
         match &mut expr.kind {
             hir::ExprKind::FunctionExpression(func_expr) => {
                 // Visit function body recursively to handle nested loops
@@ -587,6 +592,15 @@ impl<'hir> Visitor<'hir> for RefactoredHirJsPass {
                 }
             }
             hir::ExprKind::Loop(loop_body) => {
+                eprintln!("DEBUG: Visiting loop in visit_expr: {:?}", expr.hir_id);
+                
+                if is_loop_needing_transformation {
+                    eprintln!("DEBUG: Loop in visit_expr needs transformation but can't be transformed here");
+                    // We can't transform loops here because we're in a visitor context
+                    // and don't have a way to insert additional statements
+                    // This loop should have been caught earlier in the pipeline
+                }
+                
                 // Visit loop body to catch nested expressions that need transformation
                 self.visit_block(loop_body, ctx);
             }
