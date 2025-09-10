@@ -365,6 +365,48 @@ impl TransformationStrategy for BlockExpressionStrategy {
 }
 
 impl BlockExpressionStrategy {
+    /// Check if an expression is a reference to a specific temp variable
+    fn is_temp_var_reference(expr: &hir::Expr, temp_name: &str) -> bool {
+        match &expr.kind {
+            hir::ExprKind::Path(path) => {
+                if path.segments.len() == 1 {
+                    path.segments[0].ident.as_str() == temp_name
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
+    /// Check if an expression is an undefined value (indicating no meaningful completion)
+    fn is_undefined_value(expr: &hir::Expr) -> bool {
+        match &expr.kind {
+            hir::ExprKind::Path(path) => {
+                if path.segments.len() == 1 {
+                    path.segments[0].ident.as_str() == "undefined"
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
+    /// Check if a statement is a temp variable declaration (starts with $hir$)
+    fn is_temp_var_declaration(stmt: &hir::Stmt) -> bool {
+        match &stmt.kind {
+            hir::StmtKind::Let(pattern, _, _) => {
+                if let Some(ident) = pattern.ident() {
+                    ident.as_str().starts_with("$hir$")
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
     /// Check if an expression needs transformation (especially loops)
     fn expression_needs_transformation(expr: &hir::Expr) -> bool {
         match &expr.kind {
@@ -401,7 +443,7 @@ impl BlockExpressionStrategy {
             // Handle completion expression by adding assignment within the block
             if let Some(completion_expr) = block.expr {
                 // Check if the completion expression needs transformation first
-                let processed_completion_expr = if Self::expression_needs_transformation(&completion_expr) {
+                let (processed_completion_expr, hoisted_declarations) = if Self::expression_needs_transformation(&completion_expr) {
                     // Create a temporary transformer to handle nested expressions
                     let mut temp_transformer = crate::expression_transformer::ExpressionTransformer::new();
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BreakContinueStrategy));
@@ -412,11 +454,24 @@ impl BlockExpressionStrategy {
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
                     
                     let result = temp_transformer.transform_expression(completion_expr, ctx);
-                    // Add any statements from the nested transformation to the block
-                    block_stmts.extend(result.statements);
-                    result.expr
+                    
+                    // Extract temp variable declarations that need to be hoisted
+                    let mut hoisted_declarations = Vec::new();
+                    let mut remaining_statements = Vec::new();
+                    
+                    for stmt in result.statements {
+                        if Self::is_temp_var_declaration(&stmt) {
+                            hoisted_declarations.push(stmt);
+                        } else {
+                            remaining_statements.push(stmt);
+                        }
+                    }
+                    
+                    // Add non-declaration statements to the block
+                    block_stmts.extend(remaining_statements);
+                    (result.expr, hoisted_declarations)
                 } else {
-                    completion_expr
+                    (completion_expr, Vec::new())
                 };
                 
                 // Check if the block has return statements that would make the completion assignment unreachable
@@ -438,32 +493,58 @@ impl BlockExpressionStrategy {
                     );
                     block_stmts.push(expr_stmt);
                 } else {
-                    // No return statements, create assignment as before
-                    let assignment_stmt =
-                        stmt_builder.create_assignment(ctx, temp_name, processed_completion_expr, span);
-                    block_stmts.push(assignment_stmt);
+                    // Only create assignment if the completion expression is not already the outer temp variable
+                    // This prevents self-assignments like "$hir$0 = $hir$0"
+                    if !Self::is_temp_var_reference(&processed_completion_expr, temp_name) {
+                        let assignment_stmt =
+                            stmt_builder.create_assignment(ctx, temp_name, processed_completion_expr, span);
+                        block_stmts.push(assignment_stmt);
+                    }
                 }
-            }
 
-            // Create a new block with the modified statements and wrap it in a block expression statement
-            let modified_block = hir::Block::new(
-                ctx.hir_id_allocator.next_id(),
-                block_stmts,
-                None, // No completion expression since we converted it to assignment
-                span,
-            );
-
-            let block_expr_stmt = hir::Stmt::new(
-                ctx.hir_id_allocator.next_id(),
-                hir::StmtKind::Expr(Box::new(hir::Expr {
-                    hir_id: ctx.hir_id_allocator.next_id(),
-                    kind: hir::ExprKind::Block(Box::new(modified_block)),
+                // Create a new block with the modified statements and wrap it in a block expression statement
+                let modified_block = hir::Block::new(
+                    ctx.hir_id_allocator.next_id(),
+                    block_stmts,
+                    None, // No completion expression since we converted it to assignment
                     span,
-                })),
-                span,
-            );
+                );
 
-            vec![block_expr_stmt]
+                let block_expr_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::Block(Box::new(modified_block)),
+                        span,
+                    })),
+                    span,
+                );
+
+                // Return hoisted declarations first, then the block statement
+                let mut all_stmts = hoisted_declarations;
+                all_stmts.push(block_expr_stmt);
+                all_stmts
+            } else {
+                // No completion expression, just create the block statement
+                let modified_block = hir::Block::new(
+                    ctx.hir_id_allocator.next_id(),
+                    block_stmts,
+                    None,
+                    span,
+                );
+
+                let block_expr_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(hir::Expr {
+                        hir_id: ctx.hir_id_allocator.next_id(),
+                        kind: hir::ExprKind::Block(Box::new(modified_block)),
+                        span,
+                    })),
+                    span,
+                );
+
+                vec![block_expr_stmt]
+            }
         } else {
             // Fallback: create a simple assignment statement
             vec![stmt_builder.create_assignment(ctx, temp_name, expr, span)]
