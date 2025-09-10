@@ -22,12 +22,14 @@ impl RefactoredHirJsPass {
         let mut transformer = ExpressionTransformer::new();
 
         // Add transformation strategies in order of priority
+        // LoopExpressionStrategy must come before MatchExpressionStrategy to handle 
+        // break statements in for loops correctly
         transformer.add_strategy(Box::new(BreakContinueStrategy));
+        transformer.add_strategy(Box::new(LoopExpressionStrategy));
         transformer.add_strategy(Box::new(MatchExpressionStrategy));
         transformer.add_strategy(Box::new(IfElseExpressionStrategy));
         transformer.add_strategy(Box::new(BlockExpressionStrategy));
         transformer.add_strategy(Box::new(BinaryExpressionStrategy));
-        transformer.add_strategy(Box::new(LoopExpressionStrategy));
 
         Self {
             transformer,
@@ -380,7 +382,7 @@ impl RefactoredHirJsPass {
                         // (has break values)
                         let needs_transformation = ExpressionAnalyzer::contains_break_with_value(expr);
                             
-                        if needs_transformation && !ExpressionAnalyzer::contains_any_temp_variables(expr) {
+                        if needs_transformation {
                             // Transform using the appropriate strategy
                             let result =
                                 self.transformer.transform_expression((**expr).clone(), ctx);

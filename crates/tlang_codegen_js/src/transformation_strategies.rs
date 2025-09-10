@@ -164,11 +164,11 @@ impl MatchExpressionStrategy {
                                     let current_counter = stmt_builder.temp_var_manager().current_counter();
                                     let mut temp_transformer = crate::expression_transformer::ExpressionTransformer::new_with_counter(current_counter);
                                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BreakContinueStrategy));
+                                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
                                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::MatchExpressionStrategy));
                                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::IfElseExpressionStrategy));
                                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BlockExpressionStrategy));
                                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BinaryExpressionStrategy));
-                                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
                                     
                                     let result = temp_transformer.transform_expression(completion_expr, ctx);
                                     // Synchronize the counter
@@ -193,11 +193,11 @@ impl MatchExpressionStrategy {
                                     // Create a temporary transformer to handle nested expressions
                                     let mut temp_transformer = crate::expression_transformer::ExpressionTransformer::new();
                                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BreakContinueStrategy));
+                                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
                                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::MatchExpressionStrategy));
                                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::IfElseExpressionStrategy));
                                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BlockExpressionStrategy));
                                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BinaryExpressionStrategy));
-                                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
                                     
                                     let result = temp_transformer.transform_expression(completion_expr, ctx);
                                     // Add any statements from the nested transformation
@@ -301,11 +301,11 @@ impl IfElseExpressionStrategy {
                 if BlockExpressionStrategy::expression_needs_transformation(&completion_expr) {
                     let mut temp_transformer = crate::expression_transformer::ExpressionTransformer::new();
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BreakContinueStrategy));
+                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::MatchExpressionStrategy));
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::IfElseExpressionStrategy));
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BlockExpressionStrategy));
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BinaryExpressionStrategy));
-                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
                     
                     let result = temp_transformer.transform_expression(completion_expr, ctx);
                     
@@ -338,11 +338,11 @@ impl IfElseExpressionStrategy {
                     if BlockExpressionStrategy::expression_needs_transformation(&completion_expr) {
                         let mut temp_transformer = crate::expression_transformer::ExpressionTransformer::new();
                         temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BreakContinueStrategy));
+                        temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
                         temp_transformer.add_strategy(Box::new(crate::transformation_strategies::MatchExpressionStrategy));
                         temp_transformer.add_strategy(Box::new(crate::transformation_strategies::IfElseExpressionStrategy));
                         temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BlockExpressionStrategy));
                         temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BinaryExpressionStrategy));
-                        temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
                         
                         let result = temp_transformer.transform_expression(completion_expr, ctx);
                         
@@ -562,11 +562,11 @@ impl BlockExpressionStrategy {
                     let current_counter = stmt_builder.temp_var_manager().current_counter();
                     let mut temp_transformer = crate::expression_transformer::ExpressionTransformer::new_with_counter(current_counter);
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BreakContinueStrategy));
+                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::MatchExpressionStrategy));
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::IfElseExpressionStrategy));
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BlockExpressionStrategy));
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BinaryExpressionStrategy));
-                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
                     
                     let result = temp_transformer.transform_expression(completion_expr, ctx);
                     
@@ -1081,10 +1081,10 @@ impl BinaryExpressionStrategy {
                     
                     // Add strategies for the nested expressions
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BreakContinueStrategy));
+                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::MatchExpressionStrategy));
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::IfElseExpressionStrategy));
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BlockExpressionStrategy));
-                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
                     
                     // Transform the RHS
                     let rhs_result = temp_transformer.transform_expression(rhs, ctx);
@@ -1159,10 +1159,10 @@ impl BinaryExpressionStrategy {
                     
                     // Add strategies for the nested expressions
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BreakContinueStrategy));
+                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::MatchExpressionStrategy));
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::IfElseExpressionStrategy));
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BlockExpressionStrategy));
-                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
                     
                     let lhs_result = temp_transformer.transform_expression(final_lhs, ctx);
                     statements.extend(lhs_result.statements);
@@ -1175,10 +1175,10 @@ impl BinaryExpressionStrategy {
                     
                     // Add strategies for the nested expressions
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BreakContinueStrategy));
+                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::MatchExpressionStrategy));
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::IfElseExpressionStrategy));
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BlockExpressionStrategy));
-                    temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
                     
                     let rhs_result = temp_transformer.transform_expression(final_rhs, ctx);
                     statements.extend(rhs_result.statements);
