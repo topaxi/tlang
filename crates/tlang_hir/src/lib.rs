@@ -2,4 +2,4 @@
 
 pub mod hir;
 pub mod visit;
-pub use visit::Visitor;
+pub use visit::{PostOrderVisitor, Visitor};
