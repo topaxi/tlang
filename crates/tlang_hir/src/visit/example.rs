@@ -1,9 +1,9 @@
-use crate::visit::post_order_walk_expr;
+use crate::visit::walk_expr;
 /// Example usage of the PostOrderVisitor trait
 ///
 /// This example demonstrates how to use the post-order visitor to process
 /// HIR nodes in post-order traversal, where children are visited before their parents.
-use crate::{PostOrderVisitor, hir};
+use crate::{PostOrderVisitor, Visitor, hir};
 
 pub struct ExpressionCounter {
     expression_count: usize,
@@ -27,10 +27,31 @@ impl ExpressionCounter {
     }
 }
 
+impl<'hir> Visitor<'hir> for ExpressionCounter {
+    fn visit_literal(
+        &mut self,
+        literal: &'hir mut tlang_ast::token::Literal,
+        _ctx: &mut Self::Context,
+    ) {
+        self.literal_count += 1;
+        println!("Found literal #{}: {:?}", self.literal_count, literal);
+    }
+}
+
 impl<'hir> PostOrderVisitor<'hir> for ExpressionCounter {
     fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
-        // First visit all children expressions
-        post_order_walk_expr(self, expr, ctx);
+        // First manually visit children expressions for post-order traversal
+        match &mut expr.kind {
+            hir::ExprKind::Binary(_, lhs, rhs) => {
+                // Visit children first (post-order)
+                PostOrderVisitor::visit_expr(self, lhs, ctx);
+                PostOrderVisitor::visit_expr(self, rhs, ctx);
+            }
+            _ => {
+                // For leaf nodes, use the default behavior
+                walk_expr(self, expr, ctx);
+            }
+        }
 
         // Then count this expression (post-order processing)
         self.expression_count += 1;
@@ -39,15 +60,6 @@ impl<'hir> PostOrderVisitor<'hir> for ExpressionCounter {
             "Processed expression #{}: {:?}",
             self.expression_count, expr.kind
         );
-    }
-
-    fn visit_literal(
-        &mut self,
-        literal: &'hir mut tlang_ast::token::Literal,
-        _ctx: &mut Self::Context,
-    ) {
-        self.literal_count += 1;
-        println!("Found literal #{}: {:?}", self.literal_count, literal);
     }
 }
 
@@ -82,7 +94,7 @@ mod example_tests {
         };
 
         let mut counter = ExpressionCounter::new();
-        counter.visit_expr(&mut expr, &mut ());
+        PostOrderVisitor::visit_expr(&mut counter, &mut expr, &mut ());
 
         // In post-order: literals are processed first, then the binary expression
         assert_eq!(counter.expression_count(), 3); // 2 literals + 1 binary

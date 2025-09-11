@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::hir;
-    use crate::visit::{post_order_walk_expr, walk_expr};
+    use crate::visit::walk_expr;
     use crate::{PostOrderVisitor, Visitor};
     use tlang_ast::token::Literal;
     use tlang_span::HirIdAllocator;
@@ -30,14 +30,16 @@ mod tests {
         visit_order: Vec<String>,
     }
 
-    impl<'hir> PostOrderVisitor<'hir> for PostOrderRecordingVisitor {
-        fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
-            post_order_walk_expr(self, expr, ctx);
-            self.visit_order.push(format!("expr-{:?}", expr.hir_id));
-        }
-
+    impl<'hir> Visitor<'hir> for PostOrderRecordingVisitor {
         fn visit_literal(&mut self, literal: &'hir mut Literal, _ctx: &mut Self::Context) {
             self.visit_order.push(format!("literal-{:?}", literal));
+        }
+    }
+
+    impl<'hir> PostOrderVisitor<'hir> for PostOrderRecordingVisitor {
+        fn visit_expr(&mut self, expr: &'hir mut hir::Expr, ctx: &mut Self::Context) {
+            walk_expr(self, expr, ctx);
+            self.visit_order.push(format!("expr-{:?}", expr.hir_id));
         }
     }
 
@@ -96,7 +98,7 @@ mod tests {
         let mut expr = create_binary_expr();
         let parent_id = expr.hir_id;
         let mut visitor = PostOrderRecordingVisitor::default();
-        visitor.visit_expr(&mut expr, &mut ());
+        PostOrderVisitor::visit_expr(&mut visitor, &mut expr, &mut ());
 
         // Post-order should visit children before parent
         let order = visitor.visit_order;
