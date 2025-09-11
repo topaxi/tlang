@@ -145,7 +145,7 @@ impl AnfTransformer {
     /// Check if an expression needs transformation
     fn needs_transformation(&self, expr: &hir::Expr) -> bool {
         match &expr.kind {
-            hir::ExprKind::Block(block) => block.expr.is_some(), // Only blocks with completion expressions
+            hir::ExprKind::Block(_) => true, // All blocks need statement form
             hir::ExprKind::Loop(_) => true,
             hir::ExprKind::Match(_, _) => true,
             hir::ExprKind::IfElse(_, _, _) => true,
@@ -176,42 +176,31 @@ impl AnfTransformer {
     fn transform_block_to_temp_variable(&mut self, expr: hir::Expr, _block: &hir::Block, ctx: &mut HirOptContext) -> hir::Expr {
         let mut expr_copy = expr.clone();
         if let hir::ExprKind::Block(ref mut block) = expr_copy.kind {
-            if let Some(completion_expr) = block.expr.take() {
-                // Create temp variable for the result
-                let temp_name = self.generate_temp_name();
-                let temp_path = self.create_temp_path(ctx, &temp_name, completion_expr.span);
-                let temp_declaration = self.create_temp_declaration(ctx, &temp_name, completion_expr.span);
-                
-                // Transform the completion expression
-                let transformed_completion = self.transform_expression(completion_expr, ctx);
-                
-                // Create assignment expression
-                let assignment = self.create_assignment_expression(temp_path.clone(), transformed_completion);
-                
-                // Set the assignment as the completion expression
-                block.expr = Some(assignment);
-                
-                // Transform the rest of the block
-                self.transform_block(block, ctx);
-                
-                // Create the block statement and add to current function
-                let block_stmt = hir::Stmt::new(
-                    ctx.hir_id_allocator.next_id(),
-                    hir::StmtKind::Expr(Box::new(hir::Expr {
-                        hir_id: expr.hir_id,
-                        kind: hir::ExprKind::Block(Box::new(*block.clone())),
-                        span: expr.span,
-                    })),
-                    expr.span,
-                );
-                
-                // Add temp declaration and block statement to the function
-                self.temp_declarations.push(temp_declaration);
-                self.temp_declarations.push(block_stmt);
-                
-                // Return the temp variable reference
-                return temp_path;
-            }
+            // Create temp variable for the result
+            let temp_name = self.generate_temp_name();
+            let temp_path = self.create_temp_path(ctx, &temp_name, expr.span);
+            let temp_declaration = self.create_temp_declaration(ctx, &temp_name, expr.span);
+            
+            // Transform the block to assign its completion to temp variable
+            self.transform_block_to_assign_to_temp(block, &temp_name, ctx);
+            
+            // Create the block statement and add to current function
+            let block_stmt = hir::Stmt::new(
+                ctx.hir_id_allocator.next_id(),
+                hir::StmtKind::Expr(Box::new(hir::Expr {
+                    hir_id: expr.hir_id,
+                    kind: hir::ExprKind::Block(Box::new(*block.clone())),
+                    span: expr.span,
+                })),
+                expr.span,
+            );
+            
+            // Add temp declaration and block statement to the function
+            self.temp_declarations.push(temp_declaration);
+            self.temp_declarations.push(block_stmt);
+            
+            // Return the temp variable reference
+            return temp_path;
         }
         
         // Fallback to normal transformation
@@ -225,8 +214,11 @@ impl AnfTransformer {
         let temp_path = self.create_temp_path(ctx, &temp_name, expr.span);
         let temp_declaration = self.create_temp_declaration(ctx, &temp_name, expr.span);
         
-        // Transform the loop (TODO: handle break statements)
-        let transformed_loop = self.transform_expression(expr.clone(), ctx);
+        // Transform the loop body to ensure break statements assign to temp variable
+        let mut transformed_loop = expr.clone();
+        if let hir::ExprKind::Loop(body) = &mut transformed_loop.kind {
+            self.transform_loop_body_for_temp_variable(body, &temp_name, ctx);
+        }
         
         // Create the loop statement
         let loop_stmt = hir::Stmt::new(
@@ -242,6 +234,55 @@ impl AnfTransformer {
         // Return the temp variable reference
         temp_path
     }
+    
+    /// Transform loop body to handle break statements with temp variables
+    fn transform_loop_body_for_temp_variable(&mut self, body: &mut hir::Block, temp_name: &str, ctx: &mut HirOptContext) {
+        // Transform all statements, looking for break statements
+        for stmt in &mut body.stmts {
+            self.transform_statement_for_loop_temp(stmt, temp_name, ctx);
+        }
+        
+        // Transform completion expression if present
+        if let Some(completion_expr) = &mut body.expr {
+            self.transform_expression_for_loop_temp(completion_expr, temp_name, ctx);
+        }
+    }
+    
+    /// Transform statements in loop context, handling break statements
+    fn transform_statement_for_loop_temp(&mut self, stmt: &mut hir::Stmt, temp_name: &str, ctx: &mut HirOptContext) {
+        match &mut stmt.kind {
+            hir::StmtKind::Expr(expr) => {
+                self.transform_expression_for_loop_temp(expr, temp_name, ctx);
+            }
+            _ => {
+                // Regular transformation for other statement types
+                self.transform_statement(stmt, ctx);
+            }
+        }
+    }
+    
+    /// Transform expressions in loop context, handling break statements
+    fn transform_expression_for_loop_temp(&mut self, expr: &mut hir::Expr, temp_name: &str, ctx: &mut HirOptContext) {
+        match &mut expr.kind {
+            hir::ExprKind::Break(Some(break_expr)) => {
+                // Transform the break expression and ensure it assigns to temp variable
+                let transformed_break_expr = self.transform_expression(*break_expr.clone(), ctx);
+                let temp_path = self.create_temp_path(ctx, temp_name, break_expr.span);
+                let assignment = self.create_assignment_expression(temp_path, transformed_break_expr);
+                
+                // Create a new break with the assignment
+                *expr = hir::Expr {
+                    hir_id: expr.hir_id,
+                    kind: hir::ExprKind::Break(Some(Box::new(assignment))),
+                    span: expr.span,
+                };
+            }
+            _ => {
+                // Regular transformation
+                *expr = self.transform_expression(expr.clone(), ctx);
+            }
+        }
+    }
 
     /// Transform a match expression to use temp variables
     fn transform_match_to_temp_variable(&mut self, expr: hir::Expr, ctx: &mut HirOptContext) -> hir::Expr {
@@ -250,8 +291,24 @@ impl AnfTransformer {
         let temp_path = self.create_temp_path(ctx, &temp_name, expr.span);
         let temp_declaration = self.create_temp_declaration(ctx, &temp_name, expr.span);
         
-        // Transform the match expression (TODO: transform arms to assign to temp variable)
-        let transformed_match = self.transform_expression(expr.clone(), ctx);
+        // Transform the match expression by modifying its arms to assign to temp variable
+        let mut transformed_match = expr.clone();
+        
+        if let hir::ExprKind::Match(scrutinee, arms) = &mut transformed_match.kind {
+            // Transform scrutinee
+            *scrutinee = Box::new(self.transform_expression(*scrutinee.clone(), ctx));
+            
+            // Transform each arm's block to assign to temp variable
+            for arm in arms {
+                // Transform the guard if present
+                if let Some(guard) = &mut arm.guard {
+                    *guard = self.transform_expression(guard.clone(), ctx);
+                }
+                
+                // Transform the block to assign its completion to temp variable
+                self.transform_block_to_assign_to_temp(&mut arm.block, &temp_name, ctx);
+            }
+        }
         
         // Create the match statement
         let match_stmt = hir::Stmt::new(
@@ -275,8 +332,24 @@ impl AnfTransformer {
         let temp_path = self.create_temp_path(ctx, &temp_name, expr.span);
         let temp_declaration = self.create_temp_declaration(ctx, &temp_name, expr.span);
         
-        // Transform the if expression (TODO: transform branches to assign to temp variable)
-        let transformed_if = self.transform_expression(expr.clone(), ctx);
+        // Transform the if expression by modifying its branches to assign to temp variable
+        let mut transformed_if = expr.clone();
+        
+        if let hir::ExprKind::IfElse(cond, then_block, else_clauses) = &mut transformed_if.kind {
+            // Transform condition
+            *cond = Box::new(self.transform_expression(*cond.clone(), ctx));
+            
+            // Transform then block to assign to temp variable
+            self.transform_block_to_assign_to_temp(then_block, &temp_name, ctx);
+            
+            // Transform else clauses to assign to temp variable
+            for else_clause in else_clauses {
+                if let Some(condition) = &mut else_clause.condition {
+                    *condition = self.transform_expression(condition.clone(), ctx);
+                }
+                self.transform_block_to_assign_to_temp(&mut else_clause.consequence, &temp_name, ctx);
+            }
+        }
         
         // Create the if statement
         let if_stmt = hir::Stmt::new(
@@ -292,44 +365,71 @@ impl AnfTransformer {
         // Return the temp variable reference
         temp_path
     }
+    
+    /// Transform a block to assign its completion expression to a temp variable
+    fn transform_block_to_assign_to_temp(&mut self, block: &mut hir::Block, temp_name: &str, ctx: &mut HirOptContext) {
+        // Transform all statements
+        for stmt in &mut block.stmts {
+            self.transform_statement(stmt, ctx);
+        }
+        
+        // Transform completion expression if present
+        if let Some(completion_expr) = block.expr.take() {
+            let span = completion_expr.span;
+            
+            // Transform the completion expression
+            let transformed_completion = self.transform_expression(completion_expr, ctx);
+            
+            // Create temp variable path
+            let temp_path = self.create_temp_path(ctx, temp_name, span);
+            
+            // Create assignment expression: temp_var = completion_expr
+            let assignment = self.create_assignment_expression(temp_path, transformed_completion);
+            
+            // Add assignment as a statement to the block
+            let assignment_stmt = hir::Stmt::new(
+                ctx.hir_id_allocator.next_id(),
+                hir::StmtKind::Expr(Box::new(assignment)),
+                span,
+            );
+            block.stmts.push(assignment_stmt);
+            
+            // Remove completion expression (it's now a statement)
+            block.expr = None;
+        } else {
+            // If no completion expression, assign wildcard/unit to temp variable
+            let temp_path = self.create_temp_path(ctx, temp_name, block.span);
+            let wildcard = hir::Expr {
+                hir_id: ctx.hir_id_allocator.next_id(),
+                kind: hir::ExprKind::Wildcard,
+                span: block.span,
+            };
+            let assignment = self.create_assignment_expression(temp_path, wildcard);
+            
+            // Add assignment as a statement to the block
+            let assignment_stmt = hir::Stmt::new(
+                ctx.hir_id_allocator.next_id(),
+                hir::StmtKind::Expr(Box::new(assignment)),
+                block.span,
+            );
+            block.stmts.push(assignment_stmt);
+            
+            // Ensure no completion expression
+            block.expr = None;
+        }
+    }
 
     /// Transform an expression
     fn transform_expression(&mut self, mut expr: hir::Expr, ctx: &mut HirOptContext) -> hir::Expr {
+        // Check if this expression needs transformation to statement form
+        if self.needs_transformation(&expr) {
+            return self.transform_complex_expression(expr, ctx);
+        }
+
         // First, recursively transform children (post-order)
         match &mut expr.kind {
             hir::ExprKind::Block(block) => {
-                // For block expressions, check if they have completion expressions
-                if block.expr.is_some() {
-                    // Extract the completion expression to transform it to an assignment
-                    let mut block = *block.clone();
-                    if let Some(completion_expr) = block.expr.take() {
-                        // Create temp variable for the result
-                        let temp_name = self.generate_temp_name();
-                        let temp_path = self.create_temp_path(ctx, &temp_name, completion_expr.span);
-                        let temp_declaration = self.create_temp_declaration(ctx, &temp_name, completion_expr.span);
-                        
-                        // Transform the completion expression
-                        let transformed_completion = self.transform_expression(completion_expr, ctx);
-                        
-                        // Create assignment expression
-                        let assignment = self.create_assignment_expression(temp_path.clone(), transformed_completion);
-                        
-                        // Set the assignment as the completion expression
-                        block.expr = Some(assignment);
-                        
-                        // Transform the rest of the block
-                        self.transform_block(&mut block, ctx);
-                        
-                        // Add temp declaration to be hoisted
-                        self.temp_declarations.push(temp_declaration);
-                        
-                        // Return the temp variable reference
-                        return temp_path;
-                    }
-                } else {
-                    // Block with no completion expression - just transform normally
-                    self.transform_block(block, ctx);
-                }
+                self.transform_block(block, ctx);
             }
             hir::ExprKind::Binary(_, left, right) => {
                 *left = Box::new(self.transform_expression(*left.clone(), ctx));
@@ -340,13 +440,39 @@ impl AnfTransformer {
                     *arg = self.transform_expression(arg.clone(), ctx);
                 }
             }
+            hir::ExprKind::IfElse(cond, then_block, else_clauses) => {
+                *cond = Box::new(self.transform_expression(*cond.clone(), ctx));
+                self.transform_block(then_block, ctx);
+                for else_clause in else_clauses {
+                    if let Some(condition) = &mut else_clause.condition {
+                        *condition = self.transform_expression(condition.clone(), ctx);
+                    }
+                    self.transform_block(&mut else_clause.consequence, ctx);
+                }
+            }
+            hir::ExprKind::Match(scrutinee, arms) => {
+                *scrutinee = Box::new(self.transform_expression(*scrutinee.clone(), ctx));
+                for arm in arms {
+                    if let Some(guard) = &mut arm.guard {
+                        *guard = self.transform_expression(guard.clone(), ctx);
+                    }
+                    self.transform_block(&mut arm.block, ctx);
+                }
+            }
+            hir::ExprKind::Loop(body) => {
+                self.transform_block(body, ctx);
+            }
             _ => {
-                // For now, only handle these expression types
-                // TODO: Add support for other complex expressions (loops, matches, etc.)
+                // Other expression types don't need recursive transformation
             }
         }
 
         expr
+    }
+
+    /// Transform an expression in place
+    fn transform_expression_in_place(&mut self, expr: &mut hir::Expr, ctx: &mut HirOptContext) {
+        *expr = self.transform_expression(expr.clone(), ctx);
     }
 }
 
