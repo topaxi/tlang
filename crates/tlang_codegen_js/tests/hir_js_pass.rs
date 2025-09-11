@@ -1977,7 +1977,16 @@ fn test_handwritten_for_loop() {
             };
         }
     "#;
+    
+    // Debug: Let's check the original HIR first
+    let (original_module, original_meta) = compile(source);
+    println!("=== Original HIR (before transformation) ===");
+    println!("{}", pretty_print(&original_module));
+    
     let hir = compile_and_apply_hir_js_pass(source);
+    println!("=== After HIR JS Pass ===");
+    println!("{}", pretty_print(&hir));
+    
     assert_snapshot!(pretty_print(&hir), @r"
     fn test() -> unknown {
         let $hir$0: unknown = _;

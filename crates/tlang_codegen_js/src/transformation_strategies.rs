@@ -520,6 +520,38 @@ impl BlockExpressionStrategy {
         }
     }
 
+    /// Check if an expression involves loops that might need local temp variables
+    fn transformation_involves_loops(expr: &hir::Expr) -> bool {
+        match &expr.kind {
+            hir::ExprKind::Loop(_) => true,
+            hir::ExprKind::Block(block) => {
+                // Check if any statements in the block are loops
+                block.stmts.iter().any(|stmt| {
+                    match &stmt.kind {
+                        hir::StmtKind::Expr(expr) | hir::StmtKind::Let(_, expr, _) => {
+                            Self::transformation_involves_loops(expr)
+                        }
+                        _ => false,
+                    }
+                }) || block.expr.as_ref().map_or(false, |expr| Self::transformation_involves_loops(expr))
+            }
+            hir::ExprKind::Match(_, arms) => {
+                // Check if any match arms contain loops
+                arms.iter().any(|arm| {
+                    arm.block.stmts.iter().any(|stmt| {
+                        match &stmt.kind {
+                            hir::StmtKind::Expr(expr) | hir::StmtKind::Let(_, expr, _) => {
+                                Self::transformation_involves_loops(expr)
+                            }
+                            _ => false,
+                        }
+                    }) || arm.block.expr.as_ref().map_or(false, |expr| Self::transformation_involves_loops(expr))
+                })
+            }
+            _ => false,
+        }
+    }
+
     /// Check if an expression needs transformation (especially loops)
     fn expression_needs_transformation(expr: &hir::Expr) -> bool {
         match &expr.kind {
@@ -556,11 +588,16 @@ impl BlockExpressionStrategy {
             // Handle completion expression by adding assignment within the block
             if let Some(completion_expr) = block.expr {
                 // Check if the completion expression needs transformation first
-                let (processed_completion_expr, hoisted_declarations) = if Self::expression_needs_transformation(&completion_expr) {
+                // BUT: Do NOT create nested transformations for loops - they should be handled by the main transformer
+                let (processed_completion_expr, hoisted_declarations) = if Self::expression_needs_transformation(&completion_expr) && !matches!(&completion_expr.kind, hir::ExprKind::Loop(_)) {
+                    // Check if this transformation involves loops BEFORE moving completion_expr
+                    let involves_loops = Self::transformation_involves_loops(&completion_expr);
+                    
                     // Create a temporary transformer to handle nested expressions
-                    // Use the current counter to avoid temp variable name collisions
-                    let current_counter = stmt_builder.temp_var_manager().current_counter();
-                    let mut temp_transformer = crate::expression_transformer::ExpressionTransformer::new_with_counter(current_counter);
+                    // CRITICAL: Start the nested transformer from the next counter to avoid name collisions
+                    // The outer transformation may have already used some counter values
+                    let next_counter = stmt_builder.temp_var_manager().current_counter();
+                    let mut temp_transformer = crate::expression_transformer::ExpressionTransformer::new_with_counter(next_counter);
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::BreakContinueStrategy));
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::LoopExpressionStrategy));
                     temp_transformer.add_strategy(Box::new(crate::transformation_strategies::MatchExpressionStrategy));
@@ -574,11 +611,17 @@ impl BlockExpressionStrategy {
                     stmt_builder.temp_var_manager().set_counter(temp_transformer.current_counter());
                     
                     // Extract temp variable declarations that need to be hoisted
+                    // BUT: Do NOT hoist temp variables that are used within loop contexts
+                    // as they need to stay in their local scope
                     let mut hoisted_declarations = Vec::new();
                     let mut remaining_statements = Vec::new();
                     
                     for stmt in result.statements {
-                        if Self::is_temp_var_declaration(&stmt) {
+                        // Only hoist temp variable declarations that are safe to hoist
+                        // Don't hoist if this transformation involves loops that might reference the temp vars
+                        let should_hoist = Self::is_temp_var_declaration(&stmt) && !involves_loops;
+                        
+                        if should_hoist {
                             hoisted_declarations.push(stmt);
                         } else {
                             remaining_statements.push(stmt);
