@@ -5,6 +5,9 @@ use crate::hir;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod example;
+
 pub trait Visitor<'hir>: Sized {
     // The default type here requires #![feature(associated_type_defaults)]
     type Context = ();
