@@ -471,6 +471,25 @@ impl BlockExpressionStrategy {
         }
     }
 
+    /// Get the temp variable name from a declaration statement
+    fn get_temp_var_name(stmt: &hir::Stmt) -> Option<String> {
+        match &stmt.kind {
+            hir::StmtKind::Let(pattern, _, _) => {
+                if let Some(ident) = pattern.ident() {
+                    let name = ident.as_str();
+                    if name.starts_with("$hir$") {
+                        Some(name.to_string())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
     /// Recursively extract temp variable declarations from nested structures
     fn extract_nested_temp_declarations(stmt: hir::Stmt) -> (Vec<hir::Stmt>, hir::Stmt) {
         match &stmt.kind {
@@ -611,39 +630,38 @@ impl BlockExpressionStrategy {
                     // For now, disable it to fix the immediate problem
                     // stmt_builder.temp_var_manager().set_counter(temp_transformer.current_counter());
                     
-                    // Extract temp variable declarations that need to be hoisted
-                    // BUT: Do NOT hoist temp variables that are used within loop contexts
-                    // as they need to stay in their local scope
+                    // SIMPLIFIED: Prevent duplicate temp variable declarations
+                    // If the nested transformation created temp variables, don't create duplicates
                     let mut hoisted_declarations = Vec::new();
-                    let mut remaining_statements = Vec::new();
+                    let mut seen_temp_vars = std::collections::HashSet::new();
                     
                     for stmt in result.statements {
-                        // Only hoist temp variable declarations that are safe to hoist
-                        // Don't hoist if this transformation involves loops that might reference the temp vars
-                        let should_hoist = Self::is_temp_var_declaration(&stmt) && !involves_loops;
-                        
-                        if should_hoist {
-                            hoisted_declarations.push(stmt);
+                        if Self::is_temp_var_declaration(&stmt) {
+                            // Check if we've already seen this temp variable name
+                            if let Some(var_name) = Self::get_temp_var_name(&stmt) {
+                                if !seen_temp_vars.contains(&var_name) {
+                                    seen_temp_vars.insert(var_name);
+                                    hoisted_declarations.push(stmt);
+                                }
+                                // Skip duplicate declarations
+                            } else {
+                                hoisted_declarations.push(stmt);
+                            }
                         } else {
-                            remaining_statements.push(stmt);
+                            block_stmts.push(stmt);
                         }
                     }
                     
-                    // Also check for nested temp variable declarations in remaining statements
-                    let mut additional_hoisted = Vec::new();
-                    let mut final_statements = Vec::new();
-                    
-                    for stmt in remaining_statements {
-                        let (nested_hoisted, final_stmt) = Self::extract_nested_temp_declarations(stmt);
-                        additional_hoisted.extend(nested_hoisted);
-                        final_statements.push(final_stmt);
+                    // SIMPLIFIED: Directly assign the result expression to temp variable
+                    // Don't create complex assignment chains
+                    if !Self::is_temp_var_reference(&result.expr, temp_name) {
+                        let assignment_stmt = stmt_builder.create_assignment(ctx, temp_name, result.expr, span);
+                        block_stmts.push(assignment_stmt);
                     }
                     
-                    hoisted_declarations.extend(additional_hoisted);
-                    
-                    // Add final statements to the block
-                    block_stmts.extend(final_statements);
-                    (result.expr, hoisted_declarations)
+                    // Return a temp variable reference as the processed completion expression
+                    let temp_ref = stmt_builder.temp_var_manager().create_path(ctx, temp_name, span);
+                    (temp_ref, hoisted_declarations)
                 } else {
                     (completion_expr, Vec::new())
                 };
@@ -659,21 +677,13 @@ impl BlockExpressionStrategy {
                 let has_return_statements = ExpressionAnalyzer::block_contains_return_statements(&block_ref);
 
                 if has_return_statements {
-                    // Block has return statements, so completion expression assignment would be stray
-                    let expr_stmt = hir::Stmt::new(
-                        ctx.hir_id_allocator.next_id(),
-                        hir::StmtKind::Expr(Box::new(processed_completion_expr)),
-                        span,
-                    );
-                    block_stmts.push(expr_stmt);
+                    // Block has return statements, so completion expression assignment would be unreachable
+                    // SIMPLIFIED: Don't add standalone temp var references
+                    // The assignment is already handled within the nested transformation
                 } else {
-                    // Only create assignment if the completion expression is not already the outer temp variable
-                    // This prevents self-assignments like "$hir$0 = $hir$0"
-                    if !Self::is_temp_var_reference(&processed_completion_expr, temp_name) {
-                        let assignment_stmt =
-                            stmt_builder.create_assignment(ctx, temp_name, processed_completion_expr, span);
-                        block_stmts.push(assignment_stmt);
-                    }
+                    // SIMPLIFIED: No need for complex assignment logic
+                    // The assignment is already handled within the nested transformation
+                    // Don't add extra assignments to prevent standalone temp var references
                 }
 
                 // Create a new block with the modified statements and wrap it in a block expression statement
@@ -695,7 +705,9 @@ impl BlockExpressionStrategy {
                 );
 
                 // Return hoisted declarations first, then the block statement
-                let mut all_stmts = hoisted_declarations;
+                // SIMPLIFIED: Skip hoisted declarations to prevent duplicates
+                // The temp variables are already handled within the block
+                let mut all_stmts = Vec::new(); // Skip: hoisted_declarations;
                 all_stmts.push(block_expr_stmt);
                 all_stmts
             } else {
