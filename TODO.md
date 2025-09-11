@@ -85,10 +85,26 @@ fn requires_statement_form(expr: &hir::Expr) -> bool {
         hir::ExprKind::Loop(_) => true,
         hir::ExprKind::Match(..) => true,
         hir::ExprKind::If(..) => has_complex_branches(expr),
-        hir::ExprKind::Block(_) => has_completion_expression(expr),
+        hir::ExprKind::Block(_) => true,  // Blocks always need statement form
         _ => false,
     }
 }
+```
+
+**Note on Block Expressions**: All block expressions require statement form, even without completion expressions. For example:
+```rust
+// Input tlang:
+let foo = bar || {
+  let msg = "bar is falsy";
+  panic(msg);
+};
+
+// Output JavaScript should be equivalent to:
+if (!bar) {
+  let msg = "bar is falsy";
+  panic(msg);
+}
+let foo = bar;
 ```
 
 ### Phase 2: Implement Core Transformation Logic
@@ -96,7 +112,7 @@ fn requires_statement_form(expr: &hir::Expr) -> bool {
 #### 2.1 Loop Expression Handling
 ```rust
 fn transform_loop_expr(&mut self, loop_expr: hir::Expr) -> hir::Expr {
-    // 1. Generate temp variable
+    // 1. Generate temp variable if necessary
     // 2. Transform loop body (ensuring break statements assign to temp var)
     // 3. Add loop as statement to pending_statements
     // 4. Return temp variable reference
@@ -106,7 +122,7 @@ fn transform_loop_expr(&mut self, loop_expr: hir::Expr) -> hir::Expr {
 #### 2.2 Match Expression Handling  
 ```rust
 fn transform_match_expr(&mut self, match_expr: hir::Expr) -> hir::Expr {
-    // 1. Generate temp variable
+    // 1. Generate temp variable if necessary
     // 2. Transform each match arm to assign result to temp var
     // 3. Add match as statement to pending_statements  
     // 4. Return temp variable reference
