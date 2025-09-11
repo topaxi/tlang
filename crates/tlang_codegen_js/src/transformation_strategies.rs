@@ -588,8 +588,7 @@ impl BlockExpressionStrategy {
             // Handle completion expression by adding assignment within the block
             if let Some(completion_expr) = block.expr {
                 // Check if the completion expression needs transformation first
-                // BUT: Do NOT create nested transformations for loops - they should be handled by the main transformer
-                let (processed_completion_expr, hoisted_declarations) = if Self::expression_needs_transformation(&completion_expr) && !matches!(&completion_expr.kind, hir::ExprKind::Loop(_)) {
+                let (processed_completion_expr, hoisted_declarations) = if Self::expression_needs_transformation(&completion_expr) {
 
                     // Check if this transformation involves loops BEFORE moving completion_expr
                     let involves_loops = Self::transformation_involves_loops(&completion_expr);
@@ -608,8 +607,9 @@ impl BlockExpressionStrategy {
                     
                     let result = temp_transformer.transform_expression(completion_expr, ctx);
                     
-                    // Synchronize the counter to avoid future collisions
-                    stmt_builder.temp_var_manager().set_counter(temp_transformer.current_counter());
+                    // FIXME: Counter synchronization is causing temp variable naming issues
+                    // For now, disable it to fix the immediate problem
+                    // stmt_builder.temp_var_manager().set_counter(temp_transformer.current_counter());
                     
                     // Extract temp variable declarations that need to be hoisted
                     // BUT: Do NOT hoist temp variables that are used within loop contexts
