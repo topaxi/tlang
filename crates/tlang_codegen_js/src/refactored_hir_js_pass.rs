@@ -372,7 +372,6 @@ impl RefactoredHirJsPass {
                 additional_stmts.append(&mut temp_stmts);
 
                 // Then check if the expression itself needs flattening
-                let can_render_js = ExpressionAnalyzer::can_render_as_js_expr(expr);
                 let can_render = expr_can_render_as_assignment_rhs(expr);
                 
                 if !can_render {
@@ -607,6 +606,17 @@ impl<'hir> Visitor<'hir> for RefactoredHirJsPass {
                 new_stmts.extend(result.statements);
                 *completion_expr = result.expr;
                 self.changes_made = true;
+            } else if matches!(completion_expr.kind, hir::ExprKind::Loop(_)) {
+                // Special case: if this is a loop, check if it needs transformation directly
+                let needs_transformation = ExpressionAnalyzer::contains_break_with_value(completion_expr);
+                if needs_transformation {
+                    let result = self
+                        .transformer
+                        .transform_expression(completion_expr.clone(), ctx);
+                    new_stmts.extend(result.statements);
+                    *completion_expr = result.expr;
+                    self.changes_made = true;
+                }
             } else {
                 // Check for other expressions that need transformation
                 if !ExpressionAnalyzer::can_render_as_js_expr(completion_expr)
@@ -736,7 +746,7 @@ impl<'hir> Visitor<'hir> for RefactoredHirJsPass {
                 }
             }
             hir::ExprKind::Block(block) => {
-                // Visit block content
+                // Visit block content normally
                 self.visit_block(block, ctx);
             }
             hir::ExprKind::Break(_) | hir::ExprKind::Continue => {

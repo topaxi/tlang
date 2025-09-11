@@ -590,6 +590,7 @@ impl BlockExpressionStrategy {
                 // Check if the completion expression needs transformation first
                 // BUT: Do NOT create nested transformations for loops - they should be handled by the main transformer
                 let (processed_completion_expr, hoisted_declarations) = if Self::expression_needs_transformation(&completion_expr) && !matches!(&completion_expr.kind, hir::ExprKind::Loop(_)) {
+
                     // Check if this transformation involves loops BEFORE moving completion_expr
                     let involves_loops = Self::transformation_involves_loops(&completion_expr);
                     
