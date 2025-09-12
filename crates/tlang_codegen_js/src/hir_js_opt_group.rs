@@ -9,7 +9,8 @@ use crate::anf_transformer::AnfTransformer;
 /// 2. AnfTransformer - converts complex expressions to ANF form with temp variables
 pub fn create_hir_js_opt_group() -> HirOptGroup {
     let passes: Vec<Box<dyn HirPass>> = vec![
-        Box::new(ReturnStatementPass::new()),
+        // TODO: Re-add ReturnStatementPass once ANF transformer is complete
+        // Box::new(ReturnStatementPass::new()),
         Box::new(AnfTransformer::new()),
     ];
 

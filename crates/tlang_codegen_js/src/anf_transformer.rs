@@ -12,12 +12,15 @@ use tlang_ast::node::Ident;
 /// ANF-like transformer that converts complex expressions to statements with temp variables
 pub struct AnfTransformer {
     counter: usize,
+    /// Track which blocks are function body blocks (should have completion transformed to return)
+    function_body_blocks: std::collections::HashSet<tlang_span::HirId>,
 }
 
 impl AnfTransformer {
     pub fn new() -> Self {
         Self {
             counter: 0,
+            function_body_blocks: std::collections::HashSet::new(),
         }
     }
 
@@ -93,10 +96,31 @@ impl AnfTransformer {
 
         // Transform completion expression if present
         if let Some(completion_expr) = &mut block.expr {
-            println!("DEBUG: Transforming completion expression: {:?}", completion_expr.kind);
-            println!("DEBUG: Needs transformation: {}", self.needs_transformation(completion_expr));
-            *completion_expr = self.transform_expression(completion_expr.clone(), ctx, &mut temp_declarations);
-            println!("DEBUG: Temp declarations after completion: {}", temp_declarations.len());
+            // Check if this is a function body block that should have return statements
+            if self.function_body_blocks.contains(&block.hir_id) {
+                // Transform to return statement
+                let transformed_expr = self.transform_expression(completion_expr.clone(), ctx, &mut temp_declarations);
+                
+                // Add temp declarations first
+                if !temp_declarations.is_empty() {
+                    temp_declarations.extend_from_slice(&block.stmts);
+                    block.stmts = temp_declarations;
+                }
+                
+                // Create return statement and add to the end of the block
+                let return_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Return(Some(Box::new(transformed_expr))),
+                    completion_expr.span,
+                );
+                
+                block.stmts.push(return_stmt);
+                block.expr = None; // Remove completion expression
+                return; // Early return to avoid adding temp_declarations again
+            } else {
+                // Normal completion expression transformation
+                *completion_expr = self.transform_expression(completion_expr.clone(), ctx, &mut temp_declarations);
+            }
         }
         
         // Add temp declarations at the beginning of the block
@@ -116,6 +140,9 @@ impl AnfTransformer {
                 *expr = Box::new(self.transform_expression(*expr.clone(), ctx, temp_declarations));
             }
             hir::StmtKind::FunctionDeclaration(func_decl) => {
+                // Mark the function body as a function body block (for return statement transformation)
+                self.function_body_blocks.insert(func_decl.body.hir_id);
+                
                 // Transform function body
                 self.transform_block(&mut func_decl.body, ctx);
             }
@@ -170,17 +197,8 @@ impl AnfTransformer {
         let temp_path = self.create_temp_path(ctx, &temp_name, expr.span);
         let temp_declaration = self.create_temp_declaration(ctx, &temp_name, expr.span);
         
-        println!("DEBUG: Creating temp variable '{}' for expression: {:?}", temp_name, match &expr.kind {
-            hir::ExprKind::Block(_) => "Block",
-            hir::ExprKind::Loop(_) => "Loop", 
-            hir::ExprKind::Match(_, _) => "Match",
-            hir::ExprKind::IfElse(_, _, _) => "IfElse",
-            _ => "Other"
-        });
-        
         // Add temp declaration
         temp_declarations.push(temp_declaration);
-        println!("DEBUG: Added temp declaration '{}', total temp declarations: {}", temp_name, temp_declarations.len());
         
         // Transform the expression based on its type
         match expr.kind {
@@ -200,10 +218,69 @@ impl AnfTransformer {
                 );
                 
                 temp_declarations.push(block_stmt);
-                println!("DEBUG: Added block statement for '{}', total temp declarations: {}", temp_name, temp_declarations.len());
                 temp_path
             }
-            // ... other cases remain the same for now
+            hir::ExprKind::Loop(mut body) => {
+                // Transform loop body to handle break statements with temp variables
+                self.transform_loop_body_for_temp_variable(&mut body, &temp_name, ctx);
+                
+                // Create the loop statement
+                let loop_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(hir::Expr {
+                        hir_id: expr.hir_id,
+                        kind: hir::ExprKind::Loop(body),
+                        span: expr.span,
+                    })),
+                    expr.span,
+                );
+                
+                temp_declarations.push(loop_stmt);
+                temp_path
+            }
+            hir::ExprKind::Match(scrutinee, mut arms) => {
+                // Transform each arm's block to assign to temp variable
+                for arm in &mut arms {
+                    self.transform_block_to_assign_to_temp(&mut arm.block, &temp_name, ctx);
+                }
+                
+                // Create the match statement
+                let match_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(hir::Expr {
+                        hir_id: expr.hir_id,
+                        kind: hir::ExprKind::Match(scrutinee, arms),
+                        span: expr.span,
+                    })),
+                    expr.span,
+                );
+                
+                temp_declarations.push(match_stmt);
+                temp_path
+            }
+            hir::ExprKind::IfElse(cond, mut then_block, mut else_clauses) => {
+                // Transform then block to assign to temp variable
+                self.transform_block_to_assign_to_temp(&mut then_block, &temp_name, ctx);
+                
+                // Transform else clauses to assign to temp variable
+                for else_clause in &mut else_clauses {
+                    self.transform_block_to_assign_to_temp(&mut else_clause.consequence, &temp_name, ctx);
+                }
+                
+                // Create the if statement
+                let if_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(hir::Expr {
+                        hir_id: expr.hir_id,
+                        kind: hir::ExprKind::IfElse(cond, Box::new(*then_block), else_clauses),
+                        span: expr.span,
+                    })),
+                    expr.span,
+                );
+                
+                temp_declarations.push(if_stmt);
+                temp_path
+            }
             _ => {
                 // For other expression types, just return the expression as-is
                 expr
@@ -318,6 +395,7 @@ impl HirPass for AnfTransformer {
     fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
         // Reset state
         self.counter = 0;
+        self.function_body_blocks.clear();
         
         // Transform the module's block
         self.transform_block(&mut module.block, ctx);
