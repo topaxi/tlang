@@ -1977,7 +1977,9 @@ fn test_handwritten_for_loop() {
             };
         }
     "#;
+    
     let hir = compile_and_apply_hir_js_pass(source);
+    
     assert_snapshot!(pretty_print(&hir), @r"
     fn test() -> unknown {
         let $hir$0: unknown = _;
@@ -1988,17 +1990,19 @@ fn test_handwritten_for_loop() {
             loop {
                 let sum: unknown = list_accumulator;
                 let $hir$2: unknown = _;
+                let $hir$0: unknown = _;
                 match list_iterator.next() {
                     Option::Some { 0: a } => {
-                        ($hir$2 = (sum + a));
+                        ($hir$0 = (sum + a));
                     },
                     Option::None => {
-                        ($hir$2 = list_accumulator);
+                        ($hir$0 = list_accumulator);
                         break;
                     },
                 };
-                (list_accumulator = $hir$2);
-                ($hir$1 = $hir$2);
+                (list_accumulator = $hir$0);
+                ($hir$2 = list_accumulator);
+                $hir$2
             };
             ($hir$0 = $hir$1);
         };
