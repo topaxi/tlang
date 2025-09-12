@@ -87,11 +87,16 @@ impl AnfTransformer {
 
     /// Transform expressions in a block
     fn transform_block(&mut self, block: &mut hir::Block, ctx: &mut HirOptContext) {
-        let mut temp_declarations = Vec::new();
+        let mut transformed_statements = Vec::new();
         
-        // Transform all statements
+        // Transform all statements in order, collecting temp declarations appropriately
         for stmt in &mut block.stmts {
-            self.transform_statement(stmt, ctx, &mut temp_declarations);
+            let mut stmt_temp_declarations = Vec::new();
+            self.transform_statement(stmt, ctx, &mut stmt_temp_declarations);
+            
+            // Add temp declarations immediately before the statement that needs them
+            transformed_statements.extend(stmt_temp_declarations);
+            transformed_statements.push(stmt.clone());
         }
 
         // Transform completion expression if present
@@ -99,13 +104,11 @@ impl AnfTransformer {
             // Check if this is a function body block that should have return statements
             if self.function_body_blocks.contains(&block.hir_id) {
                 // Transform to return statement
-                let transformed_expr = self.transform_expression(completion_expr.clone(), ctx, &mut temp_declarations);
+                let mut expr_temp_declarations = Vec::new();
+                let transformed_expr = self.transform_expression(completion_expr.clone(), ctx, &mut expr_temp_declarations);
                 
-                // Add temp declarations first
-                if !temp_declarations.is_empty() {
-                    temp_declarations.extend_from_slice(&block.stmts);
-                    block.stmts = temp_declarations;
-                }
+                // Add temp declarations before the return statement
+                transformed_statements.extend(expr_temp_declarations);
                 
                 // Create return statement and add to the end of the block
                 let return_stmt = hir::Stmt::new(
@@ -114,27 +117,35 @@ impl AnfTransformer {
                     completion_expr.span,
                 );
                 
-                block.stmts.push(return_stmt);
+                transformed_statements.push(return_stmt);
+                block.stmts = transformed_statements;
                 block.expr = None; // Remove completion expression
-                return; // Early return to avoid adding temp_declarations again
+                return; // Early return
             } else {
                 // Normal completion expression transformation
-                *completion_expr = self.transform_expression(completion_expr.clone(), ctx, &mut temp_declarations);
+                let mut expr_temp_declarations = Vec::new();
+                *completion_expr = self.transform_expression(completion_expr.clone(), ctx, &mut expr_temp_declarations);
+                
+                // Add temp declarations at the end of the existing statements
+                transformed_statements.extend(expr_temp_declarations);
             }
         }
         
-        // Add temp declarations at the beginning of the block
-        if !temp_declarations.is_empty() {
-            temp_declarations.extend_from_slice(&block.stmts);
-            block.stmts = temp_declarations;
-        }
+        // Update block statements with transformed ones
+        block.stmts = transformed_statements;
     }
 
     /// Transform a statement
     fn transform_statement(&mut self, stmt: &mut hir::Stmt, ctx: &mut HirOptContext, temp_declarations: &mut Vec<hir::Stmt>) {
         match &mut stmt.kind {
             hir::StmtKind::Let(_pattern, init, _ty) => {
-                *init = Box::new(self.transform_expression(*init.clone(), ctx, temp_declarations));
+                // Special handling for break expressions in let statements
+                if let hir::ExprKind::Break(Some(_)) = &init.kind {
+                    // Convert break expression to assignment + break statements
+                    self.transform_break_in_let_statement(stmt, ctx, temp_declarations);
+                } else {
+                    *init = Box::new(self.transform_expression(*init.clone(), ctx, temp_declarations));
+                }
             }
             hir::StmtKind::Expr(expr) => {
                 *expr = Box::new(self.transform_expression(*expr.clone(), ctx, temp_declarations));
@@ -290,53 +301,89 @@ impl AnfTransformer {
     
     /// Transform loop body to handle break statements with temp variables
     fn transform_loop_body_for_temp_variable(&mut self, body: &mut hir::Block, temp_name: &str, ctx: &mut HirOptContext) {
+        let mut new_statements = Vec::new();
+        
         // Transform all statements, looking for break statements
         for stmt in &mut body.stmts {
-            self.transform_statement_for_loop_temp(stmt, temp_name, ctx);
+            match &mut stmt.kind {
+                hir::StmtKind::Expr(expr) => {
+                    // Check for break expressions that need special handling
+                    if let hir::ExprKind::Break(Some(break_value)) = &expr.kind {
+                        // Convert `break value` to assignment + plain break
+                        let span = break_value.span;
+                        
+                        // Transform the break value
+                        let mut temp_declarations = Vec::new();
+                        let transformed_break_value = self.transform_expression(*break_value.clone(), ctx, &mut temp_declarations);
+                        new_statements.extend(temp_declarations);
+                        
+                        // Create assignment statement: temp_name = break_value
+                        let temp_path = self.create_temp_path(ctx, temp_name, span);
+                        let assignment = self.create_assignment_expression(temp_path, transformed_break_value);
+                        let assignment_stmt = hir::Stmt::new(
+                            ctx.hir_id_allocator.next_id(),
+                            hir::StmtKind::Expr(Box::new(assignment)),
+                            span,
+                        );
+                        new_statements.push(assignment_stmt);
+                        
+                        // Create plain break statement
+                        let plain_break_stmt = hir::Stmt::new(
+                            ctx.hir_id_allocator.next_id(),
+                            hir::StmtKind::Expr(Box::new(hir::Expr {
+                                hir_id: expr.hir_id,
+                                kind: hir::ExprKind::Break(None),
+                                span: expr.span,
+                            })),
+                            expr.span,
+                        );
+                        new_statements.push(plain_break_stmt);
+                    } else {
+                        self.transform_expression_for_loop_temp(expr, temp_name, ctx);
+                        new_statements.push(stmt.clone());
+                    }
+                }
+                _ => {
+                    // Regular transformation for other statement types
+                    let mut temp_declarations = Vec::new();
+                    self.transform_statement(stmt, ctx, &mut temp_declarations);
+                    new_statements.extend(temp_declarations);
+                    new_statements.push(stmt.clone());
+                }
+            }
         }
         
         // Transform completion expression if present
         if let Some(completion_expr) = &mut body.expr {
             self.transform_expression_for_loop_temp(completion_expr, temp_name, ctx);
         }
-    }
-    
-    /// Transform statements in loop context, handling break statements
-    fn transform_statement_for_loop_temp(&mut self, stmt: &mut hir::Stmt, temp_name: &str, ctx: &mut HirOptContext) {
-        match &mut stmt.kind {
-            hir::StmtKind::Expr(expr) => {
-                self.transform_expression_for_loop_temp(expr, temp_name, ctx);
-            }
-            _ => {
-                // Regular transformation for other statement types
-                let mut temp_declarations = Vec::new();
-                self.transform_statement(stmt, ctx, &mut temp_declarations);
-                // Note: We don't handle temp_declarations here as loops should be simple
-            }
-        }
+        
+        // Replace the body statements with the transformed ones
+        body.stmts = new_statements;
     }
     
     /// Transform expressions in loop context, handling break statements
     fn transform_expression_for_loop_temp(&mut self, expr: &mut hir::Expr, temp_name: &str, ctx: &mut HirOptContext) {
         match &mut expr.kind {
-            hir::ExprKind::Break(Some(break_expr)) => {
-                // Transform the break expression and ensure it assigns to temp variable
-                let mut temp_declarations = Vec::new();
-                let transformed_break_expr = self.transform_expression(*break_expr.clone(), ctx, &mut temp_declarations);
-                let temp_path = self.create_temp_path(ctx, temp_name, break_expr.span);
-                let assignment = self.create_assignment_expression(temp_path, transformed_break_expr);
-                
-                // Create a new break with the assignment
-                *expr = hir::Expr {
-                    hir_id: expr.hir_id,
-                    kind: hir::ExprKind::Break(Some(Box::new(assignment))),
-                    span: expr.span,
-                };
-            }
-            _ => {
-                // Regular transformation
+            hir::ExprKind::Match(_, _) | hir::ExprKind::Block(_) | hir::ExprKind::Loop(_) | hir::ExprKind::IfElse(_, _, _) => {
+                // Complex expressions in loop context - transform recursively
                 let mut temp_declarations = Vec::new();
                 *expr = self.transform_expression(expr.clone(), ctx, &mut temp_declarations);
+            }
+            _ => {
+                // Simple expressions - leave as is but recurse into children
+                match &mut expr.kind {
+                    hir::ExprKind::Binary(_, left, right) => {
+                        self.transform_expression_for_loop_temp(left, temp_name, ctx);
+                        self.transform_expression_for_loop_temp(right, temp_name, ctx);
+                    }
+                    hir::ExprKind::Call(call) => {
+                        for arg in &mut call.arguments {
+                            self.transform_expression_for_loop_temp(arg, temp_name, ctx);
+                        }
+                    }
+                    _ => {}
+                }
             }
         }
     }
@@ -384,6 +431,50 @@ impl AnfTransformer {
             block.expr = None;
         }
         // If no completion expression, no need to assign anything
+    }
+
+    /// Transform break expressions in let statements
+    /// Converts `let x = break value;` into `temp = value; break; let x = temp;`
+    fn transform_break_in_let_statement(&mut self, stmt: &mut hir::Stmt, ctx: &mut HirOptContext, temp_declarations: &mut Vec<hir::Stmt>) {
+        if let hir::StmtKind::Let(pattern, init_expr, ty) = &mut stmt.kind {
+            if let hir::ExprKind::Break(Some(break_value)) = &init_expr.kind {
+                // Generate temp variable for the break value
+                let temp_name = self.generate_temp_name();
+                let temp_declaration = self.create_temp_declaration(ctx, &temp_name, init_expr.span);
+                temp_declarations.push(temp_declaration);
+                
+                // Transform the break value
+                let mut break_temp_declarations = Vec::new();
+                let transformed_break_value = self.transform_expression(*break_value.clone(), ctx, &mut break_temp_declarations);
+                temp_declarations.extend(break_temp_declarations);
+                
+                // Create assignment statement: temp = break_value
+                let temp_path = self.create_temp_path(ctx, &temp_name, break_value.span);
+                let assignment = self.create_assignment_expression(temp_path.clone(), transformed_break_value);
+                let assignment_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(assignment)),
+                    break_value.span,
+                );
+                temp_declarations.push(assignment_stmt);
+                
+                // Create plain break statement
+                let plain_break = hir::Expr {
+                    hir_id: ctx.hir_id_allocator.next_id(),
+                    kind: hir::ExprKind::Break(None),
+                    span: init_expr.span,
+                };
+                let break_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(plain_break)),
+                    init_expr.span,
+                );
+                temp_declarations.push(break_stmt);
+                
+                // Update the let statement to use the temp variable
+                *init_expr = Box::new(temp_path);
+            }
+        }
     }
 }
 
