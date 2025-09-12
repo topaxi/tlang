@@ -139,13 +139,7 @@ impl AnfTransformer {
     fn transform_statement(&mut self, stmt: &mut hir::Stmt, ctx: &mut HirOptContext, temp_declarations: &mut Vec<hir::Stmt>) {
         match &mut stmt.kind {
             hir::StmtKind::Let(_pattern, init, _ty) => {
-                // Special handling for break expressions in let statements
-                if let hir::ExprKind::Break(Some(_)) = &init.kind {
-                    // Convert break expression to assignment + break statements
-                    self.transform_break_in_let_statement(stmt, ctx, temp_declarations);
-                } else {
-                    *init = Box::new(self.transform_expression(*init.clone(), ctx, temp_declarations));
-                }
+                *init = Box::new(self.transform_expression(*init.clone(), ctx, temp_declarations));
             }
             hir::StmtKind::Expr(expr) => {
                 *expr = Box::new(self.transform_expression(*expr.clone(), ctx, temp_declarations));
@@ -170,6 +164,7 @@ impl AnfTransformer {
             hir::ExprKind::Loop(_) => true,
             hir::ExprKind::Match(_, _) => true,
             hir::ExprKind::IfElse(_, _, _) => true,
+            hir::ExprKind::Break(Some(_)) => true, // Break with value needs transformation
             _ => false,
         }
     }
@@ -290,6 +285,37 @@ impl AnfTransformer {
                 );
                 
                 temp_declarations.push(if_stmt);
+                temp_path
+            }
+            hir::ExprKind::Break(Some(break_value)) => {
+                // Transform break expression: assign value to temp and then break
+                let mut break_temp_declarations = Vec::new();
+                let transformed_break_value = self.transform_expression(*break_value, ctx, &mut break_temp_declarations);
+                temp_declarations.extend(break_temp_declarations);
+                
+                // Create assignment statement: temp = break_value
+                let assignment = self.create_assignment_expression(temp_path.clone(), transformed_break_value);
+                let assignment_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(assignment)),
+                    expr.span,
+                );
+                temp_declarations.push(assignment_stmt);
+                
+                // Create plain break statement
+                let plain_break = hir::Expr {
+                    hir_id: ctx.hir_id_allocator.next_id(),
+                    kind: hir::ExprKind::Break(None),
+                    span: expr.span,
+                };
+                let break_stmt = hir::Stmt::new(
+                    ctx.hir_id_allocator.next_id(),
+                    hir::StmtKind::Expr(Box::new(plain_break)),
+                    expr.span,
+                );
+                temp_declarations.push(break_stmt);
+                
+                // Return the temp variable as the "result" (though this shouldn't be used in practice)
                 temp_path
             }
             _ => {
@@ -431,50 +457,6 @@ impl AnfTransformer {
             block.expr = None;
         }
         // If no completion expression, no need to assign anything
-    }
-
-    /// Transform break expressions in let statements
-    /// Converts `let x = break value;` into `temp = value; break; let x = temp;`
-    fn transform_break_in_let_statement(&mut self, stmt: &mut hir::Stmt, ctx: &mut HirOptContext, temp_declarations: &mut Vec<hir::Stmt>) {
-        if let hir::StmtKind::Let(pattern, init_expr, ty) = &mut stmt.kind {
-            if let hir::ExprKind::Break(Some(break_value)) = &init_expr.kind {
-                // Generate temp variable for the break value
-                let temp_name = self.generate_temp_name();
-                let temp_declaration = self.create_temp_declaration(ctx, &temp_name, init_expr.span);
-                temp_declarations.push(temp_declaration);
-                
-                // Transform the break value
-                let mut break_temp_declarations = Vec::new();
-                let transformed_break_value = self.transform_expression(*break_value.clone(), ctx, &mut break_temp_declarations);
-                temp_declarations.extend(break_temp_declarations);
-                
-                // Create assignment statement: temp = break_value
-                let temp_path = self.create_temp_path(ctx, &temp_name, break_value.span);
-                let assignment = self.create_assignment_expression(temp_path.clone(), transformed_break_value);
-                let assignment_stmt = hir::Stmt::new(
-                    ctx.hir_id_allocator.next_id(),
-                    hir::StmtKind::Expr(Box::new(assignment)),
-                    break_value.span,
-                );
-                temp_declarations.push(assignment_stmt);
-                
-                // Create plain break statement
-                let plain_break = hir::Expr {
-                    hir_id: ctx.hir_id_allocator.next_id(),
-                    kind: hir::ExprKind::Break(None),
-                    span: init_expr.span,
-                };
-                let break_stmt = hir::Stmt::new(
-                    ctx.hir_id_allocator.next_id(),
-                    hir::StmtKind::Expr(Box::new(plain_break)),
-                    init_expr.span,
-                );
-                temp_declarations.push(break_stmt);
-                
-                // Update the let statement to use the temp variable
-                *init_expr = Box::new(temp_path);
-            }
-        }
     }
 }
 
