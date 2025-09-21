@@ -11,10 +11,15 @@ path = "src/lib.rs"
 tlang_ast = { path = "../../tlang_ast" }
 tlang_hir = { path = "../../tlang_hir" }
 tlang_span = { path = "../../tlang_span" }
+tlang_gc = { path = "../tlang_gc", optional = true }
 inventory = { workspace = true }
 log = { workspace = true }
 slab = "0.4"
 smallvec = "1.15"
+
+[features]
+default = []
+gc = ["dep:tlang_gc"]
 
 [lints]
 workspace = true

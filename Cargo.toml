@@ -4,6 +4,7 @@ members = [
   "crates/tlang_runtime/tlang_stdlib",
   "crates/tlang_runtime/tlang_interpreter",
   "crates/tlang_runtime/tlang_gc",
+  "crates/tlang_runtime/tlang_gc_integration",
   "crates/*",
 ]
 exclude = ["crates/tlang_runtime"]
