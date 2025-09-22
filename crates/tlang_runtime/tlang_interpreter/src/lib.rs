@@ -15,7 +15,7 @@ use tlang_memory::value::object::TlangEnum;
 use tlang_memory::{InterpreterState, NativeFnReturn, Resolver, scope};
 
 #[cfg(feature = "gc")]
-use tlang_gc_integration::GcInterpreterState;
+use tlang_gc::GcConfig;
 use tlang_memory::{prelude::*, state};
 use tlang_span::HirId;
 use tlang_symbols::SymbolType;
@@ -54,10 +54,7 @@ pub enum MatchResult {
 }
 
 pub struct Interpreter {
-    #[cfg(not(feature = "gc"))]
     state: InterpreterState,
-    #[cfg(feature = "gc")]
-    state: GcInterpreterState,
 }
 
 impl Resolver for Interpreter {
@@ -117,10 +114,7 @@ impl Interpreter {
     /// # Panics
     pub fn new() -> Self {
         let mut interpreter = Self {
-            #[cfg(not(feature = "gc"))]
             state: InterpreterState::default(),
-            #[cfg(feature = "gc")]
-            state: GcInterpreterState::default(),
         };
 
         interpreter.init_stdlib();
@@ -139,9 +133,9 @@ impl Interpreter {
 
     /// Create a new interpreter with custom GC configuration (only available with gc feature)
     #[cfg(feature = "gc")]
-    pub fn with_gc_config(gc_config: tlang_gc::GcConfig) -> Self {
+    pub fn with_gc_config(gc_config: GcConfig) -> Self {
         let mut interpreter = Self {
-            state: GcInterpreterState::with_gc_config(gc_config),
+            state: InterpreterState::with_gc_config(gc_config),
         };
 
         interpreter.init_stdlib();
@@ -192,23 +186,11 @@ impl Interpreter {
     #[cfg(not(feature = "stdlib"))]
     pub fn init_stdlib(&mut self) {}
 
-    #[cfg(not(feature = "gc"))]
     pub fn state(&self) -> &InterpreterState {
         &self.state
     }
 
-    #[cfg(feature = "gc")]
-    pub fn state(&self) -> &GcInterpreterState {
-        &self.state
-    }
-
-    #[cfg(not(feature = "gc"))]
     pub fn state_mut(&mut self) -> &mut InterpreterState {
-        &mut self.state
-    }
-
-    #[cfg(feature = "gc")]
-    pub fn state_mut(&mut self) -> &mut GcInterpreterState {
         &mut self.state
     }
 

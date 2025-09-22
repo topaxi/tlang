@@ -7,6 +7,9 @@ use smallvec::SmallVec;
 use tlang_hir::hir;
 use tlang_span::HirId;
 
+#[cfg(feature = "gc")]
+use tlang_gc::{GcCollector, GcConfig, GcRootProvider, GcTracer};
+
 use crate::resolver::Resolver;
 use crate::scope::{Scope, ScopeStack};
 use crate::shape::{
@@ -218,7 +221,10 @@ pub struct NativeFnMeta {
 pub struct InterpreterState {
     pub scope_stack: ScopeStack,
     closures: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
+    #[cfg(not(feature = "gc"))]
     objects: Slab<TlangObjectKind>,
+    #[cfg(feature = "gc")]
+    gc_heap: GcCollector<TlangObjectKind>,
     shapes: HashMap<ShapeKey, TlangShape>,
     fn_decls: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
     struct_decls: HashMap<String, Rc<hir::StructDeclaration>>,
@@ -265,7 +271,37 @@ impl InterpreterState {
         Self {
             scope_stack: ScopeStack::default(),
             closures: HashMap::with_capacity(100),
+            #[cfg(not(feature = "gc"))]
             objects: Slab::with_capacity(1000),
+            #[cfg(feature = "gc")]
+            gc_heap: GcCollector::new_default(),
+            struct_decls: HashMap::with_capacity(100),
+            enum_decls: HashMap::with_capacity(100),
+            fn_decls: HashMap::with_capacity(1000),
+            shapes: HashMap::with_capacity(100),
+            call_stack,
+            globals: HashMap::with_capacity(100),
+            builtin_shapes: BuiltinShapes::default(),
+            native_fns: HashMap::with_capacity(100),
+            native_fns_meta: HashMap::with_capacity(100),
+        }
+    }
+
+    /// Create a new interpreter state with custom GC configuration (only available with gc feature)
+    #[cfg(feature = "gc")]
+    pub fn with_gc_config(gc_config: GcConfig) -> Self {
+        let mut call_stack = Vec::with_capacity(1000);
+
+        call_stack.push(CallStackEntry {
+            kind: CallStackKind::Root,
+            tail_call: None,
+            current_span: tlang_span::Span::default(),
+        });
+
+        Self {
+            scope_stack: ScopeStack::default(),
+            closures: HashMap::with_capacity(100),
+            gc_heap: GcCollector::new_mark_sweep(gc_config),
             struct_decls: HashMap::with_capacity(100),
             enum_decls: HashMap::with_capacity(100),
             fn_decls: HashMap::with_capacity(1000),
@@ -398,7 +434,22 @@ impl InterpreterState {
     }
 
     pub fn new_object(&mut self, kind: TlangObjectKind) -> TlangValue {
-        TlangValue::new_object(self.objects.insert(kind))
+        #[cfg(not(feature = "gc"))]
+        {
+            TlangValue::new_object(self.objects.insert(kind))
+        }
+        #[cfg(feature = "gc")]
+        {
+            // Create a temporary root provider to avoid borrowing conflicts
+            let root_provider = TempRootProvider {
+                scope_stack: &self.scope_stack,
+                globals: &self.globals,
+                call_stack: &self.call_stack,
+            };
+            
+            let handle = self.gc_heap.allocate_with_gc(kind, &root_provider);
+            TlangValue::new_object(handle)
+        }
     }
 
     pub fn new_enum(
@@ -471,12 +522,26 @@ impl InterpreterState {
 
     #[inline(always)]
     pub fn get_object_by_id_mut(&mut self, id: TlangObjectId) -> Option<&mut TlangObjectKind> {
-        self.objects.get_mut(id)
+        #[cfg(not(feature = "gc"))]
+        {
+            self.objects.get_mut(id)
+        }
+        #[cfg(feature = "gc")]
+        {
+            self.gc_heap.get_mut(id)
+        }
     }
 
     #[inline(always)]
     pub fn get_object_by_id(&self, id: TlangObjectId) -> Option<&TlangObjectKind> {
-        self.objects.get(id)
+        #[cfg(not(feature = "gc"))]
+        {
+            self.objects.get(id)
+        }
+        #[cfg(feature = "gc")]
+        {
+            self.gc_heap.get(id)
+        }
     }
 
     pub fn get_object(&self, value: TlangValue) -> Option<&TlangObjectKind> {
@@ -752,5 +817,125 @@ impl InterpreterState {
 impl Default for InterpreterState {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Temporary root provider to avoid borrowing conflicts
+#[cfg(feature = "gc")]
+struct TempRootProvider<'a> {
+    scope_stack: &'a ScopeStack,
+    globals: &'a HashMap<String, TlangValue>,
+    call_stack: &'a [CallStackEntry],
+}
+
+#[cfg(feature = "gc")]
+impl<'a> GcRootProvider for TempRootProvider<'a> {
+    fn trace_roots(&self, tracer: &mut dyn GcTracer) {
+        // Trace global variables
+        for value in self.globals.values() {
+            if let Some(object_id) = value.get_object_id() {
+                tracer.mark_object(object_id);
+            }
+        }
+
+        // Trace scope stack variables
+        trace_scope_stack(self.scope_stack, tracer);
+
+        // Trace call stack (closures in native functions, etc.)
+        for entry in self.call_stack {
+            if let Some(tail_call) = &entry.tail_call {
+                if let Some(object_id) = tail_call.callee.get_object_id() {
+                    tracer.mark_object(object_id);
+                }
+                for arg in &tail_call.args {
+                    if let Some(object_id) = arg.get_object_id() {
+                        tracer.mark_object(object_id);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Implement GcRootProvider for InterpreterState when GC feature is enabled
+#[cfg(feature = "gc")]
+impl GcRootProvider for InterpreterState {
+    fn trace_roots(&self, tracer: &mut dyn GcTracer) {
+        // Trace global variables
+        for value in self.globals.values() {
+            if let Some(object_id) = value.get_object_id() {
+                tracer.mark_object(object_id);
+            }
+        }
+
+        // Trace scope stack variables
+        trace_scope_stack(&self.scope_stack, tracer);
+
+        // Trace call stack (closures in native functions, etc.)
+        for entry in &self.call_stack {
+            if let Some(tail_call) = &entry.tail_call {
+                if let Some(object_id) = tail_call.callee.get_object_id() {
+                    tracer.mark_object(object_id);
+                }
+                for arg in &tail_call.args {
+                    if let Some(object_id) = arg.get_object_id() {
+                        tracer.mark_object(object_id);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Helper function to trace all values in the scope stack
+#[cfg(feature = "gc")]
+fn trace_scope_stack(scope_stack: &ScopeStack, tracer: &mut dyn GcTracer) {
+    // For each scope, we need to trace its local variables
+    for scope in &scope_stack.scopes {
+        // Get the local variables for this scope
+        let locals = scope_stack.get_scope_locals(scope);
+        
+        // Trace all values in this scope
+        for value in locals {
+            if let Some(object_id) = value.get_object_id() {
+                tracer.mark_object(object_id);
+            }
+        }
+    }
+}
+
+/// GC-specific methods (only available when gc feature is enabled)
+#[cfg(feature = "gc")]
+impl InterpreterState {
+    /// Force a garbage collection cycle
+    pub fn collect_garbage(&mut self) {
+        let root_provider = TempRootProvider {
+            scope_stack: &self.scope_stack,
+            globals: &self.globals,
+            call_stack: &self.call_stack,
+        };
+        
+        let result = self.gc_heap.force_collect(&root_provider);
+        log::info!(
+            "GC: Collected {} objects ({} bytes) in {}μs", 
+            result.objects_collected,
+            result.bytes_freed,
+            result.duration_micros
+        );
+    }
+
+    /// Get GC statistics
+    pub fn gc_stats(&self) -> &tlang_gc::GcStats {
+        self.gc_heap.stats()
+    }
+
+    /// Get number of objects currently in GC heap
+    pub fn object_count(&self) -> usize {
+        self.gc_heap.object_count()
+    }
+
+    /// Get total allocated bytes in GC heap
+    pub fn allocated_bytes(&self) -> usize {
+        self.gc_heap.allocated_bytes()
     }
 }

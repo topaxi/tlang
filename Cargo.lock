@@ -880,18 +880,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tlang_gc_integration"
-version = "0.1.0"
-dependencies = [
- "log",
- "smallvec",
- "tlang_gc",
- "tlang_hir",
- "tlang_memory",
- "tlang_span",
-]
-
-[[package]]
 name = "tlang_hir"
 version = "0.1.0"
 dependencies = [
@@ -945,7 +933,7 @@ dependencies = [
  "smallvec",
  "tlang_ast",
  "tlang_ast_lowering",
- "tlang_gc_integration",
+ "tlang_gc",
  "tlang_hir",
  "tlang_hir_opt",
  "tlang_macros",
