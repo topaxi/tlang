@@ -13,6 +13,9 @@ use tlang_memory::state::TailCall;
 use tlang_memory::value::TlangArithmetic;
 use tlang_memory::value::object::TlangEnum;
 use tlang_memory::{InterpreterState, NativeFnReturn, Resolver, scope};
+
+#[cfg(feature = "gc")]
+use tlang_gc::GcConfig;
 use tlang_memory::{prelude::*, state};
 use tlang_span::HirId;
 use tlang_symbols::SymbolType;
@@ -126,6 +129,51 @@ impl Interpreter {
         );
 
         interpreter
+    }
+
+    /// Create a new interpreter with custom GC configuration (only available with gc feature)
+    #[cfg(feature = "gc")]
+    pub fn with_gc_config(gc_config: GcConfig) -> Self {
+        let mut interpreter = Self {
+            state: InterpreterState::with_gc_config(gc_config),
+        };
+
+        interpreter.init_stdlib();
+
+        for native_fn_def in inventory::iter::<NativeFnDef> {
+            interpreter.define_native_fn(&native_fn_def.name(), native_fn_def.fn_ptr());
+        }
+
+        interpreter.state.set_global(
+            "math::pi".to_string(),
+            TlangValue::F64(std::f64::consts::PI),
+        );
+
+        interpreter
+    }
+
+    /// Force garbage collection (only available with gc feature)
+    #[cfg(feature = "gc")]
+    pub fn collect_garbage(&mut self) {
+        self.state.collect_garbage();
+    }
+
+    /// Get garbage collection statistics (only available with gc feature)
+    #[cfg(feature = "gc")]
+    pub fn gc_stats(&self) -> &tlang_gc::GcStats {
+        self.state.gc_stats()
+    }
+
+    /// Get the number of objects in the GC heap (only available with gc feature)
+    #[cfg(feature = "gc")]
+    pub fn object_count(&self) -> usize {
+        self.state.object_count()
+    }
+
+    /// Get the total allocated bytes in the GC heap (only available with gc feature)
+    #[cfg(feature = "gc")]
+    pub fn allocated_bytes(&self) -> usize {
+        self.state.allocated_bytes()
     }
 
     #[cfg(feature = "stdlib")]
