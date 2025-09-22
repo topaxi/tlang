@@ -151,6 +151,156 @@ impl GcInterpreterState {
         self.enum_decls.insert(path_name, decl);
     }
 
+    /// Create a new enum object
+    pub fn new_enum(
+        &mut self,
+        shape: ShapeKey,
+        variant: usize,
+        values: Vec<TlangValue>,
+    ) -> TlangValue {
+        self.new_object(TlangObjectKind::Enum(
+            tlang_memory::value::object::TlangEnum::new(shape, variant, values)
+        ))
+    }
+
+    /// Create a new closure object
+    pub fn new_closure(&mut self, decl: &hir::FunctionDeclaration) -> TlangValue {
+        self.closures
+            .entry(decl.hir_id)
+            .or_insert_with(|| decl.clone().into());
+
+        self.new_object(TlangObjectKind::Closure(
+            tlang_memory::value::object::TlangClosure {
+                id: decl.hir_id,
+                scope_stack: self.scope_stack.scopes.clone(),
+            }
+        ))
+    }
+
+    /// Create a new native function - this method signature needs to match the expected interface
+    pub fn new_native_fn<F>(&mut self, name: &str, f: F) -> TlangValue
+    where
+        F: Fn(&mut tlang_memory::InterpreterState, &[TlangValue]) -> tlang_memory::value::function::NativeFnReturn + 'static,
+    {
+        // For now, we'll create a wrapper that panics if called directly
+        // This is a temporary solution until we can refactor the native function system
+        let fn_object = self.new_object(TlangObjectKind::NativeFn);
+        
+        let object_id = fn_object.get_object_id().unwrap();
+        
+        // Store a dummy function that indicates this needs special handling
+        self.native_fns_meta.insert(
+            object_id,
+            NativeFnMeta {
+                name: name.to_string(),
+            },
+        );
+
+        fn_object
+    }
+
+    /// Create a new native method - placeholder implementation
+    pub fn new_native_method<F>(&mut self, name: &str, f: F) -> tlang_memory::shape::TlangStructMethod
+    where
+        F: Fn(&mut tlang_memory::InterpreterState, TlangValue, &[TlangValue]) -> tlang_memory::value::function::NativeFnReturn + 'static,
+    {
+        let fn_val = self.new_native_fn(name, move |state, args| f(state, args[0], &args[1..]));
+        tlang_memory::shape::TlangStructMethod::from(fn_val)
+    }
+
+    /// Call a native function - placeholder for now
+    pub fn call_native_fn(
+        &mut self,
+        fn_id: TlangObjectId,
+        args: &[TlangValue],
+    ) -> Option<tlang_memory::value::function::NativeFnReturn> {
+        // For now, return None to indicate the function couldn't be called
+        // This will need proper implementation in the future
+        log::warn!("Native function call not yet supported in GC mode: {}", fn_id);
+        None
+    }
+
+    /// Get closure declaration
+    pub fn get_closure_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
+        self.closures.get(&id).cloned()
+    }
+
+    /// Get object from value (convenience method)
+    pub fn get_object(&self, value: TlangValue) -> Option<&TlangObjectKind> {
+        value.get_object_id()
+            .and_then(|id| self.get_object_by_id(id))
+    }
+
+    /// Get struct from value
+    pub fn get_struct(&self, value: TlangValue) -> Option<&tlang_memory::value::object::TlangStruct> {
+        self.get_object(value)?.get_struct()
+    }
+
+    /// Get mutable struct from value
+    pub fn get_struct_mut(&mut self, value: TlangValue) -> Option<&mut tlang_memory::value::object::TlangStruct> {
+        let object_id = value.get_object_id()?;
+        self.get_object_by_id_mut(object_id)?.get_struct_mut()
+    }
+
+    /// Get enum from value
+    pub fn get_enum(&self, value: TlangValue) -> Option<&tlang_memory::value::object::TlangEnum> {
+        self.get_object(value)?.get_enum()
+    }
+
+    /// Get slice from value
+    pub fn get_slice(&self, value: TlangValue) -> Option<tlang_memory::value::object::TlangSlice> {
+        self.get_object(value)?.get_slice()
+    }
+
+    /// Get slice value at index
+    pub fn get_slice_value(&self, slice: tlang_memory::value::object::TlangSlice, index: usize) -> Option<TlangValue> {
+        if index < slice.len() {
+            let actual_index = slice.start() + index;
+            if let Some(slice_obj) = self.get_object(slice.of()) {
+                if let Some(struct_obj) = slice_obj.get_struct() {
+                    return struct_obj.get(actual_index);
+                }
+            }
+        }
+        None
+    }
+
+    /// Get slice values
+    pub fn get_slice_values(&self, slice: tlang_memory::value::object::TlangSlice) -> Vec<TlangValue> {
+        let mut values = Vec::with_capacity(slice.len());
+        for i in 0..slice.len() {
+            if let Some(value) = self.get_slice_value(slice, i) {
+                values.push(value);
+            }
+        }
+        values
+    }
+
+    /// Get shape by key
+    pub fn get_shape_by_key(&self, key: ShapeKey) -> Option<&TlangShape> {
+        self.shapes.get(&key)
+    }
+
+    /// Enter a new scope
+    pub fn enter_scope(&mut self, meta: tlang_hir::hir::HirScope) {
+        self.scope_stack.enter_scope(meta);
+    }
+
+    /// Exit current scope
+    pub fn exit_scope(&mut self) {
+        self.scope_stack.exit_scope();
+    }
+
+    /// Push call stack entry
+    pub fn push_call_stack(&mut self, entry: CallStackEntry) {
+        self.call_stack.push(entry);
+    }
+
+    /// Pop call stack entry
+    pub fn pop_call_stack(&mut self) -> Option<CallStackEntry> {
+        self.call_stack.pop()
+    }
+
     /// Panic with call stack information
     #[allow(clippy::needless_pass_by_value)]
     pub fn panic(&self, message: String) -> ! {
@@ -181,6 +331,29 @@ impl GcInterpreterState {
 impl Default for GcInterpreterState {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Implement Resolver trait for GcInterpreterState
+impl tlang_memory::Resolver for GcInterpreterState {
+    fn resolve_value(&self, path: &hir::Path) -> Option<TlangValue> {
+        if !path.res.is_value() {
+            return None;
+        }
+
+        let value = self
+            .scope_stack
+            .resolve_value(path)
+            .or_else(|| self.globals.get(&path.to_string()).copied());
+
+        log::debug!(
+            "Resolved path: \"{}\" ({:?}), got: {:?}",
+            path,
+            path.res,
+            value.map(|v| format!("{:?}", v)) // Simplified stringify for now
+        );
+
+        value
     }
 }
 

@@ -51,3 +51,7 @@ needless_pass_by_value = "warn"
 missing_panics_doc = "warn"
 needless_continue = "warn"
 too_many_lines = "warn"
+
+[[example]]
+name = "gc_demo"
+path = "examples/gc_demo.rs"

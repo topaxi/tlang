@@ -945,6 +945,7 @@ dependencies = [
  "smallvec",
  "tlang_ast",
  "tlang_ast_lowering",
+ "tlang_gc_integration",
  "tlang_hir",
  "tlang_hir_opt",
  "tlang_macros",

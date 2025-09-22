@@ -16,6 +16,7 @@ required-features = ["binary"]
 default = ["stdlib"]
 binary = ["tlang_ast_lowering"]
 stdlib = ["dep:tlang_stdlib"]
+gc = ["dep:tlang_gc_integration", "tlang_memory/gc"]
 
 [dependencies]
 tlang_ast = { path = "../../tlang_ast" }
@@ -28,6 +29,7 @@ tlang_span = { path = "../../tlang_span" }
 tlang_symbols = { path = "../../tlang_symbols" }
 tlang_memory = { path = "../tlang_memory" }
 tlang_stdlib = { path = "../tlang_stdlib", optional = true }
+tlang_gc_integration = { path = "../tlang_gc_integration", optional = true }
 tlang_hir_opt = { path = "../../tlang_hir_opt" }
 log = { workspace = true }
 env_logger = { workspace = true }
