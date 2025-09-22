@@ -20,7 +20,7 @@ fn factorial_helper#290(num, acc)
 fn factorial_helper#290(num, acc)
 
 
-thread 'main' panicked at crates/tlang_runtime/tlang_memory/src/state.rs:328:9:
+thread 'main' panicked at crates/tlang_runtime/tlang_memory/src/state.rs:[LINE]:[COLUMN]:
 Function `"anonymous"` expects 1 arguments, but got 0
   at root 141:1
 

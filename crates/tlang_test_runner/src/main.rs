@@ -58,6 +58,11 @@ mod tests {
             .expect("Failed to compile ID tag redaction regex")
     });
 
+    static FILE_LINE_COLUMN_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(\w+\.rs):\d+:\d+:")
+            .expect("Failed to compile file line/column redaction regex")
+    });
+
     #[derive(Clone, Copy)]
     enum Backend {
         Interpreter,
@@ -242,6 +247,9 @@ mod tests {
 
         // Redact specific internal IDs that may vary between runs
         result = ID_TAG_RE.replace_all(&result, "$1([ID])").into_owned();
+
+        // Redact line and column numbers after file names in panic messages
+        result = FILE_LINE_COLUMN_RE.replace_all(&result, "$1:[LINE]:[COLUMN]:").into_owned();
 
         result
     }
