@@ -40,9 +40,5 @@ ctor = { workspace = true }
 indoc = { workspace = true }
 pretty_assertions = { workspace = true }
 
-[[bench]]
-name = "interpreter_benchmark"
-harness = false
-
 [lints]
 workspace = true
