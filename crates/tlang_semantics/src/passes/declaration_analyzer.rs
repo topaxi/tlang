@@ -33,7 +33,7 @@ impl DeclarationAnalyzer {
         debug!("Entering new scope for node: {}", node_id);
 
         let parent = self.current_symbol_table().clone();
-        let new_symbol_table = Rc::new(RefCell::new(SymbolTable::new(parent)));
+        let new_symbol_table = Rc::new(RefCell::new(SymbolTable::new_child(parent)));
         ctx.symbol_tables.insert(node_id, new_symbol_table.clone());
         self.symbol_table_stack.push(new_symbol_table.clone());
 
@@ -43,7 +43,13 @@ impl DeclarationAnalyzer {
     fn pop_symbol_table(&mut self) -> Rc<RefCell<SymbolTable>> {
         debug!("Leaving scope");
 
-        self.symbol_table_stack.pop().unwrap()
+        let child_table = self.symbol_table_stack.pop().unwrap();
+        
+        // Do NOT update parent scope size to include child symbols
+        // This would break scope isolation - child scope symbols should not be
+        // accessible from parent scopes
+        
+        child_table
     }
 
     #[inline(always)]
@@ -60,9 +66,10 @@ impl DeclarationAnalyzer {
         let symbol_info =
             SymbolInfo::new(id, name, symbol_type, defined_at, scope_start).with_node_id(node_id);
 
-        debug!("Declaring symbol: {:#?}", symbol_info);
-
-        self.current_symbol_table().borrow_mut().insert(symbol_info);
+        let returned_id = self.current_symbol_table().borrow_mut().insert(symbol_info);
+        
+        // The returned ID should match the original ID for proper lookup
+        assert_eq!(returned_id, id, "ID mismatch in storage!");
     }
 }
 
@@ -127,11 +134,22 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                 );
 
                 for element in &decl.variants {
+                    // Calculate arity for enum variant:
+                    // - For positional parameters (e.g., Foo(x, y)), arity = number of parameters
+                    // - For named parameters (e.g., Foo { x, y }), arity = 1 (takes single object)
+                    let arity = if element.parameters.is_empty() {
+                        0 // No parameters
+                    } else if element.parameters[0].name.as_str().chars().all(|c| c.is_ascii_digit()) {
+                        element.parameters.len() as u16 // Positional parameters (numbered field names)
+                    } else {
+                        1 // Named parameters (takes single object)
+                    };
+                    
                     self.declare_symbol(
                         ctx,
                         element.id,
                         &(decl.name.to_string() + "::" + element.name.as_str()),
-                        SymbolType::EnumVariant(element.parameters.len() as u16),
+                        SymbolType::EnumVariant(arity),
                         element.span,
                         element.span.end,
                     );

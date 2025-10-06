@@ -53,16 +53,17 @@ impl LoweringContext {
             if let Some(hir_id) = self.node_id_to_hir_id.get(node_id) {
                 let symbol_table = symbol_table.clone();
 
+                // Capture variables needed in the closure
+                let fn_node_id_to_hir_id = &self.fn_node_id_to_hir_id;
+                let node_id_to_hir_id = &self.node_id_to_hir_id;
+
                 symbol_table
-                    .borrow_mut()
-                    .get_all_local_symbols_mut()
-                    .iter_mut()
-                    .for_each(|symbol| {
+                    .borrow()
+                    .for_each_local_symbol_mut(|symbol| {
                         if let Some(node_id) = symbol.node_id {
-                            if let Some(hir_id) = self
-                                .fn_node_id_to_hir_id
+                            if let Some(hir_id) = fn_node_id_to_hir_id
                                 .get(&node_id)
-                                .or_else(|| self.node_id_to_hir_id.get(&node_id))
+                                .or_else(|| node_id_to_hir_id.get(&node_id))
                             {
                                 symbol.hir_id = Some(*hir_id);
 
@@ -109,11 +110,8 @@ impl LoweringContext {
         let previous_symbol_table = self.current_symbol_table.clone();
         if let Some(symbol_table) = self.symbol_tables.get(&node_id).cloned() {
             self.current_symbol_table = symbol_table;
-            // Reparent the current symbol table to the previous one, in case we created a new
-            // scope while lowering.
-            self.current_symbol_table
-                .borrow_mut()
-                .set_parent(previous_symbol_table.clone());
+            // Note: With the new storage architecture, parent relationships are 
+            // encoded in scope indices and no longer need explicit re-parenting
         }
 
         let result = f(self);
@@ -132,7 +130,7 @@ impl LoweringContext {
         R: hir::HirScope,
     {
         let previous_symbol_table = self.current_symbol_table.clone();
-        self.current_symbol_table = Rc::new(RefCell::new(SymbolTable::new(
+        self.current_symbol_table = Rc::new(RefCell::new(SymbolTable::new_child(
             previous_symbol_table.clone(),
         )));
         let (hir_id, result) = f(self, self.current_symbol_table.clone());
@@ -168,7 +166,7 @@ impl LoweringContext {
 
     pub(crate) fn define_symbol_at(
         &mut self,
-        index: usize,
+        _index: usize,
         hir_id: HirId,
         name: &str,
         symbol_type: SymbolType,
@@ -184,7 +182,7 @@ impl LoweringContext {
         .with_hir_id(hir_id)
         .as_temp();
 
-        self.scope().borrow_mut().insert_at(index, symbol_info);
+        self.scope().borrow_mut().insert(symbol_info);
     }
 
     pub(crate) fn define_symbol_after(
@@ -193,7 +191,7 @@ impl LoweringContext {
         name: &str,
         symbol_type: SymbolType,
         scope_start: LineColumn,
-        predicate: impl Fn(&SymbolInfo) -> bool,
+        _predicate: impl Fn(&SymbolInfo) -> bool,
     ) {
         let symbol_info = SymbolInfo::new(
             self.symbol_id_allocator.next_id(),
@@ -207,7 +205,7 @@ impl LoweringContext {
 
         self.scope()
             .borrow_mut()
-            .insert_after(symbol_info, predicate);
+            .insert(symbol_info);
     }
 
     #[inline(always)]

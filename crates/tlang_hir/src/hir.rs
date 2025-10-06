@@ -79,7 +79,7 @@ impl From<SymbolType> for BindingKind {
             SymbolType::EnumVariant(_) => BindingKind::Variant,
             SymbolType::Function(_) | SymbolType::FunctionSelfRef(_) => BindingKind::Fn,
             SymbolType::Parameter => BindingKind::Param,
-            SymbolType::Module => todo!(),
+            SymbolType::Module => BindingKind::Local, // Modules act like local bindings
         }
     }
 }

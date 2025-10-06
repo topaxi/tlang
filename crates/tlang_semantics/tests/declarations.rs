@@ -576,3 +576,35 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
         ]
     );
 }
+
+#[test]
+fn debug_closure_symbol_placement() {
+    let (analyzer, ast) = analyze!(
+        "
+        fn make_adder(a: Int) {
+            return fn adder(b: Int) -> Int {
+                a + b
+            };
+        }
+
+        let add_5 = make_adder(5);
+        "
+    );
+
+    let program_symbols = analyzer
+        .get_symbol_table(ast.id)
+        .expect("Program to have a symbol_table")
+        .clone();
+
+    println!("PROGRAM SCOPE DEBUG:");
+    println!("Scope info: {}", program_symbols.borrow().debug_scope_info());
+    println!("All symbols: {}", program_symbols.borrow().debug_all_symbols());
+    
+    // Check if add_5 is in the program scope
+    let add_5_symbols = program_symbols.borrow().get_by_name("add_5");
+    println!("add_5 symbols found: {:?}", add_5_symbols);
+    
+    // Check if make_adder is in the program scope  
+    let make_adder_symbols = program_symbols.borrow().get_by_name("make_adder");
+    println!("make_adder symbols found: {:?}", make_adder_symbols);
+}
