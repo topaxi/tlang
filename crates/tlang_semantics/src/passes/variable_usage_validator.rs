@@ -424,6 +424,7 @@ fn levenshtein_distance(a: &str, b: &str) -> usize {
     for i in 0..=a.len() {
         matrix[i][0] = i;
     }
+    #[allow(clippy::needless_range_loop)]
     for j in 0..=b.len() {
         matrix[0][j] = j;
     }
