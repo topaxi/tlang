@@ -81,10 +81,10 @@ impl BuiltinShapes {
         let list_iterator = Self::create_list_iterator_shape(&mut store);
 
         Self {
-            option,
-            result,
             list,
             list_iterator,
+            option,
+            result,
             store,
         }
     }
@@ -694,7 +694,7 @@ impl InterpreterState {
         match value {
             TlangValue::Object(id) => match self.get_object_by_id(id) {
                 None => value.to_string(),
-                Some(TlangObjectKind::String(s)) => s.to_string(),
+                Some(TlangObjectKind::String(s)) => s.clone(),
                 Some(TlangObjectKind::Struct(s)) => self.stringify_struct(s),
                 Some(TlangObjectKind::Enum(e)) => self.stringify_enum(e),
                 Some(TlangObjectKind::Slice(s)) => {

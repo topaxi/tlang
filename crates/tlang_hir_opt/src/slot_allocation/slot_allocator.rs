@@ -65,7 +65,7 @@ impl SlotAllocator {
             .get_slot(|s| s.hir_id == path.res.hir_id());
 
         if let Some(slot) = slot {
-            debug!("Assigning path '{}' to slot {:?}", path, slot,);
+            debug!("Assigning path '{path}' to slot {slot:?}",);
 
             path.res.set_slot(slot.into());
         } else {
@@ -92,7 +92,7 @@ impl<'hir> Visitor<'hir> for SlotAllocator {
 
     fn enter_scope(&mut self, hir_id: HirId, ctx: &mut Self::Context) {
         if ctx.symbols.contains_key(&hir_id) {
-            debug!("Entering scope for: {:?}", hir_id);
+            debug!("Entering scope for: {hir_id:?}");
 
             ctx.current_scope = hir_id;
             self.scopes.push(hir_id);
@@ -101,7 +101,7 @@ impl<'hir> Visitor<'hir> for SlotAllocator {
 
     fn leave_scope(&mut self, hir_id: HirId, ctx: &mut Self::Context) {
         if ctx.symbols.contains_key(&hir_id) {
-            debug!("Leaving scope for: {:?}", hir_id);
+            debug!("Leaving scope for: {hir_id:?}");
 
             let left_scope = self.scopes.pop();
             debug_assert!(left_scope == Some(hir_id), "Mismatched scope exit");

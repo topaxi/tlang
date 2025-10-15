@@ -88,7 +88,7 @@ impl<'hir> Visitor<'hir> for ConstantPropagator {
             if let Some(resolved_hir_id) = path.res.hir_id()
                 && let Some(lit) = self.constants.get(&resolved_hir_id)
             {
-                debug!("Constant propagating: {:?} -> {:?}", resolved_hir_id, lit);
+                debug!("Constant propagating: {resolved_hir_id:?} -> {lit:?}");
                 expr.kind = ExprKind::Literal(Box::new(lit.clone()));
                 self.changed = true;
                 return;

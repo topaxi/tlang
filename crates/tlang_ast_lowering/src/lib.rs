@@ -81,7 +81,7 @@ impl LoweringContext {
 
                 symbol_tables.insert(*hir_id, symbol_table);
             } else {
-                warn!("No HirId found for NodeId: {:?}", node_id);
+                warn!("No HirId found for NodeId: {node_id:?}");
             }
         }
 
@@ -104,7 +104,7 @@ impl LoweringContext {
         F: FnOnce(&mut Self) -> R,
         R: hir::HirScope,
     {
-        debug!("Entering scope for node_id: {:?}", node_id);
+        debug!("Entering scope for node_id: {node_id:?}");
 
         let previous_symbol_table = self.current_symbol_table.clone();
         if let Some(symbol_table) = self.symbol_tables.get(&node_id).cloned() {
@@ -119,7 +119,7 @@ impl LoweringContext {
         let result = f(self);
 
         if self.symbol_tables.contains_key(&node_id) {
-            debug!("Leaving scope for node_id: {:?}", node_id);
+            debug!("Leaving scope for node_id: {node_id:?}");
         }
         self.current_symbol_table = previous_symbol_table;
 
@@ -224,7 +224,7 @@ impl LoweringContext {
             *hir_id
         } else {
             let hir_id = self.unique_id();
-            debug!("Lowering {:?} to {:?}", id, hir_id);
+            debug!("Lowering {id:?} to {hir_id:?}");
             self.node_id_to_hir_id.insert(id, hir_id);
             hir_id
         }

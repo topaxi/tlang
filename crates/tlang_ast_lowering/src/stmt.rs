@@ -140,7 +140,7 @@ impl LoweringContext {
                                     fe.field.set_arity(*arity);
                                 }
                                 _ => unreachable!(),
-                            };
+                            }
                             decl
                         })
                         .collect::<Vec<_>>();
@@ -534,7 +534,7 @@ fn get_param_names(decls: &[FunctionDeclaration]) -> Vec<Option<Ident>> {
             argument_names.push(Some(Ident::new(&arg_name, Default::default())));
         } else {
             argument_names.push(None);
-        };
+        }
     }
 
     argument_names

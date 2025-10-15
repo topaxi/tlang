@@ -129,7 +129,7 @@ impl VariableUsageValidator {
     }
 
     fn analyze_path(&mut self, path: &Path, span: Span, ctx: &mut SemanticAnalysisContext) {
-        debug!("Analyzing path: {}", path);
+        debug!("Analyzing path: {path}");
 
         let mut path_str = String::new();
 
@@ -148,8 +148,7 @@ impl VariableUsageValidator {
         ctx: &mut SemanticAnalysisContext,
     ) {
         debug!(
-            "Analyzing path with known arity: {}, arity: {}",
-            path, arity
+            "Analyzing path with known arity: {path}, arity: {arity}"
         );
 
         let mut path_str = String::new();
@@ -430,11 +429,7 @@ fn levenshtein_distance(a: &str, b: &str) -> usize {
     }
     for j in 1..=b.len() {
         for i in 1..=a.len() {
-            let substitution_cost = if a.chars().nth(i - 1) == b.chars().nth(j - 1) {
-                0
-            } else {
-                1
-            };
+            let substitution_cost = usize::from(a.chars().nth(i - 1) != b.chars().nth(j - 1));
             matrix[i][j] = [
                 matrix[i - 1][j] + 1,
                 matrix[i][j - 1] + 1,

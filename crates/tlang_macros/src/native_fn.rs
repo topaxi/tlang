@@ -9,7 +9,7 @@ pub(crate) struct NativeFnMeta {
 pub(crate) fn parse_native_fn_meta(
     args: syn::punctuated::Punctuated<syn::Meta, syn::token::Comma>,
 ) -> NativeFnMeta {
-    use syn::*;
+    use syn::{Meta, MetaNameValue, Expr, ExprLit, Lit};
 
     let mut meta = NativeFnMeta {
         name: None,
@@ -90,7 +90,7 @@ pub(crate) fn generate_native_fn(
         );
 
     let fn_native_name_ident =
-        Ident::new(&format!("{}_native", fn_name_string), fn_name_ident.span());
+        Ident::new(&format!("{fn_name_string}_native"), fn_name_ident.span());
     let binding_name = native_fn_meta.name.unwrap_or_default();
     let mut arity = native_fn_meta.arity.unwrap_or(arity);
 

@@ -30,7 +30,7 @@ impl DeclarationAnalyzer {
         node_id: NodeId,
         ctx: &mut SemanticAnalysisContext,
     ) -> Rc<RefCell<SymbolTable>> {
-        debug!("Entering new scope for node: {}", node_id);
+        debug!("Entering new scope for node: {node_id}");
 
         let parent = self.current_symbol_table().clone();
         let new_symbol_table = Rc::new(RefCell::new(SymbolTable::new(parent)));
@@ -60,7 +60,7 @@ impl DeclarationAnalyzer {
         let symbol_info =
             SymbolInfo::new(id, name, symbol_type, defined_at, scope_start).with_node_id(node_id);
 
-        debug!("Declaring symbol: {:#?}", symbol_info);
+        debug!("Declaring symbol: {symbol_info:#?}");
 
         self.current_symbol_table().borrow_mut().insert(symbol_info);
     }

@@ -167,7 +167,7 @@ impl TlangStructShape {
 
         let mut fields = fields.flatten().collect::<Vec<_>>();
 
-        fields.sort();
+        fields.sort_unstable();
 
         for (i, k) in fields.into_iter().enumerate() {
             if i == k {

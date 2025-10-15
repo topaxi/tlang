@@ -71,7 +71,7 @@ impl Default for SemanticAnalysisContext {
 }
 
 /**
- * Trait for semantic analysis passes, similar to HirPass in the HIR optimizer.
+ * Trait for semantic analysis passes, similar to `HirPass` in the HIR optimizer.
  */
 pub trait SemanticAnalysisPass {
     fn name(&self) -> &'static str {
@@ -85,8 +85,8 @@ pub trait SemanticAnalysisPass {
 }
 
 /**
- * Group of semantic analysis passes that implements SemanticAnalysisPass.
- * Similar to HirOptGroup in the HIR optimizer.
+ * Group of semantic analysis passes that implements `SemanticAnalysisPass`.
+ * Similar to `HirOptGroup` in the HIR optimizer.
  */
 #[derive(Default)]
 pub struct SemanticAnalysisGroup {

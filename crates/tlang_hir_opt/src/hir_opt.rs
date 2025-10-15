@@ -75,9 +75,7 @@ impl HirPass for HirOptGroup {
 
         while changed {
             iteration += 1;
-            if iteration > 10 {
-                panic!("Too many optimization iterations, likely an infinite loop");
-            }
+            assert!(iteration <= 10, "Too many optimization iterations, likely an infinite loop");
 
             changed = false;
             for pass in &mut self.passes {

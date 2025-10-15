@@ -18,5 +18,5 @@ pub fn log(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
 #[native_fn]
 pub fn panic(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
     let stringified = stringify(state, args);
-    state.panic(format!("Panic!: {}", stringified));
+    state.panic(format!("Panic!: {stringified}"));
 }

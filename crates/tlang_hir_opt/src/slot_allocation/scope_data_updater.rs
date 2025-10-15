@@ -6,7 +6,7 @@ use crate::HirPass;
 use crate::hir_opt::HirOptContext;
 
 /// A HIR pass that updates scope data (locals count) for HIR nodes after slot allocation.
-/// This pass should run after SlotAllocator to ensure accurate locals count for memory pre-allocation.
+/// This pass should run after `SlotAllocator` to ensure accurate locals count for memory pre-allocation.
 #[derive(Debug, Default)]
 pub struct ScopeDataUpdater;
 
@@ -66,8 +66,7 @@ impl<'hir> Visitor<'hir> for ScopeDataUpdater {
                 if let Some(symbol_table) = ctx.symbols.get(&function_hir_id) {
                     let locals_count = symbol_table.borrow().locals();
                     debug!(
-                        "Setting function {:?} locals count to {}",
-                        function_hir_id, locals_count
+                        "Setting function {function_hir_id:?} locals count to {locals_count}"
                     );
                     if let hir::StmtKind::FunctionDeclaration(decl) = &mut stmt.kind {
                         decl.set_locals(locals_count);
@@ -94,8 +93,7 @@ impl<'hir> Visitor<'hir> for ScopeDataUpdater {
                 if let Some(symbol_table) = ctx.symbols.get(&function_hir_id) {
                     let locals_count = symbol_table.borrow().locals();
                     debug!(
-                        "Setting lambda function {:?} locals count to {}",
-                        function_hir_id, locals_count
+                        "Setting lambda function {function_hir_id:?} locals count to {locals_count}"
                     );
                     if let hir::ExprKind::FunctionExpression(decl) = &mut expr.kind {
                         decl.set_locals(locals_count);

@@ -580,7 +580,7 @@ impl HirPretty {
         if self.options.print_ids
             && let Some(hir_id) = path.res.hir_id()
         {
-            self.push_str(&format!("#{}", hir_id));
+            self.push_str(&format!("#{hir_id}"));
         }
     }
 

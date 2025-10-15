@@ -313,18 +313,17 @@ impl SymbolTable {
         let fn_symbols: Vec<_> = symbols
             .iter()
             .filter(|s| *s.name == *name && s.is_any_fn())
-            .flat_map(|s| s.symbol_type.arity())
+            .filter_map(|s| s.symbol_type.arity())
             .filter(|a| hashset.insert(*a))
             .collect();
 
         let has_fn = fn_symbols.len() > 1 && fn_symbols.iter().any(|s| *s as usize == arity);
 
         debug!(
-            "Checking if symbol table has function: {} with arity {}: {:?} -> {}",
-            name, arity, fn_symbols, has_fn
+            "Checking if symbol table has function: {name} with arity {arity}: {fn_symbols:?} -> {has_fn}"
         );
         if !has_fn {
-            debug!("Available symbols: {:#?}", symbols);
+            debug!("Available symbols: {symbols:#?}");
         }
 
         has_fn
@@ -338,13 +337,13 @@ impl SymbolTable {
     }
 
     pub fn insert(&mut self, symbol_info: SymbolInfo) {
-        debug!("Inserting symbol: {:?}", symbol_info);
+        debug!("Inserting symbol: {symbol_info:?}");
 
         self.symbols.push(symbol_info);
     }
 
     pub fn insert_at(&mut self, index: usize, symbol_info: SymbolInfo) {
-        debug!("Inserting symbol at index {}: {:?}", index, symbol_info);
+        debug!("Inserting symbol at index {index}: {symbol_info:?}");
 
         self.symbols.insert(index, symbol_info);
     }
@@ -354,7 +353,7 @@ impl SymbolTable {
         symbol_info: SymbolInfo,
         predicate: impl Fn(&SymbolInfo) -> bool,
     ) {
-        debug!("Inserting symbol after predicate: {:?}", symbol_info);
+        debug!("Inserting symbol after predicate: {symbol_info:?}");
 
         if let Some(index) = self.symbols.iter().position(&predicate) {
             self.symbols.insert(index + 1, symbol_info);

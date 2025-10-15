@@ -9,7 +9,7 @@ pub fn len(state: &mut InterpreterState, iterable: TlangValue) -> TlangValue {
     match state.get_object(iterable) {
         Some(TlangObjectKind::Struct(obj)) => TlangValue::from(obj.len()),
         Some(TlangObjectKind::String(string)) => TlangValue::from(string.len()),
-        _ => state.panic(format!("Expected struct or string, got {:?}", iterable)),
+        _ => state.panic(format!("Expected struct or string, got {iterable:?}")),
     }
 }
 

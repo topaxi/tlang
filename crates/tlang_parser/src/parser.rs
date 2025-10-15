@@ -798,7 +798,7 @@ impl<'src> Parser<'src> {
         .with_span(span)
     }
 
-    /// Can be a Identifier, NestedIdentifier or FieldExpression with a single field name.
+    /// Can be a Identifier, `NestedIdentifier` or `FieldExpression` with a single field name.
     fn parse_function_name(&mut self) -> Expr {
         let path = self.parse_path_expression();
         let mut span = path.span;

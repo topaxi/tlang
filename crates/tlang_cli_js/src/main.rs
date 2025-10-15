@@ -190,7 +190,7 @@ fn compile_to_hir(source: &str, show_warnings: bool) -> Result<hir::Module, Pars
     if show_warnings {
         for diagnostic in semantic_analyzer.get_diagnostics() {
             if diagnostic.is_warning() {
-                eprintln!("{}", diagnostic);
+                eprintln!("{diagnostic}");
             }
         }
     }

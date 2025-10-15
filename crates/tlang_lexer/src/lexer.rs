@@ -127,28 +127,25 @@ impl Lexer<'_> {
                         self.advance(); // consume 'u'
                         if self.current_char == '{' {
                             self.advance(); // consume '{'
-                            match self.read_unicode_escape() {
-                                Ok(unicode_char) => result.push(unicode_char),
-                                Err(_) => {
-                                    // Invalid Unicode escape, treat as literal characters
-                                    // We need to backtrack and treat the whole sequence as literal
-                                    result.push('\\');
-                                    result.push('u');
-                                    result.push('{');
-                                    // Continue reading characters as literals until we find '}' or end
-                                    while self.current_char != '}'
-                                        && self.current_char != '\0'
-                                        && self.current_char != quote
-                                    {
-                                        result.push(self.current_char);
-                                        self.advance();
-                                    }
-                                    if self.current_char == '}' {
-                                        result.push('}');
-                                        self.advance(); // consume the '}'
-                                    }
-                                    continue; // Skip the advance at the end since we already handled it
+                            if let Ok(unicode_char) = self.read_unicode_escape() { result.push(unicode_char) } else {
+                                // Invalid Unicode escape, treat as literal characters
+                                // We need to backtrack and treat the whole sequence as literal
+                                result.push('\\');
+                                result.push('u');
+                                result.push('{');
+                                // Continue reading characters as literals until we find '}' or end
+                                while self.current_char != '}'
+                                    && self.current_char != '\0'
+                                    && self.current_char != quote
+                                {
+                                    result.push(self.current_char);
+                                    self.advance();
                                 }
+                                if self.current_char == '}' {
+                                    result.push('}');
+                                    self.advance(); // consume the '}'
+                                }
+                                continue; // Skip the advance at the end since we already handled it
                             }
                         } else {
                             // Not a valid Unicode escape, treat as literal

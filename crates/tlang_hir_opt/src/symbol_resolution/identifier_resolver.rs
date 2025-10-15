@@ -42,7 +42,7 @@ impl IdentifierResolver {
             // TODO: Also match function names with explicit arity in their name
             .get_closest_by_name(&path_string, path.span)
             .or_else(|| {
-                if path_string.contains("/") {
+                if path_string.contains('/') {
                     let (name, arity) = path_string
                         .rsplit_once('/')
                         .expect("Path should contain a '/' for arity");
@@ -101,7 +101,7 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
 
     fn enter_scope(&mut self, hir_id: HirId, ctx: &mut Self::Context) {
         if ctx.symbols.contains_key(&hir_id) {
-            debug!("Entering scope for: {:?}", hir_id);
+            debug!("Entering scope for: {hir_id:?}");
             ctx.current_scope = hir_id;
             self.scopes.push(hir_id);
         } else {
@@ -116,7 +116,7 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
         if ctx.symbols.contains_key(&hir_id) {
             let left_scope = self.scopes.pop();
 
-            debug!("Leaving scope for: {:?}", hir_id);
+            debug!("Leaving scope for: {hir_id:?}");
             debug_assert!(left_scope == Some(hir_id), "Mismatched scope exit");
 
             ctx.current_scope = self.scopes.last().copied().unwrap();
