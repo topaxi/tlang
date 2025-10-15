@@ -147,9 +147,7 @@ impl VariableUsageValidator {
         span: Span,
         ctx: &mut SemanticAnalysisContext,
     ) {
-        debug!(
-            "Analyzing path with known arity: {path}, arity: {arity}"
-        );
+        debug!("Analyzing path with known arity: {path}, arity: {arity}");
 
         let mut path_str = String::new();
 

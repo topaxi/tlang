@@ -65,9 +65,7 @@ impl<'hir> Visitor<'hir> for ScopeDataUpdater {
                 // Update the function's scope data with locals count
                 if let Some(symbol_table) = ctx.symbols.get(&function_hir_id) {
                     let locals_count = symbol_table.borrow().locals();
-                    debug!(
-                        "Setting function {function_hir_id:?} locals count to {locals_count}"
-                    );
+                    debug!("Setting function {function_hir_id:?} locals count to {locals_count}");
                     if let hir::StmtKind::FunctionDeclaration(decl) = &mut stmt.kind {
                         decl.set_locals(locals_count);
                     }

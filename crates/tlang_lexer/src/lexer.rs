@@ -127,7 +127,9 @@ impl Lexer<'_> {
                         self.advance(); // consume 'u'
                         if self.current_char == '{' {
                             self.advance(); // consume '{'
-                            if let Ok(unicode_char) = self.read_unicode_escape() { result.push(unicode_char) } else {
+                            if let Ok(unicode_char) = self.read_unicode_escape() {
+                                result.push(unicode_char)
+                            } else {
                                 // Invalid Unicode escape, treat as literal characters
                                 // We need to backtrack and treat the whole sequence as literal
                                 result.push('\\');

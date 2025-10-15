@@ -233,9 +233,7 @@ impl ScopeStack {
 
     /// Check if the current scope has allocated slots for variables
     pub fn current_scope_has_slots(&self) -> bool {
-        self.scopes
-            .last()
-            .is_some_and(|scope| scope.size() > 0)
+        self.scopes.last().is_some_and(|scope| scope.size() > 0)
     }
 
     /// Initialize the variable index counter for function parameters
@@ -249,7 +247,10 @@ impl ScopeStack {
 
     pub fn get_scope_locals(&self, scope: &Scope) -> &[TlangValue] {
         // Check if this is the global scope (first scope with start 0)
-        if scope.start() == 0 && !self.scopes.is_empty() && std::ptr::eq(scope, &raw const self.scopes[0]) {
+        if scope.start() == 0
+            && !self.scopes.is_empty()
+            && std::ptr::eq(scope, &raw const self.scopes[0])
+        {
             // Global scope uses global_memory - return entire vector
             &self.global_memory[..]
         } else {
