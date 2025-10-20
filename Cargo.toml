@@ -12,7 +12,7 @@ resolver = "2"
 edition = "2024"
 
 [workspace.dependencies]
-ctor = "0.4"
+ctor = "0.6"
 env_logger = "0.11"
 indoc = "2"
 insta = { version = "1", features = ["redactions", "ron"] }
