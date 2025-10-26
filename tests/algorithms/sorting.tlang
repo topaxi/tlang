@@ -31,19 +31,6 @@ fn simple_quicksort([pivot, ...rest]) {
     append(append(simple_quicksort(smaller), [pivot]), simple_quicksort(larger))
 }
 
-// Find minimum and maximum
-fn find_min([x]) { x }
-fn find_min([x, ...xs]) {
-    let min_rest = find_min(xs);
-    if x <= min_rest { x } else { min_rest }
-}
-
-fn find_max([x]) { x }
-fn find_max([x, ...xs]) {
-    let max_rest = find_max(xs);
-    if x >= max_rest { x } else { max_rest }
-}
-
 // Reverse a list
 fn reverse_list(xs) { reverse_helper(xs, []) }
 
@@ -63,10 +50,6 @@ test_data |> insert_sort() |> log();
 
 log("Quicksort:");
 test_data |> simple_quicksort() |> log();
-
-log("Min and max:");
-1 |> log(); // Expected min
-9 |> log(); // Expected max
 
 log("Reversed:");
 test_data |> reverse_list() |> log();

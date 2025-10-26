@@ -10,9 +10,6 @@ Insertion sort:
 [1, 2, 3, 5, 8, 9]
 Quicksort:
 [1, 2, 3, 5, 8, 9]
-Min and max:
-1
-9
 Reversed:
 [3, 9, 1, 8, 2, 5]
 Empty list sort:
