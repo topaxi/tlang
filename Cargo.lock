@@ -610,9 +610,9 @@ dependencies = [
 
 [[package]]
 name = "ron"
-version = "0.10.1"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "beceb6f7bf81c73e73aeef6dd1356d9a1b2b4909e1f0fc3e59b034f9572d7b7f"
+checksum = "db09040cc89e461f1a265139777a2bde7f8d8c67c4936f700c63ce3e2904d468"
 dependencies = [
  "base64 0.22.1",
  "bitflags 2.9.0",
@@ -803,7 +803,7 @@ dependencies = [
  "inventory",
  "js-sys",
  "log",
- "ron 0.10.1",
+ "ron 0.11.0",
  "serde",
  "serde-wasm-bindgen",
  "tlang_ast",
@@ -829,7 +829,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "indoc",
- "ron 0.10.1",
+ "ron 0.11.0",
  "tlang_ast",
  "tlang_ast_lowering",
  "tlang_codegen_js",
