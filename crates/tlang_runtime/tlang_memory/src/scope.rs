@@ -1,4 +1,3 @@
-use log::debug;
 use tlang_hir::hir::{self, HirScope, ScopeIndex};
 
 use crate::resolver::Resolver;
@@ -31,7 +30,7 @@ impl ScopeStack {
     where
         T: HirScope,
     {
-        debug!(
+        log::debug!(
             "Pushing scope with: {} locals and {} upvars",
             meta.locals(),
             meta.upvars()
@@ -73,7 +72,7 @@ impl ScopeStack {
             // Global scope uses separate global_memory, no truncation needed for memory vector
         }
 
-        debug!("Popping scope");
+        log::debug!("Popping scope");
     }
 
     /// # Panics
