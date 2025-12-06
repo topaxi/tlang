@@ -200,11 +200,11 @@ impl CodegenJS {
         }
 
         if generate_arrow
-            && declaration.body.expr.is_some()
-            && expr_can_render_as_js_expr(declaration.body.expr.as_ref().unwrap())
+            && let Some(expr) = &declaration.body.expr
+            && expr_can_render_as_js_expr(expr)
         {
             self.push_char(' ');
-            self.generate_expr(declaration.body.expr.as_ref().unwrap(), None);
+            self.generate_expr(expr, None);
         } else {
             self.push_str(" {\n");
             self.inc_indent();
@@ -386,22 +386,16 @@ fn is_function_body_tail_recursive(function_name: &str, node: &hir::Expr) -> boo
             .any(|arm| is_function_body_tail_recursive_block(function_name, &arm.block)),
         hir::ExprKind::IfElse(expr, then_branch, else_branches) => {
             is_function_body_tail_recursive(function_name, expr)
-                || if then_branch.expr.is_some() {
-                    is_function_body_tail_recursive(
-                        function_name,
-                        then_branch.expr.as_ref().unwrap(),
-                    )
+                || if let Some(expr) = &then_branch.expr {
+                    is_function_body_tail_recursive(function_name, expr)
                 } else if let Some(stmt) = then_branch.stmts.last() {
                     is_function_body_tail_recursive_stmt(function_name, stmt)
                 } else {
                     false
                 }
                 || else_branches.iter().any(|else_clause| {
-                    if else_clause.consequence.expr.is_some() {
-                        is_function_body_tail_recursive(
-                            function_name,
-                            else_clause.consequence.expr.as_ref().unwrap(),
-                        )
+                    if let Some(expr) = &else_clause.consequence.expr {
+                        is_function_body_tail_recursive(function_name, expr)
                     } else if let Some(stmt) = else_clause.consequence.stmts.last() {
                         is_function_body_tail_recursive_stmt(function_name, stmt)
                     } else {

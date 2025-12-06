@@ -136,13 +136,12 @@ impl Tlang {
     }
 
     fn parse(&mut self) -> Result<&ast::Module, &ParseError> {
-        if self.build.parse_result.is_some() {
-            return self.build.parse_result.as_ref().unwrap().as_ref();
+        if self.build.parse_result.is_none() {
+            let mut parser = Parser::from_source(&self.source).set_recoverable(true);
+
+            self.build.parse_result = Some(parser.parse());
         }
 
-        let mut parser = Parser::from_source(&self.source).set_recoverable(true);
-
-        self.build.parse_result = Some(parser.parse());
         self.build.parse_result.as_ref().unwrap().as_ref()
     }
 
