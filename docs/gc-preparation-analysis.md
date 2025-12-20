@@ -337,18 +337,19 @@ The closure capture refactor is more complex than initially assessed due to:
 
 Given the complexity, the recommended approach is:
 
-1. **Phase 1 (this PR)**: Add GC infrastructure without changing closure behavior
+1. **Phase 1**: Add GC infrastructure without changing closure behavior
    - Object tracing (`referenced_values()`)
    - Memory statistics (`MemoryStats`)
    - Object deallocation capability (`remove_object()`)
    - Comprehensive analysis documentation
+   - Criterion benchmarks for closure performance
 
-2. **Phase 2 (future PR)**: Closure capture refactoring
+2. **Phase 2**: Closure capture refactoring
    - Should be a focused, dedicated effort
    - Requires extensive testing with all closure patterns
    - Should include criterion benchmarks before and after
 
-3. **Phase 3 (future PR)**: Full GC implementation
+3. **Phase 3**: Full GC implementation
    - Mark-and-sweep collection
    - Safe point identification
    - Collection triggering policy
