@@ -309,6 +309,50 @@ The file `tests/known_failures/large_data_processing.tlang` appears to be design
    - Circular reference handling (if applicable)
    - Large allocation/deallocation cycles
 
+## Implementation Attempt Notes
+
+An attempt was made to implement the GC-managed captured values approach. Key findings:
+
+### Complexity of Closure Refactoring
+
+The closure capture refactor is more complex than initially assessed due to:
+
+1. **Multiple variable access patterns**:
+   - `Local` slots for current scope variables
+   - `Upvar` slots for parent scope variables
+   - Global scope variables accessed via both `Local` and `Upvar` depending on context
+
+2. **Global variable mutations**: When a closure modifies a global variable, the change must be visible outside the closure. This requires:
+   - Not capturing globals by value (or mutations are lost)
+   - Detecting which upvars refer to global scope at runtime
+   - Using live `global_memory` access for globals while using captured values for non-globals
+
+3. **Scope stack restoration**: Closures need both:
+   - Captured values for upvar accesses (GC-managed)
+   - Scope metadata for local slot accesses (like globals accessed via `Local(0)`)
+
+4. **Function resolution**: When closures call other functions that recursively call themselves, the function resolution must work correctly regardless of scope stack state.
+
+### Recommended Approach
+
+Given the complexity, the recommended approach is:
+
+1. **Phase 1 (this PR)**: Add GC infrastructure without changing closure behavior
+   - Object tracing (`referenced_values()`)
+   - Memory statistics (`MemoryStats`)
+   - Object deallocation capability (`remove_object()`)
+   - Comprehensive analysis documentation
+
+2. **Phase 2 (future PR)**: Closure capture refactoring
+   - Should be a focused, dedicated effort
+   - Requires extensive testing with all closure patterns
+   - Should include criterion benchmarks before and after
+
+3. **Phase 3 (future PR)**: Full GC implementation
+   - Mark-and-sweep collection
+   - Safe point identification
+   - Collection triggering policy
+
 ## Conclusion
 
 The tlang runtime has a clean, simple architecture that is amenable to GC implementation. The main challenges are:
