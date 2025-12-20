@@ -66,16 +66,65 @@ pub fn pop(&mut self) {
 }
 ```
 
-**Problem**: When a scope is popped, the underlying memory is not reclaimed because closures may reference those values.
+**Problem**: When a scope is popped, the underlying memory is not reclaimed because closures may reference those values via indices into the memory vector. If we truncated the memory, those indices would become invalid.
 
-**Impact**: The memory vector grows indefinitely during execution.
+**Impact**: The memory vector (`ScopeStack.memory`) grows indefinitely during execution, never shrinking.
 
-**Recommendation**: 
-- Closures should capture only the values they reference, not raw memory indices
-- Implement proper closure capture analysis during HIR optimization
-- Alternative: Use reference counting or GC for closure-captured values specifically
+**Root Cause Analysis**:
+The current design stores local variables in a contiguous `memory: Vec<TlangValue>` where each scope tracks its `start` position. Closures store copies of `Scope` metadata (which is `Copy` - just `start`, `size`, `next_var_index` fields). When a closure accesses an upvar, it uses the stored scope metadata to compute the absolute index into the memory vector.
 
-### 3. Closure Design Clones Entire Scope Stack
+The problem is that the memory vector must preserve values at those indices for as long as any closure might reference them. Since we don't track which closures are still alive or which specific indices they reference, we cannot safely reclaim any memory.
+
+**Detailed Solution - GC-Managed Captured Values**:
+
+The recommended solution is to move captured values from the scope memory vector into GC-managed objects when creating closures:
+
+1. **Capture Analysis (already partially exists in HIR)**: During compilation, analyze which variables each closure captures. This information is available via `upvars()` in `HirScope`.
+
+2. **Closure Capture Objects**: When creating a closure, allocate a new `TlangObjectKind::CapturedVars` object containing only the specific `TlangValue`s the closure needs:
+
+```rust
+pub struct TlangClosure {
+    pub id: HirId,
+    // Instead of scope_stack metadata, store captured values directly
+    pub captures: TlangValue,  // Object ID pointing to CapturedVars
+}
+
+pub struct TlangCapturedVars {
+    pub values: Vec<TlangValue>,
+}
+```
+
+3. **Modified Closure Creation**:
+```rust
+pub fn new_closure(&mut self, decl: &hir::FunctionDeclaration) -> TlangValue {
+    // Collect captured values from current scope chain
+    let captured_values = decl.upvar_indices()
+        .map(|(scope_idx, var_idx)| self.get_upvar(scope_idx, var_idx))
+        .collect();
+    
+    let captures = self.new_object(TlangObjectKind::CapturedVars(
+        TlangCapturedVars { values: captured_values }
+    ));
+    
+    self.new_object(TlangObjectKind::Closure(TlangClosure {
+        id: decl.hir_id,
+        captures,
+    }))
+}
+```
+
+4. **Safe Scope Memory Truncation**: With captured values stored in GC-managed objects, `scope.pop()` can now safely call `self.memory.truncate(scope.start())` since no indices into the truncated region will be accessed.
+
+5. **GC Tracing**: The `TlangCapturedVars` object participates in normal GC tracing via `referenced_values()`, ensuring captured values remain alive as long as the closure is alive.
+
+**Benefits**:
+- Scope memory can be reclaimed immediately when scopes pop
+- Captured values are GC-managed and collected when closures die
+- Clear ownership semantics - captured values are owned by their closure
+- Memory usage is proportional to live closures, not historical scope depth
+
+### 3. Closure Scope Metadata Storage
 
 **Location**: `crates/tlang_runtime/tlang_memory/src/state.rs:415-424`
 
@@ -87,20 +136,18 @@ pub fn new_closure(&mut self, decl: &hir::FunctionDeclaration) -> TlangValue {
 
     self.new_object(TlangObjectKind::Closure(TlangClosure {
         id: decl.hir_id,
-        scope_stack: self.scope_stack.scopes.clone(),  // ← clones entire scope stack
+        scope_stack: self.scope_stack.scopes.clone(),  // ← clones scope metadata
     }))
 }
 ```
 
-**Problem**: Each closure copies the entire scope stack metadata. This:
-- Prevents GC from collecting parent scope values
-- Creates unnecessary memory overhead
-- Makes it impossible to track what values a closure actually uses
+**Clarification**: Each closure clones `Vec<Scope>` where `Scope` is a small `Copy` struct containing just three `usize` fields (`start`, `size`, `next_var_index`). This is **not** expensive - it's O(scope_depth) copies of 24 bytes each, typically a few hundred bytes total.
 
-**Recommendation**:
-- Implement upvar analysis in the semantic/HIR phase (partially exists)
-- Closures should only capture the specific `TlangValue`s they reference
-- Change `TlangClosure` to store captured values directly
+The actual issue is that these scope metadata structs contain indices into the global `memory` vector, which must remain valid. This is addressed in Issue #2 above (scope memory leak).
+
+**Current Behavior**: Acceptable for now - the cloned scope metadata is lightweight and necessary for closure variable resolution.
+
+**Future Optimization**: When implementing GC-managed captured values (see Issue #2), closures won't need scope metadata at all, reducing `TlangClosure` to just `id` and `captures` fields.
 
 ### 4. Unsafe Code in Native Function Calls
 
@@ -124,15 +171,14 @@ pub fn call_native_fn(
 
 **Problem**: Uses raw pointer to work around borrow checker limitations. The native function has mutable access to `InterpreterState` while the function object is borrowed.
 
-**Impact**: While currently safe, this pattern:
-- Is fragile and could break with future changes
-- Makes GC implementation more complex (need to ensure GC doesn't run during native calls)
-- The existing comment indicates the author is aware this is a workaround
+**Impact for GC**: For a single-threaded GC implementation, this pattern is acceptable. The key concern (GC running during native calls) is not an issue because:
+- GC will only be triggered at safe points (e.g., allocation)
+- Native functions complete synchronously
+- No concurrent access to `InterpreterState`
 
-**Recommendation**:
-- Restructure to avoid the need for unsafe code
-- Consider storing native functions outside of `InterpreterState`
-- Alternative: Use `RefCell` with clear borrowing semantics
+**Priority**: Low - can be ignored for initial single-threaded GC implementation.
+
+**Future Consideration**: If implementing concurrent/parallel GC or multi-threaded execution, this pattern would need restructuring.
 
 ### 5. Extensive Use of Rc for Declarations
 
