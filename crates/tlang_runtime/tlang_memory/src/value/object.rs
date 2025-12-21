@@ -11,6 +11,13 @@ pub struct TlangClosure {
     pub id: HirId,
     // Closures hold a reference to the scope stack at the time of creation.
     pub scope_stack: Vec<crate::scope::Scope>,
+    // Captured values from parent scopes, stored contiguously.
+    // This enables proper memory management for GC - closures own their captured values
+    // instead of keeping the parent scope's memory alive.
+    pub captured_memory: Vec<TlangValue>,
+    // Length of global memory at capture time, used to split captured_memory
+    // when restoring for closure invocation.
+    pub global_memory_len: usize,
 }
 
 #[derive(Debug, PartialEq)]

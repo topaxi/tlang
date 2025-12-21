@@ -453,9 +453,16 @@ impl InterpreterState {
             .entry(decl.hir_id)
             .or_insert_with(|| decl.clone().into());
 
+        // Capture all memory values from the current scope stack
+        // This enables proper GC by having closures own their captured values
+        let global_memory_len = self.scope_stack.global_memory_len();
+        let captured_memory = self.scope_stack.capture_all_memory();
+
         self.new_object(TlangObjectKind::Closure(TlangClosure {
             id: decl.hir_id,
             scope_stack: self.scope_stack.scopes.clone(),
+            captured_memory,
+            global_memory_len,
         }))
     }
 
