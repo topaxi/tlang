@@ -321,8 +321,8 @@ impl InterpreterState {
 fn test_mark_phase_finds_reachable() {
     let mut state = InterpreterState::new();
     
-    // Create a reachable object
-    let obj = state.new_object(TlangObjectKind::String("hello".to_string()));
+    // Create a reachable object using new_string helper
+    let obj = state.new_string("hello".to_string());
     state.set_global("my_string".to_string(), obj);
     
     let marked = state.mark_reachable();
@@ -333,14 +333,17 @@ fn test_mark_phase_finds_reachable() {
 }
 
 #[test]
-fn test_mark_phase_follows_references() {
+fn test_mark_phase_ignores_unreachable() {
     let mut state = InterpreterState::new();
     
-    // Create a struct containing another object
-    let inner = state.new_object(TlangObjectKind::String("inner".to_string()));
-    // ... create struct containing inner ...
+    // Create an unreachable object (no root reference)
+    let orphan = state.new_string("orphan".to_string());
+    let orphan_id = orphan.get_object_id().unwrap();
     
-    // Only the struct is a root, but inner should be marked too
+    let marked = state.mark_reachable();
+    
+    // Orphan should NOT be in marked set
+    assert!(!marked.contains(&orphan_id));
 }
 ```
 
@@ -378,15 +381,15 @@ fn test_sweep_removes_unreachable() {
     let mut state = InterpreterState::new();
     
     // Create an object but don't make it a root
-    let orphan = state.new_object(TlangObjectKind::String("orphan".to_string()));
+    let orphan = state.new_string("orphan".to_string());
     let orphan_id = orphan.get_object_id().unwrap();
     
-    // Run GC
+    // Run GC phases
     let marked = state.mark_reachable();
     let collected = state.sweep_unreachable(&marked);
     
     assert_eq!(collected, 1);
-    assert!(state.objects.get(orphan_id).is_none());
+    assert!(!state.contains_object(orphan_id));
 }
 ```
 
@@ -416,12 +419,12 @@ impl InterpreterState {
 }
 ```
 
-Add `gc_collections` to `MemoryStats`:
+**Note**: `gc_collections` is already defined in `MemoryStats` (added in the prepare-gc branch):
 ```rust
 pub struct MemoryStats {
     pub objects_allocated: usize,
     pub objects_deallocated: usize,
-    pub gc_collections: usize,  // Add this
+    pub gc_collections: usize,  // Already exists
 }
 ```
 
@@ -470,31 +473,76 @@ Create a test file that exercises GC in realistic scenarios:
 
 ```rust
 #[test]
+fn test_gc_collects_unreachable_objects() {
+    let mut state = InterpreterState::new();
+
+    // Create objects but don't make them roots
+    let _orphan1 = state.new_string("orphan1".to_string());
+    let _orphan2 = state.new_string("orphan2".to_string());
+
+    assert_eq!(state.object_count(), 2);
+
+    // Run GC - both should be collected
+    let collected = state.collect_garbage();
+
+    assert_eq!(collected, 2);
+    assert_eq!(state.object_count(), 0);
+    assert_eq!(state.memory_stats().gc_collections, 1);
+}
+
+#[test]
+fn test_gc_preserves_reachable_objects() {
+    let mut state = InterpreterState::new();
+
+    // Create an object and make it a root via globals
+    let reachable = state.new_string("keep_me".to_string());
+    state.set_global("my_string".to_string(), reachable);
+
+    // Create unreachable objects
+    let _orphan = state.new_string("orphan".to_string());
+
+    assert_eq!(state.object_count(), 2);
+
+    // Run GC - only orphan should be collected
+    let collected = state.collect_garbage();
+
+    assert_eq!(collected, 1);
+    assert_eq!(state.object_count(), 1);
+
+    // The reachable object should still exist
+    let id = reachable.get_object_id().unwrap();
+    assert!(state.contains_object(id));
+}
+
+#[test]
 fn test_gc_collects_temporary_objects() {
     let mut state = InterpreterState::new();
     
     // Simulate a loop that creates temporary objects
     for _ in 0..10_000 {
-        let temp = state.new_object(TlangObjectKind::String("temp".to_string()));
+        let _temp = state.new_string("temp".to_string());
         // Don't store temp anywhere - it becomes garbage
     }
     
-    // After GC, heap should be small
+    // After GC, heap should be empty (no roots)
     state.collect_garbage();
-    assert!(state.objects.len() < 100);
+    assert_eq!(state.object_count(), 0);
 }
 
 #[test]
 fn test_gc_preserves_reachable_closures() {
     // Create a closure with captured values
-    // Verify captured values survive GC
+    // Make the closure reachable via a global
+    // Run GC
+    // Verify captured values inside the closure survive GC
+    // (The referenced_values() method returns captured_memory)
 }
 
 #[test]
 fn test_gc_handles_circular_references() {
-    // Create two objects that reference each other
-    // Make them unreachable
-    // Verify they get collected (no infinite loop)
+    // Create two objects that reference each other (e.g., structs)
+    // Make them unreachable (remove from globals)
+    // Verify they get collected (mark phase handles cycles via HashSet)
 }
 ```
 
