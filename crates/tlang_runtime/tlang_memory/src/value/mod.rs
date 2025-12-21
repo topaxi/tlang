@@ -2,7 +2,7 @@ use crate::{InterpreterState, impl_from_tlang_value};
 
 mod arithmetic;
 
-pub use self::object::TlangObjectId;
+pub use self::object::{ReferencedValuesIter, TlangObjectId};
 pub use arithmetic::TlangArithmetic;
 
 pub mod function;

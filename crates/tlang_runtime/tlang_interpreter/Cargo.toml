@@ -12,6 +12,10 @@ name = "tlangdi"
 path = "src/main.rs"
 required-features = ["binary"]
 
+[[bench]]
+name = "closure_benchmark"
+harness = false
+
 [features]
 default = ["stdlib"]
 binary = ["tlang_ast_lowering"]
@@ -39,6 +43,7 @@ tlang_ast_lowering = { path = "../../tlang_ast_lowering" }
 ctor = { workspace = true }
 indoc = { workspace = true }
 pretty_assertions = { workspace = true }
+criterion = "0.5"
 
 [lints]
 workspace = true

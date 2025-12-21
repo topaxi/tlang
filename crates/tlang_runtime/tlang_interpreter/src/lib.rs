@@ -352,7 +352,9 @@ impl Interpreter {
         EvalResult::Void
     }
 
-    fn eval_expr(&mut self, expr: &hir::Expr) -> EvalResult {
+    /// Evaluate an expression and return the result.
+    /// This is useful for benchmarking and testing individual expressions.
+    pub fn eval_expr(&mut self, expr: &hir::Expr) -> EvalResult {
         self.state.set_current_span(expr.span);
 
         match &expr.kind {

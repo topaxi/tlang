@@ -6,14 +6,14 @@ pub mod state;
 pub mod value;
 
 pub use resolver::Resolver;
-pub use state::InterpreterState;
+pub use state::{InterpreterState, MemoryStats};
 pub use value::{TlangValue, object::TlangObjectKind};
 
 pub use self::value::function::NativeFnReturn;
 
 pub mod prelude {
     pub use crate::value::{
-        TlangPrimitive, TlangValue,
+        ReferencedValuesIter, TlangPrimitive, TlangValue,
         function::TlangNativeFn,
         object::{TlangObjectId, TlangObjectKind, TlangSlice, TlangStruct},
     };
