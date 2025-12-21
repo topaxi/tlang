@@ -337,12 +337,13 @@ The closure capture refactor is more complex than initially assessed due to:
 
 Given the complexity, the recommended approach is:
 
-1. **Phase 1**: Add GC infrastructure without changing closure behavior
-   - Object tracing (`referenced_values()`)
-   - Memory statistics (`MemoryStats`)
-   - Object deallocation capability (`remove_object()`)
-   - Comprehensive analysis documentation
-   - Criterion benchmarks for closure performance
+1. **Phase 1**: Add GC infrastructure without changing closure behavior ✅ **COMPLETED**
+   - Object tracing (`referenced_values()`) ✅
+   - Memory statistics (`MemoryStats`) ✅
+   - Object deallocation capability (`remove_object()`) ✅
+   - Comprehensive analysis documentation ✅
+   - Closure captured memory storage (`captured_memory` field) ✅
+   - Criterion benchmarks for closure performance (optional, not yet implemented)
 
 2. **Phase 2**: Closure capture refactoring
    - Should be a focused, dedicated effort
@@ -354,12 +355,127 @@ Given the complexity, the recommended approach is:
    - Safe point identification
    - Collection triggering policy
 
+## Current Implementation Status
+
+### Completed Items
+
+The following GC preparation infrastructure has been implemented:
+
+1. **`TlangObjectKind::referenced_values()`** - Returns an iterator over all `TlangValue` references contained in an object, enabling GC tracing. All object types now properly report their references:
+   - `Struct` → yields all field values
+   - `Enum` → yields all field values
+   - `Slice` → yields the underlying array reference
+   - `Closure` → yields all captured memory values
+   - `Fn`, `NativeFn`, `String` → no references (empty iterator)
+
+2. **`MemoryStats`** - Tracks allocation statistics:
+   - `objects_allocated: usize` - Total objects created
+   - `objects_deallocated: usize` - Total objects removed
+   - Accessible via `InterpreterState::memory_stats()`
+
+3. **`InterpreterState::remove_object()`** - Enables object deallocation:
+   - Removes object from the Slab
+   - Updates `objects_deallocated` counter
+   - Returns the removed object kind
+
+4. **`TlangClosure::captured_memory`** - Closures now capture their memory context:
+   - Stores all values from global and local memory at closure creation time
+   - `global_memory_len` field tracks the split point
+   - Currently stored but not used during execution (execution still uses scope-swapping)
+   - Enables GC tracing via `referenced_values()`
+
+5. **`ScopeStack::capture_all_memory()`** - Helper to capture memory state:
+   - Returns combined global + local memory as a single vector
+   - `global_memory_len()` returns the current global memory size
+
+### Remaining Work Before GC Implementation
+
+The following items remain before a full GC can be implemented:
+
+#### High Priority (Required for GC)
+
+1. **Root Enumeration** - Need a method to enumerate all GC roots:
+   - Global variables (`globals` HashMap)
+   - Scope stack values (`global_memory` and `memory` vectors)
+   - Call stack frames (if any values stored there)
+   
+   ```rust
+   impl InterpreterState {
+       pub fn gc_roots(&self) -> impl Iterator<Item = TlangValue> + '_ {
+           // Yield all values that are roots
+       }
+   }
+   ```
+
+2. **Mark Phase Implementation** - Traverse from roots, marking reachable objects:
+   ```rust
+   pub fn mark_reachable(&mut self) -> HashSet<TlangObjectId> {
+       let mut marked = HashSet::new();
+       let mut worklist: Vec<TlangValue> = self.gc_roots().collect();
+       
+       while let Some(value) = worklist.pop() {
+           if let Some(id) = value.get_object_id() {
+               if marked.insert(id) {
+                   if let Some(obj) = self.get_object_by_id(id) {
+                       worklist.extend(obj.referenced_values());
+                   }
+               }
+           }
+       }
+       marked
+   }
+   ```
+
+3. **Sweep Phase Implementation** - Remove unreachable objects:
+   ```rust
+   pub fn sweep_unreachable(&mut self, marked: &HashSet<TlangObjectId>) {
+       let all_ids: Vec<_> = self.objects.iter().map(|(id, _)| id).collect();
+       for id in all_ids {
+           if !marked.contains(&id) {
+               self.remove_object(id);
+           }
+       }
+   }
+   ```
+
+4. **GC Trigger Policy** - Decide when to run collection:
+   - After N allocations
+   - When memory usage exceeds threshold
+   - On explicit request
+
+#### Medium Priority (Improve GC Effectiveness)
+
+5. **Scope Memory Truncation** - Currently disabled to preserve closure references:
+   - Once closures use `captured_memory` for execution, scope memory can be truncated
+   - Requires Phase 2 closure refactoring
+
+6. **Selective Capture** - Currently captures all memory:
+   - Optimize to only capture values the closure actually uses
+   - Requires upvar analysis from HIR
+
+#### Lower Priority (Optimizations)
+
+7. **Criterion Benchmarks** - Performance testing:
+   - Closure creation overhead
+   - Memory capture overhead
+   - GC pause times
+
+8. **Generational GC** - Future optimization:
+   - Track object age
+   - Collect young objects more frequently
+
 ## Conclusion
 
 The tlang runtime has a clean, simple architecture that is amenable to GC implementation. The main challenges are:
 
 1. **Closure capture design** - needs redesign to capture specific values
 2. **Scope memory management** - currently leaks by design
-3. **Tracing infrastructure** - needs to be added
+3. **Tracing infrastructure** - ✅ Now implemented
+
+**Phase 1 is complete.** The remaining work for a basic mark-and-sweep GC is:
+1. Implement root enumeration
+2. Implement mark phase
+3. Implement sweep phase  
+4. Add GC trigger policy
 
 The recommended approach is to implement the refactors incrementally, with tests at each step, before adding the actual GC collection logic.
