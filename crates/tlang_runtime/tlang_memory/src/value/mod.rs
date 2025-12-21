@@ -1,6 +1,6 @@
 use crate::{InterpreterState, impl_from_tlang_value};
 
-pub use self::object::TlangObjectId;
+pub use self::object::{ReferencedValuesIter, TlangObjectId};
 
 pub mod function;
 pub mod object;

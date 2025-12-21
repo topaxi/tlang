@@ -215,6 +215,28 @@ pub struct NativeFnMeta {
     pub name: String,
 }
 
+/// Statistics about memory usage in the interpreter.
+///
+/// This struct tracks object allocations and deallocations to help
+/// monitor memory usage and debug potential memory leaks.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct MemoryStats {
+    /// Total number of objects allocated since interpreter creation.
+    pub objects_allocated: usize,
+    /// Total number of objects deallocated (via GC or explicit removal).
+    pub objects_deallocated: usize,
+    /// Number of garbage collection cycles performed.
+    pub gc_collections: usize,
+}
+
+impl MemoryStats {
+    /// Returns the current number of live objects (allocated - deallocated).
+    pub fn live_objects(&self) -> usize {
+        self.objects_allocated
+            .saturating_sub(self.objects_deallocated)
+    }
+}
+
 pub struct InterpreterState {
     pub scope_stack: ScopeStack,
     closures: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
@@ -228,6 +250,8 @@ pub struct InterpreterState {
     pub builtin_shapes: BuiltinShapes,
     native_fns: HashMap<TlangObjectId, TlangNativeFn>,
     native_fns_meta: HashMap<TlangObjectId, NativeFnMeta>,
+    /// Memory statistics for debugging and monitoring.
+    memory_stats: MemoryStats,
 }
 
 impl Resolver for InterpreterState {
@@ -275,6 +299,7 @@ impl InterpreterState {
             builtin_shapes: BuiltinShapes::default(),
             native_fns: HashMap::with_capacity(100),
             native_fns_meta: HashMap::with_capacity(100),
+            memory_stats: MemoryStats::default(),
         }
     }
 
@@ -398,7 +423,18 @@ impl InterpreterState {
     }
 
     pub fn new_object(&mut self, kind: TlangObjectKind) -> TlangValue {
+        self.memory_stats.objects_allocated += 1;
         TlangValue::new_object(self.objects.insert(kind))
+    }
+
+    /// Returns the current memory statistics.
+    pub fn memory_stats(&self) -> &MemoryStats {
+        &self.memory_stats
+    }
+
+    /// Returns the number of currently allocated objects in the object store.
+    pub fn object_count(&self) -> usize {
+        self.objects.len()
     }
 
     pub fn new_enum(
@@ -467,6 +503,28 @@ impl InterpreterState {
 
     pub fn get_closure_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
         self.closures.get(&id).cloned()
+    }
+
+    /// Removes an object from the object store by its ID.
+    ///
+    /// This is used during garbage collection to deallocate unreachable objects.
+    /// Returns the removed object if it existed, or None if the ID was invalid.
+    ///
+    /// # Important
+    ///
+    /// The caller must ensure that no other code holds references (via `TlangValue::Object`)
+    /// to this object ID, as accessing a removed object will cause a panic.
+    pub fn remove_object(&mut self, id: TlangObjectId) -> Option<TlangObjectKind> {
+        let removed = self.objects.try_remove(id);
+        if removed.is_some() {
+            self.memory_stats.objects_deallocated += 1;
+        }
+        removed
+    }
+
+    /// Checks if an object with the given ID exists in the object store.
+    pub fn contains_object(&self, id: TlangObjectId) -> bool {
+        self.objects.contains(id)
     }
 
     #[inline(always)]
@@ -752,5 +810,90 @@ impl InterpreterState {
 impl Default for InterpreterState {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_memory_stats_initial() {
+        let state = InterpreterState::new();
+        let stats = state.memory_stats();
+
+        assert_eq!(stats.objects_allocated, 0);
+        assert_eq!(stats.objects_deallocated, 0);
+        assert_eq!(stats.live_objects(), 0);
+    }
+
+    #[test]
+    fn test_memory_stats_after_allocation() {
+        let mut state = InterpreterState::new();
+
+        // Allocate some objects
+        state.new_string("hello".to_string());
+        state.new_string("world".to_string());
+        state.new_list(vec![TlangValue::I64(1), TlangValue::I64(2)]);
+
+        let stats = state.memory_stats();
+        assert_eq!(stats.objects_allocated, 3);
+        assert_eq!(stats.objects_deallocated, 0);
+        assert_eq!(stats.live_objects(), 3);
+        assert_eq!(state.object_count(), 3);
+    }
+
+    #[test]
+    fn test_object_removal() {
+        let mut state = InterpreterState::new();
+
+        // Allocate objects
+        let obj1 = state.new_string("first".to_string());
+        let obj2 = state.new_string("second".to_string());
+        let _obj3 = state.new_string("third".to_string());
+
+        assert_eq!(state.object_count(), 3);
+
+        // Remove an object
+        let id1 = obj1.get_object_id().unwrap();
+        let removed = state.remove_object(id1);
+        assert!(removed.is_some());
+
+        let stats = state.memory_stats();
+        assert_eq!(stats.objects_allocated, 3);
+        assert_eq!(stats.objects_deallocated, 1);
+        assert_eq!(stats.live_objects(), 2);
+        assert_eq!(state.object_count(), 2);
+
+        // Object should no longer exist
+        assert!(!state.contains_object(id1));
+        assert!(state.get_object(obj1).is_none());
+
+        // Other objects should still exist
+        assert!(state.get_object(obj2).is_some());
+    }
+
+    #[test]
+    fn test_remove_nonexistent_object() {
+        let mut state = InterpreterState::new();
+
+        // Try to remove an object that doesn't exist
+        let removed = state.remove_object(999);
+        assert!(removed.is_none());
+
+        // Stats should not change
+        let stats = state.memory_stats();
+        assert_eq!(stats.objects_deallocated, 0);
+    }
+
+    #[test]
+    fn test_contains_object() {
+        let mut state = InterpreterState::new();
+
+        let obj = state.new_string("test".to_string());
+        let id = obj.get_object_id().unwrap();
+
+        assert!(state.contains_object(id));
+        assert!(!state.contains_object(999));
     }
 }
