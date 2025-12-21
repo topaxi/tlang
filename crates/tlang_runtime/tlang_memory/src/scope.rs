@@ -278,6 +278,24 @@ impl ScopeStack {
             &self.memory[start..end]
         }
     }
+
+    /// Capture all memory values from all scopes for closure creation.
+    /// Returns the global memory followed by all local scope memory.
+    /// This enables closures to own their captured values for proper GC.
+    pub fn capture_all_memory(&self) -> Vec<TlangValue> {
+        let mut captured = Vec::with_capacity(self.global_memory.len() + self.memory.len());
+        // Copy global memory first
+        captured.extend_from_slice(&self.global_memory);
+        // Then copy all local scope memory
+        captured.extend_from_slice(&self.memory);
+        captured
+    }
+
+    /// Get the current length of global memory.
+    /// Used when restoring captured memory to know where the split is.
+    pub fn global_memory_len(&self) -> usize {
+        self.global_memory.len()
+    }
 }
 
 impl Default for ScopeStack {

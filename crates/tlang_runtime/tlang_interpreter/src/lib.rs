@@ -927,8 +927,12 @@ impl Interpreter {
         match self.get_object_by_id(id) {
             TlangObjectKind::Closure(closure) => {
                 let closure_decl = self.get_closure_decl(closure.id).unwrap();
+                let scope_stack = closure.scope_stack.clone();
 
-                self.with_scope(closure.scope_stack.clone(), |this| {
+                // Use the original approach: just swap in the scope metadata
+                // The actual memory is kept alive (not truncated when scopes exit)
+                // so the closure can still access its captured values
+                self.with_scope(scope_stack, |this| {
                     this.eval_fn_call(&closure_decl, callee, args)
                         .unwrap_value()
                 })
