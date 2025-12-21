@@ -453,8 +453,10 @@ impl InterpreterState {
             .entry(decl.hir_id)
             .or_insert_with(|| decl.clone().into());
 
-        // Capture all memory values from the current scope stack
-        // This enables proper GC by having closures own their captured values
+        // Capture all memory values from the current scope stack for future GC.
+        // NOTE: Currently, captured_memory is stored but not used during execution.
+        // Execution still uses scope_stack with shared memory for correct mutable
+        // capture semantics. Future GC work will switch to using captured_memory.
         let global_memory_len = self.scope_stack.global_memory_len();
         let captured_memory = self.scope_stack.capture_all_memory();
 

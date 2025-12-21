@@ -9,14 +9,18 @@ use super::TlangValue;
 #[derive(Debug)]
 pub struct TlangClosure {
     pub id: HirId,
-    // Closures hold a reference to the scope stack at the time of creation.
+    // Scope metadata at closure creation time. Used during execution to
+    // restore the correct scope context via scope-swapping.
     pub scope_stack: Vec<crate::scope::Scope>,
-    // Captured values from parent scopes, stored contiguously.
-    // This enables proper memory management for GC - closures own their captured values
-    // instead of keeping the parent scope's memory alive.
+    // Captured values from parent scopes, stored contiguously (global + local).
+    //
+    // NOTE: This is currently stored for future GC preparation but NOT used during
+    // execution. Execution still relies on scope_stack and the original shared memory
+    // model for correct mutable capture semantics. Future GC work will switch to using
+    // captured_memory, enabling memory reclamation when parent scopes exit.
     pub captured_memory: Vec<TlangValue>,
     // Length of global memory at capture time, used to split captured_memory
-    // when restoring for closure invocation.
+    // into global and local portions.
     pub global_memory_len: usize,
 }
 
