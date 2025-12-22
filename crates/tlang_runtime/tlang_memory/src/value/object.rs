@@ -9,8 +9,19 @@ use super::TlangValue;
 #[derive(Debug)]
 pub struct TlangClosure {
     pub id: HirId,
-    // Closures hold a reference to the scope stack at the time of creation.
+    // Scope metadata at closure creation time. Used during execution to
+    // restore the correct scope context via scope-swapping.
     pub scope_stack: Vec<crate::scope::Scope>,
+    // Captured values from parent scopes, stored contiguously (global + local).
+    //
+    // NOTE: This is currently stored for future GC preparation but NOT used during
+    // execution. Execution still relies on scope_stack and the original shared memory
+    // model for correct mutable capture semantics. Future GC work will switch to using
+    // captured_memory, enabling memory reclamation when parent scopes exit.
+    pub captured_memory: Vec<TlangValue>,
+    // Length of global memory at capture time, used to split captured_memory
+    // into global and local portions.
+    pub global_memory_len: usize,
 }
 
 #[derive(Debug, PartialEq)]
@@ -209,17 +220,16 @@ impl TlangObjectKind {
     ///
     /// This is used for garbage collection tracing to find all reachable objects.
     /// Note: This only yields values directly contained in the object, not transitively.
-    /// For closures, this currently does not yield captured values as closures store
-    /// scope metadata rather than captured values directly.
+    /// For closures, this yields all captured values which may include object references.
     pub fn referenced_values(&self) -> ReferencedValuesIter<'_> {
         match self {
             TlangObjectKind::Struct(s) => ReferencedValuesIter::Slice(s.values.iter()),
             TlangObjectKind::Enum(e) => ReferencedValuesIter::Slice(e.field_values.iter()),
             TlangObjectKind::Slice(s) => ReferencedValuesIter::Single(Some(s.of)),
-            TlangObjectKind::Fn(_)
-            | TlangObjectKind::NativeFn
-            | TlangObjectKind::String(_)
-            | TlangObjectKind::Closure(_) => ReferencedValuesIter::Empty,
+            TlangObjectKind::Closure(c) => ReferencedValuesIter::Slice(c.captured_memory.iter()),
+            TlangObjectKind::Fn(_) | TlangObjectKind::NativeFn | TlangObjectKind::String(_) => {
+                ReferencedValuesIter::Empty
+            }
         }
     }
 }
@@ -323,6 +333,48 @@ mod tests {
     #[test]
     fn test_native_fn_has_no_referenced_values() {
         let obj = TlangObjectKind::NativeFn;
+
+        let refs: Vec<_> = obj.referenced_values().collect();
+        assert!(refs.is_empty());
+    }
+
+    #[test]
+    fn test_closure_referenced_values() {
+        use crate::scope::Scope;
+        use tlang_span::HirId;
+
+        // Create a closure with some captured values
+        let captured = vec![
+            TlangValue::I64(42),
+            TlangValue::Object(5), // This is an object reference that GC needs to trace
+            TlangValue::Bool(true),
+        ];
+        let closure = TlangClosure {
+            id: HirId::new(1),
+            scope_stack: vec![Scope::default()],
+            captured_memory: captured.clone(),
+            global_memory_len: 1,
+        };
+        let obj = TlangObjectKind::Closure(closure);
+
+        let refs: Vec<_> = obj.referenced_values().collect();
+        assert_eq!(refs.len(), 3);
+        assert_eq!(refs, captured);
+    }
+
+    #[test]
+    fn test_closure_empty_captured_memory() {
+        use crate::scope::Scope;
+        use tlang_span::HirId;
+
+        // Closure with no captured values
+        let closure = TlangClosure {
+            id: HirId::new(1),
+            scope_stack: vec![Scope::default()],
+            captured_memory: vec![],
+            global_memory_len: 0,
+        };
+        let obj = TlangObjectKind::Closure(closure);
 
         let refs: Vec<_> = obj.referenced_values().collect();
         assert!(refs.is_empty());
