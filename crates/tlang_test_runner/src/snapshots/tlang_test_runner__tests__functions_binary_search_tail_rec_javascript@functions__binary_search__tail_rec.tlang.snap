@@ -1,5 +1,6 @@
 ---
 source: crates/tlang_test_runner/src/main.rs
+description: "Backend: javascript"
 expression: apply_redactions(&output)
 input_file: tests/functions/binary_search/tail_rec.tlang
 ---

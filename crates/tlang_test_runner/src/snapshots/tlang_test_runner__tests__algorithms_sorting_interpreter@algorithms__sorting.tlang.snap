@@ -1,5 +1,6 @@
 ---
 source: crates/tlang_test_runner/src/main.rs
+description: "Backend: interpreter"
 expression: apply_redactions(&output)
 input_file: tests/algorithms/sorting.tlang
 ---

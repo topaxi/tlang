@@ -1,6 +1,7 @@
 ---
 source: crates/tlang_test_runner/src/main.rs
-expression: output
+description: "Backend: javascript"
+expression: apply_redactions(&output)
 input_file: tests/functions/tco/tco_mutual.tlang
 ---
 true

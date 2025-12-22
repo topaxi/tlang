@@ -309,12 +309,16 @@ mod tests {
                             // For known failures, we still want to capture the snapshot
                             // but we mark it specially and don't fail if it doesn't match
                             insta::with_settings!({
-                                description => "Known failure - output may not match expected",
+                                description => format!("Known failure for Backend: {}\n\tOutput mismatch.", backend.as_str()),
                             }, {
                                 insta::assert_snapshot!(test_name, apply_redactions(&output));
                             });
                         } else {
-                            insta::assert_snapshot!(test_name, apply_redactions(&output));
+                            insta::with_settings!({
+                                description => format!("Backend: {}", backend.as_str()),
+                            }, {
+                                insta::assert_snapshot!(test_name, apply_redactions(&output));
+                            });
                         }
                     }
                     Err(error_msg) => {
@@ -322,7 +326,7 @@ mod tests {
                             println!("Known failing test failed as expected: {}", path.display());
                             // Create a snapshot for the error output
                             insta::with_settings!({
-                                description => "Known failure - error during execution",
+                                description => format!("Known failure for Backend: {}\n\tError during execution, output captured.", backend.as_str()),
                             }, {
                                 insta::assert_snapshot!(format!("{}_error", test_name), error_msg);
                             });
