@@ -1,0 +1,14 @@
+---
+source: crates/tlang_test_runner/src/main.rs
+expression: apply_redactions(&output)
+input_file: tests/functions/closures/complex_closures.tlang
+---
+=== Complex Closures Test ===
+1
+2
+1
+2
+4
+2
+4
+2

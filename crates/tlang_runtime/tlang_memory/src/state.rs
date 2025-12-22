@@ -607,7 +607,7 @@ impl InterpreterState {
             out.push_str("  {\n");
             for entry in self.scope_stack.get_scope_locals(scope) {
                 out.push_str("    ");
-                out.push_str(self.stringify(*entry).as_str());
+                out.push_str(self.stringify(entry).as_str());
                 out.push_str(",\n");
             }
             out.push_str("  },\n");

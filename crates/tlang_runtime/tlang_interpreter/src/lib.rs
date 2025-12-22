@@ -264,7 +264,7 @@ impl Interpreter {
     where
         F: FnOnce(&mut Self) -> R,
     {
-        let root_scope = vec![*self.state.scope_stack.root_scope()];
+        let root_scope = vec![self.state.scope_stack.root_scope().clone()];
         self.with_scope(root_scope, f)
     }
 

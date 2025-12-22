@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use tlang_hir::hir::{self, HirScope, ScopeIndex};
 
 use crate::resolver::Resolver;
@@ -58,16 +61,14 @@ impl ScopeStack {
     }
 
     pub fn pop(&mut self) {
-        if let Some(_scope) = self.scopes.pop() {
-            // For local scopes, we don't physically truncate memory (to preserve closures)
-            // but we do need to ensure that the next scope starts at the correct position
+        if let Some(scope) = self.scopes.pop() {
+            // For local scopes, we truncate memory and close the scope
             if !self.scopes.is_empty() {
-                // Instead of truncating, we'll let the next scope start at the correct logical position
-                // The key insight is that we need to maintain correct scope boundaries
-                // even when memory is preserved for closures
-
-                // Note: We don't call self.memory.truncate(scope.start()) here to preserve closure memory
-                // The downside is that this can lead to memory leaks, but it's necessary for closures
+                let start = scope.start();
+                let end = self.memory.len();
+                let values = self.memory[start..end].to_vec();
+                scope.close(values);
+                self.memory.truncate(start);
             }
             // Global scope uses separate global_memory, no truncation needed for memory vector
         }
@@ -129,9 +130,13 @@ impl ScopeStack {
         } else {
             // Local scopes use memory vector with start position
             let current_scope = self.current_scope();
-            let start = current_scope.start();
-            let absolute_index = start + index;
-            self.memory.get(absolute_index).copied()
+            match current_scope.state() {
+                ScopeState::Open { start, .. } => {
+                    let absolute_index = start + index;
+                    self.memory.get(absolute_index).copied()
+                }
+                ScopeState::Closed { values } => values.get(index).copied(),
+            }
         }
     }
 
@@ -148,14 +153,22 @@ impl ScopeStack {
         } else {
             // Local scopes use memory vector with start position
             let current_scope = self.current_scope();
-            let start = current_scope.start();
-            let absolute_index = start + index;
+            match current_scope.state() {
+                ScopeState::Open { start, .. } => {
+                    let absolute_index = start + index;
 
-            // Extend memory vector if needed to accommodate this slot
-            if absolute_index >= self.memory.len() {
-                self.memory.resize(absolute_index + 1, TlangValue::Nil);
+                    // Extend memory vector if needed to accommodate this slot
+                    if absolute_index >= self.memory.len() {
+                        self.memory.resize(absolute_index + 1, TlangValue::Nil);
+                    }
+                    self.memory[absolute_index] = value;
+                }
+                ScopeState::Closed { .. } => {
+                    // Should not happen for current scope?
+                    // Actually, current scope should always be Open unless we are doing something weird.
+                    panic!("Cannot set local in closed scope");
+                }
             }
-            self.memory[absolute_index] = value;
         }
     }
 
@@ -168,9 +181,13 @@ impl ScopeStack {
         } else {
             // Local scopes use memory vector with start position
             let scope = &self.scopes[scope_index];
-            let start = scope.start();
-            let absolute_index = start + index;
-            self.memory.get(absolute_index).copied()
+            match scope.state() {
+                ScopeState::Open { start, .. } => {
+                    let absolute_index = start + index;
+                    self.memory.get(absolute_index).copied()
+                }
+                ScopeState::Closed { values } => values.get(index).copied(),
+            }
         }
     }
 
@@ -185,10 +202,19 @@ impl ScopeStack {
         } else {
             // Local scopes use memory vector with start position
             let scope = &self.scopes[scope_index];
-            let start = scope.start();
-            let absolute_index = start + index;
-            if absolute_index < self.memory.len() {
-                self.memory[absolute_index] = value;
+            match scope.state() {
+                ScopeState::Open { start, .. } => {
+                    let absolute_index = start + index;
+                    if absolute_index < self.memory.len() {
+                        self.memory[absolute_index] = value;
+                    }
+                }
+                ScopeState::Closed { .. } => {
+                    // We need to be able to mutate closed upvalues too!
+                    // But Scope::state() returns a copy of the state enum?
+                    // No, I need to access the inner RefCell.
+                    scope.set_value(index, value);
+                }
             }
         }
     }
@@ -241,41 +267,47 @@ impl ScopeStack {
     /// Panics if there is no current scope
     pub fn init_var_index_after_params(&mut self, param_count: usize) {
         let current_scope = self.scopes.last_mut().expect("No current scope");
-        current_scope.next_var_index = param_count;
+        current_scope.set_next_var_index(param_count);
     }
 
-    pub fn get_scope_locals(&self, scope: &Scope) -> &[TlangValue] {
+    pub fn get_scope_locals(&self, scope: &Scope) -> Vec<TlangValue> {
         // Check if this is the global scope (first scope with start 0)
         if scope.start() == 0
             && !self.scopes.is_empty()
-            && std::ptr::eq(scope, &raw const self.scopes[0])
+            && std::ptr::eq(scope.inner.as_ptr(), self.scopes[0].inner.as_ptr())
         {
             // Global scope uses global_memory - return entire vector
-            &self.global_memory[..]
+            self.global_memory.clone()
         } else {
-            // Local scopes: find the range for this scope
-            let start = scope.start();
+            match scope.state() {
+                ScopeState::Open { start, .. } => {
+                    // Local scopes: find the range for this scope
+                    // Find the end position by looking for the next scope's start or using vector length
+                    let end = {
+                        // Find this scope's index
+                        let scope_index = self
+                            .scopes
+                            .iter()
+                            .position(|s| std::ptr::eq(s.inner.as_ptr(), scope.inner.as_ptr()));
 
-            // Find the end position by looking for the next scope's start or using vector length
-            let end = {
-                // Find this scope's index
-                let scope_index = self.scopes.iter().position(|s| std::ptr::eq(s, scope));
+                        if let Some(idx) = scope_index {
+                            if idx == self.scopes.len() - 1 {
+                                // This is the current (last) scope - end is vector length
+                                self.memory.len()
+                            } else {
+                                // Not the last scope - end is next scope's start
+                                self.scopes[idx + 1].start()
+                            }
+                        } else {
+                            // Fallback: assume this scope goes to the end
+                            self.memory.len()
+                        }
+                    };
 
-                if let Some(idx) = scope_index {
-                    if idx == self.scopes.len() - 1 {
-                        // This is the current (last) scope - end is vector length
-                        self.memory.len()
-                    } else {
-                        // Not the last scope - end is next scope's start
-                        self.scopes[idx + 1].start()
-                    }
-                } else {
-                    // Fallback: assume this scope goes to the end
-                    self.memory.len()
+                    self.memory[start..end].to_vec()
                 }
-            };
-
-            &self.memory[start..end]
+                ScopeState::Closed { values } => values,
+            }
         }
     }
 }
@@ -292,49 +324,100 @@ impl Resolver for ScopeStack {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
-pub struct Scope {
-    // Starting position of this scope in the memory vector
-    start: usize,
-    // Number of local variables allocated for this scope
-    size: usize,
-    // Track the next variable index for let bindings in this scope
-    // Function parameters are assigned sequentially starting from 0,
-    // then let bindings continue from there
+#[derive(Debug, Clone)]
+enum ScopeState {
+    Open { start: usize, size: usize },
+    Closed { values: Vec<TlangValue> },
+}
+
+#[derive(Debug)]
+struct ScopeInner {
+    state: ScopeState,
     next_var_index: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct Scope {
+    inner: Rc<RefCell<ScopeInner>>,
+}
+
+impl Default for Scope {
+    fn default() -> Self {
+        Self::new(0, 0)
+    }
 }
 
 impl Scope {
     pub fn new(start: usize, size: usize) -> Self {
         Self {
-            start,
-            size,
-            next_var_index: 0,
+            inner: Rc::new(RefCell::new(ScopeInner {
+                state: ScopeState::Open { start, size },
+                next_var_index: 0,
+            })),
         }
     }
 
     pub fn start(&self) -> usize {
-        self.start
+        match self.inner.borrow().state {
+            ScopeState::Open { start, .. } => start,
+            ScopeState::Closed { .. } => 0, // Or panic?
+        }
     }
 
     pub fn size(&self) -> usize {
-        self.size
+        match self.inner.borrow().state {
+            ScopeState::Open { size, .. } => size,
+            ScopeState::Closed { ref values } => values.len(),
+        }
+    }
+
+    fn state(&self) -> ScopeState {
+        self.inner.borrow().state.clone()
+    }
+
+    fn close(&self, values: Vec<TlangValue>) {
+        self.inner.borrow_mut().state = ScopeState::Closed { values };
+    }
+
+    fn set_value(&self, index: usize, value: TlangValue) {
+        let mut inner = self.inner.borrow_mut();
+        match &mut inner.state {
+            ScopeState::Closed { values } => {
+                if index < values.len() {
+                    values[index] = value;
+                }
+            }
+            _ => panic!("Cannot set value on open scope directly"),
+        }
     }
 
     pub fn increment_var_index(&mut self) -> usize {
-        let index = self.next_var_index;
+        let mut inner = self.inner.borrow_mut();
+        let index = inner.next_var_index;
         // If we're exceeding the pre-calculated scope size, expand it
         // This handles cases where HIR analysis doesn't perfectly match runtime needs
-        if index >= self.size {
+        let size = match inner.state {
+            ScopeState::Open { size, .. } => size,
+            ScopeState::Closed { ref values } => values.len(),
+        };
+
+        if index >= size {
             log::debug!(
                 "Expanding scope size from {} to {} due to additional variable allocation at index {}",
-                self.size,
+                size,
                 index + 1,
                 index
             );
-            self.size = index + 1;
+            match &mut inner.state {
+                ScopeState::Open { size, .. } => *size = index + 1,
+                ScopeState::Closed { .. } => panic!("Cannot expand closed scope"),
+            }
         }
-        self.next_var_index += 1;
+        inner.next_var_index += 1;
         index
+    }
+
+    pub fn set_next_var_index(&mut self, index: usize) {
+        self.inner.borrow_mut().next_var_index = index;
     }
 }
