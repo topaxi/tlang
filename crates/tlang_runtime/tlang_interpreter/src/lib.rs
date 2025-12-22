@@ -726,7 +726,11 @@ impl Interpreter {
 
         let fn_object = self.state.new_object(TlangObjectKind::Fn(decl.hir_id));
 
-        self.push_value(fn_object);
+        if self.state.is_global_scope() || !self.state.current_scope_has_slots() {
+            self.push_value(fn_object);
+        } else {
+            self.state.set_let_binding(fn_object);
+        }
 
         match &decl.name.kind {
             hir::ExprKind::Path(path) => {
@@ -808,7 +812,11 @@ impl Interpreter {
     fn eval_dyn_fn_decl(&mut self, decl: &hir::DynFunctionDeclaration) {
         let dyn_fn_object = self.create_dyn_fn_object(decl);
 
-        self.push_value(dyn_fn_object);
+        if self.state.is_global_scope() || !self.state.current_scope_has_slots() {
+            self.push_value(dyn_fn_object);
+        } else {
+            self.state.set_let_binding(dyn_fn_object);
+        }
 
         match &decl.name.kind {
             hir::ExprKind::Path(path) => {

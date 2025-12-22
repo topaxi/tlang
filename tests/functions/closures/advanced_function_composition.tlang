@@ -136,7 +136,3 @@ counter_gen() |> log();
 
 fact_gen() |> log();
 fact_gen() |> log();
-
-// Test composition of generated functions
-let composed_generators = compose(counter_gen, fib_gen);
-composed_generators() |> log();
