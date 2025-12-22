@@ -92,11 +92,7 @@ impl Clone for Literal {
         match self {
             Literal::String(value) => Literal::String(value.clone()),
             Literal::Char(value) => Literal::Char(value.clone()),
-            Literal::Boolean(value) => Literal::Boolean(*value),
-            Literal::Integer(value) => Literal::Integer(*value),
-            Literal::UnsignedInteger(value) => Literal::UnsignedInteger(*value),
-            Literal::Float(value) => Literal::Float(*value),
-            Literal::None => Literal::None,
+            _ => unsafe { std::ptr::read(self) },
         }
     }
 }
