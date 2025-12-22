@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use smallvec::SmallVec;
 
 use tlang_span::HirId;
@@ -6,7 +8,7 @@ use crate::InterpreterState;
 
 use super::TlangValue;
 
-pub type TlangNativeFn = Box<dyn FnMut(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn>;
+pub type TlangNativeFn = Rc<dyn Fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn>;
 
 #[derive(Debug)]
 pub enum NativeFnReturn {
