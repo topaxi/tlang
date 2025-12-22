@@ -431,7 +431,7 @@ impl InterpreterState {
         let fn_object = self.new_object(TlangObjectKind::NativeFn);
 
         self.native_fns
-            .insert(fn_object.get_object_id().unwrap(), Box::new(f));
+            .insert(fn_object.get_object_id().unwrap(), Rc::new(f));
         self.native_fns_meta.insert(
             fn_object.get_object_id().unwrap(),
             NativeFnMeta {
@@ -456,13 +456,8 @@ impl InterpreterState {
         fn_id: TlangObjectId,
         args: &[TlangValue],
     ) -> Option<NativeFnReturn> {
-        let native_fn_ptr = self.native_fns.get_mut(&fn_id)? as *mut TlangNativeFn;
-
-        // 🙈
-        unsafe {
-            let native_fn = &mut *native_fn_ptr;
-            Some(native_fn(self, args))
-        }
+        let native_fn = self.native_fns.get(&fn_id)?.clone();
+        Some(native_fn(self, args))
     }
 
     pub fn get_closure_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
