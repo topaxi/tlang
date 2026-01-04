@@ -928,10 +928,12 @@ impl Interpreter {
             TlangObjectKind::Closure(closure) => {
                 let closure_decl = self.get_closure_decl(closure.id).unwrap();
                 // Clone the captured scope stack so we can move it into `with_scope`
-                // without borrowing `closure` for the duration of the call. The closure
-                // already owns its own independent `scope_stack`; this clone exists
-                // solely to satisfy borrowing/ownership requirements, not to preserve
-                // the original scope stack.
+                // without borrowing `closure` for the duration of the call.
+                //
+                // Note: We use with_scope (scope-swapping) rather than with_captured_scope
+                // because closures need to be able to mutate variables in parent scopes.
+                // The captured_memory field is used for GC tracing but not for execution,
+                // since using captured memory would prevent mutable capture semantics.
                 let scope_stack = closure.scope_stack.clone();
 
                 self.with_scope(scope_stack, |this| {

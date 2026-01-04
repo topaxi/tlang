@@ -303,6 +303,40 @@ impl ScopeStack {
     pub fn global_memory_len(&self) -> usize {
         self.global_memory.len()
     }
+
+    /// Replace all memory with captured values from a closure.
+    /// Returns the previous memory state (global_memory, memory) for restoration.
+    ///
+    /// The captured_memory is split at global_memory_len into:
+    /// - global_memory: captured_memory[..global_memory_len]
+    /// - memory: captured_memory[global_memory_len..]
+    ///
+    /// Note: This method is prepared for future GC work but is not currently used
+    /// because closure execution requires mutable capture semantics (scope-swapping).
+    #[allow(dead_code)]
+    pub fn replace_memory_with_captured(
+        &mut self,
+        captured_memory: &[TlangValue],
+        global_memory_len: usize,
+    ) -> (Vec<TlangValue>, Vec<TlangValue>) {
+        let (global_part, local_part) =
+            captured_memory.split_at(global_memory_len.min(captured_memory.len()));
+
+        let old_global = std::mem::replace(&mut self.global_memory, global_part.to_vec());
+        let old_local = std::mem::replace(&mut self.memory, local_part.to_vec());
+
+        (old_global, old_local)
+    }
+
+    /// Restore memory to previous state after closure execution.
+    ///
+    /// Note: This method is prepared for future GC work but is not currently used
+    /// because closure execution requires mutable capture semantics (scope-swapping).
+    #[allow(dead_code)]
+    pub fn restore_memory(&mut self, global_memory: Vec<TlangValue>, memory: Vec<TlangValue>) {
+        self.global_memory = global_memory;
+        self.memory = memory;
+    }
 }
 
 impl Default for ScopeStack {
