@@ -927,11 +927,13 @@ impl Interpreter {
         match self.get_object_by_id(id) {
             TlangObjectKind::Closure(closure) => {
                 let closure_decl = self.get_closure_decl(closure.id).unwrap();
+                // Clone the captured scope stack so we can move it into `with_scope`
+                // without borrowing `closure` for the duration of the call. The closure
+                // already owns its own independent `scope_stack`; this clone exists
+                // solely to satisfy borrowing/ownership requirements, not to preserve
+                // the original scope stack.
                 let scope_stack = closure.scope_stack.clone();
 
-                // Use the original approach: just swap in the scope metadata
-                // The actual memory is kept alive (not truncated when scopes exit)
-                // so the closure can still access its captured values
                 self.with_scope(scope_stack, |this| {
                     this.eval_fn_call(&closure_decl, callee, args)
                         .unwrap_value()
@@ -1806,6 +1808,24 @@ mod tests {
         let mut interpreter = interpreter("");
         let result = interpreter.eval("");
         assert_matches!(result, TlangValue::Nil);
+    }
+
+    #[test]
+    fn test_eval_expr_direct() {
+        // Test the public eval_expr method directly
+        let mut test_interp = TestInterpreter::new();
+        let hir = test_interp.parse("{ 1 + 2 };");
+
+        // Extract the block expression from the statement
+        if let hir::StmtKind::Expr(expr) = &hir.block.stmts[0].kind {
+            if let hir::ExprKind::Block(block_expr) = &expr.kind {
+                // Evaluate the expression inside the block
+                if let Some(tail_expr) = &block_expr.expr {
+                    let result = test_interp.interpreter.eval_expr(tail_expr);
+                    assert_eq!(result.unwrap_value(), TlangValue::U64(3));
+                }
+            }
+        }
     }
 
     #[test]
