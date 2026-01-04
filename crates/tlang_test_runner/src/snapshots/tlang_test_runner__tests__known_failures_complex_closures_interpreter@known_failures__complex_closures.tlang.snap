@@ -7,6 +7,6 @@ input_file: tests/known_failures/complex_closures.tlang
 === Complex Closures Test ===
 
 
-thread 'main' panicked at crates/tlang_runtime/tlang_interpreter/src/lib.rs:731:22:
+thread 'main' panicked at crates/tlang_runtime/tlang_interpreter/src/lib.rs:700:22:
 not yet implemented: eval_object_binary_op: Add, "fn anonymous#13(operation)", "1"
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

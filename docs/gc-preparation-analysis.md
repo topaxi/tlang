@@ -366,6 +366,7 @@ The following GC preparation infrastructure has been implemented:
    - `Enum` → yields all field values
    - `Slice` → yields the underlying array reference
    - `Closure` → yields all captured memory values
+   - `Cell` → yields the wrapped value
    - `Fn`, `NativeFn`, `String` → no references (empty iterator)
 
 2. **`MemoryStats`** - Tracks allocation statistics:
@@ -384,7 +385,18 @@ The following GC preparation infrastructure has been implemented:
    - Currently stored but not used during execution (execution still uses scope-swapping)
    - Enables GC tracing via `referenced_values()`
 
-5. **`ScopeStack::capture_all_memory()`** - Helper to capture memory state:
+5. **`TlangClosure::captured_cells`** - Prepared for mutable capture support:
+   - Maps (scope_index, var_index) to Cell object IDs
+   - Enables closures to share mutable state with parent scopes via cells
+   - Not currently populated during closure creation (prepared for future use)
+
+6. **`TlangObjectKind::Cell`** - New object type for mutable captures:
+   - Wraps a `TlangValue` in a mutable cell
+   - Enables shared mutable state between closures and parent scopes
+   - Includes `get()` and `set()` methods for value access/mutation
+   - Helper methods: `new_cell()`, `get_cell_value()`, `set_cell_value()` on `InterpreterState`
+
+7. **`ScopeStack::capture_all_memory()`** - Helper to capture memory state:
    - Returns combined global + local memory as a single vector
    - `global_memory_len()` returns the current global memory size
 
