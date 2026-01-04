@@ -16,7 +16,9 @@ use crate::shape::{
 use crate::value::{
     TlangValue,
     function::{NativeFnReturn, TlangNativeFn},
-    object::{TlangClosure, TlangEnum, TlangObjectId, TlangObjectKind, TlangSlice, TlangStruct},
+    object::{
+        TlangCell, TlangClosure, TlangEnum, TlangObjectId, TlangObjectKind, TlangSlice, TlangStruct,
+    },
 };
 
 pub enum CallStackKind {
@@ -427,6 +429,29 @@ impl InterpreterState {
         TlangValue::new_object(self.objects.insert(kind))
     }
 
+    /// Create a new cell containing the given value.
+    /// Cells are used for closure captures to enable mutable bindings.
+    pub fn new_cell(&mut self, value: TlangValue) -> TlangValue {
+        self.new_object(TlangObjectKind::Cell(TlangCell::new(value)))
+    }
+
+    /// Get the value inside a cell.
+    pub fn get_cell_value(&self, cell_id: TlangObjectId) -> Option<TlangValue> {
+        self.objects
+            .get(cell_id)
+            .and_then(|obj| obj.get_cell())
+            .map(|cell| cell.get())
+    }
+
+    /// Set the value inside a cell.
+    pub fn set_cell_value(&mut self, cell_id: TlangObjectId, value: TlangValue) {
+        if let Some(obj) = self.objects.get_mut(cell_id) {
+            if let Some(cell) = obj.get_cell_mut() {
+                cell.set(value);
+            }
+        }
+    }
+
     /// Returns the current memory statistics.
     pub fn memory_stats(&self) -> &MemoryStats {
         &self.memory_stats
@@ -453,16 +478,14 @@ impl InterpreterState {
             .entry(decl.hir_id)
             .or_insert_with(|| decl.clone().into());
 
-        // Capture all memory values from the current scope stack for future GC.
-        // NOTE: Currently, captured_memory is stored but not used during execution.
-        // Execution still uses scope_stack with shared memory for correct mutable
-        // capture semantics. Future GC work will switch to using captured_memory.
+        // Capture all memory values from the current scope stack for GC tracing.
         let global_memory_len = self.scope_stack.global_memory_len();
         let captured_memory = self.scope_stack.capture_all_memory();
 
         self.new_object(TlangObjectKind::Closure(TlangClosure {
             id: decl.hir_id,
             scope_stack: self.scope_stack.scopes.clone(),
+            captured_cells: std::collections::HashMap::new(),
             captured_memory,
             global_memory_len,
         }))
@@ -804,6 +827,10 @@ impl InterpreterState {
                     } else {
                         "fn anonymous(...) { *native* }".to_string()
                     }
+                }
+                Some(TlangObjectKind::Cell(cell)) => {
+                    // Stringify the value inside the cell
+                    self.stringify(cell.get())
                 }
             },
             _ => value.to_string(),

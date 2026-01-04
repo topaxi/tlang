@@ -12,17 +12,16 @@ pub struct TlangClosure {
     // Scope metadata at closure creation time. Used during execution to
     // restore the correct scope context when the closure is called.
     pub scope_stack: Vec<crate::scope::Scope>,
+    // Captured cells for mutable upvar bindings.
+    // Key: (scope_index, var_index) - where scope_index is the absolute scope index
+    // Value: TlangObjectId of a Cell object
+    //
+    // When a closure captures an upvar, instead of copying the value, we create a
+    // Cell object and store references in both the closure and the original memory.
+    // This enables mutations to be visible in both places.
+    pub captured_cells: std::collections::HashMap<(usize, usize), TlangObjectId>,
     // Captured values from parent scopes, stored contiguously (global + local).
-    //
-    // This is used for GC tracing (via referenced_values()) but NOT for execution.
-    // Execution uses scope-swapping with shared memory because closures need to
-    // be able to mutate variables in parent scopes. Using captured_memory for
-    // execution would break mutable capture semantics since mutations would be
-    // lost when the closure returns.
-    //
-    // Future optimization: A full GC implementation could use this captured_memory
-    // combined with reference cells for mutable captures, enabling scope memory
-    // truncation while preserving mutation semantics.
+    // Used for GC tracing to find all reachable objects from this closure.
     pub captured_memory: Vec<TlangValue>,
     // Length of global memory at capture time, used to split captured_memory
     // into global and local portions for GC tracing.
@@ -154,6 +153,28 @@ impl TlangSlice {
 
 pub type TlangObjectId = usize;
 
+/// A mutable cell that holds a TlangValue. Used for closure captures
+/// to enable mutable bindings that are shared between the closure
+/// and its parent scope.
+#[derive(Debug)]
+pub struct TlangCell {
+    pub value: TlangValue,
+}
+
+impl TlangCell {
+    pub fn new(value: TlangValue) -> Self {
+        Self { value }
+    }
+
+    pub fn get(&self) -> TlangValue {
+        self.value
+    }
+
+    pub fn set(&mut self, value: TlangValue) {
+        self.value = value;
+    }
+}
+
 #[derive(Debug)]
 pub enum TlangObjectKind {
     Fn(HirId),
@@ -163,6 +184,10 @@ pub enum TlangObjectKind {
     Enum(TlangEnum),
     Slice(TlangSlice),
     Closure(TlangClosure),
+    /// A mutable cell for closure captures. When a variable is captured by a
+    /// closure, it's wrapped in a cell so mutations are visible to both the
+    /// closure and the original scope.
+    Cell(TlangCell),
 }
 
 impl TlangObjectKind {
@@ -217,7 +242,24 @@ impl TlangObjectKind {
             TlangObjectKind::Struct(s) => !s.is_empty(),
             TlangObjectKind::Slice(s) => !s.is_empty(),
             TlangObjectKind::Closure(_) => true,
+            TlangObjectKind::Cell(_) => true, // Cells are always truthy (they exist)
             TlangObjectKind::Enum(_) => todo!(),
+        }
+    }
+
+    /// Get a reference to the cell if this is a Cell variant.
+    pub fn get_cell(&self) -> Option<&TlangCell> {
+        match self {
+            TlangObjectKind::Cell(c) => Some(c),
+            _ => None,
+        }
+    }
+
+    /// Get a mutable reference to the cell if this is a Cell variant.
+    pub fn get_cell_mut(&mut self) -> Option<&mut TlangCell> {
+        match self {
+            TlangObjectKind::Cell(c) => Some(c),
+            _ => None,
         }
     }
 
@@ -232,6 +274,7 @@ impl TlangObjectKind {
             TlangObjectKind::Enum(e) => ReferencedValuesIter::Slice(e.field_values.iter()),
             TlangObjectKind::Slice(s) => ReferencedValuesIter::Single(Some(s.of)),
             TlangObjectKind::Closure(c) => ReferencedValuesIter::Slice(c.captured_memory.iter()),
+            TlangObjectKind::Cell(c) => ReferencedValuesIter::Single(Some(c.value)),
             TlangObjectKind::Fn(_) | TlangObjectKind::NativeFn | TlangObjectKind::String(_) => {
                 ReferencedValuesIter::Empty
             }
@@ -357,6 +400,7 @@ mod tests {
         let closure = TlangClosure {
             id: HirId::new(1),
             scope_stack: vec![Scope::default()],
+            captured_cells: std::collections::HashMap::new(),
             captured_memory: captured.clone(),
             global_memory_len: 1,
         };
@@ -376,6 +420,7 @@ mod tests {
         let closure = TlangClosure {
             id: HirId::new(1),
             scope_stack: vec![Scope::default()],
+            captured_cells: std::collections::HashMap::new(),
             captured_memory: vec![],
             global_memory_len: 0,
         };
@@ -402,5 +447,44 @@ mod tests {
         let obj = TlangObjectKind::String("test".to_string());
         let iter = obj.referenced_values();
         assert_eq!(iter.len(), 0);
+    }
+
+    #[test]
+    fn test_cell_basic_operations() {
+        // Test cell creation and value access
+        let cell = TlangCell::new(TlangValue::I64(42));
+        assert_eq!(cell.get(), TlangValue::I64(42));
+    }
+
+    #[test]
+    fn test_cell_mutation() {
+        // Test cell value mutation
+        let mut cell = TlangCell::new(TlangValue::I64(0));
+        assert_eq!(cell.get(), TlangValue::I64(0));
+
+        cell.set(TlangValue::I64(100));
+        assert_eq!(cell.get(), TlangValue::I64(100));
+    }
+
+    #[test]
+    fn test_cell_referenced_values() {
+        // Cell containing an object reference should yield that reference
+        let cell = TlangCell::new(TlangValue::Object(42));
+        let obj = TlangObjectKind::Cell(cell);
+
+        let refs: Vec<_> = obj.referenced_values().collect();
+        assert_eq!(refs.len(), 1);
+        assert_eq!(refs[0], TlangValue::Object(42));
+    }
+
+    #[test]
+    fn test_cell_with_primitive() {
+        // Cell containing a primitive should yield that primitive
+        let cell = TlangCell::new(TlangValue::Bool(true));
+        let obj = TlangObjectKind::Cell(cell);
+
+        let refs: Vec<_> = obj.referenced_values().collect();
+        assert_eq!(refs.len(), 1);
+        assert_eq!(refs[0], TlangValue::Bool(true));
     }
 }
