@@ -17,6 +17,6 @@
     "@lezer/generator": "^1.8.0"
   },
   "dependencies": {
-    "@lezer/lr": "^1.4.5"
+    "@lezer/lr": "^1.4.6"
   }
 }
