@@ -1,7 +1,7 @@
 import {
+  CodemirrorDiagnostic,
   getStandardLibraryCompiled,
   Tlang,
-  type CodemirrorDiagnostic,
   type JsHirPrettyOptions,
   type Runner,
 } from '../tlang';
@@ -19,7 +19,13 @@ export interface LocalDiagnostic {
 export class TlangController {
   private tlang: Tlang;
   consoleMessages: ConsoleMessage[] = [];
-  private tlangConsole: Record<string, (...args: unknown[]) => void>;
+  private readonly tlangConsole = {
+    log: (...args: unknown[]) => this.logToConsole('log', ...args),
+    warn: (...args: unknown[]) => this.logToConsole('warn', ...args),
+    error: (...args: unknown[]) => this.logToConsole('error', ...args),
+    group: (...args: unknown[]) => this.logToConsole('group', ...args),
+    groupEnd: (...args: unknown[]) => this.logToConsole('groupEnd', ...args),
+  };
 
   private cachedAST: string | null = null;
   private cachedHIR: string | null = null;
@@ -27,13 +33,6 @@ export class TlangController {
 
   constructor(initialSource: string, initialRunner: Runner) {
     this.tlang = new Tlang(initialSource, initialRunner);
-    this.tlangConsole = {
-      log: (...args: unknown[]) => this.logToConsole('log', ...args),
-      warn: (...args: unknown[]) => this.logToConsole('warn', ...args),
-      error: (...args: unknown[]) => this.logToConsole('error', ...args),
-      group: (...args: unknown[]) => this.logToConsole('group', ...args),
-      groupEnd: (...args: unknown[]) => this.logToConsole('groupEnd', ...args),
-    };
   }
 
   updateTlang(source: string, runner: Runner) {
@@ -58,15 +57,9 @@ export class TlangController {
     this.analyze();
   }
 
-  analyze(): LocalDiagnostic[] {
+  analyze(): CodemirrorDiagnostic[] {
     try {
       this.tlang.analyze();
-
-      const rawDiagnostics = this.tlang.getCodemirrorDiagnostics();
-      const diagnostics =
-        rawDiagnostics.map(this.mapCodemirrorDiagnosticToJS) ?? [];
-
-      rawDiagnostics.forEach((d) => d.free());
 
       for (let diagnostic of this.tlang.getDiagnostics()) {
         let method =
@@ -78,7 +71,7 @@ export class TlangController {
         this.logToConsole(method, formatted);
       }
 
-      return diagnostics;
+      return this.tlang.getCodemirrorDiagnostics();
     } catch {
       for (let parseError of this.tlang.getParseErrors()) {
         let kind =
@@ -151,17 +144,6 @@ export class TlangController {
 
   private runInterpreted() {
     this.tlang.eval();
-  }
-
-  private mapCodemirrorDiagnosticToJS(
-    diagnostic: CodemirrorDiagnostic,
-  ): LocalDiagnostic {
-    return {
-      from: diagnostic.from,
-      to: diagnostic.to,
-      message: diagnostic.message,
-      severity: diagnostic.severity as CodemirrorSeverity,
-    };
   }
 
   getASTString() {

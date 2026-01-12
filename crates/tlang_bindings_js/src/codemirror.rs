@@ -1,25 +1,19 @@
 use tlang_parser::error::ParseIssue;
 use tlang_semantics::diagnostic::Diagnostic;
-use wasm_bindgen::prelude::*;
+use serde::{Deserialize, Serialize};
+use tsify::Tsify;
 
-#[wasm_bindgen]
+#[derive(Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi)]
 pub struct CodemirrorDiagnostic {
-    #[wasm_bindgen(readonly, getter_with_clone)]
     pub message: String,
-
-    #[wasm_bindgen(readonly, getter_with_clone)]
     pub severity: String,
-
     /// Relative position in the document, our diagnostics are line/column based
-    #[wasm_bindgen(readonly)]
     pub from: u32,
-
     /// Relative position in the document, our diagnostics are line/column based
-    #[wasm_bindgen(readonly)]
     pub to: u32,
 }
 
-#[wasm_bindgen]
 impl CodemirrorDiagnostic {
     pub(crate) fn new(message: &str, severity: &str, from: u32, to: u32) -> Self {
         CodemirrorDiagnostic {
