@@ -63,7 +63,7 @@ export class TlangController {
 
       for (let diagnostic of this.tlang.getDiagnostics()) {
         let method =
-          diagnostic.severity === 'Error'
+          diagnostic.severity === 'error'
             ? ('error' as const)
             : ('warn' as const);
         let formatted = `${diagnostic.message} at ${diagnostic.span.start.line}:${diagnostic.span.start.column}`;
