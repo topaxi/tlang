@@ -1,0 +1,13 @@
+[package]
+name = "tlang_runtime"
+version = "0.1.0"
+edition.workspace = true
+description = "Runtime environment for tlang, including memory management, standard library, and interpreter"
+
+[dependencies]
+tlang_interpreter = { path = "tlang_interpreter" }
+tlang_memory = { path = "tlang_memory" }
+tlang_stdlib = { path = "tlang_stdlib" }
+
+[lints]
+workspace = true

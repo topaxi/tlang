@@ -1,9 +1,8 @@
 extern crate console_error_panic_hook;
-extern crate tlang_interpreter;
 
 use wasm_bindgen::prelude::*;
 
-pub use tlang_memory::NativeFnDef;
+pub use tlang_runtime::memory::NativeFnDef;
 
 pub mod codemirror;
 pub mod interpreter;

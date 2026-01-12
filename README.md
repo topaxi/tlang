@@ -41,6 +41,10 @@ fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
 - **WebAssembly Bindings**: Run in browsers via WebAssembly
 - **Interactive Playground**: Web-based development environment
 
+## Architecture
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details on the compiler pipeline and runtime structure.
+
 ## Quick Examples
 
 ### Basic Function Definition and Pattern Matching
@@ -197,7 +201,7 @@ Output options:
 
 ### Interpreter
 
-Run tlang directly:
+Run tlang interpreter directly:
 ```bash
 ./target/release/tlangdi input.tlang
 ```

@@ -88,7 +88,7 @@ impl Tlang {
                 analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());
             }
             Runner::Interpreter => {
-                analyzer.add_builtin_symbols(&tlang_interpreter::Interpreter::builtin_symbols());
+                analyzer.add_builtin_symbols(&tlang_runtime::interpreter::Interpreter::builtin_symbols());
             }
             _ => {}
         }

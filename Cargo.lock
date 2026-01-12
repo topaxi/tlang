@@ -830,10 +830,9 @@ dependencies = [
  "tlang_hir",
  "tlang_hir_opt",
  "tlang_hir_pretty",
- "tlang_interpreter",
  "tlang_macros",
- "tlang_memory",
  "tlang_parser",
+ "tlang_runtime",
  "tlang_semantics",
  "tlang_symbols",
  "wasm-bindgen",
@@ -985,6 +984,15 @@ dependencies = [
  "tlang_ast",
  "tlang_lexer",
  "tlang_span",
+]
+
+[[package]]
+name = "tlang_runtime"
+version = "0.1.0"
+dependencies = [
+ "tlang_interpreter",
+ "tlang_memory",
+ "tlang_stdlib",
 ]
 
 [[package]]

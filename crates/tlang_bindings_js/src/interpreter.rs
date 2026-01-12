@@ -1,8 +1,8 @@
 use tlang_hir::hir;
-use tlang_memory::{InterpreterState, NativeFnReturn, prelude::*};
+use tlang_runtime::memory::{InterpreterState, NativeFnReturn, prelude::*};
 use wasm_bindgen::prelude::*;
 
-pub struct TlangInterpreter(tlang_interpreter::Interpreter);
+pub struct TlangInterpreter(tlang_runtime::interpreter::Interpreter);
 
 impl Default for TlangInterpreter {
     fn default() -> Self {
@@ -12,7 +12,7 @@ impl Default for TlangInterpreter {
 
 impl TlangInterpreter {
     pub(crate) fn new() -> Self {
-        let interpreter = tlang_interpreter::Interpreter::default();
+        let interpreter = tlang_runtime::interpreter::Interpreter::default();
 
         TlangInterpreter(interpreter)
     }
