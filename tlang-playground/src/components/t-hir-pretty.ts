@@ -1,7 +1,7 @@
 import { css, html, LitElement, TemplateResult } from 'lit';
 import { floating } from '../directives/floating';
 import { customElement, property, state } from 'lit/decorators.js';
-import { type Tlang } from 'tlang_bindings_js';
+import { type JsHirPrettyOptions } from '../tlang';
 
 import './t-button';
 import './t-menu';
@@ -45,13 +45,16 @@ export class HirPrettyElement extends LitElement {
   `;
 
   @property({ attribute: false })
-  tlang: Tlang | null = null;
+  rawSource: string = '';
+
+  @property({ attribute: false })
+  formatter = (_options: JsHirPrettyOptions) => this.rawSource;
 
   @state()
   private pretty = true;
 
   @state()
-  private hirPrettyOptions = {
+  private hirPrettyOptions: JsHirPrettyOptions = {
     indentSize: 4,
     tabIndent: false,
     markUnresolved: true,
@@ -59,13 +62,13 @@ export class HirPrettyElement extends LitElement {
     comments: false,
   };
 
-  private toggleHirPrettyOption(option: keyof typeof this.hirPrettyOptions) {
+  private toggleHirPrettyOption(option: keyof JsHirPrettyOptions) {
     this.setHirPrettyOption(option, !this.hirPrettyOptions[option]);
   }
 
-  private setHirPrettyOption<T extends keyof typeof this.hirPrettyOptions>(
+  private setHirPrettyOption<T extends keyof JsHirPrettyOptions>(
     option: T,
-    value: (typeof this.hirPrettyOptions)[T],
+    value: JsHirPrettyOptions[T],
   ) {
     this.hirPrettyOptions = {
       ...this.hirPrettyOptions,
@@ -148,10 +151,16 @@ export class HirPrettyElement extends LitElement {
         ? html`<t-codemirror
             part="output pretty"
             language="tlang"
-            .source=${this.tlang?.getHIRPretty(this.hirPrettyOptions)}
+            .source=${this.formatter(this.hirPrettyOptions)}
             readonly
           ></t-codemirror>`
-        : html`<pre part="output raw">${this.tlang?.getHIRString()}</pre>`}
+        : html`<pre part="output raw">${this.rawSource}</pre>`}
     `;
+  }
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    't-hir-pretty': HirPrettyElement;
   }
 }

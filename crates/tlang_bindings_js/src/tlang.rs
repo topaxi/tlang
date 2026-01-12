@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tlang_ast::node::{self as ast};
 use tlang_codegen_js::generator::CodegenJS;
 use tlang_hir::hir;
@@ -8,16 +8,31 @@ use tlang_parser::Parser;
 use tlang_parser::error::{ParseError, ParseIssue};
 use tlang_semantics::SemanticAnalyzer;
 use tlang_symbols::SymbolType;
+use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 
 use crate::codemirror;
+use crate::ts_types::{JsDiagnostic, JsParseIssue};
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(typescript_type = "JsDiagnostic[]")]
+    pub type JsDiagnosticArray;
+
+    #[wasm_bindgen(typescript_type = "JsParseIssue[]")]
+    pub type JsParseIssueArray;
+
+    #[wasm_bindgen(typescript_type = "unknown")]
+    pub type JsUnknown;
+}
 
 #[wasm_bindgen(js_name = "getStandardLibrarySource")]
 pub fn get_standard_library_source() -> String {
     CodegenJS::get_standard_library_source()
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 #[serde(rename_all = "camelCase")]
 pub struct JsHirPrettyOptions {
     pub tab_indent: Option<bool>,
@@ -88,7 +103,9 @@ impl Tlang {
                 analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());
             }
             Runner::Interpreter => {
-                analyzer.add_builtin_symbols(&tlang_runtime::interpreter::Interpreter::builtin_symbols());
+                analyzer.add_builtin_symbols(
+                    &tlang_runtime::interpreter::Interpreter::builtin_symbols(),
+                );
             }
             _ => {}
         }
@@ -114,7 +131,7 @@ impl Tlang {
     }
 
     #[wasm_bindgen]
-    pub fn eval(&mut self) -> Result<JsValue, JsError> {
+    pub fn eval(&mut self) -> Result<JsUnknown, JsError> {
         self.lower_to_hir();
 
         let hir = self
@@ -123,7 +140,7 @@ impl Tlang {
             .as_ref()
             .ok_or_else(|| JsError::new("Failed to generate HIR"))?;
 
-        Ok(self.interpreter.eval(hir))
+        Ok(self.interpreter.eval(hir).into())
     }
 
     #[wasm_bindgen(js_name = "defineFunction")]
@@ -153,8 +170,13 @@ impl Tlang {
     }
 
     #[wasm_bindgen(js_name = "getParseErrors")]
-    pub fn parse_errors(&mut self) -> Result<JsValue, serde_wasm_bindgen::Error> {
-        serde_wasm_bindgen::to_value(self.parse_issues())
+    pub fn parse_errors(&mut self) -> Result<JsParseIssueArray, serde_wasm_bindgen::Error> {
+        let issues: Vec<JsParseIssue> = self
+            .parse_issues()
+            .iter()
+            .map(|issue| JsParseIssue::from(issue.clone()))
+            .collect();
+        Ok(serde_wasm_bindgen::to_value(&issues)?.unchecked_into())
     }
 
     #[wasm_bindgen]
@@ -211,16 +233,19 @@ impl Tlang {
     }
 
     #[wasm_bindgen(js_name = "getHIRPretty")]
-    pub fn hir_pretty(&mut self, options: JsValue) -> Result<String, serde_wasm_bindgen::Error> {
+    pub fn hir_pretty(
+        &mut self,
+        options: Option<JsHirPrettyOptions>,
+    ) -> Result<String, serde_wasm_bindgen::Error> {
         self.lower_to_hir();
 
         if let Some(hir) = self.build.hir.as_ref() {
-            if options.is_undefined() {
-                return Ok(HirPretty::pretty_print(hir));
-            }
+            let options = if let Some(options) = options {
+                options.into_hir_pretty_options()
+            } else {
+                HirPrettyOptions::default()
+            };
 
-            let options: JsHirPrettyOptions = serde_wasm_bindgen::from_value(options)?;
-            let options = options.into_hir_pretty_options();
             let mut pretty_pinter = HirPretty::new(options);
 
             pretty_pinter.print_module(hir);
@@ -249,8 +274,14 @@ impl Tlang {
     }
 
     #[wasm_bindgen(js_name = "getDiagnostics")]
-    pub fn diagnostics(&mut self) -> Result<JsValue, serde_wasm_bindgen::Error> {
-        serde_wasm_bindgen::to_value(&self.analyzer.get_diagnostics())
+    pub fn diagnostics(&mut self) -> Result<JsDiagnosticArray, serde_wasm_bindgen::Error> {
+        let diagnostics: Vec<JsDiagnostic> = self
+            .analyzer
+            .get_diagnostics()
+            .iter()
+            .map(|diagnostic| JsDiagnostic::from(diagnostic.clone()))
+            .collect();
+        Ok(serde_wasm_bindgen::to_value(&diagnostics)?.unchecked_into())
     }
 
     #[wasm_bindgen(js_name = "getCodemirrorDiagnostics")]

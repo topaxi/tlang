@@ -6,6 +6,14 @@ export {
   Tlang,
   type CodemirrorDiagnostic,
   type Runner,
+  type JsHirPrettyOptions,
+  type JsDiagnostic,
+  type JsParseIssue,
+  type JsSpan,
+  type JsLineColumn,
+  type JsSeverity,
+  type JsParseIssueKind,
+  type JsToken,
 } from 'tlang_bindings_js';
 
 export const standardLibrarySource = getStandardLibrarySource();

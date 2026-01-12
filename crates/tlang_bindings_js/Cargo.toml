@@ -15,8 +15,8 @@ crate-type = [
 
 [dependencies]
 console_error_panic_hook = "0.1"
-wasm-bindgen = "=0.2.100"
-js-sys = "=0.3.77"
+wasm-bindgen = "=0.2.106"
+js-sys = "=0.3.83"
 console_log = { version = "1", features = ["color"] }
 tlang_ast = { path = "../tlang_ast", features = ["serde"] }
 tlang_ast_lowering = { path = "../tlang_ast_lowering" }
@@ -25,6 +25,7 @@ tlang_hir_opt = { path = "../tlang_hir_opt" }
 tlang_hir_pretty = { path = "../tlang_hir_pretty" }
 tlang_parser = { path = "../tlang_parser", features = ["serde"] }
 tlang_semantics = { path = "../tlang_semantics", features = ["serde"] }
+tlang_span = { path = "../tlang_span", features = ["serde"] }
 tlang_symbols = { path = "../tlang_symbols", features = ["serde"] }
 tlang_runtime = { path = "../tlang_runtime" }
 tlang_macros = { path = "../tlang_macros" }
@@ -34,9 +35,10 @@ log = { workspace = true }
 ron = { workspace = true }
 serde = { workspace = true }
 serde-wasm-bindgen = "0.6"
+tsify = { version = "0.5.6", features = ["js"] }
 
 [dependencies.web-sys]
-version = "=0.3.77"
+version = "=0.3.83"
 features = ['Document', 'Element', 'HtmlElement', 'Node', 'Window']
 
 [dev-dependencies]

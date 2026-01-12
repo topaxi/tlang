@@ -8,6 +8,7 @@ pub mod codemirror;
 pub mod interpreter;
 mod stdlib;
 pub mod tlang;
+pub mod ts_types;
 
 unsafe extern "C" {
     fn __wasm_call_ctors();
