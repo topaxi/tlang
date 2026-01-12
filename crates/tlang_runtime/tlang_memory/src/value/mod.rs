@@ -8,7 +8,6 @@ pub use arithmetic::TlangArithmetic;
 pub mod function;
 pub mod object;
 
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TlangPrimitive {
     Nil,

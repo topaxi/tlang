@@ -48,7 +48,11 @@ fn compile_standard_library() -> Result<String, ParserError> {
     Ok(js)
 }
 
-fn compile_to_hir(source: &str, target: &CompileTargetArg, show_warnings: bool) -> Result<hir::Module, ParserError> {
+fn compile_to_hir(
+    source: &str,
+    target: &CompileTargetArg,
+    show_warnings: bool,
+) -> Result<hir::Module, ParserError> {
     let mut parser = tlang_parser::Parser::from_source(source);
     let ast = parser.parse()?;
 
@@ -103,20 +107,22 @@ pub fn handle_compile(options: CompileOptions) {
         }
 
         let output_result = if options.output_format == OutputFormat::Ast {
-             // AST output has a separate pipeline path as it doesn't require HIR lowering
-             let mut module = hir::Module::default();
-             AstTarget.compile(&source, &mut module)
+            // AST output has a separate pipeline path as it doesn't require HIR lowering
+            let mut module = hir::Module::default();
+            AstTarget.compile(&source, &mut module)
         } else {
             // Standard pipeline: Parse -> AST -> Semantics -> HIR -> Optimize
             match compile_to_hir(&source, &options.target, !options.quiet_warnings) {
                 Ok(mut module) => {
                     match (&options.target, &options.output_format) {
-                        (CompileTargetArg::Js, OutputFormat::Source) => JsTarget.compile(&source, &mut module),
+                        (CompileTargetArg::Js, OutputFormat::Source) => {
+                            JsTarget.compile(&source, &mut module)
+                        }
                         (_, OutputFormat::Hir) => HirTarget.compile(&source, &mut module),
                         // Invalid combinations should be caught by argument parsing, but as a fallback:
                         _ => panic!("Unsupported target/format combination"),
                     }
-                },
+                }
                 Err(err) => Err(err),
             }
         };
@@ -129,7 +135,10 @@ pub fn handle_compile(options: CompileOptions) {
             }
         };
 
-        let output = if matches!((&options.target, &options.output_format), (CompileTargetArg::Js, OutputFormat::Source)) {
+        let output = if matches!(
+            (&options.target, &options.output_format),
+            (CompileTargetArg::Js, OutputFormat::Source)
+        ) {
             let std_lib_source = compile_standard_library().unwrap();
             format!("{std_lib_source}\n{{{output}}}")
         } else {

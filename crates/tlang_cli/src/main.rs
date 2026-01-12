@@ -89,6 +89,6 @@ fn main() {
 
     match command {
         Command::Compile(options) => handle_compile(options),
-        Command::Run { input_file } => handle_run(input_file),
+        Command::Run { input_file } => handle_run(&input_file),
     }
 }

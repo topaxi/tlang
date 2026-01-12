@@ -1,19 +1,12 @@
-use std::{
-    fs::File,
-    io::Read,
-    path::Path,
-};
+use std::{fs::File, io::Read, path::Path};
 
 use tlang_ast_lowering::lower_to_hir;
 use tlang_hir_opt::HirOptimizer;
-use tlang_runtime::{
-    interpreter::Interpreter,
-    memory::TlangValue,
-};
+use tlang_runtime::{interpreter::Interpreter, memory::TlangValue};
 use tlang_semantics::SemanticAnalyzer;
 
-pub fn handle_run(input_file: String) {
-    let path = Path::new(&input_file);
+pub fn handle_run(input_file: &str) {
+    let path = Path::new(input_file);
     let mut file = match File::open(path) {
         Err(why) => panic!("couldn't open {}: {}", path.display(), why),
         Ok(file) => file,
