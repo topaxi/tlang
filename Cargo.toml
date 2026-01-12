@@ -2,8 +2,10 @@
 members = [
   "crates/tlang_runtime/tlang_memory",
   "crates/tlang_runtime/tlang_stdlib",
+  "crates/tlang_cli",
   "crates/tlang_runtime/tlang_interpreter",
   "crates/*",
+  "tests/runner",
 ]
 resolver = "2"
 

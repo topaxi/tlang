@@ -143,7 +143,8 @@ mod tests {
             }
             Backend::JavaScript => {
                 #[allow(clippy::zombie_processes)]
-                let tlang_js_compiler_output = Command::new("./target/release/tlang_cli_js")
+                let tlang_js_compiler_output = Command::new("./target/release/tlang")
+                    .arg("compile")
                     .arg(file_path)
                     .stdout(Stdio::piped())
                     .spawn()

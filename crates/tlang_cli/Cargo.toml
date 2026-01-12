@@ -1,7 +1,11 @@
 [package]
-name = "tlang_cli_js"
+name = "tlang_cli"
 version = "0.1.0"
 edition.workspace = true
+
+[[bin]]
+name = "tlang"
+path = "src/main.rs"
 
 [dependencies]
 tlang_ast = { path = "../tlang_ast" }
@@ -11,9 +15,12 @@ tlang_hir = { path = "../tlang_hir", features = ["serde"] }
 tlang_hir_opt = { path = "../tlang_hir_opt" }
 tlang_codegen_js = { path = "../tlang_codegen_js" }
 tlang_semantics = { path = "../tlang_semantics" }
+tlang_runtime = { path = "../tlang_runtime" }
 ron = { workspace = true }
 clap = { version = "4", features = ["cargo"] }
 indoc = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
 
 [lints]
 workspace = true

@@ -841,11 +841,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "tlang_cli_js"
+name = "tlang_cli"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "env_logger",
  "indoc",
+ "log",
  "ron",
  "tlang_ast",
  "tlang_ast_lowering",
@@ -853,6 +855,7 @@ dependencies = [
  "tlang_hir",
  "tlang_hir_opt",
  "tlang_parser",
+ "tlang_runtime",
  "tlang_semantics",
 ]
 

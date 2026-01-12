@@ -337,6 +337,22 @@ pub struct Module {
     pub span: Span,
 }
 
+impl Default for Module {
+    fn default() -> Self {
+        Self {
+            hir_id: HirId::new(1),
+            block: Block {
+                hir_id: HirId::new(2),
+                stmts: vec![],
+                expr: None,
+                scope: Default::default(),
+                span: Span::default(),
+            },
+            span: Span::default(),
+        }
+    }
+}
+
 impl HirScope for Module {
     fn locals(&self) -> usize {
         self.block.scope.locals()

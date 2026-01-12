@@ -158,7 +158,7 @@ make test
 make test-bindings-js
 
 # Build CLI compiler
-cargo build --release --bin tlang_cli_js
+cargo build --release --bin tlang
 
 # Build interpreter
 cargo build --release --features=binary --bin tlangdi
@@ -191,7 +191,7 @@ npm run typecheck
 
 Compile tlang to JavaScript:
 ```bash
-./target/release/tlang_cli_js input.tlang --output-type js
+cargo run --bin tlang -- compile examples/factorial.tlang --output-type js
 ```
 
 Output options:
@@ -199,11 +199,16 @@ Output options:
 - `--output-type hir` - Show High-level IR
 - `--output-type ast` - Show Abstract Syntax Tree
 
+Run tlang source directly:
+```bash
+cargo run --bin tlang -- run examples/factorial.tlang
+```
+
 ### Interpreter
 
 Run tlang interpreter directly:
 ```bash
-./target/release/tlangdi input.tlang
+cargo run --bin tlangdi --features=binary -- examples/factorial.tlang
 ```
 
 ### Web Playground
@@ -232,15 +237,15 @@ The playground provides:
   - `tlang_hir_pretty` - HIR pretty printing
   - `tlang_codegen_js` - JavaScript code generation
   - `tlang_bindings_js` - WebAssembly bindings for browser
-  - `tlang_cli_js` - Command-line compiler tool
+  - `tlang_cli` - Command-line tools
   - `tlang_macros` - Procedural macros
   - `tlang_span` - Source location tracking
-  - `tlang_test_runner` - Integration test runner
   - `tlang_runtime/` - Runtime components:
     - `tlang_interpreter` - Direct execution interpreter
     - `tlang_memory` - Memory management
     - `tlang_stdlib` - Standard library
 - **`tests/`** - Integration tests organized by feature
+  - `runner` - Integration test runner
 - **`tlang-playground/`** - Web-based playground (Vite + TypeScript + Lit)
 - **`packages/`** - Shared TypeScript packages
 
