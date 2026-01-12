@@ -1,13 +1,31 @@
-use tlang_parser::error::ParseIssue;
-use tlang_semantics::diagnostic::Diagnostic;
 use serde::{Deserialize, Serialize};
+use tlang_parser::error::ParseIssue;
+use tlang_semantics::diagnostic::{Diagnostic, Severity};
 use tsify::Tsify;
+
+#[derive(Clone, Copy, Serialize, Deserialize, Tsify)]
+#[serde(rename_all = "lowercase")]
+pub enum CodemirrorSeverity {
+    Hint,
+    Info,
+    Warning,
+    Error,
+}
+
+impl From<Severity> for CodemirrorSeverity {
+    fn from(severity: Severity) -> Self {
+        match severity {
+            Severity::Error => CodemirrorSeverity::Error,
+            Severity::Warning => CodemirrorSeverity::Warning,
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Tsify)]
 #[tsify(into_wasm_abi)]
 pub struct CodemirrorDiagnostic {
     pub message: String,
-    pub severity: String,
+    pub severity: CodemirrorSeverity,
     /// Relative position in the document, our diagnostics are line/column based
     pub from: u32,
     /// Relative position in the document, our diagnostics are line/column based
@@ -15,10 +33,10 @@ pub struct CodemirrorDiagnostic {
 }
 
 impl CodemirrorDiagnostic {
-    pub(crate) fn new(message: &str, severity: &str, from: u32, to: u32) -> Self {
+    pub(crate) fn new(message: &str, severity: CodemirrorSeverity, from: u32, to: u32) -> Self {
         CodemirrorDiagnostic {
             message: message.to_string(),
-            severity: severity.to_string(),
+            severity,
             from,
             to,
         }
@@ -28,7 +46,7 @@ impl CodemirrorDiagnostic {
 pub fn from_parse_issue(src: &str, error: &ParseIssue) -> CodemirrorDiagnostic {
     CodemirrorDiagnostic::new(
         &error.msg,
-        "error",
+        CodemirrorSeverity::Error,
         line_column_to_offset(src, error.span.start.line, error.span.start.column),
         line_column_to_offset(src, error.span.end.line, error.span.end.column),
     )
@@ -37,7 +55,7 @@ pub fn from_parse_issue(src: &str, error: &ParseIssue) -> CodemirrorDiagnostic {
 pub fn from_tlang_diagnostic(src: &str, diagnostic: &Diagnostic) -> CodemirrorDiagnostic {
     CodemirrorDiagnostic::new(
         diagnostic.message(),
-        &diagnostic.severity().to_string(),
+        diagnostic.severity().into(),
         line_column_to_offset(
             src,
             diagnostic.span().start.line,

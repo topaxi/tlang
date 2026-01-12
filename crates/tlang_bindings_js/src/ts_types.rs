@@ -41,6 +41,7 @@ impl From<Span> for JsSpan {
 }
 
 #[derive(Serialize, Deserialize, Tsify)]
+#[serde(rename_all = "lowercase")]
 #[tsify(into_wasm_abi)]
 pub enum JsSeverity {
     Error,
@@ -69,7 +70,7 @@ impl From<Diagnostic> for JsDiagnostic {
         Self {
             message: diagnostic.message().to_string(),
             span: (*diagnostic.span()).into(),
-            severity: diagnostic.severity().clone().into(),
+            severity: diagnostic.severity().into(),
         }
     }
 }
