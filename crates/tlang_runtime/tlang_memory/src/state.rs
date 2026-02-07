@@ -445,11 +445,23 @@ impl InterpreterState {
 
     /// Set the value inside a cell.
     pub fn set_cell_value(&mut self, cell_id: TlangObjectId, value: TlangValue) {
-        if let Some(obj) = self.objects.get_mut(cell_id) {
-            if let Some(cell) = obj.get_cell_mut() {
-                cell.set(value);
-            }
-        }
+        let Some(obj) = self.objects.get_mut(cell_id) else {
+            debug_assert!(
+                false,
+                "set_cell_value called with invalid cell_id"
+            );
+            return;
+        };
+
+        let Some(cell) = obj.get_cell_mut() else {
+            debug_assert!(
+                false,
+                "set_cell_value called on non-cell object"
+            );
+            return;
+        };
+
+        cell.set(value);
     }
 
     /// Returns the current memory statistics.
