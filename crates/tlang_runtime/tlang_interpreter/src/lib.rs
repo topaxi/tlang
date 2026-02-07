@@ -919,8 +919,16 @@ impl Interpreter {
         match self.get_object_by_id(id) {
             TlangObjectKind::Closure(closure) => {
                 let closure_decl = self.get_closure_decl(closure.id).unwrap();
+                // Clone the captured scope stack so we can move it into `with_scope`
+                // without borrowing `closure` for the duration of the call.
+                //
+                // Note: We use with_scope (scope-swapping) rather than with_captured_scope
+                // because closures need to be able to mutate variables in parent scopes.
+                // The captured_memory field is used for GC tracing but not for execution,
+                // since using captured memory would prevent mutable capture semantics.
+                let scope_stack = closure.scope_stack.clone();
 
-                self.with_scope(closure.scope_stack.clone(), |this| {
+                self.with_scope(scope_stack, |this| {
                     this.eval_fn_call(&closure_decl, callee, args)
                         .unwrap_value()
                 })
@@ -1794,6 +1802,33 @@ mod tests {
         let mut interpreter = interpreter("");
         let result = interpreter.eval("");
         assert_matches!(result, TlangValue::Nil);
+    }
+
+    #[test]
+    fn test_eval_expr_direct() {
+        // Test the public eval_expr method directly
+        let mut test_interp = TestInterpreter::new();
+        let hir = test_interp.parse("{ 1 + 2 };");
+
+        // Extract the block expression from the statement
+        let hir::StmtKind::Expr(expr) = &hir.block.stmts[0].kind else {
+            panic!(
+                "Expected Expr statement, found {:?}",
+                &hir.block.stmts[0].kind
+            );
+        };
+
+        let hir::ExprKind::Block(block_expr) = &expr.kind else {
+            panic!("Expected Block expression, found {:?}", &expr.kind);
+        };
+
+        // Evaluate the expression inside the block
+        let Some(tail_expr) = &block_expr.expr else {
+            panic!("Expected tail expression in block, found None");
+        };
+
+        let result = test_interp.interpreter.eval_expr(tail_expr);
+        assert_eq!(result.unwrap_value(), TlangValue::U64(3));
     }
 
     #[test]
