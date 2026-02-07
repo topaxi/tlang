@@ -107,7 +107,7 @@ impl TlangValue {
 
             TlangValue::Object(id) => state
                 .get_object_by_id(id)
-                .is_some_and(|kind| kind.is_truthy()),
+                .is_some_and(|kind| kind.is_truthy(state)),
         }
     }
 

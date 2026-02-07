@@ -9,7 +9,7 @@
 //! Note: These benchmarks include parse + compile + execution overhead.
 //! The setup cost is amortized over many iterations.
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{BatchSize, Criterion, black_box, criterion_group, criterion_main};
 
 mod helpers {
     use tlang_ast_lowering::lower_to_hir;
@@ -56,10 +56,11 @@ fn bench_simple_closure(c: &mut Criterion) {
     );
 
     c.bench_function("simple_closure_create_and_call", |b| {
-        b.iter(|| {
-            let mut interpreter = Interpreter::new();
-            interpreter.eval(black_box(&hir))
-        });
+        b.iter_batched(
+            Interpreter::new,
+            |mut interpreter| interpreter.eval(black_box(&hir)),
+            BatchSize::SmallInput,
+        );
     });
 }
 
@@ -83,10 +84,11 @@ fn bench_counter_closure(c: &mut Criterion) {
     );
 
     c.bench_function("counter_closure_call", |b| {
-        b.iter(|| {
-            let mut interpreter = Interpreter::new();
-            interpreter.eval(black_box(&hir))
-        });
+        b.iter_batched(
+            Interpreter::new,
+            |mut interpreter| interpreter.eval(black_box(&hir)),
+            BatchSize::SmallInput,
+        );
     });
 }
 
@@ -107,10 +109,11 @@ fn bench_nested_closures(c: &mut Criterion) {
     );
 
     c.bench_function("nested_closure_create_and_call", |b| {
-        b.iter(|| {
-            let mut interpreter = Interpreter::new();
-            interpreter.eval(black_box(&hir))
-        });
+        b.iter_batched(
+            Interpreter::new,
+            |mut interpreter| interpreter.eval(black_box(&hir)),
+            BatchSize::SmallInput,
+        );
     });
 }
 
@@ -129,10 +132,11 @@ fn bench_closure_in_map(c: &mut Criterion) {
     );
 
     c.bench_function("closure_in_map", |b| {
-        b.iter(|| {
-            let mut interpreter = Interpreter::new();
-            interpreter.eval(black_box(&hir))
-        });
+        b.iter_batched(
+            Interpreter::new,
+            |mut interpreter| interpreter.eval(black_box(&hir)),
+            BatchSize::SmallInput,
+        );
     });
 }
 
@@ -155,10 +159,11 @@ fn bench_many_captures(c: &mut Criterion) {
     );
 
     c.bench_function("closure_many_captures", |b| {
-        b.iter(|| {
-            let mut interpreter = Interpreter::new();
-            interpreter.eval(black_box(&hir))
-        });
+        b.iter_batched(
+            Interpreter::new,
+            |mut interpreter| interpreter.eval(black_box(&hir)),
+            BatchSize::SmallInput,
+        );
     });
 }
 
@@ -176,10 +181,11 @@ fn bench_recursive_with_closure(c: &mut Criterion) {
     );
 
     c.bench_function("foldl_with_closure", |b| {
-        b.iter(|| {
-            let mut interpreter = Interpreter::new();
-            interpreter.eval(black_box(&hir))
-        });
+        b.iter_batched(
+            Interpreter::new,
+            |mut interpreter| interpreter.eval(black_box(&hir)),
+            BatchSize::SmallInput,
+        );
     });
 }
 

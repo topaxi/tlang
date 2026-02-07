@@ -1818,22 +1818,19 @@ mod tests {
         let mut test_interp = TestInterpreter::new();
         let hir = test_interp.parse("{ 1 + 2 };");
 
-        // Extract the block expression from the statement, failing loudly on mismatch
-        let expr = assert_matches!(
-            &hir.block.stmts[0].kind,
-            hir::StmtKind::Expr(expr) => expr
-        );
+        // Extract the block expression from the statement
+        let hir::StmtKind::Expr(expr) = &hir.block.stmts[0].kind else {
+            panic!("Expected Expr statement");
+        };
 
-        let block_expr = assert_matches!(
-            &expr.kind,
-            hir::ExprKind::Block(block_expr) => block_expr
-        );
+        let hir::ExprKind::Block(block_expr) = &expr.kind else {
+            panic!("Expected Block expression");
+        };
 
         // Evaluate the expression inside the block
-        let tail_expr = assert_matches!(
-            &block_expr.expr,
-            Some(tail_expr) => tail_expr
-        );
+        let Some(tail_expr) = &block_expr.expr else {
+            panic!("Expected tail expression in block");
+        };
 
         let result = test_interp.interpreter.eval_expr(tail_expr);
         assert_eq!(result.unwrap_value(), TlangValue::U64(3));
