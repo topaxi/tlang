@@ -244,7 +244,22 @@ impl TlangObjectKind {
             TlangObjectKind::Slice(s) => !s.is_empty(),
             TlangObjectKind::Closure(_) => true,
             TlangObjectKind::Cell(c) => c.value.is_truthy(state),
-            TlangObjectKind::Enum(_) => true, // Enums are truthy by default (they exist)
+            TlangObjectKind::Enum(e) => {
+                // Option::None is falsy
+                if e.shape() == state.builtin_shapes.option && e.variant == 1 {
+                    return false;
+                }
+                // Result::Err is falsy
+                if e.shape() == state.builtin_shapes.result && e.variant == 1 {
+                    return false;
+                }
+                // For enums with field values, all values must be truthy
+                if e.field_values.is_empty() {
+                    true
+                } else {
+                    e.field_values.iter().all(|v| v.is_truthy(state))
+                }
+            }
         }
     }
 
@@ -504,6 +519,99 @@ mod tests {
         let obj = TlangObjectKind::String("test".to_string());
         let iter = obj.referenced_values();
         assert_eq!(iter.len(), 0);
+    }
+
+    #[test]
+    fn test_enum_truthiness_option_some() {
+        use crate::InterpreterState;
+
+        let state = InterpreterState::new();
+        let option_shape = state.builtin_shapes.option;
+
+        // Option::Some(truthy value) should be truthy
+        let some_truthy = TlangEnum::new(option_shape, 0, vec![TlangValue::I64(42)]);
+        let obj = TlangObjectKind::Enum(some_truthy);
+        assert!(obj.is_truthy(&state), "Option::Some(42) should be truthy");
+
+        // Option::Some(falsy value) should be falsy (value-based truthiness)
+        let some_falsy = TlangEnum::new(option_shape, 0, vec![TlangValue::I64(0)]);
+        let obj = TlangObjectKind::Enum(some_falsy);
+        assert!(!obj.is_truthy(&state), "Option::Some(0) should be falsy");
+    }
+
+    #[test]
+    fn test_enum_truthiness_option_none() {
+        use crate::InterpreterState;
+
+        let state = InterpreterState::new();
+        let option_shape = state.builtin_shapes.option;
+
+        // Option::None should be falsy (variant 1 = None)
+        let none = TlangEnum::new(option_shape, 1, vec![]);
+        let obj = TlangObjectKind::Enum(none);
+        assert!(!obj.is_truthy(&state), "Option::None should be falsy");
+    }
+
+    #[test]
+    fn test_enum_truthiness_result_ok() {
+        use crate::InterpreterState;
+
+        let state = InterpreterState::new();
+        let result_shape = state.builtin_shapes.result;
+
+        // Result::Ok(truthy value) should be truthy
+        let ok_truthy = TlangEnum::new(result_shape, 0, vec![TlangValue::I64(42)]);
+        let obj = TlangObjectKind::Enum(ok_truthy);
+        assert!(obj.is_truthy(&state), "Result::Ok(42) should be truthy");
+
+        // Result::Ok(falsy value) should be falsy (value-based truthiness)
+        let ok_falsy = TlangEnum::new(result_shape, 0, vec![TlangValue::I64(0)]);
+        let obj = TlangObjectKind::Enum(ok_falsy);
+        assert!(!obj.is_truthy(&state), "Result::Ok(0) should be falsy");
+    }
+
+    #[test]
+    fn test_enum_truthiness_result_err() {
+        use crate::InterpreterState;
+
+        let state = InterpreterState::new();
+        let result_shape = state.builtin_shapes.result;
+
+        // Result::Err should be falsy (variant 1 = Err)
+        let err = TlangEnum::new(result_shape, 1, vec![TlangValue::I64(42)]);
+        let obj = TlangObjectKind::Enum(err);
+        assert!(!obj.is_truthy(&state), "Result::Err should be falsy");
+    }
+
+    #[test]
+    fn test_enum_truthiness_custom_enum() {
+        use crate::InterpreterState;
+
+        let state = InterpreterState::new();
+
+        // Custom enum with truthy field values should be truthy
+        let custom_truthy = TlangEnum::new(ShapeKey::Native(999), 0, vec![TlangValue::I64(42)]);
+        let obj = TlangObjectKind::Enum(custom_truthy);
+        assert!(
+            obj.is_truthy(&state),
+            "Custom enum with truthy value should be truthy"
+        );
+
+        // Custom enum with falsy field values should be falsy
+        let custom_falsy = TlangEnum::new(ShapeKey::Native(999), 0, vec![TlangValue::I64(0)]);
+        let obj = TlangObjectKind::Enum(custom_falsy);
+        assert!(
+            !obj.is_truthy(&state),
+            "Custom enum with falsy value should be falsy"
+        );
+
+        // Custom unit variant (no field values) should be truthy
+        let custom_unit = TlangEnum::new(ShapeKey::Native(999), 0, vec![]);
+        let obj = TlangObjectKind::Enum(custom_unit);
+        assert!(
+            obj.is_truthy(&state),
+            "Custom unit variant should be truthy"
+        );
     }
 
     #[test]
