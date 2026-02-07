@@ -1820,16 +1820,19 @@ mod tests {
 
         // Extract the block expression from the statement
         let hir::StmtKind::Expr(expr) = &hir.block.stmts[0].kind else {
-            panic!("Expected Expr statement");
+            panic!(
+                "Expected Expr statement, found {:?}",
+                &hir.block.stmts[0].kind
+            );
         };
 
         let hir::ExprKind::Block(block_expr) = &expr.kind else {
-            panic!("Expected Block expression");
+            panic!("Expected Block expression, found {:?}", &expr.kind);
         };
 
         // Evaluate the expression inside the block
         let Some(tail_expr) = &block_expr.expr else {
-            panic!("Expected tail expression in block");
+            panic!("Expected tail expression in block, found None");
         };
 
         let result = test_interp.interpreter.eval_expr(tail_expr);
