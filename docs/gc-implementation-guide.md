@@ -701,7 +701,7 @@ See `docs/gc-preparation-analysis.md` for detailed analysis.
 - [ ] Add `sweep_unreachable()` method
 - [ ] Add `collect_garbage()` method
 - [ ] Add GC trigger in `new_object()`
-- [ ] Add `gc_collections` counter
+- [ ] Ensure `gc_collections` counter in `MemoryStats` is updated by the GC
 - [ ] Write unit tests for each component
 - [ ] Write integration tests
 - [ ] Run existing test suite
