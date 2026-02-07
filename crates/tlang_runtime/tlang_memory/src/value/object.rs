@@ -2,6 +2,7 @@ use std::ops::{Index, IndexMut};
 
 use tlang_span::HirId;
 
+use crate::InterpreterState;
 use crate::shape::{ShapeKey, Shaped};
 
 use super::TlangValue;
@@ -234,7 +235,7 @@ impl TlangObjectKind {
         }
     }
 
-    pub(crate) fn is_truthy(&self) -> bool {
+    pub(crate) fn is_truthy(&self, state: &InterpreterState) -> bool {
         match self {
             TlangObjectKind::Fn(_) => true,
             TlangObjectKind::NativeFn => true,
@@ -242,8 +243,8 @@ impl TlangObjectKind {
             TlangObjectKind::Struct(s) => !s.is_empty(),
             TlangObjectKind::Slice(s) => !s.is_empty(),
             TlangObjectKind::Closure(_) => true,
-            TlangObjectKind::Cell(_) => true, // Cells are always truthy (they exist)
-            TlangObjectKind::Enum(_) => todo!(),
+            TlangObjectKind::Cell(c) => c.value.is_truthy(state),
+            TlangObjectKind::Enum(_) => true, // Enums are truthy by default (they exist)
         }
     }
 
@@ -267,13 +268,16 @@ impl TlangObjectKind {
     ///
     /// This is used for garbage collection tracing to find all reachable objects.
     /// Note: This only yields values directly contained in the object, not transitively.
-    /// For closures, this yields all captured values which may include object references.
+    /// For closures, this yields all captured values and captured cell object references.
     pub fn referenced_values(&self) -> ReferencedValuesIter<'_> {
         match self {
             TlangObjectKind::Struct(s) => ReferencedValuesIter::Slice(s.values.iter()),
             TlangObjectKind::Enum(e) => ReferencedValuesIter::Slice(e.field_values.iter()),
             TlangObjectKind::Slice(s) => ReferencedValuesIter::Single(Some(s.of)),
-            TlangObjectKind::Closure(c) => ReferencedValuesIter::Slice(c.captured_memory.iter()),
+            TlangObjectKind::Closure(c) => ReferencedValuesIter::Closure {
+                memory_iter: c.captured_memory.iter(),
+                cells_iter: c.captured_cells.values(),
+            },
             TlangObjectKind::Cell(c) => ReferencedValuesIter::Single(Some(c.value)),
             TlangObjectKind::Fn(_) | TlangObjectKind::NativeFn | TlangObjectKind::String(_) => {
                 ReferencedValuesIter::Empty
@@ -293,6 +297,11 @@ pub enum ReferencedValuesIter<'a> {
     Single(Option<TlangValue>),
     /// Multiple referenced values (for structs, enums)
     Slice(std::slice::Iter<'a, TlangValue>),
+    /// Closure referenced values: both captured memory and captured cell object IDs
+    Closure {
+        memory_iter: std::slice::Iter<'a, TlangValue>,
+        cells_iter: std::collections::hash_map::Values<'a, (usize, usize), TlangObjectId>,
+    },
 }
 
 impl Iterator for ReferencedValuesIter<'_> {
@@ -303,6 +312,17 @@ impl Iterator for ReferencedValuesIter<'_> {
             ReferencedValuesIter::Empty => None,
             ReferencedValuesIter::Single(opt) => opt.take(),
             ReferencedValuesIter::Slice(iter) => iter.next().copied(),
+            ReferencedValuesIter::Closure {
+                memory_iter,
+                cells_iter,
+            } => {
+                // First yield all captured memory values
+                if let Some(val) = memory_iter.next() {
+                    return Some(*val);
+                }
+                // Then yield captured cell object IDs as Object values
+                cells_iter.next().map(|&id| TlangValue::Object(id))
+            }
         }
     }
 
@@ -314,6 +334,14 @@ impl Iterator for ReferencedValuesIter<'_> {
                 (len, Some(len))
             }
             ReferencedValuesIter::Slice(iter) => iter.size_hint(),
+            ReferencedValuesIter::Closure {
+                memory_iter,
+                cells_iter,
+            } => {
+                let (mem_lower, mem_upper) = memory_iter.size_hint();
+                let cells_len = cells_iter.len();
+                (mem_lower + cells_len, mem_upper.map(|u| u + cells_len))
+            }
         }
     }
 }
@@ -409,6 +437,35 @@ mod tests {
         let refs: Vec<_> = obj.referenced_values().collect();
         assert_eq!(refs.len(), 3);
         assert_eq!(refs, captured);
+    }
+
+    #[test]
+    fn test_closure_referenced_values_includes_cells() {
+        use crate::scope::Scope;
+        use std::collections::HashMap;
+        use tlang_span::HirId;
+
+        // Create a closure with captured memory and captured cells
+        let captured_memory = vec![TlangValue::I64(42)];
+        let mut captured_cells = HashMap::new();
+        captured_cells.insert((0, 0), 100); // Cell at scope 0, var 0 -> object ID 100
+        captured_cells.insert((1, 2), 200); // Cell at scope 1, var 2 -> object ID 200
+
+        let closure = TlangClosure {
+            id: HirId::new(1),
+            scope_stack: vec![Scope::default()],
+            captured_cells,
+            captured_memory: captured_memory.clone(),
+            global_memory_len: 0,
+        };
+        let obj = TlangObjectKind::Closure(closure);
+
+        let refs: Vec<_> = obj.referenced_values().collect();
+        // Should include: 1 captured memory value + 2 cell object references
+        assert_eq!(refs.len(), 3);
+        assert!(refs.contains(&TlangValue::I64(42)));
+        assert!(refs.contains(&TlangValue::Object(100)));
+        assert!(refs.contains(&TlangValue::Object(200)));
     }
 
     #[test]
