@@ -343,7 +343,7 @@ Given the complexity, the recommended approach is:
    - Object deallocation capability (`remove_object()`) ✅
    - Comprehensive analysis documentation ✅
    - Closure captured memory storage (`captured_memory` field) ✅
-   - Criterion benchmarks for closure performance (optional, not yet implemented)
+   - Criterion benchmarks for closure performance (optional) ✅
 
 2. **Phase 2**: Closure capture refactoring
    - Should be a focused, dedicated effort
