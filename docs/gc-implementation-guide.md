@@ -202,6 +202,7 @@ pub enum TlangObjectKind {
     Struct(TlangStruct),       // Contains Vec<TlangValue>
     Enum(TlangEnum),           // Contains Vec<TlangValue>
     Slice(TlangSlice),         // Contains TlangValue reference
+    Cell(TlangCell),           // GC-managed mutable cell
     Closure(TlangClosure),     // Contains captured_memory: Vec<TlangValue>
 }
 ```
