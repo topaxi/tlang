@@ -9,7 +9,7 @@ This guide provides a comprehensive, step-by-step walkthrough for implementing g
 3. [Learning Resources](#learning-resources)
 4. [tlang Memory Architecture](#tlang-memory-architecture)
 5. [Step-by-Step Implementation Guide](#step-by-step-implementation-guide)
-6. [Testing Your GC](#testing-your-gc)
+6. [Verifying GC Correctness](#verifying-gc-correctness)
 7. [Common Pitfalls](#common-pitfalls)
 8. [Next Steps and Optimizations](#next-steps-and-optimizations)
 
@@ -56,10 +56,10 @@ Think of your program's memory as a graph:
            │
            ▼
     ┌─────────────┐
-    │   Object A  │──────┐
-    └─────────────┘      │
-           │             ▼
-           ▼      ┌─────────────┐
+    │   Object A  │──────────┐
+    └─────────────┘          │
+           │                 ▼
+           ▼          ┌─────────────┐
     ┌─────────────┐   │   Object C  │ ← Can be collected
     │   Object B  │   └─────────────┘   (unreachable)
     └─────────────┘
@@ -188,7 +188,9 @@ pub enum TlangValue {
 }
 ```
 
-Key insight: **Only `TlangValue::Object(id)` values point to GC-managed objects.** Primitives don't need GC.
+**What GC actually collects**: The GC manages *heap objects* (entries in the `Slab<TlangObjectKind>`), not individual `TlangValue`s. A `TlangValue` is just a 16-byte Copy handle: primitives are stored inline, while `Object(id)` is an index into the heap.
+
+During the **mark phase**, only `TlangValue::Object(id)` values need to be followed -- primitives don't lead anywhere. But be careful not to confuse this with "primitives don't need GC": when a closure captures primitive values, those primitives live inside the closure's `captured_memory: Vec<TlangValue>`, which is owned by the closure *object* on the heap. When the GC collects that closure object, the captured primitives are freed along with it. The unit of collection is always a heap object, not an individual value.
 
 ### Object Types
 
@@ -229,23 +231,27 @@ The following GC infrastructure is already in place:
 ```rust
 impl InterpreterState {
     /// Returns an iterator over all GC root values.
-    /// 
+    ///
     /// Roots are values that are directly accessible from the running program
     /// and therefore must be considered "live" during garbage collection.
     pub fn gc_roots(&self) -> impl Iterator<Item = TlangValue> + '_ {
         // 1. Named global variables
         let globals_iter = self.globals.values().copied();
-        
+
         // 2. Global memory (slot-based globals)
         let global_memory_iter = self.scope_stack.global_memory_iter();
-        
-        // 3. Local scope memory (stack variables)
-        let local_memory_iter = self.scope_stack.local_memory_iter();
-        
+
+        // 3. Local scope memory (only LIVE scopes, not stale memory)
+        let local_memory_iter = self.scope_stack.live_local_memory_iter();
+
+        // 4. Native function object IDs (these reference NativeFn objects in the heap)
+        let native_fn_iter = self.native_fns.keys().copied().map(TlangValue::Object);
+
         // Chain all root sources together
         globals_iter
             .chain(global_memory_iter)
             .chain(local_memory_iter)
+            .chain(native_fn_iter)
     }
 }
 ```
@@ -259,12 +265,36 @@ impl ScopeStack {
     pub fn global_memory_iter(&self) -> impl Iterator<Item = TlangValue> + '_ {
         self.global_memory.iter().copied()
     }
-    
-    pub fn local_memory_iter(&self) -> impl Iterator<Item = TlangValue> + '_ {
-        self.memory.iter().copied()
+
+    /// Iterates only over local memory belonging to LIVE scopes.
+    ///
+    /// IMPORTANT: Do NOT iterate over all of `self.memory` blindly. Because
+    /// `ScopeStack::pop()` does not truncate the memory vector (to preserve
+    /// closure references), there may be stale values from exited scopes
+    /// lingering at the end. Iterating all of `self.memory` would treat those
+    /// stale values as roots, preventing their referenced objects from ever
+    /// being collected -- defeating the purpose of GC.
+    ///
+    /// Instead, compute the end of the last live scope and only iterate up
+    /// to that point.
+    pub fn live_local_memory_iter(&self) -> impl Iterator<Item = TlangValue> + '_ {
+        let live_end = self.scopes.last().map_or(0, |scope| {
+            // The last scope's memory extends to wherever its variables end.
+            // Since push_value appends and set_local may extend, use the max
+            // of scope.start() + scope.size() and actual memory length up to
+            // that scope's known extent.
+            (scope.start() + scope.size()).min(self.memory.len())
+        });
+        self.memory[..live_end].iter().copied()
     }
 }
 ```
+
+**Why `live_local_memory_iter` instead of iterating all of `memory`?**
+
+The `ScopeStack` never truncates `memory` when scopes are popped (to preserve closure references). This means `self.memory` can contain stale values from exited scopes. If root enumeration scans all of `self.memory`, those stale entries act as "phantom roots" that keep objects alive indefinitely -- exactly the leak GC is supposed to fix. By only scanning memory belonging to currently live scopes, we allow objects referenced only by dead scopes to be collected.
+
+Note: this is safe because closures store their own copy of captured values in `captured_memory`, which is traced via `referenced_values()`. Values in stale scope memory that are still needed are reachable through live closure objects.
 
 **Test your implementation**:
 ```rust
@@ -433,40 +463,76 @@ pub struct MemoryStats {
 
 **Goal**: Decide when to run GC automatically.
 
+#### Choosing a safe trigger point
+
+GC can only run at **safe points** -- moments when no temporary `TlangValue::Object` references exist on the Rust call stack outside of the interpreter state. If GC runs while the evaluator holds a temporary object reference in a local Rust variable (e.g., partway through evaluating a binary expression), the referenced object might be swept even though it's still needed.
+
+**Option A: Trigger at statement boundaries (recommended)**
+
+Instead of triggering GC inside `new_object()`, trigger it between statements in the evaluator. At statement boundaries, all live values are stored in the scope stack or globals -- nothing is held as a Rust-local temporary.
+
+```rust
+// In the evaluator, between statements:
+if state.should_collect() {
+    state.collect_garbage();
+}
+```
+
+**Option B: Trigger inside `new_object()` (simpler but riskier)**
+
+This is simpler to implement but requires careful auditing. Every call site that creates objects while holding temporary object references becomes a potential bug:
+
 ```rust
 impl InterpreterState {
-    // Configuration constants
-    const GC_THRESHOLD: usize = 1000;  // Run GC every N allocations
-    
-    /// Allocates a new object, possibly triggering GC first.
+    const GC_INITIAL_THRESHOLD: usize = 1000;
+
     pub fn new_object(&mut self, kind: TlangObjectKind) -> TlangValue {
-        // Check if we should collect
         if self.should_collect() {
             self.collect_garbage();
         }
-        
-        // Normal allocation
+
         self.memory_stats.objects_allocated += 1;
         TlangValue::new_object(self.objects.insert(kind))
-    }
-    
-    fn should_collect(&self) -> bool {
-        // Simple strategy: collect every N allocations
-        self.memory_stats.objects_allocated % Self::GC_THRESHOLD == 0
-            && self.memory_stats.objects_allocated > 0
     }
 }
 ```
 
-**Better strategy (memory-based)**:
+If you choose Option B, use GC stress testing (see [Verifying GC Correctness](#verifying-gc-correctness)) to find bugs: trigger GC on *every* allocation and run the full test suite.
+
+#### Collection policy
+
+Use a growth-based threshold rather than a simple modulo counter. A modulo counter (`objects_allocated % N == 0`) checks total lifetime allocations, which is incorrect -- after many allocations, the counter drifts and collections become unpredictable.
+
 ```rust
-fn should_collect(&self) -> bool {
-    // Collect when live objects exceed threshold
-    let live_count = self.objects.len();
-    let threshold = self.last_gc_live_count * 2;  // Double since last GC
-    live_count >= threshold
+impl InterpreterState {
+    const GC_INITIAL_THRESHOLD: usize = 1000;
+
+    fn should_collect(&self) -> bool {
+        // Collect when live objects have doubled since the last collection.
+        // This is the strategy used by Lua and Crafting Interpreters.
+        self.objects.len() >= self.next_gc_threshold
+    }
 }
 ```
+
+After each collection, update the threshold:
+```rust
+pub fn collect_garbage(&mut self) -> usize {
+    let marked = self.mark_reachable();
+    let collected = self.sweep_unreachable(&marked);
+
+    self.memory_stats.gc_collections += 1;
+    // Next GC when live objects double (with a minimum floor)
+    self.next_gc_threshold = (self.objects.len() * 2).max(Self::GC_INITIAL_THRESHOLD);
+
+    log::debug!("GC: collected {} objects, {} remain, next at {}",
+        collected, self.objects.len(), self.next_gc_threshold);
+
+    collected
+}
+```
+
+You'll need to add `next_gc_threshold: usize` to `InterpreterState`, initialized to `GC_INITIAL_THRESHOLD`.
 
 ### Step 6: Integration Testing
 
@@ -549,35 +615,153 @@ fn test_gc_handles_circular_references() {
 
 ---
 
-## Testing Your GC
+## Verifying GC Correctness
 
-### Unit Tests
+A GC has two failure modes, and you need strategies to detect both:
 
-Test each component in isolation:
+1. **Memory leak**: Garbage is not collected (objects stay alive when they shouldn't)
+2. **Premature collection**: Live objects are collected (use-after-free)
 
-1. **Root enumeration**: Test that all expected roots are found
-2. **Mark phase**: Test that reachable objects are marked
-3. **Sweep phase**: Test that unmarked objects are removed
-4. **Edge cases**: Empty heap, single object, circular references
+Premature collection is far more dangerous -- it causes crashes, silent data corruption, or wrong results. Leaks are merely wasteful. Invest most of your testing effort in detecting premature collection.
 
-### Integration Tests
+### Strategy 1: GC Stress Mode (Most Important)
 
-Run existing tlang programs and verify:
+Add a **stress mode** that triggers GC on *every* allocation. This maximizes the chance of exposing premature collection bugs by collecting as aggressively as possible.
 
-1. **No crashes**: Programs that worked before still work
-2. **No premature collection**: Live objects aren't collected
-3. **Memory bounded**: Long-running programs don't OOM
+```rust
+impl InterpreterState {
+    /// When true, run GC before every allocation.
+    /// Use only for testing -- extremely slow.
+    pub gc_stress: bool,
 
-### Stress Tests
-
-```tlang
-// Create many temporary objects in a loop
-fn stress_test() {
-    for i in 0..100000 {
-        let temp = [i, i+1, i+2];  // Creates temporary array
+    fn should_collect(&self) -> bool {
+        if self.gc_stress {
+            return true;
+        }
+        self.objects.len() >= self.next_gc_threshold
     }
 }
 ```
+
+Then run the **entire existing test suite** with stress mode enabled:
+
+```rust
+#[test]
+fn test_all_programs_survive_gc_stress() {
+    // For each .tlang test file, run it with gc_stress = true.
+    // If any test crashes or produces different output, you have a bug.
+}
+```
+
+This is the single most effective technique for finding GC bugs. If your GC survives stress mode across the full test suite, it's likely correct.
+
+### Strategy 2: Leak Detection via MemoryStats
+
+After running a program that should produce no long-lived objects, verify the heap is empty:
+
+```rust
+#[test]
+fn test_no_leaks_after_execution() {
+    let mut state = InterpreterState::new();
+
+    // Run a program that creates and discards many objects
+    // ... evaluate program ...
+
+    state.collect_garbage();
+
+    // After the program completes and all scopes are exited,
+    // only global-rooted objects should remain.
+    let stats = state.memory_stats();
+    println!(
+        "allocated={}, deallocated={}, live={}",
+        stats.objects_allocated, stats.objects_deallocated, stats.live_objects()
+    );
+
+    // For programs with no persistent state, live objects should be zero
+    // (or equal to the number of global objects like native functions)
+    assert_eq!(state.object_count(), expected_globals_count);
+}
+```
+
+### Strategy 3: Object Existence Assertions
+
+After GC, verify that every value reachable from roots still points to a valid object:
+
+```rust
+impl InterpreterState {
+    /// Debug assertion: verify all root values point to valid objects.
+    /// Call this after every GC cycle during development.
+    #[cfg(debug_assertions)]
+    pub fn assert_roots_valid(&self) {
+        for value in self.gc_roots() {
+            if let TlangValue::Object(id) = value {
+                assert!(
+                    self.contains_object(id),
+                    "GC BUG: root references collected object {id}"
+                );
+            }
+        }
+    }
+}
+```
+
+Call this at the end of `collect_garbage()` during development.
+
+### Strategy 4: Unit Tests
+
+Test each GC component in isolation:
+
+1. **Root enumeration**: Verify all expected roots are found (globals, scope values, native fns)
+2. **Mark phase**: Verify reachable objects are marked, unreachable are not
+3. **Sweep phase**: Verify unmarked objects are removed
+4. **Edge cases**: Empty heap, single object, circular references, deeply nested closures
+
+### Strategy 5: Integration Tests with Output Comparison
+
+Run existing `.tlang` test programs and compare output with GC enabled vs. disabled. Any difference indicates a GC bug:
+
+```rust
+#[test]
+fn test_gc_does_not_change_program_behavior() {
+    for test_file in glob("tests/**/*.tlang") {
+        let output_without_gc = run_program(test_file, gc_enabled: false);
+        let output_with_gc = run_program(test_file, gc_enabled: true);
+        assert_eq!(output_without_gc, output_with_gc,
+            "GC changed behavior of {test_file}");
+    }
+}
+```
+
+### Strategy 6: Memory Bounded Stress Tests
+
+Verify that long-running programs don't run out of memory:
+
+```tlang
+// This should complete without OOM if GC is working
+fn stress_test() {
+    for i in 0..100000 {
+        let temp = [i, i+1, i+2];  // Creates temporary array
+        let s = "hello " + to_string(i);  // Creates temporary string
+    }
+}
+```
+
+Check that `object_count()` stays bounded during execution, not growing linearly with iterations.
+
+### Strategy 7: Sweep Side-Effect Cleanup
+
+When sweeping a `NativeFn` object, the corresponding entries in `native_fns` and `native_fns_meta` HashMaps must also be removed, otherwise they become dangling references. Verify this in tests:
+
+```rust
+#[test]
+fn test_sweep_cleans_up_native_fn_maps() {
+    // Create a native fn, don't root it
+    // Run GC
+    // Verify native_fns and native_fns_meta no longer contain the ID
+}
+```
+
+Note: In practice, native functions are typically rooted via globals and won't be collected. But the sweep implementation should handle this case correctly for safety.
 
 ---
 
@@ -587,11 +771,12 @@ fn stress_test() {
 
 **Symptom**: Live objects get collected, causing crashes.
 
-**Solution**: Audit all places values are stored:
-- Global variables ✓
-- Local variables (scope stack) ✓
-- Function arguments (on the scope stack when called)
-- Temporary values during expression evaluation
+**Solution**: Audit *all* places `TlangValue::Object` references are stored:
+- `globals: HashMap<String, TlangValue>` -- named globals
+- `scope_stack.global_memory` -- slot-based globals
+- `scope_stack.memory` -- local scope variables (**only live scopes**, see pitfall #5)
+- `native_fns` keys -- object IDs of native function objects
+- Temporary values on the Rust call stack during evaluation (see pitfall #6)
 
 ### 2. Not Handling Cycles
 
@@ -634,6 +819,41 @@ for id in to_remove {
 }
 ```
 
+### 5. Scanning Stale Scope Memory as Roots
+
+**Symptom**: Objects are never collected even though they're unreachable from the program. Memory usage grows despite GC running.
+
+**Cause**: `ScopeStack::pop()` does not truncate the `memory` vector (to preserve values for closures). If root enumeration scans all of `self.memory`, stale values from exited scopes act as phantom roots.
+
+**Solution**: Only scan memory belonging to currently live scopes. See the `live_local_memory_iter()` implementation in Step 1. This is safe because closures store their own copy of captured values in `captured_memory`, which is traced via `referenced_values()`.
+
+### 6. Temporary Values on the Rust Call Stack
+
+**Symptom**: Intermittent crashes, especially during complex expressions or when GC triggers frequently.
+
+**Cause**: When the evaluator computes an expression like `f(a, b)`, it may evaluate `a` (getting a `TlangValue::Object`), then evaluate `b` (which allocates and triggers GC). At this point, `a`'s value is held in a Rust local variable -- invisible to the GC -- and might be swept.
+
+**Solutions**:
+- **Safest**: Only trigger GC at statement boundaries in the evaluator, where all live values are stored in the scope stack
+- **Alternative**: Audit every allocation call site to ensure no live temporaries are held. Use GC stress mode to find violations
+- **Advanced**: Implement a "shadow stack" where the evaluator registers temporary roots before allocating
+
+### 7. Forgetting to Clean Up Side Tables
+
+**Symptom**: `native_fns` or `native_fns_meta` contain dangling object IDs after GC.
+
+**Cause**: When a `NativeFn` object is swept from the slab, the `native_fns` and `native_fns_meta` HashMaps still contain entries keyed by the old object ID.
+
+**Solution**: In the sweep phase, also remove entries from auxiliary maps:
+```rust
+for id in &to_remove {
+    if let Some(TlangObjectKind::NativeFn) = self.remove_object(*id) {
+        self.native_fns.remove(id);
+        self.native_fns_meta.remove(id);
+    }
+}
+```
+
 ---
 
 ## Next Steps and Optimizations
@@ -658,11 +878,156 @@ Collect young objects more frequently:
 
 **Key insight**: Most objects die young ("generational hypothesis").
 
-### 3. Moving/Compacting GC
+### 3. Heap Compaction
 
-Reduce fragmentation by moving live objects together:
-- Requires updating all pointers
-- More complex but better memory utilization
+#### The problem
+
+tlang's heap is a `Slab<TlangObjectKind>`, backed by a `Vec`. When objects are swept, their slots go onto an internal free list and are reused by future allocations, but the `Vec` itself never shrinks. After many GC cycles, the backing `Vec` may be much larger than the number of live objects -- the high-water mark is permanent. This wastes memory and hurts cache locality.
+
+Scope memory (`ScopeStack::memory`) has the same issue: it is never truncated when scopes pop (to preserve closure references), so it also only grows. Heap compaction alone does not address scope memory; that requires the closure refactoring described in section 4 below.
+
+#### Algorithm: rebuild-and-remap
+
+Since `TlangObjectId` is just a `usize` index, compaction means assigning new contiguous IDs to all live objects and updating every reference. A practical approach:
+
+```rust
+impl InterpreterState {
+    /// Compacts the heap by rebuilding the Slab with contiguous IDs.
+    /// Call after sweep when fragmentation is high.
+    pub fn compact_heap(&mut self) {
+        // 1. Build a new Slab and an old→new ID mapping
+        let mut new_objects = Slab::with_capacity(self.objects.len());
+        let mut id_map: HashMap<TlangObjectId, TlangObjectId> = HashMap::new();
+
+        for (old_id, obj) in self.objects.drain() {
+            let new_id = new_objects.insert(obj);
+            id_map.insert(old_id, new_id);
+        }
+
+        self.objects = new_objects;
+
+        // 2. Update all references using the mapping
+        self.remap_all_references(&id_map);
+    }
+
+    fn remap_all_references(&mut self, id_map: &HashMap<TlangObjectId, TlangObjectId>) {
+        // Helper to remap a single value
+        let remap = |v: &mut TlangValue| {
+            if let TlangValue::Object(id) = v {
+                if let Some(&new_id) = id_map.get(id) {
+                    *id = new_id;
+                }
+            }
+        };
+
+        // Named globals
+        for value in self.globals.values_mut() {
+            remap(value);
+        }
+
+        // Scope memory (global + local, including stale slots)
+        self.scope_stack.remap_all_values(remap);
+
+        // Inside every heap object
+        for (_, obj) in self.objects.iter_mut() {
+            obj.remap_references(remap, id_map);
+        }
+
+        // native_fns and native_fns_meta keyed by old object IDs
+        self.native_fns = self.native_fns.drain()
+            .map(|(old_id, f)| (*id_map.get(&old_id).unwrap_or(&old_id), f))
+            .collect();
+        self.native_fns_meta = self.native_fns_meta.drain()
+            .map(|(old_id, m)| (*id_map.get(&old_id).unwrap_or(&old_id), m))
+            .collect();
+    }
+}
+```
+
+You'll need a `remap_references` method on `TlangObjectKind`. Note that `captured_cells` stores raw `TlangObjectId`s (not `TlangValue`), so it needs a separate ID-level remapping parameter:
+
+```rust
+impl TlangObjectKind {
+    /// Update all TlangValue::Object references inside this object.
+    pub fn remap_references(
+        &mut self,
+        mut remap_value: impl FnMut(&mut TlangValue),
+        id_map: &HashMap<TlangObjectId, TlangObjectId>,
+    ) {
+        match self {
+            TlangObjectKind::Struct(s) => {
+                for v in s.values_mut() { remap_value(v); }
+            }
+            TlangObjectKind::Enum(e) => {
+                for v in e.field_values.iter_mut() { remap_value(v); }
+            }
+            TlangObjectKind::Slice(s) => {
+                let mut of = s.of();
+                remap_value(&mut of);
+                *s = TlangSlice::new(of, s.start(), s.len());
+            }
+            TlangObjectKind::Closure(c) => {
+                for v in c.captured_memory.iter_mut() { remap_value(v); }
+                // captured_cells stores raw TlangObjectId, not TlangValue
+                for cell_id in c.captured_cells.values_mut() {
+                    if let Some(&new_id) = id_map.get(cell_id) {
+                        *cell_id = new_id;
+                    }
+                }
+            }
+            TlangObjectKind::Cell(c) => {
+                let mut v = c.get();
+                remap_value(&mut v);
+                c.set(v);
+            }
+            TlangObjectKind::Fn(_)
+            | TlangObjectKind::NativeFn
+            | TlangObjectKind::String(_) => {}
+        }
+    }
+}
+```
+
+And on `ScopeStack`:
+
+```rust
+impl ScopeStack {
+    /// Remap all TlangValue::Object references in both global and local memory.
+    /// This includes stale slots from exited scopes -- they still hold values
+    /// that may be referenced by live closures' captured_memory.
+    pub fn remap_all_values(&mut self, mut remap: impl FnMut(&mut TlangValue)) {
+        for v in self.global_memory.iter_mut() { remap(v); }
+        for v in self.memory.iter_mut() { remap(v); }
+    }
+}
+```
+
+**Note on stale scope memory during compaction**: Even though `live_local_memory_iter()` skips stale slots during root enumeration (correctly -- those values are not roots), compaction must still remap *all* slots in `self.memory`, including stale ones. If a stale slot contains `Object(5)` and we don't remap it, then later code that reads that slot (e.g., a closure's scope-swapping logic) would find a dangling or wrong ID. Either remap all slots, or zero out stale slots during sweep so they can't cause confusion.
+
+#### When to compact
+
+Compaction is expensive (touches every reference), so don't do it on every GC cycle. Run it when fragmentation is high:
+
+```rust
+fn should_compact(&self) -> bool {
+    // Compact when the Slab's capacity is much larger than live objects.
+    // Slab doesn't expose capacity directly, but you can track the
+    // high-water mark or use objects.len() vs. last known pre-sweep count.
+    let live = self.objects.len();
+    let capacity_estimate = self.memory_stats.objects_allocated
+        - self.memory_stats.objects_deallocated;
+    // If less than 25% of slots are used, compact
+    live > 0 && live < capacity_estimate / 4
+}
+```
+
+Or simply compact after every N GC cycles, or on explicit request.
+
+#### Scope memory compaction
+
+Scope memory (`ScopeStack::memory`) cannot be compacted independently of heap compaction because scopes reference memory by absolute index (`Scope::start`). However, once the closure refactoring (section 4) is complete and `scope.pop()` truncates memory, this problem goes away -- scope memory naturally stays compact.
+
+Until then, stale scope memory is a source of waste that heap compaction does not address. If scope memory becomes a concern before the closure refactoring, you could add a `compact_scope_memory()` that shifts live scope data down and updates `Scope::start` offsets, but this is complex and best deferred.
 
 ### 4. Scope Memory Truncation
 
@@ -681,9 +1046,10 @@ See `docs/gc-preparation-analysis.md` for detailed analysis.
 
 | File | Changes Needed |
 |------|----------------|
-| `state.rs` | `gc_roots()`, `mark_reachable()`, `sweep_unreachable()`, `collect_garbage()` |
-| `scope.rs` | `global_memory_iter()`, `local_memory_iter()` |
+| `state.rs` | `gc_roots()`, `mark_reachable()`, `sweep_unreachable()`, `collect_garbage()`, `next_gc_threshold` field, `gc_stress` flag |
+| `scope.rs` | `global_memory_iter()`, `live_local_memory_iter()` |
 | `object.rs` | Already has `referenced_values()` ✓ |
+| evaluator | GC trigger at statement boundaries (if using safe-point approach) |
 
 ### Existing Infrastructure
 
@@ -696,15 +1062,17 @@ See `docs/gc-preparation-analysis.md` for detailed analysis.
 
 ### Implementation Checklist
 
-- [ ] Add `gc_roots()` method
-- [ ] Add `mark_reachable()` method  
-- [ ] Add `sweep_unreachable()` method
-- [ ] Add `collect_garbage()` method
-- [ ] Add GC trigger in `new_object()`
-- [ ] Ensure `gc_collections` counter in `MemoryStats` is updated by the GC
+- [ ] Add `gc_roots()` method (including native_fns as roots)
+- [ ] Add `live_local_memory_iter()` to ScopeStack (not all of memory!)
+- [ ] Add `mark_reachable()` method
+- [ ] Add `sweep_unreachable()` method (with side-table cleanup for native_fns)
+- [ ] Add `collect_garbage()` method with growth-based threshold
+- [ ] Choose GC trigger strategy (statement boundaries vs. inside new_object)
+- [ ] Add `gc_stress` mode for testing
+- [ ] Add `assert_roots_valid()` debug assertion
 - [ ] Write unit tests for each component
-- [ ] Write integration tests
-- [ ] Run existing test suite
+- [ ] Run full test suite with `gc_stress = true`
+- [ ] Run full test suite comparing output with/without GC
 - [ ] Profile and tune GC threshold
 
 ---
@@ -713,13 +1081,11 @@ See `docs/gc-preparation-analysis.md` for detailed analysis.
 
 Implementing a garbage collector for tlang involves:
 
-1. **Understanding the architecture**: Know where objects live and how they reference each other
-2. **Finding roots**: Enumerate all directly-accessible values
-3. **Tracing**: Follow references to find all live objects
-4. **Sweeping**: Remove everything not found during tracing
-5. **Triggering**: Decide when to run the collector
-6. **Testing**: Verify correctness and performance
+1. **Understanding the architecture**: GC collects *heap objects* (`TlangObjectKind` entries in the Slab). `TlangValue` is just a handle -- primitives are inline, `Object(id)` is an index.
+2. **Finding roots**: Enumerate all directly-accessible values -- globals, live scope memory, native function IDs. Be careful to only scan *live* scope memory, not stale leftovers.
+3. **Tracing**: Follow `Object(id)` references to find all reachable heap objects. Primitives in the worklist can be skipped (they don't lead anywhere).
+4. **Sweeping**: Remove unreachable objects and clean up side tables (`native_fns`, `native_fns_meta`).
+5. **Triggering**: Choose safe trigger points (statement boundaries recommended) and a growth-based threshold policy.
+6. **Verifying correctness**: Use GC stress mode (collect on every allocation) across the full test suite. This is the most effective way to find premature collection bugs.
 
-The tlang codebase already has the necessary infrastructure for object tracing and deallocation. The remaining work is to implement the mark-and-sweep algorithm and integrate it with the interpreter's allocation path.
-
-Good luck with your implementation! 🎉
+The tlang codebase already has the necessary infrastructure for object tracing and deallocation. The remaining work is to implement the mark-and-sweep algorithm, integrate it with the interpreter, and verify correctness with stress testing.
