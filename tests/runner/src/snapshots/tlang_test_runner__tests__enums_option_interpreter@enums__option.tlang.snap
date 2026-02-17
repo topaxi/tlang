@@ -1,5 +1,5 @@
 ---
-source: crates/tlang_test_runner/src/main.rs
+source: tests/runner/src/main.rs
 description: "Backend: interpreter"
 expression: apply_redactions(&output)
 input_file: tests/enums/option.tlang
@@ -11,7 +11,7 @@ true
 10
 
 
-thread 'main' panicked at crates/tlang_runtime/tlang_memory/src/state.rs:355:9:
+thread 'main' panicked at crates/tlang_runtime/tlang_memory/src/state.rs:404:9:
 Called unwrap on None
   at root 10:1
 

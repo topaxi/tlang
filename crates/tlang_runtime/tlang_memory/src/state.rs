@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use log::debug;
@@ -303,6 +303,77 @@ impl InterpreterState {
             native_fns_meta: HashMap::with_capacity(100),
             memory_stats: MemoryStats::default(),
         }
+    }
+
+    /// Returns an iterator over all GC root values.
+    pub fn gc_roots(&self) -> impl Iterator<Item = TlangValue> + '_ {
+        let globals = self.globals.values().copied();
+        let scope_memory = self.scope_stack.memory_iter();
+        let native_fns = self.native_fns.keys().copied().map(TlangValue::Object);
+
+        globals.chain(scope_memory).chain(native_fns)
+    }
+
+    /// Mark all objects reachable from GC roots.
+    /// Returns a set of reachable object IDs.
+    pub fn mark_reachable(&self) -> HashSet<TlangObjectId> {
+        let mut reachable = HashSet::new();
+        let mut values = self.gc_roots().collect::<Vec<_>>();
+
+        while let Some(value) = values.pop() {
+            if let TlangValue::Object(id) = value {
+                if !reachable.insert(id) {
+                    continue;
+                }
+
+                if let Some(obj) = self.objects.get(id) {
+                    values.extend(obj.referenced_values());
+                }
+            }
+        }
+
+        reachable
+    }
+
+    /// Remove all objects not in the reachable set.
+    /// Returns the number of objects collected.
+    pub fn sweep_unreachable(&mut self, reachable: &HashSet<TlangObjectId>) -> usize {
+        let garbage = self
+            .objects
+            .iter()
+            .map(|(id, _)| id)
+            .filter(|id| !reachable.contains(id))
+            .collect::<Vec<_>>();
+
+        let count = garbage.len();
+
+        for id in garbage {
+            self.remove_object(id);
+        }
+
+        count
+    }
+
+    /// Runs a complete garbage collection cycle.
+    /// Returns the number of objects collected.
+    pub fn collect_garbage(&mut self) -> usize {
+        let unreachable = self.mark_reachable();
+        let collected = self.sweep_unreachable(&unreachable);
+
+        self.memory_stats.gc_collections += 1;
+        self.memory_stats.objects_deallocated += collected;
+
+        log::debug!(
+            "GC: collected {} objects, {} remain",
+            collected,
+            self.objects.len()
+        );
+
+        collected
+    }
+
+    pub fn should_collect(&self) -> bool {
+        true
     }
 
     pub fn get_fn_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
@@ -932,5 +1003,60 @@ mod tests {
 
         assert!(state.contains_object(id));
         assert!(!state.contains_object(999));
+    }
+
+    #[test]
+    fn test_gc_roots_includes_globals() {
+        let value = TlangValue::I64(42);
+        let mut state = InterpreterState::new();
+        state.set_global("test".to_string(), value);
+
+        let roots: Vec<_> = state.gc_roots().collect();
+        assert!(roots.contains(&value));
+    }
+
+    #[test]
+    fn test_mark_phase_finds_reachable() {
+        let mut state = InterpreterState::new();
+
+        // Create a reachable object using new_string helper
+        let obj = state.new_string("hello".to_string());
+        state.set_global("my_string".to_string(), obj);
+
+        let marked = state.mark_reachable();
+
+        if let TlangValue::Object(id) = obj {
+            assert!(marked.contains(&id));
+        }
+    }
+
+    #[test]
+    fn test_mark_phase_ignores_unreachable() {
+        let mut state = InterpreterState::new();
+
+        // Create an unreachable object (no root reference)
+        let orphan = state.new_string("orphan".to_string());
+        let orphan_id = orphan.get_object_id().unwrap();
+
+        let marked = state.mark_reachable();
+
+        // Orphan should NOT be in marked set
+        assert!(!marked.contains(&orphan_id));
+    }
+
+    #[test]
+    fn test_sweep_removes_unreachable() {
+        let mut state = InterpreterState::new();
+
+        // Create an object but don't make it a root
+        let orphan = state.new_string("orphan".to_string());
+        let orphan_id = orphan.get_object_id().unwrap();
+
+        // Run GC phases
+        let marked = state.mark_reachable();
+        let collected = state.sweep_unreachable(&marked);
+
+        assert_eq!(collected, 1);
+        assert!(!state.contains_object(orphan_id));
     }
 }

@@ -26,6 +26,29 @@ impl ScopeStack {
         }
     }
 
+    pub fn memory_iter(&self) -> impl Iterator<Item = TlangValue> + '_ {
+        // IMPORTANT: Do NOT iterate over all of `self.memory` blindly. Because
+        // `ScopeStack::pop()` does not truncate the memory vector (to preserve
+        // closure references), there may be stale values from exited scopes
+        // lingering at the end. Iterating all of `self.memory` would treat those
+        // stale values as roots, preventing their referenced objects from ever
+        // being collected -- defeating the purpose of GC.
+        //
+        // Instead, compute the end of the last live scope and only iterate up
+        // to that point.
+        let live_end = self.scopes.last().map_or(0, |scope| {
+            // The last scope's memory extends to wherever its variables end.
+            // Since push_value appends and set_local may extend, use the max
+            // of scope.start() + scope.size() and actual memory length up to
+            // that scope's known extent.
+            (scope.start() + scope.size()).min(self.memory.len())
+        });
+
+        let scope_memory = self.memory[..live_end].iter().copied();
+
+        return self.global_memory.iter().copied().chain(scope_memory);
+    }
+
     pub fn push<T>(&mut self, meta: &T)
     where
         T: HirScope,
