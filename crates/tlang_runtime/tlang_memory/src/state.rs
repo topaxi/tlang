@@ -40,6 +40,14 @@ impl CallStackEntry {
         }
     }
 
+    pub fn new_native_call(name: &str) -> Self {
+        Self {
+            kind: CallStackKind::NativeFn(name.to_string()),
+            tail_call: None,
+            current_span: Default::default(),
+        }
+    }
+
     pub fn replace_fn_decl(&mut self, fn_decl: Rc<hir::FunctionDeclaration>) {
         self.kind = CallStackKind::Function(fn_decl);
     }
@@ -457,7 +465,13 @@ impl InterpreterState {
         args: &[TlangValue],
     ) -> Option<NativeFnReturn> {
         let native_fn = self.native_fns.get(&fn_id)?.clone();
-        Some(native_fn(self, args))
+        let native_fn_meta = self.native_fns_meta.get(&fn_id)?;
+
+        self.push_call_stack(CallStackEntry::new_native_call(&native_fn_meta.name));
+        let result = native_fn(self, args);
+        self.pop_call_stack();
+
+        Some(result)
     }
 
     pub fn get_closure_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
