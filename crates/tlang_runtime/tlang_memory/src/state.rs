@@ -357,8 +357,8 @@ impl InterpreterState {
     /// Runs a complete garbage collection cycle.
     /// Returns the number of objects collected.
     pub fn collect_garbage(&mut self) -> usize {
-        let unreachable = self.mark_reachable();
-        let collected = self.sweep_unreachable(&unreachable);
+        let reachable = self.mark_reachable();
+        let collected = self.sweep_unreachable(&reachable);
 
         self.memory_stats.gc_collections += 1;
         self.memory_stats.objects_deallocated += collected;

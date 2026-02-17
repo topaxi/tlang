@@ -1,6 +1,6 @@
 use tlang_ast as ast;
 use tlang_ast::node::Ident;
-use tlang_hir::hir;
+use tlang_hir::hir::{self, HirScope};
 use tlang_span::NodeId;
 use tlang_symbols::SymbolType;
 
@@ -154,6 +154,14 @@ impl LoweringContext {
             if let Some(stmt) = accumulator_initializer {
                 init_loop_block.stmts.push(stmt);
             }
+
+            // Set the locals count explicitly for this synthesized block.
+            // The ScopeDataUpdater pass can't find the symbol table for this
+            // block because its hir_id doesn't match the scope's node_id
+            // mapping. We know exactly how many bindings we created:
+            // iterator$$ (always) + accumulator$$ (if present).
+            let locals_count = if for_loop.acc.is_some() { 2 } else { 1 };
+            init_loop_block.set_locals(locals_count);
 
             init_loop_block
         });
