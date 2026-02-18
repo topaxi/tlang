@@ -358,6 +358,7 @@ impl InterpreterState {
     /// Returns the number of objects collected.
     pub fn collect_garbage(&mut self) -> usize {
         let reachable = self.mark_reachable();
+
         let collected = self.sweep_unreachable(&reachable);
 
         self.memory_stats.gc_collections += 1;
@@ -373,7 +374,11 @@ impl InterpreterState {
     }
 
     pub fn should_collect(&self) -> bool {
-        true
+        // Only collect at the top-level (root call frame). During nested function
+        // calls, intermediate expression values (e.g., partially evaluated function
+        // arguments) may live only on the Rust stack and are invisible to GC roots.
+        // Collecting inside nested calls can incorrectly free these live objects.
+        self.call_stack.len() <= 1
     }
 
     pub fn get_fn_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
