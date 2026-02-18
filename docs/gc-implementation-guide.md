@@ -772,11 +772,11 @@ Note: In practice, native functions are typically rooted via globals and won't b
 **Symptom**: Live objects get collected, causing crashes.
 
 **Solution**: Audit *all* places `TlangValue::Object` references are stored:
+- `temp_roots: Vec<TlangValue>` -- intermediate expression values registered by the evaluator (see pitfall #6)
 - `globals: HashMap<String, TlangValue>` -- named globals
 - `scope_stack.global_memory` -- slot-based globals
 - `scope_stack.memory` -- local scope variables (**only live scopes**, see pitfall #5)
 - `native_fns` keys -- object IDs of native function objects
-- Temporary values on the Rust call stack during evaluation (see pitfall #6)
 
 ### 2. Not Handling Cycles
 
@@ -829,14 +829,65 @@ for id in to_remove {
 
 ### 6. Temporary Values on the Rust Call Stack
 
-**Symptom**: Intermittent crashes, especially during complex expressions or when GC triggers frequently.
+**Symptom**: Intermittent crashes, especially during complex expressions or when GC triggers frequently. A collected slab slot gets reused for a different object type (e.g., a list becomes a Closure), causing `todo!("eval_pat: ...")` panics or silent wrong results. Often only manifests with deeply recursive code (e.g., recursive quicksort calling `filter` with closures).
 
-**Cause**: When the evaluator computes an expression like `f(a, b)`, it may evaluate `a` (getting a `TlangValue::Object`), then evaluate `b` (which allocates and triggers GC). At this point, `a`'s value is held in a Rust local variable -- invisible to the GC -- and might be swept.
+**Cause**: When the evaluator computes an expression like `f(a, b)`, it evaluates `a` (getting a `TlangValue::Object`), stores it in a Rust local (the `SmallVec` inside `eval_exprs!`), then evaluates `b`. If `b` involves a function call, that call enters `eval_stmt` which triggers GC. At this point, `a`'s value is held only on the Rust call stack -- invisible to `gc_roots()` -- and gets swept. The slab slot is reused for a new object, and when the caller later uses `a`, it finds a different object type.
 
-**Solutions**:
-- **Safest**: Only trigger GC at statement boundaries in the evaluator, where all live values are stored in the scope stack
-- **Alternative**: Audit every allocation call site to ensure no live temporaries are held. Use GC stress mode to find violations
-- **Advanced**: Implement a "shadow stack" where the evaluator registers temporary roots before allocating
+This is especially dangerous with nested calls like `append(append(qs(smaller), [pivot]), qs(larger))` where the inner `append` result is held in the outer call's argument list while `qs(larger)` executes a deep recursive chain.
+
+**Solution — Temporary roots (recommended)**:
+
+Add a `temp_roots: Vec<TlangValue>` field to `InterpreterState` and include it in `gc_roots()`. Use a save/restore pattern to manage lifetime:
+
+```rust
+// In InterpreterState:
+pub fn temp_roots_mark(&self) -> usize {
+    self.temp_roots.len()
+}
+
+pub fn push_temp_root(&mut self, value: TlangValue) {
+    self.temp_roots.push(value);
+}
+
+pub fn temp_roots_restore(&mut self, mark: usize) {
+    self.temp_roots.truncate(mark);
+}
+```
+
+The save/restore pattern handles nesting naturally — each call site saves its own mark, inner calls push/restore within that, and the outer restore cleans up everything:
+
+```rust
+// In eval_call, root the callee and each argument:
+let mark = self.state.temp_roots_mark();
+let callee = eval_value!(self.eval_expr(&call_expr.callee));
+self.state.push_temp_root(callee);
+let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
+// ↑ each arg also pushed to temp_roots inside the macro
+let result = self.eval_call_object(callee, &args);
+self.state.temp_roots_restore(mark);
+// ↑ safe: args were pushed to scope memory inside eval_fn_call
+```
+
+The key risk points that need rooting:
+
+| Site | What's at risk | Pop point |
+|------|---------------|-----------|
+| `eval_exprs!` | Earlier args while later args are evaluated | After the function call returns |
+| `eval_list_expr` | Earlier list elements while later elements are evaluated | After `new_list` consumes the Vec |
+| `eval_call` callee | The callee value while arguments are evaluated | After the function call returns |
+| `eval_binary` | Left operand while right operand is evaluated | After the binary op completes |
+
+**Fallback — Call-depth guard (simpler but limits GC)**:
+
+If temporary roots aren't implemented yet, restrict GC to only run at the top-level call frame:
+
+```rust
+fn should_collect(&self) -> bool {
+    self.call_stack.len() <= 1
+}
+```
+
+This is correct but means GC never runs during long-running nested computations. Use this as a stopgap until temporary roots are in place.
 
 ### 7. Forgetting to Clean Up Side Tables
 
@@ -1046,10 +1097,10 @@ See `docs/gc-preparation-analysis.md` for detailed analysis.
 
 | File | Changes Needed |
 |------|----------------|
-| `state.rs` | `gc_roots()`, `mark_reachable()`, `sweep_unreachable()`, `collect_garbage()`, `next_gc_threshold` field, `gc_stress` flag |
+| `state.rs` | `gc_roots()`, `mark_reachable()`, `sweep_unreachable()`, `collect_garbage()`, `next_gc_threshold` field, `gc_stress` flag, `temp_roots` field + `temp_roots_mark()`/`push_temp_root()`/`temp_roots_restore()` |
 | `scope.rs` | `global_memory_iter()`, `live_local_memory_iter()` |
 | `object.rs` | Already has `referenced_values()` ✓ |
-| evaluator | GC trigger at statement boundaries (if using safe-point approach) |
+| evaluator | GC trigger at statement boundaries; temp root registration in `eval_exprs!`, `eval_list_expr`, `eval_call`, `eval_binary` |
 
 ### Existing Infrastructure
 
@@ -1062,12 +1113,14 @@ See `docs/gc-preparation-analysis.md` for detailed analysis.
 
 ### Implementation Checklist
 
-- [ ] Add `gc_roots()` method (including native_fns as roots)
+- [ ] Add `gc_roots()` method (including temp_roots and native_fns as roots)
 - [ ] Add `live_local_memory_iter()` to ScopeStack (not all of memory!)
 - [ ] Add `mark_reachable()` method
 - [ ] Add `sweep_unreachable()` method (with side-table cleanup for native_fns)
 - [ ] Add `collect_garbage()` method with growth-based threshold
 - [ ] Choose GC trigger strategy (statement boundaries vs. inside new_object)
+- [ ] Add temporary roots (`temp_roots` + save/restore) to protect Rust-stack intermediates
+- [ ] Root values in `eval_exprs!`, `eval_list_expr`, `eval_call` callee, `eval_binary` operands
 - [ ] Add `gc_stress` mode for testing
 - [ ] Add `assert_roots_valid()` debug assertion
 - [ ] Write unit tests for each component
@@ -1082,10 +1135,11 @@ See `docs/gc-preparation-analysis.md` for detailed analysis.
 Implementing a garbage collector for tlang involves:
 
 1. **Understanding the architecture**: GC collects *heap objects* (`TlangObjectKind` entries in the Slab). `TlangValue` is just a handle -- primitives are inline, `Object(id)` is an index.
-2. **Finding roots**: Enumerate all directly-accessible values -- globals, live scope memory, native function IDs. Be careful to only scan *live* scope memory, not stale leftovers.
-3. **Tracing**: Follow `Object(id)` references to find all reachable heap objects. Primitives in the worklist can be skipped (they don't lead anywhere).
-4. **Sweeping**: Remove unreachable objects and clean up side tables (`native_fns`, `native_fns_meta`).
-5. **Triggering**: Choose safe trigger points (statement boundaries recommended) and a growth-based threshold policy.
-6. **Verifying correctness**: Use GC stress mode (collect on every allocation) across the full test suite. This is the most effective way to find premature collection bugs.
+2. **Finding roots**: Enumerate all directly-accessible values -- temporary roots, globals, live scope memory, native function IDs. Be careful to only scan *live* scope memory, not stale leftovers.
+3. **Protecting temporaries**: Intermediate expression values on the Rust call stack (function arguments being evaluated, list elements, binary operands) are invisible to GC. Use a `temp_roots` save/restore mechanism to register them before any code path that could trigger GC.
+4. **Tracing**: Follow `Object(id)` references to find all reachable heap objects. Primitives in the worklist can be skipped (they don't lead anywhere).
+5. **Sweeping**: Remove unreachable objects and clean up side tables (`native_fns`, `native_fns_meta`).
+6. **Triggering**: Choose safe trigger points (statement boundaries recommended) and a growth-based threshold policy. Without temporary roots, restrict GC to the top-level call frame as a stopgap.
+7. **Verifying correctness**: Use GC stress mode (collect on every allocation) across the full test suite. This is the most effective way to find premature collection bugs.
 
-The tlang codebase already has the necessary infrastructure for object tracing and deallocation. The remaining work is to implement the mark-and-sweep algorithm, integrate it with the interpreter, and verify correctness with stress testing.
+The tlang codebase already has the necessary infrastructure for object tracing and deallocation. The remaining work is to implement the mark-and-sweep algorithm, integrate it with the interpreter, protect temporary values with root registration, and verify correctness with stress testing.

@@ -249,6 +249,7 @@ pub struct InterpreterState {
     enum_decls: HashMap<String, Rc<hir::EnumDeclaration>>,
     call_stack: Vec<CallStackEntry>,
     globals: HashMap<String, TlangValue>,
+    temp_roots: Vec<TlangValue>,
     pub builtin_shapes: BuiltinShapes,
     native_fns: HashMap<TlangObjectId, TlangNativeFn>,
     native_fns_meta: HashMap<TlangObjectId, NativeFnMeta>,
@@ -298,6 +299,7 @@ impl InterpreterState {
             shapes: HashMap::with_capacity(100),
             call_stack,
             globals: HashMap::with_capacity(100),
+            temp_roots: Vec::with_capacity(10),
             builtin_shapes: BuiltinShapes::default(),
             native_fns: HashMap::with_capacity(100),
             native_fns_meta: HashMap::with_capacity(100),
@@ -307,11 +309,15 @@ impl InterpreterState {
 
     /// Returns an iterator over all GC root values.
     pub fn gc_roots(&self) -> impl Iterator<Item = TlangValue> + '_ {
+        let temp_roots = self.temp_roots.iter().copied();
         let globals = self.globals.values().copied();
         let scope_memory = self.scope_stack.memory_iter();
         let native_fns = self.native_fns.keys().copied().map(TlangValue::Object);
 
-        globals.chain(scope_memory).chain(native_fns)
+        temp_roots
+            .chain(globals)
+            .chain(scope_memory)
+            .chain(native_fns)
     }
 
     /// Mark all objects reachable from GC roots.
