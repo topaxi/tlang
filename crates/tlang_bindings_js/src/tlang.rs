@@ -288,7 +288,9 @@ impl Tlang {
     }
 
     #[wasm_bindgen(js_name = "getCodemirrorDiagnostics")]
-    pub fn codemirror_diagnostics(&mut self) -> Result<JsCodemirrorDiagnosticArray, serde_wasm_bindgen::Error> {
+    pub fn codemirror_diagnostics(
+        &mut self,
+    ) -> Result<JsCodemirrorDiagnosticArray, serde_wasm_bindgen::Error> {
         let source = self.source.clone();
         let diagnostics = self
             .analyzer
