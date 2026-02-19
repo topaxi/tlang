@@ -15,12 +15,12 @@ use tlang_semantics::SemanticAnalyzer;
 
 use crate::error::ParserError;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum CompileTargetArg {
     Js,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum OutputFormat {
     Source,
     Hir,
