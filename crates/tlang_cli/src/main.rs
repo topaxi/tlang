@@ -84,7 +84,11 @@ fn get_args() -> Command {
 }
 
 fn main() {
-    env_logger::init();
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Warn)
+        .parse_default_env()
+        .init();
+
     let command = get_args();
 
     match command {
