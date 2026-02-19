@@ -1,6 +1,6 @@
 enum Tree {
     Leaf(unknown),
-    Node { left, right },
+    Node { left: Tree, right: Tree },
 }
 
 // maximum_depth(Tree) -> Int
