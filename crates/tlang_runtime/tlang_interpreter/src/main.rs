@@ -10,6 +10,8 @@ use tlang_semantics::SemanticAnalyzer;
 use tlang_semantics::diagnostic::Diagnostic;
 
 fn main() {
+    let stress_gc = env::var("TLANG_STRESS_GC").is_ok();
+
     env_logger::builder()
         .filter_level(log::LevelFilter::Warn)
         .parse_default_env()
@@ -70,5 +72,6 @@ fn main() {
     optimizer.optimize_hir(&mut module, meta.into());
 
     let mut interp = Interpreter::default();
+    interp.state_mut().set_stress_gc(stress_gc);
     interp.eval(&module);
 }

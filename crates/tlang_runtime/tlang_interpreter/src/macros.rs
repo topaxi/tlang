@@ -1,9 +1,12 @@
 /// Propagate control flow (`Return`, `TailCall`, etc.), otherwise extract the value.
 #[macro_export]
 macro_rules! eval_value {
-    ($expr:expr) => {
+    ($this:expr, $expr:expr) => {
         match $expr {
-            EvalResult::Value(val) => val,
+            EvalResult::Value(val) => {
+                $this.state.push_temp_root(val);
+                val
+            }
             other => return other,
         }
     };
@@ -38,7 +41,7 @@ macro_rules! eval_exprs {
     ($this:expr, $eval:expr, $exprs:expr, $capacity:expr) => {{
         let mut exprs = SmallVec::<[TlangValue; 4]>::with_capacity($capacity);
         for expr in &$exprs {
-            exprs.push(eval_value!($eval($this, expr)));
+            exprs.push(eval_value!($this, $eval($this, expr)));
         }
         exprs
     }};

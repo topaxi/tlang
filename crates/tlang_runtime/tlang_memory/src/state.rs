@@ -318,7 +318,9 @@ impl InterpreterState {
     }
 
     pub fn push_temp_root(&mut self, value: TlangValue) {
-        self.temp_roots.push(value);
+        if value.is_object() {
+            self.temp_roots.push(value);
+        }
     }
 
     pub fn temp_roots_restore(&mut self, mark: usize) {

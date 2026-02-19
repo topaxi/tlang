@@ -337,7 +337,7 @@ impl Interpreter {
             }
             hir::StmtKind::Let(pat, expr, ty) => self.eval_let_stmt(pat, expr, ty),
             hir::StmtKind::Return(Some(expr)) => {
-                EvalResult::Return(eval_value!(self.eval_expr(expr)))
+                EvalResult::Return(eval_value!(self, self.eval_expr(expr)))
             }
 
             hir::StmtKind::Return(_) => EvalResult::Return(TlangValue::Nil),
@@ -376,7 +376,7 @@ impl Interpreter {
             hir::ExprKind::Block(block) => self.eval_block(block),
             hir::ExprKind::Loop(block) => self.eval_loop(block),
             hir::ExprKind::Break(Some(expr)) => {
-                EvalResult::Break(eval_value!(self.eval_expr(expr)))
+                EvalResult::Break(eval_value!(self, self.eval_expr(expr)))
             }
             hir::ExprKind::Break(_) => EvalResult::Break(TlangValue::Nil),
             hir::ExprKind::Continue => EvalResult::Continue,
@@ -406,13 +406,13 @@ impl Interpreter {
         consequence: &hir::Block,
         else_clauses: &[hir::ElseClause],
     ) -> EvalResult {
-        if eval_value!(self.eval_expr(condition)).is_truthy(&self.state) {
+        if eval_value!(self, self.eval_expr(condition)).is_truthy(&self.state) {
             return self.eval_block(consequence);
         }
 
         for else_clause in else_clauses {
             if let Some(condition) = &else_clause.condition {
-                if eval_value!(self.eval_expr(condition)).is_truthy(&self.state) {
+                if eval_value!(self, self.eval_expr(condition)).is_truthy(&self.state) {
                     return self.eval_block(&else_clause.consequence);
                 }
             } else {
@@ -424,8 +424,8 @@ impl Interpreter {
     }
 
     fn eval_index_access(&mut self, lhs: &hir::Expr, rhs: &hir::Expr) -> EvalResult {
-        let rhs_value = eval_value!(self.eval_expr(rhs));
-        let lhs_value = eval_value!(self.eval_expr(lhs));
+        let rhs_value = eval_value!(self, self.eval_expr(rhs));
+        let lhs_value = eval_value!(self, self.eval_expr(lhs));
 
         match self.get_object(lhs_value) {
             Some(TlangObjectKind::Struct(obj)) => EvalResult::Value(obj[rhs_value.as_usize()]),
@@ -437,7 +437,7 @@ impl Interpreter {
     }
 
     fn eval_field_access(&mut self, lhs: &hir::Expr, ident: &Ident) -> EvalResult {
-        let value = eval_value!(self.eval_expr(lhs));
+        let value = eval_value!(self, self.eval_expr(lhs));
 
         if let Some(TlangObjectKind::Struct(obj)) = self.get_object(value) {
             if let Some(index) = self
@@ -492,7 +492,7 @@ impl Interpreter {
     fn eval_unary(&mut self, op: UnaryOp, expr: &hir::Expr) -> EvalResult {
         match op {
             UnaryOp::Not => EvalResult::Value(TlangValue::Bool(
-                !eval_value!(self.eval_expr(expr)).is_truthy(&self.state),
+                !eval_value!(self, self.eval_expr(expr)).is_truthy(&self.state),
             )),
             UnaryOp::Rest => unreachable!("Rest operator implemented in eval_list_expr"),
             _ => todo!("eval_unary: {:?}", op),
@@ -507,10 +507,10 @@ impl Interpreter {
     ) -> EvalResult {
         match op {
             hir::BinaryOpKind::And => {
-                let lhs = eval_value!(self.eval_expr(lhs));
+                let lhs = eval_value!(self, self.eval_expr(lhs));
 
                 if lhs.is_truthy(&self.state) {
-                    let rhs = eval_value!(self.eval_expr(rhs));
+                    let rhs = eval_value!(self, self.eval_expr(rhs));
 
                     debug!(
                         "eval_binary: {:?} && {:?}",
@@ -529,7 +529,7 @@ impl Interpreter {
             }
 
             hir::BinaryOpKind::Or => {
-                let lhs = eval_value!(self.eval_expr(lhs));
+                let lhs = eval_value!(self, self.eval_expr(lhs));
 
                 if lhs.is_truthy(&self.state) {
                     debug!("eval_binary: {:?} || ...", self.state.stringify(lhs));
@@ -541,7 +541,7 @@ impl Interpreter {
             }
 
             hir::BinaryOpKind::Assign if let hir::ExprKind::Path(path) = &lhs.kind => {
-                let value = eval_value!(self.eval_expr(rhs));
+                let value = eval_value!(self, self.eval_expr(rhs));
 
                 debug!("eval_binary: {} = {}", path, self.state.stringify(value));
 
@@ -553,7 +553,7 @@ impl Interpreter {
             hir::BinaryOpKind::Assign
                 if let hir::ExprKind::FieldAccess(base, ident) = &lhs.kind =>
             {
-                let struct_value = eval_value!(self.eval_expr(base));
+                let struct_value = eval_value!(self, self.eval_expr(base));
                 let struct_shape = self
                     .get_object(struct_value)
                     .and_then(|o| o.shape())
@@ -569,7 +569,7 @@ impl Interpreter {
                         ))
                     });
 
-                let value = eval_value!(self.eval_expr(rhs));
+                let value = eval_value!(self, self.eval_expr(rhs));
 
                 let struct_obj = self.get_struct_mut(struct_value).unwrap();
 
@@ -585,8 +585,8 @@ impl Interpreter {
             _ => {}
         }
 
-        let lhs = eval_value!(self.eval_expr(lhs));
-        let rhs = eval_value!(self.eval_expr(rhs));
+        let lhs = eval_value!(self, self.eval_expr(lhs));
+        let rhs = eval_value!(self, self.eval_expr(rhs));
 
         debug!(
             "eval_binary: {:?} {:?} {:?}",
@@ -961,7 +961,7 @@ impl Interpreter {
             self.panic("Tail call with wildcard arguments not allowed".to_string());
         }
 
-        let callee = eval_value!(self.eval_expr(&call_expr.callee));
+        let callee = eval_value!(self, self.eval_expr(&call_expr.callee));
         let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
 
         self.state
@@ -1044,7 +1044,7 @@ impl Interpreter {
     }
 
     fn eval_partial_call(&mut self, call_expr: &hir::CallExpression) -> EvalResult {
-        let callee = eval_value!(self.eval_expr(&call_expr.callee));
+        let callee = eval_value!(self, self.eval_expr(&call_expr.callee));
         let applied_args = eval_exprs!(
             self,
             |this: &mut Self, expr: &hir::Expr| {
@@ -1098,7 +1098,7 @@ impl Interpreter {
                     ));
                 };
 
-                eval_value!(self.eval_struct_ctor(call_expr, &struct_decl))
+                eval_value!(self, self.eval_struct_ctor(call_expr, &struct_decl))
             }
             hir::ExprKind::Path(path) if path.res.is_enum_variant_def() => {
                 let Some(enum_decl) = self.state.get_enum_decl(&path.as_init()) else {
@@ -1109,7 +1109,10 @@ impl Interpreter {
                     ));
                 };
 
-                eval_value!(self.eval_enum_ctor(call_expr, &enum_decl, path.last_ident()))
+                eval_value!(
+                    self,
+                    self.eval_enum_ctor(call_expr, &enum_decl, path.last_ident())
+                )
             }
             hir::ExprKind::Path(path)
                 if let Some(struct_decl) = self.state.get_struct_decl(&path.as_init()) =>
@@ -1120,7 +1123,10 @@ impl Interpreter {
             hir::ExprKind::Path(path)
                 if let Some(enum_decl) = self.state.get_enum_decl(&path.as_init()) =>
             {
-                eval_value!(self.eval_enum_ctor(call_expr, &enum_decl, path.last_ident()))
+                eval_value!(
+                    self,
+                    self.eval_enum_ctor(call_expr, &enum_decl, path.last_ident())
+                )
             }
             hir::ExprKind::Path(path) => {
                 self.panic(format!(
@@ -1130,7 +1136,7 @@ impl Interpreter {
                 ));
             }
             hir::ExprKind::FieldAccess(expr, ident) => {
-                let call_target = eval_value!(self.eval_expr(expr));
+                let call_target = eval_value!(self, self.eval_expr(expr));
                 let mut args = eval_exprs!(
                     self,
                     Self::eval_expr,
@@ -1153,7 +1159,7 @@ impl Interpreter {
                 }
             }
             _ => {
-                let callee = eval_value!(self.eval_expr(&call_expr.callee));
+                let callee = eval_value!(self, self.eval_expr(&call_expr.callee));
                 let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
                 self.eval_call_object(callee, &args)
             }
@@ -1377,7 +1383,7 @@ impl Interpreter {
     }
 
     fn eval_let_stmt(&mut self, pat: &hir::Pat, expr: &hir::Expr, _ty: &hir::Ty) -> EvalResult {
-        let value = eval_value!(self.eval_expr(expr));
+        let value = eval_value!(self, self.eval_expr(expr));
 
         if !self.eval_pat(pat, value) {
             self.panic(format!(
@@ -1394,7 +1400,7 @@ impl Interpreter {
 
         for (i, expr) in values.iter().enumerate() {
             if let hir::ExprKind::Unary(UnaryOp::Spread, expr) = &expr.kind {
-                let value = eval_value!(self.eval_expr(expr));
+                let value = eval_value!(self, self.eval_expr(expr));
 
                 if let TlangValue::Object(id) = value {
                     match self.get_object_by_id(id) {
@@ -1417,7 +1423,7 @@ impl Interpreter {
                     self.panic(format!("Expected list, got {value:?}"));
                 }
             } else {
-                field_values.push(eval_value!(self.eval_expr(expr)));
+                field_values.push(eval_value!(self, self.eval_expr(expr)));
             }
         }
 
@@ -1429,7 +1435,7 @@ impl Interpreter {
         let mut shape_keys = Vec::with_capacity(entries.len());
 
         for entry in entries {
-            field_values.push(eval_value!(self.eval_expr(&entry.1)));
+            field_values.push(eval_value!(self, self.eval_expr(&entry.1)));
 
             // As we primarily had compilation to JS in mind, paths here should actually be
             // strings instead. Need to update the parser to emit strings instead of paths,
@@ -1457,7 +1463,7 @@ impl Interpreter {
     }
 
     fn eval_match(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) -> EvalResult {
-        let value = eval_value!(self.eval_expr(expr));
+        let value = eval_value!(self, self.eval_expr(expr));
 
         debug!("eval_match: {}", self.state.stringify(value));
 
