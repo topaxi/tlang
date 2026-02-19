@@ -325,7 +325,7 @@ impl InterpreterState {
                     ));
                 }
                 CallStackKind::NativeFn(name) => {
-                    call_stack.push_str(&format!("  at native function {name}:0:0\n"));
+                    call_stack.push_str(&format!("  at native function {name}\n"));
                 }
                 CallStackKind::Root => {
                     call_stack.push_str(&format!("  at root {}\n", entry.current_span.start));

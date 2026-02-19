@@ -130,7 +130,8 @@ mod tests {
             Backend::Interpreter => {
                 exec_start = std::time::Instant::now();
 
-                Command::new("./target/release/tlangdi")
+                Command::new("./target/release/tlang")
+                    .arg("run")
                     .arg(file_path)
                     .output()
                     .map_err(|e| {
