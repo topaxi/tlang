@@ -315,15 +315,6 @@ impl Interpreter {
     }
 
     fn eval_stmt(&mut self, stmt: &hir::Stmt) -> EvalResult {
-        // Run GC before statement evaluation, not after. This ensures that
-        // intermediate values produced by the statement (e.g., return values,
-        // newly created closures) are not collected before they can be rooted.
-        // If GC ran after eval, the EvalResult could hold the only reference
-        // to a new object (on the Rust stack), invisible to the GC roots.
-        if self.state.should_collect() {
-            self.state.collect_garbage();
-        }
-
         self.state.set_current_span(stmt.span);
 
         match &stmt.kind {
@@ -1091,6 +1082,8 @@ impl Interpreter {
             return self.eval_partial_call(call_expr);
         }
 
+        let mark = self.state.temp_roots_mark();
+
         let return_value = match &call_expr.callee.kind {
             hir::ExprKind::Path(path) if let Some(value) = self.resolve_value(path) => {
                 let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
@@ -1165,6 +1158,8 @@ impl Interpreter {
                 self.eval_call_object(callee, &args)
             }
         };
+
+        self.state.temp_roots_restore(mark);
 
         EvalResult::Value(return_value)
     }

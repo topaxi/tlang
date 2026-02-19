@@ -253,6 +253,8 @@ pub struct InterpreterState {
     pub builtin_shapes: BuiltinShapes,
     native_fns: HashMap<TlangObjectId, TlangNativeFn>,
     native_fns_meta: HashMap<TlangObjectId, NativeFnMeta>,
+    next_gc_threshold: usize,
+    stress_gc: bool,
     /// Memory statistics for debugging and monitoring.
     memory_stats: MemoryStats,
 }
@@ -280,6 +282,8 @@ impl Resolver for InterpreterState {
 }
 
 impl InterpreterState {
+    const GC_INITIAL_THRESHOLD: usize = 1000;
+
     pub fn new() -> Self {
         let mut call_stack = Vec::with_capacity(1000);
 
@@ -304,7 +308,25 @@ impl InterpreterState {
             native_fns: HashMap::with_capacity(100),
             native_fns_meta: HashMap::with_capacity(100),
             memory_stats: MemoryStats::default(),
+            next_gc_threshold: Self::GC_INITIAL_THRESHOLD,
+            stress_gc: false,
         }
+    }
+
+    pub fn temp_roots_mark(&self) -> usize {
+        self.temp_roots.len()
+    }
+
+    pub fn push_temp_root(&mut self, value: TlangValue) {
+        self.temp_roots.push(value);
+    }
+
+    pub fn temp_roots_restore(&mut self, mark: usize) {
+        self.temp_roots.truncate(mark);
+    }
+
+    pub fn set_stress_gc(&mut self, stress: bool) {
+        self.stress_gc = stress;
     }
 
     /// Returns an iterator over all GC root values.
@@ -354,7 +376,10 @@ impl InterpreterState {
         let count = garbage.len();
 
         for id in garbage {
-            self.remove_object(id);
+            if let Some(TlangObjectKind::NativeFn) = self.remove_object(id) {
+                self.native_fns.remove(&id);
+                self.native_fns_meta.remove(&id);
+            }
         }
 
         count
@@ -364,11 +389,11 @@ impl InterpreterState {
     /// Returns the number of objects collected.
     pub fn collect_garbage(&mut self) -> usize {
         let reachable = self.mark_reachable();
-
         let collected = self.sweep_unreachable(&reachable);
 
         self.memory_stats.gc_collections += 1;
         self.memory_stats.objects_deallocated += collected;
+        self.next_gc_threshold = (self.objects.len() * 2).max(Self::GC_INITIAL_THRESHOLD);
 
         log::debug!(
             "GC: collected {} objects, {} remain",
@@ -376,15 +401,21 @@ impl InterpreterState {
             self.objects.len()
         );
 
+        #[cfg(debug_assertions)]
+        for value in self.gc_roots() {
+            if let TlangValue::Object(id) = value {
+                assert!(
+                    self.contains_object(id),
+                    "GC BUG: root references collected object {id}"
+                );
+            }
+        }
+
         collected
     }
 
     pub fn should_collect(&self) -> bool {
-        // Only collect at the top-level (root call frame). During nested function
-        // calls, intermediate expression values (e.g., partially evaluated function
-        // arguments) may live only on the Rust stack and are invisible to GC roots.
-        // Collecting inside nested calls can incorrectly free these live objects.
-        self.call_stack.len() <= 1
+        self.stress_gc || self.objects.len() >= self.next_gc_threshold
     }
 
     pub fn get_fn_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
@@ -507,6 +538,10 @@ impl InterpreterState {
     }
 
     pub fn new_object(&mut self, kind: TlangObjectKind) -> TlangValue {
+        if self.should_collect() {
+            self.collect_garbage();
+        }
+
         self.memory_stats.objects_allocated += 1;
         TlangValue::new_object(self.objects.insert(kind))
     }
@@ -1069,5 +1104,62 @@ mod tests {
 
         assert_eq!(collected, 1);
         assert!(!state.contains_object(orphan_id));
+    }
+
+    #[test]
+    fn test_gc_collects_unreachable_objects() {
+        let mut state = InterpreterState::new();
+
+        // Create objects but don't make them roots
+        let _orphan1 = state.new_string("orphan1".to_string());
+        let _orphan2 = state.new_string("orphan2".to_string());
+
+        assert_eq!(state.object_count(), 2);
+
+        // Run GC - both should be collected
+        let collected = state.collect_garbage();
+
+        assert_eq!(collected, 2);
+        assert_eq!(state.object_count(), 0);
+        assert_eq!(state.memory_stats().gc_collections, 1);
+    }
+
+    #[test]
+    fn test_gc_preserves_reachable_objects() {
+        let mut state = InterpreterState::new();
+
+        // Create an object and make it a root via globals
+        let reachable = state.new_string("keep_me".to_string());
+        state.set_global("my_string".to_string(), reachable);
+
+        // Create unreachable objects
+        let _orphan = state.new_string("orphan".to_string());
+
+        assert_eq!(state.object_count(), 2);
+
+        // Run GC - only orphan should be collected
+        let collected = state.collect_garbage();
+
+        assert_eq!(collected, 1);
+        assert_eq!(state.object_count(), 1);
+
+        // The reachable object should still exist
+        let id = reachable.get_object_id().unwrap();
+        assert!(state.contains_object(id));
+    }
+
+    #[test]
+    fn test_gc_collects_temporary_objects() {
+        let mut state = InterpreterState::new();
+
+        // Simulate a loop that creates temporary objects
+        for _ in 0..10_000 {
+            let _temp = state.new_string("temp".to_string());
+            // Don't store temp anywhere - it becomes garbage
+        }
+
+        // After GC, heap should be empty (no roots)
+        state.collect_garbage();
+        assert_eq!(state.object_count(), 0);
     }
 }
