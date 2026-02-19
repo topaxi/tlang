@@ -12,7 +12,7 @@ input_file: tests/known_failures/recursive_data_structures.tlang
 [TIMESTAMP] WARN  tlang_hir_opt::slot_allocation::slot_allocator] Unable to assign slot for path 'left' on line 49:41, as it has not been resolved
 [TIMESTAMP] WARN  tlang_hir_opt::slot_allocation::slot_allocator] Unable to assign slot for path 'right' on line 50:42, as it has not been resolved
 
-thread 'main' panicked at crates/tlang_runtime/tlang_memory/src/state.rs:336:9:
+thread 'main' panicked at crates/tlang_runtime/tlang_memory/src/state.rs:186:9:
 Could not resolve path "left" (Res { hir_id: None, binding_kind: Unknown, slot: None })
 Current scope: [INTERNAL_MEMORY_STATE]
 

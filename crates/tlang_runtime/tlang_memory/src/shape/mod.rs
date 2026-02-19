@@ -5,6 +5,8 @@ use tlang_span::HirId;
 
 use crate::value::{TlangObjectId, TlangValue};
 
+pub mod builtin;
+
 pub trait Shaped {
     fn shape(&self) -> ShapeKey;
 }
