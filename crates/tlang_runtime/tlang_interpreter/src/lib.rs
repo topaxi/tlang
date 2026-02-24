@@ -1810,6 +1810,18 @@ mod tests {
         fn state(&self) -> &InterpreterState {
             self.interpreter.state()
         }
+
+        fn state_mut(&mut self) -> &mut InterpreterState {
+            self.interpreter.state_mut()
+        }
+
+        fn object_count(&self) -> usize {
+            self.state().object_count()
+        }
+
+        fn memory_stats(&self) -> &tlang_memory::MemoryStats {
+            self.state().memory_stats()
+        }
     }
 
     fn interpreter(initial_source: &str) -> TestInterpreter {
@@ -2316,5 +2328,462 @@ mod tests {
         let result = t.eval(r#"split_first("hello")"#);
         // Both first and rest are strings; stringify prints them without quotes.
         assert_eq!(t.state().stringify(result), "[h, ello]");
+    }
+
+    #[test]
+    fn test_stress_gc_string_concatenation() {
+        let mut t = interpreter("");
+        t.interpreter.state_mut().set_stress_gc(true);
+        // String concatenation allocates a new string via new_string.
+        let result = t.eval(r#""hello" + " " + "world""#);
+        assert_eq!(t.state().stringify(result), "hello world");
+    }
+
+    #[test]
+    fn test_stress_gc_list_of_strings() {
+        let mut t = interpreter("");
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Each string literal allocates, then new_list allocates the list.
+        let result = t.eval(r#"["a", "b", "c", "d", "e"]"#);
+        assert_eq!(t.state().stringify(result), "[a, b, c, d, e]");
+    }
+
+    #[test]
+    fn test_stress_gc_list_spread() {
+        let mut t = interpreter(indoc! {"
+            fn prepend(x, list) { [x, ...list] }
+        "});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Spread creates a new list from existing objects.
+        let result = t.eval(r#"prepend("x", ["a", "b", "c"])"#);
+        assert_eq!(t.state().stringify(result), "[x, a, b, c]");
+    }
+
+    #[test]
+    fn test_stress_gc_recursive_string_decomposition() {
+        let mut t = interpreter(indoc! {r#"
+            fn reverse(str) { reverse(str, "") }
+            fn reverse("", acc) { acc }
+            fn reverse([x, ...xs], acc) { rec reverse(xs, x + acc) }
+        "#});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Recursive string decomposition creates many char/rest/concat strings.
+        let result = t.eval(r#"reverse("abcdef")"#);
+        assert_eq!(t.state().stringify(result), "fedcba");
+    }
+
+    #[test]
+    fn test_stress_gc_closure_captures() {
+        let mut t = interpreter(indoc! {r#"
+            fn make_greeter(greeting) {
+                fn(name) { greeting + " " + name }
+            }
+        "#});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Closure captures a string, then concatenation inside allocates more strings.
+        let result = t.eval(r#"make_greeter("hello")("world")"#);
+        assert_eq!(t.state().stringify(result), "hello world");
+    }
+
+    #[test]
+    fn test_stress_gc_nested_closures() {
+        let mut t = interpreter(indoc! {"
+            fn compose(f, g) { fn(x) { f(g(x)) } }
+            fn add(a) { fn(b) { a + b } }
+            fn multiply(a) { fn(b) { a * b } }
+        "});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // compose creates a closure, and both add/multiply create closures.
+        let result = t.eval("compose(multiply(3), add(5))(2)");
+        assert_matches!(result, TlangValue::U64(21));
+    }
+
+    #[test]
+    fn test_stress_gc_recursive_list_construction() {
+        let mut t = interpreter(indoc! {r#"
+            fn build(0) { [] }
+            fn build(n) { ["item", ...build(n - 1)] }
+        "#});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Each recursive call creates a string + list + spread.
+        let result = t.eval("build(5)");
+        assert_eq!(
+            t.state().stringify(result),
+            "[item, item, item, item, item]"
+        );
+    }
+
+    #[test]
+    fn test_stress_gc_map_filter_with_strings() {
+        let mut t = interpreter(indoc! {r#"
+            fn map([], _) { [] }
+            fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
+        "#});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // map creates closures, new strings from concatenation, and new lists.
+        let result = t.eval(r#"map(["a", "b", "c"], fn(s) { s + s })"#);
+        assert_eq!(t.state().stringify(result), "[aa, bb, cc]");
+    }
+
+    #[test]
+    fn test_stress_gc_for_loop_accumulator_with_objects() {
+        let mut t = interpreter(indoc! {r#"
+            fn collect_strings() {
+                for n in [1, 2, 3, 4] with acc = []; {
+                    [...acc, "x"]
+                }
+            }
+        "#});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Each iteration creates a new string and a new list via spread.
+        let result = t.eval("collect_strings()");
+        assert_eq!(t.state().stringify(result), "[x, x, x, x]");
+    }
+
+    #[test]
+    fn test_stress_gc_enum_pattern_matching_with_objects() {
+        let mut t = interpreter(indoc! {r#"
+            enum Wrapper {
+                Val(Int),
+            }
+            fn unwrap(w) {
+                match w {
+                    Wrapper::Val(v) => v,
+                }
+            }
+        "#});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Enum wrapping and unwrapping with string values.
+        let result = t.eval(r#"unwrap(Wrapper::Val("hello"))"#);
+        assert_eq!(t.state().stringify(result), "hello");
+    }
+
+    #[test]
+    fn test_stress_gc_multiple_struct_constructions() {
+        let mut t = interpreter(indoc! {"
+            struct Pair {
+                fst: Int,
+                snd: Int,
+            }
+            fn swap(p) { Pair { fst: p.snd, snd: p.fst } }
+        "});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Creates multiple structs in sequence. Fields access existing objects,
+        // swap creates a new struct from field values of an existing one.
+        let result = t.eval(r#"swap(Pair { fst: "a", snd: "b" })"#);
+        assert_eq!(t.state().stringify(result), "Pair { fst: b, snd: a }");
+    }
+
+    #[test]
+    fn test_stress_gc_chained_function_calls() {
+        let mut t = interpreter(indoc! {r#"
+            fn identity(x) { x }
+            fn wrap(x) { [x] }
+        "#});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Chained calls test watermark save/restore with object values passing through.
+        let result = t.eval(r#"wrap(identity(identity("hello")))"#);
+        assert_eq!(t.state().stringify(result), "[hello]");
+    }
+
+    #[test]
+    fn test_stress_gc_deeply_nested_pattern_matching() {
+        let mut t = interpreter(indoc! {r#"
+            fn nested_match(list) {
+                match list {
+                    [[a, ...rest_inner], ...rest_outer] => [a, rest_inner, rest_outer],
+                    _ => [],
+                }
+            }
+        "#});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Nested pattern creates multiple slices as rest values.
+        let result = t.eval(r#"nested_match([["x", "y", "z"], "a", "b"])"#);
+        assert_eq!(t.state().stringify(result), "[x, &[y, z], &[a, b]]");
+    }
+
+    #[test]
+    fn test_stress_gc_string_pattern_all_chars() {
+        let mut t = interpreter(indoc! {r#"
+            fn chars([a, b, c]) { [a, b, c] }
+            fn chars(_) { [] }
+        "#});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Each character in the pattern creates a new_string allocation.
+        let result = t.eval(r#"chars("abc")"#);
+        assert_eq!(t.state().stringify(result), "[a, b, c]");
+    }
+
+    #[test]
+    fn test_stress_gc_partial_application() {
+        let mut t = interpreter(indoc! {"
+            fn add(a, b) { a + b }
+        "});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Partial application creates a native fn object capturing args.
+        let result = t.eval("add(1, _)(2)");
+        assert_matches!(result, TlangValue::U64(3));
+    }
+
+    #[test]
+    fn test_stress_gc_partial_application_with_objects() {
+        let mut t = interpreter(indoc! {r#"
+            fn concat(a, b) { a + b }
+        "#});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Partial application captures a string object, then applies with another.
+        let result = t.eval(r#"concat("hello ", _)("world")"#);
+        assert_eq!(t.state().stringify(result), "hello world");
+    }
+
+    #[test]
+    fn test_stress_gc_foldl_with_string_concat() {
+        let mut t = interpreter(indoc! {"
+            fn foldl([], acc, _) { acc }
+            fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+        "});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // foldl with string concatenation creates many intermediate strings.
+        let result = t.eval(r#"foldl(["a", "b", "c", "d"], "", fn(acc, x) { acc + x })"#);
+        assert_eq!(t.state().stringify(result), "abcd");
+    }
+
+    #[test]
+    fn test_stress_gc_enum_with_multiple_object_fields() {
+        let mut t = interpreter(indoc! {"
+            enum Entry {
+                Pair(Int, Int),
+            }
+            fn first(e) {
+                match e {
+                    Entry::Pair(a, _) => a,
+                }
+            }
+            fn second(e) {
+                match e {
+                    Entry::Pair(_, b) => b,
+                }
+            }
+        "});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Enum with two string fields, then destructure to access them.
+        let result = t.eval(r#"first(Entry::Pair("key", "value"))"#);
+        assert_eq!(t.state().stringify(result), "key");
+        let result = t.eval(r#"second(Entry::Pair("key", "value"))"#);
+        assert_eq!(t.state().stringify(result), "value");
+    }
+
+    // --- GC collection tests: verify unreachable objects are swept ---
+
+    #[test]
+    fn test_gc_collects_temporaries_after_string_concat() {
+        // Wrap concatenation in a function call so the eval_call watermark
+        // trims temp_roots when the call returns, making intermediates collectible.
+        let mut t = interpreter(indoc! {r#"
+            fn concat_three() { "hello" + " " + "world" }
+        "#});
+        let result = t.eval("concat_three()");
+        assert_eq!(t.state().stringify(result), "hello world");
+        // After the call returns, temp_roots have been trimmed.
+        // An explicit GC should collect the intermediate strings.
+        let before = t.memory_stats().objects_deallocated;
+        t.state_mut().collect_garbage();
+        let after = t.memory_stats().objects_deallocated;
+        assert!(after > before, "expected intermediate strings to be collected (before={before}, after={after})");
+    }
+
+    #[test]
+    fn test_gc_collects_temporaries_from_function_calls() {
+        let mut t = interpreter(indoc! {r#"
+            fn make_and_discard() {
+                let a = "temporary1";
+                let b = "temporary2";
+                let c = "temporary3";
+                42
+            }
+        "#});
+        t.state_mut().set_stress_gc(true);
+        let before_objects = t.object_count();
+        let result = t.eval("make_and_discard()");
+        assert_matches!(result, TlangValue::U64(42));
+        // After the call returns, the 3 temporary strings should be collectible.
+        t.state_mut().collect_garbage();
+        let after_objects = t.object_count();
+        assert!(
+            after_objects <= before_objects,
+            "expected temporary strings to be collected (before={before_objects}, after={after_objects})"
+        );
+    }
+
+    #[test]
+    fn test_gc_collects_intermediate_lists() {
+        let mut t = interpreter(indoc! {"
+            fn sum_list(list) {
+                match list {
+                    [] => 0,
+                    [x, ...rest] => x + sum_list(rest),
+                }
+            }
+        "});
+        // sum_list uses non-tail recursion, so each recursive call goes through
+        // eval_call with its own watermark. Intermediate slices from ...rest become
+        // collectible as each call returns.
+        let result = t.eval("sum_list([1, 2, 3, 4, 5])");
+        assert_matches!(result, TlangValue::U64(15));
+        // After the call, the original list and all intermediate slices should be collectible.
+        t.state_mut().collect_garbage();
+        let stats = t.memory_stats();
+        assert!(
+            stats.objects_deallocated > 0,
+            "expected intermediate slices to be collected"
+        );
+    }
+
+    #[test]
+    fn test_gc_collects_abandoned_closures() {
+        let mut t = interpreter(indoc! {"
+            fn create_and_discard() {
+                let f = fn(x) { x + 1 };
+                let g = fn(x) { x * 2 };
+                f(10)
+            }
+        "});
+        t.state_mut().set_stress_gc(true);
+        let result = t.eval("create_and_discard()");
+        assert_matches!(result, TlangValue::U64(11));
+        // After the call, both closures f and g should be unreachable.
+        t.state_mut().collect_garbage();
+        let stats = t.memory_stats();
+        assert!(
+            stats.objects_deallocated > 0,
+            "expected abandoned closures to be collected"
+        );
+    }
+
+    #[test]
+    fn test_gc_collects_unreachable_structs() {
+        let mut t = interpreter(indoc! {"
+            struct Point {
+                x: Int,
+                y: Int,
+            }
+            fn make_point_x() {
+                let p = Point { x: 1, y: 2 };
+                p.x
+            }
+        "});
+        let before = t.object_count();
+        let result = t.eval("make_point_x()");
+        assert_matches!(result, TlangValue::U64(1));
+        // The Point struct is no longer reachable after extracting .x.
+        t.state_mut().collect_garbage();
+        let after = t.object_count();
+        assert!(
+            after <= before,
+            "expected unreachable struct to be collected (before={before}, after={after})"
+        );
+    }
+
+    #[test]
+    fn test_gc_collects_unreachable_enum_variants() {
+        let mut t = interpreter(indoc! {"
+            enum Wrapper {
+                Val(Int),
+            }
+            fn unwrap_val(w) {
+                match w {
+                    Wrapper::Val(v) => v,
+                }
+            }
+        "});
+        let before = t.object_count();
+        let result = t.eval("unwrap_val(Wrapper::Val(99))");
+        assert_matches!(result, TlangValue::U64(99));
+        // The Wrapper::Val enum object is unreachable after unwrapping.
+        t.state_mut().collect_garbage();
+        let after = t.object_count();
+        assert!(
+            after <= before,
+            "expected unreachable enum to be collected (before={before}, after={after})"
+        );
+    }
+
+    #[test]
+    fn test_gc_stress_many_allocations_bounded_heap() {
+        // Use non-tail recursion so each call gets its own watermark.
+        // When each call returns, its temp_roots are trimmed and temporaries
+        // become collectible on the next stress-GC triggered allocation.
+        let mut t = interpreter(indoc! {r#"
+            fn loop_alloc(0) { "done" }
+            fn loop_alloc(n) {
+                let s = "temp" + "str";
+                loop_alloc(n - 1)
+            }
+        "#});
+        t.state_mut().set_stress_gc(true);
+        let result = t.eval("loop_alloc(50)");
+        assert_eq!(t.state().stringify(result), "done");
+        // After the top-level call returns, do a final collection.
+        t.state_mut().collect_garbage();
+        let stats = t.memory_stats();
+        // Verify the GC actually ran and collected objects.
+        assert!(
+            stats.gc_collections > 10,
+            "expected many GC cycles with stress_gc, got {}",
+            stats.gc_collections
+        );
+        assert!(
+            stats.objects_deallocated > 10,
+            "expected many temporaries collected, got {}",
+            stats.objects_deallocated
+        );
+        // Heap should be much smaller than total allocations.
+        assert!(
+            t.object_count() < stats.objects_allocated / 2,
+            "heap should be bounded: {} live vs {} allocated",
+            t.object_count(),
+            stats.objects_allocated
+        );
+    }
+
+    #[test]
+    fn test_gc_recursive_string_processing_collects() {
+        let mut t = interpreter(indoc! {r#"
+            fn reverse(str) { reverse(str, "") }
+            fn reverse("", acc) { acc }
+            fn reverse([x, ...xs], acc) { rec reverse(xs, x + acc) }
+        "#});
+        t.state_mut().set_stress_gc(true);
+        let result = t.eval(r#"reverse("abcdefgh")"#);
+        assert_eq!(t.state().stringify(result), "hgfedcba");
+        // After the call returns, temp_roots are trimmed. Explicit GC collects the rest.
+        t.state_mut().collect_garbage();
+        let stats = t.memory_stats();
+        // Each step creates char strings, rest strings, and concat results.
+        // After the call, only the final result string is live.
+        assert!(
+            stats.objects_deallocated > 0,
+            "expected intermediates to be collected, got 0 deallocated out of {} allocated",
+            stats.objects_allocated
+        );
+    }
+
+    #[test]
+    fn test_gc_map_creates_and_collects_intermediates() {
+        let mut t = interpreter(indoc! {"
+            fn map([], _) { [] }
+            fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
+            fn identity(x) { x }
+        "});
+        t.state_mut().set_stress_gc(true);
+        let result = t.eval("map([1, 2, 3, 4, 5], identity)");
+        assert_eq!(t.state().stringify(result), "[1, 2, 3, 4, 5]");
+        let stats = t.memory_stats();
+        // map creates intermediate slices (from ...xs rest pattern) at each recursive step.
+        // These slices become unreachable as recursion unwinds.
+        assert!(
+            stats.objects_deallocated > 0,
+            "expected intermediate slices from map to be collected"
+        );
     }
 }
