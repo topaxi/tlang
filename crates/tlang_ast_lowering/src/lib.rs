@@ -1,5 +1,4 @@
 #![feature(box_patterns)]
-#![feature(if_let_guard)]
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
