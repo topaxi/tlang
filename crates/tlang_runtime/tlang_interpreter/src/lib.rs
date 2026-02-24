@@ -1249,17 +1249,18 @@ impl Interpreter {
     ) -> EvalResult {
         // Structs are always instantiated with a single argument, which is a dict.
         let dict_map: HashMap<String, TlangValue> = match &call_expr.arguments[0].kind {
-            hir::ExprKind::Dict(entries) => entries
-                .iter()
-                .map(|(key, value)| {
-                    let key = match &key.kind {
+            hir::ExprKind::Dict(entries) => {
+                let mut map = HashMap::with_capacity(entries.len());
+                for (key_expr, value_expr) in entries {
+                    let key = match &key_expr.kind {
                         hir::ExprKind::Path(path) => path.first_ident().to_string(),
-                        _ => todo!("eval_call: {:?}", key),
+                        _ => todo!("eval_call: {:?}", key_expr),
                     };
-                    let value = self.eval_expr(value).unwrap_value();
-                    (key, value)
-                })
-                .collect(),
+                    let value = eval_value!(self, self.eval_expr(value_expr));
+                    map.insert(key, value);
+                }
+                map
+            }
             _ => todo!("eval_call: {:?}", call_expr.arguments[0]),
         };
 
@@ -1316,17 +1317,18 @@ impl Interpreter {
                 .collect()
         } else {
             match &call_expr.arguments[0].kind {
-                hir::ExprKind::Dict(entries) => entries
-                    .iter()
-                    .map(|(key, value)| {
-                        let key = match &key.kind {
+                hir::ExprKind::Dict(entries) => {
+                    let mut map = HashMap::with_capacity(entries.len());
+                    for (key_expr, value_expr) in entries {
+                        let key = match &key_expr.kind {
                             hir::ExprKind::Path(path) => path.first_ident().to_string(),
-                            _ => todo!("eval_call: {:?}", key),
+                            _ => todo!("eval_call: {:?}", key_expr),
                         };
-                        let value = self.eval_expr(value).unwrap_value();
-                        (key, value)
-                    })
-                    .collect(),
+                        let value = eval_value!(self, self.eval_expr(value_expr));
+                        map.insert(key, value);
+                    }
+                    map
+                }
                 _ => todo!("eval_call: {:?}", call_expr.arguments[0]),
             }
         };
@@ -1631,7 +1633,7 @@ impl Interpreter {
 
                     if let hir::PatKind::Rest(pat) = &pat.kind {
                         let rest_object = self.state.new_slice(value, i, list_struct.len() - i);
-
+                        self.state.push_temp_root(rest_object);
                         return self.eval_pat(pat, rest_object);
                     }
 
@@ -1667,7 +1669,7 @@ impl Interpreter {
                             list_slice.start() + i,
                             list_slice.len() - i,
                         );
-
+                        self.state.push_temp_root(rest_object);
                         return self.eval_pat(pat, rest_object);
                     }
 
@@ -1688,7 +1690,7 @@ impl Interpreter {
                         } else {
                             self.state.new_string(String::new())
                         };
-
+                        self.state.push_temp_root(rest_object);
                         return self.eval_pat(pat, rest_object);
                     }
 
@@ -1697,6 +1699,7 @@ impl Interpreter {
                     } else {
                         self.state.new_string(String::new())
                     };
+                    self.state.push_temp_root(char_match);
 
                     if !self.eval_pat(pat, char_match) {
                         return false;
@@ -2245,5 +2248,73 @@ mod tests {
         let result = interpreter.eval("even_odd()");
 
         assert_eq!(interpreter.state().stringify(result), "[[2, 4], [1, 3]]");
+    }
+
+    #[test]
+    fn test_stress_gc_struct_ctor_object_fields() {
+        let mut t = interpreter(indoc! {"
+            struct Named {
+                label: Int,
+                value: Int,
+            }
+        "});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Pass string values even though fields are typed Int; types aren't enforced at runtime.
+        let result = t.eval(r#"Named { label: "hello", value: "world" }"#);
+        // stringify prints strings without quotes; fields are sorted alphabetically.
+        assert_eq!(t.state().stringify(result), "Named { label: hello, value: world }");
+    }
+
+    #[test]
+    fn test_stress_gc_enum_ctor_object_fields() {
+        let mut t = interpreter(indoc! {"
+            enum Shape {
+                Circle(Int),
+                Rect(Int, Int),
+            }
+        "});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Positional enum variant with string arguments exercises the eval_exprs! path.
+        let result = t.eval(r#"Shape::Rect("wide", "tall")"#);
+        assert_matches!(result, TlangValue::Object(_));
+        let enum_data = match result {
+            TlangValue::Object(id) => t.interpreter.get_object_by_id(id).get_enum().unwrap(),
+            _ => panic!("expected Object"),
+        };
+        assert_eq!(enum_data.variant, 1);
+        assert_eq!(t.state().stringify(enum_data.field_values[0]), "wide");
+        assert_eq!(t.state().stringify(enum_data.field_values[1]), "tall");
+    }
+
+    #[test]
+    fn test_stress_gc_pat_list_rest_slice() {
+        let mut t = interpreter(indoc! {"
+            fn first_and_rest(list) {
+                match list {
+                    [first, ...rest] => [first, rest],
+                    _ => [],
+                }
+            }
+        "});
+        t.interpreter.state_mut().set_stress_gc(true);
+        let result = t.eval(r#"first_and_rest(["a", "b", "c"])"#);
+        // first is a string (no quotes in stringify), rest is a slice (&[...]).
+        assert_eq!(t.state().stringify(result), "[a, &[b, c]]");
+    }
+
+    #[test]
+    fn test_stress_gc_pat_list_rest_string() {
+        let mut t = interpreter(indoc! {"
+            fn split_first(s) {
+                match s {
+                    [first, ...rest] => [first, rest],
+                    _ => [],
+                }
+            }
+        "});
+        t.interpreter.state_mut().set_stress_gc(true);
+        let result = t.eval(r#"split_first("hello")"#);
+        // Both first and rest are strings; stringify prints them without quotes.
+        assert_eq!(t.state().stringify(result), "[h, ello]");
     }
 }
