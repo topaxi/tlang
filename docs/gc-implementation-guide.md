@@ -235,20 +235,25 @@ impl InterpreterState {
     /// Roots are values that are directly accessible from the running program
     /// and therefore must be considered "live" during garbage collection.
     pub fn gc_roots(&self) -> impl Iterator<Item = TlangValue> + '_ {
-        // 1. Named global variables
+        // 1. Temporary roots (intermediate values on the Rust call stack,
+        //    registered by the evaluator to protect them from collection)
+        let temp_roots_iter = self.temp_roots.iter().copied();
+
+        // 2. Named global variables
         let globals_iter = self.globals.values().copied();
 
-        // 2. Global memory (slot-based globals)
+        // 3. Global memory (slot-based globals)
         let global_memory_iter = self.scope_stack.global_memory_iter();
 
-        // 3. Local scope memory (only LIVE scopes, not stale memory)
+        // 4. Local scope memory (only LIVE scopes, not stale memory)
         let local_memory_iter = self.scope_stack.live_local_memory_iter();
 
-        // 4. Native function object IDs (these reference NativeFn objects in the heap)
+        // 5. Native function object IDs (these reference NativeFn objects in the heap)
         let native_fn_iter = self.native_fns.keys().copied().map(TlangValue::Object);
 
         // Chain all root sources together
-        globals_iter
+        temp_roots_iter
+            .chain(globals_iter)
             .chain(global_memory_iter)
             .chain(local_memory_iter)
             .chain(native_fn_iter)
