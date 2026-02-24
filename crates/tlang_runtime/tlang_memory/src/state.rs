@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use log::debug;
@@ -14,7 +14,9 @@ use crate::shape::{ShapeKey, Shaped, TlangShape, TlangStructMethod};
 use crate::value::{
     TlangValue,
     function::{NativeFnReturn, TlangNativeFn},
-    object::{TlangClosure, TlangEnum, TlangObjectId, TlangObjectKind, TlangSlice, TlangStruct},
+    object::{
+        TlangCell, TlangClosure, TlangEnum, TlangObjectId, TlangObjectKind, TlangSlice, TlangStruct,
+    },
 };
 
 pub enum CallStackKind {
@@ -73,6 +75,28 @@ pub struct NativeFnMeta {
     pub name: String,
 }
 
+/// Statistics about memory usage in the interpreter.
+///
+/// This struct tracks object allocations and deallocations to help
+/// monitor memory usage and debug potential memory leaks.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct MemoryStats {
+    /// Total number of objects allocated since interpreter creation.
+    pub objects_allocated: usize,
+    /// Total number of objects deallocated (via GC or explicit removal).
+    pub objects_deallocated: usize,
+    /// Number of garbage collection cycles performed.
+    pub gc_collections: usize,
+}
+
+impl MemoryStats {
+    /// Returns the current number of live objects (allocated - deallocated).
+    pub fn live_objects(&self) -> usize {
+        self.objects_allocated
+            .saturating_sub(self.objects_deallocated)
+    }
+}
+
 pub struct InterpreterState {
     pub scope_stack: ScopeStack,
     closures: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
@@ -83,9 +107,14 @@ pub struct InterpreterState {
     enum_decls: HashMap<String, Rc<hir::EnumDeclaration>>,
     call_stack: Vec<CallStackEntry>,
     globals: HashMap<String, TlangValue>,
+    temp_roots: Vec<TlangValue>,
     pub builtin_shapes: BuiltinShapes,
     native_fns: HashMap<TlangObjectId, TlangNativeFn>,
     native_fns_meta: HashMap<TlangObjectId, NativeFnMeta>,
+    next_gc_threshold: usize,
+    stress_gc: bool,
+    /// Memory statistics for debugging and monitoring.
+    memory_stats: MemoryStats,
 }
 
 impl Resolver for InterpreterState {
@@ -111,6 +140,8 @@ impl Resolver for InterpreterState {
 }
 
 impl InterpreterState {
+    const GC_INITIAL_THRESHOLD: usize = 1000;
+
     pub fn new() -> Self {
         let mut call_stack = Vec::with_capacity(1000);
 
@@ -130,10 +161,121 @@ impl InterpreterState {
             shapes: HashMap::with_capacity(100),
             call_stack,
             globals: HashMap::with_capacity(100),
+            temp_roots: Vec::with_capacity(10),
             builtin_shapes: BuiltinShapes::default(),
             native_fns: HashMap::with_capacity(100),
             native_fns_meta: HashMap::with_capacity(100),
+            memory_stats: MemoryStats::default(),
+            next_gc_threshold: Self::GC_INITIAL_THRESHOLD,
+            stress_gc: false,
         }
+    }
+
+    pub fn temp_roots_mark(&self) -> usize {
+        self.temp_roots.len()
+    }
+
+    pub fn push_temp_root(&mut self, value: TlangValue) {
+        if value.is_object() {
+            self.temp_roots.push(value);
+        }
+    }
+
+    pub fn temp_roots_restore(&mut self, mark: usize) {
+        self.temp_roots.truncate(mark);
+    }
+
+    pub fn set_stress_gc(&mut self, stress: bool) {
+        self.stress_gc = stress;
+    }
+
+    /// Returns an iterator over all GC root values.
+    pub fn gc_roots(&self) -> impl Iterator<Item = TlangValue> + '_ {
+        let temp_roots = self.temp_roots.iter().copied();
+        let globals = self.globals.values().copied();
+        let scope_memory = self.scope_stack.memory_iter();
+        let native_fns = self.native_fns.keys().copied().map(TlangValue::Object);
+
+        temp_roots
+            .chain(globals)
+            .chain(scope_memory)
+            .chain(native_fns)
+    }
+
+    /// Mark all objects reachable from GC roots.
+    /// Returns a set of reachable object IDs.
+    pub fn mark_reachable(&self) -> HashSet<TlangObjectId> {
+        let mut reachable = HashSet::new();
+        let mut values = self.gc_roots().collect::<Vec<_>>();
+
+        while let Some(value) = values.pop() {
+            if let TlangValue::Object(id) = value {
+                if !reachable.insert(id) {
+                    continue;
+                }
+
+                if let Some(obj) = self.objects.get(id) {
+                    values.extend(obj.referenced_values());
+                }
+            }
+        }
+
+        reachable
+    }
+
+    /// Remove all objects not in the reachable set.
+    /// Returns the number of objects collected.
+    pub fn sweep_unreachable(&mut self, reachable: &HashSet<TlangObjectId>) -> usize {
+        let garbage = self
+            .objects
+            .iter()
+            .map(|(id, _)| id)
+            .filter(|id| !reachable.contains(id))
+            .collect::<Vec<_>>();
+
+        let count = garbage.len();
+
+        for id in garbage {
+            if let Some(TlangObjectKind::NativeFn) = self.remove_object(id) {
+                self.native_fns.remove(&id);
+                self.native_fns_meta.remove(&id);
+            }
+        }
+
+        count
+    }
+
+    /// Runs a complete garbage collection cycle.
+    /// Returns the number of objects collected.
+    pub fn collect_garbage(&mut self) -> usize {
+        let reachable = self.mark_reachable();
+        let collected = self.sweep_unreachable(&reachable);
+
+        self.memory_stats.gc_collections += 1;
+        self.memory_stats.objects_deallocated += collected;
+        self.next_gc_threshold = (self.objects.len() * 2).max(Self::GC_INITIAL_THRESHOLD);
+
+        log::debug!(
+            "GC: collected {} objects, {} remain",
+            collected,
+            self.objects.len()
+        );
+
+        #[cfg(debug_assertions)]
+        for value in self.gc_roots() {
+            if let TlangValue::Object(id) = value {
+                assert!(
+                    self.contains_object(id),
+                    "GC BUG: root references collected object {id}"
+                );
+            }
+        }
+
+        collected
+    }
+
+    pub fn should_collect(&self) -> bool {
+        self.stress_gc || self.objects.len() >= self.next_gc_threshold
     }
 
     pub fn get_fn_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
@@ -256,7 +398,51 @@ impl InterpreterState {
     }
 
     pub fn new_object(&mut self, kind: TlangObjectKind) -> TlangValue {
+        if self.should_collect() {
+            self.collect_garbage();
+        }
+
+        self.memory_stats.objects_allocated += 1;
         TlangValue::new_object(self.objects.insert(kind))
+    }
+
+    /// Create a new cell containing the given value.
+    /// Cells are used for closure captures to enable mutable bindings.
+    pub fn new_cell(&mut self, value: TlangValue) -> TlangValue {
+        self.new_object(TlangObjectKind::Cell(TlangCell::new(value)))
+    }
+
+    /// Get the value inside a cell.
+    pub fn get_cell_value(&self, cell_id: TlangObjectId) -> Option<TlangValue> {
+        self.objects
+            .get(cell_id)
+            .and_then(|obj| obj.get_cell())
+            .map(|cell| cell.get())
+    }
+
+    /// Set the value inside a cell.
+    pub fn set_cell_value(&mut self, cell_id: TlangObjectId, value: TlangValue) {
+        let Some(obj) = self.objects.get_mut(cell_id) else {
+            debug_assert!(false, "set_cell_value called with invalid cell_id");
+            return;
+        };
+
+        let Some(cell) = obj.get_cell_mut() else {
+            debug_assert!(false, "set_cell_value called on non-cell object");
+            return;
+        };
+
+        cell.set(value);
+    }
+
+    /// Returns the current memory statistics.
+    pub fn memory_stats(&self) -> &MemoryStats {
+        &self.memory_stats
+    }
+
+    /// Returns the number of currently allocated objects in the object store.
+    pub fn object_count(&self) -> usize {
+        self.objects.len()
     }
 
     pub fn new_enum(
@@ -275,9 +461,16 @@ impl InterpreterState {
             .entry(decl.hir_id)
             .or_insert_with(|| decl.clone().into());
 
+        // Capture all memory values from the current scope stack for GC tracing.
+        let global_memory_len = self.scope_stack.global_memory_len();
+        let captured_memory = self.scope_stack.capture_all_memory();
+
         self.new_object(TlangObjectKind::Closure(TlangClosure {
             id: decl.hir_id,
             scope_stack: self.scope_stack.scopes.clone(),
+            captured_cells: std::collections::HashMap::new(),
+            captured_memory,
+            global_memory_len,
         }))
     }
 
@@ -326,6 +519,28 @@ impl InterpreterState {
 
     pub fn get_closure_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
         self.closures.get(&id).cloned()
+    }
+
+    /// Removes an object from the object store by its ID.
+    ///
+    /// This is used during garbage collection to deallocate unreachable objects.
+    /// Returns the removed object if it existed, or None if the ID was invalid.
+    ///
+    /// # Important
+    ///
+    /// The caller must ensure that no other code holds references (via `TlangValue::Object`)
+    /// to this object ID, as accessing a removed object will cause a panic.
+    pub fn remove_object(&mut self, id: TlangObjectId) -> Option<TlangObjectKind> {
+        let removed = self.objects.try_remove(id);
+        if removed.is_some() {
+            self.memory_stats.objects_deallocated += 1;
+        }
+        removed
+    }
+
+    /// Checks if an object with the given ID exists in the object store.
+    pub fn contains_object(&self, id: TlangObjectId) -> bool {
+        self.objects.contains(id)
     }
 
     #[inline(always)]
@@ -602,6 +817,10 @@ impl InterpreterState {
                         "fn anonymous(...) { *native* }".to_string()
                     }
                 }
+                Some(TlangObjectKind::Cell(cell)) => {
+                    // Stringify the value inside the cell
+                    self.stringify(cell.get())
+                }
             },
             _ => value.to_string(),
         }
@@ -611,5 +830,202 @@ impl InterpreterState {
 impl Default for InterpreterState {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_memory_stats_initial() {
+        let state = InterpreterState::new();
+        let stats = state.memory_stats();
+
+        assert_eq!(stats.objects_allocated, 0);
+        assert_eq!(stats.objects_deallocated, 0);
+        assert_eq!(stats.live_objects(), 0);
+    }
+
+    #[test]
+    fn test_memory_stats_after_allocation() {
+        let mut state = InterpreterState::new();
+
+        // Allocate some objects
+        state.new_string("hello".to_string());
+        state.new_string("world".to_string());
+        state.new_list(vec![TlangValue::I64(1), TlangValue::I64(2)]);
+
+        let stats = state.memory_stats();
+        assert_eq!(stats.objects_allocated, 3);
+        assert_eq!(stats.objects_deallocated, 0);
+        assert_eq!(stats.live_objects(), 3);
+        assert_eq!(state.object_count(), 3);
+    }
+
+    #[test]
+    fn test_object_removal() {
+        let mut state = InterpreterState::new();
+
+        // Allocate objects
+        let obj1 = state.new_string("first".to_string());
+        let obj2 = state.new_string("second".to_string());
+        let _obj3 = state.new_string("third".to_string());
+
+        assert_eq!(state.object_count(), 3);
+
+        // Remove an object
+        let id1 = obj1.get_object_id().unwrap();
+        let removed = state.remove_object(id1);
+        assert!(removed.is_some());
+
+        let stats = state.memory_stats();
+        assert_eq!(stats.objects_allocated, 3);
+        assert_eq!(stats.objects_deallocated, 1);
+        assert_eq!(stats.live_objects(), 2);
+        assert_eq!(state.object_count(), 2);
+
+        // Object should no longer exist
+        assert!(!state.contains_object(id1));
+        assert!(state.get_object(obj1).is_none());
+
+        // Other objects should still exist
+        assert!(state.get_object(obj2).is_some());
+    }
+
+    #[test]
+    fn test_remove_nonexistent_object() {
+        let mut state = InterpreterState::new();
+
+        // Try to remove an object that doesn't exist
+        let removed = state.remove_object(999);
+        assert!(removed.is_none());
+
+        // Stats should not change
+        let stats = state.memory_stats();
+        assert_eq!(stats.objects_deallocated, 0);
+    }
+
+    #[test]
+    fn test_contains_object() {
+        let mut state = InterpreterState::new();
+
+        let obj = state.new_string("test".to_string());
+        let id = obj.get_object_id().unwrap();
+
+        assert!(state.contains_object(id));
+        assert!(!state.contains_object(999));
+    }
+
+    #[test]
+    fn test_gc_roots_includes_globals() {
+        let value = TlangValue::I64(42);
+        let mut state = InterpreterState::new();
+        state.set_global("test".to_string(), value);
+
+        let roots: Vec<_> = state.gc_roots().collect();
+        assert!(roots.contains(&value));
+    }
+
+    #[test]
+    fn test_mark_phase_finds_reachable() {
+        let mut state = InterpreterState::new();
+
+        // Create a reachable object using new_string helper
+        let obj = state.new_string("hello".to_string());
+        state.set_global("my_string".to_string(), obj);
+
+        let marked = state.mark_reachable();
+
+        if let TlangValue::Object(id) = obj {
+            assert!(marked.contains(&id));
+        }
+    }
+
+    #[test]
+    fn test_mark_phase_ignores_unreachable() {
+        let mut state = InterpreterState::new();
+
+        // Create an unreachable object (no root reference)
+        let orphan = state.new_string("orphan".to_string());
+        let orphan_id = orphan.get_object_id().unwrap();
+
+        let marked = state.mark_reachable();
+
+        // Orphan should NOT be in marked set
+        assert!(!marked.contains(&orphan_id));
+    }
+
+    #[test]
+    fn test_sweep_removes_unreachable() {
+        let mut state = InterpreterState::new();
+
+        // Create an object but don't make it a root
+        let orphan = state.new_string("orphan".to_string());
+        let orphan_id = orphan.get_object_id().unwrap();
+
+        // Run GC phases
+        let marked = state.mark_reachable();
+        let collected = state.sweep_unreachable(&marked);
+
+        assert_eq!(collected, 1);
+        assert!(!state.contains_object(orphan_id));
+    }
+
+    #[test]
+    fn test_gc_collects_unreachable_objects() {
+        let mut state = InterpreterState::new();
+
+        // Create objects but don't make them roots
+        let _orphan1 = state.new_string("orphan1".to_string());
+        let _orphan2 = state.new_string("orphan2".to_string());
+
+        assert_eq!(state.object_count(), 2);
+
+        // Run GC - both should be collected
+        let collected = state.collect_garbage();
+
+        assert_eq!(collected, 2);
+        assert_eq!(state.object_count(), 0);
+        assert_eq!(state.memory_stats().gc_collections, 1);
+    }
+
+    #[test]
+    fn test_gc_preserves_reachable_objects() {
+        let mut state = InterpreterState::new();
+
+        // Create an object and make it a root via globals
+        let reachable = state.new_string("keep_me".to_string());
+        state.set_global("my_string".to_string(), reachable);
+
+        // Create unreachable objects
+        let _orphan = state.new_string("orphan".to_string());
+
+        assert_eq!(state.object_count(), 2);
+
+        // Run GC - only orphan should be collected
+        let collected = state.collect_garbage();
+
+        assert_eq!(collected, 1);
+        assert_eq!(state.object_count(), 1);
+
+        // The reachable object should still exist
+        let id = reachable.get_object_id().unwrap();
+        assert!(state.contains_object(id));
+    }
+
+    #[test]
+    fn test_gc_collects_temporary_objects() {
+        let mut state = InterpreterState::new();
+
+        // Simulate a loop that creates temporary objects
+        for _ in 0..10_000 {
+            let _temp = state.new_string("temp".to_string());
+            // Don't store temp anywhere - it becomes garbage
+        }
+
+        // After GC, heap should be empty (no roots)
+        state.collect_garbage();
+        assert_eq!(state.object_count(), 0);
     }
 }

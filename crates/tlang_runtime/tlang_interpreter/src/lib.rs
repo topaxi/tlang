@@ -337,7 +337,7 @@ impl Interpreter {
             }
             hir::StmtKind::Let(pat, expr, ty) => self.eval_let_stmt(pat, expr, ty),
             hir::StmtKind::Return(Some(expr)) => {
-                EvalResult::Return(eval_value!(self.eval_expr(expr)))
+                EvalResult::Return(eval_value!(self, self.eval_expr(expr)))
             }
 
             hir::StmtKind::Return(_) => EvalResult::Return(TlangValue::Nil),
@@ -352,7 +352,9 @@ impl Interpreter {
         EvalResult::Void
     }
 
-    fn eval_expr(&mut self, expr: &hir::Expr) -> EvalResult {
+    /// Evaluate an expression and return the result.
+    /// This is useful for benchmarking and testing individual expressions.
+    pub fn eval_expr(&mut self, expr: &hir::Expr) -> EvalResult {
         self.state.set_current_span(expr.span);
 
         match &expr.kind {
@@ -374,7 +376,7 @@ impl Interpreter {
             hir::ExprKind::Block(block) => self.eval_block(block),
             hir::ExprKind::Loop(block) => self.eval_loop(block),
             hir::ExprKind::Break(Some(expr)) => {
-                EvalResult::Break(eval_value!(self.eval_expr(expr)))
+                EvalResult::Break(eval_value!(self, self.eval_expr(expr)))
             }
             hir::ExprKind::Break(_) => EvalResult::Break(TlangValue::Nil),
             hir::ExprKind::Continue => EvalResult::Continue,
@@ -404,13 +406,13 @@ impl Interpreter {
         consequence: &hir::Block,
         else_clauses: &[hir::ElseClause],
     ) -> EvalResult {
-        if eval_value!(self.eval_expr(condition)).is_truthy(&self.state) {
+        if eval_value!(self, self.eval_expr(condition)).is_truthy(&self.state) {
             return self.eval_block(consequence);
         }
 
         for else_clause in else_clauses {
             if let Some(condition) = &else_clause.condition {
-                if eval_value!(self.eval_expr(condition)).is_truthy(&self.state) {
+                if eval_value!(self, self.eval_expr(condition)).is_truthy(&self.state) {
                     return self.eval_block(&else_clause.consequence);
                 }
             } else {
@@ -422,8 +424,8 @@ impl Interpreter {
     }
 
     fn eval_index_access(&mut self, lhs: &hir::Expr, rhs: &hir::Expr) -> EvalResult {
-        let rhs_value = eval_value!(self.eval_expr(rhs));
-        let lhs_value = eval_value!(self.eval_expr(lhs));
+        let rhs_value = eval_value!(self, self.eval_expr(rhs));
+        let lhs_value = eval_value!(self, self.eval_expr(lhs));
 
         match self.get_object(lhs_value) {
             Some(TlangObjectKind::Struct(obj)) => EvalResult::Value(obj[rhs_value.as_usize()]),
@@ -435,7 +437,7 @@ impl Interpreter {
     }
 
     fn eval_field_access(&mut self, lhs: &hir::Expr, ident: &Ident) -> EvalResult {
-        let value = eval_value!(self.eval_expr(lhs));
+        let value = eval_value!(self, self.eval_expr(lhs));
 
         if let Some(TlangObjectKind::Struct(obj)) = self.get_object(value) {
             if let Some(index) = self
@@ -490,7 +492,7 @@ impl Interpreter {
     fn eval_unary(&mut self, op: UnaryOp, expr: &hir::Expr) -> EvalResult {
         match op {
             UnaryOp::Not => EvalResult::Value(TlangValue::Bool(
-                !eval_value!(self.eval_expr(expr)).is_truthy(&self.state),
+                !eval_value!(self, self.eval_expr(expr)).is_truthy(&self.state),
             )),
             UnaryOp::Rest => unreachable!("Rest operator implemented in eval_list_expr"),
             _ => todo!("eval_unary: {:?}", op),
@@ -505,10 +507,10 @@ impl Interpreter {
     ) -> EvalResult {
         match op {
             hir::BinaryOpKind::And => {
-                let lhs = eval_value!(self.eval_expr(lhs));
+                let lhs = eval_value!(self, self.eval_expr(lhs));
 
                 if lhs.is_truthy(&self.state) {
-                    let rhs = eval_value!(self.eval_expr(rhs));
+                    let rhs = eval_value!(self, self.eval_expr(rhs));
 
                     debug!(
                         "eval_binary: {:?} && {:?}",
@@ -527,7 +529,7 @@ impl Interpreter {
             }
 
             hir::BinaryOpKind::Or => {
-                let lhs = eval_value!(self.eval_expr(lhs));
+                let lhs = eval_value!(self, self.eval_expr(lhs));
 
                 if lhs.is_truthy(&self.state) {
                     debug!("eval_binary: {:?} || ...", self.state.stringify(lhs));
@@ -539,7 +541,7 @@ impl Interpreter {
             }
 
             hir::BinaryOpKind::Assign if let hir::ExprKind::Path(path) = &lhs.kind => {
-                let value = eval_value!(self.eval_expr(rhs));
+                let value = eval_value!(self, self.eval_expr(rhs));
 
                 debug!("eval_binary: {} = {}", path, self.state.stringify(value));
 
@@ -551,7 +553,7 @@ impl Interpreter {
             hir::BinaryOpKind::Assign
                 if let hir::ExprKind::FieldAccess(base, ident) = &lhs.kind =>
             {
-                let struct_value = eval_value!(self.eval_expr(base));
+                let struct_value = eval_value!(self, self.eval_expr(base));
                 let struct_shape = self
                     .get_object(struct_value)
                     .and_then(|o| o.shape())
@@ -567,7 +569,7 @@ impl Interpreter {
                         ))
                     });
 
-                let value = eval_value!(self.eval_expr(rhs));
+                let value = eval_value!(self, self.eval_expr(rhs));
 
                 let struct_obj = self.get_struct_mut(struct_value).unwrap();
 
@@ -583,8 +585,8 @@ impl Interpreter {
             _ => {}
         }
 
-        let lhs = eval_value!(self.eval_expr(lhs));
-        let rhs = eval_value!(self.eval_expr(rhs));
+        let lhs = eval_value!(self, self.eval_expr(lhs));
+        let rhs = eval_value!(self, self.eval_expr(rhs));
 
         debug!(
             "eval_binary: {:?} {:?} {:?}",
@@ -925,8 +927,16 @@ impl Interpreter {
         match self.get_object_by_id(id) {
             TlangObjectKind::Closure(closure) => {
                 let closure_decl = self.get_closure_decl(closure.id).unwrap();
+                // Clone the captured scope stack so we can move it into `with_scope`
+                // without borrowing `closure` for the duration of the call.
+                //
+                // Note: We use with_scope (scope-swapping) rather than with_captured_scope
+                // because closures need to be able to mutate variables in parent scopes.
+                // The captured_memory field is used for GC tracing but not for execution,
+                // since using captured memory would prevent mutable capture semantics.
+                let scope_stack = closure.scope_stack.clone();
 
-                self.with_scope(closure.scope_stack.clone(), |this| {
+                self.with_scope(scope_stack, |this| {
                     this.eval_fn_call(&closure_decl, callee, args)
                         .unwrap_value()
                 })
@@ -951,7 +961,7 @@ impl Interpreter {
             self.panic("Tail call with wildcard arguments not allowed".to_string());
         }
 
-        let callee = eval_value!(self.eval_expr(&call_expr.callee));
+        let callee = eval_value!(self, self.eval_expr(&call_expr.callee));
         let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
 
         self.state
@@ -1034,7 +1044,7 @@ impl Interpreter {
     }
 
     fn eval_partial_call(&mut self, call_expr: &hir::CallExpression) -> EvalResult {
-        let callee = eval_value!(self.eval_expr(&call_expr.callee));
+        let callee = eval_value!(self, self.eval_expr(&call_expr.callee));
         let applied_args = eval_exprs!(
             self,
             |this: &mut Self, expr: &hir::Expr| {
@@ -1072,6 +1082,8 @@ impl Interpreter {
             return self.eval_partial_call(call_expr);
         }
 
+        let mark = self.state.temp_roots_mark();
+
         let return_value = match &call_expr.callee.kind {
             hir::ExprKind::Path(path) if let Some(value) = self.resolve_value(path) => {
                 let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
@@ -1086,7 +1098,7 @@ impl Interpreter {
                     ));
                 };
 
-                eval_value!(self.eval_struct_ctor(call_expr, &struct_decl))
+                eval_value!(self, self.eval_struct_ctor(call_expr, &struct_decl))
             }
             hir::ExprKind::Path(path) if path.res.is_enum_variant_def() => {
                 let Some(enum_decl) = self.state.get_enum_decl(&path.as_init()) else {
@@ -1097,7 +1109,10 @@ impl Interpreter {
                     ));
                 };
 
-                eval_value!(self.eval_enum_ctor(call_expr, &enum_decl, path.last_ident()))
+                eval_value!(
+                    self,
+                    self.eval_enum_ctor(call_expr, &enum_decl, path.last_ident())
+                )
             }
             hir::ExprKind::Path(path)
                 if let Some(struct_decl) = self.state.get_struct_decl(&path.as_init()) =>
@@ -1108,7 +1123,10 @@ impl Interpreter {
             hir::ExprKind::Path(path)
                 if let Some(enum_decl) = self.state.get_enum_decl(&path.as_init()) =>
             {
-                eval_value!(self.eval_enum_ctor(call_expr, &enum_decl, path.last_ident()))
+                eval_value!(
+                    self,
+                    self.eval_enum_ctor(call_expr, &enum_decl, path.last_ident())
+                )
             }
             hir::ExprKind::Path(path) => {
                 self.panic(format!(
@@ -1118,7 +1136,7 @@ impl Interpreter {
                 ));
             }
             hir::ExprKind::FieldAccess(expr, ident) => {
-                let call_target = eval_value!(self.eval_expr(expr));
+                let call_target = eval_value!(self, self.eval_expr(expr));
                 let mut args = eval_exprs!(
                     self,
                     Self::eval_expr,
@@ -1141,11 +1159,13 @@ impl Interpreter {
                 }
             }
             _ => {
-                let callee = eval_value!(self.eval_expr(&call_expr.callee));
+                let callee = eval_value!(self, self.eval_expr(&call_expr.callee));
                 let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
                 self.eval_call_object(callee, &args)
             }
         };
+
+        self.state.temp_roots_restore(mark);
 
         EvalResult::Value(return_value)
     }
@@ -1229,17 +1249,18 @@ impl Interpreter {
     ) -> EvalResult {
         // Structs are always instantiated with a single argument, which is a dict.
         let dict_map: HashMap<String, TlangValue> = match &call_expr.arguments[0].kind {
-            hir::ExprKind::Dict(entries) => entries
-                .iter()
-                .map(|(key, value)| {
-                    let key = match &key.kind {
+            hir::ExprKind::Dict(entries) => {
+                let mut map = HashMap::with_capacity(entries.len());
+                for (key_expr, value_expr) in entries {
+                    let key = match &key_expr.kind {
                         hir::ExprKind::Path(path) => path.first_ident().to_string(),
-                        _ => todo!("eval_call: {:?}", key),
+                        _ => todo!("eval_call: {:?}", key_expr),
                     };
-                    let value = self.eval_expr(value).unwrap_value();
-                    (key, value)
-                })
-                .collect(),
+                    let value = eval_value!(self, self.eval_expr(value_expr));
+                    map.insert(key, value);
+                }
+                map
+            }
             _ => todo!("eval_call: {:?}", call_expr.arguments[0]),
         };
 
@@ -1296,17 +1317,18 @@ impl Interpreter {
                 .collect()
         } else {
             match &call_expr.arguments[0].kind {
-                hir::ExprKind::Dict(entries) => entries
-                    .iter()
-                    .map(|(key, value)| {
-                        let key = match &key.kind {
+                hir::ExprKind::Dict(entries) => {
+                    let mut map = HashMap::with_capacity(entries.len());
+                    for (key_expr, value_expr) in entries {
+                        let key = match &key_expr.kind {
                             hir::ExprKind::Path(path) => path.first_ident().to_string(),
-                            _ => todo!("eval_call: {:?}", key),
+                            _ => todo!("eval_call: {:?}", key_expr),
                         };
-                        let value = self.eval_expr(value).unwrap_value();
-                        (key, value)
-                    })
-                    .collect(),
+                        let value = eval_value!(self, self.eval_expr(value_expr));
+                        map.insert(key, value);
+                    }
+                    map
+                }
                 _ => todo!("eval_call: {:?}", call_expr.arguments[0]),
             }
         };
@@ -1363,7 +1385,7 @@ impl Interpreter {
     }
 
     fn eval_let_stmt(&mut self, pat: &hir::Pat, expr: &hir::Expr, _ty: &hir::Ty) -> EvalResult {
-        let value = eval_value!(self.eval_expr(expr));
+        let value = eval_value!(self, self.eval_expr(expr));
 
         if !self.eval_pat(pat, value) {
             self.panic(format!(
@@ -1380,7 +1402,7 @@ impl Interpreter {
 
         for (i, expr) in values.iter().enumerate() {
             if let hir::ExprKind::Unary(UnaryOp::Spread, expr) = &expr.kind {
-                let value = eval_value!(self.eval_expr(expr));
+                let value = eval_value!(self, self.eval_expr(expr));
 
                 if let TlangValue::Object(id) = value {
                     match self.get_object_by_id(id) {
@@ -1403,7 +1425,7 @@ impl Interpreter {
                     self.panic(format!("Expected list, got {value:?}"));
                 }
             } else {
-                field_values.push(eval_value!(self.eval_expr(expr)));
+                field_values.push(eval_value!(self, self.eval_expr(expr)));
             }
         }
 
@@ -1415,7 +1437,7 @@ impl Interpreter {
         let mut shape_keys = Vec::with_capacity(entries.len());
 
         for entry in entries {
-            field_values.push(eval_value!(self.eval_expr(&entry.1)));
+            field_values.push(eval_value!(self, self.eval_expr(&entry.1)));
 
             // As we primarily had compilation to JS in mind, paths here should actually be
             // strings instead. Need to update the parser to emit strings instead of paths,
@@ -1443,7 +1465,7 @@ impl Interpreter {
     }
 
     fn eval_match(&mut self, expr: &hir::Expr, arms: &[hir::MatchArm]) -> EvalResult {
-        let value = eval_value!(self.eval_expr(expr));
+        let value = eval_value!(self, self.eval_expr(expr));
 
         debug!("eval_match: {}", self.state.stringify(value));
 
@@ -1611,7 +1633,7 @@ impl Interpreter {
 
                     if let hir::PatKind::Rest(pat) = &pat.kind {
                         let rest_object = self.state.new_slice(value, i, list_struct.len() - i);
-
+                        self.state.push_temp_root(rest_object);
                         return self.eval_pat(pat, rest_object);
                     }
 
@@ -1647,7 +1669,7 @@ impl Interpreter {
                             list_slice.start() + i,
                             list_slice.len() - i,
                         );
-
+                        self.state.push_temp_root(rest_object);
                         return self.eval_pat(pat, rest_object);
                     }
 
@@ -1668,7 +1690,7 @@ impl Interpreter {
                         } else {
                             self.state.new_string(String::new())
                         };
-
+                        self.state.push_temp_root(rest_object);
                         return self.eval_pat(pat, rest_object);
                     }
 
@@ -1677,6 +1699,7 @@ impl Interpreter {
                     } else {
                         self.state.new_string(String::new())
                     };
+                    self.state.push_temp_root(char_match);
 
                     if !self.eval_pat(pat, char_match) {
                         return false;
@@ -1787,6 +1810,18 @@ mod tests {
         fn state(&self) -> &InterpreterState {
             self.interpreter.state()
         }
+
+        fn state_mut(&mut self) -> &mut InterpreterState {
+            self.interpreter.state_mut()
+        }
+
+        fn object_count(&self) -> usize {
+            self.state().object_count()
+        }
+
+        fn memory_stats(&self) -> &tlang_memory::MemoryStats {
+            self.state().memory_stats()
+        }
     }
 
     fn interpreter(initial_source: &str) -> TestInterpreter {
@@ -1800,6 +1835,33 @@ mod tests {
         let mut interpreter = interpreter("");
         let result = interpreter.eval("");
         assert_matches!(result, TlangValue::Nil);
+    }
+
+    #[test]
+    fn test_eval_expr_direct() {
+        // Test the public eval_expr method directly
+        let mut test_interp = TestInterpreter::new();
+        let hir = test_interp.parse("{ 1 + 2 };");
+
+        // Extract the block expression from the statement
+        let hir::StmtKind::Expr(expr) = &hir.block.stmts[0].kind else {
+            panic!(
+                "Expected Expr statement, found {:?}",
+                &hir.block.stmts[0].kind
+            );
+        };
+
+        let hir::ExprKind::Block(block_expr) = &expr.kind else {
+            panic!("Expected Block expression, found {:?}", &expr.kind);
+        };
+
+        // Evaluate the expression inside the block
+        let Some(tail_expr) = &block_expr.expr else {
+            panic!("Expected tail expression in block, found None");
+        };
+
+        let result = test_interp.interpreter.eval_expr(tail_expr);
+        assert_eq!(result.unwrap_value(), TlangValue::U64(3));
     }
 
     #[test]
@@ -2198,5 +2260,530 @@ mod tests {
         let result = interpreter.eval("even_odd()");
 
         assert_eq!(interpreter.state().stringify(result), "[[2, 4], [1, 3]]");
+    }
+
+    #[test]
+    fn test_stress_gc_struct_ctor_object_fields() {
+        let mut t = interpreter(indoc! {"
+            struct Named {
+                label: Int,
+                value: Int,
+            }
+        "});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Pass string values even though fields are typed Int; types aren't enforced at runtime.
+        let result = t.eval(r#"Named { label: "hello", value: "world" }"#);
+        // stringify prints strings without quotes; fields are sorted alphabetically.
+        assert_eq!(t.state().stringify(result), "Named { label: hello, value: world }");
+    }
+
+    #[test]
+    fn test_stress_gc_enum_ctor_object_fields() {
+        let mut t = interpreter(indoc! {"
+            enum Shape {
+                Circle(Int),
+                Rect(Int, Int),
+            }
+        "});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Positional enum variant with string arguments exercises the eval_exprs! path.
+        let result = t.eval(r#"Shape::Rect("wide", "tall")"#);
+        assert_matches!(result, TlangValue::Object(_));
+        let enum_data = match result {
+            TlangValue::Object(id) => t.interpreter.get_object_by_id(id).get_enum().unwrap(),
+            _ => panic!("expected Object"),
+        };
+        assert_eq!(enum_data.variant, 1);
+        assert_eq!(t.state().stringify(enum_data.field_values[0]), "wide");
+        assert_eq!(t.state().stringify(enum_data.field_values[1]), "tall");
+    }
+
+    #[test]
+    fn test_stress_gc_pat_list_rest_slice() {
+        let mut t = interpreter(indoc! {"
+            fn first_and_rest(list) {
+                match list {
+                    [first, ...rest] => [first, rest],
+                    _ => [],
+                }
+            }
+        "});
+        t.interpreter.state_mut().set_stress_gc(true);
+        let result = t.eval(r#"first_and_rest(["a", "b", "c"])"#);
+        // first is a string (no quotes in stringify), rest is a slice (&[...]).
+        assert_eq!(t.state().stringify(result), "[a, &[b, c]]");
+    }
+
+    #[test]
+    fn test_stress_gc_pat_list_rest_string() {
+        let mut t = interpreter(indoc! {"
+            fn split_first(s) {
+                match s {
+                    [first, ...rest] => [first, rest],
+                    _ => [],
+                }
+            }
+        "});
+        t.interpreter.state_mut().set_stress_gc(true);
+        let result = t.eval(r#"split_first("hello")"#);
+        // Both first and rest are strings; stringify prints them without quotes.
+        assert_eq!(t.state().stringify(result), "[h, ello]");
+    }
+
+    #[test]
+    fn test_stress_gc_string_concatenation() {
+        let mut t = interpreter("");
+        t.interpreter.state_mut().set_stress_gc(true);
+        // String concatenation allocates a new string via new_string.
+        let result = t.eval(r#""hello" + " " + "world""#);
+        assert_eq!(t.state().stringify(result), "hello world");
+    }
+
+    #[test]
+    fn test_stress_gc_list_of_strings() {
+        let mut t = interpreter("");
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Each string literal allocates, then new_list allocates the list.
+        let result = t.eval(r#"["a", "b", "c", "d", "e"]"#);
+        assert_eq!(t.state().stringify(result), "[a, b, c, d, e]");
+    }
+
+    #[test]
+    fn test_stress_gc_list_spread() {
+        let mut t = interpreter(indoc! {"
+            fn prepend(x, list) { [x, ...list] }
+        "});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Spread creates a new list from existing objects.
+        let result = t.eval(r#"prepend("x", ["a", "b", "c"])"#);
+        assert_eq!(t.state().stringify(result), "[x, a, b, c]");
+    }
+
+    #[test]
+    fn test_stress_gc_recursive_string_decomposition() {
+        let mut t = interpreter(indoc! {r#"
+            fn reverse(str) { reverse(str, "") }
+            fn reverse("", acc) { acc }
+            fn reverse([x, ...xs], acc) { rec reverse(xs, x + acc) }
+        "#});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Recursive string decomposition creates many char/rest/concat strings.
+        let result = t.eval(r#"reverse("abcdef")"#);
+        assert_eq!(t.state().stringify(result), "fedcba");
+    }
+
+    #[test]
+    fn test_stress_gc_closure_captures() {
+        let mut t = interpreter(indoc! {r#"
+            fn make_greeter(greeting) {
+                fn(name) { greeting + " " + name }
+            }
+        "#});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Closure captures a string, then concatenation inside allocates more strings.
+        let result = t.eval(r#"make_greeter("hello")("world")"#);
+        assert_eq!(t.state().stringify(result), "hello world");
+    }
+
+    #[test]
+    fn test_stress_gc_nested_closures() {
+        let mut t = interpreter(indoc! {"
+            fn compose(f, g) { fn(x) { f(g(x)) } }
+            fn add(a) { fn(b) { a + b } }
+            fn multiply(a) { fn(b) { a * b } }
+        "});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // compose creates a closure, and both add/multiply create closures.
+        let result = t.eval("compose(multiply(3), add(5))(2)");
+        assert_matches!(result, TlangValue::U64(21));
+    }
+
+    #[test]
+    fn test_stress_gc_recursive_list_construction() {
+        let mut t = interpreter(indoc! {r#"
+            fn build(0) { [] }
+            fn build(n) { ["item", ...build(n - 1)] }
+        "#});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Each recursive call creates a string + list + spread.
+        let result = t.eval("build(5)");
+        assert_eq!(
+            t.state().stringify(result),
+            "[item, item, item, item, item]"
+        );
+    }
+
+    #[test]
+    fn test_stress_gc_map_filter_with_strings() {
+        let mut t = interpreter(indoc! {r#"
+            fn map([], _) { [] }
+            fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
+        "#});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // map creates closures, new strings from concatenation, and new lists.
+        let result = t.eval(r#"map(["a", "b", "c"], fn(s) { s + s })"#);
+        assert_eq!(t.state().stringify(result), "[aa, bb, cc]");
+    }
+
+    #[test]
+    fn test_stress_gc_for_loop_accumulator_with_objects() {
+        let mut t = interpreter(indoc! {r#"
+            fn collect_strings() {
+                for n in [1, 2, 3, 4] with acc = []; {
+                    [...acc, "x"]
+                }
+            }
+        "#});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Each iteration creates a new string and a new list via spread.
+        let result = t.eval("collect_strings()");
+        assert_eq!(t.state().stringify(result), "[x, x, x, x]");
+    }
+
+    #[test]
+    fn test_stress_gc_enum_pattern_matching_with_objects() {
+        let mut t = interpreter(indoc! {r#"
+            enum Wrapper {
+                Val(Int),
+            }
+            fn unwrap(w) {
+                match w {
+                    Wrapper::Val(v) => v,
+                }
+            }
+        "#});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Enum wrapping and unwrapping with string values.
+        let result = t.eval(r#"unwrap(Wrapper::Val("hello"))"#);
+        assert_eq!(t.state().stringify(result), "hello");
+    }
+
+    #[test]
+    fn test_stress_gc_multiple_struct_constructions() {
+        let mut t = interpreter(indoc! {"
+            struct Pair {
+                fst: Int,
+                snd: Int,
+            }
+            fn swap(p) { Pair { fst: p.snd, snd: p.fst } }
+        "});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Creates multiple structs in sequence. Fields access existing objects,
+        // swap creates a new struct from field values of an existing one.
+        let result = t.eval(r#"swap(Pair { fst: "a", snd: "b" })"#);
+        assert_eq!(t.state().stringify(result), "Pair { fst: b, snd: a }");
+    }
+
+    #[test]
+    fn test_stress_gc_chained_function_calls() {
+        let mut t = interpreter(indoc! {r#"
+            fn identity(x) { x }
+            fn wrap(x) { [x] }
+        "#});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Chained calls test watermark save/restore with object values passing through.
+        let result = t.eval(r#"wrap(identity(identity("hello")))"#);
+        assert_eq!(t.state().stringify(result), "[hello]");
+    }
+
+    #[test]
+    fn test_stress_gc_deeply_nested_pattern_matching() {
+        let mut t = interpreter(indoc! {r#"
+            fn nested_match(list) {
+                match list {
+                    [[a, ...rest_inner], ...rest_outer] => [a, rest_inner, rest_outer],
+                    _ => [],
+                }
+            }
+        "#});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Nested pattern creates multiple slices as rest values.
+        let result = t.eval(r#"nested_match([["x", "y", "z"], "a", "b"])"#);
+        assert_eq!(t.state().stringify(result), "[x, &[y, z], &[a, b]]");
+    }
+
+    #[test]
+    fn test_stress_gc_string_pattern_all_chars() {
+        let mut t = interpreter(indoc! {r#"
+            fn chars([a, b, c]) { [a, b, c] }
+            fn chars(_) { [] }
+        "#});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Each character in the pattern creates a new_string allocation.
+        let result = t.eval(r#"chars("abc")"#);
+        assert_eq!(t.state().stringify(result), "[a, b, c]");
+    }
+
+    #[test]
+    fn test_stress_gc_partial_application() {
+        let mut t = interpreter(indoc! {"
+            fn add(a, b) { a + b }
+        "});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Partial application creates a native fn object capturing args.
+        let result = t.eval("add(1, _)(2)");
+        assert_matches!(result, TlangValue::U64(3));
+    }
+
+    #[test]
+    fn test_stress_gc_partial_application_with_objects() {
+        let mut t = interpreter(indoc! {r#"
+            fn concat(a, b) { a + b }
+        "#});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Partial application captures a string object, then applies with another.
+        let result = t.eval(r#"concat("hello ", _)("world")"#);
+        assert_eq!(t.state().stringify(result), "hello world");
+    }
+
+    #[test]
+    fn test_stress_gc_foldl_with_string_concat() {
+        let mut t = interpreter(indoc! {"
+            fn foldl([], acc, _) { acc }
+            fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
+        "});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // foldl with string concatenation creates many intermediate strings.
+        let result = t.eval(r#"foldl(["a", "b", "c", "d"], "", fn(acc, x) { acc + x })"#);
+        assert_eq!(t.state().stringify(result), "abcd");
+    }
+
+    #[test]
+    fn test_stress_gc_enum_with_multiple_object_fields() {
+        let mut t = interpreter(indoc! {"
+            enum Entry {
+                Pair(Int, Int),
+            }
+            fn first(e) {
+                match e {
+                    Entry::Pair(a, _) => a,
+                }
+            }
+            fn second(e) {
+                match e {
+                    Entry::Pair(_, b) => b,
+                }
+            }
+        "});
+        t.interpreter.state_mut().set_stress_gc(true);
+        // Enum with two string fields, then destructure to access them.
+        let result = t.eval(r#"first(Entry::Pair("key", "value"))"#);
+        assert_eq!(t.state().stringify(result), "key");
+        let result = t.eval(r#"second(Entry::Pair("key", "value"))"#);
+        assert_eq!(t.state().stringify(result), "value");
+    }
+
+    // --- GC collection tests: verify unreachable objects are swept ---
+
+    #[test]
+    fn test_gc_collects_temporaries_after_string_concat() {
+        // Wrap concatenation in a function call so the eval_call watermark
+        // trims temp_roots when the call returns, making intermediates collectible.
+        let mut t = interpreter(indoc! {r#"
+            fn concat_three() { "hello" + " " + "world" }
+        "#});
+        let result = t.eval("concat_three()");
+        assert_eq!(t.state().stringify(result), "hello world");
+        // After the call returns, temp_roots have been trimmed.
+        // An explicit GC should collect the intermediate strings.
+        let before = t.memory_stats().objects_deallocated;
+        t.state_mut().collect_garbage();
+        let after = t.memory_stats().objects_deallocated;
+        assert!(after > before, "expected intermediate strings to be collected (before={before}, after={after})");
+    }
+
+    #[test]
+    fn test_gc_collects_temporaries_from_function_calls() {
+        let mut t = interpreter(indoc! {r#"
+            fn make_and_discard() {
+                let a = "temporary1";
+                let b = "temporary2";
+                let c = "temporary3";
+                42
+            }
+        "#});
+        t.state_mut().set_stress_gc(true);
+        let before_objects = t.object_count();
+        let result = t.eval("make_and_discard()");
+        assert_matches!(result, TlangValue::U64(42));
+        // After the call returns, the 3 temporary strings should be collectible.
+        t.state_mut().collect_garbage();
+        let after_objects = t.object_count();
+        assert!(
+            after_objects <= before_objects,
+            "expected temporary strings to be collected (before={before_objects}, after={after_objects})"
+        );
+    }
+
+    #[test]
+    fn test_gc_collects_intermediate_lists() {
+        let mut t = interpreter(indoc! {"
+            fn sum_list(list) {
+                match list {
+                    [] => 0,
+                    [x, ...rest] => x + sum_list(rest),
+                }
+            }
+        "});
+        // sum_list uses non-tail recursion, so each recursive call goes through
+        // eval_call with its own watermark. Intermediate slices from ...rest become
+        // collectible as each call returns.
+        let result = t.eval("sum_list([1, 2, 3, 4, 5])");
+        assert_matches!(result, TlangValue::U64(15));
+        // After the call, the original list and all intermediate slices should be collectible.
+        t.state_mut().collect_garbage();
+        let stats = t.memory_stats();
+        assert!(
+            stats.objects_deallocated > 0,
+            "expected intermediate slices to be collected"
+        );
+    }
+
+    #[test]
+    fn test_gc_collects_abandoned_closures() {
+        let mut t = interpreter(indoc! {"
+            fn create_and_discard() {
+                let f = fn(x) { x + 1 };
+                let g = fn(x) { x * 2 };
+                f(10)
+            }
+        "});
+        t.state_mut().set_stress_gc(true);
+        let result = t.eval("create_and_discard()");
+        assert_matches!(result, TlangValue::U64(11));
+        // After the call, both closures f and g should be unreachable.
+        t.state_mut().collect_garbage();
+        let stats = t.memory_stats();
+        assert!(
+            stats.objects_deallocated > 0,
+            "expected abandoned closures to be collected"
+        );
+    }
+
+    #[test]
+    fn test_gc_collects_unreachable_structs() {
+        let mut t = interpreter(indoc! {"
+            struct Point {
+                x: Int,
+                y: Int,
+            }
+            fn make_point_x() {
+                let p = Point { x: 1, y: 2 };
+                p.x
+            }
+        "});
+        let before = t.object_count();
+        let result = t.eval("make_point_x()");
+        assert_matches!(result, TlangValue::U64(1));
+        // The Point struct is no longer reachable after extracting .x.
+        t.state_mut().collect_garbage();
+        let after = t.object_count();
+        assert!(
+            after <= before,
+            "expected unreachable struct to be collected (before={before}, after={after})"
+        );
+    }
+
+    #[test]
+    fn test_gc_collects_unreachable_enum_variants() {
+        let mut t = interpreter(indoc! {"
+            enum Wrapper {
+                Val(Int),
+            }
+            fn unwrap_val(w) {
+                match w {
+                    Wrapper::Val(v) => v,
+                }
+            }
+        "});
+        let before = t.object_count();
+        let result = t.eval("unwrap_val(Wrapper::Val(99))");
+        assert_matches!(result, TlangValue::U64(99));
+        // The Wrapper::Val enum object is unreachable after unwrapping.
+        t.state_mut().collect_garbage();
+        let after = t.object_count();
+        assert!(
+            after <= before,
+            "expected unreachable enum to be collected (before={before}, after={after})"
+        );
+    }
+
+    #[test]
+    fn test_gc_stress_many_allocations_bounded_heap() {
+        // Use non-tail recursion so each call gets its own watermark.
+        // When each call returns, its temp_roots are trimmed and temporaries
+        // become collectible on the next stress-GC triggered allocation.
+        let mut t = interpreter(indoc! {r#"
+            fn loop_alloc(0) { "done" }
+            fn loop_alloc(n) {
+                let s = "temp" + "str";
+                loop_alloc(n - 1)
+            }
+        "#});
+        t.state_mut().set_stress_gc(true);
+        let result = t.eval("loop_alloc(50)");
+        assert_eq!(t.state().stringify(result), "done");
+        // After the top-level call returns, do a final collection.
+        t.state_mut().collect_garbage();
+        let stats = t.memory_stats();
+        // Verify the GC actually ran and collected objects.
+        assert!(
+            stats.gc_collections > 10,
+            "expected many GC cycles with stress_gc, got {}",
+            stats.gc_collections
+        );
+        assert!(
+            stats.objects_deallocated > 10,
+            "expected many temporaries collected, got {}",
+            stats.objects_deallocated
+        );
+        // Heap should be much smaller than total allocations.
+        assert!(
+            t.object_count() < stats.objects_allocated / 2,
+            "heap should be bounded: {} live vs {} allocated",
+            t.object_count(),
+            stats.objects_allocated
+        );
+    }
+
+    #[test]
+    fn test_gc_recursive_string_processing_collects() {
+        let mut t = interpreter(indoc! {r#"
+            fn reverse(str) { reverse(str, "") }
+            fn reverse("", acc) { acc }
+            fn reverse([x, ...xs], acc) { rec reverse(xs, x + acc) }
+        "#});
+        t.state_mut().set_stress_gc(true);
+        let result = t.eval(r#"reverse("abcdefgh")"#);
+        assert_eq!(t.state().stringify(result), "hgfedcba");
+        // After the call returns, temp_roots are trimmed. Explicit GC collects the rest.
+        t.state_mut().collect_garbage();
+        let stats = t.memory_stats();
+        // Each step creates char strings, rest strings, and concat results.
+        // After the call, only the final result string is live.
+        assert!(
+            stats.objects_deallocated > 0,
+            "expected intermediates to be collected, got 0 deallocated out of {} allocated",
+            stats.objects_allocated
+        );
+    }
+
+    #[test]
+    fn test_gc_map_creates_and_collects_intermediates() {
+        let mut t = interpreter(indoc! {"
+            fn map([], _) { [] }
+            fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
+            fn identity(x) { x }
+        "});
+        t.state_mut().set_stress_gc(true);
+        let result = t.eval("map([1, 2, 3, 4, 5], identity)");
+        assert_eq!(t.state().stringify(result), "[1, 2, 3, 4, 5]");
+        let stats = t.memory_stats();
+        // map creates intermediate slices (from ...xs rest pattern) at each recursive step.
+        // These slices become unreachable as recursion unwinds.
+        assert!(
+            stats.objects_deallocated > 0,
+            "expected intermediate slices from map to be collected"
+        );
     }
 }
