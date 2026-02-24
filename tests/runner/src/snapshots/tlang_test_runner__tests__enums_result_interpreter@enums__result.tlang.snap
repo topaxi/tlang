@@ -11,7 +11,7 @@ true
 10
 
 
-thread 'main' panicked at crates/tlang_runtime/tlang_memory/src/state.rs:478:9:
+thread 'main' panicked at crates/tlang_runtime/tlang_memory/src/state.rs:328:9:
 Called unwrap on Err
   at native function Result::unwrap
   at root 10:1

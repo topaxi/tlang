@@ -53,7 +53,7 @@ fn validate_compile_args(matches: &ArgMatches) -> Command {
 }
 
 fn get_args() -> Command {
-    let matches = command!()
+    let mut command = command!()
         .subcommand(
             command!("run")
                 .about("Run a tlang file")
@@ -68,8 +68,9 @@ fn get_args() -> Command {
                 .arg(arg!(output_type: -t --"output-type" <OUTPUT_TYPE> "Output type, defaults to js"))
                 .arg(arg!(silent: -s --"silent" "Flag to suppress output"))
                 .arg(arg!(quiet_warnings: -q --"quiet-warnings" "Flag to suppress warning output")),
-        )
-        .get_matches();
+        );
+
+    let matches = command.clone().get_matches();
 
     match matches.subcommand() {
         Some(("run", sub_matches)) => Command::Run {
@@ -77,7 +78,7 @@ fn get_args() -> Command {
         },
         Some(("compile", sub_matches)) => validate_compile_args(sub_matches),
         _ => {
-            let _ = command!().print_help();
+            let _ = command.print_help();
             std::process::exit(0);
         }
     }
