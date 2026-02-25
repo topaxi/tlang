@@ -133,6 +133,7 @@ fn test_should_allow_shadowing_of_single_variable() {
                 temp: false,
                 builtin: false,
                 used: false,
+                global_slot: None,
             },
             SymbolInfo {
                 node_id: Some(NodeId::new(6)),
@@ -149,6 +150,7 @@ fn test_should_allow_shadowing_of_single_variable() {
                 temp: false,
                 builtin: false,
                 used: false,
+                global_slot: None,
             },
         ]
     );
@@ -188,6 +190,7 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
             temp: false,
             builtin: false,
             used: true,
+            global_slot: None,
         })
     );
     assert_eq!(
@@ -212,6 +215,7 @@ fn test_should_allow_shadowing_of_single_variable_with_self_reference() {
             temp: false,
             builtin: false,
             used: false,
+            global_slot: None,
         })
     );
 }

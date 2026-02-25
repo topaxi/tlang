@@ -24,9 +24,9 @@ impl SlotAllocator {
                 )
             });
 
-        if path.res.slot().is_builtin() {
+        if path.res.slot().is_global() {
             debug!(
-                "Path '{}' on line {} is a builtin symbol, skipping slot assignment.",
+                "Path '{}' on line {} is a global slot, skipping slot assignment.",
                 path, path.span.start,
             );
 
@@ -79,7 +79,7 @@ impl SlotAllocator {
                     .borrow()
                     .get_all_declared_symbols()
                     .iter()
-                    // built-in symbols are not assigned slots (yet?)
+                    // built-in symbols use global slots assigned at compile time
                     .filter(|s| !s.builtin && s.hir_id.is_some())
                     .collect::<Vec<_>>(),
             );

@@ -47,7 +47,7 @@ fn main() {
         }
     };
     let mut analyzer = SemanticAnalyzer::default();
-    analyzer.add_builtin_symbols(&Interpreter::builtin_symbols());
+    analyzer.add_builtin_symbols_with_slots(&Interpreter::builtin_symbols());
 
     match analyzer.analyze(&ast) {
         Ok(_) => {}

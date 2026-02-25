@@ -58,6 +58,25 @@ impl SemanticAnalysisContext {
                 self.symbol_id_allocator.next_id(),
                 name.as_ref(),
                 *symbol_type,
+                None,
+            );
+            self.root_symbol_table.borrow_mut().insert(symbol_info);
+        }
+    }
+
+    pub fn add_builtin_symbols_with_slots<'a, S, I>(&mut self, symbols: I)
+    where
+        S: AsRef<str> + 'a,
+        I: IntoIterator<Item = &'a (S, SymbolType, Option<usize>)>,
+    {
+        use tlang_symbols::SymbolInfo;
+
+        for (name, symbol_type, global_slot) in symbols {
+            let symbol_info = SymbolInfo::new_builtin(
+                self.symbol_id_allocator.next_id(),
+                name.as_ref(),
+                *symbol_type,
+                *global_slot,
             );
             self.root_symbol_table.borrow_mut().insert(symbol_info);
         }
@@ -215,6 +234,21 @@ impl SemanticAnalyzer {
 
         if let Some(ref mut ctx) = self.context {
             ctx.add_builtin_symbols(symbols);
+        }
+    }
+
+    pub fn add_builtin_symbols_with_slots<'a, S, I>(&mut self, symbols: I)
+    where
+        S: AsRef<str> + 'a,
+        I: IntoIterator<Item = &'a (S, SymbolType, Option<usize>)>,
+    {
+        // Initialize context if it doesn't exist
+        if self.context.is_none() {
+            self.context = Some(SemanticAnalysisContext::new());
+        }
+
+        if let Some(ref mut ctx) = self.context {
+            ctx.add_builtin_symbols_with_slots(symbols);
         }
     }
 

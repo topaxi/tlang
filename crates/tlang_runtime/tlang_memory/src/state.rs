@@ -106,6 +106,11 @@ pub struct InterpreterState {
     struct_decls: HashMap<String, Rc<hir::StructDeclaration>>,
     enum_decls: HashMap<String, Rc<hir::EnumDeclaration>>,
     call_stack: Vec<CallStackEntry>,
+    /// Indexed storage for builtin/global symbols with pre-assigned slots.
+    global_slots: Vec<TlangValue>,
+    /// Maps builtin symbol names to their slot indices in `global_slots`.
+    global_slot_map: HashMap<String, usize>,
+    /// Fallback HashMap for dynamic globals (user-defined top-level fns, JS bindings).
     globals: HashMap<String, TlangValue>,
     temp_roots: Vec<TlangValue>,
     pub builtin_shapes: BuiltinShapes,
@@ -126,7 +131,10 @@ impl Resolver for InterpreterState {
         let value = self
             .scope_stack
             .resolve_value(path)
-            .or_else(|| self.globals.get(&path.to_string()).copied());
+            .or_else(|| match path.res.slot() {
+                hir::Slot::Global(i) => self.global_slots.get(i).copied(),
+                _ => self.globals.get(&path.to_string()).copied(),
+            });
 
         debug!(
             "Resolved path: \"{}\" ({:?}), got: {:?}",
@@ -160,6 +168,8 @@ impl InterpreterState {
             fn_decls: HashMap::with_capacity(1000),
             shapes: HashMap::with_capacity(100),
             call_stack,
+            global_slots: Vec::new(),
+            global_slot_map: HashMap::new(),
             globals: HashMap::with_capacity(100),
             temp_roots: Vec::with_capacity(10),
             builtin_shapes: BuiltinShapes::default(),
@@ -192,11 +202,13 @@ impl InterpreterState {
     /// Returns an iterator over all GC root values.
     pub fn gc_roots(&self) -> impl Iterator<Item = TlangValue> + '_ {
         let temp_roots = self.temp_roots.iter().copied();
+        let global_slots = self.global_slots.iter().copied();
         let globals = self.globals.values().copied();
         let scope_memory = self.scope_stack.memory_iter();
         let native_fns = self.native_fns.keys().copied().map(TlangValue::Object);
 
         temp_roots
+            .chain(global_slots)
             .chain(globals)
             .chain(scope_memory)
             .chain(native_fns)
@@ -393,8 +405,31 @@ impl InterpreterState {
         self.scope_stack.current_scope_has_slots()
     }
 
+    /// Initialize the global slots Vec from name→slot mappings for builtin symbols.
+    /// Must be called before any `set_global` calls for builtin symbols.
+    pub fn init_global_slots<'a>(
+        &mut self,
+        slot_entries: impl IntoIterator<Item = (&'a str, usize)>,
+    ) {
+        let entries: Vec<(&'a str, usize)> = slot_entries.into_iter().collect();
+        let max_slot = entries
+            .iter()
+            .map(|(_, i)| i)
+            .max()
+            .map(|m| m + 1)
+            .unwrap_or(0);
+        self.global_slots = vec![TlangValue::Nil; max_slot];
+        for (name, i) in entries {
+            self.global_slot_map.insert(name.to_string(), i);
+        }
+    }
+
     pub fn set_global(&mut self, name: String, value: TlangValue) {
-        self.globals.insert(name, value);
+        if let Some(&slot) = self.global_slot_map.get(&name) {
+            self.global_slots[slot] = value;
+        } else {
+            self.globals.insert(name, value);
+        }
     }
 
     pub fn new_object(&mut self, kind: TlangObjectKind) -> TlangValue {

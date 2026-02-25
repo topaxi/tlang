@@ -51,6 +51,7 @@ fn test_analyze_variable_declaration() {
             temp: false,
             builtin: false,
             used: false,
+            global_slot: None,
         }]
     );
 }
@@ -100,7 +101,8 @@ fn test_block_scope() {
             declared: true,
             temp: false,
             builtin: false,
-            used: false
+            used: false,
+            global_slot: None,
         }]
     );
     assert!(program_symbols.borrow().get_by_name("b").is_empty());
@@ -144,7 +146,8 @@ fn test_block_scope() {
             declared: true,
             temp: false,
             builtin: false,
-            used: false
+            used: false,
+            global_slot: None,
         }]
     );
     assert_eq!(
@@ -172,7 +175,8 @@ fn test_block_scope() {
             declared: true,
             temp: false,
             builtin: false,
-            used: false
+            used: false,
+            global_slot: None,
         }]
     );
     assert!(block1_symbols.borrow().get_by_name("c").is_empty());
@@ -218,7 +222,8 @@ fn test_block_scope() {
             declared: true,
             temp: false,
             builtin: false,
-            used: false
+            used: false,
+            global_slot: None,
         }]
     );
     assert_eq!(
@@ -246,7 +251,8 @@ fn test_block_scope() {
             declared: true,
             temp: false,
             builtin: false,
-            used: false
+            used: false,
+            global_slot: None,
         }]
     );
     assert_eq!(
@@ -274,7 +280,8 @@ fn test_block_scope() {
             declared: true,
             temp: false,
             builtin: false,
-            used: false
+            used: false,
+            global_slot: None,
         }]
     );
 }
@@ -308,7 +315,8 @@ fn test_should_collect_function_definitions() {
             declared: true,
             temp: false,
             builtin: false,
-            used: false
+            used: false,
+            global_slot: None,
         }]
     );
 }
@@ -342,7 +350,8 @@ fn test_should_collect_list_destructuring_symbols_in_function_arguments() {
             declared: true,
             temp: false,
             builtin: false,
-            used: false
+            used: false,
+            global_slot: None,
         }]
     );
 }
@@ -377,6 +386,7 @@ fn test_should_collect_list_destructuring_with_rest_symbols_in_function_argument
             temp: false,
             builtin: false,
             used: false,
+            global_slot: None,
         }]
     );
 }
@@ -417,6 +427,7 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
                 temp: false,
                 builtin: false,
                 used: false,
+                global_slot: None,
             },
             SymbolInfo {
                 node_id: Some(NodeId::new(24)),
@@ -439,6 +450,7 @@ fn should_collect_function_arguments_of_multiple_fn_definitions() {
                 temp: false,
                 builtin: false,
                 used: false,
+                global_slot: None,
             }
         ]
     );
@@ -484,7 +496,8 @@ fn should_collect_function_arguments_with_enum_extraction() {
                 declared: true,
                 temp: false,
                 builtin: false,
-                used: false
+                used: false,
+                global_slot: None,
             },
             SymbolInfo {
                 node_id: Some(NodeId::new(22)),
@@ -506,7 +519,8 @@ fn should_collect_function_arguments_with_enum_extraction() {
                 declared: true,
                 temp: false,
                 builtin: false,
-                used: false
+                used: false,
+                global_slot: None,
             }
         ]
     );
@@ -550,6 +564,7 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
                 temp: false,
                 builtin: false,
                 used: true,
+                global_slot: None,
             },
             SymbolInfo {
                 node_id: Some(NodeId::new(9)),
@@ -572,6 +587,7 @@ fn should_warn_if_multiple_functions_with_different_arity_are_unused() {
                 temp: false,
                 builtin: false,
                 used: false,
+                global_slot: None,
             }
         ]
     );

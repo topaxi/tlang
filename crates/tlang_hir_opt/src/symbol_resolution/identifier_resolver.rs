@@ -71,14 +71,18 @@ impl IdentifierResolver {
 
                 path.res.set_hir_id(hir_id);
             } else if symbol_info.is_builtin() {
-                debug!(
-                    "Path '{}' on line {} is a builtin symbol, skipping resolution.",
-                    path, path.span.start
-                );
-
-                // TODO: We should probably have actual slots for the builtins and assign
-                // them in the slot allocator pass.
-                path.res.set_slot(hir::Slot::Builtin);
+                if let Some(slot) = symbol_info.global_slot() {
+                    debug!(
+                        "Path '{}' on line {} is a builtin symbol with global slot {}.",
+                        path, path.span.start, slot
+                    );
+                    path.res.set_slot(hir::Slot::Global(slot));
+                } else {
+                    debug!(
+                        "Path '{}' on line {} is a builtin symbol with no slot (module/type).",
+                        path, path.span.start
+                    );
+                }
             } else {
                 debug!(
                     "Symbol '{}' on line {} has no HirId, skipping resolution.",

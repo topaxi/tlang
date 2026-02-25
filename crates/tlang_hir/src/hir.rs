@@ -92,7 +92,7 @@ pub type ScopeIndex = u16;
 pub enum Slot {
     Local(SlotIndex),
     Upvar(SlotIndex, ScopeIndex),
-    Builtin,
+    Global(SlotIndex),
     #[default]
     None,
 }
@@ -116,8 +116,8 @@ impl Slot {
         matches!(self, Slot::Upvar(..))
     }
 
-    pub fn is_builtin(self) -> bool {
-        matches!(self, Slot::Builtin)
+    pub fn is_global(self) -> bool {
+        matches!(self, Slot::Global(..))
     }
 
     pub fn is_none(self) -> bool {

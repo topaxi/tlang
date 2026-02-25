@@ -75,6 +75,8 @@ pub struct SymbolInfo {
     pub builtin: bool,
     pub used: bool,
     pub declared: bool,
+    /// Slot index into the global slots Vec for builtin symbols.
+    pub global_slot: Option<usize>,
 }
 
 impl SymbolInfo {
@@ -97,10 +99,16 @@ impl SymbolInfo {
             temp: false,
             used: false,
             declared: true,
+            global_slot: None,
         }
     }
 
-    pub fn new_builtin(id: SymbolId, name: &str, symbol_type: SymbolType) -> Self {
+    pub fn new_builtin(
+        id: SymbolId,
+        name: &str,
+        symbol_type: SymbolType,
+        global_slot: Option<usize>,
+    ) -> Self {
         let mut symbol_info = SymbolInfo::new(
             id,
             name,
@@ -109,7 +117,12 @@ impl SymbolInfo {
             LineColumn::default(),
         );
         symbol_info.builtin = true;
+        symbol_info.global_slot = global_slot;
         symbol_info
+    }
+
+    pub fn global_slot(&self) -> Option<usize> {
+        self.global_slot
     }
 
     pub fn set_declared(&mut self, declared: bool) -> &mut Self {
@@ -420,7 +433,7 @@ impl SymbolTable {
     /// Helper method to determine if a symbol gets a slot allocated.
     /// This centralizes the filtering logic used in both `get_slot` and `locals`.
     fn symbol_gets_slot(&self, s: &SymbolInfo) -> bool {
-        // Builtins are currently not slotted and are looked up by name.
+        // Builtins use global slots assigned at interpreter startup, not local scope slots.
         !s.builtin
             // Enum and struct definitions do not generate a slot
             && !matches!(s.symbol_type, SymbolType::Enum | SymbolType::Struct)
