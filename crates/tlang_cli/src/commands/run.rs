@@ -26,7 +26,7 @@ pub fn handle_run(input_file: &str) {
     };
 
     let mut semantic_analyzer = SemanticAnalyzer::default();
-    semantic_analyzer.add_builtin_symbols(&Interpreter::builtin_symbols());
+    semantic_analyzer.add_builtin_symbols_with_slots(&Interpreter::builtin_symbols());
     if let Err(err) = semantic_analyzer.analyze(&ast) {
         eprintln!("{err:?}");
         std::process::exit(1);

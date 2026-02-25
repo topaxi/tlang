@@ -24,7 +24,7 @@ mod helpers {
         let ast = Parser::from_source(src).parse().expect("Parse error");
 
         let mut analyzer = SemanticAnalyzer::default();
-        analyzer.add_builtin_symbols(&Interpreter::builtin_symbols());
+        analyzer.add_builtin_symbols_with_slots(&Interpreter::builtin_symbols());
         analyzer.analyze(&ast).expect("Semantic analysis error");
 
         let (mut module, meta) = lower_to_hir(

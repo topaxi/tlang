@@ -1,4 +1,3 @@
-
 #![feature(box_patterns)]
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -78,13 +77,6 @@ impl Interpreter {
             .collect()
     }
 
-    fn builtin_fn_symbols() -> Vec<(String, SymbolType)> {
-        inventory::iter::<NativeFnDef>
-            .into_iter()
-            .map(|def| (def.name(), SymbolType::Function(def.arity() as u16)))
-            .collect::<Vec<_>>()
-    }
-
     const fn builtin_const_symbols() -> &'static [(&'static str, SymbolType)] {
         &[
             ("Option", SymbolType::Enum),
@@ -94,18 +86,52 @@ impl Interpreter {
         ]
     }
 
-    pub fn builtin_symbols() -> Vec<(String, SymbolType)> {
-        let mut symbols: Vec<(String, SymbolType)> = Self::builtin_module_symbols()
-            .iter()
-            .map(|(name, ty)| (name.to_string(), *ty))
+    pub fn builtin_symbols() -> Vec<(String, SymbolType, Option<usize>)> {
+        let mut slot_counter = 0usize;
+
+        // Module symbols: no slot (never looked up as values)
+        let module_syms: Vec<(String, SymbolType, Option<usize>)> = Self::builtin_module_symbols()
+            .into_iter()
+            .map(|(name, ty)| (name.to_string(), ty, None))
             .collect();
-        symbols.extend(Self::builtin_fn_symbols());
-        symbols.extend(
-            Self::builtin_const_symbols()
-                .iter()
-                .map(|(name, ty)| (name.to_string(), *ty)),
-        );
-        symbols
+
+        // Native function symbols: sorted by name for determinism, each gets a slot
+        let mut fn_defs: Vec<&NativeFnDef> = inventory::iter::<NativeFnDef>.into_iter().collect();
+        fn_defs.sort_by_key(|def| def.name());
+        let fn_syms: Vec<(String, SymbolType, Option<usize>)> = fn_defs
+            .iter()
+            .map(|def| {
+                let slot = slot_counter;
+                slot_counter += 1;
+                (
+                    def.name(),
+                    SymbolType::Function(def.arity() as u16),
+                    Some(slot),
+                )
+            })
+            .collect();
+
+        // Const symbols: value-producing ones each get a slot
+        let const_syms: Vec<(String, SymbolType, Option<usize>)> = Self::builtin_const_symbols()
+            .iter()
+            .map(|(name, ty)| {
+                let slot = match ty {
+                    SymbolType::Enum => None,
+                    _ => {
+                        let s = Some(slot_counter);
+                        slot_counter += 1;
+                        s
+                    }
+                };
+                (name.to_string(), *ty, slot)
+            })
+            .collect();
+
+        module_syms
+            .into_iter()
+            .chain(fn_syms)
+            .chain(const_syms)
+            .collect()
     }
 
     /// # Panics
@@ -114,9 +140,20 @@ impl Interpreter {
             state: InterpreterState::default(),
         };
 
+        // Build stable slot assignments and initialize the global slots Vec.
+        let builtin_defs = Self::builtin_symbols();
+        interpreter.state.init_global_slots(
+            builtin_defs
+                .iter()
+                .filter_map(|(name, _, slot)| slot.map(|i| (name.as_str(), i))),
+        );
+
         interpreter.init_stdlib();
 
-        for native_fn_def in inventory::iter::<NativeFnDef> {
+        // Register inventory native functions sorted by name (same order as builtin_symbols).
+        let mut fn_defs: Vec<&NativeFnDef> = inventory::iter::<NativeFnDef>.into_iter().collect();
+        fn_defs.sort_by_key(|def| def.name());
+        for native_fn_def in &fn_defs {
             interpreter.define_native_fn(&native_fn_def.name(), native_fn_def.fn_ptr());
         }
 
@@ -1742,7 +1779,7 @@ mod tests {
     impl TestInterpreter {
         fn new() -> Self {
             let mut semantic_analyzer = tlang_semantics::SemanticAnalyzer::default();
-            semantic_analyzer.add_builtin_symbols(&Interpreter::builtin_symbols());
+            semantic_analyzer.add_builtin_symbols_with_slots(&Interpreter::builtin_symbols());
             let interpreter = Interpreter::new();
 
             TestInterpreter {
@@ -2274,7 +2311,10 @@ mod tests {
         // Pass string values even though fields are typed Int; types aren't enforced at runtime.
         let result = t.eval(r#"Named { label: "hello", value: "world" }"#);
         // stringify prints strings without quotes; fields are sorted alphabetically.
-        assert_eq!(t.state().stringify(result), "Named { label: hello, value: world }");
+        assert_eq!(
+            t.state().stringify(result),
+            "Named { label: hello, value: world }"
+        );
     }
 
     #[test]
@@ -2589,7 +2629,10 @@ mod tests {
         let before = t.memory_stats().objects_deallocated;
         t.state_mut().collect_garbage();
         let after = t.memory_stats().objects_deallocated;
-        assert!(after > before, "expected intermediate strings to be collected (before={before}, after={after})");
+        assert!(
+            after > before,
+            "expected intermediate strings to be collected (before={before}, after={after})"
+        );
     }
 
     #[test]
