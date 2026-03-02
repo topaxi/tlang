@@ -418,6 +418,7 @@ impl InterpreterState {
             .max()
             .map(|m| m + 1)
             .unwrap_or(0);
+        self.global_slot_map.clear();
         self.global_slots = vec![TlangValue::Nil; max_slot];
         for (name, i) in entries {
             self.global_slot_map.insert(name.to_string(), i);

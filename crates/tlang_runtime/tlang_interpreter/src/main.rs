@@ -69,7 +69,8 @@ fn main() {
     );
 
     let mut optimizer = HirOptimizer::default();
-    optimizer.optimize_hir(&mut module, meta.into());
+    let mut ctx = meta.into();
+    optimizer.optimize_hir(&mut module, &mut ctx);
 
     let mut interp = Interpreter::default();
     interp.state_mut().set_stress_gc(stress_gc);
