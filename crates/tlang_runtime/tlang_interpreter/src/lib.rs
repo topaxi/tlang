@@ -7,12 +7,11 @@ use smallvec::SmallVec;
 use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token;
 use tlang_hir::{self as hir, BindingKind};
+use tlang_memory::prelude::*;
 use tlang_memory::shape::{ShapeKey, Shaped, TlangEnumVariant, TlangShape};
-use tlang_memory::state::TailCall;
 use tlang_memory::value::TlangArithmetic;
 use tlang_memory::value::object::TlangEnum;
-use tlang_memory::{InterpreterState, NativeFnReturn, Resolver, scope};
-use tlang_memory::{prelude::*, state};
+use tlang_memory::{InterpreterState, NativeFnReturn, Resolver, execution, scope};
 use tlang_span::HirId;
 use tlang_symbols::SymbolType;
 
@@ -290,7 +289,7 @@ impl Interpreter {
         F: FnOnce(&mut Self) -> R,
     {
         self.state
-            .push_call_stack(state::CallStackEntry::new_call(fn_decl));
+            .push_call_stack(execution::CallStackEntry::new_call(fn_decl));
         let result = self.with_new_scope(fn_decl, f);
         self.state.pop_call_stack();
         result
@@ -1012,7 +1011,7 @@ impl Interpreter {
 
         self.state
             .current_call_frame_mut()
-            .set_tail_call(TailCall { callee, args });
+            .set_tail_call(execution::TailCall { callee, args });
 
         EvalResult::TailCall
     }

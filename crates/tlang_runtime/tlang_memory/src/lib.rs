@@ -1,12 +1,18 @@
+pub mod execution;
+pub mod heap;
 mod macros;
+pub mod program;
 pub mod resolver;
 pub mod scope;
 pub mod shape;
 pub mod state;
 pub mod value;
 
+pub use execution::ExecutionContext;
+pub use heap::{Heap, MemoryStats};
+pub use program::Program;
 pub use resolver::Resolver;
-pub use state::{ExecutionContext, Heap, InterpreterState, MemoryStats, Program};
+pub use state::InterpreterState;
 pub use value::{TlangValue, object::TlangObjectKind};
 
 pub use self::value::function::NativeFnReturn;
