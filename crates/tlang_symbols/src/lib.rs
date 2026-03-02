@@ -195,29 +195,37 @@ impl SymbolTable {
         self.parent = Some(parent);
     }
 
+    fn get_slot_index<'a>(
+        &'a self,
+        symbols: &'a [SymbolInfo],
+        predicate: impl Fn(&SymbolInfo) -> bool,
+    ) -> Option<usize> {
+        let mut set = HashSet::new();
+
+        symbols
+            .iter()
+            .filter(|s| self.symbol_gets_slot(s))
+            .filter(|s| s.hir_id.is_none() || set.insert(s.hir_id))
+            .position(&predicate)
+    }
+
     pub fn get_slot(&self, predicate: impl Fn(&SymbolInfo) -> bool) -> Option<(usize, usize)> {
-        let mut table = Some(Rc::new(RefCell::new(self.clone())));
-        let mut scope_index = 0;
+        if let Some(index) = self.get_slot_index(&self.symbols, &predicate) {
+            return Some((index, 0));
+        }
+
+        let mut scope_index = 1;
+        let mut table = self.parent();
 
         while let Some(t) = table {
-            let mut set = HashSet::new();
+            let t = t.borrow();
 
-            if let Some(index) = t
-                .borrow()
-                .symbols
-                .iter()
-                .filter(|s| t.borrow().symbol_gets_slot(s))
-                // Filter out duplicate symbols, as fn definitions might have multiple symbols
-                // attached to them. The lowering result should properly assign the same HirId to
-                // each fn symbol representing the same fn.
-                .filter(|s| s.hir_id.is_none() || set.insert(s.hir_id))
-                .position(&predicate)
-            {
+            if let Some(index) = self.get_slot_index(&t.symbols, &predicate) {
                 return Some((index, scope_index));
             }
 
             scope_index += 1;
-            table = t.borrow().parent();
+            table = t.parent();
         }
 
         None
