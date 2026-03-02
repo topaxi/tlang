@@ -16,3 +16,12 @@ pub enum NativeFnReturn {
     DynamicCall(HirId),
     CallObject(Box<(TlangValue, SmallVec<[TlangValue; 4]>)>),
 }
+
+impl NativeFnReturn {
+    pub fn value(&self) -> Option<&TlangValue> {
+        match self {
+            NativeFnReturn::Return(value) => Some(value),
+            _ => None,
+        }
+    }
+}

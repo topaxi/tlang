@@ -711,6 +711,48 @@ impl InterpreterState {
             .and_then(|shape| shape.method_map.insert(method_name.to_string(), method));
     }
 
+    /// # Panics
+    pub fn is_truthy(&mut self, value: TlangValue) -> bool {
+        if !value.is_object() {
+            return value.is_truthy();
+        }
+
+        match self
+            .get_object_by_id(value.get_object_id().unwrap())
+            .unwrap()
+        {
+            TlangObjectKind::Fn(_) | TlangObjectKind::NativeFn | TlangObjectKind::Closure(_) => {
+                true
+            }
+            TlangObjectKind::String(s) => !s.is_empty(),
+            TlangObjectKind::Slice(s) => !s.is_empty(),
+            TlangObjectKind::Cell(c) => self.is_truthy(c.value),
+            TlangObjectKind::Struct(s) => {
+                if let Some(shape) = self.get_shape(s)
+                    && let Some(TlangStructMethod::Native(id)) = shape.get_method("is_truthy")
+                {
+                    let value = *self.call_native_fn(*id, &[value]).unwrap().value().unwrap();
+
+                    return self.is_truthy(value);
+                }
+
+                !s.is_empty()
+            }
+            TlangObjectKind::Enum(e) => {
+                if let Some(shape) = self.get_shape(e)
+                    && let Some(TlangStructMethod::Native(id)) = shape.get_method("is_truthy")
+                {
+                    let value = *self.call_native_fn(*id, &[value]).unwrap().value().unwrap();
+
+                    return self.is_truthy(value);
+                }
+
+                e.field_values.is_empty()
+                    || e.field_values.clone().iter().all(|v| self.is_truthy(*v))
+            }
+        }
+    }
+
     pub fn debug_stringify_scope_stack(&self) -> String {
         let mut out = "[\n".to_string();
         for scope in self.scope_stack.iter() {

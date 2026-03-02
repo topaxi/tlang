@@ -443,13 +443,17 @@ impl Interpreter {
         consequence: &hir::Block,
         else_clauses: &[hir::ElseClause],
     ) -> EvalResult {
-        if eval_value!(self, self.eval_expr(condition)).is_truthy(&self.state) {
+        let value = eval_value!(self, self.eval_expr(condition));
+
+        if self.state.is_truthy(value) {
             return self.eval_block(consequence);
         }
 
         for else_clause in else_clauses {
             if let Some(condition) = &else_clause.condition {
-                if eval_value!(self, self.eval_expr(condition)).is_truthy(&self.state) {
+                let value = eval_value!(self, self.eval_expr(condition));
+
+                if self.state.is_truthy(value) {
                     return self.eval_block(&else_clause.consequence);
                 }
             } else {
@@ -528,9 +532,11 @@ impl Interpreter {
 
     fn eval_unary(&mut self, op: UnaryOp, expr: &hir::Expr) -> EvalResult {
         match op {
-            UnaryOp::Not => EvalResult::Value(TlangValue::Bool(
-                !eval_value!(self, self.eval_expr(expr)).is_truthy(&self.state),
-            )),
+            UnaryOp::Not => {
+                let value = eval_value!(self, self.eval_expr(expr));
+
+                EvalResult::Value(TlangValue::Bool(!self.state.is_truthy(value)))
+            }
             UnaryOp::Rest => unreachable!("Rest operator implemented in eval_list_expr"),
             _ => todo!("eval_unary: {:?}", op),
         }
@@ -546,7 +552,7 @@ impl Interpreter {
             hir::BinaryOpKind::And => {
                 let lhs = eval_value!(self, self.eval_expr(lhs));
 
-                if lhs.is_truthy(&self.state) {
+                if self.state.is_truthy(lhs) {
                     let rhs = eval_value!(self, self.eval_expr(rhs));
 
                     debug!(
@@ -555,7 +561,7 @@ impl Interpreter {
                         self.state.stringify(rhs)
                     );
 
-                    if rhs.is_truthy(&self.state) {
+                    if self.state.is_truthy(rhs) {
                         return EvalResult::Value(TlangValue::Bool(true));
                     }
                 }
@@ -568,7 +574,7 @@ impl Interpreter {
             hir::BinaryOpKind::Or => {
                 let lhs = eval_value!(self, self.eval_expr(lhs));
 
-                if lhs.is_truthy(&self.state) {
+                if self.state.is_truthy(lhs) {
                     debug!("eval_binary: {:?} || ...", self.state.stringify(lhs));
 
                     return EvalResult::Value(TlangValue::Bool(true));
@@ -1155,7 +1161,7 @@ impl Interpreter {
                 if let Some(struct_decl) = self.state.get_struct_decl(&path.as_init()) =>
             {
                 let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
-                self.call_shape_method(struct_decl.hir_id.into(), path.last_ident(), &args)
+                self.call_shape_method(struct_decl.hir_id.into(), path.last_ident().as_str(), &args)
             }
             hir::ExprKind::Path(path)
                 if let Some(enum_decl) = self.state.get_enum_decl(&path.as_init()) =>
@@ -1185,7 +1191,7 @@ impl Interpreter {
                 let shape_key = self.get_object(call_target).and_then(|o| o.shape());
 
                 if let Some(shape_key) = shape_key {
-                    self.call_shape_method(shape_key, ident, &args)
+                    self.call_shape_method(shape_key, ident.as_str(), &args)
                 } else {
                     self.panic(format!(
                         "Field access on non-struct: {:?},\nExpr: {:?}, Current scope: {}",
@@ -1392,12 +1398,12 @@ impl Interpreter {
     fn call_shape_method(
         &mut self,
         shape_key: ShapeKey,
-        method_name: &Ident,
+        method_name: &str,
         args: &[TlangValue],
     ) -> TlangValue {
         let shape = self.state.get_shape_by_key(shape_key).unwrap();
 
-        match shape.get_method(method_name.as_str()) {
+        match shape.get_method(method_name) {
             Some(TlangStructMethod::HirId(id)) => {
                 let fn_decl = self.state.get_fn_decl(*id).unwrap();
                 self.with_root_scope(|this| {
@@ -1414,7 +1420,7 @@ impl Interpreter {
                 self.panic(format!(
                     "{} does not have a method {:?}, {:?}",
                     shape.name(),
-                    method_name.as_str(),
+                    method_name,
                     shape.get_method_names(),
                 ));
             }
@@ -1539,8 +1545,12 @@ impl Interpreter {
                     if !this.eval_pat(pat, value) {
                         return MatchResult::NotMatched(EvalResult::Void);
                     }
-                } else if !eval_match_value!(this.eval_expr(expr)).is_truthy(&this.state) {
-                    return MatchResult::NotMatched(EvalResult::Void);
+                } else {
+                    let value = eval_match_value!(this.eval_expr(expr));
+
+                    if !this.state.is_truthy(value) {
+                        return MatchResult::NotMatched(EvalResult::Void);
+                    }
                 }
             }
 

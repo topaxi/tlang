@@ -22,6 +22,12 @@ impl Default for BuiltinShapes {
 }
 
 impl BuiltinShapes {
+    pub const OPTION_VARIANT_SOME: usize = 0;
+    pub const OPTION_VARIANT_NONE: usize = 1;
+
+    pub const RESULT_VARIANT_OK: usize = 0;
+    pub const RESULT_VARIANT_ERR: usize = 1;
+
     pub fn new() -> Self {
         let mut store = Slab::with_capacity(3);
 

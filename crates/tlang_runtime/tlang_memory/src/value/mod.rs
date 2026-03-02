@@ -1,4 +1,4 @@
-use crate::{InterpreterState, impl_from_tlang_value};
+use crate::impl_from_tlang_value;
 
 mod arithmetic;
 
@@ -68,8 +68,6 @@ impl std::hash::Hash for TlangValue {
     }
 }
 
-// ArithmeticOp moved to arithmetic.rs
-
 impl TlangValue {
     pub fn new_object(id: TlangObjectId) -> Self {
         TlangValue::Object(id)
@@ -90,7 +88,8 @@ impl TlangValue {
         matches!(self, TlangValue::Object(_))
     }
 
-    pub fn is_truthy(self, state: &InterpreterState) -> bool {
+    /// # Panics
+    pub fn is_truthy(self) -> bool {
         match self {
             TlangValue::Nil => false,
             TlangValue::Bool(b) => b,
@@ -105,9 +104,9 @@ impl TlangValue {
 
             TlangValue::F32(f) | TlangValue::F64(f) => f != 0.0,
 
-            TlangValue::Object(id) => state
-                .get_object_by_id(id)
-                .is_some_and(|kind| kind.is_truthy(state)),
+            TlangValue::Object(_) => {
+                panic!("Truthiness of objects must be checked through the interpreter state")
+            }
         }
     }
 

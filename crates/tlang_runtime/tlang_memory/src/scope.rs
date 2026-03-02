@@ -46,7 +46,7 @@ impl ScopeStack {
 
         let scope_memory = self.memory[..live_end].iter().copied();
 
-        return self.global_memory.iter().copied().chain(scope_memory);
+        self.global_memory.iter().copied().chain(scope_memory)
     }
 
     pub fn push<T>(&mut self, meta: &T)
