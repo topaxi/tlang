@@ -107,7 +107,7 @@ fn tlang_object_to_js_value(state: &InterpreterState, value: TlangValue) -> JsVa
     match state.get_object(value) {
         Some(TlangObjectKind::String(s)) => JsValue::from(s),
         Some(TlangObjectKind::Struct(s)) => {
-            if s.shape() == state.builtin_shapes.list {
+            if s.shape() == state.heap.builtin_shapes.list {
                 let array = js_sys::Array::new();
                 for value in s.values() {
                     array.push(&tlang_value_to_js_value(state, *value));

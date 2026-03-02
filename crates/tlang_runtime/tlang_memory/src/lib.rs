@@ -6,7 +6,7 @@ pub mod state;
 pub mod value;
 
 pub use resolver::Resolver;
-pub use state::{InterpreterState, MemoryStats};
+pub use state::{ExecutionContext, Heap, InterpreterState, MemoryStats, Program};
 pub use value::{TlangValue, object::TlangObjectKind};
 
 pub use self::value::function::NativeFnReturn;

@@ -256,7 +256,7 @@ impl Interpreter {
 
     #[inline(always)]
     fn push_value(&mut self, value: TlangValue) {
-        self.state.scope_stack.push_value(value);
+        self.state.execution.scope_stack.push_value(value);
     }
 
     #[inline(always)]
@@ -301,7 +301,7 @@ impl Interpreter {
     where
         F: FnOnce(&mut Self) -> R,
     {
-        let root_scope = vec![*self.state.scope_stack.root_scope()];
+        let root_scope = vec![*self.state.execution.scope_stack.root_scope()];
         self.with_scope(root_scope, f)
     }
 
@@ -310,9 +310,9 @@ impl Interpreter {
     where
         F: FnOnce(&mut Self) -> R,
     {
-        let old_scopes = std::mem::replace(&mut self.state.scope_stack.scopes, scopes);
+        let old_scopes = std::mem::replace(&mut self.state.execution.scope_stack.scopes, scopes);
         let result = f(self);
-        self.state.scope_stack.scopes = old_scopes;
+        self.state.execution.scope_stack.scopes = old_scopes;
         result
     }
 
@@ -588,7 +588,10 @@ impl Interpreter {
 
                 debug!("eval_binary: {} = {}", path, self.state.stringify(value));
 
-                self.state.scope_stack.update_value(&path.res, value);
+                self.state
+                    .execution
+                    .scope_stack
+                    .update_value(&path.res, value);
 
                 return EvalResult::Value(value);
             }
@@ -1074,7 +1077,7 @@ impl Interpreter {
         self.state
             .current_call_frame_mut()
             .replace_fn_decl(fn_decl.clone());
-        self.state.scope_stack.clear_current_scope();
+        self.state.execution.scope_stack.clear_current_scope();
 
         // TODO: Methods currently do not reserve a slot for the fn itself.
         if fn_decl.name.path().is_some() {

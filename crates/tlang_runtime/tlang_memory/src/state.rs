@@ -19,6 +19,8 @@ use crate::value::{
     },
 };
 
+// ─── CallStack types ──────────────────────────────────────────────────────────
+
 pub enum CallStackKind {
     Root,
     Function(Rc<hir::FunctionDeclaration>),
@@ -97,87 +99,35 @@ impl MemoryStats {
     }
 }
 
-pub struct InterpreterState {
-    pub scope_stack: ScopeStack,
-    closures: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
+// ─── Heap ─────────────────────────────────────────────────────────────────────
+
+/// GC-managed object store together with shapes and native-function registries.
+pub struct Heap {
     objects: Slab<TlangObjectKind>,
     shapes: HashMap<ShapeKey, TlangShape>,
-    fn_decls: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
-    struct_decls: HashMap<String, Rc<hir::StructDeclaration>>,
-    enum_decls: HashMap<String, Rc<hir::EnumDeclaration>>,
-    call_stack: Vec<CallStackEntry>,
-    /// Indexed storage for builtin/global symbols with pre-assigned slots.
-    global_slots: Vec<TlangValue>,
-    /// Maps builtin symbol names to their slot indices in `global_slots`.
-    global_slot_map: HashMap<String, usize>,
-    /// Fallback HashMap for dynamic globals (user-defined top-level fns, JS bindings).
-    globals: HashMap<String, TlangValue>,
-    temp_roots: Vec<TlangValue>,
     pub builtin_shapes: BuiltinShapes,
     native_fns: HashMap<TlangObjectId, TlangNativeFn>,
     native_fns_meta: HashMap<TlangObjectId, NativeFnMeta>,
+    temp_roots: Vec<TlangValue>,
     next_gc_threshold: usize,
     stress_gc: bool,
-    /// Memory statistics for debugging and monitoring.
     memory_stats: MemoryStats,
 }
 
-impl Resolver for InterpreterState {
-    fn resolve_value(&self, path: &hir::Path) -> Option<TlangValue> {
-        if !path.res.is_value() {
-            return None;
-        }
-
-        let value = self
-            .scope_stack
-            .resolve_value(path)
-            .or_else(|| match path.res.slot() {
-                hir::Slot::Global(i) => self.global_slots.get(i).copied(),
-                _ => self.globals.get(&path.to_string()).copied(),
-            });
-
-        debug!(
-            "Resolved path: \"{}\" ({:?}), got: {:?}",
-            path,
-            path.res,
-            value.map(|v| self.stringify(v))
-        );
-
-        value
-    }
-}
-
-impl InterpreterState {
+impl Heap {
     const GC_INITIAL_THRESHOLD: usize = 1000;
 
-    pub fn new() -> Self {
-        let mut call_stack = Vec::with_capacity(1000);
-
-        call_stack.push(CallStackEntry {
-            kind: CallStackKind::Root,
-            tail_call: None,
-            current_span: tlang_span::Span::default(),
-        });
-
+    fn new() -> Self {
         Self {
-            scope_stack: ScopeStack::default(),
-            closures: HashMap::with_capacity(100),
             objects: Slab::with_capacity(1000),
-            struct_decls: HashMap::with_capacity(100),
-            enum_decls: HashMap::with_capacity(100),
-            fn_decls: HashMap::with_capacity(1000),
             shapes: HashMap::with_capacity(100),
-            call_stack,
-            global_slots: Vec::new(),
-            global_slot_map: HashMap::new(),
-            globals: HashMap::with_capacity(100),
-            temp_roots: Vec::with_capacity(10),
             builtin_shapes: BuiltinShapes::default(),
             native_fns: HashMap::with_capacity(100),
             native_fns_meta: HashMap::with_capacity(100),
-            memory_stats: MemoryStats::default(),
+            temp_roots: Vec::with_capacity(10),
             next_gc_threshold: Self::GC_INITIAL_THRESHOLD,
             stress_gc: false,
+            memory_stats: MemoryStats::default(),
         }
     }
 
@@ -199,26 +149,25 @@ impl InterpreterState {
         self.stress_gc = stress;
     }
 
-    /// Returns an iterator over all GC root values.
-    pub fn gc_roots(&self) -> impl Iterator<Item = TlangValue> + '_ {
-        let temp_roots = self.temp_roots.iter().copied();
-        let global_slots = self.global_slots.iter().copied();
-        let globals = self.globals.values().copied();
-        let scope_memory = self.scope_stack.memory_iter();
-        let native_fns = self.native_fns.keys().copied().map(TlangValue::Object);
-
-        temp_roots
-            .chain(global_slots)
-            .chain(globals)
-            .chain(scope_memory)
-            .chain(native_fns)
+    pub fn should_collect(&self) -> bool {
+        self.stress_gc || self.objects.len() >= self.next_gc_threshold
     }
 
-    /// Mark all objects reachable from GC roots.
+    /// Low-level object allocator. Callers are responsible for triggering GC beforehand
+    /// when needed. Prefer [`InterpreterState::new_object`] for automatic GC scheduling.
+    pub fn alloc_object(&mut self, kind: TlangObjectKind) -> TlangValue {
+        self.memory_stats.objects_allocated += 1;
+        TlangValue::new_object(self.objects.insert(kind))
+    }
+
+    /// Mark all objects reachable from the provided roots.
     /// Returns a set of reachable object IDs.
-    pub fn mark_reachable(&self) -> HashSet<TlangObjectId> {
+    pub fn mark_reachable(
+        &self,
+        roots: impl Iterator<Item = TlangValue>,
+    ) -> HashSet<TlangObjectId> {
         let mut reachable = HashSet::new();
-        let mut values = self.gc_roots().collect::<Vec<_>>();
+        let mut values = roots.collect::<Vec<_>>();
 
         while let Some(value) = values.pop() {
             if let TlangValue::Object(id) = value {
@@ -257,220 +206,6 @@ impl InterpreterState {
         count
     }
 
-    /// Runs a complete garbage collection cycle.
-    /// Returns the number of objects collected.
-    pub fn collect_garbage(&mut self) -> usize {
-        let reachable = self.mark_reachable();
-        let collected = self.sweep_unreachable(&reachable);
-
-        self.memory_stats.gc_collections += 1;
-        self.memory_stats.objects_deallocated += collected;
-        self.next_gc_threshold = (self.objects.len() * 2).max(Self::GC_INITIAL_THRESHOLD);
-
-        log::debug!(
-            "GC: collected {} objects, {} remain",
-            collected,
-            self.objects.len()
-        );
-
-        #[cfg(debug_assertions)]
-        for value in self.gc_roots() {
-            if let TlangValue::Object(id) = value {
-                assert!(
-                    self.contains_object(id),
-                    "GC BUG: root references collected object {id}"
-                );
-            }
-        }
-
-        collected
-    }
-
-    pub fn should_collect(&self) -> bool {
-        self.stress_gc || self.objects.len() >= self.next_gc_threshold
-    }
-
-    pub fn get_fn_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
-        self.fn_decls.get(&id).cloned()
-    }
-
-    pub fn set_fn_decl(&mut self, id: HirId, decl: Rc<hir::FunctionDeclaration>) {
-        self.fn_decls.insert(id, decl);
-    }
-
-    pub fn get_struct_decl(&self, path: &hir::Path) -> Option<Rc<hir::StructDeclaration>> {
-        self.struct_decls.get(&path.to_string()).cloned()
-    }
-
-    pub fn set_struct_decl(&mut self, path_name: String, decl: Rc<hir::StructDeclaration>) {
-        self.struct_decls.insert(path_name, decl);
-    }
-
-    pub fn get_enum_decl(&self, path: &hir::Path) -> Option<Rc<hir::EnumDeclaration>> {
-        self.enum_decls.get(&path.to_string()).cloned()
-    }
-
-    pub fn set_enum_decl(&mut self, path_name: String, decl: Rc<hir::EnumDeclaration>) {
-        self.enum_decls.insert(path_name, decl);
-    }
-
-    /// # Panics
-    #[allow(clippy::needless_pass_by_value)]
-    pub fn panic(&self, message: String) -> ! {
-        let mut call_stack = String::new();
-
-        for entry in self.call_stack.iter().rev() {
-            match &entry.kind {
-                CallStackKind::Function(decl) => {
-                    call_stack.push_str(&format!(
-                        "  at function {}:{}\n",
-                        decl.name(),
-                        entry.current_span.start
-                    ));
-                }
-                CallStackKind::NativeFn(name) => {
-                    call_stack.push_str(&format!("  at native function {name}\n"));
-                }
-                CallStackKind::Root => {
-                    call_stack.push_str(&format!("  at root {}\n", entry.current_span.start));
-                }
-            }
-        }
-
-        panic!("{message}\n{call_stack}")
-    }
-
-    /// # Panics
-    pub fn set_current_span(&mut self, span: tlang_span::Span) {
-        self.call_stack.last_mut().unwrap().current_span = span;
-    }
-
-    pub fn push_call_stack(&mut self, entry: CallStackEntry) {
-        self.call_stack.push(entry);
-    }
-
-    /// # Panics
-    pub fn pop_call_stack(&mut self) -> CallStackEntry {
-        self.call_stack.pop().unwrap()
-    }
-
-    /// # Panics
-    pub fn current_call_frame(&mut self) -> &CallStackEntry {
-        self.call_stack.last().unwrap()
-    }
-
-    /// # Panics
-    pub fn current_call_frame_mut(&mut self) -> &mut CallStackEntry {
-        self.call_stack.last_mut().unwrap()
-    }
-
-    pub fn enter_scope<T>(&mut self, meta: &T)
-    where
-        T: hir::HirScope,
-    {
-        self.scope_stack.push(meta);
-    }
-
-    pub fn exit_scope(&mut self) {
-        self.scope_stack.pop();
-    }
-
-    pub fn current_scope(&self) -> &Scope {
-        self.scope_stack.current_scope()
-    }
-
-    pub fn push_value(&mut self, value: TlangValue) {
-        self.scope_stack.push_value(value);
-    }
-
-    /// Allocate a variable index for let bindings and set the value at that position
-    pub fn set_let_binding(&mut self, value: TlangValue) -> usize {
-        let index = self.scope_stack.allocate_let_binding_index();
-        self.scope_stack.set_local(index, value);
-        index
-    }
-
-    /// Initialize variable index counter after function parameters are pushed
-    pub fn init_var_index_after_params(&mut self, param_count: usize) {
-        self.scope_stack.init_var_index_after_params(param_count);
-    }
-
-    /// Check if we're currently in the global scope
-    pub fn is_global_scope(&self) -> bool {
-        self.scope_stack.scopes.len() == 1
-    }
-
-    /// Check if the current scope has allocated slots for variables
-    pub fn current_scope_has_slots(&self) -> bool {
-        self.scope_stack.current_scope_has_slots()
-    }
-
-    /// Initialize the global slots Vec from name→slot mappings for builtin symbols.
-    /// Must be called before any `set_global` calls for builtin symbols.
-    pub fn init_global_slots<'a>(
-        &mut self,
-        slot_entries: impl IntoIterator<Item = (&'a str, usize)>,
-    ) {
-        let entries: Vec<(&'a str, usize)> = slot_entries.into_iter().collect();
-        let max_slot = entries
-            .iter()
-            .map(|(_, i)| i)
-            .max()
-            .map(|m| m + 1)
-            .unwrap_or(0);
-        self.global_slot_map.clear();
-        self.global_slots = vec![TlangValue::Nil; max_slot];
-        for (name, i) in entries {
-            self.global_slot_map.insert(name.to_string(), i);
-        }
-    }
-
-    pub fn set_global(&mut self, name: String, value: TlangValue) {
-        if let Some(&slot) = self.global_slot_map.get(&name) {
-            self.global_slots[slot] = value;
-        } else {
-            self.globals.insert(name, value);
-        }
-    }
-
-    pub fn new_object(&mut self, kind: TlangObjectKind) -> TlangValue {
-        if self.should_collect() {
-            self.collect_garbage();
-        }
-
-        self.memory_stats.objects_allocated += 1;
-        TlangValue::new_object(self.objects.insert(kind))
-    }
-
-    /// Create a new cell containing the given value.
-    /// Cells are used for closure captures to enable mutable bindings.
-    pub fn new_cell(&mut self, value: TlangValue) -> TlangValue {
-        self.new_object(TlangObjectKind::Cell(TlangCell::new(value)))
-    }
-
-    /// Get the value inside a cell.
-    pub fn get_cell_value(&self, cell_id: TlangObjectId) -> Option<TlangValue> {
-        self.objects
-            .get(cell_id)
-            .and_then(|obj| obj.get_cell())
-            .map(|cell| cell.get())
-    }
-
-    /// Set the value inside a cell.
-    pub fn set_cell_value(&mut self, cell_id: TlangObjectId, value: TlangValue) {
-        let Some(obj) = self.objects.get_mut(cell_id) else {
-            debug_assert!(false, "set_cell_value called with invalid cell_id");
-            return;
-        };
-
-        let Some(cell) = obj.get_cell_mut() else {
-            debug_assert!(false, "set_cell_value called on non-cell object");
-            return;
-        };
-
-        cell.set(value);
-    }
-
     /// Returns the current memory statistics.
     pub fn memory_stats(&self) -> &MemoryStats {
         &self.memory_stats
@@ -481,91 +216,7 @@ impl InterpreterState {
         self.objects.len()
     }
 
-    pub fn new_enum(
-        &mut self,
-        shape: ShapeKey,
-        variant: usize,
-        values: Vec<TlangValue>,
-    ) -> TlangValue {
-        self.new_object(TlangObjectKind::Enum(TlangEnum::new(
-            shape, variant, values,
-        )))
-    }
-
-    pub fn new_closure(&mut self, decl: &hir::FunctionDeclaration) -> TlangValue {
-        self.closures
-            .entry(decl.hir_id)
-            .or_insert_with(|| decl.clone().into());
-
-        // Capture all memory values from the current scope stack for GC tracing.
-        let global_memory_len = self.scope_stack.global_memory_len();
-        let captured_memory = self.scope_stack.capture_all_memory();
-
-        self.new_object(TlangObjectKind::Closure(TlangClosure {
-            id: decl.hir_id,
-            scope_stack: self.scope_stack.scopes.clone(),
-            captured_cells: std::collections::HashMap::new(),
-            captured_memory,
-            global_memory_len,
-        }))
-    }
-
-    /// # Panics
-    pub fn new_native_fn<F>(&mut self, name: &str, f: F) -> TlangValue
-    where
-        F: Fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn + 'static,
-    {
-        let fn_object = self.new_object(TlangObjectKind::NativeFn);
-
-        self.native_fns
-            .insert(fn_object.get_object_id().unwrap(), Rc::new(f));
-        self.native_fns_meta.insert(
-            fn_object.get_object_id().unwrap(),
-            NativeFnMeta {
-                name: name.to_string(),
-            },
-        );
-
-        fn_object
-    }
-
-    pub fn new_native_method<F>(&mut self, name: &str, f: F) -> TlangStructMethod
-    where
-        F: Fn(&mut InterpreterState, TlangValue, &[TlangValue]) -> NativeFnReturn + 'static,
-    {
-        TlangStructMethod::from(
-            self.new_native_fn(name, move |state, args| f(state, args[0], &args[1..])),
-        )
-    }
-
-    pub fn call_native_fn(
-        &mut self,
-        fn_id: TlangObjectId,
-        args: &[TlangValue],
-    ) -> Option<NativeFnReturn> {
-        let native_fn = self.native_fns.get(&fn_id)?.clone();
-        let native_fn_meta = self.native_fns_meta.get(&fn_id)?;
-
-        self.push_call_stack(CallStackEntry::new_native_call(&native_fn_meta.name));
-        let result = native_fn(self, args);
-        self.pop_call_stack();
-
-        Some(result)
-    }
-
-    pub fn get_closure_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
-        self.closures.get(&id).cloned()
-    }
-
     /// Removes an object from the object store by its ID.
-    ///
-    /// This is used during garbage collection to deallocate unreachable objects.
-    /// Returns the removed object if it existed, or None if the ID was invalid.
-    ///
-    /// # Important
-    ///
-    /// The caller must ensure that no other code holds references (via `TlangValue::Object`)
-    /// to this object ID, as accessing a removed object will cause a panic.
     pub fn remove_object(&mut self, id: TlangObjectId) -> Option<TlangObjectKind> {
         let removed = self.objects.try_remove(id);
         if removed.is_some() {
@@ -630,33 +281,6 @@ impl InterpreterState {
         &list.values()[slice.range()]
     }
 
-    pub fn new_list(&mut self, values: Vec<TlangValue>) -> TlangValue {
-        self.new_object(TlangObjectKind::Struct(TlangStruct::new(
-            self.builtin_shapes.list,
-            values,
-        )))
-    }
-
-    pub fn new_string(&mut self, value: String) -> TlangValue {
-        self.new_object(TlangObjectKind::String(value))
-    }
-
-    pub fn new_slice(&mut self, of: TlangValue, start: usize, len: usize) -> TlangValue {
-        self.new_object(TlangObjectKind::Slice(TlangSlice::new(of, start, len)))
-    }
-
-    pub fn define_struct_shape(
-        &mut self,
-        shape_key: ShapeKey,
-        name: String,
-        fields: Vec<String>,
-        methods: HashMap<String, TlangStructMethod>,
-    ) -> ShapeKey {
-        let shape = TlangShape::new_struct_shape(name, fields, methods);
-        self.set_shape(shape_key, shape);
-        shape_key
-    }
-
     pub fn has_shape(&self, key: ShapeKey) -> bool {
         self.shapes.contains_key(&key)
     }
@@ -711,6 +335,703 @@ impl InterpreterState {
             .and_then(|shape| shape.method_map.insert(method_name.to_string(), method));
     }
 
+    pub fn define_struct_shape(
+        &mut self,
+        shape_key: ShapeKey,
+        name: String,
+        fields: Vec<String>,
+        methods: HashMap<String, TlangStructMethod>,
+    ) -> ShapeKey {
+        let shape = TlangShape::new_struct_shape(name, fields, methods);
+        self.set_shape(shape_key, shape);
+        shape_key
+    }
+
+    /// Returns an iterator over GC roots owned by the heap itself
+    /// (temp_roots and native_fn object IDs).
+    pub fn owned_gc_roots(&self) -> impl Iterator<Item = TlangValue> + '_ {
+        let temp_roots = self.temp_roots.iter().copied();
+        let native_fns = self.native_fns.keys().copied().map(TlangValue::Object);
+        temp_roots.chain(native_fns)
+    }
+}
+
+// ─── Program ──────────────────────────────────────────────────────────────────
+
+/// Static program metadata: HIR declarations and the global variable namespace.
+pub struct Program {
+    fn_decls: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
+    struct_decls: HashMap<String, Rc<hir::StructDeclaration>>,
+    enum_decls: HashMap<String, Rc<hir::EnumDeclaration>>,
+    /// Lazy cache of function declarations for closures, keyed by HirId.
+    /// Populated on first closure creation; semantically identical to fn_decls.
+    closures: HashMap<HirId, Rc<hir::FunctionDeclaration>>,
+    /// Indexed storage for builtin/global symbols with pre-assigned slots.
+    global_slots: Vec<TlangValue>,
+    /// Maps builtin symbol names to their slot indices in `global_slots`.
+    global_slot_map: HashMap<String, usize>,
+    /// Fallback HashMap for dynamic globals (user-defined top-level fns, JS bindings).
+    globals: HashMap<String, TlangValue>,
+}
+
+impl Program {
+    fn new() -> Self {
+        Self {
+            fn_decls: HashMap::with_capacity(1000),
+            struct_decls: HashMap::with_capacity(100),
+            enum_decls: HashMap::with_capacity(100),
+            closures: HashMap::with_capacity(100),
+            global_slots: Vec::new(),
+            global_slot_map: HashMap::new(),
+            globals: HashMap::with_capacity(100),
+        }
+    }
+
+    pub fn get_fn_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
+        self.fn_decls.get(&id).cloned()
+    }
+
+    pub fn set_fn_decl(&mut self, id: HirId, decl: Rc<hir::FunctionDeclaration>) {
+        self.fn_decls.insert(id, decl);
+    }
+
+    pub fn get_struct_decl(&self, path: &hir::Path) -> Option<Rc<hir::StructDeclaration>> {
+        self.struct_decls.get(&path.to_string()).cloned()
+    }
+
+    pub fn set_struct_decl(&mut self, path_name: String, decl: Rc<hir::StructDeclaration>) {
+        self.struct_decls.insert(path_name, decl);
+    }
+
+    pub fn get_enum_decl(&self, path: &hir::Path) -> Option<Rc<hir::EnumDeclaration>> {
+        self.enum_decls.get(&path.to_string()).cloned()
+    }
+
+    pub fn set_enum_decl(&mut self, path_name: String, decl: Rc<hir::EnumDeclaration>) {
+        self.enum_decls.insert(path_name, decl);
+    }
+
+    pub fn get_closure_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
+        self.closures.get(&id).cloned()
+    }
+
+    /// Initialize the global slots Vec from name→slot mappings for builtin symbols.
+    /// Must be called before any `set_global` calls for builtin symbols.
+    pub fn init_global_slots<'a>(
+        &mut self,
+        slot_entries: impl IntoIterator<Item = (&'a str, usize)>,
+    ) {
+        let entries: Vec<(&'a str, usize)> = slot_entries.into_iter().collect();
+        let max_slot = entries
+            .iter()
+            .map(|(_, i)| i)
+            .max()
+            .map(|m| m + 1)
+            .unwrap_or(0);
+        self.global_slot_map.clear();
+        self.global_slots = vec![TlangValue::Nil; max_slot];
+        for (name, i) in entries {
+            self.global_slot_map.insert(name.to_string(), i);
+        }
+    }
+
+    pub fn set_global(&mut self, name: String, value: TlangValue) {
+        if let Some(&slot) = self.global_slot_map.get(&name) {
+            self.global_slots[slot] = value;
+        } else {
+            self.globals.insert(name, value);
+        }
+    }
+
+    /// Returns an iterator over GC roots owned by the program (global slots and globals).
+    pub fn gc_roots(&self) -> impl Iterator<Item = TlangValue> + '_ {
+        self.global_slots
+            .iter()
+            .copied()
+            .chain(self.globals.values().copied())
+    }
+}
+
+// ─── ExecutionContext ─────────────────────────────────────────────────────────
+
+/// Per-execution runtime state: the scope stack and call frames.
+pub struct ExecutionContext {
+    pub scope_stack: ScopeStack,
+    call_stack: Vec<CallStackEntry>,
+}
+
+impl ExecutionContext {
+    fn new() -> Self {
+        let mut call_stack = Vec::with_capacity(1000);
+        call_stack.push(CallStackEntry {
+            kind: CallStackKind::Root,
+            tail_call: None,
+            current_span: tlang_span::Span::default(),
+        });
+        Self {
+            scope_stack: ScopeStack::default(),
+            call_stack,
+        }
+    }
+
+    pub fn push_call_stack(&mut self, entry: CallStackEntry) {
+        self.call_stack.push(entry);
+    }
+
+    /// # Panics
+    pub fn pop_call_stack(&mut self) -> CallStackEntry {
+        self.call_stack.pop().unwrap()
+    }
+
+    /// # Panics
+    pub fn current_call_frame(&self) -> &CallStackEntry {
+        self.call_stack.last().unwrap()
+    }
+
+    /// # Panics
+    pub fn current_call_frame_mut(&mut self) -> &mut CallStackEntry {
+        self.call_stack.last_mut().unwrap()
+    }
+
+    /// # Panics
+    pub fn set_current_span(&mut self, span: tlang_span::Span) {
+        self.call_stack.last_mut().unwrap().current_span = span;
+    }
+
+    pub fn enter_scope<T>(&mut self, meta: &T)
+    where
+        T: hir::HirScope,
+    {
+        self.scope_stack.push(meta);
+    }
+
+    pub fn exit_scope(&mut self) {
+        self.scope_stack.pop();
+    }
+
+    pub fn current_scope(&self) -> &Scope {
+        self.scope_stack.current_scope()
+    }
+
+    pub fn push_value(&mut self, value: TlangValue) {
+        self.scope_stack.push_value(value);
+    }
+
+    /// Allocate a variable index for let bindings and set the value at that position.
+    pub fn set_let_binding(&mut self, value: TlangValue) -> usize {
+        let index = self.scope_stack.allocate_let_binding_index();
+        self.scope_stack.set_local(index, value);
+        index
+    }
+
+    /// Initialize variable index counter after function parameters are pushed.
+    pub fn init_var_index_after_params(&mut self, param_count: usize) {
+        self.scope_stack.init_var_index_after_params(param_count);
+    }
+
+    /// Check if we're currently in the global scope.
+    pub fn is_global_scope(&self) -> bool {
+        self.scope_stack.scopes.len() == 1
+    }
+
+    /// Check if the current scope has allocated slots for variables.
+    pub fn current_scope_has_slots(&self) -> bool {
+        self.scope_stack.current_scope_has_slots()
+    }
+
+    /// Returns an iterator over GC roots in the execution context (live scope values).
+    pub fn gc_roots(&self) -> impl Iterator<Item = TlangValue> + '_ {
+        self.scope_stack.memory_iter()
+    }
+}
+
+// ─── InterpreterState ────────────────────────────────────────────────────────
+
+pub struct InterpreterState {
+    pub heap: Heap,
+    pub program: Program,
+    pub execution: ExecutionContext,
+}
+
+impl Resolver for InterpreterState {
+    fn resolve_value(&self, path: &hir::Path) -> Option<TlangValue> {
+        if !path.res.is_value() {
+            return None;
+        }
+
+        let value =
+            self.execution
+                .scope_stack
+                .resolve_value(path)
+                .or_else(|| match path.res.slot() {
+                    hir::Slot::Global(i) => self.program.global_slots.get(i).copied(),
+                    _ => self.program.globals.get(&path.to_string()).copied(),
+                });
+
+        debug!(
+            "Resolved path: \"{}\" ({:?}), got: {:?}",
+            path,
+            path.res,
+            value.map(|v| self.stringify(v))
+        );
+
+        value
+    }
+}
+
+impl InterpreterState {
+    pub fn new() -> Self {
+        Self {
+            heap: Heap::new(),
+            program: Program::new(),
+            execution: ExecutionContext::new(),
+        }
+    }
+
+    // ── GC ──────────────────────────────────────────────────────────────────
+
+    /// Returns an iterator over all GC root values across all three sub-states.
+    pub fn gc_roots(&self) -> impl Iterator<Item = TlangValue> + '_ {
+        self.heap
+            .owned_gc_roots()
+            .chain(self.program.gc_roots())
+            .chain(self.execution.gc_roots())
+    }
+
+    /// Mark all objects reachable from GC roots.
+    /// Returns a set of reachable object IDs.
+    pub fn mark_reachable(&self) -> HashSet<TlangObjectId> {
+        self.heap.mark_reachable(self.gc_roots())
+    }
+
+    /// Remove all objects not in the reachable set.
+    /// Returns the number of objects collected.
+    pub fn sweep_unreachable(&mut self, reachable: &HashSet<TlangObjectId>) -> usize {
+        self.heap.sweep_unreachable(reachable)
+    }
+
+    /// Runs a complete garbage collection cycle.
+    /// Returns the number of objects collected.
+    pub fn collect_garbage(&mut self) -> usize {
+        let reachable = self.mark_reachable();
+        let collected = self.heap.sweep_unreachable(&reachable);
+
+        self.heap.memory_stats.gc_collections += 1;
+        self.heap.memory_stats.objects_deallocated += collected;
+        self.heap.next_gc_threshold = (self.heap.objects.len() * 2).max(Heap::GC_INITIAL_THRESHOLD);
+
+        log::debug!(
+            "GC: collected {} objects, {} remain",
+            collected,
+            self.heap.objects.len()
+        );
+
+        #[cfg(debug_assertions)]
+        for value in self.gc_roots() {
+            if let TlangValue::Object(id) = value {
+                assert!(
+                    self.heap.contains_object(id),
+                    "GC BUG: root references collected object {id}"
+                );
+            }
+        }
+
+        collected
+    }
+
+    // ── Object allocation ───────────────────────────────────────────────────
+
+    /// Allocate a new heap object, triggering GC if the threshold is reached.
+    pub fn new_object(&mut self, kind: TlangObjectKind) -> TlangValue {
+        if self.heap.should_collect() {
+            self.collect_garbage();
+        }
+        self.heap.alloc_object(kind)
+    }
+
+    /// Create a new cell containing the given value.
+    /// Cells are used for closure captures to enable mutable bindings.
+    pub fn new_cell(&mut self, value: TlangValue) -> TlangValue {
+        self.new_object(TlangObjectKind::Cell(TlangCell::new(value)))
+    }
+
+    /// Get the value inside a cell.
+    pub fn get_cell_value(&self, cell_id: TlangObjectId) -> Option<TlangValue> {
+        self.heap
+            .get_object_by_id(cell_id)
+            .and_then(|obj| obj.get_cell())
+            .map(|cell| cell.get())
+    }
+
+    /// Set the value inside a cell.
+    pub fn set_cell_value(&mut self, cell_id: TlangObjectId, value: TlangValue) {
+        let Some(obj) = self.heap.get_object_by_id_mut(cell_id) else {
+            debug_assert!(false, "set_cell_value called with invalid cell_id");
+            return;
+        };
+
+        let Some(cell) = obj.get_cell_mut() else {
+            debug_assert!(false, "set_cell_value called on non-cell object");
+            return;
+        };
+
+        cell.set(value);
+    }
+
+    pub fn new_enum(
+        &mut self,
+        shape: ShapeKey,
+        variant: usize,
+        values: Vec<TlangValue>,
+    ) -> TlangValue {
+        self.new_object(TlangObjectKind::Enum(TlangEnum::new(
+            shape, variant, values,
+        )))
+    }
+
+    pub fn new_closure(&mut self, decl: &hir::FunctionDeclaration) -> TlangValue {
+        self.program
+            .closures
+            .entry(decl.hir_id)
+            .or_insert_with(|| decl.clone().into());
+
+        // Capture all memory values from the current scope stack for GC tracing.
+        let global_memory_len = self.execution.scope_stack.global_memory_len();
+        let captured_memory = self.execution.scope_stack.capture_all_memory();
+
+        self.new_object(TlangObjectKind::Closure(TlangClosure {
+            id: decl.hir_id,
+            scope_stack: self.execution.scope_stack.scopes.clone(),
+            captured_cells: std::collections::HashMap::new(),
+            captured_memory,
+            global_memory_len,
+        }))
+    }
+
+    /// # Panics
+    pub fn new_native_fn<F>(&mut self, name: &str, f: F) -> TlangValue
+    where
+        F: Fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn + 'static,
+    {
+        let fn_object = self.new_object(TlangObjectKind::NativeFn);
+        let id = fn_object.get_object_id().unwrap();
+        self.heap.native_fns.insert(id, Rc::new(f));
+        self.heap.native_fns_meta.insert(
+            id,
+            NativeFnMeta {
+                name: name.to_string(),
+            },
+        );
+        fn_object
+    }
+
+    pub fn new_native_method<F>(&mut self, name: &str, f: F) -> TlangStructMethod
+    where
+        F: Fn(&mut InterpreterState, TlangValue, &[TlangValue]) -> NativeFnReturn + 'static,
+    {
+        TlangStructMethod::from(
+            self.new_native_fn(name, move |state, args| f(state, args[0], &args[1..])),
+        )
+    }
+
+    pub fn call_native_fn(
+        &mut self,
+        fn_id: TlangObjectId,
+        args: &[TlangValue],
+    ) -> Option<NativeFnReturn> {
+        let native_fn = self.heap.native_fns.get(&fn_id)?.clone();
+        let name = self.heap.native_fns_meta.get(&fn_id)?.name.clone();
+
+        self.execution
+            .push_call_stack(CallStackEntry::new_native_call(&name));
+        let result = native_fn(self, args);
+        self.execution.pop_call_stack();
+
+        Some(result)
+    }
+
+    pub fn new_list(&mut self, values: Vec<TlangValue>) -> TlangValue {
+        self.new_object(TlangObjectKind::Struct(TlangStruct::new(
+            self.heap.builtin_shapes.list,
+            values,
+        )))
+    }
+
+    pub fn new_string(&mut self, value: String) -> TlangValue {
+        self.new_object(TlangObjectKind::String(value))
+    }
+
+    pub fn new_slice(&mut self, of: TlangValue, start: usize, len: usize) -> TlangValue {
+        self.new_object(TlangObjectKind::Slice(TlangSlice::new(of, start, len)))
+    }
+
+    // ── Heap delegates ──────────────────────────────────────────────────────
+
+    pub fn temp_roots_mark(&self) -> usize {
+        self.heap.temp_roots_mark()
+    }
+
+    pub fn push_temp_root(&mut self, value: TlangValue) {
+        self.heap.push_temp_root(value);
+    }
+
+    pub fn temp_roots_restore(&mut self, mark: usize) {
+        self.heap.temp_roots_restore(mark);
+    }
+
+    pub fn set_stress_gc(&mut self, stress: bool) {
+        self.heap.set_stress_gc(stress);
+    }
+
+    pub fn should_collect(&self) -> bool {
+        self.heap.should_collect()
+    }
+
+    /// Returns the current memory statistics.
+    pub fn memory_stats(&self) -> &MemoryStats {
+        self.heap.memory_stats()
+    }
+
+    /// Returns the number of currently allocated objects in the object store.
+    pub fn object_count(&self) -> usize {
+        self.heap.object_count()
+    }
+
+    pub fn remove_object(&mut self, id: TlangObjectId) -> Option<TlangObjectKind> {
+        self.heap.remove_object(id)
+    }
+
+    pub fn contains_object(&self, id: TlangObjectId) -> bool {
+        self.heap.contains_object(id)
+    }
+
+    #[inline(always)]
+    pub fn get_object_by_id_mut(&mut self, id: TlangObjectId) -> Option<&mut TlangObjectKind> {
+        self.heap.get_object_by_id_mut(id)
+    }
+
+    #[inline(always)]
+    pub fn get_object_by_id(&self, id: TlangObjectId) -> Option<&TlangObjectKind> {
+        self.heap.get_object_by_id(id)
+    }
+
+    pub fn get_object(&self, value: TlangValue) -> Option<&TlangObjectKind> {
+        self.heap.get_object(value)
+    }
+
+    pub fn get_object_mut(&mut self, value: TlangValue) -> Option<&mut TlangObjectKind> {
+        self.heap.get_object_mut(value)
+    }
+
+    pub fn get_struct(&self, value: TlangValue) -> Option<&TlangStruct> {
+        self.heap.get_struct(value)
+    }
+
+    pub fn get_struct_mut(&mut self, value: TlangValue) -> Option<&mut TlangStruct> {
+        self.heap.get_struct_mut(value)
+    }
+
+    pub fn get_enum(&self, value: TlangValue) -> Option<&TlangEnum> {
+        self.heap.get_enum(value)
+    }
+
+    pub fn get_slice(&self, value: TlangValue) -> Option<TlangSlice> {
+        self.heap.get_slice(value)
+    }
+
+    /// # Panics
+    pub fn get_slice_value(&self, slice: TlangSlice, index: usize) -> TlangValue {
+        self.heap.get_slice_value(slice, index)
+    }
+
+    /// # Panics
+    pub fn get_slice_values(&self, slice: TlangSlice) -> &[TlangValue] {
+        self.heap.get_slice_values(slice)
+    }
+
+    pub fn define_struct_shape(
+        &mut self,
+        shape_key: ShapeKey,
+        name: String,
+        fields: Vec<String>,
+        methods: HashMap<String, TlangStructMethod>,
+    ) -> ShapeKey {
+        self.heap
+            .define_struct_shape(shape_key, name, fields, methods)
+    }
+
+    pub fn has_shape(&self, key: ShapeKey) -> bool {
+        self.heap.has_shape(key)
+    }
+
+    pub fn set_shape(&mut self, key: ShapeKey, shape: TlangShape) {
+        self.heap.set_shape(key, shape);
+    }
+
+    #[inline(always)]
+    pub fn get_shape<T>(&self, shaped: &T) -> Option<&TlangShape>
+    where
+        T: Shaped,
+    {
+        self.heap.get_shape(shaped)
+    }
+
+    pub fn get_shape_by_key(&self, key: ShapeKey) -> Option<&TlangShape> {
+        self.heap.get_shape_by_key(key)
+    }
+
+    pub fn get_struct_field_index(&self, shape: ShapeKey, field: &str) -> Option<usize> {
+        self.heap.get_struct_field_index(shape, field)
+    }
+
+    pub fn set_struct_method(
+        &mut self,
+        shape: ShapeKey,
+        method_name: &str,
+        method: TlangStructMethod,
+    ) {
+        self.heap.set_struct_method(shape, method_name, method);
+    }
+
+    pub fn set_enum_method(
+        &mut self,
+        shape: ShapeKey,
+        method_name: &str,
+        method: TlangStructMethod,
+    ) {
+        self.heap.set_enum_method(shape, method_name, method);
+    }
+
+    // ── Program delegates ───────────────────────────────────────────────────
+
+    pub fn get_fn_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
+        self.program.get_fn_decl(id)
+    }
+
+    pub fn set_fn_decl(&mut self, id: HirId, decl: Rc<hir::FunctionDeclaration>) {
+        self.program.set_fn_decl(id, decl);
+    }
+
+    pub fn get_struct_decl(&self, path: &hir::Path) -> Option<Rc<hir::StructDeclaration>> {
+        self.program.get_struct_decl(path)
+    }
+
+    pub fn set_struct_decl(&mut self, path_name: String, decl: Rc<hir::StructDeclaration>) {
+        self.program.set_struct_decl(path_name, decl);
+    }
+
+    pub fn get_enum_decl(&self, path: &hir::Path) -> Option<Rc<hir::EnumDeclaration>> {
+        self.program.get_enum_decl(path)
+    }
+
+    pub fn set_enum_decl(&mut self, path_name: String, decl: Rc<hir::EnumDeclaration>) {
+        self.program.set_enum_decl(path_name, decl);
+    }
+
+    pub fn get_closure_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
+        self.program.get_closure_decl(id)
+    }
+
+    pub fn init_global_slots<'a>(
+        &mut self,
+        slot_entries: impl IntoIterator<Item = (&'a str, usize)>,
+    ) {
+        self.program.init_global_slots(slot_entries);
+    }
+
+    pub fn set_global(&mut self, name: String, value: TlangValue) {
+        self.program.set_global(name, value);
+    }
+
+    // ── ExecutionContext delegates ───────────────────────────────────────────
+
+    /// # Panics
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn panic(&self, message: String) -> ! {
+        let mut call_stack = String::new();
+
+        for entry in self.execution.call_stack.iter().rev() {
+            match &entry.kind {
+                CallStackKind::Function(decl) => {
+                    call_stack.push_str(&format!(
+                        "  at function {}:{}\n",
+                        decl.name(),
+                        entry.current_span.start
+                    ));
+                }
+                CallStackKind::NativeFn(name) => {
+                    call_stack.push_str(&format!("  at native function {name}\n"));
+                }
+                CallStackKind::Root => {
+                    call_stack.push_str(&format!("  at root {}\n", entry.current_span.start));
+                }
+            }
+        }
+
+        panic!("{message}\n{call_stack}")
+    }
+
+    pub fn push_call_stack(&mut self, entry: CallStackEntry) {
+        self.execution.push_call_stack(entry);
+    }
+
+    /// # Panics
+    pub fn pop_call_stack(&mut self) -> CallStackEntry {
+        self.execution.pop_call_stack()
+    }
+
+    /// # Panics
+    pub fn current_call_frame(&self) -> &CallStackEntry {
+        self.execution.current_call_frame()
+    }
+
+    /// # Panics
+    pub fn current_call_frame_mut(&mut self) -> &mut CallStackEntry {
+        self.execution.current_call_frame_mut()
+    }
+
+    /// # Panics
+    pub fn set_current_span(&mut self, span: tlang_span::Span) {
+        self.execution.set_current_span(span);
+    }
+
+    pub fn enter_scope<T>(&mut self, meta: &T)
+    where
+        T: hir::HirScope,
+    {
+        self.execution.enter_scope(meta);
+    }
+
+    pub fn exit_scope(&mut self) {
+        self.execution.exit_scope();
+    }
+
+    pub fn current_scope(&self) -> &Scope {
+        self.execution.current_scope()
+    }
+
+    pub fn push_value(&mut self, value: TlangValue) {
+        self.execution.push_value(value);
+    }
+
+    pub fn set_let_binding(&mut self, value: TlangValue) -> usize {
+        self.execution.set_let_binding(value)
+    }
+
+    pub fn init_var_index_after_params(&mut self, param_count: usize) {
+        self.execution.init_var_index_after_params(param_count);
+    }
+
+    pub fn is_global_scope(&self) -> bool {
+        self.execution.is_global_scope()
+    }
+
+    pub fn current_scope_has_slots(&self) -> bool {
+        self.execution.current_scope_has_slots()
+    }
+
+    // ── Cross-cutting helpers ───────────────────────────────────────────────
+
     /// # Panics
     pub fn is_truthy(&mut self, value: TlangValue) -> bool {
         if !value.is_object() {
@@ -718,6 +1039,7 @@ impl InterpreterState {
         }
 
         match self
+            .heap
             .get_object_by_id(value.get_object_id().unwrap())
             .unwrap()
         {
@@ -728,25 +1050,21 @@ impl InterpreterState {
             TlangObjectKind::Slice(s) => !s.is_empty(),
             TlangObjectKind::Cell(c) => self.is_truthy(c.value),
             TlangObjectKind::Struct(s) => {
-                if let Some(shape) = self.get_shape(s)
+                if let Some(shape) = self.heap.get_shape(s)
                     && let Some(TlangStructMethod::Native(id)) = shape.get_method("is_truthy")
                 {
                     let value = *self.call_native_fn(*id, &[value]).unwrap().value().unwrap();
-
                     return self.is_truthy(value);
                 }
-
                 !s.is_empty()
             }
             TlangObjectKind::Enum(e) => {
-                if let Some(shape) = self.get_shape(e)
+                if let Some(shape) = self.heap.get_shape(e)
                     && let Some(TlangStructMethod::Native(id)) = shape.get_method("is_truthy")
                 {
                     let value = *self.call_native_fn(*id, &[value]).unwrap().value().unwrap();
-
                     return self.is_truthy(value);
                 }
-
                 e.field_values.is_empty()
                     || e.field_values.clone().iter().all(|v| self.is_truthy(*v))
             }
@@ -755,9 +1073,9 @@ impl InterpreterState {
 
     pub fn debug_stringify_scope_stack(&self) -> String {
         let mut out = "[\n".to_string();
-        for scope in self.scope_stack.iter() {
+        for scope in self.execution.scope_stack.iter() {
             out.push_str("  {\n");
-            for entry in self.scope_stack.get_scope_locals(scope) {
+            for entry in self.execution.scope_stack.get_scope_locals(scope) {
                 out.push_str("    ");
                 out.push_str(self.stringify(*entry).as_str());
                 out.push_str(",\n");
@@ -779,11 +1097,12 @@ impl InterpreterState {
     }
 
     fn stringify_struct(&self, s: &TlangStruct) -> String {
-        if s.shape() == self.builtin_shapes.list {
+        if s.shape() == self.heap.builtin_shapes.list {
             return self.stringify_struct_as_list(s);
         }
 
         let shape = self
+            .heap
             .get_shape(s)
             .and_then(|s| s.get_struct_shape())
             .unwrap();
@@ -793,7 +1112,6 @@ impl InterpreterState {
         }
 
         let mut result = String::new();
-
         result.push_str(&shape.name);
         result.push_str(" { ");
 
@@ -817,7 +1135,11 @@ impl InterpreterState {
     }
 
     fn stringify_enum(&self, e: &TlangEnum) -> String {
-        let shape = self.get_shape(e).and_then(|s| s.get_enum_shape()).unwrap();
+        let shape = self
+            .heap
+            .get_shape(e)
+            .and_then(|s| s.get_enum_shape())
+            .unwrap();
         let variant = &shape.variants[e.variant];
         let mut result = String::new();
         result.push_str(&shape.name);
@@ -844,13 +1166,14 @@ impl InterpreterState {
     /// # Panics
     pub fn stringify(&self, value: TlangValue) -> String {
         match value {
-            TlangValue::Object(id) => match self.get_object_by_id(id) {
+            TlangValue::Object(id) => match self.heap.get_object_by_id(id) {
                 None => value.to_string(),
                 Some(TlangObjectKind::String(s)) => s.clone(),
                 Some(TlangObjectKind::Struct(s)) => self.stringify_struct(s),
                 Some(TlangObjectKind::Enum(e)) => self.stringify_enum(e),
                 Some(TlangObjectKind::Slice(s)) => {
                     let values = self
+                        .heap
                         .get_slice_values(*s)
                         .iter()
                         .map(|v| self.stringify(*v))
@@ -859,8 +1182,7 @@ impl InterpreterState {
                     format!("&[{values}]")
                 }
                 Some(TlangObjectKind::Closure(s)) => {
-                    let fn_decl = self.closures.get(&s.id).unwrap();
-
+                    let fn_decl = self.program.closures.get(&s.id).unwrap();
                     format!(
                         "fn {}#{}({})",
                         fn_decl.name(),
@@ -874,8 +1196,7 @@ impl InterpreterState {
                     )
                 }
                 Some(TlangObjectKind::Fn(id)) => {
-                    let fn_decl = self.fn_decls.get(id).unwrap();
-
+                    let fn_decl = self.program.fn_decls.get(id).unwrap();
                     format!(
                         "fn {}#{}({})",
                         fn_decl.name(),
@@ -889,16 +1210,13 @@ impl InterpreterState {
                     )
                 }
                 Some(TlangObjectKind::NativeFn) => {
-                    if let Some(meta) = self.native_fns_meta.get(&id) {
+                    if let Some(meta) = self.heap.native_fns_meta.get(&id) {
                         format!("fn {}(...) {{ *native* }}", meta.name)
                     } else {
                         "fn anonymous(...) { *native* }".to_string()
                     }
                 }
-                Some(TlangObjectKind::Cell(cell)) => {
-                    // Stringify the value inside the cell
-                    self.stringify(cell.get())
-                }
+                Some(TlangObjectKind::Cell(cell)) => self.stringify(cell.get()),
             },
             _ => value.to_string(),
         }

@@ -23,7 +23,7 @@ pub fn define_list_shape(state: &mut InterpreterState) {
         "iter".to_string(),
         state.new_native_method("List::iter", |state, this, _args| {
             NativeFnReturn::Return(state.new_object(TlangObjectKind::Struct(TlangStruct::new(
-                state.builtin_shapes.list_iterator,
+                state.heap.builtin_shapes.list_iterator,
                 vec![this, TlangValue::from(0)],
             ))))
         }),
@@ -46,6 +46,7 @@ pub fn define_list_shape(state: &mut InterpreterState) {
     );
 
     state
+        .heap
         .builtin_shapes
         .get_list_shape_mut()
         .set_methods(method_map);
@@ -62,11 +63,11 @@ fn define_list_iterator_shape(state: &mut InterpreterState) {
             let index = iter[1].as_usize();
 
             if index >= list.len() {
-                let none = state.new_enum(state.builtin_shapes.option, 1, vec![]);
+                let none = state.new_enum(state.heap.builtin_shapes.option, 1, vec![]);
 
                 NativeFnReturn::Return(none)
             } else {
-                let some = state.new_enum(state.builtin_shapes.option, 0, vec![list[index]]);
+                let some = state.new_enum(state.heap.builtin_shapes.option, 0, vec![list[index]]);
                 let iter_mut = state.get_struct_mut(this).unwrap();
                 iter_mut[1] = TlangValue::from(index + 1);
 
@@ -76,6 +77,7 @@ fn define_list_iterator_shape(state: &mut InterpreterState) {
     );
 
     state
+        .heap
         .builtin_shapes
         .get_list_iterator_shape_mut()
         .set_methods(method_map);

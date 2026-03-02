@@ -8,12 +8,20 @@ pub const RESULT_VARIANT_ERR: usize = 1;
 
 #[native_fn(name = "Result::Ok")]
 pub fn new_result_ok(state: &mut InterpreterState, value: TlangValue) -> TlangValue {
-    state.new_enum(state.builtin_shapes.result, RESULT_VARIANT_OK, vec![value])
+    state.new_enum(
+        state.heap.builtin_shapes.result,
+        RESULT_VARIANT_OK,
+        vec![value],
+    )
 }
 
 #[native_fn(name = "Result::Err")]
 pub fn new_result_err(state: &mut InterpreterState, err: TlangValue) -> TlangValue {
-    state.new_enum(state.builtin_shapes.result, RESULT_VARIANT_ERR, vec![err])
+    state.new_enum(
+        state.heap.builtin_shapes.result,
+        RESULT_VARIANT_ERR,
+        vec![err],
+    )
 }
 
 #[allow(clippy::missing_panics_doc)]
@@ -61,6 +69,7 @@ pub fn define_result_shape(state: &mut InterpreterState) {
     );
 
     state
+        .heap
         .builtin_shapes
         .get_result_shape_mut()
         .set_methods(method_map);
@@ -83,7 +92,7 @@ mod tests {
     #[test]
     fn test_enum_truthiness_result_ok() {
         let mut state = interpreter_state();
-        let result_shape = state.builtin_shapes.result;
+        let result_shape = state.heap.builtin_shapes.result;
 
         // Result::Ok(truthy value) should be truthy
         let obj = state.new_enum(result_shape, RESULT_VARIANT_OK, vec![TlangValue::I64(42)]);
@@ -97,7 +106,7 @@ mod tests {
     #[test]
     fn test_enum_truthiness_result_err() {
         let mut state = interpreter_state();
-        let result_shape = state.builtin_shapes.result;
+        let result_shape = state.heap.builtin_shapes.result;
 
         // Result::Err should be falsy (variant 1 = Err)
         let obj = state.new_enum(result_shape, RESULT_VARIANT_ERR, vec![TlangValue::I64(42)]);

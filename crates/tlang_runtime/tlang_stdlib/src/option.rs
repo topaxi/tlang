@@ -9,7 +9,7 @@ pub const OPTION_VARIANT_NONE: usize = 1;
 #[native_fn(name = "Option::Some")]
 pub fn new_option_some(state: &mut InterpreterState, value: TlangValue) -> TlangValue {
     state.new_enum(
-        state.builtin_shapes.option,
+        state.heap.builtin_shapes.option,
         OPTION_VARIANT_SOME,
         vec![value],
     )
@@ -60,11 +60,16 @@ pub fn define_option_shape(state: &mut InterpreterState) {
     );
 
     state
+        .heap
         .builtin_shapes
         .get_option_shape_mut()
         .set_methods(method_map);
 
-    let none_value = state.new_enum(state.builtin_shapes.option, OPTION_VARIANT_NONE, vec![]);
+    let none_value = state.new_enum(
+        state.heap.builtin_shapes.option,
+        OPTION_VARIANT_NONE,
+        vec![],
+    );
 
     state.set_global("Option::None".to_string(), none_value);
 }
@@ -86,7 +91,7 @@ mod tests {
     #[test]
     fn test_enum_truthiness_option_some() {
         let mut state = interpreter_state();
-        let option_shape = state.builtin_shapes.option;
+        let option_shape = state.heap.builtin_shapes.option;
 
         // Option::Some(truthy value) should be truthy
         let obj = state.new_enum(option_shape, OPTION_VARIANT_SOME, vec![TlangValue::I64(42)]);
@@ -100,7 +105,7 @@ mod tests {
     #[test]
     fn test_enum_truthiness_option_none() {
         let mut state = interpreter_state();
-        let option_shape = state.builtin_shapes.option;
+        let option_shape = state.heap.builtin_shapes.option;
 
         // Option::None should be falsy (variant 1 = None)
         let obj = state.new_enum(option_shape, OPTION_VARIANT_NONE, vec![]);
