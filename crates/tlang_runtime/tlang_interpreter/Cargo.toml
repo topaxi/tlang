@@ -43,7 +43,7 @@ tlang_ast_lowering = { path = "../../tlang_ast_lowering" }
 ctor = { workspace = true }
 indoc = { workspace = true }
 pretty_assertions = { workspace = true }
-criterion = "0.5"
+criterion = "0.8"
 
 [lints]
 workspace = true
