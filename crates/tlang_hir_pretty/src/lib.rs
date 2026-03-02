@@ -1,6 +1,6 @@
 use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token::{Literal, Token, TokenKind};
-use tlang_hir::hir;
+use tlang_hir as hir;
 use tlang_span::HirId;
 
 pub struct HirPrettyOptions {

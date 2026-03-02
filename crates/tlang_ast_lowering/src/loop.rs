@@ -1,6 +1,6 @@
 use tlang_ast as ast;
 use tlang_ast::node::Ident;
-use tlang_hir::hir::{self, HirScope};
+use tlang_hir::{self as hir, HirScope};
 use tlang_span::NodeId;
 use tlang_symbols::SymbolType;
 

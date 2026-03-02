@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use tlang_ast::{node::UnaryOp, token::Literal};
 use tlang_hir::{
-    hir::{self, BinaryOpKind, Expr, ExprKind},
+    self as hir, BinaryOpKind, Expr, ExprKind,
     visit::{self, Visitor},
 };
 use tlang_span::HirId;

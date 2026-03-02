@@ -5,6 +5,7 @@ mod expr_generator;
 mod function_generator;
 pub mod generator;
 mod js;
+pub mod js_hir_opt;
 mod pattern_match_generator;
 mod scope;
 mod stmt_generator;

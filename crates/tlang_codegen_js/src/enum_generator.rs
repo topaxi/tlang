@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use tlang_ast::node::Ident;
-use tlang_hir::hir;
+use tlang_hir as hir;
 
 use crate::generator::CodegenJS;
 

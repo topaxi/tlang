@@ -13,7 +13,7 @@ use criterion::{BatchSize, Criterion, black_box, criterion_group, criterion_main
 
 mod helpers {
     use tlang_ast_lowering::lower_to_hir;
-    use tlang_hir::hir;
+    use tlang_hir as hir;
     use tlang_hir_opt::HirOptimizer;
     pub use tlang_interpreter::Interpreter;
     use tlang_parser::Parser;
@@ -24,7 +24,7 @@ mod helpers {
         let ast = Parser::from_source(src).parse().expect("Parse error");
 
         let mut analyzer = SemanticAnalyzer::default();
-        analyzer.add_builtin_symbols(&Interpreter::builtin_symbols());
+        analyzer.add_builtin_symbols_with_slots(&Interpreter::builtin_symbols());
         analyzer.analyze(&ast).expect("Semantic analysis error");
 
         let (mut module, meta) = lower_to_hir(
@@ -35,7 +35,8 @@ mod helpers {
         );
 
         let mut optimizer = HirOptimizer::default();
-        optimizer.optimize_hir(&mut module, meta.into());
+        let mut ctx = meta.into();
+        optimizer.optimize_hir(&mut module, &mut ctx);
 
         module
     }

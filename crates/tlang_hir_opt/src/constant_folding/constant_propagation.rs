@@ -2,7 +2,7 @@ use log::debug;
 use std::collections::{HashMap, HashSet};
 use tlang_ast::token::Literal;
 use tlang_hir::{
-    hir::{self, BinaryOpKind, Expr, ExprKind, Module, Pat, PatKind, Stmt, StmtKind},
+    self as hir, BinaryOpKind, Expr, ExprKind, Module, Pat, PatKind, Stmt, StmtKind,
     visit::{self, Visitor},
 };
 use tlang_span::HirId;

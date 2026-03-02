@@ -1,4 +1,4 @@
-use tlang_hir::hir;
+use tlang_hir as hir;
 
 use crate::HirPass;
 use crate::hir_opt::{HirOptContext, HirOptGroup};

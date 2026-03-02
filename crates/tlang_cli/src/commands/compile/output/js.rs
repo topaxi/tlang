@@ -8,7 +8,7 @@ impl CompileTarget for JsTarget {
     fn compile(
         &self,
         _source: &str,
-        module: &mut tlang_hir::hir::Module,
+        module: &mut tlang_hir::Module,
     ) -> Result<String, ParserError> {
         let mut generator = CodegenJS::default();
         generator.generate_code(module);

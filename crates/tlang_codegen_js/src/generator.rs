@@ -1,6 +1,6 @@
 use crate::{pattern_match_generator::MatchContextStack, scope::Scope};
 use tlang_ast::token::{Token, TokenKind};
-use tlang_hir::hir;
+use tlang_hir as hir;
 use tlang_symbols::SymbolType;
 
 // Before we indent a line, we reserve at least the indentation space plus some more for the the

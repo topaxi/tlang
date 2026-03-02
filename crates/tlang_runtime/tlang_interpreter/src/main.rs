@@ -47,7 +47,7 @@ fn main() {
         }
     };
     let mut analyzer = SemanticAnalyzer::default();
-    analyzer.add_builtin_symbols(&Interpreter::builtin_symbols());
+    analyzer.add_builtin_symbols_with_slots(&Interpreter::builtin_symbols());
 
     match analyzer.analyze(&ast) {
         Ok(_) => {}
@@ -69,7 +69,8 @@ fn main() {
     );
 
     let mut optimizer = HirOptimizer::default();
-    optimizer.optimize_hir(&mut module, meta.into());
+    let mut ctx = meta.into();
+    optimizer.optimize_hir(&mut module, &mut ctx);
 
     let mut interp = Interpreter::default();
     interp.state_mut().set_stress_gc(stress_gc);

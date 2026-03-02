@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use tlang_hir::hir;
+use tlang_hir as hir;
 
 use crate::generator::{BlockContext, CodegenJS};
 

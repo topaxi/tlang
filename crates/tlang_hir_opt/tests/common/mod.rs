@@ -4,8 +4,8 @@ use std::collections::HashMap;
 
 use tlang_ast_lowering::lower_to_hir;
 use tlang_hir::visit::{walk_pat, walk_stmt};
-use tlang_hir::{Visitor, hir};
-use tlang_hir_opt::hir_opt::HirOptimizer;
+use tlang_hir::{self as hir, Visitor};
+use tlang_hir_opt::HirOptimizer;
 use tlang_hir_pretty::HirPrettyOptions;
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
@@ -36,7 +36,8 @@ pub fn compile(source: &str) -> hir::LowerResult {
 
 pub fn compile_and_optimize(source: &str, optimizer: &mut HirOptimizer) -> hir::Module {
     let (mut module, meta) = compile(source);
-    optimizer.optimize_hir(&mut module, meta.into());
+    let mut ctx = meta.into();
+    optimizer.optimize_hir(&mut module, &mut ctx);
     module
 }
 

@@ -1,6 +1,5 @@
 use log::debug;
-use tlang_hir::hir::HirScope;
-use tlang_hir::{Visitor, hir};
+use tlang_hir::{self as hir, HirScope, Visitor};
 
 use crate::HirPass;
 use crate::hir_opt::HirOptContext;

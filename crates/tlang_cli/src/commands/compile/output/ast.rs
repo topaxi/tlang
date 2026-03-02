@@ -7,7 +7,7 @@ impl CompileTarget for AstTarget {
     fn compile(
         &self,
         source: &str,
-        _module: &mut tlang_hir::hir::Module,
+        _module: &mut tlang_hir::Module,
     ) -> Result<String, ParserError> {
         let mut parser = tlang_parser::Parser::from_source(source);
         let ast = parser.parse()?;
