@@ -1,6 +1,6 @@
 use tlang_ast::node::{self as ast, Ident};
 use tlang_ast::token::Literal;
-use tlang_hir::hir;
+use tlang_hir as hir;
 
 use crate::binary_operator_generator::{
     JSAssociativity, JSOperatorInfo, map_operator_info, should_wrap_with_parentheses,

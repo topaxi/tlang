@@ -3,10 +3,11 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use log::debug;
-use tlang_hir::hir;
+use tlang_hir as hir;
 use tlang_span::{HirId, HirIdAllocator};
 use tlang_symbols::SymbolTable;
 
+#[derive(Debug)]
 pub struct HirOptContext {
     pub symbols: HashMap<HirId, Rc<RefCell<SymbolTable>>>,
     pub hir_id_allocator: HirIdAllocator,
@@ -91,9 +92,7 @@ impl HirPass for HirOptGroup {
     }
 }
 
-pub struct HirOptimizer {
-    group: HirOptGroup,
-}
+pub struct HirOptimizer(HirOptGroup);
 
 impl Default for HirOptimizer {
     fn default() -> Self {
@@ -107,17 +106,25 @@ impl Default for HirOptimizer {
 
 impl HirOptimizer {
     pub fn new(passes: Vec<Box<dyn HirPass>>) -> Self {
-        Self {
-            group: HirOptGroup::new("root", passes),
-        }
+        Self(HirOptGroup::new("root", passes))
     }
 
     pub fn add_pass(&mut self, pass: Box<dyn HirPass>) {
-        self.group.passes.push(pass);
+        self.0.add_pass(pass);
     }
 
-    pub fn optimize_hir(&mut self, module: &mut hir::Module, mut ctx: HirOptContext) -> bool {
-        self.group.init_context(&mut ctx);
-        self.group.optimize_hir(module, &mut ctx)
+    pub fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
+        HirPass::optimize_hir(self, module, ctx)
+    }
+}
+
+impl HirPass for HirOptimizer {
+    fn init_context(&mut self, ctx: &mut HirOptContext) {
+        self.0.init_context(ctx);
+    }
+
+    fn optimize_hir(&mut self, module: &mut hir::Module, ctx: &mut HirOptContext) -> bool {
+        self.init_context(ctx);
+        self.0.optimize_hir(module, ctx)
     }
 }

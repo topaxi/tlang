@@ -1,4 +1,4 @@
-use tlang_hir::hir;
+use tlang_hir as hir;
 
 use crate::expr_generator::expr_can_render_as_js_expr;
 use crate::generator::{BlockContext, CodegenJS, FunctionContext};

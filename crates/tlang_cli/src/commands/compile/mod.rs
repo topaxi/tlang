@@ -8,9 +8,8 @@ use std::{
 
 use output::{CompileTarget, ast::AstTarget, hir::HirTarget, js::JsTarget};
 use tlang_ast_lowering::lower_to_hir;
-use tlang_codegen_js::generator::CodegenJS;
-use tlang_hir::hir;
-use tlang_hir_opt::HirOptimizer;
+use tlang_codegen_js::{generator::CodegenJS, js_hir_opt::JsHirOptimizer};
+use tlang_hir_opt::{HirOptimizer, HirPass};
 use tlang_semantics::SemanticAnalyzer;
 
 use crate::error::ParserError;
@@ -25,6 +24,26 @@ pub enum OutputFormat {
     Source,
     Hir,
     Ast,
+}
+
+pub enum CompileTargetHirOptimizer {
+    Interpreter(HirOptimizer),
+    JavaScript(JsHirOptimizer),
+}
+
+impl HirPass for CompileTargetHirOptimizer {
+    fn optimize_hir(
+        &mut self,
+        module: &mut tlang_hir::Module,
+        ctx: &mut tlang_hir_opt::hir_opt::HirOptContext,
+    ) -> bool {
+        match self {
+            CompileTargetHirOptimizer::Interpreter(optimizer) => {
+                optimizer.optimize_hir(module, ctx)
+            }
+            CompileTargetHirOptimizer::JavaScript(optimizer) => optimizer.optimize_hir(module, ctx),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -52,7 +71,7 @@ fn compile_to_hir(
     source: &str,
     target: &CompileTargetArg,
     show_warnings: bool,
-) -> Result<hir::Module, ParserError> {
+) -> Result<tlang_hir::Module, ParserError> {
     let mut parser = tlang_parser::Parser::from_source(source);
     let ast = parser.parse()?;
 
@@ -75,14 +94,15 @@ fn compile_to_hir(
         semantic_analyzer.root_symbol_table(),
         semantic_analyzer.symbol_tables().clone(),
     );
+    let mut ctx = meta.into();
 
-    let mut optimizer = HirOptimizer::default();
-    optimizer.optimize_hir(&mut module, meta.into());
+    let mut optimizer = if matches!(target, CompileTargetArg::Js) {
+        CompileTargetHirOptimizer::JavaScript(JsHirOptimizer::default())
+    } else {
+        CompileTargetHirOptimizer::Interpreter(HirOptimizer::default())
+    };
 
-    if matches!(target, CompileTargetArg::Js) {
-        // Future: Apply JS-specific HIR optimizations here
-        // optimizer.optimize_for_js(&mut module);
-    }
+    optimizer.optimize_hir(&mut module, &mut ctx);
 
     Ok(module)
 }
@@ -108,7 +128,7 @@ pub fn handle_compile(options: CompileOptions) {
 
         let output_result = if options.output_format == OutputFormat::Ast {
             // AST output has a separate pipeline path as it doesn't require HIR lowering
-            let mut module = hir::Module::default();
+            let mut module = tlang_hir::Module::default();
             AstTarget.compile(&source, &mut module)
         } else {
             // Standard pipeline: Parse -> AST -> Semantics -> HIR -> Optimize

@@ -4,7 +4,7 @@ use std::rc::Rc;
 use log::debug;
 use slab::Slab;
 use smallvec::SmallVec;
-use tlang_hir::hir;
+use tlang_hir as hir;
 use tlang_span::HirId;
 
 use crate::resolver::Resolver;

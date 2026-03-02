@@ -1,4 +1,4 @@
-use tlang_hir::hir::{self, HirScope, ScopeIndex};
+use tlang_hir::{self as hir, HirScope, ScopeIndex};
 
 use crate::resolver::Resolver;
 use crate::value::TlangValue;

@@ -806,7 +806,7 @@ pub enum BinaryOpKind {
     BitwiseXor,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LowerResultMeta {
     pub root_symbol_table: HirId,
     pub symbol_tables: HashMap<HirId, Rc<RefCell<SymbolTable>>>,

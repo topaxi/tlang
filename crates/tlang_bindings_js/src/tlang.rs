@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tlang_ast::node::{self as ast};
 use tlang_codegen_js::generator::CodegenJS;
-use tlang_hir::hir;
+use tlang_hir as hir;
 use tlang_hir_opt::HirOptimizer;
 use tlang_hir_pretty::{HirPretty, HirPrettyOptions};
 use tlang_parser::Parser;
@@ -206,7 +206,8 @@ impl Tlang {
                 self.analyzer.symbol_tables().clone(),
             );
             let mut optimizer = HirOptimizer::default();
-            optimizer.optimize_hir(&mut module, meta.into());
+            let mut ctx = meta.into();
+            optimizer.optimize_hir(&mut module, &mut ctx);
             self.build.hir = Some(module);
         }
     }

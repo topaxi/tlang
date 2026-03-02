@@ -13,7 +13,7 @@ use criterion::{BatchSize, Criterion, black_box, criterion_group, criterion_main
 
 mod helpers {
     use tlang_ast_lowering::lower_to_hir;
-    use tlang_hir::hir;
+    use tlang_hir as hir;
     use tlang_hir_opt::HirOptimizer;
     pub use tlang_interpreter::Interpreter;
     use tlang_parser::Parser;
@@ -35,7 +35,8 @@ mod helpers {
         );
 
         let mut optimizer = HirOptimizer::default();
-        optimizer.optimize_hir(&mut module, meta.into());
+        let mut ctx = meta.into();
+        optimizer.optimize_hir(&mut module, &mut ctx);
 
         module
     }

@@ -6,6 +6,18 @@ use tlang_runtime::{interpreter::Interpreter, memory::TlangValue};
 use tlang_semantics::SemanticAnalyzer;
 
 pub fn handle_run(input_file: &str) {
+    let module = compile(input_file);
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.eval(&module);
+
+    match result {
+        TlangValue::Nil => {}
+        _ => println!("{}", result),
+    }
+}
+
+fn compile(input_file: &str) -> tlang_hir::Module {
     let path = Path::new(input_file);
     let mut file = match File::open(path) {
         Err(why) => panic!("couldn't open {}: {}", path.display(), why),
@@ -40,13 +52,8 @@ pub fn handle_run(input_file: &str) {
     );
 
     let mut optimizer = HirOptimizer::default();
-    optimizer.optimize_hir(&mut module, meta.into());
+    let mut ctx = meta.into();
+    optimizer.optimize_hir(&mut module, &mut ctx);
 
-    let mut interpreter = Interpreter::default();
-    let result = interpreter.eval(&module);
-
-    match result {
-        TlangValue::Nil => {}
-        _ => println!("{}", result),
-    }
+    module
 }

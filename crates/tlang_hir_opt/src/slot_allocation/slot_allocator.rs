@@ -1,6 +1,6 @@
 use log::{debug, warn};
 use tlang_hir::visit::walk_expr;
-use tlang_hir::{Visitor, hir};
+use tlang_hir::{self as hir, Visitor};
 use tlang_span::HirId;
 
 use crate::HirPass;

@@ -1,7 +1,7 @@
 mod common;
 
 use tlang_hir::Visitor;
-use tlang_hir::hir::{self, HirScope};
+use tlang_hir::{self as hir, HirScope};
 
 fn optimizer() -> tlang_hir_opt::HirOptimizer {
     tlang_hir_opt::HirOptimizer::new(vec![

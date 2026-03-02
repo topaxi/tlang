@@ -3,7 +3,7 @@ mod common;
 use std::collections::HashMap;
 
 use pretty_assertions::assert_eq;
-use tlang_hir::hir;
+use tlang_hir as hir;
 use tlang_span::HirId;
 
 use self::common::{collect_declarations, collect_paths};

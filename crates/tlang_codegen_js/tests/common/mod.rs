@@ -1,5 +1,5 @@
 use tlang_codegen_js::generator::CodegenJS;
-use tlang_hir_opt::HirOptimizer;
+use tlang_codegen_js::js_hir_opt::JsHirOptimizer;
 use tlang_parser::Parser;
 use tlang_semantics::SemanticAnalyzer;
 use tlang_symbols::SymbolType;
@@ -71,8 +71,9 @@ pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
             );
 
             if options.optimize {
-                let mut optimizer = HirOptimizer::default();
-                optimizer.optimize_hir(&mut module, meta.into());
+                let mut optimizer = JsHirOptimizer::default();
+                let mut ctx = meta.into();
+                optimizer.optimize_hir(&mut module, &mut ctx);
             }
 
             let mut codegen = CodegenJS::default();

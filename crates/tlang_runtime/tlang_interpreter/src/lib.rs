@@ -6,7 +6,7 @@ use log::debug;
 use smallvec::SmallVec;
 use tlang_ast::node::{Ident, UnaryOp};
 use tlang_ast::token;
-use tlang_hir::hir::{self, BindingKind};
+use tlang_hir::{self as hir, BindingKind};
 use tlang_memory::shape::{ShapeKey, Shaped, TlangEnumVariant, TlangShape};
 use tlang_memory::state::TailCall;
 use tlang_memory::value::TlangArithmetic;
@@ -1818,7 +1818,8 @@ mod tests {
 
             let mut optimizer = HirOptimizer::default();
             debug!("LowerResultMeta = {:?}", meta);
-            optimizer.optimize_hir(&mut module, meta.into());
+            let mut ctx = meta.into();
+            optimizer.optimize_hir(&mut module, &mut ctx);
 
             module
         }
