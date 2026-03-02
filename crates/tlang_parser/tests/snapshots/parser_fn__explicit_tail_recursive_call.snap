@@ -633,7 +633,7 @@ Module(
                   Expr(
                     id: 26,
                     kind: BinaryOp(BinaryOpExpression(
-                      op: Subtract,
+                      op: Sub,
                       lhs: Expr(
                         id: 24,
                         kind: Path(Path(
@@ -712,7 +712,7 @@ Module(
                   Expr(
                     id: 29,
                     kind: BinaryOp(BinaryOpExpression(
-                      op: Multiply,
+                      op: Mul,
                       lhs: Expr(
                         id: 27,
                         kind: Path(Path(

@@ -1464,18 +1464,18 @@ impl<'src> Parser<'src> {
     fn map_binary_op(token: &TokenKind) -> BinaryOpKind {
         match token {
             TokenKind::Plus => BinaryOpKind::Add,
-            TokenKind::Minus => BinaryOpKind::Subtract,
-            TokenKind::Asterisk => BinaryOpKind::Multiply,
-            TokenKind::AsteriskAsterisk => BinaryOpKind::Exponentiation,
-            TokenKind::Slash => BinaryOpKind::Divide,
-            TokenKind::Percent => BinaryOpKind::Modulo,
+            TokenKind::Minus => BinaryOpKind::Sub,
+            TokenKind::Asterisk => BinaryOpKind::Mul,
+            TokenKind::AsteriskAsterisk => BinaryOpKind::Exp,
+            TokenKind::Slash => BinaryOpKind::Div,
+            TokenKind::Percent => BinaryOpKind::Mod,
             TokenKind::EqualSign => BinaryOpKind::Assign,
-            TokenKind::EqualEqual => BinaryOpKind::Equal,
-            TokenKind::NotEqual => BinaryOpKind::NotEqual,
-            TokenKind::LessThan => BinaryOpKind::LessThan,
-            TokenKind::LessThanOrEqual => BinaryOpKind::LessThanOrEqual,
-            TokenKind::GreaterThan => BinaryOpKind::GreaterThan,
-            TokenKind::GreaterThanOrEqual => BinaryOpKind::GreaterThanOrEqual,
+            TokenKind::EqualEqual => BinaryOpKind::Eq,
+            TokenKind::NotEqual => BinaryOpKind::NotEq,
+            TokenKind::LessThan => BinaryOpKind::Less,
+            TokenKind::LessThanOrEqual => BinaryOpKind::LessEq,
+            TokenKind::GreaterThan => BinaryOpKind::Greater,
+            TokenKind::GreaterThanOrEqual => BinaryOpKind::GreaterEq,
             TokenKind::Pipe => BinaryOpKind::BitwiseOr,
             TokenKind::Ampersand => BinaryOpKind::BitwiseAnd,
             TokenKind::Caret => BinaryOpKind::BitwiseXor,
@@ -1496,20 +1496,20 @@ impl<'src> Parser<'src> {
                 precedence: 1,
                 associativity: Associativity::Right,
             },
-            BinaryOpKind::Add | BinaryOpKind::Subtract => OperatorInfo {
+            BinaryOpKind::Add | BinaryOpKind::Sub => OperatorInfo {
                 precedence: 7,
                 associativity: Associativity::Left,
             },
-            BinaryOpKind::Multiply | BinaryOpKind::Divide | BinaryOpKind::Modulo => OperatorInfo {
+            BinaryOpKind::Mul | BinaryOpKind::Div | BinaryOpKind::Mod => OperatorInfo {
                 precedence: 8,
                 associativity: Associativity::Left,
             },
-            BinaryOpKind::Equal
-            | BinaryOpKind::NotEqual
-            | BinaryOpKind::LessThan
-            | BinaryOpKind::LessThanOrEqual
-            | BinaryOpKind::GreaterThan
-            | BinaryOpKind::GreaterThanOrEqual => OperatorInfo {
+            BinaryOpKind::Eq
+            | BinaryOpKind::NotEq
+            | BinaryOpKind::Less
+            | BinaryOpKind::LessEq
+            | BinaryOpKind::Greater
+            | BinaryOpKind::GreaterEq => OperatorInfo {
                 precedence: 6,
                 associativity: Associativity::Left,
             },
@@ -1527,7 +1527,7 @@ impl<'src> Parser<'src> {
                     associativity: Associativity::Left,
                 }
             }
-            BinaryOpKind::Exponentiation => OperatorInfo {
+            BinaryOpKind::Exp => OperatorInfo {
                 precedence: 10,
                 associativity: Associativity::Right,
             },

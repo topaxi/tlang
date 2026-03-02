@@ -10,7 +10,7 @@ Module(
       kind: Expr(Expr(
         id: 8,
         kind: BinaryOp(BinaryOpExpression(
-          op: Multiply,
+          op: Mul,
           lhs: Expr(
             id: 6,
             kind: BinaryOp(BinaryOpExpression(

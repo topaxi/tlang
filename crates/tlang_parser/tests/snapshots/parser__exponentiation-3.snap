@@ -10,7 +10,7 @@ Module(
       kind: Expr(Expr(
         id: 8,
         kind: BinaryOp(BinaryOpExpression(
-          op: Exponentiation,
+          op: Exp,
           lhs: Expr(
             id: 4,
             kind: Literal(UnsignedInteger(1)),
@@ -30,7 +30,7 @@ Module(
           rhs: Expr(
             id: 7,
             kind: BinaryOp(BinaryOpExpression(
-              op: Exponentiation,
+              op: Exp,
               lhs: Expr(
                 id: 5,
                 kind: Literal(UnsignedInteger(2)),

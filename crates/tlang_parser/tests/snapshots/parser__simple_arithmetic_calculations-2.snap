@@ -14,7 +14,7 @@ Module(
           lhs: Expr(
             id: 6,
             kind: BinaryOp(BinaryOpExpression(
-              op: Multiply,
+              op: Mul,
               lhs: Expr(
                 id: 4,
                 kind: Literal(UnsignedInteger(1)),

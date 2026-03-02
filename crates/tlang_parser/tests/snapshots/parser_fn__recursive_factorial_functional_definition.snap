@@ -248,7 +248,7 @@ Module(
                 kind: Return(Some(Expr(
                   id: 18,
                   kind: BinaryOp(BinaryOpExpression(
-                    op: Multiply,
+                    op: Mul,
                     lhs: Expr(
                       id: 12,
                       kind: Path(Path(
@@ -346,7 +346,7 @@ Module(
                           Expr(
                             id: 16,
                             kind: BinaryOp(BinaryOpExpression(
-                              op: Subtract,
+                              op: Sub,
                               lhs: Expr(
                                 id: 14,
                                 kind: Path(Path(

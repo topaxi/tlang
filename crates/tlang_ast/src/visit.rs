@@ -644,7 +644,7 @@ mod tests {
             guard: Some(node::Expr::new(
                 NodeId::new(4),
                 node::ExprKind::BinaryOp(Box::new(BinaryOpExpression {
-                    op: BinaryOpKind::GreaterThanOrEqual,
+                    op: BinaryOpKind::GreaterEq,
                     lhs: node::Expr::new(
                         NodeId::new(5),
                         node::ExprKind::Path(Box::new(Path::new(vec![Ident::new(

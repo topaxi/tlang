@@ -89,7 +89,7 @@ Module(
                 guard: Some(Expr(
                   id: 8,
                   kind: BinaryOp(BinaryOpExpression(
-                    op: Equal,
+                    op: Eq,
                     lhs: Expr(
                       id: 6,
                       kind: Path(Path(

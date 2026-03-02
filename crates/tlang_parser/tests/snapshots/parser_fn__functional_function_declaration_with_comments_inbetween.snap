@@ -229,7 +229,7 @@ Module(
             expression: Some(Expr(
               id: 14,
               kind: BinaryOp(BinaryOpExpression(
-                op: Multiply,
+                op: Mul,
                 lhs: Expr(
                   id: 12,
                   kind: Path(Path(

@@ -30,7 +30,7 @@ Module(
           rhs: Expr(
             id: 7,
             kind: BinaryOp(BinaryOpExpression(
-              op: Multiply,
+              op: Mul,
               lhs: Expr(
                 id: 5,
                 kind: Literal(UnsignedInteger(2)),

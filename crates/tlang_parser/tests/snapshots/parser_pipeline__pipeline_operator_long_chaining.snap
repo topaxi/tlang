@@ -237,7 +237,7 @@ Module(
                                   expression: Some(Expr(
                                     id: 14,
                                     kind: BinaryOp(BinaryOpExpression(
-                                      op: Exponentiation,
+                                      op: Exp,
                                       lhs: Expr(
                                         id: 12,
                                         kind: Path(Path(
@@ -528,11 +528,11 @@ Module(
                               expression: Some(Expr(
                                 id: 28,
                                 kind: BinaryOp(BinaryOpExpression(
-                                  op: Equal,
+                                  op: Eq,
                                   lhs: Expr(
                                     id: 26,
                                     kind: BinaryOp(BinaryOpExpression(
-                                      op: Modulo,
+                                      op: Mod,
                                       lhs: Expr(
                                         id: 24,
                                         kind: Path(Path(
