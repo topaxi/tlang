@@ -1512,7 +1512,10 @@ impl Interpreter {
             }
         }
 
-        EvalResult::Void
+        self.panic(format!(
+            "No match found for value {:?}",
+            self.state.stringify(value)
+        ));
     }
 
     /// Evaluates a match arm and returns the value if it matches, otherwise returns None.
