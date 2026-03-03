@@ -45,7 +45,7 @@ impl MemoryStats {
 
 /// GC-managed object store together with shapes and native-function registries.
 pub struct Heap {
-    pub(crate) objects: Slab<TlangObjectKind>,
+    objects: Slab<TlangObjectKind>,
     shapes: HashMap<ShapeKey, TlangShape>,
     pub builtin_shapes: BuiltinShapes,
     pub(crate) native_fns: HashMap<TlangObjectId, TlangNativeFn>,
@@ -99,7 +99,7 @@ impl Heap {
     /// when needed. Prefer [`crate::InterpreterState::new_object`] for automatic GC scheduling.
     pub fn alloc_object(&mut self, kind: TlangObjectKind) -> TlangValue {
         self.memory_stats.objects_allocated += 1;
-        TlangValue::new_object(self.objects.insert(kind))
+        TlangValue::new_object(self.objects.insert(kind).into())
     }
 
     /// Mark all objects reachable from the provided roots.
@@ -117,7 +117,7 @@ impl Heap {
                     continue;
                 }
 
-                if let Some(obj) = self.objects.get(id) {
+                if let Some(obj) = self.objects.get(id.into()) {
                     values.extend(obj.referenced_values());
                 }
             }
@@ -132,16 +132,16 @@ impl Heap {
         let garbage = self
             .objects
             .iter()
-            .map(|(id, _)| id)
+            .map(|(id, _)| TlangObjectId::from(id))
             .filter(|id| !reachable.contains(id))
             .collect::<Vec<_>>();
 
         let count = garbage.len();
 
-        for id in garbage {
-            if let Some(TlangObjectKind::NativeFn) = self.remove_object(id) {
-                self.native_fns.remove(&id);
-                self.native_fns_meta.remove(&id);
+        for object_id in garbage {
+            if let Some(TlangObjectKind::NativeFn) = self.remove_object(object_id) {
+                self.native_fns.remove(&object_id);
+                self.native_fns_meta.remove(&object_id);
             }
         }
 
@@ -160,7 +160,7 @@ impl Heap {
 
     /// Removes an object from the object store by its ID.
     pub fn remove_object(&mut self, id: TlangObjectId) -> Option<TlangObjectKind> {
-        let removed = self.objects.try_remove(id);
+        let removed = self.objects.try_remove(id.into());
         if removed.is_some() {
             self.memory_stats.objects_deallocated += 1;
         }
@@ -169,17 +169,17 @@ impl Heap {
 
     /// Checks if an object with the given ID exists in the object store.
     pub fn contains_object(&self, id: TlangObjectId) -> bool {
-        self.objects.contains(id)
+        self.objects.contains(id.into())
     }
 
     #[inline(always)]
     pub fn get_object_by_id_mut(&mut self, id: TlangObjectId) -> Option<&mut TlangObjectKind> {
-        self.objects.get_mut(id)
+        self.objects.get_mut(id.into())
     }
 
     #[inline(always)]
     pub fn get_object_by_id(&self, id: TlangObjectId) -> Option<&TlangObjectKind> {
-        self.objects.get(id)
+        self.objects.get(id.into())
     }
 
     pub fn get_object(&self, value: TlangValue) -> Option<&TlangObjectKind> {

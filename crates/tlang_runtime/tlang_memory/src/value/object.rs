@@ -151,7 +151,27 @@ impl TlangSlice {
     }
 }
 
-pub type TlangObjectId = usize;
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TlangObjectId(usize);
+
+impl std::fmt::Display for TlangObjectId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ObjectId({})", self.0)
+    }
+}
+
+impl From<TlangObjectId> for usize {
+    fn from(value: TlangObjectId) -> Self {
+        value.0
+    }
+}
+
+impl From<usize> for TlangObjectId {
+    fn from(value: usize) -> Self {
+        TlangObjectId(value)
+    }
+}
 
 /// A mutable cell that holds a TlangValue. Used for closure captures
 /// to enable mutable bindings that are shared between the closure
@@ -343,7 +363,7 @@ mod tests {
     fn test_struct_referenced_values() {
         let values = vec![
             TlangValue::I64(1),
-            TlangValue::Object(42),
+            TlangValue::Object(42.into()),
             TlangValue::Bool(true),
         ];
         let s = TlangStruct::new(ShapeKey::Native(0), values.clone());
@@ -356,7 +376,7 @@ mod tests {
 
     #[test]
     fn test_enum_referenced_values() {
-        let values = vec![TlangValue::I64(10), TlangValue::Object(99)];
+        let values = vec![TlangValue::I64(10), TlangValue::Object(99.into())];
         let e = TlangEnum::new(ShapeKey::Native(0), 0, values.clone());
         let obj = TlangObjectKind::Enum(e);
 
@@ -367,7 +387,7 @@ mod tests {
 
     #[test]
     fn test_slice_referenced_values() {
-        let underlying = TlangValue::Object(123);
+        let underlying = TlangValue::Object(123.into());
         let slice = TlangSlice::new(underlying, 0, 10);
         let obj = TlangObjectKind::Slice(slice);
 
@@ -408,7 +428,7 @@ mod tests {
         // Create a closure with some captured values
         let captured = vec![
             TlangValue::I64(42),
-            TlangValue::Object(5), // This is an object reference that GC needs to trace
+            TlangValue::Object(5.into()), // This is an object reference that GC needs to trace
             TlangValue::Bool(true),
         ];
         let closure = TlangClosure {
@@ -434,8 +454,8 @@ mod tests {
         // Create a closure with captured memory and captured cells
         let captured_memory = vec![TlangValue::I64(42)];
         let mut captured_cells = HashMap::new();
-        captured_cells.insert((0, 0), 100); // Cell at scope 0, var 0 -> object ID 100
-        captured_cells.insert((1, 2), 200); // Cell at scope 1, var 2 -> object ID 200
+        captured_cells.insert((0, 0), 100.into()); // Cell at scope 0, var 0 -> object ID 100
+        captured_cells.insert((1, 2), 200.into()); // Cell at scope 1, var 2 -> object ID 200
 
         let closure = TlangClosure {
             id: HirId::new(1),
@@ -450,8 +470,8 @@ mod tests {
         // Should include: 1 captured memory value + 2 cell object references
         assert_eq!(refs.len(), 3);
         assert!(refs.contains(&TlangValue::I64(42)));
-        assert!(refs.contains(&TlangValue::Object(100)));
-        assert!(refs.contains(&TlangValue::Object(200)));
+        assert!(refs.contains(&TlangValue::Object(100.into())));
+        assert!(refs.contains(&TlangValue::Object(200.into())));
     }
 
     #[test]
@@ -482,7 +502,7 @@ mod tests {
         let iter = obj.referenced_values();
         assert_eq!(iter.len(), 3);
 
-        let slice = TlangSlice::new(TlangValue::Object(1), 0, 5);
+        let slice = TlangSlice::new(TlangValue::Object(1.into()), 0, 5);
         let obj = TlangObjectKind::Slice(slice);
         let iter = obj.referenced_values();
         assert_eq!(iter.len(), 1);
@@ -540,12 +560,12 @@ mod tests {
     #[test]
     fn test_cell_referenced_values() {
         // Cell containing an object reference should yield that reference
-        let cell = TlangCell::new(TlangValue::Object(42));
+        let cell = TlangCell::new(TlangValue::Object(42.into()));
         let obj = TlangObjectKind::Cell(cell);
 
         let refs: Vec<_> = obj.referenced_values().collect();
         assert_eq!(refs.len(), 1);
-        assert_eq!(refs[0], TlangValue::Object(42));
+        assert_eq!(refs[0], TlangValue::Object(42.into()));
     }
 
     #[test]

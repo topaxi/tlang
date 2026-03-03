@@ -91,12 +91,13 @@ impl InterpreterState {
 
         self.heap.memory_stats.gc_collections += 1;
         self.heap.memory_stats.objects_deallocated += collected;
-        self.heap.next_gc_threshold = (self.heap.objects.len() * 2).max(Heap::GC_INITIAL_THRESHOLD);
+        self.heap.next_gc_threshold =
+            (self.heap.object_count() * 2).max(Heap::GC_INITIAL_THRESHOLD);
 
         log::debug!(
             "GC: collected {} objects, {} remain",
             collected,
-            self.heap.objects.len()
+            self.heap.object_count()
         );
 
         #[cfg(debug_assertions)]
@@ -268,14 +269,6 @@ impl InterpreterState {
     /// Returns the number of currently allocated objects in the object store.
     pub fn object_count(&self) -> usize {
         self.heap.object_count()
-    }
-
-    pub fn remove_object(&mut self, id: TlangObjectId) -> Option<TlangObjectKind> {
-        self.heap.remove_object(id)
-    }
-
-    pub fn contains_object(&self, id: TlangObjectId) -> bool {
-        self.heap.contains_object(id)
     }
 
     #[inline(always)]
@@ -745,7 +738,7 @@ mod tests {
 
         // Remove an object
         let id1 = obj1.get_object_id().unwrap();
-        let removed = state.remove_object(id1);
+        let removed = state.heap.remove_object(id1);
         assert!(removed.is_some());
 
         let stats = state.memory_stats();
@@ -755,7 +748,7 @@ mod tests {
         assert_eq!(state.object_count(), 2);
 
         // Object should no longer exist
-        assert!(!state.contains_object(id1));
+        assert!(!state.heap.contains_object(id1));
         assert!(state.get_object(obj1).is_none());
 
         // Other objects should still exist
@@ -767,7 +760,7 @@ mod tests {
         let mut state = InterpreterState::new();
 
         // Try to remove an object that doesn't exist
-        let removed = state.remove_object(999);
+        let removed = state.heap.remove_object(999.into());
         assert!(removed.is_none());
 
         // Stats should not change
@@ -782,8 +775,8 @@ mod tests {
         let obj = state.new_string("test".to_string());
         let id = obj.get_object_id().unwrap();
 
-        assert!(state.contains_object(id));
-        assert!(!state.contains_object(999));
+        assert!(state.heap.contains_object(id));
+        assert!(!state.heap.contains_object(999.into()));
     }
 
     #[test]
@@ -838,7 +831,7 @@ mod tests {
         let collected = state.sweep_unreachable(&marked);
 
         assert_eq!(collected, 1);
-        assert!(!state.contains_object(orphan_id));
+        assert!(!state.heap.contains_object(orphan_id));
     }
 
     #[test]
@@ -880,7 +873,7 @@ mod tests {
 
         // The reachable object should still exist
         let id = reachable.get_object_id().unwrap();
-        assert!(state.contains_object(id));
+        assert!(state.heap.contains_object(id));
     }
 
     #[test]
