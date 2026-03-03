@@ -55,7 +55,7 @@ Module(
                 ),
                 ty: Ty(
                   id: 3,
-                  name: Path(
+                  kind: Path(Path(
                     segments: [
                       Ident(
                         name: "x",
@@ -84,7 +84,7 @@ Module(
                         column: 11,
                       ),
                     ),
-                  ),
+                  )),
                   parameters: [],
                   span: Span(
                     start: LineColumn(

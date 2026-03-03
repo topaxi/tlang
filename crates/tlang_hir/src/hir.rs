@@ -668,6 +668,7 @@ pub enum TyKind {
     #[default]
     Unknown,
     Path(Path),
+    Union(Vec<Path>),
 }
 
 #[derive(Debug, Clone)]

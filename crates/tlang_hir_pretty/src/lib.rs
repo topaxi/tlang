@@ -566,6 +566,14 @@ impl HirPretty {
         match &ty.kind {
             hir::TyKind::Unknown => self.push_str("unknown"),
             hir::TyKind::Path(path) => self.print_path(path),
+            hir::TyKind::Union(paths) => {
+                for (i, path) in paths.iter().enumerate() {
+                    if i > 0 {
+                        self.push_str(" | ");
+                    }
+                    self.print_path(path);
+                }
+            }
         }
     }
 

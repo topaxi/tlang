@@ -1,4 +1,5 @@
 pub mod analyzer;
+pub mod builtin_types;
 pub mod diagnostic;
 pub mod passes;
 

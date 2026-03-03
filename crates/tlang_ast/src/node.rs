@@ -527,11 +527,20 @@ pub struct StructField {
     pub ty: Ty,
 }
 
+#[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub enum TyKind {
+    #[default]
+    Unknown,
+    Path(Path),
+    Union(Vec<Path>),
+}
+
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Ty {
     pub id: NodeId,
-    pub name: Path,
+    pub kind: TyKind,
     pub parameters: Vec<Ty>,
     pub span: Span,
 }
@@ -540,7 +549,16 @@ impl Ty {
     pub fn new(id: NodeId, name: Path) -> Self {
         Ty {
             id,
-            name,
+            kind: TyKind::Path(name),
+            parameters: vec![],
+            span: Span::default(),
+        }
+    }
+
+    pub fn new_unknown(id: NodeId) -> Self {
+        Ty {
+            id,
+            kind: TyKind::Unknown,
             parameters: vec![],
             span: Span::default(),
         }

@@ -7,7 +7,9 @@ use tlang_symbols::{SymbolIdAllocator, SymbolTable, SymbolType};
 
 use crate::{
     diagnostic::Diagnostic,
-    passes::{DeclarationAnalyzer, FnParamTypeInference, StringLiteralValidator, VariableUsageValidator},
+    passes::{
+        DeclarationAnalyzer, FnParamTypeInference, StringLiteralValidator, VariableUsageValidator,
+    },
 };
 
 /// Context for semantic analysis, containing shared state needed

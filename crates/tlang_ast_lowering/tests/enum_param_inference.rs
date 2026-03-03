@@ -45,7 +45,7 @@ fn test_enum_param_type_inferred_from_variants() {
 #[test]
 fn test_enum_param_type_not_inferred_when_mixed() {
     // If different declarations at the same position use different enum types,
-    // no inference should occur and the type stays `unknown`.
+    // a union type should be inferred.
     let hir = hir_from_str_analyzed(
         r#"
             enum Foo { A }
@@ -58,7 +58,7 @@ fn test_enum_param_type_not_inferred_when_mixed() {
 
     let output = pretty_print(&hir);
     assert!(
-        output.contains("f(arg0: unknown)"),
-        "Expected unknown type when enum types conflict, got:\n{output}"
+        output.contains("f(arg0: Foo | Bar)"),
+        "Expected union type when enum types differ, got:\n{output}"
     );
 }

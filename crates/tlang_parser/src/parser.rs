@@ -4,7 +4,7 @@ use tlang_ast::node::{
     EnumDeclaration, EnumPattern, EnumVariant, Expr, ExprKind, FieldAccessExpression,
     FunctionDeclaration, FunctionParameter, Ident, IfElseExpression, IndexAccessExpression,
     LetDeclaration, MatchArm, MatchExpression, Module, OperatorInfo, Pat, Path, Stmt, StmtKind,
-    StructDeclaration, StructField, Ty, UnaryOp,
+    StructDeclaration, StructField, Ty, TyKind, UnaryOp,
 };
 use tlang_ast::token::{Literal, Token, TokenKind};
 use tlang_lexer::Lexer;
@@ -448,7 +448,7 @@ impl<'src> Parser<'src> {
                     } else {
                         node::Ty {
                             id: self.unique_id(),
-                            name: Path::new(vec![Ident::new("unknown", Span::default())]),
+                            kind: TyKind::Unknown,
                             parameters: Vec::new(),
                             span: Span::default(),
                         }

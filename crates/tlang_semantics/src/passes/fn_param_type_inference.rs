@@ -1,17 +1,28 @@
 use tlang_ast::{
-    node::{FunctionDeclaration, PatKind, Ty},
+    node::{FunctionDeclaration, PatKind, Ty, TyKind},
+    token::Literal,
     visit_mut::{VisitorMut, walk_fn_decl},
 };
 use tlang_span::NodeId;
 
-use crate::analyzer::{SemanticAnalysisContext, SemanticAnalysisPass};
+use crate::{
+    analyzer::{SemanticAnalysisContext, SemanticAnalysisPass},
+    builtin_types,
+};
 
-/// Semantic pass that infers parameter types from enum variant patterns.
+/// Semantic pass that infers parameter types from patterns across overloaded
+/// function declarations.
 ///
-/// When multiple function declarations share the same name and a parameter
-/// position consistently uses variants of the same enum (e.g. `LinkedList::Empty`
-/// and `LinkedList::Node(...)`), the parameter type is annotated as that enum
-/// (`LinkedList`) so the lowered HIR can emit a proper type instead of `unknown`.
+/// - **Enum patterns** (`LinkedList::Node(...)`): all overloads agree on the
+///   same enum prefix → infer that enum type.
+/// - **Literal patterns** (`0`, `"hello"`, `true`, …): infer the canonical
+///   builtin type (`i64`, `String`, `bool`, …).
+/// - **List patterns** (`[]`, `[x, ...xs]`): infer `Slice`, since the
+///   interpreter matches list patterns against both list slices and strings.
+/// - When overloads **disagree** on types but each is a known type, a
+///   `TyKind::Union` annotation is emitted (e.g. `String | Slice`).
+/// - Identifier, wildcard, and `self` patterns are **unconstrained** and do
+///   not affect inference.
 #[derive(Default)]
 pub struct FnParamTypeInference;
 
@@ -20,7 +31,7 @@ impl VisitorMut for FnParamTypeInference {
         let num_params = decls.iter().map(|d| d.parameters.len()).max().unwrap_or(0);
 
         for i in 0..num_params {
-            if let Some(inferred_ty) = infer_enum_type(decls, i) {
+            if let Some(inferred_ty) = infer_param_type(decls, i) {
                 for decl in decls.iter_mut() {
                     if let Some(param) = decl.parameters.get_mut(i)
                         && param.type_annotation.is_none()
@@ -38,45 +49,97 @@ impl VisitorMut for FnParamTypeInference {
     }
 }
 
-/// Returns an inferred `Ty` for parameter `param_idx` if all declarations that
-/// have an enum pattern at that position agree on the same enum type name.
-/// Identifier, wildcard, and `self` patterns are treated as unconstrained and
-/// do not prevent inference.
-fn infer_enum_type(decls: &[FunctionDeclaration], param_idx: usize) -> Option<Ty> {
-    let mut enum_type_name: Option<String> = None;
+/// The type constraint contributed by a single pattern.
+#[derive(Debug, Clone, PartialEq)]
+enum PatternType {
+    /// A named type (enum name or builtin type name).
+    Named(String),
+}
+
+/// Returns the `PatternType` contributed by a single pattern, or `None` if the
+/// pattern is unconstrained (identifier, wildcard, `self`) or unrecognised.
+fn pattern_type(pat: &PatKind) -> Option<Result<PatternType, ()>> {
+    match pat {
+        PatKind::Enum(enum_pattern) => {
+            let segs = &enum_pattern.path.segments;
+            if segs.len() < 2 {
+                return Some(Err(()));
+            }
+            let name = segs[segs.len() - 2].to_string();
+            Some(Ok(PatternType::Named(name)))
+        }
+        PatKind::Literal(lit) => {
+            builtin_type_for_literal(lit).map(|name| Ok(PatternType::Named(name.to_string())))
+        }
+        PatKind::List(_) => Some(Ok(PatternType::Named(builtin_types::SLICE.to_string()))),
+        // Unconstrained — don't block or contribute to inference.
+        PatKind::Identifier(_) | PatKind::Wildcard | PatKind::_Self => None,
+        // Rest patterns at the top level, None patterns — block inference.
+        _ => Some(Err(())),
+    }
+}
+
+/// Returns the canonical builtin type name for a literal, or `None` if the
+/// literal kind carries no type information (e.g. `Literal::None`).
+fn builtin_type_for_literal(lit: &Literal) -> Option<&'static str> {
+    match lit {
+        Literal::Boolean(_) => Some(builtin_types::BOOL),
+        // Both signed and unsigned integer literals default to i64, since
+        // non-negative integers are stored as UnsignedInteger in the AST.
+        Literal::Integer(_) | Literal::UnsignedInteger(_) => Some(builtin_types::I64),
+        Literal::Float(_) => Some(builtin_types::F64),
+        Literal::String(_) => Some(builtin_types::STRING),
+        Literal::Char(_) => Some(builtin_types::CHAR),
+        Literal::None => None,
+    }
+}
+
+/// Infers a `Ty` for parameter `param_idx` by inspecting all declarations.
+///
+/// - If all constrained patterns agree on one type → `TyKind::Path`.
+/// - If constrained patterns are all known types but disagree → `TyKind::Union`.
+/// - If any pattern is unrecognised or blocks inference → `None`.
+fn infer_param_type(decls: &[FunctionDeclaration], param_idx: usize) -> Option<Ty> {
+    let mut type_names: Vec<String> = Vec::new();
 
     for decl in decls {
         if let Some(param) = decl.parameters.get(param_idx) {
-            match &param.pattern.kind {
-                PatKind::Enum(enum_pattern) => {
-                    let segs = &enum_pattern.path.segments;
-                    if segs.len() < 2 {
-                        return None;
-                    }
-                    // The enum type is the path prefix before the variant name.
-                    // e.g. `LinkedList::Node` → `LinkedList`
-                    let name = segs[segs.len() - 2].to_string();
-                    match &enum_type_name {
-                        None => enum_type_name = Some(name),
-                        Some(existing) if *existing != name => return None,
-                        _ => {}
-                    }
+            match pattern_type(&param.pattern.kind) {
+                None => {}                    // unconstrained, skip
+                Some(Err(())) => return None, // blocks inference
+                Some(Ok(PatternType::Named(name))) if !type_names.contains(&name) => {
+                    type_names.push(name);
                 }
-                PatKind::Identifier(_) | PatKind::Wildcard | PatKind::_Self => {}
-                _ => return None,
+                Some(Ok(PatternType::Named(_))) => {}
             }
         }
     }
 
-    enum_type_name.map(|name| {
-        use tlang_ast::node::{Ident, Path};
-        // NodeId::new(1) is used as a placeholder for this synthetic node;
-        // the lowering only reads the path name, not the NodeId.
-        Ty::new(
-            NodeId::new(1),
-            Path::new(vec![Ident::new(&name, Default::default())]),
-        )
-    })
+    if type_names.is_empty() {
+        return None;
+    }
+
+    use tlang_ast::node::{Ident, Path};
+
+    let make_path = |name: &str| Path::new(vec![Ident::new(name, Default::default())]);
+
+    // NodeId::new(1) is a placeholder for synthetic nodes; lowering only reads
+    // the kind, not the NodeId.
+    if type_names.len() == 1 {
+        Some(Ty {
+            id: NodeId::new(1),
+            kind: TyKind::Path(make_path(&type_names[0])),
+            parameters: vec![],
+            span: Default::default(),
+        })
+    } else {
+        Some(Ty {
+            id: NodeId::new(1),
+            kind: TyKind::Union(type_names.iter().map(|n| make_path(n)).collect()),
+            parameters: vec![],
+            span: Default::default(),
+        })
+    }
 }
 
 impl SemanticAnalysisPass for FnParamTypeInference {

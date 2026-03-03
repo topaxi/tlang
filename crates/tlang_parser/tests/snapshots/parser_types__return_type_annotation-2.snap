@@ -58,7 +58,7 @@ Module(
         guard: None,
         return_type_annotation: Some(Ty(
           id: 5,
-          name: Path(
+          kind: Path(Path(
             segments: [
               Ident(
                 name: "Option",
@@ -87,11 +87,11 @@ Module(
                 column: 18,
               ),
             ),
-          ),
+          )),
           parameters: [
             Ty(
               id: 4,
-              name: Path(
+              kind: Path(Path(
                 segments: [
                   Ident(
                     name: "i64",
@@ -120,7 +120,7 @@ Module(
                     column: 22,
                   ),
                 ),
-              ),
+              )),
               parameters: [],
               span: Span(
                 start: LineColumn(

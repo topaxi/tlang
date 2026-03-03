@@ -422,8 +422,15 @@ impl LoweringContext {
         debug!("Lowering type {node:?}");
 
         if let Some(node) = node {
+            let kind = match &node.kind {
+                ast::node::TyKind::Path(path) => hir::TyKind::Path(self.lower_path(path)),
+                ast::node::TyKind::Union(paths) => {
+                    hir::TyKind::Union(paths.iter().map(|p| self.lower_path(p)).collect())
+                }
+                ast::node::TyKind::Unknown => hir::TyKind::Unknown,
+            };
             hir::Ty {
-                kind: hir::TyKind::Path(self.lower_path(&node.name)),
+                kind,
                 span: node.span,
             }
         } else {

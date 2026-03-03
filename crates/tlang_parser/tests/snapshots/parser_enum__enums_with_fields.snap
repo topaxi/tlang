@@ -55,36 +55,7 @@ Module(
                 ),
                 ty: Ty(
                   id: 3,
-                  name: Path(
-                    segments: [
-                      Ident(
-                        name: "unknown",
-                        span: Span(
-                          start: LineColumn(
-                            line: 0,
-                            column: 0,
-                          ),
-                          end: LineColumn(
-                            line: 0,
-                            column: 0,
-                          ),
-                        ),
-                      ),
-                    ],
-                    res: Res(
-                      node_id: None,
-                    ),
-                    span: Span(
-                      start: LineColumn(
-                        line: 0,
-                        column: 0,
-                      ),
-                      end: LineColumn(
-                        line: 0,
-                        column: 0,
-                      ),
-                    ),
-                  ),
+                  kind: Unknown,
                   parameters: [],
                   span: Span(
                     start: LineColumn(
