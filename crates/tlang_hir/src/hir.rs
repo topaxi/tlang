@@ -66,6 +66,9 @@ pub enum BindingKind {
     Param,
     Field,
     Closure,
+    /// A builtin/primitive type (e.g. `i64`, `bool`, `String`) — has no HIR
+    /// declaration node.
+    PrimTy,
     #[default]
     Unknown,
 }
@@ -151,6 +154,14 @@ impl Res {
         }
     }
 
+    pub fn new_prim_ty() -> Self {
+        Res {
+            hir_id: None,
+            binding_kind: BindingKind::PrimTy,
+            slot: Slot::None,
+        }
+    }
+
     pub fn new_local(hir_id: HirId) -> Self {
         Res::new(hir_id, BindingKind::Local)
     }
@@ -190,6 +201,10 @@ impl Res {
                 | BindingKind::Variant // variants can be used as values
                 | BindingKind::Unknown
         )
+    }
+
+    pub fn is_prim_ty(self) -> bool {
+        matches!(self.binding_kind, BindingKind::PrimTy)
     }
 
     pub fn is_unknown(self) -> bool {

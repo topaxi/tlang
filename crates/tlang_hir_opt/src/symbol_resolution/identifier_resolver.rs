@@ -6,12 +6,38 @@ use tlang_span::HirId;
 use crate::HirPass;
 use crate::hir_opt::HirOptContext;
 
+/// Primitive type names that are builtin to the language and have no
+/// declaration node in the symbol table.
+const PRIM_TY_NAMES: &[&str] = &[
+    "bool", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64", "char",
+    "String", "Slice",
+];
+
 #[derive(Debug, Default)]
 pub struct IdentifierResolver {
     scopes: Vec<HirId>,
 }
 
 impl IdentifierResolver {
+    fn resolve_ty_path(&mut self, path: &mut hir::Path, ctx: &mut HirOptContext) {
+        if path.res.hir_id().is_some() || path.res.is_prim_ty() {
+            return;
+        }
+
+        let name = path.to_string();
+
+        if PRIM_TY_NAMES.contains(&name.as_str()) {
+            debug!("Type path '{}' resolved as primitive type", name);
+            path.res = hir::Res::new_prim_ty();
+            return;
+        }
+
+        // For user-defined types (enums, structs) use the normal symbol resolver,
+        // but suppress the warning if not found since type paths are not always
+        // resolvable from the current scope.
+        self.resolve_path(path, ctx);
+    }
+
     fn resolve_path(&mut self, path: &mut hir::Path, ctx: &mut HirOptContext) {
         debug!("Resolving path: '{}' on line {}", path, path.span.start);
 
@@ -143,6 +169,18 @@ impl<'hir> Visitor<'hir> for IdentifierResolver {
 
     fn visit_path(&mut self, path: &'hir mut hir::Path, ctx: &mut Self::Context) {
         self.resolve_path(path, ctx);
+    }
+
+    fn visit_ty(&mut self, ty: &'hir mut hir::Ty, ctx: &mut Self::Context) {
+        match &mut ty.kind {
+            hir::TyKind::Path(path) => self.resolve_ty_path(path, ctx),
+            hir::TyKind::Union(paths) => {
+                for path in paths {
+                    self.resolve_ty_path(path, ctx);
+                }
+            }
+            hir::TyKind::Unknown => {}
+        }
     }
 }
 
