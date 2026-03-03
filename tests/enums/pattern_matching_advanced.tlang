@@ -3,7 +3,7 @@
 
 // Define a more complex enum for expression trees
 enum Expr {
-    Num(int),
+    Num(i64),
     Add(Expr, Expr),
     Mul(Expr, Expr),
     Sub(Expr, Expr),

@@ -1,16 +1,16 @@
 struct Point {
-    x: int,
-    y: int,
+    x: i64,
+    y: i64,
 }
 
-fn Point::new(x: int, y: int) -> Point {
+fn Point::new(x: i64, y: i64) -> Point {
     Point {
         x: x,
         y: y,
     }
 }
 
-// Point.get_coordinates(self) -> int[]
+// Point.get_coordinates(self) -> i64[]
 fn Point.get_coordinates(self) {
     [self.x, self.y]
 }

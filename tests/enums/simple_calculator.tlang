@@ -2,17 +2,17 @@
 // Demonstrates: enums, pattern matching, recursion, and basic arithmetic
 
 enum Expr {
-    Number(int),
+    Number(i64),
     Add(Expr, Expr),
     Multiply(Expr, Expr),
 }
 
-// evaluate(Expr) -> int
+// evaluate(Expr) -> i64
 fn evaluate(Expr::Number(n)) { n }
 fn evaluate(Expr::Add(left, right)) { evaluate(left) + evaluate(right) }
 fn evaluate(Expr::Multiply(left, right)) { evaluate(left) * evaluate(right) }
 
-// print_expr_results(Expr[], int) -> ()
+// print_expr_results(Expr[], i64) -> ()
 fn print_expr_results([], _) { }
 fn print_expr_results([expr, ...rest], index) {
     log(evaluate(expr));

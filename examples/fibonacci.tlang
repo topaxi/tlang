@@ -1,10 +1,10 @@
-// fibonacci(int) -> int
+// fibonacci(i64) -> i64
 fn fibonacci(n) { fibonacci(n, 0, 1) }
-// fibonacci(0, int, int) -> int
+// fibonacci(0, i64, i64) -> i64
 fn fibonacci(0, a, _) { a }
-// fibonacci(1, int, int) -> int
+// fibonacci(1, i64, i64) -> i64
 fn fibonacci(1, _, b) { b }
-// fibonacci(int, int, int) -> int
+// fibonacci(i64, i64, i64) -> i64
 fn fibonacci(n, a, b) { rec fibonacci(n - 1, b, a + b) }
 
 fibonacci(50)

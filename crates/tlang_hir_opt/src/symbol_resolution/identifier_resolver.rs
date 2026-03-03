@@ -10,8 +10,8 @@ use crate::hir_opt::HirOptContext;
 /// Primitive type names that are builtin to the language and have no
 /// declaration node in the symbol table.
 const PRIM_TY_NAMES: &[&str] = &[
-    "bool", "int", "Int", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64",
-    "char", "String", "Slice",
+    "bool", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64", "char",
+    "String", "Slice",
     // `unknown` is a placeholder type meaning "any / untyped"; it has no declaration.
     "unknown",
 ];

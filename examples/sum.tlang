@@ -1,4 +1,4 @@
-// sum(int[]) -> int
+// sum(i64[]) -> i64
 fn sum([]) { 0 }
 fn sum([x, ...xs]) { x + sum(xs) }
 

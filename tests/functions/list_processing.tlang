@@ -14,7 +14,7 @@ fn filter([_, ...xs], f) { rec filter(xs, f) }
 fn foldl([], acc, _) { acc }
 fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
 
-// range(int, int) -> int[]
+// range(i64, i64) -> i64[]
 fn range(start, end) {
     if start >= end {
         []
