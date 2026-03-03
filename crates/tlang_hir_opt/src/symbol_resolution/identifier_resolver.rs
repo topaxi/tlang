@@ -2,6 +2,7 @@ use log::{debug, warn};
 use tlang_hir::visit::walk_expr;
 use tlang_hir::{self as hir, Visitor};
 use tlang_span::HirId;
+use tlang_symbols::SymbolType;
 
 use crate::HirPass;
 use crate::hir_opt::HirOptContext;
@@ -9,8 +10,10 @@ use crate::hir_opt::HirOptContext;
 /// Primitive type names that are builtin to the language and have no
 /// declaration node in the symbol table.
 const PRIM_TY_NAMES: &[&str] = &[
-    "bool", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64", "char",
-    "String", "Slice",
+    "bool", "int", "Int", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "f32", "f64",
+    "char", "String", "Slice",
+    // `unknown` is a placeholder type meaning "any / untyped"; it has no declaration.
+    "unknown",
 ];
 
 #[derive(Debug, Default)]
@@ -32,10 +35,48 @@ impl IdentifierResolver {
             return;
         }
 
-        // For user-defined types (enums, structs) use the normal symbol resolver,
-        // but suppress the warning if not found since type paths are not always
-        // resolvable from the current scope.
-        self.resolve_path(path, ctx);
+        // Type definitions (enums, structs) are module-scoped and accessible
+        // from any point, so use a span-independent lookup. Synthetic type
+        // paths produced by passes like `FnParamTypeInference` carry a default
+        // span (0:0) that would otherwise fail the scope-based `get_closest_by_name`.
+        let symbol_table = ctx.current_symbol_table().unwrap_or_else(|| {
+            panic!(
+                "No symbol table for current scope {:?} while resolving type path '{}'.",
+                ctx.current_scope, name
+            )
+        });
+
+        let symbol_info = symbol_table
+            .borrow()
+            .get_by_name(&name)
+            .into_iter()
+            .filter(|s| s.declared)
+            .find(|s| {
+                matches!(s.symbol_type, SymbolType::Enum | SymbolType::Struct)
+            });
+
+        if let Some(symbol_info) = symbol_info {
+            debug!("Type path '{}' resolved to {:?}", name, symbol_info);
+            path.res.set_binding_kind(symbol_info.symbol_type.into());
+            if let Some(hir_id) = symbol_info.hir_id {
+                path.res.set_hir_id(hir_id);
+            }
+        } else {
+            // Lowercase single-segment names are used as generic type parameter
+            // placeholders (e.g. `value` in `Option::Some(value)`) and have no
+            // explicit declaration. Treat them silently like `unknown`.
+            let is_generic_placeholder = name
+                .chars()
+                .next()
+                .map(|c| c.is_lowercase())
+                .unwrap_or(false);
+            if !is_generic_placeholder {
+                warn!(
+                    "No type declaration found for type path '{}' on line {}.",
+                    name, path.span.start
+                );
+            }
+        }
     }
 
     fn resolve_path(&mut self, path: &mut hir::Path, ctx: &mut HirOptContext) {
