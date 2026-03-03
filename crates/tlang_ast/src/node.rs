@@ -304,8 +304,14 @@ pub enum ExprKind {
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-pub struct Res {
-    pub node_id: Option<NodeId>,
+pub enum Res {
+    /// Not yet resolved.
+    #[default]
+    Unresolved,
+    /// Resolved to a user-declared definition node.
+    Def(NodeId),
+    /// Resolved to a builtin / primitive type (no declaration node).
+    PrimTy,
 }
 
 /// AST representation of a path.

@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use tlang_ast::{
-    node::{FunctionDeclaration, PatKind, Ty, TyKind},
+    node::{FunctionDeclaration, Module, PatKind, Res, StmtKind, Ty, TyKind},
     token::Literal,
     visit_mut::{VisitorMut, walk_fn_decl},
 };
@@ -24,14 +26,18 @@ use crate::{
 /// - Identifier, wildcard, and `self` patterns are **unconstrained** and do
 ///   not affect inference.
 #[derive(Default)]
-pub struct FnParamTypeInference;
+pub struct FnParamTypeInference {
+    /// Maps enum names to the `NodeId` of their declaration statement,
+    /// populated by a pre-scan of the module before the main visitor run.
+    enum_decl_ids: HashMap<String, NodeId>,
+}
 
 impl VisitorMut for FnParamTypeInference {
     fn visit_fn_decls(&mut self, decls: &mut [FunctionDeclaration]) {
         let num_params = decls.iter().map(|d| d.parameters.len()).max().unwrap_or(0);
 
         for i in 0..num_params {
-            if let Some(inferred_ty) = infer_param_type(decls, i) {
+            if let Some(inferred_ty) = infer_param_type(decls, i, &self.enum_decl_ids) {
                 for decl in decls.iter_mut() {
                     if let Some(param) = decl.parameters.get_mut(i)
                         && param.type_annotation.is_none()
@@ -99,7 +105,11 @@ fn builtin_type_for_literal(lit: &Literal) -> Option<&'static str> {
 /// - If all constrained patterns agree on one type → `TyKind::Path`.
 /// - If constrained patterns are all known types but disagree → `TyKind::Union`.
 /// - If any pattern is unrecognised or blocks inference → `None`.
-fn infer_param_type(decls: &[FunctionDeclaration], param_idx: usize) -> Option<Ty> {
+fn infer_param_type(
+    decls: &[FunctionDeclaration],
+    param_idx: usize,
+    enum_decl_ids: &HashMap<String, NodeId>,
+) -> Option<Ty> {
     let mut type_names: Vec<String> = Vec::new();
 
     for decl in decls {
@@ -121,7 +131,18 @@ fn infer_param_type(decls: &[FunctionDeclaration], param_idx: usize) -> Option<T
 
     use tlang_ast::node::{Ident, Path};
 
-    let make_path = |name: &str| Path::new(vec![Ident::new(name, Default::default())]);
+    let make_path = |name: &str| {
+        let res = if builtin_types::ALL.contains(&name) {
+            Res::PrimTy
+        } else if let Some(&node_id) = enum_decl_ids.get(name) {
+            Res::Def(node_id)
+        } else {
+            Res::Unresolved
+        };
+        let mut path = Path::new(vec![Ident::new(name, Default::default())]);
+        path.res = res;
+        path
+    };
 
     // NodeId::new(1) is a placeholder for synthetic nodes; lowering only reads
     // the kind, not the NodeId.
@@ -142,8 +163,22 @@ fn infer_param_type(decls: &[FunctionDeclaration], param_idx: usize) -> Option<T
     }
 }
 
+/// Scans the top-level statements of a module and returns a map from enum name
+/// to the `NodeId` of the declaration statement, matching what
+/// `DeclarationAnalyzer` records in the symbol table.
+fn collect_enum_decl_ids(module: &Module) -> HashMap<String, NodeId> {
+    let mut map = HashMap::new();
+    for stmt in &module.statements {
+        if let StmtKind::EnumDeclaration(decl) = &stmt.kind {
+            map.insert(decl.name.to_string(), stmt.id);
+        }
+    }
+    map
+}
+
 impl SemanticAnalysisPass for FnParamTypeInference {
     fn mutate(&mut self, module: &mut tlang_ast::node::Module) {
+        self.enum_decl_ids = collect_enum_decl_ids(module);
         self.visit_module(module);
     }
 

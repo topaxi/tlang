@@ -1,4 +1,4 @@
-use tlang_ast::node::{FunctionDeclaration, StmtKind, TyKind};
+use tlang_ast::node::{FunctionDeclaration, Res, StmtKind, TyKind};
 use tlang_parser::Parser;
 use tlang_semantics::analyzer::SemanticAnalyzer;
 use tlang_symbols::SymbolType;
@@ -42,6 +42,14 @@ fn param_ty_kind(decls: &[FunctionDeclaration], decl_idx: usize, param_idx: usiz
         .kind
 }
 
+/// Returns the `Res` for a `TyKind::Path` annotation.
+fn param_ty_res(decls: &[FunctionDeclaration], decl_idx: usize, param_idx: usize) -> Res {
+    match param_ty_kind(decls, decl_idx, param_idx) {
+        TyKind::Path(p) => p.res,
+        other => panic!("expected TyKind::Path, got {other:?}"),
+    }
+}
+
 // ── Existing enum inference (must still work) ─────────────────────────────────
 
 #[test]
@@ -53,6 +61,11 @@ fn test_enum_pattern_inference() {
     );
     assert!(matches!(param_ty_kind(&decls, 0, 0), TyKind::Path(p) if p.to_string() == "Option"));
     assert!(matches!(param_ty_kind(&decls, 1, 0), TyKind::Path(p) if p.to_string() == "Option"));
+    // res should point to the enum declaration node
+    assert!(matches!(param_ty_res(&decls, 0, 0), Res::Def(_)));
+    assert!(matches!(param_ty_res(&decls, 1, 0), Res::Def(_)));
+    // both overloads resolve to the same declaration node
+    assert_eq!(param_ty_res(&decls, 0, 0), param_ty_res(&decls, 1, 0));
 }
 
 // ── Literal pattern inference ─────────────────────────────────────────────────
@@ -68,6 +81,11 @@ fn test_integer_literal_inference() {
         assert!(
             matches!(param_ty_kind(&decls, i, 0), TyKind::Path(p) if p.to_string() == "i64"),
             "decl {i} param 0 should be i64"
+        );
+        assert_eq!(
+            param_ty_res(&decls, i, 0),
+            Res::PrimTy,
+            "decl {i} param 0 res should be PrimTy"
         );
     }
 }
@@ -167,6 +185,14 @@ fn test_mixed_enum_types_produce_union() {
                 let names: Vec<String> = paths.iter().map(|p| p.to_string()).collect();
                 assert!(names.contains(&"Foo".to_string()), "union missing Foo");
                 assert!(names.contains(&"Bar".to_string()), "union missing Bar");
+                // Both enum paths in the union should resolve to their declaration nodes
+                for path in paths {
+                    assert!(
+                        matches!(path.res, Res::Def(_)),
+                        "union path '{}' res should be Def",
+                        path
+                    );
+                }
             }
             other => panic!("expected Union for decl {i}, got {other:?}"),
         }
@@ -203,6 +229,18 @@ fn test_literal_and_enum_mix_produces_union() {
                     names.contains(&"MyEnum".to_string()),
                     "union missing MyEnum"
                 );
+                for path in paths {
+                    let expected = if path.to_string() == "i64" {
+                        Res::PrimTy
+                    } else {
+                        // MyEnum should resolve to its declaration node
+                        match path.res {
+                            Res::Def(_) => path.res,
+                            other => panic!("MyEnum path res should be Def, got {other:?}"),
+                        }
+                    };
+                    assert_eq!(path.res, expected, "unexpected res for path '{}'", path);
+                }
             }
             other => panic!("expected Union for decl {i}, got {other:?}"),
         }
