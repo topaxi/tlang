@@ -5,12 +5,14 @@
   else @right,
   member,
   call,
-  exp @left,
+  exp @right,
+  bitwise @left,
   times @left,
   plus @left,
   rel @left,
   and @left,
   or @left,
+  pipeline @left,
   assign @right,
   statement @cut
 }
@@ -24,24 +26,53 @@
 declaration {
   FunctionDeclaration |
   VariableDeclaration |
-  EnumDeclaration
+  EnumDeclaration |
+  StructDeclaration
 }
 
 //!statement
 
 statement[@isGroup=Statement] {
   declaration |
-  IfStatement |
   ReturnStatement |
   Block |
   ExpressionStatement { expression semi } |
   EmptyStatement { ";" }
 }
 
-//!ifstatement
+//!ifexpression
 
-IfStatement {
-  kw<"if"> ParenthesizedExpression statement (!else kw<"else"> statement)?
+IfExpression {
+  kw<"if"> expression Block (!else kw<"else"> (IfExpression | Block))?
+}
+
+//!matchexpression
+
+MatchExpression {
+  kw<"match"> expression ";"? "{" commaSep<MatchArm> "}"
+}
+
+MatchArm {
+  pattern GuardClause? "=>" expression
+}
+
+GuardClause {
+  kw<"if"> expression
+}
+
+//!loopexpression
+
+LoopExpression {
+  kw<"loop"> Block
+}
+
+//!forexpression
+
+ForExpression {
+  kw<"for"> pattern kw<"in"> expression ";"?
+  (kw<"with"> patternAssign ";"?)?
+  Block
+  (!else kw<"else"> Block)?
 }
 
 //!returnstatement
@@ -59,12 +90,24 @@ RecExpression {
 //!functiondeclaration
 
 FunctionDeclaration {
-  !statement kw<"fn"> VariableDefinition? ParamList Block
+  !statement kw<"fn"> FunctionName ParamList GuardClause? Block
 }
 
 FunctionExpression {
   kw<"fn"> VariableDefinition? ParamList? Block
 }
+
+FunctionName {
+  (Namespace "::")* FunctionDefinition FunctionArity? ("." PropertyName)?
+}
+
+FunctionDefinition { identifier }
+
+FunctionArity { ArithOp<"/"> Number }
+
+Namespace { identifier }
+
+PathName { identifier }
 
 ParamList {
   "(" commaSep<"..."? pattern> ")"
@@ -72,28 +115,64 @@ ParamList {
 
 //!variabledeclaration
 
-VariableName { identifier }
-VariableDefinition { identifier }
+VariableName { identifier | kw<"self"> }
+VariableDefinition { identifier | kw<"self"> }
 
 VariableDeclaration {
-  (kw<"let">) patternAssign semi
+  kw<"let"> patternAssign semi
 }
 
 //!enumdeclaration
+
 EnumDeclaration {
-  kw<"enum"> identifier "{" commaSep<EnumVariant> "}" semi
+  kw<"enum"> identifier "{" commaSep<EnumVariant> "}"
 }
 
 EnumVariant {
-  identifier ("(" commaSep<identifier> ")") | (identifier "{" commaSep<identifier> "}")
+  identifier (
+    "(" commaSep<TypeAnnotation> ")" |
+    "{" commaSep<StructField> "}"
+  )?
+}
+
+//!structdeclaration
+
+StructDeclaration {
+  kw<"struct"> identifier "{" commaSep<StructField> "}"
+}
+
+StructField {
+  identifier (":" TypeAnnotation)?
+}
+
+TypeAnnotation {
+  identifier ("::" identifier)* ("<" commaSep<TypeAnnotation> ">")?
 }
 
 //!pattern
 
 pattern {
-  VariableDefinition |
+  WildcardPattern { kw<"_"> } |
+  LiteralPattern { "-"? Number | String | BooleanLiteral } |
+  EnumPattern |
+  StructPattern |
   ArrayPattern |
-  ObjectPattern
+  ObjectPattern |
+  VariableDefinition
+}
+
+// Requires at least one "::" to distinguish from plain VariableDefinition
+EnumPattern {
+  identifier ("::" identifier)+ "(" commaSep<"..."? pattern> ")"
+}
+
+// Requires at least one "::" to distinguish from plain VariableDefinition
+StructPattern {
+  identifier ("::" identifier)+ "{" commaSep<StructPatternField> "}"
+}
+
+StructPatternField {
+  ("..." pattern | propName ":" pattern | PropertyName) ("=" expression)?
 }
 
 ArrayPattern {
@@ -123,7 +202,9 @@ expression[@isGroup=Expression] {
   Number |
   String |
   VariableName |
-  @specialize[@name=BooleanLiteral]<identifier, "true" | "false"> |
+  PathExpression { (Namespace "::")+ PathName } |
+  BooleanLiteral |
+  WildcardExpression { kw<"_"> } |
   ArrayExpression {
     "[" commaSep1<"..."? expression | ""> ~destructure "]"
   } |
@@ -133,20 +214,33 @@ expression[@isGroup=Expression] {
   UnaryExpression |
   ParenthesizedExpression |
   MemberExpression |
+  IndexExpression |
   FunctionExpression |
   BinaryExpression |
   AssignmentExpression |
   RecExpression |
+  BreakExpression |
+  ContinueExpression |
+  IfExpression |
+  MatchExpression |
+  LoopExpression |
+  ForExpression |
   CallExpression {
     expression !call ArgList
   }
 }
+
+BooleanLiteral { @specialize[@name=BooleanLiteral]<identifier, "true" | "false"> }
 
 //!expression_misc
 
 ParenthesizedExpression { "(" expression ")" }
 
 ArgList { "(" commaSep<"..."? expression> ")" }
+
+BreakExpression { kw<"break"> (noSemi expression)? }
+
+ContinueExpression { kw<"continue"> }
 
 //!property
 
@@ -160,25 +254,33 @@ Property {
 //!operators
 
 UnaryExpression {
-  (LogicOp<"!"> | ArithOp<"+" | "-">)
+  (LogicOp<"!"> | kw<"not"> | ArithOp<"+" | "-">)
   expression
 }
 
 BinaryExpression {
+  expression !exp ArithOp<"**"> expression |
+  expression !bitwise (BitOp<"&"> | BitOp<"|"> | BitOp<"^">) expression |
   expression !times (ArithOp<"/"> | ArithOp<"%"> | ArithOp<"*">) expression |
   expression !plus ArithOp<"+" | "-"> expression |
-  expression !rel CompareOp expression
+  expression !rel CompareOp expression |
+  expression !and (LogicOp<"&&"> | kw<"and">) expression |
+  expression !or (LogicOp<"||"> | kw<"or">) expression |
+  expression !pipeline "|>" expression
 }
 
 //!assign
 
 AssignmentExpression {
-  (identifier | MemberExpression) !assign UpdateOp expression |
-  (MemberExpression | pattern) !assign "=" expression
+  (identifier | MemberExpression | IndexExpression) !assign (UpdateOp | "=") expression
 }
 
 MemberExpression {
-  expression !member ("." PropertyName | "[" expression "]")
+  expression !member "." PropertyName
+}
+
+IndexExpression {
+  expression !member "[" expression "]"
 }
 
 //!commaSep
@@ -272,18 +374,26 @@ semi { ";" | insertSemi }
 
   ArithOp<expr> { expr }
   LogicOp<expr> { expr }
+  BitOp<expr> { expr }
 
-  UpdateOp { $[+\-/%*] "=" }
+  UpdateOp { $[+\-/%*] "=" | "**=" }
 
-  CompareOp { ("<" | ">" | "==" | "!=") "="? }
+  CompareOp { "<=" | ">=" | "==" | "!=" | "<" | ">" }
 
 //!literalTokens
 
   "="[@name=Equals]
-  "|>"[@name="Pipeline"]
+  "|>"[@name=Pipeline]
+  "::"[@name=PathSep]
   "..." "=>"
   "(" ")" "[" "]" "{" "}"
   "." "," ";" ":"
+
+  @precedence { "|>", LogicOp<"||">, BitOp<"|"> }
+  @precedence { LogicOp<"&&">, BitOp<"&"> }
+  @precedence { ArithOp<"**">, ArithOp<"*"> }
+  @precedence { "::", ":" }
+  @precedence { UpdateOp, "=" }
 }
 
 //!insertSemicolon
