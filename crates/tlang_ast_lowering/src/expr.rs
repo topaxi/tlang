@@ -117,64 +117,25 @@ impl LoweringContext {
         let arms = arms
             .iter()
             .map(|arm| {
-                let arm_scope_locals = self
-                    .symbol_tables
-                    .get(&arm.id)
-                    .map(|t| t.borrow().locals())
-                    .unwrap_or(0);
-
-                if arm_scope_locals > 0 {
-                    // Two-scope model: arm scope holds pattern-bound vars, block scope holds
-                    // let-bindings. The block scope is reparented to the arm scope so that
-                    // pattern vars are visible from within the block body.
-                    self.with_scope(arm.id, |this| {
-                        let hir_id = this.lower_node_id(arm.id);
-                        let pat = this.lower_pat_with_idents(&arm.pattern, &mut idents);
-                        let guard = arm.guard.as_ref().map(|expr| this.lower_expr(expr));
-                        let block =
-                            if let ast::node::ExprKind::Block(ast_block) = &arm.expression.kind {
-                                this.lower_block(ast_block)
-                            } else {
-                                hir::Block::new(
-                                    hir_id,
-                                    vec![],
-                                    Some(this.lower_expr(&arm.expression)),
-                                    arm.expression.span,
-                                )
-                            };
-
-                        hir::MatchArm {
-                            hir_id,
-                            pat,
-                            guard,
-                            block,
-                            pat_locals: 0,
-                            leading_comments: vec![],
-                            trailing_comments: vec![],
-                        }
-                    })
-                } else {
-                    // Single-scope model: no pattern vars, so we skip the arm scope entirely
-                    // and reparent the block scope directly to the enclosing scope.
-                    // Register arm.id so symbol_tables() can resolve it without warnings.
-                    self.lower_node_id(arm.id);
-                    let pat = self.lower_pat_with_idents(&arm.pattern, &mut idents);
-                    let guard = arm.guard.as_ref().map(|expr| self.lower_expr(expr));
+                // All arms enter the arm scope. For block-body arms this creates two distinct
+                // scopes (arm scope + block scope), making `arm.hir_id != arm.block.hir_id`.
+                // For inline-expr arms the block reuses the arm's hir_id, so they are equal.
+                // This invariant drives the two-scope vs one-scope decision in the runtime.
+                self.with_scope(arm.id, |this| {
+                    let hir_id = this.lower_node_id(arm.id);
+                    let pat = this.lower_pat_with_idents(&arm.pattern, &mut idents);
+                    let guard = arm.guard.as_ref().map(|expr| this.lower_expr(expr));
                     let block = if let ast::node::ExprKind::Block(ast_block) = &arm.expression.kind
                     {
-                        self.with_scope(ast_block.id, |this| {
-                            this.lower_block_in_current_scope(ast_block)
-                        })
+                        this.lower_block(ast_block)
                     } else {
-                        let inline_hir_id = self.lower_node_id(arm.id);
                         hir::Block::new(
-                            inline_hir_id,
+                            hir_id,
                             vec![],
-                            Some(self.lower_expr(&arm.expression)),
+                            Some(this.lower_expr(&arm.expression)),
                             arm.expression.span,
                         )
                     };
-                    let hir_id = block.hir_id;
 
                     hir::MatchArm {
                         hir_id,
@@ -185,7 +146,7 @@ impl LoweringContext {
                         leading_comments: vec![],
                         trailing_comments: vec![],
                     }
-                }
+                })
             })
             .collect();
         hir::ExprKind::Match(Box::new(expr), arms)

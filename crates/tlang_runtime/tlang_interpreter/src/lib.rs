@@ -52,6 +52,24 @@ pub struct Interpreter {
     state: InterpreterState,
 }
 
+/// A minimal `HirScope` that represents the arm's pattern-variable scope.
+/// Used to pre-allocate slots for pattern-bound variables before entering the block scope.
+struct ArmPatScope(usize);
+
+impl hir::HirScope for ArmPatScope {
+    fn locals(&self) -> usize {
+        self.0
+    }
+
+    fn upvars(&self) -> usize {
+        0
+    }
+
+    fn set_locals(&mut self, _: usize) {}
+
+    fn set_upvars(&mut self, _: usize) {}
+}
+
 impl Resolver for Interpreter {
     fn resolve_value(&self, path: &hir::Path) -> Option<TlangValue> {
         self.state.resolve_value(path)
@@ -1538,22 +1556,10 @@ impl Interpreter {
             self.state.stringify(value)
         );
 
-        if arm.pat_locals > 0 {
-            // Block-body arm with pattern-bound variables: use two nested scopes.
-            // Outer scope holds the pattern variables; inner block scope holds let bindings.
-            struct PatScope(usize);
-            impl hir::HirScope for PatScope {
-                fn locals(&self) -> usize {
-                    self.0
-                }
-                fn upvars(&self) -> usize {
-                    0
-                }
-                fn set_locals(&mut self, _: usize) {}
-                fn set_upvars(&mut self, _: usize) {}
-            }
-
-            self.with_new_scope(&PatScope(arm.pat_locals), |this| {
+        if arm.hir_id != arm.block.hir_id {
+            // Block-body arm: push the arm's pattern scope, then evaluate the block
+            // (which pushes its own scope). Two scopes in total.
+            self.with_new_scope(&ArmPatScope(arm.pat_locals), |this| {
                 if !this.eval_pat(&arm.pat, value) {
                     return MatchResult::NotMatched(EvalResult::Void);
                 }
@@ -1577,6 +1583,7 @@ impl Interpreter {
                 MatchResult::Matched(this.eval_block(&arm.block))
             })
         } else {
+            // Inline-expr arm: single scope combining the arm and its expression.
             self.with_new_scope(arm, |this| {
                 if !this.eval_pat(&arm.pat, value) {
                     return MatchResult::NotMatched(EvalResult::Void);
