@@ -129,3 +129,181 @@ fn constant_folding_booleans() {
     println(false, true, false);
     "###);
 }
+
+#[test]
+fn integer_arithmetic_folding() {
+    let source = r#"
+        let a: unknown = 10 - 3;
+        let b: unknown = 4 * 5;
+        let c: unknown = 10 + 7;
+        println(a, b, c);
+    "#;
+    let hir = common::compile_and_optimize(source, &mut optimizer());
+    assert_snapshot!(common::pretty_print(&hir), @r###"
+    let a: unknown = 7;
+    let b: unknown = 20;
+    let c: unknown = 17;
+    println(7, 20, 17);
+    "###);
+}
+
+#[test]
+fn unsigned_integer_division_folding() {
+    let source = r#"
+        let a: unknown = 10 / 2;
+        let b: unknown = 10 % 3;
+        println(a, b);
+    "#;
+    let hir = common::compile_and_optimize(source, &mut optimizer());
+    assert_snapshot!(common::pretty_print(&hir), @r###"
+    let a: unknown = 5;
+    let b: unknown = 1;
+    println(5, 1);
+    "###);
+}
+
+#[test]
+fn exponentiation_folding() {
+    let source = r#"
+        let a: unknown = 2 ** 10;
+        println(a);
+    "#;
+    let hir = common::compile_and_optimize(source, &mut optimizer());
+    assert_snapshot!(common::pretty_print(&hir), @r###"
+    let a: unknown = 1024;
+    println(1024);
+    "###);
+}
+
+#[test]
+fn comparison_eq_folding() {
+    let source = r#"
+        let a: unknown = 1 == 1;
+        let b: unknown = 1 == 2;
+        println(a, b);
+    "#;
+    let hir = common::compile_and_optimize(source, &mut optimizer());
+    assert_snapshot!(common::pretty_print(&hir), @r###"
+    let a: unknown = true;
+    let b: unknown = false;
+    println(true, false);
+    "###);
+}
+
+#[test]
+fn comparison_ordering_folding() {
+    let source = r#"
+        let a: unknown = 1 < 2;
+        let b: unknown = 2 > 1;
+        let c: unknown = 2 <= 2;
+        let d: unknown = 3 >= 4;
+        println(a, b, c, d);
+    "#;
+    let hir = common::compile_and_optimize(source, &mut optimizer());
+    assert_snapshot!(common::pretty_print(&hir), @r###"
+    let a: unknown = true;
+    let b: unknown = true;
+    let c: unknown = true;
+    let d: unknown = false;
+    println(true, true, true, false);
+    "###);
+}
+
+#[test]
+fn comparison_neq_folding() {
+    let source = r#"
+        let a: unknown = 1 != 1;
+        let b: unknown = 1 != 2;
+        println(a, b);
+    "#;
+    let hir = common::compile_and_optimize(source, &mut optimizer());
+    assert_snapshot!(common::pretty_print(&hir), @r###"
+    let a: unknown = false;
+    let b: unknown = true;
+    println(false, true);
+    "###);
+}
+
+#[test]
+fn boolean_eq_folding() {
+    let source = r#"
+        let a: unknown = true == true;
+        let b: unknown = true == false;
+        println(a, b);
+    "#;
+    let hir = common::compile_and_optimize(source, &mut optimizer());
+    assert_snapshot!(common::pretty_print(&hir), @r###"
+    let a: unknown = true;
+    let b: unknown = false;
+    println(true, false);
+    "###);
+}
+
+#[test]
+fn bitwise_and_folding() {
+    let source = r#"
+        let a: unknown = 6 & 3;
+        println(a);
+    "#;
+    let hir = common::compile_and_optimize(source, &mut optimizer());
+    assert_snapshot!(common::pretty_print(&hir), @r###"
+    let a: unknown = 2;
+    println(2);
+    "###);
+}
+
+#[test]
+fn bitwise_or_folding() {
+    let source = r#"
+        let a: unknown = 4 | 2;
+        println(a);
+    "#;
+    let hir = common::compile_and_optimize(source, &mut optimizer());
+    assert_snapshot!(common::pretty_print(&hir), @r###"
+    let a: unknown = 6;
+    println(6);
+    "###);
+}
+
+#[test]
+fn bitwise_xor_folding() {
+    let source = r#"
+        let a: unknown = 5 ^ 3;
+        println(a);
+    "#;
+    let hir = common::compile_and_optimize(source, &mut optimizer());
+    assert_snapshot!(common::pretty_print(&hir), @r###"
+    let a: unknown = 6;
+    println(6);
+    "###);
+}
+
+#[test]
+fn unary_minus_folding() {
+    let source = r#"
+        let x: unknown = 5;
+        let y: unknown = -x;
+        println(y);
+    "#;
+    let hir = common::compile_and_optimize(source, &mut optimizer());
+    assert_snapshot!(common::pretty_print(&hir), @r###"
+    let x: unknown = 5;
+    let y: unknown = -5;
+    println(-5);
+    "###);
+}
+
+#[test]
+fn float_arithmetic_folding() {
+    let source = r#"
+        let a: unknown = 1.5 + 2.5;
+        let b: unknown = 3.0 * 2.0;
+        println(a, b);
+    "#;
+    let hir = common::compile_and_optimize(source, &mut optimizer());
+    assert_snapshot!(common::pretty_print(&hir), @r###"
+    let a: unknown = 4;
+    let b: unknown = 6;
+    println(4, 6);
+    "###);
+}
