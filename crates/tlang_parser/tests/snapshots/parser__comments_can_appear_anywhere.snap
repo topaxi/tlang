@@ -200,9 +200,7 @@ Module(
                       ),
                     ),
                   ],
-                  res: Res(
-                    node_id: None,
-                  ),
+                  res: Unresolved,
                   span: Span(
                     start: LineColumn(
                       line: 5,
@@ -286,9 +284,7 @@ Module(
                   ),
                 ),
               ],
-              res: Res(
-                node_id: None,
-              ),
+              res: Unresolved,
               span: Span(
                 start: LineColumn(
                   line: 7,
