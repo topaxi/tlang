@@ -1,0 +1,26 @@
+{
+  "grammars": [
+    {
+      "name": "tlang",
+      "scope": "source.tlang",
+      "file-types": ["tlang"],
+      "path": ".",
+      "highlights": "queries/highlights.scm",
+      "locals": "queries/locals.scm",
+      "tags": "queries/tags.scm"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "tlang grammar for tree-sitter",
+    "authors": [
+      {
+        "name": "tlang contributors"
+      }
+    ],
+    "links": {
+      "repository": "https://github.com/topaxi/tlang"
+    }
+  }
+}

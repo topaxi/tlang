@@ -1,0 +1,31 @@
+{
+  "name": "tree-sitter-tlang",
+  "version": "0.1.0",
+  "description": "tlang grammar for tree-sitter",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/topaxi/tlang"
+  },
+  "keywords": ["parser", "tree-sitter", "tlang"],
+  "files": ["grammar.js", "binding.gyp", "prebuilds/**", "bindings/node/*", "queries/*", "src/**"],
+  "main": "bindings/node",
+  "types": "bindings/node",
+  "devDependencies": {
+    "tree-sitter-cli": "^0.24.0"
+  },
+  "scripts": {
+    "generate": "tree-sitter generate",
+    "test": "tree-sitter test",
+    "parse": "tree-sitter parse"
+  },
+  "tree-sitter": [
+    {
+      "scope": "source.tlang",
+      "file-types": ["tlang"],
+      "highlights": "queries/highlights.scm",
+      "locals": "queries/locals.scm",
+      "tags": "queries/tags.scm"
+    }
+  ]
+}
