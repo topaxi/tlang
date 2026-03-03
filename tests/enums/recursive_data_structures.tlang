@@ -1,6 +1,3 @@
-// Tests recursive data structures that may cause issues in JavaScript backend
-// Self-referential types and circular references
-
 enum LinkedList {
     Empty,
     Node(i32, LinkedList),
@@ -35,26 +32,20 @@ fn create_balanced_tree(depth, value) {
 }
 
 // Traverse deeply nested structures
-fn sum_list(list) {
-    match list {
-        LinkedList::Empty => 0,
-        LinkedList::Node(value, rest) => value + sum_list(rest),
-    }
+fn sum_list(LinkedList::Empty) { 0 }
+fn sum_list(LinkedList::Node(value, rest)) {
+    value + sum_list(rest)
 }
 
-fn tree_depth(tree) {
-    match tree {
-        BinaryTree::Empty => 0,
-        BinaryTree::Leaf(_) => 1,
-        BinaryTree::Node(_, left, right) => {
-            let left_depth = tree_depth(left);
-            let right_depth = tree_depth(right);
-            if left_depth > right_depth {
-                left_depth + 1
-            } else {
-                right_depth + 1
-            }
-        },
+fn tree_depth(BinaryTree::Empty) { 0 }
+fn tree_depth(BinaryTree::Leaf(_)) { 1 }
+fn tree_depth(BinaryTree::Node(_, left, right)) {
+    let left_depth = tree_depth(left);
+    let right_depth = tree_depth(right);
+    if left_depth > right_depth {
+        left_depth + 1
+    } else {
+        right_depth + 1
     }
 }
 
