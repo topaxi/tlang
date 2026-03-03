@@ -32,7 +32,22 @@ export class TlangController {
   private cachedJS: string | null = null;
 
   constructor(initialSource: string, initialRunner: Runner) {
-    this.tlang = new Tlang(initialSource, initialRunner);
+    this.tlang = this.createTlang(initialSource, initialRunner);
+    this.analyze();
+  }
+
+  private createTlang(source: string, runner: Runner): Tlang {
+    const tlang = new Tlang(source, runner);
+    tlang.defineFunction('log', this.tlangConsole.log);
+
+    for (let [method, fn] of Object.entries(this.tlangConsole)) {
+      tlang.defineFunction(
+        `log::${method}`,
+        fn as (...args: unknown[]) => unknown,
+      );
+    }
+
+    return tlang;
   }
 
   updateTlang(source: string, runner: Runner) {
@@ -44,16 +59,7 @@ export class TlangController {
     this.cachedHIR = null;
     this.cachedJS = null;
 
-    this.tlang = new Tlang(source, runner);
-    this.tlang.defineFunction('log', this.tlangConsole.log);
-
-    for (let [method, fn] of Object.entries(this.tlangConsole)) {
-      this.tlang.defineFunction(
-        `log::${method}`,
-        fn as (...args: unknown[]) => unknown,
-      );
-    }
-
+    this.tlang = this.createTlang(source, runner);
     this.analyze();
   }
 
