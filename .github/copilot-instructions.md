@@ -60,16 +60,17 @@ This automated setup ensures a consistent development environment and eliminates
 **CRITICAL: Node.js version 24.0.2 is required for all tests to pass. Verify with `node --version` before running tests.**
 
 - **Rust tests**: `cargo nextest run --profile=ci` -- takes ~55s. NEVER CANCEL. Set timeout to 30+ minutes.
+  - **IMPORTANT**: Always use `cargo nextest` — never `cargo test`. The project uses nextest exclusively.
 - **Integration tests**: `make test` -- takes ~64s. Tests built compiler/interpreter with both backends. **REQUIRES Node.js 24.0.2 exactly** (see package.json volta config). Test failures with different Node.js versions are due to stack trace differences in expected output. NEVER CANCEL. Set timeout to 30+ minutes.
 - **WebAssembly bindings test**: `make test-bindings-js` -- takes ~21s. NEVER CANCEL. Set timeout to 30+ minutes.
 - **Build playground**: `npm run build` -- takes ~13s. NEVER CANCEL. Set timeout to 30+ minutes.
 - **Build interpreter**: `cargo build --release --features=binary --bin tlangdi` -- takes ~30s. NEVER CANCEL. Set timeout to 60+ minutes.
-- **Build CLI**: `cargo build --release --bin tlang_cli_js` -- takes ~21s. NEVER CANCEL. Set timeout to 60+ minutes.
+- **Build CLI**: `cargo build --release --bin tlang` -- takes ~21s. NEVER CANCEL. Set timeout to 60+ minutes.
 
 ### Run Applications
 
 - **Development server**: `npm run dev` (starts Vite dev server on http://localhost:5173/)
-- **CLI compiler**: `./target/release/tlang_cli_js input.tlang --output-type js`
+- **CLI compiler**: `./target/release/tlang input.tlang --output-type js`
 - **Interpreter**: `./target/release/tlangdi input.tlang`
 
 ## Commit Message Guidelines
@@ -164,7 +165,7 @@ ALWAYS manually validate any code changes through complete end-to-end scenarios:
 
    ```bash
    # This should output generated JavaScript and print "120" when executed
-   ./target/release/tlang_cli_js tests/functions/pipeline/pipeline.tlang --output-type js | node
+   ./target/release/tlang tests/functions/pipeline/pipeline.tlang --output-type js | node
    ```
 
 4. **Test interpreter functionality:**
@@ -263,6 +264,26 @@ tsconfig.json
 - Interpreter tests should always pass
 - Use CI results as authoritative - if tests pass on CI, local failures are likely environment issues
 - Focus on ensuring your changes don't break existing interpreter functionality
+
+### Semantic Analysis Architecture
+
+The semantic analysis pipeline (in `tlang_semantics`) runs in two phases before HIR lowering:
+
+1. **Mutation phase** (`SemanticAnalysisPass::mutate(&mut Module)`) — passes annotate or transform the AST in place (e.g. `FnParamTypeInference` sets inferred type annotations on `FunctionParameter` nodes).
+2. **Analysis phase** (`SemanticAnalysisPass::analyze(&Module, ctx, is_root)`) — read-only traversal that populates symbol tables and emits diagnostics.
+
+`SemanticAnalyzer::analyze()` takes `&mut Module` (not `&Module`) so the mutation phase can write back to the AST. Always bind the parsed AST as `mut` before passing it to the analyzer:
+
+```rust
+let mut ast = parser.parse()?;
+semantic_analyzer.analyze(&mut ast)?;
+```
+
+New semantic passes go in `crates/tlang_semantics/src/passes/` and must be registered in `SemanticAnalyzer::default()` in `analyzer.rs`. Mutation passes should run *before* `DeclarationAnalyzer`.
+
+### Adding HIR Lowering Tests with Semantic Analysis
+
+The `tlang_ast_lowering` test helper `hir_from_str` skips semantic analysis and is suitable for pure lowering tests. For tests that require inferred types or symbol resolution, use `hir_from_str_analyzed` (defined in `crates/tlang_ast_lowering/tests/common/mod.rs`) which runs the full semantic analysis first.
 
 ### Working with WebAssembly
 
