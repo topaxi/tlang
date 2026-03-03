@@ -84,7 +84,7 @@ impl CodegenJS {
         format!("{notice}\n{stdlib_js_src}")
     }
 
-    pub fn get_standard_library_symbols() -> &'static [(&'static str, SymbolType); 30] {
+    pub fn get_standard_library_symbols() -> &'static [(&'static str, SymbolType)] {
         &[
             ("Option", SymbolType::Enum),
             ("Result", SymbolType::Enum),
