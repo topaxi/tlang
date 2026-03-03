@@ -97,6 +97,25 @@ impl<'hir> Visitor<'hir> for ScopeDataUpdater {
                     }
                 }
             }
+            hir::ExprKind::Match(_, _) => {
+                // Walk normally first so inner blocks get their locals updated
+                tlang_hir::visit::walk_expr(self, expr, ctx);
+
+                // For block-body arms, set pat_locals from the arm's own scope.
+                // This is non-zero only when the arm scope is distinct from the block scope
+                // (i.e. the arm has pattern-bound variables AND a block body with let bindings).
+                if let hir::ExprKind::Match(_, arms) = &mut expr.kind {
+                    for arm in arms.iter_mut() {
+                        if arm.hir_id != arm.block.hir_id
+                            && let Some(symbol_table) = ctx.symbols.get(&arm.hir_id)
+                        {
+                            let pat_locals = symbol_table.borrow().locals();
+                            debug!("Setting arm {:?} pat_locals to {}", arm.hir_id, pat_locals);
+                            arm.pat_locals = pat_locals;
+                        }
+                    }
+                }
+            }
             _ => {
                 // For other expressions, use the default walking
                 tlang_hir::visit::walk_expr(self, expr, ctx);

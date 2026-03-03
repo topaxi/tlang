@@ -518,9 +518,19 @@ pub enum PatKind {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct MatchArm {
+    /// HirId for the arm's own scope, which holds pattern-bound variables.
+    /// For non-block arms this equals `block.hir_id` (single combined scope).
+    /// For block-body arms this is a distinct scope that is the parent of `block`.
+    pub hir_id: HirId,
     pub pat: Pat,
     pub guard: Option<Expr>,
     pub block: Block,
+    /// Number of slots in the arm's pattern scope (populated by `ScopeDataUpdater`).
+    /// Non-zero only for block-body arms that bind variables in their pattern.
+    /// When non-zero, the runtime must push two scopes: an outer arm scope with
+    /// `pat_locals` slots for pattern variables, and an inner block scope for
+    /// `block.locals()` let-binding variables.
+    pub pat_locals: usize,
     // TODO: We might want to handle this somehow different, as we pass them on from the AST to
     //       HIR, which feels somewhat unnecessary.
     pub leading_comments: Vec<Token>,

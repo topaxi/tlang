@@ -221,6 +221,7 @@ impl LoweringContext {
             let loop_body = this.lower_block_in_current_scope(&for_loop.block);
 
             hir::MatchArm {
+                hir_id: loop_body.hir_id,
                 pat: hir::Pat {
                     kind: hir::PatKind::Enum(
                         Box::new(hir::Path::new(
@@ -236,6 +237,7 @@ impl LoweringContext {
                 },
                 guard: None,
                 block: loop_body,
+                pat_locals: 0,
                 leading_comments: vec![],
                 trailing_comments: vec![],
             }
@@ -267,7 +269,18 @@ impl LoweringContext {
                 ))
             });
 
+            let arm_block = hir::Block::new(
+                this.unique_id(),
+                vec![],
+                Some(this.expr(
+                    Default::default(),
+                    hir::ExprKind::Break(accumulator_path_expr),
+                )),
+                Default::default(),
+            );
+
             let arm = hir::MatchArm {
+                hir_id: arm_block.hir_id,
                 pat: hir::Pat {
                     kind: hir::PatKind::Enum(
                         Box::new(hir::Path::new(
@@ -282,15 +295,8 @@ impl LoweringContext {
                     span: Default::default(),
                 },
                 guard: None,
-                block: hir::Block::new(
-                    this.unique_id(),
-                    vec![],
-                    Some(this.expr(
-                        Default::default(),
-                        hir::ExprKind::Break(accumulator_path_expr),
-                    )),
-                    Default::default(),
-                ),
+                block: arm_block,
+                pat_locals: 0,
                 leading_comments: vec![],
                 trailing_comments: vec![],
             };

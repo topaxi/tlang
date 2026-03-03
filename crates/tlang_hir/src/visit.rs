@@ -198,8 +198,12 @@ pub fn walk_expr<'hir, V: Visitor<'hir>>(
             visitor.visit_expr(expr, ctx);
 
             for arm in arms {
-                let hir_id = arm.block.hir_id;
-                visitor.enter_scope(hir_id, ctx);
+                let block_hir_id = arm.block.hir_id;
+                let has_pat_scope = arm.hir_id != block_hir_id;
+                if has_pat_scope {
+                    visitor.enter_scope(arm.hir_id, ctx);
+                }
+                visitor.enter_scope(block_hir_id, ctx);
                 visitor.visit_pat(&mut arm.pat, ctx);
 
                 if let Some(guard) = &mut arm.guard {
@@ -207,7 +211,10 @@ pub fn walk_expr<'hir, V: Visitor<'hir>>(
                 }
 
                 visitor.visit_block(&mut arm.block, ctx);
-                visitor.leave_scope(hir_id, ctx);
+                visitor.leave_scope(block_hir_id, ctx);
+                if has_pat_scope {
+                    visitor.leave_scope(arm.hir_id, ctx);
+                }
             }
         }
         hir::ExprKind::Dict(pairs) => {

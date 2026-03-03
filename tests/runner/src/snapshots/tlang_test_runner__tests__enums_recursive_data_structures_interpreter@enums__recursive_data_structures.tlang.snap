@@ -1,0 +1,11 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: apply_redactions(&output)
+input_file: tests/enums/recursive_data_structures.tlang
+---
+=== Recursive Data Structures Test ===
+5050
+9
+51
+13

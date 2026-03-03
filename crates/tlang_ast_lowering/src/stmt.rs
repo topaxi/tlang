@@ -483,9 +483,11 @@ impl LoweringContext {
             body.hir_id = this.lower_node_id(decl.id);
 
             hir::MatchArm {
+                hir_id: body.hir_id,
                 pat,
                 guard,
                 block: body,
+                pat_locals: 0,
                 leading_comments: decl.leading_comments.clone(),
                 trailing_comments: decl.trailing_comments.clone(),
             }

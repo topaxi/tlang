@@ -117,35 +117,75 @@ impl LoweringContext {
         let arms = arms
             .iter()
             .map(|arm| {
-                let scope_id = if let ast::node::ExprKind::Block(block) = &arm.expression.kind {
-                    block.id
-                } else {
-                    arm.id
-                };
+                let arm_scope_locals = self
+                    .symbol_tables
+                    .get(&arm.id)
+                    .map(|t| t.borrow().locals())
+                    .unwrap_or(0);
 
-                self.with_scope(scope_id, |this| {
-                    let hir_id = this.lower_node_id(arm.id);
-                    let pat = this.lower_pat_with_idents(&arm.pattern, &mut idents);
-                    let guard = arm.guard.as_ref().map(|expr| this.lower_expr(expr));
-                    let block = if let ast::node::ExprKind::Block(block) = &arm.expression.kind {
-                        this.lower_block_in_current_scope(block)
-                    } else {
-                        hir::Block::new(
+                if arm_scope_locals > 0 {
+                    // Two-scope model: arm scope holds pattern-bound vars, block scope holds
+                    // let-bindings. The block scope is reparented to the arm scope so that
+                    // pattern vars are visible from within the block body.
+                    self.with_scope(arm.id, |this| {
+                        let hir_id = this.lower_node_id(arm.id);
+                        let pat = this.lower_pat_with_idents(&arm.pattern, &mut idents);
+                        let guard = arm.guard.as_ref().map(|expr| this.lower_expr(expr));
+                        let block =
+                            if let ast::node::ExprKind::Block(ast_block) = &arm.expression.kind {
+                                this.lower_block(ast_block)
+                            } else {
+                                hir::Block::new(
+                                    hir_id,
+                                    vec![],
+                                    Some(this.lower_expr(&arm.expression)),
+                                    arm.expression.span,
+                                )
+                            };
+
+                        hir::MatchArm {
                             hir_id,
+                            pat,
+                            guard,
+                            block,
+                            pat_locals: 0,
+                            leading_comments: vec![],
+                            trailing_comments: vec![],
+                        }
+                    })
+                } else {
+                    // Single-scope model: no pattern vars, so we skip the arm scope entirely
+                    // and reparent the block scope directly to the enclosing scope.
+                    // Register arm.id so symbol_tables() can resolve it without warnings.
+                    self.lower_node_id(arm.id);
+                    let pat = self.lower_pat_with_idents(&arm.pattern, &mut idents);
+                    let guard = arm.guard.as_ref().map(|expr| self.lower_expr(expr));
+                    let block = if let ast::node::ExprKind::Block(ast_block) = &arm.expression.kind
+                    {
+                        self.with_scope(ast_block.id, |this| {
+                            this.lower_block_in_current_scope(ast_block)
+                        })
+                    } else {
+                        let inline_hir_id = self.lower_node_id(arm.id);
+                        hir::Block::new(
+                            inline_hir_id,
                             vec![],
-                            Some(this.lower_expr(&arm.expression)),
+                            Some(self.lower_expr(&arm.expression)),
                             arm.expression.span,
                         )
                     };
+                    let hir_id = block.hir_id;
 
                     hir::MatchArm {
+                        hir_id,
                         pat,
                         guard,
                         block,
+                        pat_locals: 0,
                         leading_comments: vec![],
                         trailing_comments: vec![],
                     }
-                })
+                }
             })
             .collect();
         hir::ExprKind::Match(Box::new(expr), arms)
@@ -185,9 +225,11 @@ impl LoweringContext {
         let block = self.lower_block(then_branch);
 
         arms.push(hir::MatchArm {
+            hir_id: block.hir_id,
             pat,
             guard: None,
             block,
+            pat_locals: 0,
             leading_comments: condition.leading_comments.clone(),
             trailing_comments: condition.trailing_comments.clone(),
         });
@@ -200,12 +242,14 @@ impl LoweringContext {
             let block = self.lower_block(&else_branch.consequence);
 
             arms.push(hir::MatchArm {
+                hir_id: block.hir_id,
                 pat: hir::Pat {
                     kind: hir::PatKind::Wildcard,
                     span: Default::default(),
                 },
                 guard,
                 block,
+                pat_locals: 0,
                 leading_comments: vec![],
                 trailing_comments: vec![],
             });
