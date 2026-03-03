@@ -77,6 +77,7 @@ impl JsHirPrettyOptions {
 pub struct BuildArtifacts {
     parse_result: Option<Result<ast::Module, ParseError>>,
     hir: Option<hir::Module>,
+    analyzed: bool,
 }
 
 #[wasm_bindgen]
@@ -188,6 +189,7 @@ impl Tlang {
 
         if let Some(Ok(ast)) = &mut self.build.parse_result {
             let _ = self.analyzer.analyze(ast);
+            self.build.analyzed = true;
         }
     }
 
@@ -196,6 +198,10 @@ impl Tlang {
 
         if self.hir().is_some() {
             return;
+        }
+
+        if !self.build.analyzed {
+            self.analyze();
         }
 
         if let Some(ast) = self.ast() {
