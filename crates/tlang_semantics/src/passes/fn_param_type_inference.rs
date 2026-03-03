@@ -22,10 +22,10 @@ impl VisitorMut for FnParamTypeInference {
         for i in 0..num_params {
             if let Some(inferred_ty) = infer_enum_type(decls, i) {
                 for decl in decls.iter_mut() {
-                    if let Some(param) = decl.parameters.get_mut(i) {
-                        if param.type_annotation.is_none() {
-                            param.type_annotation = Some(inferred_ty.clone());
-                        }
+                    if let Some(param) = decl.parameters.get_mut(i)
+                        && param.type_annotation.is_none()
+                    {
+                        param.type_annotation = Some(inferred_ty.clone());
                     }
                 }
             }
