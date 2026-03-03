@@ -1,12 +1,12 @@
 enum Expr {
-    Value(i64),
+    Value(isize),
     Add(Expr, Expr),
     Subtract(Expr, Expr),
     Multiply(Expr, Expr),
     Divide(Expr, Expr),
 }
 
-// evaluate(Expr) -> i64
+// evaluate(Expr) -> isize
 fn evaluate(Expr::Value(val)) { val }
 fn evaluate(Expr::Add(left, right)) { evaluate(left) + evaluate(right) }
 fn evaluate(Expr::Subtract(left, right)) { evaluate(left) - evaluate(right) }

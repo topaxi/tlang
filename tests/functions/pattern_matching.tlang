@@ -1,27 +1,27 @@
 // Pattern Matching Examples
 // Demonstrates: comprehensive pattern matching, guards, recursion
 
-// list_length(a[]) -> i64
+// list_length(a[]) -> usize
 fn list_length([]) { 0 }
 fn list_length([_, ...xs]) { 1 + list_length(xs) }
 
-// list_sum(i64[]) -> i64
+// list_sum(isize[]) -> isize
 fn list_sum([]) { 0 }
 fn list_sum([x, ...xs]) { x + list_sum(xs) }
 
-// classify_number(i64) -> string
+// classify_number(isize) -> string
 fn classify_number(n) if n < 0 { "negative" }
 fn classify_number(0) { "zero" }
 fn classify_number(n) if n > 0 && n < 10 { "single digit" }
 fn classify_number(n) if n >= 10 && n < 100 { "double digit" }
 fn classify_number(_) { "large number" }
 
-// fibonacci_pattern(i64) -> i64
+// fibonacci_pattern(isize) -> isize
 fn fibonacci_pattern(0) { 0 }
 fn fibonacci_pattern(1) { 1 }
 fn fibonacci_pattern(n) { fibonacci_pattern(n - 1) + fibonacci_pattern(n - 2) }
 
-// quicksort_simple(i64[]) -> i64[]
+// quicksort_simple(isize[]) -> isize[]
 fn quicksort_simple([]) { [] }
 fn quicksort_simple([pivot, ...rest]) {
     let smaller = rest |> filter(fn(x) { x <= pivot });

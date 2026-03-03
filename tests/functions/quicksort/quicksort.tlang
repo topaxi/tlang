@@ -1,4 +1,4 @@
-// random_int(i64) -> i64
+// random_int(isize) -> isize
 fn random_int(max) { math::random() * max |> math::floor() }
 
 // filter(a[], fn(a) -> bool) -> a[]

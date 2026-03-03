@@ -1,8 +1,8 @@
-// factorial(i64) -> i64
+// factorial(isize) -> isize
 fn factorial(n) { factorial(n, 1) }
-// factorial(0, i64) -> i64
+// factorial(0, isize) -> isize
 fn factorial(0, acc) { acc }
-// factorial(i64, i64) -> i64
+// factorial(isize, isize) -> isize
 fn factorial(n, acc) { rec factorial(n - 1, n * acc) }
 
 factorial(5)

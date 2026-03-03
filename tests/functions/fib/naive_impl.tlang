@@ -1,4 +1,4 @@
-fn fib(n: i64) -> i64 {
+fn fib(n: isize) -> isize {
     if n <= 1 {
         n
     } else {

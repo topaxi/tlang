@@ -3,10 +3,10 @@
 
 enum Tree {
     Empty,
-    Node { value: i64, left: Tree, right: Tree },
+    Node { value: isize, left: Tree, right: Tree },
 }
 
-// insert(Tree, i64) -> Tree
+// insert(Tree, isize) -> Tree
 fn insert(Tree::Empty, value) {
     Tree::Node { value: value, left: Tree::Empty, right: Tree::Empty }
 }
@@ -26,7 +26,7 @@ fn insert(Tree::Node { value: node_val, left: left_tree, right: right_tree }, va
     }
 }
 
-// contains(Tree, i64) -> bool
+// contains(Tree, isize) -> bool
 fn contains(Tree::Empty, _) { false }
 fn contains(Tree::Node { value: node_val, left: left_tree, right: right_tree }, value) {
     if value == node_val {
@@ -38,7 +38,7 @@ fn contains(Tree::Node { value: node_val, left: left_tree, right: right_tree }, 
     }
 }
 
-// count_nodes(Tree) -> i64
+// count_nodes(Tree) -> usize
 fn count_nodes(Tree::Empty) { 0 }
 fn count_nodes(Tree::Node { value: _, left: left_tree, right: right_tree }) {
     1 + count_nodes(left_tree) + count_nodes(right_tree)

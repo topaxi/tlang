@@ -40,16 +40,16 @@ fn flatten(list) { flatten(list, []) }
 fn flatten([], acc) { acc }
 fn flatten([x, ...xs], acc) { rec flatten(xs, [...acc, ...x]) }
 
-// take(a[], i64) -> a[]
+// take(a[], usize) -> a[]
 fn take(list, n) { take(list, n, []) }
-// take(a[], i64, a[]) -> a[]
+// take(a[], usize, a[]) -> a[]
 fn take([], _, acc) { acc }
 fn take([x, ...xs], n, acc) if n > 0 { rec take(xs, n - 1, [...acc, x]) }
 fn take(_, _, acc) { acc }
 
-// drop(a[], i64) -> a[]
+// drop(a[], usize) -> a[]
 fn drop(list, n) { drop(list, n, []) }
-// drop(a[], i64, a[]) -> a[]
+// drop(a[], usize, a[]) -> a[]
 fn drop([], _, acc) { acc }
 fn drop([_, ...xs], n, acc) if n > 0 { rec drop(xs, n - 1, acc) }
 fn drop([x, ...xs], _, acc) { rec drop(xs, 0, [...acc, x]) }

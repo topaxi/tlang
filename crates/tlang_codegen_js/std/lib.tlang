@@ -26,10 +26,10 @@ fn Result.is_err(_) { false }
 fn Result.unwrap(Result::Ok(x)) { x }
 fn Result.unwrap(_) { panic("Called unwrap on Err") }
 
-// len(a[]) -> i64
+// len(a[]) -> usize
 fn len(list) { list.length }
 
-// random_int(i64) -> i64
+// random_int(isize) -> isize
 fn random_int(max) { math::random() * max |> math::floor() }
 
 // compose(fn(a) -> b, fn(b) -> c) -> fn(a) -> c
@@ -69,7 +69,7 @@ fn foldl([x, ...xs], acc, f) { rec foldl(xs, f(acc, x), f) }
 fn foldr([], acc, _) { acc }
 fn foldr([x, ...xs], acc, f) { f(x, foldr(xs, acc, f)) }
 
-// sum(i64[] xs) -> i64
+// sum(isize[] xs) -> isize
 fn sum([]) { 0 }
 fn sum([x, ...xs]) { x + sum(xs) }
 
