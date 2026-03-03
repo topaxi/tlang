@@ -103,10 +103,21 @@ impl CodegenJS {
                 self.push_str(&value.to_string());
             }
             Literal::String(value) | Literal::Char(value) => {
-                self.push_str(&format!("\"{value}\""));
+                self.generate_string_literal(value);
             }
             Literal::None => unreachable!(),
         }
+    }
+
+    fn generate_string_literal(&mut self, value: &str) {
+        let escaped_value = value
+            .replace('\\', "\\\\")
+            .replace('\"', "\\\"")
+            .replace('\n', "\\n")
+            .replace('\r', "\\r")
+            .replace('\t', "\\t");
+
+        self.push_str(&format!("\"{escaped_value}\""));
     }
 
     fn generate_block(&mut self, block: &hir::Block) {
