@@ -46,10 +46,18 @@ impl ConstantFolder {
                 Some(Literal::UnsignedInteger(l * r))
             }
             (BinaryOpKind::Div, Literal::UnsignedInteger(l), Literal::UnsignedInteger(r)) => {
-                if *r == 0 { None } else { Some(Literal::UnsignedInteger(l / r)) }
+                if *r == 0 {
+                    None
+                } else {
+                    Some(Literal::UnsignedInteger(l / r))
+                }
             }
             (BinaryOpKind::Mod, Literal::UnsignedInteger(l), Literal::UnsignedInteger(r)) => {
-                if *r == 0 { None } else { Some(Literal::UnsignedInteger(l % r)) }
+                if *r == 0 {
+                    None
+                } else {
+                    Some(Literal::UnsignedInteger(l % r))
+                }
             }
             (BinaryOpKind::Exp, Literal::UnsignedInteger(l), Literal::UnsignedInteger(r)) => {
                 Some(Literal::UnsignedInteger(l.pow(*r as u32)))
@@ -71,11 +79,9 @@ impl ConstantFolder {
             (BinaryOpKind::Greater, Literal::UnsignedInteger(l), Literal::UnsignedInteger(r)) => {
                 Some(Literal::Boolean(l > r))
             }
-            (
-                BinaryOpKind::GreaterEq,
-                Literal::UnsignedInteger(l),
-                Literal::UnsignedInteger(r),
-            ) => Some(Literal::Boolean(l >= r)),
+            (BinaryOpKind::GreaterEq, Literal::UnsignedInteger(l), Literal::UnsignedInteger(r)) => {
+                Some(Literal::Boolean(l >= r))
+            }
 
             // Unsigned integer bitwise
             (
@@ -83,11 +89,9 @@ impl ConstantFolder {
                 Literal::UnsignedInteger(l),
                 Literal::UnsignedInteger(r),
             ) => Some(Literal::UnsignedInteger(l & r)),
-            (
-                BinaryOpKind::BitwiseOr,
-                Literal::UnsignedInteger(l),
-                Literal::UnsignedInteger(r),
-            ) => Some(Literal::UnsignedInteger(l | r)),
+            (BinaryOpKind::BitwiseOr, Literal::UnsignedInteger(l), Literal::UnsignedInteger(r)) => {
+                Some(Literal::UnsignedInteger(l | r))
+            }
             (
                 BinaryOpKind::BitwiseXor,
                 Literal::UnsignedInteger(l),
@@ -105,10 +109,18 @@ impl ConstantFolder {
                 l.checked_mul(*r).map(Literal::Integer)
             }
             (BinaryOpKind::Div, Literal::Integer(l), Literal::Integer(r)) => {
-                if *r == 0 { None } else { l.checked_div(*r).map(Literal::Integer) }
+                if *r == 0 {
+                    None
+                } else {
+                    l.checked_div(*r).map(Literal::Integer)
+                }
             }
             (BinaryOpKind::Mod, Literal::Integer(l), Literal::Integer(r)) => {
-                if *r == 0 { None } else { l.checked_rem(*r).map(Literal::Integer) }
+                if *r == 0 {
+                    None
+                } else {
+                    l.checked_rem(*r).map(Literal::Integer)
+                }
             }
             (BinaryOpKind::Exp, Literal::Integer(l), Literal::Integer(r)) if *r >= 0 => {
                 l.checked_pow(*r as u32).map(Literal::Integer)
@@ -148,23 +160,43 @@ impl ConstantFolder {
             // Float arithmetic
             (BinaryOpKind::Add, Literal::Float(l), Literal::Float(r)) => {
                 let result = l + r;
-                if result.is_finite() { Some(Literal::Float(result)) } else { None }
+                if result.is_finite() {
+                    Some(Literal::Float(result))
+                } else {
+                    None
+                }
             }
             (BinaryOpKind::Sub, Literal::Float(l), Literal::Float(r)) => {
                 let result = l - r;
-                if result.is_finite() { Some(Literal::Float(result)) } else { None }
+                if result.is_finite() {
+                    Some(Literal::Float(result))
+                } else {
+                    None
+                }
             }
             (BinaryOpKind::Mul, Literal::Float(l), Literal::Float(r)) => {
                 let result = l * r;
-                if result.is_finite() { Some(Literal::Float(result)) } else { None }
+                if result.is_finite() {
+                    Some(Literal::Float(result))
+                } else {
+                    None
+                }
             }
             (BinaryOpKind::Div, Literal::Float(l), Literal::Float(r)) => {
                 let result = l / r;
-                if result.is_finite() { Some(Literal::Float(result)) } else { None }
+                if result.is_finite() {
+                    Some(Literal::Float(result))
+                } else {
+                    None
+                }
             }
             (BinaryOpKind::Mod, Literal::Float(l), Literal::Float(r)) => {
                 let result = l % r;
-                if result.is_finite() { Some(Literal::Float(result)) } else { None }
+                if result.is_finite() {
+                    Some(Literal::Float(result))
+                } else {
+                    None
+                }
             }
 
             // Float comparisons
@@ -209,12 +241,8 @@ impl ConstantFolder {
     fn try_eval_unary_op(&self, op: UnaryOp, val: &Literal) -> Option<Literal> {
         match (op, val) {
             (UnaryOp::Not, Literal::Boolean(v)) => Some(Literal::Boolean(!v)),
-            (UnaryOp::Minus, Literal::UnsignedInteger(v)) => {
-                Some(Literal::Integer(-(*v as i64)))
-            }
-            (UnaryOp::Minus, Literal::Integer(v)) => {
-                v.checked_neg().map(Literal::Integer)
-            }
+            (UnaryOp::Minus, Literal::UnsignedInteger(v)) => Some(Literal::Integer(-(*v as i64))),
+            (UnaryOp::Minus, Literal::Integer(v)) => v.checked_neg().map(Literal::Integer),
             (UnaryOp::Minus, Literal::Float(v)) => Some(Literal::Float(-v)),
             _ => None,
         }

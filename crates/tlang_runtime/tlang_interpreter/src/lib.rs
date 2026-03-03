@@ -1240,10 +1240,13 @@ impl Interpreter {
         }
 
         self.with_new_fn_scope(fn_decl, |this| {
-            this.push_value(callee);
+            // Slots are pre-allocated by ScopeStack::push; use indexed assignment so
+            // that nested calls (which start their scope at memory.len()) don't
+            // overlap with this scope's parameter/local slots.
+            this.state.execution.scope_stack.set_local(0, callee);
 
-            for arg in args {
-                this.push_value(*arg);
+            for (i, arg) in args.iter().enumerate() {
+                this.state.execution.scope_stack.set_local(i + 1, *arg);
             }
 
             // Initialize variable index counter after function parameters (callee + args)

@@ -61,16 +61,22 @@ impl ScopeStack {
 
         // Local scopes (non-global) start at the current end of memory vector
         // Global scope (index 0) uses separate global_memory
+        let start = self.memory.len();
+
         if self.scopes.is_empty() {
             log::warn!(
                 "Pushing global scope - ScopeStack gets initialized with the global/root scope already"
             );
         } else {
-            // Reserve capacity for the exact number of locals (avoid reallocations)
-            self.memory.reserve(meta.locals());
+            // Pre-allocate all local slots with Nil so that nested function calls
+            // start their scopes *after* this scope's entire slot region.
+            // Without this, a nested call would start at `start + already_pushed`
+            // and later writes by this scope could overwrite the nested scope's
+            // memory (corrupting captured closure state).
+            self.memory.resize(start + meta.locals(), TlangValue::Nil);
         }
 
-        let new_scope = Scope::new(self.memory.len(), meta.locals());
+        let new_scope = Scope::new(start, meta.locals());
         log::debug!(
             "Creating scope with start={}, size={}, current_memory_len={}",
             new_scope.start(),
