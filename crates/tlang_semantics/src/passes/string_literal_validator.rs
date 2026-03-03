@@ -3,10 +3,8 @@ use tlang_span::Span;
 
 use crate::{analyzer::SemanticAnalysisContext, analyzer::SemanticAnalysisPass, diagnostic};
 
-/**
- * String literal validation pass that validates escape sequences
- * in string and character literals.
- */
+/// String literal validation pass that validates escape sequences
+/// in string and character literals.
 pub struct StringLiteralValidator;
 
 impl StringLiteralValidator {

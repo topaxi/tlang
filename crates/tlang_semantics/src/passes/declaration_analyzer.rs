@@ -11,9 +11,7 @@ use tlang_symbols::{SymbolInfo, SymbolTable, SymbolType};
 
 use crate::analyzer::{SemanticAnalysisContext, SemanticAnalysisPass};
 
-/**
- * The declaration analyzer is responsible for collecting all the declarations in a module.
- */
+/// The declaration analyzer is responsible for collecting all the declarations in a module.
 #[derive(Default)]
 pub struct DeclarationAnalyzer {
     symbol_table_stack: Vec<Rc<RefCell<SymbolTable>>>,

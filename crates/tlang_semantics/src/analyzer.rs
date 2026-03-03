@@ -10,10 +10,8 @@ use crate::{
     passes::{DeclarationAnalyzer, StringLiteralValidator, VariableUsageValidator},
 };
 
-/**
- * Context for semantic analysis, containing shared state needed
- * across all semantic analysis passes.
- */
+/// Context for semantic analysis, containing shared state needed
+/// across all semantic analysis passes.
 pub struct SemanticAnalysisContext {
     pub symbol_tables: HashMap<NodeId, Rc<RefCell<SymbolTable>>>,
     pub symbol_id_allocator: SymbolIdAllocator,
@@ -89,9 +87,7 @@ impl Default for SemanticAnalysisContext {
     }
 }
 
-/**
- * Trait for semantic analysis passes, similar to `HirPass` in the HIR optimizer.
- */
+/// Trait for semantic analysis passes, similar to `HirPass` in the HIR optimizer.
 pub trait SemanticAnalysisPass {
     fn name(&self) -> &'static str {
         std::any::type_name::<Self>()
@@ -103,10 +99,8 @@ pub trait SemanticAnalysisPass {
     fn analyze(&mut self, module: &Module, ctx: &mut SemanticAnalysisContext, is_root: bool);
 }
 
-/**
- * Group of semantic analysis passes that implements `SemanticAnalysisPass`.
- * Similar to `HirOptGroup` in the HIR optimizer.
- */
+/// Group of semantic analysis passes that implements `SemanticAnalysisPass`.
+/// Similar to `HirOptGroup` in the HIR optimizer.
 #[derive(Default)]
 pub struct SemanticAnalysisGroup {
     name: &'static str,
