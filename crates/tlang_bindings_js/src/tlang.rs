@@ -152,8 +152,15 @@ impl Tlang {
         let arity = f.length() as u16;
 
         self.interpreter.define_js_fn(name, f);
-        self.analyzer
-            .add_builtin_symbols(&[(name, SymbolType::Function(arity))]);
+        // Skip registration if the symbol is already a builtin (e.g. `log` for the
+        // interpreter runner, which is registered with a global slot via
+        // `add_builtin_symbols_with_slots`). Re-adding it without a slot would cause
+        // the identifier resolver to pick up the slot-less duplicate and the
+        // runtime to panic with "Function not found".
+        if !self.analyzer.has_builtin_symbol(name) {
+            self.analyzer
+                .add_builtin_symbols(&[(name, SymbolType::Function(arity))]);
+        }
     }
 
     fn parse(&mut self) -> Result<&ast::Module, &ParseError> {

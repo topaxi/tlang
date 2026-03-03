@@ -259,6 +259,14 @@ impl SemanticAnalyzer {
         }
     }
 
+    /// Returns true if a symbol with the given name is already registered as a builtin.
+    pub fn has_builtin_symbol(&self, name: &str) -> bool {
+        self.context
+            .as_ref()
+            .map(|ctx| ctx.root_symbol_table.borrow().has_name(name))
+            .unwrap_or(false)
+    }
+
     pub fn analyze(&mut self, module: &mut Module) -> Result<(), Vec<Diagnostic>> {
         self.analyze_root_module(module, false)
     }
