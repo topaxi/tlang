@@ -21,11 +21,11 @@ mod helpers {
 
     /// Parse and lower source code to HIR module.
     pub fn parse_to_hir(src: &str) -> hir::Module {
-        let ast = Parser::from_source(src).parse().expect("Parse error");
+        let mut ast = Parser::from_source(src).parse().expect("Parse error");
 
         let mut analyzer = SemanticAnalyzer::default();
         analyzer.add_builtin_symbols_with_slots(&Interpreter::builtin_symbols());
-        analyzer.analyze(&ast).expect("Semantic analysis error");
+        analyzer.analyze(&mut ast).expect("Semantic analysis error");
 
         let (mut module, meta) = lower_to_hir(
             &ast,

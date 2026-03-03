@@ -18,6 +18,21 @@ pub fn hir_from_str(input: &str) -> tlang_hir::Module {
     module
 }
 
+/// Like `hir_from_str` but runs semantic analysis first so that type inference
+/// annotations (e.g. inferred enum parameter types) are available.
+pub fn hir_from_str_analyzed(input: &str) -> tlang_hir::Module {
+    let mut ast = parse_str(input);
+    let mut analyzer = tlang_semantics::SemanticAnalyzer::default();
+    let _ = analyzer.analyze(&mut ast);
+    let (module, _) = tlang_ast_lowering::lower_to_hir(
+        &ast,
+        analyzer.symbol_id_allocator(),
+        analyzer.root_symbol_table(),
+        analyzer.symbol_tables().clone(),
+    );
+    module
+}
+
 pub fn pretty_print(node: &tlang_hir::Module) -> String {
     let mut printer = tlang_hir_pretty::HirPretty::new(tlang_hir_pretty::HirPrettyOptions {
         // We don't resolve in ast lowering, but in a optimization phase.

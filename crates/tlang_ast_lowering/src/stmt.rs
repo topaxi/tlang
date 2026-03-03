@@ -297,11 +297,21 @@ impl LoweringContext {
 
         let params = param_names
             .iter()
-            .map(|ident| hir::FunctionParameter {
-                hir_id: self.unique_id(),
-                name: ident.clone(),
-                type_annotation: hir::Ty::default(),
-                span: ident.span,
+            .enumerate()
+            .map(|(i, ident)| {
+                // Pick up any type annotation inferred by the semantic analysis phase.
+                let type_annotation = decls
+                    .iter()
+                    .find_map(|d| d.parameters.get(i).and_then(|p| p.type_annotation.as_ref()))
+                    .map(|ty| self.lower_ty(Some(ty)))
+                    .unwrap_or_default();
+
+                hir::FunctionParameter {
+                    hir_id: self.unique_id(),
+                    name: ident.clone(),
+                    type_annotation,
+                    span: ident.span,
+                }
             })
             .collect::<Vec<_>>();
 

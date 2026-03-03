@@ -7,7 +7,7 @@ use tlang_symbols::{SymbolIdAllocator, SymbolTable, SymbolType};
 
 use crate::{
     diagnostic::Diagnostic,
-    passes::{DeclarationAnalyzer, StringLiteralValidator, VariableUsageValidator},
+    passes::{DeclarationAnalyzer, FnParamTypeInference, StringLiteralValidator, VariableUsageValidator},
 };
 
 /// Context for semantic analysis, containing shared state needed
@@ -96,6 +96,10 @@ pub trait SemanticAnalysisPass {
     #[allow(unused_variables)]
     fn init_context(&mut self, ctx: &mut SemanticAnalysisContext) {}
 
+    /// Mutate the AST before symbol-table analysis runs. The default is a no-op.
+    #[allow(unused_variables)]
+    fn mutate(&mut self, module: &mut Module) {}
+
     fn analyze(&mut self, module: &Module, ctx: &mut SemanticAnalysisContext, is_root: bool);
 }
 
@@ -129,6 +133,12 @@ impl SemanticAnalysisPass for SemanticAnalysisGroup {
         }
     }
 
+    fn mutate(&mut self, module: &mut Module) {
+        for pass in &mut self.passes {
+            pass.mutate(module);
+        }
+    }
+
     fn analyze(&mut self, module: &Module, ctx: &mut SemanticAnalysisContext, is_root: bool) {
         for pass in &mut self.passes {
             debug!("Running semantic analysis pass: {}", pass.name());
@@ -146,6 +156,7 @@ pub struct SemanticAnalyzer {
 impl Default for SemanticAnalyzer {
     fn default() -> Self {
         Self::new(vec![
+            Box::new(FnParamTypeInference::default()),
             Box::new(DeclarationAnalyzer::default()),
             Box::new(VariableUsageValidator::default()),
             Box::new(StringLiteralValidator),
@@ -246,17 +257,17 @@ impl SemanticAnalyzer {
         }
     }
 
-    pub fn analyze(&mut self, module: &Module) -> Result<(), Vec<Diagnostic>> {
+    pub fn analyze(&mut self, module: &mut Module) -> Result<(), Vec<Diagnostic>> {
         self.analyze_root_module(module, false)
     }
 
-    pub fn analyze_as_root_module(&mut self, module: &Module) -> Result<(), Vec<Diagnostic>> {
+    pub fn analyze_as_root_module(&mut self, module: &mut Module) -> Result<(), Vec<Diagnostic>> {
         self.analyze_root_module(module, true)
     }
 
     fn analyze_root_module(
         &mut self,
-        module: &Module,
+        module: &mut Module,
         is_root: bool,
     ) -> Result<(), Vec<Diagnostic>> {
         // Initialize or reuse existing context
@@ -268,6 +279,9 @@ impl SemanticAnalyzer {
 
         // Initialize context for all passes
         self.group.init_context(&mut context);
+
+        // Run mutation passes first (e.g. type annotation inference)
+        self.group.mutate(module);
 
         // Run all semantic analysis passes
         self.group.analyze(module, &mut context, is_root);

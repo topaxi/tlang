@@ -29,7 +29,7 @@ fn compile(input_file: &str) -> tlang_hir::Module {
     }
 
     let mut parser = tlang_parser::Parser::from_source(&source);
-    let ast = match parser.parse() {
+    let mut ast = match parser.parse() {
         Ok(ast) => ast,
         Err(err) => {
             eprintln!("{err:?}");
@@ -39,7 +39,7 @@ fn compile(input_file: &str) -> tlang_hir::Module {
 
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.add_builtin_symbols_with_slots(&Interpreter::builtin_symbols());
-    if let Err(err) = semantic_analyzer.analyze(&ast) {
+    if let Err(err) = semantic_analyzer.analyze(&mut ast) {
         eprintln!("{err:?}");
         std::process::exit(1);
     }

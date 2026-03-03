@@ -54,14 +54,14 @@ impl<'a> From<Vec<(&'a str, SymbolType)>> for CodegenOptions<'a> {
 
 pub fn compile_src(source: &str, options: &CodegenOptions) -> String {
     let mut parser = Parser::from_source(source);
-    let ast = match parser.parse() {
+    let mut ast = match parser.parse() {
         Ok(ast) => ast,
         Err(errors) => panic!("{errors:#?}"),
     };
 
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.add_builtin_symbols(&options.builtin_symbols);
-    match semantic_analyzer.analyze(&ast) {
+    match semantic_analyzer.analyze(&mut ast) {
         Ok(()) => {
             let (mut module, meta) = tlang_ast_lowering::lower_to_hir(
                 &ast,

@@ -1867,7 +1867,7 @@ mod tests {
             module
         }
 
-        fn analyze(&mut self, module: &tlang_ast::node::Module) {
+        fn analyze(&mut self, module: &mut tlang_ast::node::Module) {
             self.semantic_analyzer
                 .analyze_as_root_module(module)
                 .unwrap();
@@ -1890,8 +1890,8 @@ mod tests {
         }
 
         fn parse(&mut self, src: &str) -> hir::Module {
-            let ast = self.parse_src(src);
-            self.analyze(&ast);
+            let mut ast = self.parse_src(src);
+            self.analyze(&mut ast);
             self.lower(&ast)
         }
 

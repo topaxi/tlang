@@ -22,10 +22,10 @@ fn before_all() {
 }
 
 pub fn compile(source: &str) -> hir::LowerResult {
-    let ast = Parser::from_source(source).parse().unwrap();
+    let mut ast = Parser::from_source(source).parse().unwrap();
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.add_builtin_symbols(&[("println", SymbolType::Function(u16::MAX))]);
-    semantic_analyzer.analyze(&ast).unwrap();
+    semantic_analyzer.analyze(&mut ast).unwrap();
     lower_to_hir(
         &ast,
         semantic_analyzer.symbol_id_allocator(),

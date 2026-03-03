@@ -39,7 +39,7 @@ fn main() {
     };
 
     let mut parser = tlang_parser::Parser::from_source(&code);
-    let ast = match parser.parse() {
+    let mut ast = match parser.parse() {
         Ok(ast) => ast,
         Err(err) => {
             eprintln!("Error parsing file '{}': {}", filename, err);
@@ -49,7 +49,7 @@ fn main() {
     let mut analyzer = SemanticAnalyzer::default();
     analyzer.add_builtin_symbols_with_slots(&Interpreter::builtin_symbols());
 
-    match analyzer.analyze(&ast) {
+    match analyzer.analyze(&mut ast) {
         Ok(_) => {}
         Err(diagnostics) => {
             for diagnostic in &diagnostics {

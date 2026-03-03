@@ -73,11 +73,11 @@ fn compile_to_hir(
     show_warnings: bool,
 ) -> Result<tlang_hir::Module, ParserError> {
     let mut parser = tlang_parser::Parser::from_source(source);
-    let ast = parser.parse()?;
+    let mut ast = parser.parse()?;
 
     let mut semantic_analyzer = SemanticAnalyzer::default();
     semantic_analyzer.add_builtin_symbols(CodegenJS::get_standard_library_symbols());
-    semantic_analyzer.analyze(&ast)?;
+    semantic_analyzer.analyze(&mut ast)?;
 
     // Display warnings (but don't fail compilation)
     if show_warnings {

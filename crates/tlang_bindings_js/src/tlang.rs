@@ -186,7 +186,7 @@ impl Tlang {
     pub fn analyze(&mut self) {
         let _ = self.parse();
 
-        if let Some(Ok(ast)) = &self.build.parse_result {
+        if let Some(Ok(ast)) = &mut self.build.parse_result {
             let _ = self.analyzer.analyze(ast);
         }
     }
