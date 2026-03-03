@@ -250,7 +250,7 @@ impl Interpreter {
     }
 
     fn get_str(&self, value: TlangValue) -> Option<&str> {
-        self.get_object(value).and_then(|obj| obj.get_str())
+        self.get_object(value).and_then(|obj| obj.as_str())
     }
 
     #[inline(always)]
@@ -2176,7 +2176,7 @@ mod tests {
             TlangValue::Object(id) => interpreter
                 .interpreter
                 .get_object_by_id(id)
-                .get_enum()
+                .as_enum()
                 .unwrap(),
             val => panic!("Expected struct, got {val:?}"),
         };
@@ -2185,7 +2185,7 @@ mod tests {
             TlangValue::Object(id) => interpreter
                 .interpreter
                 .get_object_by_id(id)
-                .get_enum()
+                .as_enum()
                 .unwrap(),
             val => panic!("Expected struct, got {val:?}"),
         };
@@ -2208,7 +2208,7 @@ mod tests {
             TlangValue::Object(id) => interpreter
                 .interpreter
                 .get_object_by_id(id)
-                .get_slice()
+                .as_slice()
                 .unwrap(),
             val => panic!("Expected slice, got {val:?}"),
         };
@@ -2230,7 +2230,7 @@ mod tests {
             TlangValue::Object(id) => interpreter
                 .interpreter
                 .get_object_by_id(id)
-                .get_slice()
+                .as_slice()
                 .unwrap(),
             val => panic!("Expected slice, got {val:?}"),
         };
@@ -2346,7 +2346,7 @@ mod tests {
         let result = t.eval(r#"Shape::Rect("wide", "tall")"#);
         assert_matches!(result, TlangValue::Object(_));
         let enum_data = match result {
-            TlangValue::Object(id) => t.interpreter.get_object_by_id(id).get_enum().unwrap(),
+            TlangValue::Object(id) => t.interpreter.get_object_by_id(id).as_enum().unwrap(),
             _ => panic!("expected Object"),
         };
         assert_eq!(enum_data.variant, 1);

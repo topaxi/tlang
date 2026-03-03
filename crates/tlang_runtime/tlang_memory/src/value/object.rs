@@ -211,35 +211,35 @@ pub enum TlangObjectKind {
 }
 
 impl TlangObjectKind {
-    pub fn get_struct(&self) -> Option<&TlangStruct> {
+    pub fn as_struct(&self) -> Option<&TlangStruct> {
         match self {
             TlangObjectKind::Struct(s) => Some(s),
             _ => None,
         }
     }
 
-    pub fn get_struct_mut(&mut self) -> Option<&mut TlangStruct> {
+    pub fn as_struct_mut(&mut self) -> Option<&mut TlangStruct> {
         match self {
             TlangObjectKind::Struct(s) => Some(s),
             _ => None,
         }
     }
 
-    pub fn get_enum(&self) -> Option<&TlangEnum> {
+    pub fn as_enum(&self) -> Option<&TlangEnum> {
         match self {
             TlangObjectKind::Enum(e) => Some(e),
             _ => None,
         }
     }
 
-    pub fn get_slice(&self) -> Option<TlangSlice> {
+    pub fn as_slice(&self) -> Option<TlangSlice> {
         match self {
             TlangObjectKind::Slice(s) => Some(*s),
             _ => None,
         }
     }
 
-    pub fn get_str(&self) -> Option<&str> {
+    pub fn as_str(&self) -> Option<&str> {
         match self {
             TlangObjectKind::String(s) => Some(s),
             _ => None,
@@ -255,7 +255,7 @@ impl TlangObjectKind {
     }
 
     /// Get a reference to the cell if this is a Cell variant.
-    pub fn get_cell(&self) -> Option<&TlangCell> {
+    pub fn as_cell(&self) -> Option<&TlangCell> {
         match self {
             TlangObjectKind::Cell(c) => Some(c),
             _ => None,
@@ -263,7 +263,7 @@ impl TlangObjectKind {
     }
 
     /// Get a mutable reference to the cell if this is a Cell variant.
-    pub fn get_cell_mut(&mut self) -> Option<&mut TlangCell> {
+    pub fn as_cell_mut(&mut self) -> Option<&mut TlangCell> {
         match self {
             TlangObjectKind::Cell(c) => Some(c),
             _ => None,

@@ -195,20 +195,20 @@ impl Heap {
     }
 
     pub fn get_struct(&self, value: TlangValue) -> Option<&TlangStruct> {
-        self.get_object(value).and_then(|obj| obj.get_struct())
+        self.get_object(value).and_then(|obj| obj.as_struct())
     }
 
     pub fn get_struct_mut(&mut self, value: TlangValue) -> Option<&mut TlangStruct> {
         self.get_object_mut(value)
-            .and_then(|obj| obj.get_struct_mut())
+            .and_then(|obj| obj.as_struct_mut())
     }
 
     pub fn get_enum(&self, value: TlangValue) -> Option<&TlangEnum> {
-        self.get_object(value).and_then(|obj| obj.get_enum())
+        self.get_object(value).and_then(|obj| obj.as_enum())
     }
 
     pub fn get_slice(&self, value: TlangValue) -> Option<TlangSlice> {
-        self.get_object(value).and_then(|obj| obj.get_slice())
+        self.get_object(value).and_then(|obj| obj.as_slice())
     }
 
     /// # Panics

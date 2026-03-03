@@ -133,7 +133,7 @@ impl InterpreterState {
     pub fn get_cell_value(&self, cell_id: TlangObjectId) -> Option<TlangValue> {
         self.heap
             .get_object_by_id(cell_id)
-            .and_then(|obj| obj.get_cell())
+            .and_then(|obj| obj.as_cell())
             .map(|cell| cell.get())
     }
 
@@ -144,7 +144,7 @@ impl InterpreterState {
             return;
         };
 
-        let Some(cell) = obj.get_cell_mut() else {
+        let Some(cell) = obj.as_cell_mut() else {
             debug_assert!(false, "set_cell_value called on non-cell object");
             return;
         };
