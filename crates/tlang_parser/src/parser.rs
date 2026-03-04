@@ -25,6 +25,8 @@ pub struct Parser<'src> {
     node_id_allocator: NodeIdAllocator,
 
     errors: Vec<ParseIssue>,
+
+    trailing_comments_buffer: Vec<Token>,
 }
 
 impl<'src> Parser<'src> {
@@ -37,6 +39,7 @@ impl<'src> Parser<'src> {
             node_id_allocator: NodeIdAllocator::default(),
             errors: Vec::new(),
             recoverable: false,
+            trailing_comments_buffer: Vec::new(),
         }
     }
 
@@ -275,6 +278,12 @@ impl<'src> Parser<'src> {
             let mut node = node::stmt!(self.unique_id(), None);
             node.leading_comments = comments;
             return (false, Some(node));
+        }
+
+        // Comments before a closing brace are trailing comments of the previous statement.
+        if matches!(self.current_token_kind(), TokenKind::RBrace) {
+            self.trailing_comments_buffer = comments;
+            return (false, None);
         }
 
         let mut span = self.create_span_from_current_token();
@@ -528,7 +537,9 @@ impl<'src> Parser<'src> {
         }
 
         if let Some(stmt) = statements.last_mut() {
-            stmt.trailing_comments = self.parse_comments();
+            let mut trailing = std::mem::take(&mut self.trailing_comments_buffer);
+            trailing.extend(self.parse_comments());
+            stmt.trailing_comments = trailing;
         }
 
         (statements, completion_expression)
