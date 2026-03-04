@@ -26,7 +26,7 @@ pub fn new_result_err(state: &mut InterpreterState, err: TlangValue) -> TlangVal
 
 #[allow(clippy::missing_panics_doc)]
 pub fn define_result_shape(state: &mut InterpreterState) {
-    let mut method_map = HashMap::with_capacity(4);
+    let mut method_map = HashMap::with_capacity(5);
 
     method_map.insert(
         "is_ok".to_string(),
@@ -52,6 +52,33 @@ pub fn define_result_shape(state: &mut InterpreterState) {
             let this = state.get_enum(this).unwrap();
 
             NativeFnReturn::Return(TlangValue::Bool(this.variant == RESULT_VARIANT_OK))
+        }),
+    );
+
+    method_map.insert(
+        "map".to_string(),
+        state.new_native_method("Result::map", |state, this, args| {
+            let func = args[0];
+            let this = state.get_enum(this).unwrap();
+
+            if this.variant == RESULT_VARIANT_ERR {
+                let err_val = this.field_values[0];
+                let err = state.new_enum(
+                    state.heap.builtin_shapes.result,
+                    RESULT_VARIANT_ERR,
+                    vec![err_val],
+                );
+                return NativeFnReturn::Return(err);
+            }
+
+            let inner = this.field_values[0];
+            let mapped = state.call(func, &[inner]);
+            let ok = state.new_enum(
+                state.heap.builtin_shapes.result,
+                RESULT_VARIANT_OK,
+                vec![mapped],
+            );
+            NativeFnReturn::Return(ok)
         }),
     );
 

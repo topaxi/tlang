@@ -17,7 +17,7 @@ pub fn new_option_some(state: &mut InterpreterState, value: TlangValue) -> Tlang
 
 #[allow(clippy::missing_panics_doc)]
 pub fn define_option_shape(state: &mut InterpreterState) {
-    let mut method_map = HashMap::with_capacity(4);
+    let mut method_map = HashMap::with_capacity(5);
 
     method_map.insert(
         "is_some".to_string(),
@@ -47,6 +47,32 @@ pub fn define_option_shape(state: &mut InterpreterState) {
             }
 
             NativeFnReturn::Return(this.field_values[0])
+        }),
+    );
+
+    method_map.insert(
+        "map".to_string(),
+        state.new_native_method("Option::map", |state, this, args| {
+            let func = args[0];
+            let this = state.get_enum(this).unwrap();
+
+            if this.variant == OPTION_VARIANT_NONE {
+                let none = state.new_enum(
+                    state.heap.builtin_shapes.option,
+                    OPTION_VARIANT_NONE,
+                    vec![],
+                );
+                return NativeFnReturn::Return(none);
+            }
+
+            let inner = this.field_values[0];
+            let mapped = state.call(func, &[inner]);
+            let some = state.new_enum(
+                state.heap.builtin_shapes.option,
+                OPTION_VARIANT_SOME,
+                vec![mapped],
+            );
+            NativeFnReturn::Return(some)
         }),
     );
 
