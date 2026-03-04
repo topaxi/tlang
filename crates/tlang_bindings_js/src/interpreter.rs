@@ -32,7 +32,7 @@ impl TlangInterpreter {
                     }
                 }
                 1 => {
-                    let arg = tlang_value_to_js_value(state, args[0]);
+                    let arg = tlang_value_to_js_value(state, args[0]).unwrap();
                     let result = f.call1(&this, &arg);
                     match result {
                         Ok(value) => js_value_to_tlang_value(state, &value),
@@ -42,8 +42,8 @@ impl TlangInterpreter {
                     }
                 }
                 2 => {
-                    let arg1 = tlang_value_to_js_value(state, args[0]);
-                    let arg2 = tlang_value_to_js_value(state, args[1]);
+                    let arg1 = tlang_value_to_js_value(state, args[0]).unwrap();
+                    let arg2 = tlang_value_to_js_value(state, args[1]).unwrap();
                     let result = f.call2(&this, &arg1, &arg2);
                     match result {
                         Ok(value) => js_value_to_tlang_value(state, &value),
@@ -53,9 +53,9 @@ impl TlangInterpreter {
                     }
                 }
                 3 => {
-                    let arg1 = tlang_value_to_js_value(state, args[0]);
-                    let arg2 = tlang_value_to_js_value(state, args[1]);
-                    let arg3 = tlang_value_to_js_value(state, args[2]);
+                    let arg1 = tlang_value_to_js_value(state, args[0]).unwrap();
+                    let arg2 = tlang_value_to_js_value(state, args[1]).unwrap();
+                    let arg3 = tlang_value_to_js_value(state, args[2]).unwrap();
                     let result = f.call3(&this, &arg1, &arg2, &arg3);
                     match result {
                         Ok(value) => js_value_to_tlang_value(state, &value),
@@ -67,7 +67,7 @@ impl TlangInterpreter {
                 _ => {
                     let js_args = js_sys::Array::new();
                     for arg in args {
-                        js_args.push(&tlang_value_to_js_value(state, *arg));
+                        js_args.push(&tlang_value_to_js_value(state, *arg).unwrap());
                     }
                     let result = f.apply(&this, &js_args);
                     match result {
@@ -83,16 +83,36 @@ impl TlangInterpreter {
         });
     }
 
-    pub(crate) fn eval(&mut self, hir: &hir::Module) -> JsValue {
+    pub(crate) fn eval(&mut self, hir: &hir::Module) -> Result<JsValue, TlangValueSerializeError> {
         let value = self.0.eval(hir);
         tlang_value_to_js_value(self.0.state(), value)
     }
 }
 
-fn tlang_value_to_js_value(state: &InterpreterState, value: TlangValue) -> JsValue {
-    match value {
+#[derive(Debug)]
+pub struct TlangValueSerializeError(String);
+
+impl TlangValueSerializeError {
+    pub fn new(message: &str) -> Self {
+        Self(message.to_string())
+    }
+}
+
+impl std::fmt::Display for TlangValueSerializeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for TlangValueSerializeError {}
+
+fn tlang_value_to_js_value(
+    state: &InterpreterState,
+    value: TlangValue,
+) -> Result<JsValue, TlangValueSerializeError> {
+    let js_value = match value {
         TlangValue::Nil => JsValue::null(),
-        TlangValue::Object(_) => tlang_object_to_js_value(state, value),
+        TlangValue::Object(_) => tlang_object_to_js_value(state, value)?,
         value => match value.as_primitive() {
             TlangPrimitive::Nil => JsValue::null(),
             TlangPrimitive::Bool(value) => JsValue::from(value),
@@ -100,19 +120,24 @@ fn tlang_value_to_js_value(state: &InterpreterState, value: TlangValue) -> JsVal
             TlangPrimitive::UInt(value) => JsValue::from(value),
             TlangPrimitive::Float(value) => JsValue::from(value),
         },
-    }
+    };
+
+    Ok(js_value)
 }
 
-fn tlang_object_to_js_value(state: &InterpreterState, value: TlangValue) -> JsValue {
-    match state.get_object(value) {
+fn tlang_object_to_js_value(
+    state: &InterpreterState,
+    value: TlangValue,
+) -> Result<JsValue, TlangValueSerializeError> {
+    let js_value = match state.get_object(value) {
         Some(TlangObjectKind::String(s)) => JsValue::from(s),
         Some(TlangObjectKind::Struct(s)) => {
             if s.shape() == state.heap.builtin_shapes.list {
                 let array = js_sys::Array::new();
                 for value in s.values() {
-                    array.push(&tlang_value_to_js_value(state, *value));
+                    array.push(&tlang_value_to_js_value(state, *value)?);
                 }
-                return JsValue::from(array);
+                return Ok(JsValue::from(array));
             }
 
             let shape = state
@@ -123,7 +148,7 @@ fn tlang_object_to_js_value(state: &InterpreterState, value: TlangValue) -> JsVa
             for (field, idx) in &shape.field_map {
                 let key = JsValue::from(field);
                 let value = s[*idx];
-                js_sys::Reflect::set(&object, &key, &tlang_value_to_js_value(state, value))
+                js_sys::Reflect::set(&object, &key, &tlang_value_to_js_value(state, value)?)
                     .expect("Unable to set property on object");
             }
             JsValue::from(object)
@@ -141,7 +166,7 @@ fn tlang_object_to_js_value(state: &InterpreterState, value: TlangValue) -> JsVa
             for (field, idx) in &variant.field_map {
                 let key = JsValue::from(field);
                 let value = e.field_values[*idx];
-                js_sys::Reflect::set(&object, &key, &tlang_value_to_js_value(state, value))
+                js_sys::Reflect::set(&object, &key, &tlang_value_to_js_value(state, value)?)
                     .expect("Unable to set property on object");
             }
             JsValue::from(object)
@@ -150,16 +175,22 @@ fn tlang_object_to_js_value(state: &InterpreterState, value: TlangValue) -> JsVa
             let values = state.get_slice_values(*slice);
             let array = js_sys::Array::new();
             for value in values {
-                array.push(&tlang_value_to_js_value(state, *value));
+                array.push(&tlang_value_to_js_value(state, *value)?);
             }
             JsValue::from(array)
         }
         Some(TlangObjectKind::Fn(_)) => JsValue::from(js_sys::Object::new()),
         Some(TlangObjectKind::NativeFn) => JsValue::from(js_sys::Object::new()),
         Some(TlangObjectKind::Closure(_)) => JsValue::from(js_sys::Object::new()),
-        Some(TlangObjectKind::Cell(cell)) => tlang_value_to_js_value(state, cell.value),
-        None => JsValue::NULL,
-    }
+        Some(TlangObjectKind::Cell(cell)) => tlang_value_to_js_value(state, cell.value)?,
+        None => {
+            return Err(TlangValueSerializeError::new(
+                "Unable to convert TlangValue to JsValue: Object not found in heap",
+            ));
+        }
+    };
+
+    Ok(js_value)
 }
 
 fn js_value_to_tlang_value(state: &mut InterpreterState, value: &JsValue) -> TlangValue {

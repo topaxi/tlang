@@ -144,7 +144,7 @@ impl Tlang {
             .as_ref()
             .ok_or_else(|| JsError::new("Failed to generate HIR"))?;
 
-        Ok(self.interpreter.eval(hir).into())
+        Ok(self.interpreter.eval(hir)?.into())
     }
 
     #[wasm_bindgen(js_name = "defineFunction")]
