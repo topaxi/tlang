@@ -1,6 +1,3 @@
-// Tests deeply nested pattern matching that may cause issues in JavaScript backend
-// Complex enum hierarchies and nested matching patterns
-
 enum TreeNode {
     Leaf(i32),
     Branch(TreeNode, TreeNode),
