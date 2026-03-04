@@ -68,12 +68,9 @@ runs:
       shell: bash
       run: |
         REQUIRED_VERSION=$(grep -oP 'wasm-bindgen = "=\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
-        INSTALLED_VERSION=$(wasm-bindgen --version 2>/dev/null | awk '{print $2}')
 
-        if [ "$INSTALLED_VERSION" != "$REQUIRED_VERSION" ]; then
+        if ! cargo install --list | grep -q "wasm-bindgen-cli v$REQUIRED_VERSION"; then
             cargo install -f --locked wasm-bindgen-cli --version "$REQUIRED_VERSION"
-        else
-            echo "wasm-bindgen-cli is already up to date ($INSTALLED_VERSION)."
         fi
 
     - name: Install wasm-pack
