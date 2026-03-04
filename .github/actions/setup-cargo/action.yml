@@ -1,0 +1,57 @@
+name: "Setup Cargo"
+description: >
+  Restores the Cargo cache and installs all Rust tooling.
+  Fully self-contained so individual jobs remain reproducible on cache miss.
+
+runs:
+  using: composite
+  steps:
+    - name: Restore cargo cache
+      uses: actions/cache/restore@v5
+      with:
+        path: |
+          # Taken from <https://doc.rust-lang.org/nightly/cargo/guide/cargo-home.html#caching-the-cargo-home-in-ci>.
+          ~/.cargo/bin
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
+          ~/.cargo/git/db
+          # contains package information of crates installed via `cargo install`.
+          ~/.cargo/.crates.toml
+          ~/.cargo/.crates2.json
+          # Cache build targets to avoid rebuilds in case not all crates
+          # changed. Especially useful while working on playground/non-rust
+          # code.
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-5
+        restore-keys: ${{ runner.os }}-cargo-
+
+    - name: Install Rust tools
+      shell: bash
+      run: |
+        command -v cargo-fmt     &>/dev/null || cargo install --locked cargo-fmt
+        command -v cargo-nextest &>/dev/null || cargo install --locked cargo-nextest
+        command -v cargo-insta   &>/dev/null || cargo install --locked cargo-insta
+
+    - name: Fetch dependencies
+      shell: bash
+      run: cargo fetch
+
+    - name: Install wasm toolchain
+      shell: bash
+      run: rustup target add wasm32-unknown-unknown
+
+    - name: Install wasm-bindgen-cli
+      shell: bash
+      run: |
+        REQUIRED_VERSION=$(grep -oP 'wasm-bindgen = "=\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
+        INSTALLED_VERSION=$(wasm-bindgen --version 2>/dev/null | awk '{print $2}')
+
+        if [ "$INSTALLED_VERSION" != "$REQUIRED_VERSION" ]; then
+            cargo install -f --locked wasm-bindgen-cli --version "$REQUIRED_VERSION"
+        else
+            echo "wasm-bindgen-cli is already up to date ($INSTALLED_VERSION)."
+        fi
+
+    - name: Install wasm-pack
+      shell: bash
+      run: command -v wasm-pack &>/dev/null || cargo install --locked wasm-pack
