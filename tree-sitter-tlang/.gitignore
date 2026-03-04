@@ -8,6 +8,7 @@ bindings/node/*.d.ts
 # Build artifacts
 build/
 target/
+*.so
 
 # Prebuilt binaries
 prebuilds/
