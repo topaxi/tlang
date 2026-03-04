@@ -1,10 +1,6 @@
 // Factorial computation with different approaches
 // Demonstrates: recursion, tail call optimization, pattern matching
 
-// Helper function
-fn map([], _) { [] }
-fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
-
 // Traditional recursive factorial
 fn factorial(0) { 1 }
 fn factorial(n) { n * factorial(n - 1) }

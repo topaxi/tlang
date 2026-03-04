@@ -2,9 +2,6 @@
 // Demonstrates: string operations, recursion, pattern matching on strings
 
 // Helper functions
-fn map([], _) { [] }
-fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
-
 fn filter([], _) { [] }
 fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }
 fn filter([_, ...xs], f) { rec filter(xs, f) }

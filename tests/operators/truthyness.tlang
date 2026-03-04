@@ -1,6 +1,3 @@
-fn map([], _) { [] }
-fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
-
 fn to_bool(v) { !!v }
 fn void() {}
 

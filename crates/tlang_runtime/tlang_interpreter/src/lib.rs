@@ -2917,4 +2917,82 @@ mod tests {
             "expected intermediate slices from map to be collected"
         );
     }
+
+    #[test]
+    fn test_native_map_list() {
+        let mut t = interpreter("");
+        let result = t.eval("map([1, 2, 3], fn(x) { x * 2 })");
+        assert_eq!(t.state().stringify(result), "[2, 4, 6]");
+    }
+
+    #[test]
+    fn test_native_map_list_empty() {
+        let mut t = interpreter("");
+        let result = t.eval("map([], fn(x) { x * 2 })");
+        assert_eq!(t.state().stringify(result), "[]");
+    }
+
+    #[test]
+    fn test_native_map_option_some() {
+        let mut t = interpreter("");
+        let result = t.eval("Option::Some(5).map(fn(x) { x * 2 })");
+        assert_eq!(t.state().stringify(result), "Option::Some(0: 10)");
+    }
+
+    #[test]
+    fn test_native_map_option_none() {
+        let mut t = interpreter("");
+        let result = t.eval("Option::None.map(fn(x) { x * 2 })");
+        assert_eq!(t.state().stringify(result), "Option::None");
+    }
+
+    #[test]
+    fn test_native_map_option_toplevel() {
+        let mut t = interpreter("");
+        let result = t.eval("map(Option::Some(3), fn(x) { x + 1 })");
+        assert_eq!(t.state().stringify(result), "Option::Some(0: 4)");
+
+        let result = t.eval("map(Option::None, fn(x) { x + 1 })");
+        assert_eq!(t.state().stringify(result), "Option::None");
+    }
+
+    #[test]
+    fn test_native_map_result_ok() {
+        let mut t = interpreter("");
+        let result = t.eval("Result::Ok(10).map(fn(x) { x + 5 })");
+        assert_eq!(t.state().stringify(result), "Result::Ok(0: 15)");
+    }
+
+    #[test]
+    fn test_native_map_result_err() {
+        let mut t = interpreter("");
+        let result = t.eval("Result::Err(42).map(fn(x) { x + 5 })");
+        assert_eq!(t.state().stringify(result), "Result::Err(0: 42)");
+    }
+
+    #[test]
+    fn test_native_map_result_toplevel() {
+        let mut t = interpreter("");
+        let result = t.eval("map(Result::Ok(7), fn(x) { x * 3 })");
+        assert_eq!(t.state().stringify(result), "Result::Ok(0: 21)");
+
+        let result = t.eval("map(Result::Err(99), fn(x) { x * 3 })");
+        assert_eq!(t.state().stringify(result), "Result::Err(0: 99)");
+    }
+
+    #[test]
+    fn test_native_map_slice() {
+        let mut t = interpreter("");
+        // Use the slice method to get a slice, then map over it
+        let result = t.eval("[1, 2, 3].slice(1) |> map(fn(x) { x * 10 })");
+        assert_eq!(t.state().stringify(result), "[20, 30]");
+    }
+
+    #[test]
+    fn test_native_map_string() {
+        let mut t = interpreter("");
+        // map over string maps over each character
+        let result = t.eval(r#"map("abc", fn(c) { c + c })"#);
+        assert_eq!(t.state().stringify(result), "aabbcc");
+    }
 }
