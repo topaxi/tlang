@@ -22,8 +22,7 @@ fn test_enum_param_type_inferred_from_variants() {
 
     assert_snapshot!(pretty_print(&hir), @r###"
     enum LinkedList {
-        Empty {
-        }
+        Empty
         Node {
             0: int,
             1: LinkedList,

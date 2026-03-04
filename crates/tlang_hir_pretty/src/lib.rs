@@ -222,15 +222,17 @@ impl HirPretty {
                 self.push_char('#');
                 self.push_str(&variant.hir_id.to_string());
             }
-            self.push_str(" {");
-            self.push_newline();
-            self.inc_indent();
-            for field in &variant.parameters {
-                self.print_struct_field(field);
+            if !variant.parameters.is_empty() {
+                self.push_str(" {");
+                self.push_newline();
+                self.inc_indent();
+                for field in &variant.parameters {
+                    self.print_struct_field(field);
+                }
+                self.dec_indent();
+                self.push_indent();
+                self.push_char('}');
             }
-            self.dec_indent();
-            self.push_indent();
-            self.push_char('}');
             self.push_newline();
         }
         self.dec_indent();
