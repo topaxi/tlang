@@ -7,11 +7,19 @@
     "type": "git",
     "url": "https://github.com/topaxi/tlang"
   },
-  "keywords": ["parser", "tree-sitter", "tlang"],
-  "files": ["grammar.js", "queries/*", "src/**"],
+  "keywords": [
+    "parser",
+    "tree-sitter",
+    "tlang"
+  ],
+  "files": [
+    "grammar.js",
+    "queries/*",
+    "src/**"
+  ],
   "main": "grammar.js",
   "devDependencies": {
-    "tree-sitter-cli": "^0.24.0"
+    "tree-sitter-cli": "^0.26.6"
   },
   "scripts": {
     "generate": "tree-sitter generate",
@@ -21,7 +29,9 @@
   "tree-sitter": [
     {
       "scope": "source.tlang",
-      "file-types": ["tlang"],
+      "file-types": [
+        "tlang"
+      ],
       "highlights": "queries/highlights.scm",
       "locals": "queries/locals.scm",
       "tags": "queries/tags.scm"

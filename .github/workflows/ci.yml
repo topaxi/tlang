@@ -125,7 +125,6 @@ jobs:
 
       - name: Install tree-sitter-tlang dependencies
         run: npm ci
-        working-directory: ./tree-sitter-tlang
 
       - name: Test tree-sitter corpus
         run: npm test
