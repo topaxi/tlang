@@ -887,13 +887,24 @@
   {
     "type": "list_pattern",
     "named": true,
-    "fields": {},
+    "fields": {
+      "rest": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "_pattern",
+            "named": true
+          }
+        ]
+      }
+    },
     "children": {
       "multiple": true,
       "required": false,
       "types": [
         {
-          "type": "pattern_assign",
+          "type": "_pattern",
           "named": true
         }
       ]

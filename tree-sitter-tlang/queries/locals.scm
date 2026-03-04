@@ -25,9 +25,6 @@
 (function_parameter
   (binding) @local.definition)
 
-(function_parameter
-  (wildcard_pattern) @local.definition)
-
 (pattern_assign pattern: (binding) @local.definition)
 
 ; References

@@ -56,10 +56,8 @@ fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
     parameters: (parameter_list
       (function_parameter
         (list_pattern
-          (pattern_assign
-            pattern: (binding))
-          (pattern_assign
-            pattern: (binding))))
+          (binding)
+          rest: (binding)))
       (function_parameter
         (binding)))
     body: (block

@@ -8,9 +8,8 @@
     "url": "https://github.com/topaxi/tlang"
   },
   "keywords": ["parser", "tree-sitter", "tlang"],
-  "files": ["grammar.js", "binding.gyp", "prebuilds/**", "bindings/node/*", "queries/*", "src/**"],
-  "main": "bindings/node",
-  "types": "bindings/node",
+  "files": ["grammar.js", "queries/*", "src/**"],
+  "main": "grammar.js",
   "devDependencies": {
     "tree-sitter-cli": "^0.24.0"
   },

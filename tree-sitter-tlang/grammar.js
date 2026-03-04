@@ -119,7 +119,6 @@ module.exports = grammar({
 
     function_parameter: $ =>
       seq(
-        optional('...'),
         $._pattern,
         optional(seq(':', field('type', $.type_annotation))),
       ),
@@ -213,7 +212,7 @@ module.exports = grammar({
         optional(
           seq(
             '(',
-            commaSep(seq(optional('...'), $._pattern)),
+            commaSep($._pattern),
             ')',
           ),
         ),
@@ -245,7 +244,25 @@ module.exports = grammar({
       ),
 
     list_pattern: $ =>
-      seq('[', commaSep(seq(optional('...'), $.pattern_assign)), ']'),
+      seq(
+        '[',
+        optional(
+          choice(
+            // Only a rest binding: [...rest]
+            seq('...', field('rest', $._pattern), optional(',')),
+            // Plain patterns with optional trailing rest binding: [x, y, ...rest]
+            seq(
+              $._pattern,
+              repeat(seq(',', $._pattern)),
+              optional(
+                seq(',', '...', field('rest', $._pattern)),
+              ),
+              optional(','),
+            ),
+          ),
+        ),
+        ']',
+      ),
 
     object_pattern: $ => seq('{', commaSep($.pattern_property), '}'),
 
