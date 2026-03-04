@@ -3,10 +3,36 @@ description: >
   Restores the Cargo cache and installs all Rust tooling.
   Fully self-contained so individual jobs remain reproducible on cache miss.
 
+inputs:
+  save-cache:
+    description: 'Save the cache after setup (use only in the cache-priming job)'
+    default: 'false'
+
 runs:
   using: composite
   steps:
+    - name: Restore and save cargo cache
+      if: inputs.save-cache == 'true'
+      uses: actions/cache@v5
+      with:
+        path: |
+          # Taken from <https://doc.rust-lang.org/nightly/cargo/guide/cargo-home.html#caching-the-cargo-home-in-ci>.
+          ~/.cargo/bin
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
+          ~/.cargo/git/db
+          # contains package information of crates installed via `cargo install`.
+          ~/.cargo/.crates.toml
+          ~/.cargo/.crates2.json
+          # Cache build targets to avoid rebuilds in case not all crates
+          # changed. Especially useful while working on playground/non-rust
+          # code.
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-5
+        restore-keys: ${{ runner.os }}-cargo-
+
     - name: Restore cargo cache
+      if: inputs.save-cache != 'true'
       uses: actions/cache/restore@v5
       with:
         path: |

@@ -19,54 +19,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Add cache for cargo
-        id: cache
-        uses: actions/cache@v5
+      - uses: ./.github/actions/setup-cargo
         with:
-          path: |
-            # Taken from <https://doc.rust-lang.org/nightly/cargo/guide/cargo-home.html#caching-the-cargo-home-in-ci>.
-            ~/.cargo/bin
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-            ~/.cargo/git/db
-            # contains package information of crates installed via `cargo install`.
-            ~/.cargo/.crates.toml
-            ~/.cargo/.crates2.json
-            # Cache build targets to avoid rebuilds in case not all crates
-            # changed. Especially useful while working on playground/non-rust
-            # code.
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-5
-          restore-keys: ${{ runner.os }}-cargo-
-
-      - name: Install Rust tools
-        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
-        run: |
-          cargo install -f --locked rustup-toolchain-install-master
-          cargo install -f --locked cargo-nextest
-          cargo install -f --locked cargo-insta
-          cargo install -f --locked wasm-bindgen-cli --version $(grep -oP 'wasm-bindgen = "=\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
-          cargo install -f --locked wasm-pack
-
-      - name: Install wasm-bindgen-cli
-        run: |
-          REQUIRED_VERSION=$(grep -oP 'wasm-bindgen = "=\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
-          INSTALLED_VERSION=$(wasm-bindgen --version 2>/dev/null | awk '{print $2}')
-
-          if [ "$INSTALLED_VERSION" != "$REQUIRED_VERSION" ]; then
-              cargo install -f --locked wasm-bindgen-cli --version "$REQUIRED_VERSION"
-          else
-              echo "wasm-bindgen-cli is already up to date ($INSTALLED_VERSION)."
-          fi
+          save-cache: 'true'
 
       - name: Show Rust version
         run: |
           rustup show
           rustc -Vv
           cargo -V
-
-      - name: Fetch dependencies
-        run: cargo fetch
 
   lint-js:
     permissions:
