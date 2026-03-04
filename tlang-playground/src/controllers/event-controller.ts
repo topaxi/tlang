@@ -43,17 +43,14 @@ type EventListenerOrEventListenerObject<E = Event> =
   | EventListenerObject<E>;
 
 export interface EventControllerHost<E = Event>
-  extends ReactiveControllerHost,
-    EventTarget<E>,
-    EventListenerObject<E> {}
+  extends ReactiveControllerHost, EventTarget<E>, EventListenerObject<E> {}
 
 export class EventController<
   E = Event,
   Target extends EventTarget<E> = EventTarget<E>,
-  Listener extends
-    EventListenerOrEventListenerObject<E> = EventListenerOrEventListenerObject<E>,
-> implements ReactiveController
-{
+  Listener extends EventListenerOrEventListenerObject<E> =
+    EventListenerOrEventListenerObject<E>,
+> implements ReactiveController {
   protected host: ReactiveControllerHost;
   protected eventNames: string[];
   protected listener: EventListenerObject<E>;
