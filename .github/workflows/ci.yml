@@ -11,33 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint:
-    permissions:
-      contents: read
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "24.0.2"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: lit-analyzer
-        run: npx lit-analyzer src
-        working-directory: ./tlang-playground
-
-      - name: TypeCheck
-        run: npm run typecheck
-
-  test:
+  setup-rust:
     permissions:
       contents: read
     runs-on: ubuntu-latest
@@ -65,7 +39,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-4
           restore-keys: ${{ runner.os }}-cargo-
 
-      - name: Install rustup-toolchain-install-master
+      - name: Install Rust tools
         if: ${{ steps.cache.outputs.cache-hit != 'true' }}
         run: |
           cargo install -f --locked rustup-toolchain-install-master
@@ -85,14 +59,100 @@ jobs:
               echo "wasm-bindgen-cli is already up to date ($INSTALLED_VERSION)."
           fi
 
-      - name: Install wasm toolchain
-        run: rustup target add wasm32-unknown-unknown
-
       - name: Show Rust version
         run: |
           rustup show
           rustc -Vv
           cargo -V
+
+      - name: Fetch dependencies
+        run: cargo fetch
+
+  lint-js:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24.0.2"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: lit-analyzer
+        run: npx lit-analyzer src
+        working-directory: ./tlang-playground
+
+      - name: TypeCheck
+        run: npm run typecheck
+
+  lint-rust:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    needs: [setup-rust]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Restore cargo cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-4
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: cargo fmt
+        run: cargo fmt --all --check
+
+      - name: cargo clippy
+        run: cargo clippy --all-features -- -D warnings
+
+  test:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    needs: [setup-rust]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Restore cargo cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            # Taken from <https://doc.rust-lang.org/nightly/cargo/guide/cargo-home.html#caching-the-cargo-home-in-ci>.
+            ~/.cargo/bin
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            # contains package information of crates installed via `cargo install`.
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+            # Cache build targets to avoid rebuilds in case not all crates
+            # changed. Especially useful while working on playground/non-rust
+            # code.
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-4
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Install wasm toolchain
+        run: rustup target add wasm32-unknown-unknown
 
       - name: cargo-nextest
         run: cargo nextest run --profile=ci
@@ -111,7 +171,7 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-latest
-    needs: [lint, test]
+    needs: [lint-js, lint-rust, test]
 
     steps:
       - uses: actions/checkout@v6
