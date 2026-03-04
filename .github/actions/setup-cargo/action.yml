@@ -5,8 +5,8 @@ description: >
 
 inputs:
   save-cache:
-    description: 'Save the cache after setup (use only in the cache-priming job)'
-    default: 'false'
+    description: "Save the cache after setup (use only in the cache-priming job)"
+    default: "false"
 
 runs:
   using: composite
@@ -51,20 +51,20 @@ runs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-5
         restore-keys: ${{ runner.os }}-cargo-
 
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy, rustfmt
+
     - name: Install Rust tools
       shell: bash
       run: |
-        rustup component add rustfmt
         command -v cargo-nextest &>/dev/null || cargo install --locked cargo-nextest
         command -v cargo-insta   &>/dev/null || cargo install --locked cargo-insta
 
     - name: Fetch dependencies
       shell: bash
       run: cargo fetch
-
-    - name: Install wasm toolchain
-      shell: bash
-      run: rustup target add wasm32-unknown-unknown
 
     - name: Install wasm-bindgen-cli
       shell: bash
