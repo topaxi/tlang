@@ -1,0 +1,238 @@
+================================================================================
+Empty source
+================================================================================
+
+---
+
+(source_file)
+
+================================================================================
+Variable declaration
+================================================================================
+
+let x = 42;
+
+---
+
+(source_file
+  (variable_declaration
+    pattern: (pattern_assign
+      pattern: (binding)
+      default: (number))))
+
+================================================================================
+Function declaration with wildcard pattern
+================================================================================
+
+fn map([], _) { [] }
+
+---
+
+(source_file
+  (function_declaration
+    name: (function_name
+      definition: (identifier))
+    parameters: (parameter_list
+      (function_parameter
+        (list_pattern))
+      (function_parameter
+        (wildcard_pattern)))
+    body: (block
+      (expression_statement
+        (list_expression)))))
+
+================================================================================
+Function declaration with list pattern
+================================================================================
+
+fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
+
+---
+
+(source_file
+  (function_declaration
+    name: (function_name
+      definition: (identifier))
+    parameters: (parameter_list
+      (function_parameter
+        (list_pattern
+          (binding)
+          rest: (binding)))
+      (function_parameter
+        (binding)))
+    body: (block
+      (expression_statement
+        (list_expression
+          (call_expression
+            callee: (identifier)
+            arguments: (argument_list
+              (identifier)))
+          (call_expression
+            callee: (identifier)
+            arguments: (argument_list
+              (identifier)
+              (identifier))))))))
+
+================================================================================
+Function declaration with guard clause
+================================================================================
+
+fn range(start, end, acc) if start >= end; { acc }
+
+---
+
+(source_file
+  (function_declaration
+    name: (function_name
+      definition: (identifier))
+    parameters: (parameter_list
+      (function_parameter
+        (binding))
+      (function_parameter
+        (binding))
+      (function_parameter
+        (binding)))
+    guard: (guard_clause
+      condition: (binary_expression
+        left: (identifier)
+        right: (identifier)))
+    body: (block
+      (expression_statement
+        (identifier)))))
+
+================================================================================
+Function declaration with return type
+================================================================================
+
+fn add(a: isize, b: isize) -> isize { a + b }
+
+---
+
+(source_file
+  (function_declaration
+    name: (function_name
+      definition: (identifier))
+    parameters: (parameter_list
+      (function_parameter
+        (binding)
+        type: (type_annotation
+          (identifier)))
+      (function_parameter
+        (binding)
+        type: (type_annotation
+          (identifier))))
+    return_type: (type_annotation
+      (identifier))
+    body: (block
+      (expression_statement
+        (binary_expression
+          left: (identifier)
+          right: (identifier))))))
+
+================================================================================
+Method declaration
+================================================================================
+
+fn Vector.add(self, other) { self }
+
+---
+
+(source_file
+  (function_declaration
+    name: (function_name
+      definition: (type_identifier)
+      method: (property_name
+        (identifier)))
+    parameters: (parameter_list
+      (function_parameter
+        (self_pattern))
+      (function_parameter
+        (binding)))
+    body: (block
+      (expression_statement
+        (self)))))
+
+================================================================================
+Namespaced function declaration
+================================================================================
+
+fn Vector::new(x, y) { x }
+
+---
+
+(source_file
+  (function_declaration
+    name: (function_name
+      namespace: (type_identifier)
+      definition: (identifier))
+    parameters: (parameter_list
+      (function_parameter
+        (binding))
+      (function_parameter
+        (binding)))
+    body: (block
+      (expression_statement
+        (identifier)))))
+
+================================================================================
+Enum declaration
+================================================================================
+
+enum Option {
+    Some(isize),
+    None,
+}
+
+---
+
+(source_file
+  (enum_declaration
+    name: (type_identifier)
+    (enum_variant
+      name: (type_identifier)
+      (type_annotation
+        (identifier)))
+    (enum_variant
+      name: (type_identifier))))
+
+================================================================================
+Struct declaration
+================================================================================
+
+struct Vector {
+    x: isize,
+    y: isize,
+}
+
+---
+
+(source_file
+  (struct_declaration
+    name: (type_identifier)
+    (struct_field
+      name: (identifier)
+      type: (type_annotation
+        (identifier)))
+    (struct_field
+      name: (identifier)
+      type: (type_annotation
+        (identifier)))))
+
+================================================================================
+Return statement
+================================================================================
+
+fn foo() {
+    return 42;
+}
+
+---
+
+(source_file
+  (function_declaration
+    name: (function_name
+      definition: (identifier))
+    parameters: (parameter_list)
+    body: (block
+      (return_statement
+        (number)))))

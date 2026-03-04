@@ -1,0 +1,14 @@
+# Node.js bindings and dependencies
+node_modules/
+bindings/node/*.js
+bindings/node/*.d.ts
+!bindings/node/index.js
+!bindings/node/index.d.ts
+
+# Build artifacts
+build/
+target/
+*.so
+
+# Prebuilt binaries
+prebuilds/

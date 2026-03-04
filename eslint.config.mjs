@@ -13,6 +13,7 @@ export default defineConfig([
       'crates/tlang_bindings_js/pkg/',
       'packages/codemirror-lang-tlang/src/parser.js',
       'packages/codemirror-lang-tlang/src/parser.terms.js',
+      'tree-sitter-tlang/grammar.js',
     ],
   },
   { languageOptions: { globals: globals.browser } },

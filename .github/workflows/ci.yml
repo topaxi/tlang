@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  setup-rust:
     permissions:
       contents: read
     runs-on: ubuntu-latest
@@ -19,55 +19,69 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Add cache for cargo
-        id: cache
-        uses: actions/cache@v5
+      - uses: ./.github/actions/setup-cargo
         with:
-          path: |
-            # Taken from <https://doc.rust-lang.org/nightly/cargo/guide/cargo-home.html#caching-the-cargo-home-in-ci>.
-            ~/.cargo/bin
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-            ~/.cargo/git/db
-            # contains package information of crates installed via `cargo install`.
-            ~/.cargo/.crates.toml
-            ~/.cargo/.crates2.json
-            # Cache build targets to avoid rebuilds in case not all crates
-            # changed. Especially useful while working on playground/non-rust
-            # code.
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-4
-          restore-keys: ${{ runner.os }}-cargo-
-
-      - name: Install rustup-toolchain-install-master
-        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
-        run: |
-          cargo install -f --locked rustup-toolchain-install-master
-          cargo install -f --locked cargo-nextest
-          cargo install -f --locked cargo-insta
-          cargo install -f --locked wasm-bindgen-cli --version $(grep -oP 'wasm-bindgen = "=\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
-          cargo install -f --locked wasm-pack
-
-      - name: Install wasm-bindgen-cli
-        run: |
-          REQUIRED_VERSION=$(grep -oP 'wasm-bindgen = "=\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
-          INSTALLED_VERSION=$(wasm-bindgen --version 2>/dev/null | awk '{print $2}')
-
-          if [ "$INSTALLED_VERSION" != "$REQUIRED_VERSION" ]; then
-              cargo install -f --locked wasm-bindgen-cli --version "$REQUIRED_VERSION"
-          else
-              echo "wasm-bindgen-cli is already up to date ($INSTALLED_VERSION)."
-          fi
-
-      - name: Install wasm toolchain
-        run: |
-          rustup target add wasm32-unknown-unknown
+          save-cache: 'true'
 
       - name: Show Rust version
         run: |
           rustup show
           rustc -Vv
           cargo -V
+
+  lint-js:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24.0.2"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: lit-analyzer
+        run: npx lit-analyzer src
+        working-directory: ./tlang-playground
+
+      - name: TypeCheck
+        run: npm run typecheck
+
+  lint-rust:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    needs: [setup-rust]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-cargo
+
+      - name: cargo fmt
+        run: cargo fmt --all --check
+
+      - name: cargo clippy
+        run: cargo clippy --all-features -- -D warnings
+
+  test:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    needs: [setup-rust]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-cargo
 
       - name: cargo-nextest
         run: cargo nextest run --profile=ci
@@ -82,28 +96,33 @@ jobs:
       - name: Test JS bindings
         run: make test-bindings-js
 
+  build-playground:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    needs: [lint-js, lint-rust, test]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-cargo
+
       - name: Install binaryen
         run: |
-          wget https://github.com/WebAssembly/binaryen/releases/download/version_119/binaryen-version_119-x86_64-linux.tar.gz
-          tar xvzf binaryen-version_119-x86_64-linux.tar.gz
+          wget -q https://github.com/WebAssembly/binaryen/releases/download/version_119/binaryen-version_119-x86_64-linux.tar.gz
+          tar xzf binaryen-version_119-x86_64-linux.tar.gz
+          echo "$(pwd)/binaryen-version_119/bin" >> "$GITHUB_PATH"
 
-      - name: Install playground dependencies
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24.0.2"
+          cache: "npm"
+
+      - name: Install dependencies
         run: npm ci
 
-      - name: Lint playground
-        run: npm run lint
-
-      - name: lit-analyzer
-        run: npx lit-analyzer src
-        working-directory: ./tlang-playground
-
-      - name: TypeCheck playground
-        run: npm run typecheck
-
       - name: Build playground
-        run: |
-          PATH=$(pwd)/binaryen-version_119/bin:$PATH
-          npm run build -- -- --base=/tlang
+        run: npm run build -- -- --base=/tlang
 
       - name: Upload artifact
         if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
@@ -111,10 +130,29 @@ jobs:
         with:
           path: tlang-playground/dist/
 
+  test-tree-sitter:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24.0.2"
+
+      - name: Install tree-sitter-tlang dependencies
+        run: npm ci
+
+      - name: Test tree-sitter corpus
+        run: npm test
+        working-directory: ./tree-sitter-tlang
+
   deploy-pages:
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
-    needs: ["build"]
+    needs: ["build-playground"]
 
     permissions:
       actions: read
