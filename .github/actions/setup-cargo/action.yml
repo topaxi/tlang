@@ -28,7 +28,7 @@ runs:
     - name: Install Rust tools
       shell: bash
       run: |
-        command -v cargo-fmt     &>/dev/null || cargo install --locked cargo-fmt
+        rustup component add rustfmt
         command -v cargo-nextest &>/dev/null || cargo install --locked cargo-nextest
         command -v cargo-insta   &>/dev/null || cargo install --locked cargo-insta
 

@@ -43,7 +43,6 @@ jobs:
         if: ${{ steps.cache.outputs.cache-hit != 'true' }}
         run: |
           cargo install -f --locked rustup-toolchain-install-master
-          cargo install -f --locked cargo-fmt
           cargo install -f --locked cargo-nextest
           cargo install -f --locked cargo-insta
           cargo install -f --locked wasm-bindgen-cli --version $(grep -oP 'wasm-bindgen = "=\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
