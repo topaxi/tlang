@@ -242,8 +242,7 @@ impl Interpreter {
         callee: TlangValue,
         args: &[TlangValue],
     ) -> TlangValue {
-        let interpreter =
-            unsafe { &mut *(std::ptr::from_mut(state) as *mut Interpreter) };
+        let interpreter = unsafe { &mut *(std::ptr::from_mut(state) as *mut Interpreter) };
         interpreter.eval_call_object(callee, args)
     }
 
