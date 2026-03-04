@@ -128,7 +128,37 @@ fn tlang_object_to_js_value(state: &InterpreterState, value: TlangValue) -> JsVa
             }
             JsValue::from(object)
         }
-        _ => JsValue::from("unknown object"),
+        Some(TlangObjectKind::Enum(e)) => {
+            let shape = state.get_shape(e).and_then(|s| s.get_enum_shape()).unwrap();
+            let variant = shape
+                .variants
+                .iter()
+                .enumerate()
+                .find(|(variant, _)| *variant == e.variant)
+                .map(|(_, variant)| variant)
+                .unwrap();
+            let object = js_sys::Object::new();
+            for (field, idx) in &variant.field_map {
+                let key = JsValue::from(field);
+                let value = e.field_values[*idx];
+                js_sys::Reflect::set(&object, &key, &tlang_value_to_js_value(state, value))
+                    .expect("Unable to set property on object");
+            }
+            JsValue::from(object)
+        }
+        Some(TlangObjectKind::Slice(slice)) => {
+            let values = state.get_slice_values(*slice);
+            let array = js_sys::Array::new();
+            for value in values {
+                array.push(&tlang_value_to_js_value(state, *value));
+            }
+            JsValue::from(array)
+        }
+        Some(TlangObjectKind::Fn(_)) => JsValue::from(js_sys::Object::new()),
+        Some(TlangObjectKind::NativeFn) => JsValue::from(js_sys::Object::new()),
+        Some(TlangObjectKind::Closure(_)) => JsValue::from(js_sys::Object::new()),
+        Some(TlangObjectKind::Cell(cell)) => tlang_value_to_js_value(state, cell.value),
+        None => JsValue::NULL,
     }
 }
 
