@@ -5,3 +5,4 @@ pub mod globals;
 pub mod math;
 pub mod option;
 pub mod result;
+pub mod string;
