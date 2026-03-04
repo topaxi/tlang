@@ -12,10 +12,14 @@ let parserWithMetadata = parser.configure({
       'PathExpression/PathName': t.variableName,
       'CallExpression/PathExpression/PathName': t.function(t.variableName),
       'FunctionName/FunctionDefinition': t.function(t.variableName),
-      'FunctionDeclaration/FunctionName/FunctionDefinition': t.function(t.definition(t.variableName)),
+      'FunctionDeclaration/FunctionName/FunctionDefinition': t.function(
+        t.definition(t.variableName),
+      ),
       'FunctionArity/...': t.number,
       'CallExpression/VariableName': t.function(t.variableName),
-      'CallExpression/MemberExpression/PropertyName': t.function(t.propertyName),
+      'CallExpression/MemberExpression/PropertyName': t.function(
+        t.propertyName,
+      ),
       'if else return rec break continue loop for match': t.controlKeyword,
       'let enum fn struct': t.definitionKeyword,
       'in with': t.keyword,
