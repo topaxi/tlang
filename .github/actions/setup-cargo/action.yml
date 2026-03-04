@@ -67,7 +67,7 @@ runs:
     - name: Install wasm-bindgen-cli
       shell: bash
       run: |
-        REQUIRED_VERSION=$(sed -n 's/^wasm-bindgen = "=\([^"]*\)"/\1/p' crates/tlang_bindings_js/Cargo.toml)
+        REQUIRED_VERSION=$(grep -oP 'wasm-bindgen = "=\K[^"]+' crates/tlang_bindings_js/Cargo.toml)
         INSTALLED_VERSION=$(wasm-bindgen --version 2>/dev/null | awk '{print $2}')
 
         if [ "$INSTALLED_VERSION" != "$REQUIRED_VERSION" ]; then
