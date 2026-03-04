@@ -10,8 +10,8 @@ use crate::hir_opt::HirOptContext;
 /// Primitive type names that are builtin to the language and have no
 /// declaration node in the symbol table.
 const PRIM_TY_NAMES: &[&str] = &[
-    "bool", "i8", "i16", "i32", "i64", "isize", "u8", "u16", "u32", "u64", "usize", "f32",
-    "f64", "char", "String", "Slice",
+    "bool", "i8", "i16", "i32", "i64", "isize", "u8", "u16", "u32", "u64", "usize", "f32", "f64",
+    "char", "String", "Slice",
     // `unknown` is a placeholder type meaning "any / untyped"; it has no declaration.
     "unknown",
 ];
@@ -51,9 +51,7 @@ impl IdentifierResolver {
             .get_by_name(&name)
             .into_iter()
             .filter(|s| s.declared)
-            .find(|s| {
-                matches!(s.symbol_type, SymbolType::Enum | SymbolType::Struct)
-            });
+            .find(|s| matches!(s.symbol_type, SymbolType::Enum | SymbolType::Struct));
 
         if let Some(symbol_info) = symbol_info {
             debug!("Type path '{}' resolved to {:?}", name, symbol_info);
