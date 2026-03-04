@@ -53,8 +53,6 @@ runs:
 
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
-      with:
-        components: clippy, rustfmt
 
     - name: Install Rust tools
       shell: bash
