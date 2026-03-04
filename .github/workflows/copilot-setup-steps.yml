@@ -21,29 +21,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      # Set up Rust toolchain first (as specified in rust-toolchain.toml)
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - uses: ./.github/actions/setup-cargo
         with:
-          components: clippy, rustfmt
-
-      # Cache Cargo dependencies and build artifacts
-      - name: Cache Cargo dependencies
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.cargo/bin
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-            ~/.cargo/git/db
-            ~/.cargo/.crates.toml
-            ~/.cargo/.crates2.json
-            target/
-          key: >-
-            ${{ runner.os }}-cargo-dev-${{ hashFiles('**/Cargo.lock') }}-5
-          restore-keys: |
-            ${{ runner.os }}-cargo-dev-
-            ${{ runner.os }}-cargo-
+          save-cache: 'true'
 
       # Install exact Node.js version as specified in package.json (24.0.2)
       - name: Setup Node.js
@@ -63,27 +43,6 @@ jobs:
           fi
           echo "✅ Node.js version verified: $ACTUAL_VERSION"
 
-      # Install Rust tools required for development
-      - name: Install Rust development tools
-        run: |
-          # Install cargo-nextest for fast testing
-          cargo install cargo-nextest --locked
-
-          # Install cargo-insta for snapshot testing
-          cargo install cargo-insta --locked
-
-          # Install wasm-pack for WebAssembly builds
-          cargo install wasm-pack --locked
-
-          # Install exact wasm-bindgen-cli version matching Cargo.toml
-          WASM_BINDGEN_VERSION=$(grep -oP 'wasm-bindgen = "=\K[^"]+' \
-            crates/tlang_bindings_js/Cargo.toml)
-          cargo install wasm-bindgen-cli \
-            --version "$WASM_BINDGEN_VERSION" --locked
-
-          echo "✅ Rust development tools installed"
-
-      # Download and setup binaryen for WebAssembly optimization
       - name: Setup binaryen
         run: |
           BINARYEN_VERSION="119"

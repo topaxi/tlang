@@ -28,7 +28,7 @@ runs:
           # changed. Especially useful while working on playground/non-rust
           # code.
           target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-5
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-6
         restore-keys: ${{ runner.os }}-cargo-
 
     - name: Restore cargo cache
@@ -48,7 +48,7 @@ runs:
           # changed. Especially useful while working on playground/non-rust
           # code.
           target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-5
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-6
         restore-keys: ${{ runner.os }}-cargo-
 
     - name: Install Rust toolchain
