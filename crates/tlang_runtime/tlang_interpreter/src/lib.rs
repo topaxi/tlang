@@ -48,6 +48,7 @@ pub enum MatchResult {
     NotMatched(EvalResult),
 }
 
+#[repr(transparent)]
 pub struct Interpreter {
     state: InterpreterState,
 }
@@ -157,6 +158,10 @@ impl Interpreter {
             state: InterpreterState::default(),
         };
 
+        // Register the call handler so native functions can invoke callables
+        // via `InterpreterState::call()`.
+        interpreter.state.register_call_fn(Self::call_handler);
+
         // Build stable slot assignments and initialize the global slots Vec.
         let builtin_defs = Self::builtin_symbols();
         interpreter.state.init_global_slots(
@@ -222,6 +227,24 @@ impl Interpreter {
         self.state.set_global(name.to_string(), fn_object);
 
         fn_object
+    }
+
+    /// Call handler registered on [`InterpreterState`] so that native functions
+    /// can invoke user-defined callables via [`InterpreterState::call`].
+    ///
+    /// # Safety
+    /// `Interpreter` is `#[repr(transparent)]` over `InterpreterState`, so the
+    /// pointer cast is layout-compatible. The `&mut InterpreterState` passed in
+    /// is reborrowed into this function — the caller's reference is suspended
+    /// for the duration of the call, so there is only one live `&mut` at a time.
+    fn call_handler(
+        state: &mut InterpreterState,
+        callee: TlangValue,
+        args: &[TlangValue],
+    ) -> TlangValue {
+        let interpreter =
+            unsafe { &mut *(std::ptr::from_mut(state) as *mut Interpreter) };
+        interpreter.eval_call_object(callee, args)
     }
 
     fn get_closure_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {

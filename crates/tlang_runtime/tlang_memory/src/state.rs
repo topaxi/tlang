@@ -19,10 +19,21 @@ use crate::value::{
     },
 };
 
+/// Function pointer type for calling a `TlangValue` that references a callable
+/// (function, closure, or native function). Registered by the interpreter to
+/// allow native functions to invoke user-defined callables.
+///
+/// # Safety
+/// The function pointer must reconstruct a valid `&mut Interpreter` from the
+/// given `&mut InterpreterState`. This is safe when `Interpreter` is
+/// `#[repr(transparent)]` over `InterpreterState`.
+type CallFn = fn(&mut InterpreterState, TlangValue, &[TlangValue]) -> TlangValue;
+
 pub struct InterpreterState {
     pub heap: Heap,
     pub program: Program,
     pub execution: ExecutionContext,
+    call_fn: Option<CallFn>,
 }
 
 impl Resolver for InterpreterState {
@@ -57,6 +68,7 @@ impl InterpreterState {
             heap: Heap::new(),
             program: Program::new(),
             execution: ExecutionContext::new(),
+            call_fn: None,
         }
     }
 
@@ -497,6 +509,27 @@ impl InterpreterState {
     }
 
     // ── Cross-cutting helpers ───────────────────────────────────────────────
+
+    /// Register the call handler function pointer. Called by the `Interpreter`
+    /// during initialization so that native functions can invoke callables
+    /// via [`InterpreterState::call`].
+    pub fn register_call_fn(&mut self, call_fn: CallFn) {
+        self.call_fn = Some(call_fn);
+    }
+
+    /// Call a `TlangValue` that references a callable (function, closure, or
+    /// native function) with the given arguments.
+    ///
+    /// This is the primary way for native functions to invoke user-defined
+    /// callables. The call handler must be registered by the interpreter
+    /// before this method is used.
+    ///
+    /// # Panics
+    /// Panics if no call handler has been registered.
+    pub fn call(&mut self, callee: TlangValue, args: &[TlangValue]) -> TlangValue {
+        let call_fn = self.call_fn.expect("call handler not registered");
+        (call_fn)(self, callee, args)
+    }
 
     /// # Panics
     pub fn is_truthy(&mut self, value: TlangValue) -> bool {
