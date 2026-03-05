@@ -47,15 +47,6 @@ pub fn define_result_shape(state: &mut InterpreterState) {
     );
 
     method_map.insert(
-        "is_truthy".to_string(),
-        state.new_native_method("Result::is_truthy", |state, this, _args| {
-            let this = state.get_enum(this).unwrap();
-
-            NativeFnReturn::Return(TlangValue::Bool(this.variant == RESULT_VARIANT_OK))
-        }),
-    );
-
-    method_map.insert(
         "map".to_string(),
         state.new_native_method("Result::map", |state, this, args| {
             let func = args[0];
@@ -109,10 +100,12 @@ mod tests {
     use crate::result::{RESULT_VARIANT_ERR, RESULT_VARIANT_OK};
 
     use super::define_result_shape;
+    use crate::protocols::define_builtin_protocols;
 
     fn interpreter_state() -> InterpreterState {
         let mut state = InterpreterState::new();
         define_result_shape(&mut state);
+        define_builtin_protocols(&mut state);
         state
     }
 

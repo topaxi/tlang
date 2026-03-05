@@ -5,9 +5,24 @@ use crate::option::{OPTION_VARIANT_NONE, OPTION_VARIANT_SOME};
 use crate::result::{RESULT_VARIANT_ERR, RESULT_VARIANT_OK};
 
 pub fn define_builtin_protocols(state: &mut InterpreterState) {
+    state.register_protocol("Truthy".to_string(), vec!["truthy".to_string()]);
     state.register_protocol("Functor".to_string(), vec!["map".to_string()]);
     state.register_protocol("Iterable".to_string(), vec!["iter".to_string()]);
     state.register_protocol("Iterator".to_string(), vec!["next".to_string()]);
+
+    // Truthy::truthy for Option
+    let option_truthy = state.new_native_fn("Truthy::Option::truthy", |state, args| {
+        let this = state.get_enum(args[0]).unwrap();
+        NativeFnReturn::Return(TlangValue::Bool(this.variant == OPTION_VARIANT_SOME))
+    });
+    state.register_protocol_impl("Truthy", "Option", "truthy", option_truthy);
+
+    // Truthy::truthy for Result
+    let result_truthy = state.new_native_fn("Truthy::Result::truthy", |state, args| {
+        let this = state.get_enum(args[0]).unwrap();
+        NativeFnReturn::Return(TlangValue::Bool(this.variant == RESULT_VARIANT_OK))
+    });
+    state.register_protocol_impl("Truthy", "Result", "truthy", result_truthy);
 
     // Functor::map for Option
     let option_map = state.new_native_fn("Functor::Option::map", |state, args| {

@@ -76,15 +76,6 @@ pub fn define_option_shape(state: &mut InterpreterState) {
         }),
     );
 
-    method_map.insert(
-        "is_truthy".to_string(),
-        state.new_native_method("Option::is_truthy", |state, this, _args| {
-            let this = state.get_enum(this).unwrap();
-
-            NativeFnReturn::Return(TlangValue::Bool(this.variant == OPTION_VARIANT_SOME))
-        }),
-    );
-
     state
         .heap
         .builtin_shapes
@@ -107,10 +98,12 @@ mod tests {
     use crate::option::{OPTION_VARIANT_NONE, OPTION_VARIANT_SOME};
 
     use super::define_option_shape;
+    use crate::protocols::define_builtin_protocols;
 
     fn interpreter_state() -> InterpreterState {
         let mut state = InterpreterState::new();
         define_option_shape(&mut state);
+        define_builtin_protocols(&mut state);
         state
     }
 
