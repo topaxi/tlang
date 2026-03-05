@@ -37,7 +37,6 @@ declaration {
 statement[@isGroup=Statement] {
   declaration |
   ReturnStatement |
-  Block |
   ExpressionStatement { expression semi } |
   EmptyStatement { ";" }
 }
@@ -238,6 +237,7 @@ expression[@isGroup=Expression] {
   ObjectExpression {
     "{" commaSep<Property> ~destructure "}"
   } |
+  Block |
   UnaryExpression |
   ParenthesizedExpression |
   MemberExpression |
