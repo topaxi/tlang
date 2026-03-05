@@ -134,9 +134,6 @@ export class TlangController {
   private runCompiled() {
     let bindings = {
       console: this.tlangConsole,
-      panic: (message: string) => {
-        throw new Error(message);
-      },
     };
 
     let bindingsDestructuring = `let {${Object.keys(bindings).join(',')}} = ___js_bindings;`;

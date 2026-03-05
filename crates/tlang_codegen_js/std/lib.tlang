@@ -29,6 +29,8 @@ fn Result.unwrap(_) { panic("Called unwrap on Err") }
 protocol Functor {
   fn map(self, f)
 }
+// Backwards compatibility and convenience
+let map = Functor::map;
 
 impl Functor for Option {
   fn map(Option::Some(x), f) { Option::Some(f(x)) }
@@ -48,10 +50,6 @@ fn random_int(max) { math::random() * max |> math::floor() }
 
 // compose(fn(a) -> b, fn(b) -> c) -> fn(a) -> c
 fn compose(f, g) { fn(x) { f(g(x)) } }
-
-// map(a[], fn(a) -> b) -> b[]
-fn map([], _) { [] }
-fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
 
 // filter(a[], fn(a) -> bool) -> a[]
 fn filter([], _) { [] }
