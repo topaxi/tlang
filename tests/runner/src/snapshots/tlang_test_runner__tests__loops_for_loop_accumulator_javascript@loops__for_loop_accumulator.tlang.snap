@@ -4,7 +4,7 @@ description: "Backend: javascript"
 expression: apply_redactions(&output)
 input_file: tests/loops/for_loop_accumulator.tlang
 ---
-[stdin]:238
+[stdin]:236
                 $tmp$1 = return accumulator$$;;
                          ^^^^^^
 Expression expected

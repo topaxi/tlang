@@ -53,11 +53,6 @@ fn compose(f, g) { fn(x) { f(g(x)) } }
 fn map([], _) { [] }
 fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
 
-impl Functor for List {
-  fn map([], _) { [] }
-  fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
-}
-
 // filter(a[], fn(a) -> bool) -> a[]
 fn filter([], _) { [] }
 fn filter([x, ...xs], f) if f(x) { [x, ...filter(xs, f)] }

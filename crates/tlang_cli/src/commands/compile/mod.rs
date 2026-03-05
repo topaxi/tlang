@@ -62,7 +62,8 @@ fn compile_standard_library() -> Result<String, ParserError> {
     let mut module = compile_to_hir(&source, &CompileTargetArg::Js, false)?;
     let mut js = JsTarget.compile(&source, &mut module)?;
 
-    js.push_str("\nfunction panic(msg) { throw new Error(msg); }\n");
+    js.push_str("\n");
+    js.push_str(CodegenJS::get_standard_library_native_js());
 
     Ok(js)
 }

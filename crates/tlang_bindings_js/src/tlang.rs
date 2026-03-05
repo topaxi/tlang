@@ -34,6 +34,11 @@ pub fn get_standard_library_source() -> String {
     CodegenJS::get_standard_library_source()
 }
 
+#[wasm_bindgen(js_name = "getStandardLibraryNativeJs")]
+pub fn get_standard_library_native_js() -> String {
+    CodegenJS::get_standard_library_native_js().to_string()
+}
+
 #[derive(Deserialize, Serialize, Tsify)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 #[serde(rename_all = "camelCase")]
