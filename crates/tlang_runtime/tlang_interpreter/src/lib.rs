@@ -1049,6 +1049,82 @@ impl Interpreter {
             self.state
                 .register_protocol_impl(&protocol_name, &target_type, &method_name, fn_value);
         }
+
+        for apply_ident in &impl_block.apply_methods {
+            let method_name = apply_ident.as_str();
+            self.install_protocol_method_on_shape(&protocol_name, &target_type, method_name);
+        }
+    }
+
+    fn is_builtin_type(type_name: &str) -> bool {
+        matches!(type_name, "List" | "Option" | "Result" | "ListIterator")
+    }
+
+    fn shape_key_for_type_name(&self, type_name: &str) -> Option<ShapeKey> {
+        if let Some(decl) = self.state.get_struct_decl_by_name(type_name) {
+            return Some(decl.hir_id.into());
+        }
+        if let Some(decl) = self.state.get_enum_decl_by_name(type_name) {
+            return Some(decl.hir_id.into());
+        }
+        None
+    }
+
+    fn install_protocol_method_on_shape(
+        &mut self,
+        protocol_name: &str,
+        target_type: &str,
+        method_name: &str,
+    ) {
+        if Self::is_builtin_type(target_type) {
+            self.panic(format!(
+                "Cannot use 'apply' for built-in type '{target_type}': \
+                 applying methods to built-in types is not allowed to preserve backwards compatibility"
+            ));
+        }
+
+        let shape_key = self
+            .shape_key_for_type_name(target_type)
+            .unwrap_or_else(|| {
+                self.panic(format!(
+                    "Cannot install method '{method_name}': type '{target_type}' not found"
+                ))
+            });
+
+        // Collision check
+        if self
+            .state
+            .heap
+            .get_shape_by_key(shape_key)
+            .and_then(|s| s.get_method(method_name))
+            .is_some()
+        {
+            self.panic(format!(
+                "Method collision: '{method_name}' is already defined on '{target_type}'"
+            ));
+        }
+
+        let fn_value = self
+            .state
+            .get_protocol_impl(protocol_name, target_type, method_name)
+            .unwrap_or_else(|| {
+                self.panic(format!(
+                    "Cannot install method '{method_name}': not found in impl of '{protocol_name}' for '{target_type}'"
+                ))
+            });
+
+        let obj_id = fn_value.get_object_id().unwrap_or_else(|| {
+            self.panic(format!(
+                "Cannot install method '{method_name}': protocol impl is not a function object"
+            ))
+        });
+        let method = match self.get_object_by_id(obj_id) {
+            TlangObjectKind::Fn(hir_id) => TlangStructMethod::HirId(*hir_id),
+            _ => self.panic(format!(
+                "Cannot install method '{method_name}': protocol impl is not a Fn object"
+            )),
+        };
+        self.state.heap.set_method(shape_key, method_name, method);
     }
 
     fn eval_call_object(&mut self, callee: TlangValue, args: &[TlangValue]) -> TlangValue {

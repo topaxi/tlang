@@ -346,6 +346,7 @@ impl LoweringContext {
             protocol_name,
             target_type,
             methods,
+            apply_methods: impl_block.apply_methods.clone(),
         };
 
         hir::Stmt {

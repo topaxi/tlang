@@ -4,7 +4,7 @@ description: "Backend: javascript"
 expression: apply_redactions(&output)
 input_file: tests/loops/for_loop_simple.tlang
 ---
-[stdin]:232
+[stdin]:243
              = return;;
              ^
 Expression expected

@@ -52,6 +52,14 @@ impl Program {
         self.fn_decls.insert(id, decl);
     }
 
+    pub fn get_struct_decl_by_name(&self, name: &str) -> Option<Rc<hir::StructDeclaration>> {
+        self.struct_decls.get(name).cloned()
+    }
+
+    pub fn get_enum_decl_by_name(&self, name: &str) -> Option<Rc<hir::EnumDeclaration>> {
+        self.enum_decls.get(name).cloned()
+    }
+
     pub fn get_struct_decl(&self, path: &hir::Path) -> Option<Rc<hir::StructDeclaration>> {
         self.struct_decls.get(&path.to_string()).cloned()
     }

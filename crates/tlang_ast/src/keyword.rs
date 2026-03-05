@@ -27,6 +27,7 @@ define_keywords! {
 
     Protocol => "protocol",
     Impl => "impl",
+    Apply => "apply",
 
     // Reserved keywords, unused at the moment
     Pub => "pub",

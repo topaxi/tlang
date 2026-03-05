@@ -129,6 +129,17 @@ impl TlangShape {
             TlangShape::Enum(e) => e.method_map.keys().cloned().collect(),
         }
     }
+
+    pub fn add_method(&mut self, name: String, method: TlangStructMethod) {
+        match self {
+            TlangShape::Struct(s) => {
+                s.method_map.insert(name, method);
+            }
+            TlangShape::Enum(e) => {
+                e.method_map.insert(name, method);
+            }
+        }
+    }
 }
 
 pub struct TlangStructShape {

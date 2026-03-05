@@ -427,12 +427,20 @@ impl InterpreterState {
         self.program.get_struct_decl(path)
     }
 
+    pub fn get_struct_decl_by_name(&self, name: &str) -> Option<Rc<hir::StructDeclaration>> {
+        self.program.get_struct_decl_by_name(name)
+    }
+
     pub fn set_struct_decl(&mut self, path_name: String, decl: Rc<hir::StructDeclaration>) {
         self.program.set_struct_decl(path_name, decl);
     }
 
     pub fn get_enum_decl(&self, path: &hir::Path) -> Option<Rc<hir::EnumDeclaration>> {
         self.program.get_enum_decl(path)
+    }
+
+    pub fn get_enum_decl_by_name(&self, name: &str) -> Option<Rc<hir::EnumDeclaration>> {
+        self.program.get_enum_decl_by_name(name)
     }
 
     pub fn set_enum_decl(&mut self, path_name: String, decl: Rc<hir::EnumDeclaration>) {

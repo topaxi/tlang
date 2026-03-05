@@ -277,6 +277,19 @@ impl Heap {
             .and_then(|shape| shape.method_map.insert(method_name.to_string(), method));
     }
 
+    pub fn get_shape_by_key_mut(&mut self, key: ShapeKey) -> Option<&mut TlangShape> {
+        match key {
+            ShapeKey::Native(_) => self.builtin_shapes.get_shape_mut(key),
+            _ => self.shapes.get_mut(&key),
+        }
+    }
+
+    pub fn set_method(&mut self, shape: ShapeKey, method_name: &str, method: TlangStructMethod) {
+        if let Some(s) = self.get_shape_by_key_mut(shape) {
+            s.add_method(method_name.to_string(), method);
+        }
+    }
+
     pub fn define_struct_shape(
         &mut self,
         shape_key: ShapeKey,

@@ -181,5 +181,33 @@ impl CodegenJS {
             self.generate_function_expression(method);
             self.push_str(";\n");
         }
+
+        for apply_ident in &impl_block.apply_methods {
+            let method_name = apply_ident.as_str();
+            assert!(
+                !is_builtin_type(&target_type),
+                "Cannot use 'apply' for built-in type '{target_type}': \
+                 applying methods to built-in types is not allowed to preserve backwards compatibility"
+            );
+            let proto = js_prototype_for_type(&target_type);
+            self.push_indent();
+            self.push_str("$installMethod(");
+            self.push_str(&proto);
+            self.push_str(", \"");
+            self.push_str(method_name);
+            self.push_str("\", ");
+            self.push_str(&protocol_name);
+            self.push_char('.');
+            self.push_str(method_name);
+            self.push_str(");\n");
+        }
     }
+}
+
+fn is_builtin_type(type_name: &str) -> bool {
+    matches!(type_name, "List" | "Option" | "Result" | "ListIterator")
+}
+
+fn js_prototype_for_type(type_name: &str) -> String {
+    format!("{type_name}.prototype")
 }

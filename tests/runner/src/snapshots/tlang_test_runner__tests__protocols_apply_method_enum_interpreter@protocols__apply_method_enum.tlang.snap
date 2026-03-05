@@ -1,0 +1,8 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: apply_redactions(&output)
+input_file: tests/protocols/apply_method_enum.tlang
+---
+Woof! I'm Rex
+Meow! I'm Whiskers

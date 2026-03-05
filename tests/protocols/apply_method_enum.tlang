@@ -1,0 +1,21 @@
+protocol Greet {
+  fn greet(self)
+}
+
+enum Animal {
+  Dog(name),
+  Cat(name),
+}
+
+impl Greet for Animal {
+  apply greet;
+
+  fn greet(Animal::Dog(name)) { "Woof! I'm " + name }
+  fn greet(Animal::Cat(name)) { "Meow! I'm " + name }
+}
+
+let dog = Animal::Dog("Rex");
+let cat = Animal::Cat("Whiskers");
+
+dog.greet() |> log();
+cat.greet() |> log();

@@ -518,6 +518,7 @@ pub struct ImplBlock {
     pub protocol_name: Path,
     pub target_type: Path,
     pub methods: Vec<FunctionDeclaration>,
+    pub apply_methods: Vec<Ident>,
 }
 
 #[derive(Debug, Default, Clone)]

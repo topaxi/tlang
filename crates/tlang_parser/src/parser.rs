@@ -537,17 +537,32 @@ impl<'src> Parser<'src> {
         let target_type = self.parse_path();
         self.consume_token(TokenKind::LBrace);
         let mut methods = Vec::new();
+        let mut apply_methods = Vec::new();
         while matches!(
             self.current_token_kind(),
             TokenKind::Keyword(Keyword::Fn)
+                | TokenKind::Keyword(Keyword::Apply)
                 | TokenKind::SingleLineComment(_)
                 | TokenKind::MultiLineComment(_)
         ) {
-            let fn_stmt = self.parse_function_declaration();
-            match fn_stmt.kind {
-                StmtKind::FunctionDeclaration(decl) => methods.push(*decl),
-                StmtKind::FunctionDeclarations(decls) => methods.extend(decls),
-                _ => unreachable!(),
+            if matches!(
+                self.current_token_kind(),
+                TokenKind::Keyword(Keyword::Apply)
+            ) {
+                self.consume_keyword_token(Keyword::Apply);
+                apply_methods.push(self.parse_identifier());
+                while matches!(self.current_token_kind(), TokenKind::Comma) {
+                    self.consume_token(TokenKind::Comma);
+                    apply_methods.push(self.parse_identifier());
+                }
+                self.consume_token(TokenKind::Semicolon);
+            } else {
+                let fn_stmt = self.parse_function_declaration();
+                match fn_stmt.kind {
+                    StmtKind::FunctionDeclaration(decl) => methods.push(*decl),
+                    StmtKind::FunctionDeclarations(decls) => methods.extend(decls),
+                    _ => unreachable!(),
+                }
             }
         }
         self.consume_token(TokenKind::RBrace);
@@ -557,6 +572,7 @@ impl<'src> Parser<'src> {
                 protocol_name,
                 target_type,
                 methods,
+                apply_methods,
             }))
         )
     }
