@@ -358,6 +358,38 @@ impl InterpreterState {
         self.heap.get_shape_by_key(key)
     }
 
+    /// Returns the type name of a value for protocol dispatch.
+    pub fn type_name_of(&self, value: TlangValue) -> &str {
+        match value {
+            TlangValue::Nil => "Nil",
+            TlangValue::Bool(_) => "Bool",
+            TlangValue::I8(_)
+            | TlangValue::I16(_)
+            | TlangValue::I32(_)
+            | TlangValue::I64(_)
+            | TlangValue::U8(_)
+            | TlangValue::U16(_)
+            | TlangValue::U32(_)
+            | TlangValue::U64(_) => "Int",
+            TlangValue::F32(_) | TlangValue::F64(_) => "Float",
+            TlangValue::Object(_) => {
+                if let Some(obj) = self.get_object(value) {
+                    if let Some(shape_key) = obj.shape()
+                        && let Some(shape) = self.get_shape_by_key(shape_key) {
+                            return shape.name();
+                        }
+                    if obj.as_str().is_some() {
+                        return "String";
+                    }
+                    if obj.as_slice().is_some() {
+                        return "Slice";
+                    }
+                }
+                "Object"
+            }
+        }
+    }
+
     pub fn get_struct_field_index(&self, shape: ShapeKey, field: &str) -> Option<usize> {
         self.heap.get_struct_field_index(shape, field)
     }

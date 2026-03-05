@@ -294,30 +294,7 @@ impl Interpreter {
 
     /// Returns the type name of a value for protocol dispatch.
     fn type_name_of(&self, value: TlangValue) -> &str {
-        match value {
-            TlangValue::Nil => "Nil",
-            TlangValue::Bool(_) => "Bool",
-            TlangValue::I8(_)
-            | TlangValue::I16(_)
-            | TlangValue::I32(_)
-            | TlangValue::I64(_)
-            | TlangValue::U8(_)
-            | TlangValue::U16(_)
-            | TlangValue::U32(_)
-            | TlangValue::U64(_) => "Int",
-            TlangValue::F32(_) | TlangValue::F64(_) => "Float",
-            TlangValue::Object(_) => {
-                if let Some(shape) = self.get_shape_of(value) {
-                    return shape.name();
-                }
-                if let Some(obj) = self.get_object(value)
-                    && obj.as_str().is_some()
-                {
-                    return "String";
-                }
-                "Object"
-            }
-        }
+        self.state.type_name_of(value)
     }
 
     fn get_str(&self, value: TlangValue) -> Option<&str> {

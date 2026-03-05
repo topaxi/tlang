@@ -75,4 +75,44 @@ pub fn define_builtin_protocols(state: &mut InterpreterState) {
         NativeFnReturn::Return(state.new_list(result))
     });
     state.register_protocol_impl("Functor", "List", "map", list_map);
+
+    // Functor::map for Slice (maps over slice view, returns a new list)
+    let slice_map = state.new_native_fn("Functor::Slice::map", |state, args| {
+        let this = args[0];
+        let func = args[1];
+        let slice = state.get_slice(this).unwrap();
+        let values: Vec<TlangValue> = state.get_slice_values(slice).to_vec();
+
+        let mut result = Vec::with_capacity(values.len());
+        for item in values {
+            result.push(state.call(func, &[item]));
+        }
+
+        NativeFnReturn::Return(state.new_list(result))
+    });
+    state.register_protocol_impl("Functor", "Slice", "map", slice_map);
+
+    // Functor::map for String (maps over each character)
+    let string_map = state.new_native_fn("Functor::String::map", |state, args| {
+        let this = args[0];
+        let func = args[1];
+        let chars: Vec<String> = state
+            .get_object(this)
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .chars()
+            .map(|c| c.to_string())
+            .collect();
+
+        let mut result = String::with_capacity(chars.len());
+        for ch in chars {
+            let ch_val = state.new_string(ch);
+            let mapped = state.call(func, &[ch_val]);
+            result.push_str(&state.stringify(mapped));
+        }
+
+        NativeFnReturn::Return(state.new_string(result))
+    });
+    state.register_protocol_impl("Functor", "String", "map", string_map);
 }

@@ -16,64 +16,15 @@ pub fn len(state: &mut InterpreterState, iterable: TlangValue) -> TlangValue {
 #[allow(clippy::missing_panics_doc)]
 #[native_fn(name = "map")]
 pub fn map(state: &mut InterpreterState, iterable: TlangValue, func: TlangValue) -> TlangValue {
-    match state.get_object(iterable) {
-        Some(TlangObjectKind::Struct(s)) => {
-            if let Some(shape) = state.heap.get_shape(s)
-                && let Some(TlangStructMethod::Native(id)) = shape.get_method("map")
-            {
-                let id = *id;
-                return *state
-                    .call_native_fn(id, &[iterable, func])
-                    .unwrap()
-                    .value()
-                    .unwrap();
-            }
-
-            state.panic(format!(
-                "map is not defined for {}",
-                state.stringify(iterable)
-            ));
-        }
-        Some(TlangObjectKind::Enum(e)) => {
-            if let Some(shape) = state.heap.get_shape(e)
-                && let Some(TlangStructMethod::Native(id)) = shape.get_method("map")
-            {
-                let id = *id;
-                return *state
-                    .call_native_fn(id, &[iterable, func])
-                    .unwrap()
-                    .value()
-                    .unwrap();
-            }
-
-            state.panic(format!(
-                "map is not defined for {}",
-                state.stringify(iterable)
-            ));
-        }
-        Some(TlangObjectKind::Slice(slice)) => {
-            let values: Vec<TlangValue> = state.get_slice_values(*slice).to_vec();
-            let mut result = Vec::with_capacity(values.len());
-            for item in values {
-                result.push(state.call(func, &[item]));
-            }
-            state.new_list(result)
-        }
-        Some(TlangObjectKind::String(s)) => {
-            let chars: Vec<String> = s.chars().map(|c| c.to_string()).collect();
-            let mut result = String::with_capacity(chars.len());
-            for ch in chars {
-                let ch_val = state.new_string(ch);
-                let mapped = state.call(func, &[ch_val]);
-                result.push_str(&state.stringify(mapped));
-            }
-            state.new_string(result)
-        }
-        _ => state.panic(format!(
-            "map is not defined for {}",
-            state.stringify(iterable)
-        )),
+    let type_name = state.type_name_of(iterable);
+    if let Some(fn_value) = state.get_protocol_impl("Functor", type_name, "map") {
+        return state.call(fn_value, &[iterable, func]);
     }
+
+    state.panic(format!(
+        "No implementation of `Functor::map` for type `{}`",
+        type_name,
+    ))
 }
 
 #[allow(clippy::missing_panics_doc)]
