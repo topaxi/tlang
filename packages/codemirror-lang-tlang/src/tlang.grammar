@@ -27,7 +27,9 @@ declaration {
   FunctionDeclaration |
   VariableDeclaration |
   EnumDeclaration |
-  StructDeclaration
+  StructDeclaration |
+  ProtocolDeclaration |
+  ImplBlock
 }
 
 //!statement
@@ -147,6 +149,31 @@ StructField {
 
 TypeAnnotation {
   identifier ("::" identifier)* ("<" commaSep<TypeAnnotation> ">")?
+}
+
+//!protocoldeclaration
+
+ProtocolDeclaration {
+  kw<"protocol"> identifier "{" ProtocolMethodSignature* "}"
+}
+
+ProtocolMethodSignature {
+  kw<"fn"> identifier ParamList
+}
+
+//!implblock
+
+ImplBlock {
+  kw<"impl"> identifier kw<"for"> identifier "{" ImplItem* "}"
+}
+
+ImplItem {
+  FunctionDeclaration |
+  ApplyStatement
+}
+
+ApplyStatement {
+  kw<"apply"> commaSep1<identifier> semi
 }
 
 //!pattern
