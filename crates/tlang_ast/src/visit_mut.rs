@@ -29,6 +29,10 @@ pub trait VisitorMut: Sized {
     fn visit_expr(&mut self, expr: &mut node::Expr) {
         walk_expr(self, expr);
     }
+
+    fn visit_impl_block(&mut self, impl_block: &mut node::ImplBlock) {
+        walk_impl_block(self, impl_block);
+    }
 }
 
 pub fn walk_module(visitor: &mut impl VisitorMut, module: &mut node::Module) {
@@ -45,11 +49,15 @@ pub fn walk_stmt(visitor: &mut impl VisitorMut, stmt: &mut node::Stmt) {
         node::StmtKind::Return(Some(expr)) => visitor.visit_expr(expr),
         node::StmtKind::Let(let_decl) => visitor.visit_expr(&mut let_decl.expression),
         node::StmtKind::ImplBlock(impl_block) => {
-            for decl in &mut impl_block.methods {
-                visitor.visit_fn_decl(decl);
-            }
+            visitor.visit_impl_block(impl_block);
         }
         _ => {}
+    }
+}
+
+pub fn walk_impl_block(visitor: &mut impl VisitorMut, impl_block: &mut node::ImplBlock) {
+    for decl in &mut impl_block.methods {
+        visitor.visit_fn_decl(decl);
     }
 }
 

@@ -246,3 +246,82 @@ fn test_literal_and_enum_mix_produces_union() {
         }
     }
 }
+
+// ── Impl block method type inference ─────────────────────────────────────────
+
+/// Parse source and run semantic analysis. Returns methods for the named
+/// protocol method from the first impl block found.
+fn analyze_impl_methods(source: &str, method_name: &str) -> Vec<FunctionDeclaration> {
+    let mut parser = Parser::from_source(source);
+    let mut ast = parser.parse().unwrap();
+    let mut analyzer = SemanticAnalyzer::default();
+    analyzer.analyze(&mut ast).unwrap();
+
+    ast.statements
+        .into_iter()
+        .find_map(|stmt| {
+            if let StmtKind::ImplBlock(impl_block) = stmt.kind {
+                let methods: Vec<FunctionDeclaration> = impl_block
+                    .methods
+                    .into_iter()
+                    .filter(|m| m.name() == method_name)
+                    .collect();
+                if !methods.is_empty() {
+                    Some(methods)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .expect("no ImplBlock with matching methods in source")
+}
+
+#[test]
+fn test_impl_block_enum_pattern_inference() {
+    let decls = analyze_impl_methods(
+        "protocol Greet { fn greet(self) }
+         enum Animal { Dog(name), Cat(name) }
+         impl Greet for Animal {
+           fn greet(Animal::Dog(name)) { name }
+           fn greet(Animal::Cat(name)) { name }
+         }",
+        "greet",
+    );
+    assert_eq!(decls.len(), 2);
+    for (i, _) in decls.iter().enumerate() {
+        match param_ty_kind(&decls, i, 0) {
+            TyKind::Path(p) => {
+                assert_eq!(p.to_string(), "Animal");
+                assert!(
+                    matches!(p.res, Res::Def(_)),
+                    "Animal should resolve to its declaration node"
+                );
+            }
+            other => panic!("expected TyKind::Path(Animal) for decl {i}, got {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn test_impl_block_multi_method_inference_independent() {
+    let greet_decls = analyze_impl_methods(
+        "protocol Greet { fn greet(self) fn shout(self) }
+         enum Animal { Dog(name), Cat(name) }
+         impl Greet for Animal {
+           fn greet(Animal::Dog(name)) { name }
+           fn greet(Animal::Cat(name)) { name }
+           fn shout(Animal::Dog(name)) { name }
+           fn shout(Animal::Cat(name)) { name }
+         }",
+        "greet",
+    );
+    assert_eq!(greet_decls.len(), 2);
+    for (i, _) in greet_decls.iter().enumerate() {
+        match param_ty_kind(&greet_decls, i, 0) {
+            TyKind::Path(p) => assert_eq!(p.to_string(), "Animal"),
+            other => panic!("expected Animal for greet decl {i}, got {other:?}"),
+        }
+    }
+}

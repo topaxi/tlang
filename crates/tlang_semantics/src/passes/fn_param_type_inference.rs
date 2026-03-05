@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use tlang_ast::{
-    node::{FunctionDeclaration, Module, PatKind, Res, StmtKind, Ty, TyKind},
+    node::{FunctionDeclaration, ImplBlock, Module, PatKind, Res, StmtKind, Ty, TyKind},
     token::Literal,
     visit_mut::{VisitorMut, walk_fn_decl},
 };
@@ -51,6 +51,36 @@ impl VisitorMut for FnParamTypeInference {
         // Recurse into function bodies to handle nested declarations.
         for decl in decls.iter_mut() {
             walk_fn_decl(self, decl);
+        }
+    }
+
+    fn visit_impl_block(&mut self, impl_block: &mut ImplBlock) {
+        // Group methods by name so multi-clause methods get type inference
+        // applied across all their overloads together, matching the behaviour
+        // for top-level FunctionDeclarations.
+        let mut groups: Vec<(String, Vec<usize>)> = Vec::new();
+        for (i, decl) in impl_block.methods.iter().enumerate() {
+            let name = decl.name();
+            if let Some(group) = groups.iter_mut().find(|(n, _)| *n == name) {
+                group.1.push(i);
+            } else {
+                groups.push((name, vec![i]));
+            }
+        }
+        for (_name, indices) in groups {
+            if indices.len() == 1 {
+                walk_fn_decl(self, &mut impl_block.methods[indices[0]]);
+            } else {
+                // Clone the group, run inference, then write annotations back.
+                let mut group: Vec<FunctionDeclaration> = indices
+                    .iter()
+                    .map(|&i| impl_block.methods[i].clone())
+                    .collect();
+                self.visit_fn_decls(&mut group);
+                for (pos, &i) in indices.iter().enumerate() {
+                    impl_block.methods[i] = group[pos].clone();
+                }
+            }
         }
     }
 }
