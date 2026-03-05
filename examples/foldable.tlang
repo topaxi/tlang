@@ -1,0 +1,32 @@
+protocol Foldable {
+  fn foldl(self, init, f)
+}
+
+impl Foldable for List {
+  fn foldl([], acc, _) { acc }
+  fn foldl([x, ...xs], acc, f) {
+    rec foldl(xs, f(acc, x), f)
+  }
+}
+
+enum LinkedList {
+  Nil,
+  Cons(unknown, LinkedList),
+}
+
+impl Foldable for LinkedList {
+  fn foldl(LinkedList::Nil, acc, _) { acc }
+  fn foldl(LinkedList::Cons(head, tail), acc, f) {
+    rec foldl(tail, f(acc, head), f)
+  }
+}
+
+fn sum(a, b) { a + b }
+
+[1,2,3]
+|> Foldable::foldl(0, sum)
+|> log();
+
+LinkedList::Cons(1, LinkedList::Cons(2, LinkedList::Cons(3, LinkedList::Nil)))
+|> Foldable::foldl(0, sum)
+|> log();

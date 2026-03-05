@@ -1,0 +1,12 @@
+protocol Area {
+  fn area(self)
+}
+
+struct Rect { width: int, height: int }
+
+impl Area for Rect {
+  fn area(r) { r.width * r.height }
+}
+
+let r = Rect { width: 5, height: 3 };
+Area::area(r) |> log();

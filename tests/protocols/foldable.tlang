@@ -1,0 +1,19 @@
+protocol Foldable {
+  fn foldl(self, init, f)
+}
+
+enum List {
+  Nil,
+  Cons(unknown, List),
+}
+
+impl Foldable for List {
+  fn foldl(List::Nil, acc, _) { acc }
+  fn foldl(List::Cons(head, tail), acc, f) {
+    rec foldl(tail, f(acc, head), f)
+  }
+}
+
+List::Cons(1, List::Cons(2, List::Cons(3, List::Nil)))
+|> Foldable::foldl(0, fn (acc, x) { acc + x })
+|> log();
