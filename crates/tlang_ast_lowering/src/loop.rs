@@ -81,16 +81,23 @@ impl LoweringContext {
     fn create_iterator_value(&mut self, for_loop: &ast::node::ForLoop) -> hir::Expr {
         let hir_id = self.unique_id();
         let iter_expr = self.lower_expr(&for_loop.iter);
-        let iterator_binding_call = self.expr(
+        let iterable_iter_path = hir::Path::new(
+            vec![
+                hir::PathSegment::new(Ident::new("Iterable", Default::default())),
+                hir::PathSegment::new(Ident::new("iter", Default::default())),
+            ],
+            Default::default(),
+        );
+        let callee = self.expr(
             for_loop.iter.span,
-            hir::ExprKind::FieldAccess(Box::new(iter_expr), Ident::new("iter", Default::default())),
+            hir::ExprKind::Path(Box::new(iterable_iter_path)),
         );
         self.expr(
             for_loop.iter.span,
             hir::ExprKind::Call(Box::new(hir::CallExpression {
                 hir_id,
-                callee: iterator_binding_call,
-                arguments: vec![],
+                callee,
+                arguments: vec![iter_expr],
             })),
         )
     }
@@ -170,25 +177,28 @@ impl LoweringContext {
     }
 
     fn create_iterator_next_call(&mut self, iterator_binding_path: hir::Path) -> hir::Expr {
+        let hir_id = self.unique_id();
+        let iterator_next_path = hir::Path::new(
+            vec![
+                hir::PathSegment::new(Ident::new("Iterator", Default::default())),
+                hir::PathSegment::new(Ident::new("next", Default::default())),
+            ],
+            Default::default(),
+        );
+        let callee = self.expr(
+            Default::default(),
+            hir::ExprKind::Path(Box::new(iterator_next_path)),
+        );
         let iterator_binding_expr = self.expr(
             Default::default(),
             hir::ExprKind::Path(Box::new(iterator_binding_path)),
         );
-        let iterator_next_field = self.expr(
-            Default::default(),
-            hir::ExprKind::FieldAccess(
-                Box::new(iterator_binding_expr),
-                Ident::new("next", Default::default()),
-            ),
-        );
-
-        let hir_id = self.unique_id();
         self.expr(
             Default::default(),
             hir::ExprKind::Call(Box::new(hir::CallExpression {
                 hir_id,
-                callee: iterator_next_field,
-                arguments: vec![],
+                callee,
+                arguments: vec![iterator_binding_expr],
             })),
         )
     }

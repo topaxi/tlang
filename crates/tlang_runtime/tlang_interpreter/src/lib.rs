@@ -102,6 +102,10 @@ impl Interpreter {
             ("Result", SymbolType::Enum),
             ("Functor", SymbolType::Protocol),
             ("Functor::map", SymbolType::ProtocolMethod(2)),
+            ("Iterable", SymbolType::Protocol),
+            ("Iterable::iter", SymbolType::ProtocolMethod(1)),
+            ("Iterator", SymbolType::Protocol),
+            ("Iterator::next", SymbolType::ProtocolMethod(1)),
             ("math::pi", SymbolType::Variable),
         ]
     }

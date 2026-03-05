@@ -375,9 +375,10 @@ impl InterpreterState {
             TlangValue::Object(_) => {
                 if let Some(obj) = self.get_object(value) {
                     if let Some(shape_key) = obj.shape()
-                        && let Some(shape) = self.get_shape_by_key(shape_key) {
-                            return shape.name();
-                        }
+                        && let Some(shape) = self.get_shape_by_key(shape_key)
+                    {
+                        return shape.name();
+                    }
                     if obj.as_str().is_some() {
                         return "String";
                     }
