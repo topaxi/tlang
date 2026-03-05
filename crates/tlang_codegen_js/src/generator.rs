@@ -88,15 +88,7 @@ impl CodegenJS {
     /// This provides imperative implementations for protocol methods that would
     /// stack overflow if implemented recursively in tlang.
     pub fn get_standard_library_native_js() -> &'static str {
-        concat!(
-            "function panic(msg) { throw new Error(msg); }\n",
-            "Functor.List = {};\n",
-            "Functor.List.map = function(self, f) {\n",
-            "    const result = new Array(self.length);\n",
-            "    for (let i = 0; i < self.length; i++) result[i] = f(self[i]);\n",
-            "    return result;\n",
-            "};\n",
-        )
+        include_str!("../std/lib_native.js")
     }
 
     pub fn get_standard_library_symbols() -> &'static [(&'static str, SymbolType)] {
