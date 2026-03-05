@@ -1283,6 +1283,7 @@ impl Interpreter {
         EvalResult::Value(fn_object)
     }
 
+    #[allow(clippy::too_many_lines)]
     fn eval_call(&mut self, call_expr: &hir::CallExpression) -> EvalResult {
         debug!("eval_call: {call_expr:?}");
 

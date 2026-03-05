@@ -4,6 +4,8 @@ use tlang_memory::{InterpreterState, NativeFnReturn, TlangValue};
 use crate::option::{OPTION_VARIANT_NONE, OPTION_VARIANT_SOME};
 use crate::result::{RESULT_VARIANT_ERR, RESULT_VARIANT_OK};
 
+/// # Panics
+#[allow(clippy::too_many_lines)]
 pub fn define_builtin_protocols(state: &mut InterpreterState) {
     state.register_protocol("Truthy".to_string(), vec!["truthy".to_string()]);
     state.register_protocol("Functor".to_string(), vec!["map".to_string()]);
