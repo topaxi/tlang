@@ -3,7 +3,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use tlang_ast::keyword::kw;
 use tlang_ast::node::{
-    Expr, ExprKind, FunctionDeclaration, FunctionParameter, Module, Pat, PatKind, Stmt, StmtKind,
+    Expr, ExprKind, FunctionDeclaration, FunctionParameter, ImplBlock, Module, Pat, PatKind, Stmt,
+    StmtKind,
 };
 use tlang_ast::visit::{Visitor, walk_expr, walk_stmt};
 use tlang_span::{LineColumn, NodeId, Span};
@@ -61,6 +62,51 @@ impl DeclarationAnalyzer {
         debug!("Declaring symbol: {symbol_info:#?}");
 
         self.current_symbol_table().borrow_mut().insert(symbol_info);
+    }
+
+    fn visit_impl_block(&mut self, impl_block: &ImplBlock, ctx: &mut SemanticAnalysisContext) {
+        let protocol_name = impl_block.protocol_name.to_string();
+        for method in &impl_block.methods {
+            // Register the protocol-qualified path (e.g., Greet::greet)
+            let method_name = method.name();
+            let qualified_name = format!("{protocol_name}::{method_name}");
+            self.declare_symbol(
+                ctx,
+                method.id,
+                &qualified_name,
+                SymbolType::ProtocolMethod(method.parameters.len() as u16),
+                method.span,
+                method.span.end,
+            );
+
+            // Enter function scope for parameter/body analysis
+            self.enter_scope(method.id, ctx);
+
+            // Declare the function self-reference binding (needed for
+            // multi-clause lowering which calls shift() to remove it).
+            self.declare_symbol(
+                ctx,
+                method.id,
+                &method_name,
+                SymbolType::FunctionSelfRef(method.parameters.len() as u16),
+                method.name.span,
+                method.name.span.end,
+            );
+
+            self.symbol_type_context.push(SymbolType::Parameter);
+            for param in &method.parameters {
+                self.collect_pattern(&param.pattern, param.span.end, ctx);
+            }
+            self.symbol_type_context.pop();
+
+            for stmt in &method.body.statements {
+                self.visit_stmt(stmt, ctx);
+            }
+            if let Some(expr) = &method.body.expression {
+                self.visit_expr(expr, ctx);
+            }
+            self.leave_scope(method.id, ctx);
+        }
     }
 }
 
@@ -160,48 +206,7 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                 );
             }
             StmtKind::ImplBlock(impl_block) => {
-                let protocol_name = impl_block.protocol_name.to_string();
-                for method in &impl_block.methods {
-                    // Register the protocol-qualified path (e.g., Greet::greet)
-                    let method_name = method.name();
-                    let qualified_name = format!("{protocol_name}::{method_name}");
-                    self.declare_symbol(
-                        ctx,
-                        method.id,
-                        &qualified_name,
-                        SymbolType::ProtocolMethod(method.parameters.len() as u16),
-                        method.span,
-                        method.span.end,
-                    );
-
-                    // Enter function scope for parameter/body analysis
-                    self.enter_scope(method.id, ctx);
-
-                    // Declare the function self-reference binding (needed for
-                    // multi-clause lowering which calls shift() to remove it).
-                    self.declare_symbol(
-                        ctx,
-                        method.id,
-                        &method_name,
-                        SymbolType::FunctionSelfRef(method.parameters.len() as u16),
-                        method.name.span,
-                        method.name.span.end,
-                    );
-
-                    self.symbol_type_context.push(SymbolType::Parameter);
-                    for param in &method.parameters {
-                        self.collect_pattern(&param.pattern, param.span.end, ctx);
-                    }
-                    self.symbol_type_context.pop();
-
-                    for stmt in &method.body.statements {
-                        self.visit_stmt(stmt, ctx);
-                    }
-                    if let Some(expr) = &method.body.expression {
-                        self.visit_expr(expr, ctx);
-                    }
-                    self.leave_scope(method.id, ctx);
-                }
+                self.visit_impl_block(impl_block, ctx);
                 return; // Don't walk the statement again
             }
             StmtKind::Let(decl) => {
