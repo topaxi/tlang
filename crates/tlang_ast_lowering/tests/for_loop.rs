@@ -113,3 +113,29 @@ fn test_lower_for_loop_on_list_with_accumulator_pat() {
     }
     "#);
 }
+
+#[test]
+fn test_lower_for_loop_bindings_are_resolved() {
+    use tlang_hir_pretty::{HirPretty, HirPrettyOptions};
+    let hir = hir_from_str(
+        r#"
+            fn main() {
+                for i in [1, 2, 3] {
+                    log(i);
+                }
+            }
+        "#,
+    );
+
+    let mut printer = HirPretty::new(HirPrettyOptions {
+        mark_unresolved: true,
+        ..Default::default()
+    });
+    printer.print_module(&hir);
+    let output = printer.output().to_string();
+
+    assert!(
+        !output.contains("iterator$$?"),
+        "iterator$$ binding should be resolved, got:\n{output}"
+    );
+}

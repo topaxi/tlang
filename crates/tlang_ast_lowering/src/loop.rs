@@ -124,6 +124,9 @@ impl LoweringContext {
                 iterator_binding_path
                     .res
                     .set_hir_id(iterator_binding_hir_id);
+                iterator_binding_path
+                    .res
+                    .set_binding_kind(hir::BindingKind::Local);
 
                 let mut accumulator_binding_path = hir::Path::new(
                     vec![hir::PathSegment::new(accumulator_binding_name.clone())],
@@ -132,6 +135,9 @@ impl LoweringContext {
                 accumulator_binding_path
                     .res
                     .set_hir_id(accumulator_binding_hir_id);
+                accumulator_binding_path
+                    .res
+                    .set_binding_kind(hir::BindingKind::Local);
 
                 this.lower_for_loop_body(for_loop, iterator_binding_path, accumulator_binding_path)
             });
