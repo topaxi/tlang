@@ -179,6 +179,22 @@ impl Res {
         Res::new(hir_id, BindingKind::Variant)
     }
 
+    pub fn new_builtin_fn(slot_index: usize) -> Self {
+        Res {
+            hir_id: None,
+            binding_kind: BindingKind::Fn,
+            slot: Slot::Global(slot_index),
+        }
+    }
+
+    pub fn new_builtin_variant(slot_index: usize) -> Self {
+        Res {
+            hir_id: None,
+            binding_kind: BindingKind::Variant,
+            slot: Slot::Global(slot_index),
+        }
+    }
+
     pub fn new_upvar(hir_id: HirId, slot_index: usize, scope_index: usize) -> Self {
         debug_assert!(scope_index <= ScopeIndex::MAX as usize);
 
@@ -212,24 +228,23 @@ impl Res {
         matches!(self.binding_kind, BindingKind::Unknown)
     }
 
-    /// Returns true if the resolution is incomplete — either the binding kind
-    /// is Unknown, or the binding kind requires an `hir_id` but none was set.
+    /// Returns true if the resolution is incomplete — the binding kind is
+    /// still `Unknown` meaning no resolver pass has identified this path yet.
+    /// A non-Unknown binding kind means the symbol was found (builtins may
+    /// have neither `hir_id` nor a slot in slot-less compilation contexts,
+    /// but they are still considered resolved).
     pub fn is_unresolved(self) -> bool {
         if self.is_unknown() {
             return true;
         }
-        // These kinds always have a corresponding HIR declaration node.
+        // Local/Temp/Param bindings that were synthesized (e.g. by loop
+        // lowering) start with the correct binding kind but without an hir_id;
+        // that's the only remaining "truly unresolved" case we need to flag.
         let needs_hir_id = matches!(
             self.binding_kind,
-            BindingKind::Local
-                | BindingKind::Upvar
-                | BindingKind::Temp
-                | BindingKind::Fn
-                | BindingKind::Param
-                | BindingKind::Closure
-                | BindingKind::Variant
+            BindingKind::Local | BindingKind::Temp | BindingKind::Param
         );
-        needs_hir_id && self.hir_id.is_none()
+        needs_hir_id && self.hir_id.is_none() && self.slot.is_none()
     }
 
     pub fn is_def(self) -> bool {

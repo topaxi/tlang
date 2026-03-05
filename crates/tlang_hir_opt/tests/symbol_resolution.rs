@@ -2,6 +2,7 @@ mod common;
 
 use std::collections::HashMap;
 
+use insta::assert_snapshot;
 use pretty_assertions::assert_eq;
 use tlang_hir as hir;
 use tlang_span::HirId;
@@ -16,6 +17,10 @@ fn optimizer() -> tlang_hir_opt::HirOptimizer {
 
 fn compile(source: &str) -> hir::Module {
     common::compile_and_optimize(source, &mut optimizer())
+}
+
+fn compile_with_builtins(source: &str) -> hir::Module {
+    common::compile_with_interpreter_builtins_and_optimize(source, &mut optimizer())
 }
 
 fn collect_res(hir: &mut hir::Module) -> Vec<(String, hir::Res)> {
@@ -126,4 +131,30 @@ fn test_enum_resolution() {
             ("c".to_string(), hir::Res::new_local(HirId::new(12))),
         ]
     );
+}
+
+/// Verifies that builtin symbols (`log`, `Option::Some`, `Option::None`) and
+/// protocol paths (`Iterable::iter`, `Iterator::next`) are all fully resolved
+/// after the `SymbolResolution` pass — i.e. nothing is marked `?` in the
+/// pretty-printed HIR.  The source is taken from
+/// `tests/loops/for_loop_accumulator.tlang`.
+#[test]
+fn test_for_loop_accumulator_no_unresolved_paths() {
+    let source = r#"
+        let total = for x in [1, 2, 3, 4, 5]; with sum = 0 {
+          sum + x
+        };
+
+        total |> log();
+    "#;
+
+    let hir = compile_with_builtins(source);
+    let pretty = common::pretty_print_with_unresolved_markers(&hir);
+
+    assert!(
+        !pretty.contains('?'),
+        "HIR pretty output should have no unresolved paths (`?`), got:\n{pretty}"
+    );
+
+    assert_snapshot!(pretty);
 }

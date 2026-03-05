@@ -1,0 +1,20 @@
+---
+source: crates/tlang_hir_opt/tests/symbol_resolution.rs
+expression: pretty
+---
+let total: unknown = {
+    let iterator$$: unknown = Iterable::iter([1, 2, 3, 4, 5]);
+    let accumulator$$: unknown = 0;
+    loop {
+        let sum: unknown = accumulator$$;
+        (accumulator$$ = match Iterator::next(iterator$$) {
+            Option::Some { 0: x } => {
+                (sum + x)
+            },
+            Option::None => {
+                break accumulator$$
+            },
+        })
+    }
+};
+log(total);

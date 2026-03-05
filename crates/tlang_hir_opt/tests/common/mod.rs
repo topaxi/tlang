@@ -34,6 +34,76 @@ pub fn compile(source: &str) -> hir::LowerResult {
     )
 }
 
+/// Like [`compile`] but registers a representative set of interpreter-style
+/// builtin symbols with explicit global slots.  Use this when the test source
+/// references builtins such as `log`, `Option::Some`/`None`, or the
+/// `Iterable`/`Iterator` protocols so that [`IdentifierResolver`] can assign
+/// `Slot::Global` instead of leaving paths unresolved.
+pub fn compile_with_interpreter_builtins(source: &str) -> hir::LowerResult {
+    // Slot indices mirror the order the interpreter assigns them (native fns
+    // sorted by name first, then const symbols).  We only list the subset
+    // needed by the tests in this file; the exact numbers don't matter as long
+    // as they are unique and non-None.
+    let builtins: &[(&str, SymbolType, Option<usize>)] = &[
+        // module symbols – no slot
+        ("math", SymbolType::Module, None),
+        // native functions (alphabetical, matching interpreter slot order)
+        ("filter", SymbolType::Function(2), Some(0)),
+        ("foldl", SymbolType::Function(3), Some(1)),
+        ("log", SymbolType::Function(u16::MAX), Some(2)),
+        ("map", SymbolType::Function(2), Some(3)),
+        // enum/protocol type symbols – no slot
+        ("Option", SymbolType::Enum, None),
+        ("Result", SymbolType::Enum, None),
+        ("Functor", SymbolType::Protocol, None),
+        ("Functor::map", SymbolType::ProtocolMethod(2), None),
+        ("Iterable", SymbolType::Protocol, None),
+        ("Iterable::iter", SymbolType::ProtocolMethod(1), None),
+        ("Iterator", SymbolType::Protocol, None),
+        ("Iterator::next", SymbolType::ProtocolMethod(1), None),
+        // const value symbols – need slots
+        ("Option::Some", SymbolType::EnumVariant(1), Some(4)),
+        ("Option::None", SymbolType::EnumVariant(0), Some(5)),
+        ("Some", SymbolType::EnumVariant(1), Some(6)),
+        ("None", SymbolType::EnumVariant(0), Some(7)),
+        ("Result::Ok", SymbolType::EnumVariant(1), Some(8)),
+        ("Result::Err", SymbolType::EnumVariant(1), Some(9)),
+        ("Ok", SymbolType::EnumVariant(1), Some(10)),
+        ("Err", SymbolType::EnumVariant(1), Some(11)),
+    ];
+
+    let mut ast = Parser::from_source(source).parse().unwrap();
+    let mut semantic_analyzer = SemanticAnalyzer::default();
+    semantic_analyzer.add_builtin_symbols_with_slots(builtins);
+    semantic_analyzer.analyze(&mut ast).unwrap();
+    lower_to_hir(
+        &ast,
+        semantic_analyzer.symbol_id_allocator(),
+        semantic_analyzer.root_symbol_table(),
+        semantic_analyzer.symbol_tables().clone(),
+    )
+}
+
+pub fn compile_with_interpreter_builtins_and_optimize(
+    source: &str,
+    optimizer: &mut HirOptimizer,
+) -> hir::Module {
+    let (mut module, meta) = compile_with_interpreter_builtins(source);
+    let mut ctx = meta.into();
+    optimizer.optimize_hir(&mut module, &mut ctx);
+    module
+}
+
+pub fn pretty_print_with_unresolved_markers(module: &hir::Module) -> String {
+    let options = HirPrettyOptions {
+        mark_unresolved: true,
+        ..Default::default()
+    };
+    let mut prettier = tlang_hir_pretty::HirPretty::new(options);
+    prettier.print_module(module);
+    prettier.output().to_string()
+}
+
 pub fn compile_and_optimize(source: &str, optimizer: &mut HirOptimizer) -> hir::Module {
     let (mut module, meta) = compile(source);
     let mut ctx = meta.into();
