@@ -624,7 +624,7 @@ impl HirPretty {
         self.push_string(path.to_string());
 
         // We print unresolved paths with a question mark.
-        if self.options.mark_unresolved && path.res.is_unknown() {
+        if self.options.mark_unresolved && path.res.is_unresolved() {
             self.push_char('?');
         }
 

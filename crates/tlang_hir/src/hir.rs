@@ -212,6 +212,26 @@ impl Res {
         matches!(self.binding_kind, BindingKind::Unknown)
     }
 
+    /// Returns true if the resolution is incomplete — either the binding kind
+    /// is Unknown, or the binding kind requires an `hir_id` but none was set.
+    pub fn is_unresolved(self) -> bool {
+        if self.is_unknown() {
+            return true;
+        }
+        // These kinds always have a corresponding HIR declaration node.
+        let needs_hir_id = matches!(
+            self.binding_kind,
+            BindingKind::Local
+                | BindingKind::Upvar
+                | BindingKind::Temp
+                | BindingKind::Fn
+                | BindingKind::Param
+                | BindingKind::Closure
+                | BindingKind::Variant
+        );
+        needs_hir_id && self.hir_id.is_none()
+    }
+
     pub fn is_def(self) -> bool {
         matches!(
             self.binding_kind,
