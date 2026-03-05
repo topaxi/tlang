@@ -2,9 +2,10 @@ use tlang_ast::keyword::{Keyword, kw};
 use tlang_ast::node::{
     self, Associativity, BinaryOpExpression, BinaryOpKind, Block, CallExpression, ElseClause,
     EnumDeclaration, EnumPattern, EnumVariant, Expr, ExprKind, FieldAccessExpression,
-    FunctionDeclaration, FunctionParameter, Ident, IfElseExpression, IndexAccessExpression,
-    LetDeclaration, MatchArm, MatchExpression, Module, OperatorInfo, Pat, Path, Stmt, StmtKind,
-    StructDeclaration, StructField, Ty, TyKind, UnaryOp,
+    FunctionDeclaration, FunctionParameter, Ident, IfElseExpression, ImplBlock,
+    IndexAccessExpression, LetDeclaration, MatchArm, MatchExpression, Module, OperatorInfo, Pat,
+    Path, ProtocolDeclaration, ProtocolMethodSignature, Stmt, StmtKind, StructDeclaration,
+    StructField, Ty, TyKind, UnaryOp,
 };
 use tlang_ast::token::{Literal, Token, TokenKind};
 use tlang_lexer::Lexer;
@@ -299,6 +300,8 @@ impl<'src> Parser<'src> {
             TokenKind::Keyword(Keyword::Return) => self.parse_return_statement(),
             TokenKind::Keyword(Keyword::Enum) => self.parse_enum_declaration(),
             TokenKind::Keyword(Keyword::Struct) => self.parse_struct_declaration(),
+            TokenKind::Keyword(Keyword::Protocol) => self.parse_protocol_declaration(),
+            TokenKind::Keyword(Keyword::Impl) => self.parse_impl_block(),
             TokenKind::LBrace => self.parse_block_stmt(),
             _ => node::stmt!(self.unique_id(), Expr(Box::new(self.parse_expression()))),
         };
@@ -312,7 +315,10 @@ impl<'src> Parser<'src> {
             // Neither do EnumDeclaration statements.
             | StmtKind::EnumDeclaration { .. }
             // Nor do StructDeclaration statements.
-            | StmtKind::StructDeclaration { .. } => {
+            | StmtKind::StructDeclaration { .. }
+            // Nor do ProtocolDeclaration/ImplBlock statements.
+            | StmtKind::ProtocolDeclaration { .. }
+            | StmtKind::ImplBlock { .. } => {
                 (false, Some(node))
             }
             // Expressions like IfElse as statements also do not need to be terminated with a semicolon.
@@ -490,6 +496,69 @@ impl<'src> Parser<'src> {
 
         self.end_span_from_previous_token(&mut node.span);
         node
+    }
+
+    fn parse_protocol_declaration(&mut self) -> Stmt {
+        self.consume_keyword_token(Keyword::Protocol);
+        let name = self.parse_identifier();
+        self.consume_token(TokenKind::LBrace);
+        let mut methods = Vec::new();
+        while !matches!(self.current_token_kind(), TokenKind::RBrace) {
+            methods.push(self.parse_protocol_method_signature());
+        }
+        self.consume_token(TokenKind::RBrace);
+        node::stmt!(
+            self.unique_id(),
+            ProtocolDeclaration(Box::new(ProtocolDeclaration { name, methods }))
+        )
+    }
+
+    fn parse_protocol_method_signature(&mut self) -> ProtocolMethodSignature {
+        let mut span = self.create_span_from_current_token();
+        self.consume_keyword_token(Keyword::Fn);
+        let name = self.parse_identifier();
+        self.expect_token(TokenKind::LParen);
+        let parameters = self.parse_parameter_list();
+        let return_type = self.parse_return_type();
+        self.end_span_from_previous_token(&mut span);
+        ProtocolMethodSignature {
+            id: self.unique_id(),
+            name,
+            parameters,
+            return_type_annotation: return_type,
+            span,
+        }
+    }
+
+    fn parse_impl_block(&mut self) -> Stmt {
+        self.consume_keyword_token(Keyword::Impl);
+        let protocol_name = self.parse_path();
+        self.consume_keyword_token(Keyword::For);
+        let target_type = self.parse_path();
+        self.consume_token(TokenKind::LBrace);
+        let mut methods = Vec::new();
+        while matches!(
+            self.current_token_kind(),
+            TokenKind::Keyword(Keyword::Fn)
+                | TokenKind::SingleLineComment(_)
+                | TokenKind::MultiLineComment(_)
+        ) {
+            let fn_stmt = self.parse_function_declaration();
+            match fn_stmt.kind {
+                StmtKind::FunctionDeclaration(decl) => methods.push(*decl),
+                StmtKind::FunctionDeclarations(decls) => methods.extend(decls),
+                _ => unreachable!(),
+            }
+        }
+        self.consume_token(TokenKind::RBrace);
+        node::stmt!(
+            self.unique_id(),
+            ImplBlock(Box::new(ImplBlock {
+                protocol_name,
+                target_type,
+                methods,
+            }))
+        )
     }
 
     fn parse_statements(&mut self, may_complete: bool) -> (Vec<Stmt>, Option<Expr>) {

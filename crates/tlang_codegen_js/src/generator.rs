@@ -96,6 +96,8 @@ impl CodegenJS {
             ("None", SymbolType::EnumVariant(0)),
             ("Ok", SymbolType::EnumVariant(1)),
             ("Err", SymbolType::EnumVariant(1)),
+            ("Functor", SymbolType::Protocol),
+            ("Functor::map", SymbolType::ProtocolMethod(2)),
             ("len", SymbolType::Function(1)),
             ("log", SymbolType::Function(u16::MAX)),
             ("math", SymbolType::Module),

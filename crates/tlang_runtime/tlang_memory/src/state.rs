@@ -406,6 +406,39 @@ impl InterpreterState {
         self.program.set_enum_decl(path_name, decl);
     }
 
+    pub fn register_protocol(&mut self, name: String, methods: Vec<String>) {
+        self.program.register_protocol(name, methods);
+    }
+
+    pub fn register_protocol_impl(
+        &mut self,
+        protocol: &str,
+        target_type: &str,
+        method: &str,
+        fn_value: TlangValue,
+    ) {
+        self.program
+            .register_protocol_impl(protocol, target_type, method, fn_value);
+    }
+
+    pub fn get_protocol_impl(
+        &self,
+        protocol: &str,
+        target_type: &str,
+        method: &str,
+    ) -> Option<TlangValue> {
+        self.program
+            .get_protocol_impl(protocol, target_type, method)
+    }
+
+    pub fn is_protocol(&self, name: &str) -> bool {
+        self.program.is_protocol(name)
+    }
+
+    pub fn get_protocol_for_method(&self, method_name: &str) -> Option<&str> {
+        self.program.get_protocol_for_method(method_name)
+    }
+
     pub fn get_closure_decl(&self, id: HirId) -> Option<Rc<hir::FunctionDeclaration>> {
         self.program.get_closure_decl(id)
     }

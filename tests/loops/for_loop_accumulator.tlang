@@ -1,0 +1,6 @@
+// For-loop with accumulator
+let total = for x in [1, 2, 3, 4, 5]; with sum = 0 {
+  sum + x
+};
+
+total |> log();

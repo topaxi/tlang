@@ -100,6 +100,8 @@ impl Interpreter {
             ("Option", SymbolType::Enum),
             ("Option::None", SymbolType::EnumVariant(0)),
             ("Result", SymbolType::Enum),
+            ("Functor", SymbolType::Protocol),
+            ("Functor::map", SymbolType::ProtocolMethod(2)),
             ("math::pi", SymbolType::Variable),
         ]
     }
@@ -134,7 +136,7 @@ impl Interpreter {
             .iter()
             .map(|(name, ty)| {
                 let slot = match ty {
-                    SymbolType::Enum => None,
+                    SymbolType::Enum | SymbolType::Protocol | SymbolType::ProtocolMethod(_) => None,
                     _ => {
                         let s = Some(slot_counter);
                         slot_counter += 1;
@@ -192,6 +194,7 @@ impl Interpreter {
         tlang_stdlib::option::define_option_shape(&mut self.state);
         tlang_stdlib::result::define_result_shape(&mut self.state);
         tlang_stdlib::collections::define_list_shape(&mut self.state);
+        tlang_stdlib::protocols::define_builtin_protocols(&mut self.state);
     }
 
     #[cfg(not(feature = "stdlib"))]
@@ -286,6 +289,34 @@ impl Interpreter {
         match self.get_object(value)?.shape() {
             Some(s) => self.state.get_shape_by_key(s),
             _ => self.panic(format!("Cannot get shape of non-struct object: {value:?}")),
+        }
+    }
+
+    /// Returns the type name of a value for protocol dispatch.
+    fn type_name_of(&self, value: TlangValue) -> &str {
+        match value {
+            TlangValue::Nil => "Nil",
+            TlangValue::Bool(_) => "Bool",
+            TlangValue::I8(_)
+            | TlangValue::I16(_)
+            | TlangValue::I32(_)
+            | TlangValue::I64(_)
+            | TlangValue::U8(_)
+            | TlangValue::U16(_)
+            | TlangValue::U32(_)
+            | TlangValue::U64(_) => "Int",
+            TlangValue::F32(_) | TlangValue::F64(_) => "Float",
+            TlangValue::Object(_) => {
+                if let Some(shape) = self.get_shape_of(value) {
+                    return shape.name();
+                }
+                if let Some(obj) = self.get_object(value)
+                    && obj.as_str().is_some()
+                {
+                    return "String";
+                }
+                "Object"
+            }
         }
     }
 
@@ -412,6 +443,14 @@ impl Interpreter {
                 EvalResult::Void
             }
             hir::StmtKind::Let(pat, expr, ty) => self.eval_let_stmt(pat, expr, ty),
+            hir::StmtKind::ProtocolDeclaration(decl) => {
+                self.eval_protocol_decl(decl);
+                EvalResult::Void
+            }
+            hir::StmtKind::ImplBlock(impl_block) => {
+                self.eval_impl_block(impl_block);
+                EvalResult::Void
+            }
             hir::StmtKind::Return(Some(expr)) => {
                 EvalResult::Return(eval_value!(self, self.eval_expr(expr)))
             }
@@ -1004,6 +1043,33 @@ impl Interpreter {
         }
     }
 
+    fn eval_protocol_decl(&mut self, decl: &hir::ProtocolDeclaration) {
+        self.state.register_protocol(
+            decl.name.to_string(),
+            decl.methods.iter().map(|m| m.name.to_string()).collect(),
+        );
+    }
+
+    fn eval_impl_block(&mut self, impl_block: &hir::ImplBlock) {
+        let protocol_name = impl_block.protocol_name.to_string();
+        let target_type = impl_block.target_type.to_string();
+
+        for method in &impl_block.methods {
+            // Register the function declaration so it can be called
+            self.state
+                .set_fn_decl(method.hir_id, Rc::new(method.clone()));
+            let fn_value = self.state.new_object(TlangObjectKind::Fn(method.hir_id));
+
+            let method_name = match &method.name.kind {
+                hir::ExprKind::Path(path) => path.last_ident().to_string(),
+                hir::ExprKind::FieldAccess(_, ident) => ident.to_string(),
+                _ => unreachable!(),
+            };
+            self.state
+                .register_protocol_impl(&protocol_name, &target_type, &method_name, fn_value);
+        }
+    }
+
     fn eval_call_object(&mut self, callee: TlangValue, args: &[TlangValue]) -> TlangValue {
         let id = callee
             .get_object_id()
@@ -1212,6 +1278,24 @@ impl Interpreter {
                     self,
                     self.eval_enum_ctor(call_expr, &enum_decl, path.last_ident())
                 )
+            }
+            hir::ExprKind::Path(path)
+                if path.segments.len() == 2
+                    && self.state.is_protocol(path.segments[0].ident.as_str()) =>
+            {
+                let protocol_name = path.segments[0].ident.as_str();
+                let method_name = path.segments[1].ident.as_str();
+                let args = eval_exprs!(self, Self::eval_expr, call_expr.arguments);
+                let type_name = self.type_name_of(args[0]);
+                let Some(fn_value) =
+                    self.state
+                        .get_protocol_impl(protocol_name, type_name, method_name)
+                else {
+                    self.panic(format!(
+                        "No implementation of `{protocol_name}::{method_name}` for type `{type_name}`"
+                    ));
+                };
+                self.eval_call_object(fn_value, &args)
             }
             hir::ExprKind::Path(path) => {
                 self.panic(format!(

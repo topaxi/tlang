@@ -26,12 +26,16 @@ pub enum SymbolType {
     Enum,
     EnumVariant(u16),
     Struct,
+    Protocol,
+    ProtocolMethod(u16),
 }
 
 impl SymbolType {
     pub fn arity(self) -> Option<u16> {
         match self {
-            SymbolType::Function(arity) | SymbolType::FunctionSelfRef(arity) => Some(arity),
+            SymbolType::Function(arity)
+            | SymbolType::FunctionSelfRef(arity)
+            | SymbolType::ProtocolMethod(arity) => Some(arity),
             _ => None,
         }
     }
@@ -42,11 +46,14 @@ impl Display for SymbolType {
         match self {
             SymbolType::Module => write!(f, "module"),
             SymbolType::Variable => write!(f, "variable"),
-            SymbolType::Function(_) | SymbolType::FunctionSelfRef(_) => write!(f, "function"),
+            SymbolType::Function(_)
+            | SymbolType::FunctionSelfRef(_)
+            | SymbolType::ProtocolMethod(_) => write!(f, "function"),
             SymbolType::Parameter => write!(f, "parameter"),
             SymbolType::Enum => write!(f, "enum"),
             SymbolType::EnumVariant(_) => write!(f, "enum variant"),
             SymbolType::Struct => write!(f, "struct"),
+            SymbolType::Protocol => write!(f, "protocol"),
         }
     }
 }
@@ -154,13 +161,15 @@ impl SymbolInfo {
     }
 
     pub fn is_fn(&self, arity: usize) -> bool {
-        matches!(self.symbol_type, SymbolType::Function(a) | SymbolType::FunctionSelfRef(a) if a as usize == arity || a == u16::MAX)
+        matches!(self.symbol_type, SymbolType::Function(a) | SymbolType::FunctionSelfRef(a) | SymbolType::ProtocolMethod(a) if a as usize == arity || a == u16::MAX)
     }
 
     pub fn is_any_fn(&self) -> bool {
         matches!(
             self.symbol_type,
-            SymbolType::Function(_) | SymbolType::FunctionSelfRef(_)
+            SymbolType::Function(_)
+                | SymbolType::FunctionSelfRef(_)
+                | SymbolType::ProtocolMethod(_)
         )
     }
 
@@ -279,7 +288,10 @@ impl SymbolTable {
             .get_locals_by_name(name)
             .into_iter()
             .filter(|s| {
-                if let SymbolType::Function(a) | SymbolType::FunctionSelfRef(a) = s.symbol_type {
+                if let SymbolType::Function(a)
+                | SymbolType::FunctionSelfRef(a)
+                | SymbolType::ProtocolMethod(a) = s.symbol_type
+                {
                     a == u16::MAX || // Builtin n-ary function
                     a as usize == arity
                 } else {
@@ -445,6 +457,10 @@ impl SymbolTable {
         !s.builtin
             // Enum and struct definitions do not generate a slot
             && !matches!(s.symbol_type, SymbolType::Enum | SymbolType::Struct)
+            // Protocol definitions do not generate a slot
+            && !matches!(s.symbol_type, SymbolType::Protocol)
+            // Protocol method implementations do not generate a slot
+            && !matches!(s.symbol_type, SymbolType::ProtocolMethod(_))
             // And tagged enum variant definitions do not generate a slot
             && !matches!(s.symbol_type, SymbolType::EnumVariant(len) if len > 0)
     }

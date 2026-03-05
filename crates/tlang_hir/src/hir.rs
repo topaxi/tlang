@@ -83,6 +83,7 @@ impl From<SymbolType> for BindingKind {
             SymbolType::Function(_) | SymbolType::FunctionSelfRef(_) => BindingKind::Fn,
             SymbolType::Parameter => BindingKind::Param,
             SymbolType::Module => todo!(),
+            SymbolType::Protocol | SymbolType::ProtocolMethod(_) => BindingKind::Enum,
         }
     }
 }
@@ -482,6 +483,8 @@ pub enum StmtKind {
     Return(Option<Box<Expr>>),
     EnumDeclaration(Box<EnumDeclaration>),
     StructDeclaration(Box<StructDeclaration>),
+    ProtocolDeclaration(Box<ProtocolDeclaration>),
+    ImplBlock(Box<ImplBlock>),
 }
 
 #[derive(Debug, Clone)]
@@ -805,6 +808,33 @@ pub struct EnumVariant {
     pub name: Ident,
     pub parameters: Vec<StructField>,
     pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct ProtocolDeclaration {
+    pub hir_id: HirId,
+    pub name: Ident,
+    pub methods: Vec<ProtocolMethodSignature>,
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct ProtocolMethodSignature {
+    pub hir_id: HirId,
+    pub name: Ident,
+    pub parameters: Vec<FunctionParameter>,
+    pub return_type: Ty,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct ImplBlock {
+    pub hir_id: HirId,
+    pub protocol_name: Path,
+    pub target_type: Path,
+    pub methods: Vec<FunctionDeclaration>,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]

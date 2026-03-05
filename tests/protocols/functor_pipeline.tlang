@@ -1,0 +1,8 @@
+// Test Functor::map with pipeline operator
+Option::Some(5)
+|> Functor::map(fn (x) { x * 3 })
+|> log();
+
+[1, 2, 3]
+|> Functor::map(fn (x) { x + 10 })
+|> log();

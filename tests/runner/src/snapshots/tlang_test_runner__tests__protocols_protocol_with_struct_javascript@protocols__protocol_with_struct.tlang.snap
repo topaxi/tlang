@@ -1,0 +1,7 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: javascript"
+expression: apply_redactions(&output)
+input_file: tests/protocols/protocol_with_struct.tlang
+---
+15

@@ -44,6 +44,11 @@ pub fn walk_stmt(visitor: &mut impl VisitorMut, stmt: &mut node::Stmt) {
         node::StmtKind::Expr(expr) => visitor.visit_expr(expr),
         node::StmtKind::Return(Some(expr)) => visitor.visit_expr(expr),
         node::StmtKind::Let(let_decl) => visitor.visit_expr(&mut let_decl.expression),
+        node::StmtKind::ImplBlock(impl_block) => {
+            for decl in &mut impl_block.methods {
+                visitor.visit_fn_decl(decl);
+            }
+        }
         _ => {}
     }
 }

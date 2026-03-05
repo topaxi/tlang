@@ -495,6 +495,31 @@ impl Stmt {
     }
 }
 
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct ProtocolDeclaration {
+    pub name: Ident,
+    pub methods: Vec<ProtocolMethodSignature>,
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct ProtocolMethodSignature {
+    pub id: NodeId,
+    pub name: Ident,
+    pub parameters: Vec<FunctionParameter>,
+    pub return_type_annotation: Option<Ty>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct ImplBlock {
+    pub protocol_name: Path,
+    pub target_type: Path,
+    pub methods: Vec<FunctionDeclaration>,
+}
+
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum StmtKind {
@@ -508,6 +533,8 @@ pub enum StmtKind {
     Return(Option<Box<Expr>>),
     EnumDeclaration(Box<EnumDeclaration>),
     StructDeclaration(Box<StructDeclaration>),
+    ProtocolDeclaration(Box<ProtocolDeclaration>),
+    ImplBlock(Box<ImplBlock>),
 }
 
 #[derive(Debug, Clone)]

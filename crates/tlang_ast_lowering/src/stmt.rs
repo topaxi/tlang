@@ -83,6 +83,12 @@ impl LoweringContext {
                 }]
             }
             ast::node::StmtKind::EnumDeclaration(decl) => vec![self.lower_enum_decl(node, decl)],
+            ast::node::StmtKind::ProtocolDeclaration(decl) => {
+                vec![self.lower_protocol_decl(node, decl)]
+            }
+            ast::node::StmtKind::ImplBlock(impl_block) => {
+                vec![self.lower_impl_block(node, impl_block)]
+            }
 
             // This is a no-op, we do not emit any statement for this.
             // We might be losing some comments here, but this shouldn't be a problem within
@@ -246,6 +252,105 @@ impl LoweringContext {
         hir::Stmt {
             hir_id: self.lower_node_id(node.id),
             kind: hir::StmtKind::EnumDeclaration(Box::new(decl)),
+            span: node.span,
+            leading_comments: node.leading_comments.clone(),
+            trailing_comments: node.trailing_comments.clone(),
+        }
+    }
+
+    fn lower_protocol_decl(
+        &mut self,
+        node: &ast::node::Stmt,
+        decl: &ast::node::ProtocolDeclaration,
+    ) -> hir::Stmt {
+        let methods = decl
+            .methods
+            .iter()
+            .map(|method| {
+                let params = method
+                    .parameters
+                    .iter()
+                    .map(|param| {
+                        let name = match &param.pattern.kind {
+                            ast::node::PatKind::Identifier(ident) => ident.as_ref().clone(),
+                            ast::node::PatKind::_Self => Ident::new("self", param.pattern.span),
+                            _ => Ident::new("_", param.pattern.span),
+                        };
+                        hir::FunctionParameter {
+                            hir_id: self.unique_id(),
+                            name,
+                            type_annotation: self.lower_ty(param.type_annotation.as_ref()),
+                            span: param.pattern.span,
+                        }
+                    })
+                    .collect();
+                hir::ProtocolMethodSignature {
+                    hir_id: self.unique_id(),
+                    name: method.name.clone(),
+                    parameters: params,
+                    return_type: self.lower_ty(method.return_type_annotation.as_ref()),
+                    span: method.span,
+                }
+            })
+            .collect();
+
+        let protocol = hir::ProtocolDeclaration {
+            hir_id: self.lower_node_id(node.id),
+            name: decl.name.clone(),
+            methods,
+        };
+
+        hir::Stmt {
+            hir_id: self.lower_node_id(node.id),
+            kind: hir::StmtKind::ProtocolDeclaration(Box::new(protocol)),
+            span: node.span,
+            leading_comments: node.leading_comments.clone(),
+            trailing_comments: node.trailing_comments.clone(),
+        }
+    }
+
+    fn lower_impl_block(
+        &mut self,
+        node: &ast::node::Stmt,
+        impl_block: &ast::node::ImplBlock,
+    ) -> hir::Stmt {
+        let protocol_name = self.lower_path(&impl_block.protocol_name);
+        let target_type = self.lower_path(&impl_block.target_type);
+
+        // Group methods by name so multi-clause methods get lowered via pattern matching
+        let mut method_groups: Vec<(String, Vec<&ast::node::FunctionDeclaration>)> = Vec::new();
+        for method in &impl_block.methods {
+            let name = method.name();
+            if let Some(group) = method_groups.iter_mut().find(|(n, _)| *n == name) {
+                group.1.push(method);
+            } else {
+                method_groups.push((name, vec![method]));
+            }
+        }
+
+        let methods = method_groups
+            .into_iter()
+            .map(|(_name, decls)| {
+                if decls.len() == 1 {
+                    self.lower_fn_decl(decls[0])
+                } else {
+                    let owned: Vec<_> = decls.iter().map(|d| (*d).clone()).collect();
+                    let all_param_names = get_param_names(&owned);
+                    self.lower_fn_decl_matching(&owned, &all_param_names, &[])
+                }
+            })
+            .collect();
+
+        let hir_impl = hir::ImplBlock {
+            hir_id: self.lower_node_id(node.id),
+            protocol_name,
+            target_type,
+            methods,
+        };
+
+        hir::Stmt {
+            hir_id: self.lower_node_id(node.id),
+            kind: hir::StmtKind::ImplBlock(Box::new(hir_impl)),
             span: node.span,
             leading_comments: node.leading_comments.clone(),
             trailing_comments: node.trailing_comments.clone(),

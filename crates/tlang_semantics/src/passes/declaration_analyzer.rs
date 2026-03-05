@@ -149,6 +149,61 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                 ctx.struct_declarations
                     .insert(decl.name.to_string(), (**decl).clone());
             }
+            StmtKind::ProtocolDeclaration(decl) => {
+                self.declare_symbol(
+                    ctx,
+                    stmt.id,
+                    decl.name.as_str(),
+                    SymbolType::Protocol,
+                    stmt.span,
+                    stmt.span.end,
+                );
+            }
+            StmtKind::ImplBlock(impl_block) => {
+                let protocol_name = impl_block.protocol_name.to_string();
+                for method in &impl_block.methods {
+                    // Register the protocol-qualified path (e.g., Greet::greet)
+                    let method_name = method.name();
+                    let qualified_name = format!("{protocol_name}::{method_name}");
+                    self.declare_symbol(
+                        ctx,
+                        method.id,
+                        &qualified_name,
+                        SymbolType::ProtocolMethod(method.parameters.len() as u16),
+                        method.span,
+                        method.span.end,
+                    );
+
+                    // Enter function scope for parameter/body analysis
+                    self.enter_scope(method.id, ctx);
+
+                    // Declare the function self-reference binding (needed for
+                    // multi-clause lowering which calls shift() to remove it).
+                    self.declare_symbol(
+                        ctx,
+                        method.id,
+                        &method_name,
+                        SymbolType::FunctionSelfRef(method.parameters.len() as u16),
+                        method.name.span,
+                        method.name.span.end,
+                    );
+
+                    self.symbol_type_context.push(SymbolType::Parameter);
+                    for param in &method.parameters {
+                        self.collect_pattern(&param.pattern, param.span.end, ctx);
+                    }
+                    self.symbol_type_context.pop();
+
+                    for stmt in &method.body.statements {
+                        self.visit_stmt(stmt, ctx);
+                    }
+                    if let Some(expr) = &method.body.expression {
+                        self.visit_expr(expr, ctx);
+                    }
+                    self.leave_scope(method.id, ctx);
+                }
+                return; // Don't walk the statement again
+            }
             StmtKind::Let(decl) => {
                 self.visit_expr(&decl.expression, ctx);
                 self.collect_pattern(&decl.pattern, stmt.span.end, ctx);
@@ -164,6 +219,8 @@ impl<'ast> Visitor<'ast> for DeclarationAnalyzer {
                 | StmtKind::FunctionDeclarations(_)
                 | StmtKind::EnumDeclaration(_)
                 | StmtKind::StructDeclaration(_)
+                | StmtKind::ProtocolDeclaration(_)
+                | StmtKind::ImplBlock(_)
                 | StmtKind::Let(_)
         ) {
             walk_stmt(self, stmt, ctx);

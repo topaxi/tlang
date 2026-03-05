@@ -20,6 +20,12 @@ pub struct Program {
     pub(crate) global_slot_map: HashMap<String, usize>,
     /// Fallback HashMap for dynamic globals (user-defined top-level fns, JS bindings).
     pub(crate) globals: HashMap<String, TlangValue>,
+    /// Protocol definitions: protocol_name → list of method names
+    pub(crate) protocols: HashMap<String, Vec<String>>,
+    /// Reverse lookup: method_name → protocol_name (for global aliases)
+    pub(crate) protocol_method_to_protocol: HashMap<String, String>,
+    /// Protocol implementations: (protocol_name, type_name, method_name) → fn value
+    pub(crate) protocol_impls: HashMap<(String, String, String), TlangValue>,
 }
 
 impl Program {
@@ -32,6 +38,9 @@ impl Program {
             global_slots: Vec::new(),
             global_slot_map: HashMap::new(),
             globals: HashMap::with_capacity(100),
+            protocols: HashMap::new(),
+            protocol_method_to_protocol: HashMap::new(),
+            protocol_impls: HashMap::new(),
         }
     }
 
@@ -97,5 +106,56 @@ impl Program {
             .iter()
             .copied()
             .chain(self.globals.values().copied())
+            .chain(self.protocol_impls.values().copied())
+    }
+
+    pub fn register_protocol(&mut self, name: String, methods: Vec<String>) {
+        for method in &methods {
+            self.protocol_method_to_protocol
+                .insert(method.clone(), name.clone());
+        }
+        self.protocols.insert(name, methods);
+    }
+
+    pub fn register_protocol_impl(
+        &mut self,
+        protocol: &str,
+        target_type: &str,
+        method: &str,
+        fn_value: TlangValue,
+    ) {
+        self.protocol_impls.insert(
+            (
+                protocol.to_string(),
+                target_type.to_string(),
+                method.to_string(),
+            ),
+            fn_value,
+        );
+    }
+
+    pub fn get_protocol_impl(
+        &self,
+        protocol: &str,
+        target_type: &str,
+        method: &str,
+    ) -> Option<TlangValue> {
+        self.protocol_impls
+            .get(&(
+                protocol.to_string(),
+                target_type.to_string(),
+                method.to_string(),
+            ))
+            .copied()
+    }
+
+    pub fn is_protocol(&self, name: &str) -> bool {
+        self.protocols.contains_key(name)
+    }
+
+    pub fn get_protocol_for_method(&self, method_name: &str) -> Option<&str> {
+        self.protocol_method_to_protocol
+            .get(method_name)
+            .map(|s| s.as_str())
     }
 }

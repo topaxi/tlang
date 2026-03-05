@@ -221,6 +221,17 @@ pub fn walk_stmt<'ast, V: Visitor<'ast>>(
         }
         node::StmtKind::StructDeclaration(decl) => visitor.visit_struct_decl(decl, ctx),
         node::StmtKind::EnumDeclaration(decl) => visitor.visit_enum_decl(decl, ctx),
+        node::StmtKind::ProtocolDeclaration(decl) => {
+            visitor.visit_ident(&decl.name, ctx);
+            for method in &decl.methods {
+                visitor.visit_ident(&method.name, ctx);
+            }
+        }
+        node::StmtKind::ImplBlock(impl_block) => {
+            for decl in &impl_block.methods {
+                visitor.visit_fn_decl(decl, ctx);
+            }
+        }
     }
 }
 

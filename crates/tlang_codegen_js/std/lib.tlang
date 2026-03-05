@@ -26,6 +26,20 @@ fn Result.is_err(_) { false }
 fn Result.unwrap(Result::Ok(x)) { x }
 fn Result.unwrap(_) { panic("Called unwrap on Err") }
 
+protocol Functor {
+  fn map(self, f)
+}
+
+impl Functor for Option {
+  fn map(Option::Some(x), f) { Option::Some(f(x)) }
+  fn map(Option::None, _) { Option::None }
+}
+
+impl Functor for Result {
+  fn map(Result::Ok(x), f) { Result::Ok(f(x)) }
+  fn map(Result::Err(e), _) { Result::Err(e) }
+}
+
 // len(a[]) -> usize
 fn len(list) { list.length }
 
@@ -38,6 +52,11 @@ fn compose(f, g) { fn(x) { f(g(x)) } }
 // map(a[], fn(a) -> b) -> b[]
 fn map([], _) { [] }
 fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
+
+impl Functor for List {
+  fn map([], _) { [] }
+  fn map([x, ...xs], f) { [f(x), ...map(xs, f)] }
+}
 
 // filter(a[], fn(a) -> bool) -> a[]
 fn filter([], _) { [] }

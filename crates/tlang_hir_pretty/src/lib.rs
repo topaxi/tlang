@@ -194,6 +194,47 @@ impl HirPretty {
                 self.push_char(';');
             }
             hir::StmtKind::StructDeclaration(decl) => self.print_struct_declaration(decl),
+            hir::StmtKind::ProtocolDeclaration(decl) => {
+                self.push_str("protocol ");
+                self.push_str(decl.name.as_str());
+                self.push_str(" {");
+                self.push_newline();
+                self.inc_indent();
+                for method in &decl.methods {
+                    self.push_indent();
+                    self.push_str("fn ");
+                    self.push_str(method.name.as_str());
+                    self.push_char('(');
+                    for (i, param) in method.parameters.iter().enumerate() {
+                        if i > 0 {
+                            self.push_str(", ");
+                        }
+                        self.push_str(param.name.as_str());
+                    }
+                    self.push_char(')');
+                    self.push_newline();
+                }
+                self.dec_indent();
+                self.push_indent();
+                self.push_char('}');
+            }
+            hir::StmtKind::ImplBlock(impl_block) => {
+                self.push_str("impl ");
+                self.push_str(&impl_block.protocol_name.to_string());
+                self.push_str(" for ");
+                self.push_str(&impl_block.target_type.to_string());
+                self.push_str(" {");
+                self.push_newline();
+                self.inc_indent();
+                for method in &impl_block.methods {
+                    self.push_indent();
+                    self.print_function_declaration(method);
+                    self.push_newline();
+                }
+                self.dec_indent();
+                self.push_indent();
+                self.push_char('}');
+            }
         }
 
         self.push_newline();

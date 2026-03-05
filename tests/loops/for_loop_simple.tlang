@@ -1,0 +1,4 @@
+// Simple for-loop iteration
+for x in [1, 2, 3] {
+  log(x);
+};

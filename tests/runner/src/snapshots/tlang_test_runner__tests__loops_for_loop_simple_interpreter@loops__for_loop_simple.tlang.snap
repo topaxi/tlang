@@ -1,0 +1,9 @@
+---
+source: tests/runner/src/main.rs
+description: "Backend: interpreter"
+expression: apply_redactions(&output)
+input_file: tests/loops/for_loop_simple.tlang
+---
+1
+2
+3

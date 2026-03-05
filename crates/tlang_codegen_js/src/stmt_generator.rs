@@ -28,6 +28,12 @@ impl CodegenJS {
             hir::StmtKind::Return(expr) => self.generate_return_statement(expr.as_deref()),
             hir::StmtKind::EnumDeclaration(decl) => self.generate_enum_declaration(decl),
             hir::StmtKind::StructDeclaration(decl) => self.generate_struct_declaration(decl),
+            hir::StmtKind::ProtocolDeclaration(decl) => {
+                self.generate_protocol_declaration(decl);
+            }
+            hir::StmtKind::ImplBlock(impl_block) => {
+                self.generate_impl_block(impl_block);
+            }
         }
 
         self.generate_comments(&statement.trailing_comments);
@@ -115,5 +121,65 @@ impl CodegenJS {
 
         self.pop_context();
         self.push_str(";\n");
+    }
+
+    pub(crate) fn generate_protocol_declaration(&mut self, decl: &hir::ProtocolDeclaration) {
+        let name = decl.name.as_str();
+        self.push_indent();
+        self.push_str("const ");
+        self.push_str(name);
+        self.push_str(" = {};\n");
+
+        // Generate dispatch function for each protocol method
+        for method in &decl.methods {
+            let method_name = method.name.as_str();
+            self.push_indent();
+            self.push_str(name);
+            self.push_char('.');
+            self.push_str(method_name);
+            self.push_str(" = function(self, ...args) {\n");
+            self.inc_indent();
+            self.push_indent();
+            self.push_str("const __type = Array.isArray(self) ? \"List\" : self?.constructor?.name ?? typeof self;\n");
+            self.push_indent();
+            self.push_str("return ");
+            self.push_str(name);
+            self.push_str("[__type].");
+            self.push_str(method_name);
+            self.push_str("(self, ...args);\n");
+            self.dec_indent();
+            self.push_indent();
+            self.push_str("};\n");
+        }
+    }
+
+    pub(crate) fn generate_impl_block(&mut self, impl_block: &hir::ImplBlock) {
+        let protocol_name = impl_block.protocol_name.to_string();
+        let target_type = impl_block.target_type.to_string();
+
+        // Ensure protocol has a namespace for this type
+        self.push_indent();
+        self.push_str(&protocol_name);
+        self.push_char('.');
+        self.push_str(&target_type);
+        self.push_str(" = {};\n");
+
+        for method in &impl_block.methods {
+            let method_name = match &method.name.kind {
+                hir::ExprKind::Path(path) => path.last_ident().to_string(),
+                hir::ExprKind::FieldAccess(_, ident) => ident.to_string(),
+                _ => unreachable!(),
+            };
+
+            self.push_indent();
+            self.push_str(&protocol_name);
+            self.push_char('.');
+            self.push_str(&target_type);
+            self.push_char('.');
+            self.push_str(&method_name);
+            self.push_str(" = ");
+            self.generate_function_expression(method);
+            self.push_str(";\n");
+        }
     }
 }

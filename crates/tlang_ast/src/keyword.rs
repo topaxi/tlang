@@ -25,6 +25,9 @@ define_keywords! {
     // TODO: It might actually be better to just treat this as an identifier.
     _Self => "self",
 
+    Protocol => "protocol",
+    Impl => "impl",
+
     // Reserved keywords, unused at the moment
     Pub => "pub",
     SelfUpper => "Self",

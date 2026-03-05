@@ -125,6 +125,27 @@ pub fn walk_stmt<'hir, V: Visitor<'hir>>(
         hir::StmtKind::DynFunctionDeclaration(decl) => {
             visitor.visit_expr(&mut decl.name, ctx);
         }
+        hir::StmtKind::ProtocolDeclaration(decl) => {
+            visitor.visit_ident(&mut decl.name, ctx);
+            for method in &mut decl.methods {
+                visitor.visit_ident(&mut method.name, ctx);
+            }
+        }
+        hir::StmtKind::ImplBlock(impl_block) => {
+            visitor.visit_path(&mut impl_block.protocol_name, ctx);
+            visitor.visit_path(&mut impl_block.target_type, ctx);
+            for decl in &mut impl_block.methods {
+                // Skip visiting method name — it's in declaration position and
+                // not resolvable as a standalone path (only Protocol::method is).
+                visitor.enter_scope(decl.hir_id, ctx);
+                for param in &mut decl.parameters {
+                    visitor.visit_ident(&mut param.name, ctx);
+                    visitor.visit_ty(&mut param.type_annotation, ctx);
+                }
+                visitor.visit_block(&mut decl.body, ctx);
+                visitor.leave_scope(decl.hir_id, ctx);
+            }
+        }
     }
 }
 
