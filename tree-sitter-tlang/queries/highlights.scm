@@ -16,6 +16,9 @@
   "break"
   "enum"
   "struct"
+  "protocol"
+  "impl"
+  "apply"
   "not"
   "and"
   "or"
@@ -36,6 +39,16 @@
 
 (struct_declaration
   name: (type_identifier) @type)
+
+(protocol_declaration
+  name: (type_identifier) @type)
+
+(impl_block
+  protocol: (type_identifier) @type
+  type: (type_identifier) @type)
+
+(apply_statement
+  method: (identifier) @function.method)
 
 ; Type identifiers
 (type_identifier) @type

@@ -74,6 +74,8 @@ module.exports = grammar({
         $.variable_declaration,
         $.enum_declaration,
         $.struct_declaration,
+        $.protocol_declaration,
+        $.impl_block,
       ),
 
     expression_statement: ($) => seq($._expression, optional(';')),
@@ -165,6 +167,44 @@ module.exports = grammar({
         field('name', $.identifier),
         optional(seq(':', field('type', $.type_annotation))),
       ),
+
+    // =========================================================================
+    // Protocol Declaration
+    // =========================================================================
+
+    protocol_declaration: ($) =>
+      seq(
+        'protocol',
+        field('name', $.type_identifier),
+        '{',
+        repeat($.protocol_method_signature),
+        '}',
+      ),
+
+    protocol_method_signature: ($) =>
+      seq('fn', field('name', $.identifier), $.parameter_list),
+
+    // =========================================================================
+    // Impl Block
+    // =========================================================================
+
+    impl_block: ($) =>
+      seq(
+        'impl',
+        field('protocol', $.type_identifier),
+        'for',
+        field('type', $.type_identifier),
+        '{',
+        repeat($.impl_item),
+        '}',
+      ),
+
+    impl_item: ($) => choice($.function_declaration, $.apply_statement),
+
+    apply_statement: ($) =>
+      seq('apply', commaSep1(field('method', $.identifier)), optional(';')),
+
+
 
     // =========================================================================
     // Type Annotation
@@ -558,4 +598,15 @@ module.exports = grammar({
  */
 function commaSep(rule) {
   return optional(seq(rule, repeat(seq(',', rule)), optional(',')));
+}
+
+/**
+ * Creates a rule that matches one or more comma-separated occurrences of
+ * the given rule, with optional trailing comma.
+ *
+ * @param {RuleOrLiteral} rule
+ * @returns {SeqRule}
+ */
+function commaSep1(rule) {
+  return seq(rule, repeat(seq(',', rule)), optional(','));
 }
