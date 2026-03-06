@@ -1,4 +1,3 @@
-#![feature(box_patterns)]
 mod binary_operator_generator;
 mod enum_generator;
 mod expr_generator;
