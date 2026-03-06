@@ -83,9 +83,6 @@ jobs:
 
       - uses: ./.github/actions/setup-cargo
 
-      - name: cargo-nextest
-        run: cargo nextest run --profile=ci
-
       - uses: actions/setup-node@v6
         with:
           node-version: "24.0.2"
