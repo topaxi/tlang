@@ -579,7 +579,7 @@ impl VMState {
 
     // ── Cross-cutting helpers ───────────────────────────────────────────────
 
-    /// Register the call handler function pointer. Called by the `Interpreter`
+    /// Register the call handler function pointer. Called by the `VM`
     /// during initialization so that native functions can invoke callables
     /// via [`VMState::call`].
     pub fn register_call_fn(&mut self, call_fn: CallFn) {
@@ -590,7 +590,7 @@ impl VMState {
     /// native function) with the given arguments.
     ///
     /// This is the primary way for native functions to invoke user-defined
-    /// callables. The call handler must be registered by the interpreter
+    /// callables. The call handler must be registered by the `VM`
     /// before this method is used.
     ///
     /// # Panics

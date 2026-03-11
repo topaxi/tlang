@@ -114,9 +114,10 @@ impl VM {
         let mut fn_defs: Vec<&NativeFnDef> = inventory::iter::<NativeFnDef>.into_iter().collect();
         fn_defs.sort_by_key(|def| def.name());
         for native_fn_def in &fn_defs {
-            let fn_object = state.new_native_fn(&native_fn_def.name(), native_fn_def.fn_ptr());
-            debug!("Defining global native function: {}", native_fn_def.name());
-            state.set_global(native_fn_def.name(), fn_object);
+            let name = native_fn_def.name();
+            let fn_object = state.new_native_fn(&name, native_fn_def.fn_ptr());
+            debug!("Defining global native function: {name}");
+            state.set_global(name, fn_object);
         }
 
         state.set_global(

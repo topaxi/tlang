@@ -102,7 +102,7 @@ mod tests {
     use super::define_result_shape;
     use crate::protocols::define_builtin_protocols;
 
-    fn interpreter_state() -> VMState {
+    fn vm_state() -> VMState {
         let mut state = VMState::new();
         define_result_shape(&mut state);
         define_builtin_protocols(&mut state);
@@ -111,7 +111,7 @@ mod tests {
 
     #[test]
     fn test_enum_truthiness_result_ok() {
-        let mut state = interpreter_state();
+        let mut state = vm_state();
         let result_shape = state.heap.builtin_shapes.result;
 
         // Result::Ok(truthy value) should be truthy
@@ -125,7 +125,7 @@ mod tests {
 
     #[test]
     fn test_enum_truthiness_result_err() {
-        let mut state = interpreter_state();
+        let mut state = vm_state();
         let result_shape = state.heap.builtin_shapes.result;
 
         // Result::Err should be falsy (variant 1 = Err)

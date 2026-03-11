@@ -161,7 +161,7 @@ make test-bindings-js
 cargo build --release --bin tlang
 
 # Build interpreter
-cargo build --release --features=binary --bin tlangdi
+cargo build --release --features=tlang_vm/binary --bin tlangdi
 
 # Build playground
 npm run build
@@ -208,7 +208,7 @@ cargo run --bin tlang -- run examples/factorial.tlang
 
 Run tlang interpreter directly:
 ```bash
-cargo run --bin tlangdi --features=binary -- examples/factorial.tlang
+cargo run --bin tlangdi --features=tlang_vm/binary -- examples/factorial.tlang
 ```
 
 ### Web Playground
