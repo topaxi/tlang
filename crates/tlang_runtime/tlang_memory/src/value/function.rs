@@ -4,11 +4,11 @@ use smallvec::SmallVec;
 
 use tlang_span::HirId;
 
-use crate::InterpreterState;
+use crate::VMState;
 
 use super::TlangValue;
 
-pub type TlangNativeFn = Rc<dyn Fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn>;
+pub type TlangNativeFn = Rc<dyn Fn(&mut VMState, &[TlangValue]) -> NativeFnReturn>;
 
 #[derive(Debug)]
 pub enum NativeFnReturn {

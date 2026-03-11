@@ -514,9 +514,9 @@ mod tests {
 
     #[test]
     fn test_enum_truthiness_custom_enum() {
-        use crate::InterpreterState;
+        use crate::VMState;
 
-        let mut state = InterpreterState::new();
+        let mut state = VMState::new();
 
         // Custom enum with truthy field values should be truthy
         let custom_truthy = TlangEnum::new(ShapeKey::Native(999), 0, vec![TlangValue::I64(42)]);

@@ -2,14 +2,14 @@ use std::{fs::File, io::Read, path::Path};
 
 use tlang_ast_lowering::lower_to_hir;
 use tlang_hir_opt::HirOptimizer;
-use tlang_runtime::{interpreter::Interpreter, memory::TlangValue};
+use tlang_runtime::{memory::TlangValue, vm::VM};
 use tlang_semantics::SemanticAnalyzer;
 
 pub fn handle_run(input_file: &str) {
     let module = compile(input_file);
 
-    let mut interpreter = Interpreter::default();
-    let result = interpreter.eval(&module);
+    let mut vm = VM::new();
+    let result = vm.eval(&module);
 
     match result {
         TlangValue::Nil => {}
@@ -38,7 +38,7 @@ fn compile(input_file: &str) -> tlang_hir::Module {
     };
 
     let mut semantic_analyzer = SemanticAnalyzer::default();
-    semantic_analyzer.add_builtin_symbols_with_slots(&Interpreter::builtin_symbols());
+    semantic_analyzer.add_builtin_symbols_with_slots(&VM::builtin_symbols());
     if let Err(err) = semantic_analyzer.analyze(&mut ast) {
         eprintln!("{err:?}");
         std::process::exit(1);

@@ -8,6 +8,7 @@ description = "Runtime environment for tlang, including memory management, stand
 tlang_interpreter = { path = "tlang_interpreter" }
 tlang_memory = { path = "tlang_memory" }
 tlang_stdlib = { path = "tlang_stdlib" }
+tlang_vm = { path = "tlang_vm" }
 
 [lints]
 workspace = true

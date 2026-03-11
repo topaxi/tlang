@@ -4,10 +4,9 @@ use std::process;
 
 use tlang_ast_lowering::lower_to_hir;
 use tlang_hir_opt::HirOptimizer;
-use tlang_interpreter::Interpreter;
-pub use tlang_memory::NativeFnDef;
 use tlang_semantics::SemanticAnalyzer;
 use tlang_semantics::diagnostic::Diagnostic;
+use tlang_vm::VM;
 
 fn main() {
     let stress_gc = env::var("TLANG_STRESS_GC").is_ok();
@@ -47,7 +46,7 @@ fn main() {
         }
     };
     let mut analyzer = SemanticAnalyzer::default();
-    analyzer.add_builtin_symbols_with_slots(&Interpreter::builtin_symbols());
+    analyzer.add_builtin_symbols_with_slots(&VM::builtin_symbols());
 
     match analyzer.analyze(&mut ast) {
         Ok(_) => {}
@@ -72,7 +71,7 @@ fn main() {
     let mut ctx = meta.into();
     optimizer.optimize_hir(&mut module, &mut ctx);
 
-    let mut interp = Interpreter::default();
-    interp.state_mut().set_stress_gc(stress_gc);
-    interp.eval(&module);
+    let mut vm = VM::new();
+    vm.state_mut().set_stress_gc(stress_gc);
+    vm.eval(&module);
 }

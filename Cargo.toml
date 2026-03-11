@@ -4,6 +4,7 @@ members = [
   "crates/tlang_runtime/tlang_stdlib",
   "crates/tlang_cli",
   "crates/tlang_runtime/tlang_interpreter",
+  "crates/tlang_runtime/tlang_vm",
   "crates/*",
   "tests/runner",
 ]

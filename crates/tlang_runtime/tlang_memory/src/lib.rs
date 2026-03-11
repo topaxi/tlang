@@ -12,7 +12,7 @@ pub use execution::ExecutionContext;
 pub use heap::{Heap, MemoryStats};
 pub use program::Program;
 pub use resolver::Resolver;
-pub use state::InterpreterState;
+pub use state::VMState;
 pub use value::{TlangValue, object::TlangObjectKind};
 
 pub use self::value::function::NativeFnReturn;
@@ -33,7 +33,7 @@ pub struct NativeFnDef {
     name: &'static str,
     binding_name: &'static str,
     arity: usize,
-    function: fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn,
+    function: fn(&mut VMState, &[TlangValue]) -> NativeFnReturn,
     module_path: &'static str,
 }
 
@@ -42,7 +42,7 @@ impl NativeFnDef {
         name: &'static str,
         binding_name: &'static str,
         arity: usize,
-        function: fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn,
+        function: fn(&mut VMState, &[TlangValue]) -> NativeFnReturn,
         module_path: &'static str,
     ) -> Self {
         Self {
@@ -76,9 +76,7 @@ impl NativeFnDef {
         self.arity
     }
 
-    pub const fn fn_ptr(
-        &'static self,
-    ) -> fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn {
+    pub const fn fn_ptr(&'static self) -> fn(&mut VMState, &[TlangValue]) -> NativeFnReturn {
         self.function
     }
 }

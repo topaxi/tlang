@@ -1,8 +1,10 @@
 use tlang_hir as hir;
-use tlang_runtime::memory::{InterpreterState, NativeFnReturn, prelude::*};
+use tlang_runtime::memory::{NativeFnReturn, VMState, prelude::*};
 use wasm_bindgen::prelude::*;
 
-pub struct TlangInterpreter(tlang_runtime::interpreter::Interpreter);
+pub struct TlangInterpreter {
+    vm: tlang_runtime::vm::VM,
+}
 
 impl Default for TlangInterpreter {
     fn default() -> Self {
@@ -12,13 +14,13 @@ impl Default for TlangInterpreter {
 
 impl TlangInterpreter {
     pub(crate) fn new() -> Self {
-        let interpreter = tlang_runtime::interpreter::Interpreter::default();
-
-        TlangInterpreter(interpreter)
+        TlangInterpreter {
+            vm: tlang_runtime::vm::VM::new(),
+        }
     }
 
     pub fn define_js_fn(&mut self, name: &str, f: js_sys::Function) {
-        self.0.define_native_fn(name, move |state, args| {
+        self.vm.define_native_fn(name, move |state, args| {
             let this = JsValue::null();
 
             let value = match args.len() {
@@ -84,12 +86,12 @@ impl TlangInterpreter {
     }
 
     pub(crate) fn eval(&mut self, hir: &hir::Module) -> JsValue {
-        let value = self.0.eval(hir);
-        tlang_value_to_js_value(self.0.state(), value)
+        let value = self.vm.eval(hir);
+        tlang_value_to_js_value(self.vm.state(), value)
     }
 }
 
-fn tlang_value_to_js_value(state: &InterpreterState, value: TlangValue) -> JsValue {
+fn tlang_value_to_js_value(state: &VMState, value: TlangValue) -> JsValue {
     match value {
         TlangValue::Nil => JsValue::null(),
         TlangValue::Object(_) => tlang_object_to_js_value(state, value),
@@ -103,7 +105,7 @@ fn tlang_value_to_js_value(state: &InterpreterState, value: TlangValue) -> JsVal
     }
 }
 
-fn tlang_object_to_js_value(state: &InterpreterState, value: TlangValue) -> JsValue {
+fn tlang_object_to_js_value(state: &VMState, value: TlangValue) -> JsValue {
     match state.get_object(value) {
         Some(TlangObjectKind::String(s)) => JsValue::from(s),
         Some(TlangObjectKind::Struct(s)) => {
@@ -162,7 +164,7 @@ fn tlang_object_to_js_value(state: &InterpreterState, value: TlangValue) -> JsVa
     }
 }
 
-fn js_value_to_tlang_value(state: &mut InterpreterState, value: &JsValue) -> TlangValue {
+fn js_value_to_tlang_value(state: &mut VMState, value: &JsValue) -> TlangValue {
     if value.is_null() || value.is_undefined() {
         return TlangValue::Nil;
     }

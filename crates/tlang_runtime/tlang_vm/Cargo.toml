@@ -1,0 +1,30 @@
+[package]
+name = "tlang_vm"
+version = "0.1.0"
+edition.workspace = true
+
+[features]
+default = ["stdlib"]
+binary = ["dep:tlang_ast_lowering", "dep:tlang_hir_opt", "dep:tlang_parser", "dep:tlang_semantics", "dep:env_logger"]
+stdlib = ["tlang_interpreter/stdlib"]
+
+[[bin]]
+name = "tlangdi"
+path = "src/main.rs"
+required-features = ["binary"]
+
+[dependencies]
+tlang_ast_lowering = { path = "../../tlang_ast_lowering", optional = true }
+tlang_hir = { path = "../../tlang_hir" }
+tlang_hir_opt = { path = "../../tlang_hir_opt", optional = true }
+tlang_interpreter = { path = "../tlang_interpreter", default-features = false }
+tlang_memory = { path = "../tlang_memory" }
+tlang_parser = { path = "../../tlang_parser", optional = true }
+tlang_semantics = { path = "../../tlang_semantics", optional = true }
+tlang_symbols = { path = "../../tlang_symbols" }
+inventory = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true, optional = true }
+
+[lints]
+workspace = true

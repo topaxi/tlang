@@ -96,7 +96,7 @@ impl Heap {
     }
 
     /// Low-level object allocator. Callers are responsible for triggering GC beforehand
-    /// when needed. Prefer [`crate::InterpreterState::new_object`] for automatic GC scheduling.
+    /// when needed. Prefer [`crate::VMState::new_object`] for automatic GC scheduling.
     pub fn alloc_object(&mut self, kind: TlangObjectKind) -> TlangValue {
         self.memory_stats.objects_allocated += 1;
         TlangValue::new_object(self.objects.insert(kind).into())

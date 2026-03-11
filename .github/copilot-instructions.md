@@ -64,7 +64,7 @@ This automated setup ensures a consistent development environment and eliminates
 - **Integration tests**: `make test` -- takes ~64s. Tests built compiler/interpreter with both backends. **REQUIRES Node.js 24.0.2 exactly** (see package.json volta config). Test failures with different Node.js versions are due to stack trace differences in expected output. NEVER CANCEL. Set timeout to 30+ minutes.
 - **WebAssembly bindings test**: `make test-bindings-js` -- takes ~21s. NEVER CANCEL. Set timeout to 30+ minutes.
 - **Build playground**: `npm run build` -- takes ~13s. NEVER CANCEL. Set timeout to 30+ minutes.
-- **Build interpreter**: `cargo build --release --features=binary --bin tlangdi` -- takes ~30s. NEVER CANCEL. Set timeout to 60+ minutes.
+- **Build interpreter**: `cargo build --release --features=tlang_vm/binary --bin tlangdi` -- takes ~30s. NEVER CANCEL. Set timeout to 60+ minutes.
 - **Build CLI**: `cargo build --release --bin tlang` -- takes ~21s. NEVER CANCEL. Set timeout to 60+ minutes.
 
 ### Run Applications
