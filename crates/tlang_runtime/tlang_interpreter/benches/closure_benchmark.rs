@@ -16,6 +16,7 @@ mod helpers {
     use tlang_hir as hir;
     use tlang_hir_opt::HirOptimizer;
     pub use tlang_interpreter::Interpreter;
+    pub use tlang_memory::VMState;
     use tlang_parser::Parser;
     use tlang_semantics::SemanticAnalyzer;
 
@@ -24,7 +25,7 @@ mod helpers {
         let mut ast = Parser::from_source(src).parse().expect("Parse error");
 
         let mut analyzer = SemanticAnalyzer::default();
-        analyzer.add_builtin_symbols_with_slots(&Interpreter::builtin_symbols());
+        analyzer.add_builtin_symbols_with_slots(&tlang_vm::VM::builtin_symbols());
         analyzer.analyze(&mut ast).expect("Semantic analysis error");
 
         let (mut module, meta) = lower_to_hir(
@@ -39,6 +40,11 @@ mod helpers {
         optimizer.optimize_hir(&mut module, &mut ctx);
 
         module
+    }
+
+    pub fn new_interpreter_with_state() -> (Interpreter, VMState) {
+        let vm = tlang_vm::VM::new();
+        (Interpreter, vm.into_state())
     }
 }
 
@@ -58,8 +64,8 @@ fn bench_simple_closure(c: &mut Criterion) {
 
     c.bench_function("simple_closure_create_and_call", |b| {
         b.iter_batched(
-            Interpreter::new,
-            |mut interpreter| interpreter.eval(black_box(&hir)),
+            new_interpreter_with_state,
+            |(interp, mut state)| interp.eval(&mut state, black_box(&hir)),
             BatchSize::SmallInput,
         );
     });
@@ -86,8 +92,8 @@ fn bench_counter_closure(c: &mut Criterion) {
 
     c.bench_function("counter_closure_call", |b| {
         b.iter_batched(
-            Interpreter::new,
-            |mut interpreter| interpreter.eval(black_box(&hir)),
+            new_interpreter_with_state,
+            |(interp, mut state)| interp.eval(&mut state, black_box(&hir)),
             BatchSize::SmallInput,
         );
     });
@@ -111,8 +117,8 @@ fn bench_nested_closures(c: &mut Criterion) {
 
     c.bench_function("nested_closure_create_and_call", |b| {
         b.iter_batched(
-            Interpreter::new,
-            |mut interpreter| interpreter.eval(black_box(&hir)),
+            new_interpreter_with_state,
+            |(interp, mut state)| interp.eval(&mut state, black_box(&hir)),
             BatchSize::SmallInput,
         );
     });
@@ -134,8 +140,8 @@ fn bench_closure_in_map(c: &mut Criterion) {
 
     c.bench_function("closure_in_map", |b| {
         b.iter_batched(
-            Interpreter::new,
-            |mut interpreter| interpreter.eval(black_box(&hir)),
+            new_interpreter_with_state,
+            |(interp, mut state)| interp.eval(&mut state, black_box(&hir)),
             BatchSize::SmallInput,
         );
     });
@@ -161,8 +167,8 @@ fn bench_many_captures(c: &mut Criterion) {
 
     c.bench_function("closure_many_captures", |b| {
         b.iter_batched(
-            Interpreter::new,
-            |mut interpreter| interpreter.eval(black_box(&hir)),
+            new_interpreter_with_state,
+            |(interp, mut state)| interp.eval(&mut state, black_box(&hir)),
             BatchSize::SmallInput,
         );
     });
@@ -183,8 +189,8 @@ fn bench_recursive_with_closure(c: &mut Criterion) {
 
     c.bench_function("foldl_with_closure", |b| {
         b.iter_batched(
-            Interpreter::new,
-            |mut interpreter| interpreter.eval(black_box(&hir)),
+            new_interpreter_with_state,
+            |(interp, mut state)| interp.eval(&mut state, black_box(&hir)),
             BatchSize::SmallInput,
         );
     });

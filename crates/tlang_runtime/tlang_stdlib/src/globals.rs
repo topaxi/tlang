@@ -1,7 +1,7 @@
 use tlang_macros::native_fn;
-use tlang_memory::{InterpreterState, TlangValue};
+use tlang_memory::{TlangValue, VMState};
 
-fn stringify(state: &mut InterpreterState, values: &[TlangValue]) -> String {
+fn stringify(state: &mut VMState, values: &[TlangValue]) -> String {
     values
         .iter()
         .map(|v| state.stringify(*v))
@@ -10,13 +10,13 @@ fn stringify(state: &mut InterpreterState, values: &[TlangValue]) -> String {
 }
 
 #[native_fn]
-pub fn log(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
+pub fn log(state: &mut VMState, args: &[TlangValue]) -> TlangValue {
     println!("{}", stringify(state, args));
     TlangValue::Nil
 }
 
 #[native_fn]
-pub fn panic(state: &mut InterpreterState, args: &[TlangValue]) -> TlangValue {
+pub fn panic(state: &mut VMState, args: &[TlangValue]) -> TlangValue {
     let stringified = stringify(state, args);
     state.panic(format!("Panic!: {stringified}"));
 }

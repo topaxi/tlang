@@ -99,13 +99,13 @@ pub(crate) fn generate_native_fn(
         // This should be an edge case.
         arity = usize::MAX;
         quote! {
-            pub fn #fn_native_name_ident(state: &mut tlang_memory::InterpreterState, args: &[tlang_memory::TlangValue]) -> tlang_memory::NativeFnReturn {
+            pub fn #fn_native_name_ident(state: &mut tlang_memory::VMState, args: &[tlang_memory::TlangValue]) -> tlang_memory::NativeFnReturn {
                 tlang_memory::NativeFnReturn::Return(#fn_name_ident(state, args))
             }
         }
     } else {
         quote! {
-            pub fn #fn_native_name_ident(state: &mut tlang_memory::InterpreterState, args: &[tlang_memory::TlangValue]) -> tlang_memory::NativeFnReturn {
+            pub fn #fn_native_name_ident(state: &mut tlang_memory::VMState, args: &[tlang_memory::TlangValue]) -> tlang_memory::NativeFnReturn {
                 if args.len() != #arity {
                     state.panic(format!("Expected {} arguments, got {}", #arity, args.len()));
                 }

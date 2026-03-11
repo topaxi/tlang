@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
 use tlang_macros::native_fn;
-use tlang_memory::{InterpreterState, NativeFnReturn, TlangValue};
+use tlang_memory::{NativeFnReturn, TlangValue, VMState};
 
 pub const RESULT_VARIANT_OK: usize = 0;
 pub const RESULT_VARIANT_ERR: usize = 1;
 
 #[native_fn(name = "Result::Ok")]
-pub fn new_result_ok(state: &mut InterpreterState, value: TlangValue) -> TlangValue {
+pub fn new_result_ok(state: &mut VMState, value: TlangValue) -> TlangValue {
     state.new_enum(
         state.heap.builtin_shapes.result,
         RESULT_VARIANT_OK,
@@ -16,7 +16,7 @@ pub fn new_result_ok(state: &mut InterpreterState, value: TlangValue) -> TlangVa
 }
 
 #[native_fn(name = "Result::Err")]
-pub fn new_result_err(state: &mut InterpreterState, err: TlangValue) -> TlangValue {
+pub fn new_result_err(state: &mut VMState, err: TlangValue) -> TlangValue {
     state.new_enum(
         state.heap.builtin_shapes.result,
         RESULT_VARIANT_ERR,
@@ -25,7 +25,7 @@ pub fn new_result_err(state: &mut InterpreterState, err: TlangValue) -> TlangVal
 }
 
 #[allow(clippy::missing_panics_doc)]
-pub fn define_result_shape(state: &mut InterpreterState) {
+pub fn define_result_shape(state: &mut VMState) {
     let mut method_map = HashMap::with_capacity(5);
 
     method_map.insert(
@@ -95,15 +95,15 @@ pub fn define_result_shape(state: &mut InterpreterState) {
 
 #[cfg(test)]
 mod tests {
-    use tlang_memory::{InterpreterState, TlangValue};
+    use tlang_memory::{TlangValue, VMState};
 
     use crate::result::{RESULT_VARIANT_ERR, RESULT_VARIANT_OK};
 
     use super::define_result_shape;
     use crate::protocols::define_builtin_protocols;
 
-    fn interpreter_state() -> InterpreterState {
-        let mut state = InterpreterState::new();
+    fn vm_state() -> VMState {
+        let mut state = VMState::new();
         define_result_shape(&mut state);
         define_builtin_protocols(&mut state);
         state
@@ -111,7 +111,7 @@ mod tests {
 
     #[test]
     fn test_enum_truthiness_result_ok() {
-        let mut state = interpreter_state();
+        let mut state = vm_state();
         let result_shape = state.heap.builtin_shapes.result;
 
         // Result::Ok(truthy value) should be truthy
@@ -125,7 +125,7 @@ mod tests {
 
     #[test]
     fn test_enum_truthiness_result_err() {
-        let mut state = interpreter_state();
+        let mut state = vm_state();
         let result_shape = state.heap.builtin_shapes.result;
 
         // Result::Err should be falsy (variant 1 = Err)

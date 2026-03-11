@@ -34,4 +34,4 @@ test-bindings-js:
 	wasm-pack test --node crates/tlang_bindings_js
 
 tlangdi-release-debug:
-	RUSTFLAGS="-C force-frame-pointers=yes -C opt-level=0" cargo build --release --features=binary --bin tlangdi
+	RUSTFLAGS="-C force-frame-pointers=yes -C opt-level=0" cargo build --release --features=tlang_vm/binary --bin tlangdi

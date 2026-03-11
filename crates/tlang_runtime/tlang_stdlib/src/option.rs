@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
 use tlang_macros::native_fn;
-use tlang_memory::{InterpreterState, NativeFnReturn, TlangValue};
+use tlang_memory::{NativeFnReturn, TlangValue, VMState};
 
 pub const OPTION_VARIANT_SOME: usize = 0;
 pub const OPTION_VARIANT_NONE: usize = 1;
 
 #[native_fn(name = "Option::Some")]
-pub fn new_option_some(state: &mut InterpreterState, value: TlangValue) -> TlangValue {
+pub fn new_option_some(state: &mut VMState, value: TlangValue) -> TlangValue {
     state.new_enum(
         state.heap.builtin_shapes.option,
         OPTION_VARIANT_SOME,
@@ -16,7 +16,7 @@ pub fn new_option_some(state: &mut InterpreterState, value: TlangValue) -> Tlang
 }
 
 #[allow(clippy::missing_panics_doc)]
-pub fn define_option_shape(state: &mut InterpreterState) {
+pub fn define_option_shape(state: &mut VMState) {
     let mut method_map = HashMap::with_capacity(5);
 
     method_map.insert(
@@ -93,15 +93,15 @@ pub fn define_option_shape(state: &mut InterpreterState) {
 
 #[cfg(test)]
 mod tests {
-    use tlang_memory::{InterpreterState, TlangValue};
+    use tlang_memory::{TlangValue, VMState};
 
     use crate::option::{OPTION_VARIANT_NONE, OPTION_VARIANT_SOME};
 
     use super::define_option_shape;
     use crate::protocols::define_builtin_protocols;
 
-    fn interpreter_state() -> InterpreterState {
-        let mut state = InterpreterState::new();
+    fn vm_state() -> VMState {
+        let mut state = VMState::new();
         define_option_shape(&mut state);
         define_builtin_protocols(&mut state);
         state
@@ -109,7 +109,7 @@ mod tests {
 
     #[test]
     fn test_enum_truthiness_option_some() {
-        let mut state = interpreter_state();
+        let mut state = vm_state();
         let option_shape = state.heap.builtin_shapes.option;
 
         // Option::Some(truthy value) should be truthy
@@ -123,7 +123,7 @@ mod tests {
 
     #[test]
     fn test_enum_truthiness_option_none() {
-        let mut state = interpreter_state();
+        let mut state = vm_state();
         let option_shape = state.heap.builtin_shapes.option;
 
         // Option::None should be falsy (variant 1 = None)

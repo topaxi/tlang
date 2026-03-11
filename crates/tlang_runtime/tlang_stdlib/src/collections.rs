@@ -2,10 +2,10 @@ use std::collections::HashMap;
 
 use tlang_macros::native_fn;
 use tlang_memory::value::function::NativeFnReturn;
-use tlang_memory::{InterpreterState, prelude::*};
+use tlang_memory::{VMState, prelude::*};
 
 #[native_fn(name = "len")]
-pub fn len(state: &mut InterpreterState, iterable: TlangValue) -> TlangValue {
+pub fn len(state: &mut VMState, iterable: TlangValue) -> TlangValue {
     match state.get_object(iterable) {
         Some(TlangObjectKind::Struct(obj)) => TlangValue::from(obj.len()),
         Some(TlangObjectKind::String(string)) => TlangValue::from(string.len()),
@@ -15,7 +15,7 @@ pub fn len(state: &mut InterpreterState, iterable: TlangValue) -> TlangValue {
 
 #[allow(clippy::missing_panics_doc)]
 #[native_fn(name = "map")]
-pub fn map(state: &mut InterpreterState, iterable: TlangValue, func: TlangValue) -> TlangValue {
+pub fn map(state: &mut VMState, iterable: TlangValue, func: TlangValue) -> TlangValue {
     let type_name = state.type_name_of(iterable);
     if let Some(fn_value) = state.get_protocol_impl("Functor", type_name, "map") {
         return state.call(fn_value, &[iterable, func]);
@@ -28,7 +28,7 @@ pub fn map(state: &mut InterpreterState, iterable: TlangValue, func: TlangValue)
 }
 
 #[allow(clippy::missing_panics_doc)]
-pub fn define_list_shape(state: &mut InterpreterState) {
+pub fn define_list_shape(state: &mut VMState) {
     define_list_iterator_shape(state);
 
     let mut method_map = HashMap::with_capacity(3);
@@ -83,7 +83,7 @@ pub fn define_list_shape(state: &mut InterpreterState) {
         .set_methods(method_map);
 }
 
-fn define_list_iterator_shape(state: &mut InterpreterState) {
+fn define_list_iterator_shape(state: &mut VMState) {
     let mut method_map = HashMap::with_capacity(1);
 
     method_map.insert(

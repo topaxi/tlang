@@ -20,23 +20,18 @@ use crate::value::{
 };
 
 /// Function pointer type for calling a `TlangValue` that references a callable
-/// (function, closure, or native function). Registered by the interpreter to
-/// allow native functions to invoke user-defined callables.
-///
-/// # Safety
-/// The function pointer must reconstruct a valid `&mut Interpreter` from the
-/// given `&mut InterpreterState`. This is safe when `Interpreter` is
-/// `#[repr(transparent)]` over `InterpreterState`.
-type CallFn = fn(&mut InterpreterState, TlangValue, &[TlangValue]) -> TlangValue;
+/// (function, closure, or native function). Registered by the VM to allow
+/// native functions to invoke user-defined callables.
+type CallFn = fn(&mut VMState, TlangValue, &[TlangValue]) -> TlangValue;
 
-pub struct InterpreterState {
+pub struct VMState {
     pub heap: Heap,
     pub program: Program,
     pub execution: ExecutionContext,
     call_fn: Option<CallFn>,
 }
 
-impl Resolver for InterpreterState {
+impl Resolver for VMState {
     fn resolve_value(&self, path: &hir::Path) -> Option<TlangValue> {
         if !path.res.is_value() {
             return None;
@@ -62,7 +57,7 @@ impl Resolver for InterpreterState {
     }
 }
 
-impl InterpreterState {
+impl VMState {
     pub fn new() -> Self {
         Self {
             heap: Heap::new(),
@@ -197,7 +192,7 @@ impl InterpreterState {
     /// # Panics
     pub fn new_native_fn<F>(&mut self, name: &str, f: F) -> TlangValue
     where
-        F: Fn(&mut InterpreterState, &[TlangValue]) -> NativeFnReturn + 'static,
+        F: Fn(&mut VMState, &[TlangValue]) -> NativeFnReturn + 'static,
     {
         let fn_object = self.new_object(TlangObjectKind::NativeFn);
         let id = fn_object.get_object_id().unwrap();
@@ -213,7 +208,7 @@ impl InterpreterState {
 
     pub fn new_native_method<F>(&mut self, name: &str, f: F) -> TlangStructMethod
     where
-        F: Fn(&mut InterpreterState, TlangValue, &[TlangValue]) -> NativeFnReturn + 'static,
+        F: Fn(&mut VMState, TlangValue, &[TlangValue]) -> NativeFnReturn + 'static,
     {
         TlangStructMethod::from(
             self.new_native_fn(name, move |state, args| f(state, args[0], &args[1..])),
@@ -584,9 +579,9 @@ impl InterpreterState {
 
     // ── Cross-cutting helpers ───────────────────────────────────────────────
 
-    /// Register the call handler function pointer. Called by the `Interpreter`
+    /// Register the call handler function pointer. Called by the `VM`
     /// during initialization so that native functions can invoke callables
-    /// via [`InterpreterState::call`].
+    /// via [`VMState::call`].
     pub fn register_call_fn(&mut self, call_fn: CallFn) {
         self.call_fn = Some(call_fn);
     }
@@ -595,7 +590,7 @@ impl InterpreterState {
     /// native function) with the given arguments.
     ///
     /// This is the primary way for native functions to invoke user-defined
-    /// callables. The call handler must be registered by the interpreter
+    /// callables. The call handler must be registered by the `VM`
     /// before this method is used.
     ///
     /// # Panics
@@ -793,7 +788,7 @@ impl InterpreterState {
     }
 }
 
-impl Default for InterpreterState {
+impl Default for VMState {
     fn default() -> Self {
         Self::new()
     }
@@ -805,7 +800,7 @@ mod tests {
 
     #[test]
     fn test_memory_stats_initial() {
-        let state = InterpreterState::new();
+        let state = VMState::new();
         let stats = state.memory_stats();
 
         assert_eq!(stats.objects_allocated, 0);
@@ -815,7 +810,7 @@ mod tests {
 
     #[test]
     fn test_memory_stats_after_allocation() {
-        let mut state = InterpreterState::new();
+        let mut state = VMState::new();
 
         // Allocate some objects
         state.new_string("hello".to_string());
@@ -831,7 +826,7 @@ mod tests {
 
     #[test]
     fn test_object_removal() {
-        let mut state = InterpreterState::new();
+        let mut state = VMState::new();
 
         // Allocate objects
         let obj1 = state.new_string("first".to_string());
@@ -861,7 +856,7 @@ mod tests {
 
     #[test]
     fn test_remove_nonexistent_object() {
-        let mut state = InterpreterState::new();
+        let mut state = VMState::new();
 
         // Try to remove an object that doesn't exist
         let removed = state.heap.remove_object(999.into());
@@ -874,7 +869,7 @@ mod tests {
 
     #[test]
     fn test_contains_object() {
-        let mut state = InterpreterState::new();
+        let mut state = VMState::new();
 
         let obj = state.new_string("test".to_string());
         let id = obj.get_object_id().unwrap();
@@ -886,7 +881,7 @@ mod tests {
     #[test]
     fn test_gc_roots_includes_globals() {
         let value = TlangValue::I64(42);
-        let mut state = InterpreterState::new();
+        let mut state = VMState::new();
         state.set_global("test".to_string(), value);
 
         let roots: Vec<_> = state.gc_roots().collect();
@@ -895,7 +890,7 @@ mod tests {
 
     #[test]
     fn test_mark_phase_finds_reachable() {
-        let mut state = InterpreterState::new();
+        let mut state = VMState::new();
 
         // Create a reachable object using new_string helper
         let obj = state.new_string("hello".to_string());
@@ -910,7 +905,7 @@ mod tests {
 
     #[test]
     fn test_mark_phase_ignores_unreachable() {
-        let mut state = InterpreterState::new();
+        let mut state = VMState::new();
 
         // Create an unreachable object (no root reference)
         let orphan = state.new_string("orphan".to_string());
@@ -924,7 +919,7 @@ mod tests {
 
     #[test]
     fn test_sweep_removes_unreachable() {
-        let mut state = InterpreterState::new();
+        let mut state = VMState::new();
 
         // Create an object but don't make it a root
         let orphan = state.new_string("orphan".to_string());
@@ -940,7 +935,7 @@ mod tests {
 
     #[test]
     fn test_gc_collects_unreachable_objects() {
-        let mut state = InterpreterState::new();
+        let mut state = VMState::new();
 
         // Create objects but don't make them roots
         let _orphan1 = state.new_string("orphan1".to_string());
@@ -958,7 +953,7 @@ mod tests {
 
     #[test]
     fn test_gc_preserves_reachable_objects() {
-        let mut state = InterpreterState::new();
+        let mut state = VMState::new();
 
         // Create an object and make it a root via globals
         let reachable = state.new_string("keep_me".to_string());
@@ -982,7 +977,7 @@ mod tests {
 
     #[test]
     fn test_gc_collects_temporary_objects() {
-        let mut state = InterpreterState::new();
+        let mut state = VMState::new();
 
         // Simulate a loop that creates temporary objects
         for _ in 0..10_000 {

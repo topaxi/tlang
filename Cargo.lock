@@ -1291,7 +1291,6 @@ dependencies = [
  "ctor",
  "env_logger",
  "indoc",
- "inventory",
  "log",
  "pretty_assertions",
  "smallvec",
@@ -1305,7 +1304,7 @@ dependencies = [
  "tlang_semantics",
  "tlang_span",
  "tlang_stdlib",
- "tlang_symbols",
+ "tlang_vm",
 ]
 
 [[package]]
@@ -1362,6 +1361,7 @@ dependencies = [
  "tlang_interpreter",
  "tlang_memory",
  "tlang_stdlib",
+ "tlang_vm",
 ]
 
 [[package]]
@@ -1414,6 +1414,23 @@ dependencies = [
  "insta",
  "regex",
  "serde_json",
+]
+
+[[package]]
+name = "tlang_vm"
+version = "0.1.0"
+dependencies = [
+ "env_logger",
+ "inventory",
+ "log",
+ "tlang_ast_lowering",
+ "tlang_hir",
+ "tlang_hir_opt",
+ "tlang_interpreter",
+ "tlang_memory",
+ "tlang_parser",
+ "tlang_semantics",
+ "tlang_symbols",
 ]
 
 [[package]]

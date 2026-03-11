@@ -1,10 +1,10 @@
 /// Propagate control flow (`Return`, `TailCall`, etc.), otherwise extract the value.
 #[macro_export]
 macro_rules! eval_value {
-    ($this:expr, $expr:expr) => {
+    ($state:expr, $expr:expr) => {
         match $expr {
             EvalResult::Value(val) => {
-                $this.state.push_temp_root(val);
+                $state.push_temp_root(val);
                 val
             }
             other => return other,
@@ -37,11 +37,11 @@ macro_rules! propagate {
 /// Evaluate a list of hir:Expr expressions into a vector of values, propagating control flow if necessary.
 #[macro_export]
 macro_rules! eval_exprs {
-    ($this:expr, $eval:expr, $exprs:expr) => {{ eval_exprs!($this, $eval, $exprs, $exprs.len()) }};
-    ($this:expr, $eval:expr, $exprs:expr, $capacity:expr) => {{
+    ($state:expr, $eval:expr, $exprs:expr) => {{ eval_exprs!($state, $eval, $exprs, $exprs.len()) }};
+    ($state:expr, $eval:expr, $exprs:expr, $capacity:expr) => {{
         let mut exprs = SmallVec::<[TlangValue; 4]>::with_capacity($capacity);
         for expr in &$exprs {
-            exprs.push(eval_value!($this, $eval($this, expr)));
+            exprs.push(eval_value!($state, $eval($state, expr)));
         }
         exprs
     }};
