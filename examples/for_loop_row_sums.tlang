@@ -1,0 +1,10 @@
+// Compute the sum of each row in a matrix using nested for-loops.
+// The inner loop uses an accumulator; the outer loop simply iterates.
+let matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]];
+
+for row in matrix {
+  let row_sum = for cell in row; with s = 0 {
+    s + cell
+  };
+  log(row_sum);
+};

@@ -1,0 +1,10 @@
+---
+source: tests/runner/src/main.rs
+description: "Known failure for Backend: javascript\n\tOutput mismatch."
+expression: apply_redactions(&output)
+input_file: tests/known_failures/for_loop_nested_accumulator.tlang
+---
+[
+  1, 2, 3, 4, 5,
+  6, 7, 8, 9
+]

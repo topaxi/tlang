@@ -1,0 +1,13 @@
+// Flatten a matrix using nested for-loops with outer accumulator.
+// Interpreter: fails due to a slot-allocation bug in nested for-loops
+//              when both inner and outer loops use accumulators.
+// JS backend: produces the correct output [1, 2, 3, 4, 5, 6, 7, 8, 9].
+let matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]];
+
+let flat = for row in matrix; with acc = [] {
+  for cell in row; with row_acc = acc {
+    [...row_acc, cell]
+  }
+};
+
+flat |> log();
