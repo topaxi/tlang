@@ -1,6 +1,6 @@
 use tlang_ast as ast;
 use tlang_ast::node::Ident;
-use tlang_hir::{self as hir, HirScope};
+use tlang_hir::{self as hir};
 use tlang_span::NodeId;
 use tlang_symbols::SymbolType;
 
@@ -158,7 +158,12 @@ impl LoweringContext {
             );
 
             let mut init_loop_block = hir::Block::new(
-                this.lower_node_id(for_loop.id),
+                // Map init_loop_block to the expression-level scope (node_id),
+                // which holds iterator$$ and accumulator$$. This ensures
+                // ScopeDataUpdater can find the scope and the SlotAllocator
+                // pushes a matching runtime frame, so upvar depths are
+                // consistent even in nested for-loops.
+                this.lower_node_id(node_id),
                 vec![iterator_binding_stmt],
                 Some(loop_expr),
                 for_loop.iter.span,
@@ -167,14 +172,6 @@ impl LoweringContext {
             if let Some(stmt) = accumulator_initializer {
                 init_loop_block.stmts.push(stmt);
             }
-
-            // Set the locals count explicitly for this synthesized block.
-            // The ScopeDataUpdater pass can't find the symbol table for this
-            // block because its hir_id doesn't match the scope's node_id
-            // mapping. We know exactly how many bindings we created:
-            // iterator$$ (always) + accumulator$$ (if present).
-            let locals_count = if for_loop.acc.is_some() { 2 } else { 1 };
-            init_loop_block.set_locals(locals_count);
 
             init_loop_block
         });
@@ -339,7 +336,11 @@ impl LoweringContext {
         };
 
         hir::Block::new(
-            self.unique_id(),
+            // Map the loop body block to the for_loop.id scope, which holds
+            // the accumulator alias pattern (e.g. `sum` in `with sum = 0`).
+            // This gives it a proper runtime frame so that the SlotAllocator's
+            // scope-level counts align with actual runtime frame depths.
+            self.lower_node_id(for_loop.id),
             loop_statements,
             Some(match_expr),
             Default::default(),
