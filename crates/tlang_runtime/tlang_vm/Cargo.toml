@@ -7,6 +7,8 @@ edition.workspace = true
 default = ["stdlib"]
 binary = ["dep:tlang_ast_lowering", "dep:tlang_hir_opt", "dep:tlang_parser", "dep:tlang_semantics", "dep:env_logger"]
 stdlib = ["tlang_interpreter/stdlib"]
+# Activates the pipeline deps needed for integration tests
+testing = ["binary"]
 
 [[bin]]
 name = "tlangdi"
@@ -25,6 +27,11 @@ tlang_symbols = { path = "../../tlang_symbols" }
 inventory = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true, optional = true }
+
+[dev-dependencies]
+ctor = { workspace = true }
+env_logger = { workspace = true }
+pretty_assertions = { workspace = true }
 
 [lints]
 workspace = true

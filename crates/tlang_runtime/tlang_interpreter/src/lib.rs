@@ -756,10 +756,12 @@ impl Interpreter {
 
         if is_simple_enum {
             for (value, _variant) in decl.variants.iter().enumerate() {
-                state
-                    .execution
-                    .scope_stack
-                    .push_value(TlangValue::from(value));
+                let v = TlangValue::from(value);
+                if state.is_global_scope() || !state.current_scope_has_slots() {
+                    state.execution.scope_stack.push_value(v);
+                } else {
+                    state.set_let_binding(v);
+                }
             }
         } else {
             let variant_shapes = decl
@@ -792,7 +794,11 @@ impl Interpreter {
                     vec![],
                 )));
 
-                state.execution.scope_stack.push_value(enum_value);
+                if state.is_global_scope() || !state.current_scope_has_slots() {
+                    state.execution.scope_stack.push_value(enum_value);
+                } else {
+                    state.set_let_binding(enum_value);
+                }
             }
 
             let enum_shape =
