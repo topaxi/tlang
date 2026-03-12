@@ -15,7 +15,7 @@ fn test_recursive_function_definition() {
         // factorial(int) -> int
         // factorial(int) -> int
         function factorial(n) {
-            let __anf_0 = undefined;
+            let __anf_0;
             if (n === 0) {
                 // factorial(int) -> int
                 __anf_0 = 1;
@@ -35,7 +35,7 @@ fn test_recursive_function_definition() {
     "});
     let expected_output = indoc! {"
         function fibonacci(n) {
-            let __anf_0 = undefined;
+            let __anf_0;
             if (n === 0) {
                 __anf_0 = 0;
             } else if (n === 1) {
@@ -58,7 +58,7 @@ fn test_recursive_function_definition_multiple_with_multiple_args() {
     "});
     let expected_output = indoc! {"
         function gcd(m, n) {
-            let __anf_0 = undefined;
+            let __anf_0;
             if (m === 0) {
                 __anf_0 = n;
             } else if (n === 0) {
@@ -85,7 +85,7 @@ fn test_tail_recursive_factorial_nested() {
     let expected_output = indoc! {"
         function factorial(n) {
             function factorial_rec(n, acc) {
-                let __anf_0 = undefined;
+                let __anf_0;
                 if (n === 0) {
                     __anf_0 = acc;
                 } else {
@@ -111,7 +111,7 @@ fn test_tail_recursive_factorial_idiomatic() {
             return factorial$$2(n, 1);
         }
         function factorial$$2(n, acc) {
-            let __anf_0 = undefined;
+            let __anf_0;
             if (n === 0) {
                 __anf_0 = acc;
             } else {
@@ -138,7 +138,7 @@ fn test_recursive_sum() {
     "});
     let expected_output = indoc! {"
         function sum(arg0) {
-            let __anf_0 = undefined;
+            let __anf_0;
             let x,xs;if (arg0.length === 0) {
                 __anf_0 = 0;
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true)) {
@@ -158,7 +158,7 @@ fn test_recursive_map() {
     "});
     let expected_output = indoc! {"
         function map(arg0, f) {
-            let __anf_0 = undefined;
+            let __anf_0;
             let x,xs;if (arg0.length === 0) {
                 __anf_0 = [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true)) {
@@ -179,7 +179,7 @@ fn test_function_declarations_with_guard() {
     "});
     let expected_output = indoc! {"
         function filter(arg0, f) {
-            let __anf_0 = undefined;
+            let __anf_0;
             let x,xs;if (arg0.length === 0) {
                 __anf_0 = [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && f(x)) {
@@ -202,7 +202,7 @@ fn test_function_declarations_with_if_let_guard() {
     "});
     let expected_output = indoc! {"
         function filter_map(arg0, f) {
-            let __anf_1 = undefined;
+            let __anf_1;
             let x,xs;if (arg0.length === 0) {
                 __anf_1 = [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && __anf_0) {
@@ -225,7 +225,7 @@ fn test_function_declarations_with_if_let_guard_enum() {
     "});
     let expected_output = indoc! {"
         function filter_map(arg0, f) {
-            let __anf_1 = undefined;
+            let __anf_1;
             let x,xs;if (arg0.length === 0) {
                 __anf_1 = [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && __anf_0) {
@@ -248,7 +248,7 @@ fn test_function_declarations_with_if_let_guard_named_fields_enum() {
     "});
     let expected_output = indoc! {"
         function filter_map(arg0, f) {
-            let __anf_1 = undefined;
+            let __anf_1;
             let x,xs;if (arg0.length === 0) {
                 __anf_1 = [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && __anf_0) {
@@ -277,7 +277,7 @@ fn test_function_declarations_with_comments_inbetween() {
         // Comment 2
         // Comment 3
         function filter_map(arg0, f) {
-            let __anf_1 = undefined;
+            let __anf_1;
             let x,xs;if (arg0.length === 0) {
                 // Comment 1
                 __anf_1 = [];
@@ -304,7 +304,7 @@ fn test_function_declarations_with_guard_in_first_declaration() {
     let expected_output = indoc! {"
         // gcd(int, int) -> int
         function gcd(a, b) {
-            let __anf_0 = undefined;
+            let __anf_0;
             if (b === 0) {
                 // gcd(int, int) -> int
                 __anf_0 = a;
@@ -352,7 +352,7 @@ fn test_function_reuse_param_name_with_pattern() {
     let expected_output = indoc! {"
         // quicksort(a[]) -> a[]
         function quicksort(list) {
-            let __anf_0 = undefined;
+            let __anf_0;
             if (list.length === 0) {
                 // quicksort(a[]) -> a[]
                 __anf_0 = [];

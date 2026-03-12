@@ -138,7 +138,7 @@ fn test_maximum_depth_tree() {
             static Node = ({ left, right }) => Object.assign(new this, { tag: this.Node, left, right });
         }
         function maximum_depth(tree) {
-            let __anf_0 = undefined;
+            let __anf_0;
             let left,right;if (tree.tag === Tree.Leaf) {
                 __anf_0 = 1;
             } else if (tree.tag === Tree.Node && (left = tree.left, true) && (right = tree.right, true)) {
@@ -179,7 +179,7 @@ fn test_maximum_depth_tree_positional() {
             static Node = (left, right) => Object.assign(new this, { tag: this.Node, [0]: left, [1]: right });
         }
         function maximum_depth(tree) {
-            let __anf_0 = undefined;
+            let __anf_0;
             let left,right;if (tree.tag === Tree.Leaf) {
                 __anf_0 = 1;
             } else if (tree.tag === Tree.Node && (left = tree[0], true) && (right = tree[1], true)) {

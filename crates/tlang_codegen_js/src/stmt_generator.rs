@@ -1,3 +1,4 @@
+use tlang_ast::token::Literal;
 use tlang_hir as hir;
 
 use crate::generator::{BlockContext, CodegenJS};
@@ -85,8 +86,16 @@ impl CodegenJS {
             self.current_scope()
                 .declare_variable_alias(name, &shadowed_name);
         }
-        self.push_let_declaration_to_expr(&var_name, value);
-        self.push_str(";\n");
+        // Emit `let foo;` for None-initialised ANF temporaries rather than
+        // `let foo = undefined;` — the JS engine implicitly initialises to
+        // `undefined` and the shorter form is cleaner output.
+        if matches!(&value.kind, hir::ExprKind::Literal(l) if **l == Literal::None) {
+            self.push_let_declaration(&var_name);
+            self.push_newline();
+        } else {
+            self.push_let_declaration_to_expr(&var_name, value);
+            self.push_str(";\n");
+        }
         self.current_scope().declare_variable_alias(name, &var_name);
         self.pop_context();
     }

@@ -92,7 +92,7 @@ fn test_codegen_operator_precedence() {
 fn test_block_expression() {
     let output = compile!("let one = { 1 };");
     let expected_output = indoc! {"
-        let __anf_0 = undefined;
+        let __anf_0;
         __anf_0 = 1;
         let one = __anf_0;
     "};
@@ -198,7 +198,7 @@ fn test_if_else_as_expression_nested() {
     );
     let expected_output = indoc! {"
         function main() {
-            let __anf_0 = undefined;
+            let __anf_0;
             if (true) {
                 let $tmp$0;if (true) {
                     $tmp$0 = 1;
@@ -226,7 +226,7 @@ fn test_if_else_if_as_expression() {
         compile!("fn main() { let result = if true { 1 } else if true { 2 } else { 3 }; }");
     let expected_output = indoc! {"
         function main() {
-            let __anf_0 = undefined;
+            let __anf_0;
             if (true) {
                 __anf_0 = 1;
             } else if (true) {
