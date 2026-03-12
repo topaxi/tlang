@@ -77,8 +77,9 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_simple() {
     let expected_output = indoc! {"
         function factorial(n, acc) {
             rec:while (true) {
+                let __anf_0 = undefined;
                 if (n === 0) {
-                    return acc;
+                    __anf_0 = acc;
                 } else {
                     let $tmp$0 = n - 1;
                     let $tmp$1 = n * acc;
@@ -86,6 +87,7 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_simple() {
                     acc = $tmp$1;
                     continue rec;
                 }
+                return __anf_0;
             }
         }
     "};
@@ -104,17 +106,13 @@ fn test_explicit_tail_recursive_call_converted_to_loop_factorial_convenient() {
             return factorial$$2(n, 1);
         }
         function factorial$$2(n, acc) {
-            rec:while (true) {
-                if (n === 0) {
-                    return acc;
-                } else {
-                    let $tmp$0 = n - 1;
-                    let $tmp$1 = n * acc;
-                    n = $tmp$0;
-                    acc = $tmp$1;
-                    continue rec;
-                }
+            let __anf_0 = undefined;
+            if (n === 0) {
+                __anf_0 = acc;
+            } else {
+                __anf_0 = factorial$$2(n - 1, n * acc);
             }
+            return __anf_0;
         }
         function factorial() {
             if (arguments.length === 1) {
@@ -140,21 +138,15 @@ fn test_tail_recursive_fibonacci() {
             return fibonacci$$3(n, 0, 1);
         }
         function fibonacci$$3(n, a, b) {
-            rec:while (true) {
-                if (n === 0) {
-                    return a;
-                } else if (n === 1) {
-                    return b;
-                } else {
-                    let $tmp$0 = n - 1;
-                    let $tmp$1 = b;
-                    let $tmp$2 = a + b;
-                    n = $tmp$0;
-                    a = $tmp$1;
-                    b = $tmp$2;
-                    continue rec;
-                }
+            let __anf_0 = undefined;
+            if (n === 0) {
+                __anf_0 = a;
+            } else if (n === 1) {
+                __anf_0 = b;
+            } else {
+                __anf_0 = fibonacci$$3(n - 1, b, a + b);
             }
+            return __anf_0;
         }
         function fibonacci() {
             if (arguments.length === 1) {
@@ -175,19 +167,13 @@ fn test_foldl_impl() {
     "});
     let expected_output = indoc! {"
         function foldl(arg0, acc, f) {
-            rec:while (true) {
-                let x,xs;if (arg0.length === 0) {
-                    return acc;
-                } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true)) {
-                    let $tmp$0 = xs;
-                    let $tmp$1 = f(acc, x);
-                    let $tmp$2 = f;
-                    arg0 = $tmp$0;
-                    acc = $tmp$1;
-                    f = $tmp$2;
-                    continue rec;
-                }
+            let __anf_0 = undefined;
+            let x,xs;if (arg0.length === 0) {
+                __anf_0 = acc;
+            } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true)) {
+                __anf_0 = foldl(xs, f(acc, x), f);
             }
+            return __anf_0;
         }
     "};
     assert_eq!(output, expected_output);
@@ -211,33 +197,27 @@ fn test_partition_impl() {
     let expected_output = indoc! {"
         // partition(a[], fn(a) -> bool) -> (a[], a[])
         function partition$$2(list, predicate) {
+            let __anf_0 = undefined;
             if (list.length === 0) {
                 // partition(a[], fn(a) -> bool) -> (a[], a[])
-                return [[], []];
+                __anf_0 = [[], []];
             } else {
-                return partition$$4(list, predicate, [], []);
+                __anf_0 = partition$$4(list, predicate, [], []);
             }
+            return __anf_0;
         }
         // partition(a[], fn(a) -> bool, a[], a[]) -> (a[], a[])
         function partition$$4(list, predicate, satisfies, doesNotSatisfy) {
-            rec:while (true) {
-                let x,xs;if (list.length === 0) {
-                    // partition(a[], fn(a) -> bool, a[], a[]) -> (a[], a[])
-                    return [satisfies, doesNotSatisfy];
-                } else if (list.length >= 1 && (x = list[0], true) && (xs = list.slice(1), true)) {
-                    let partitionedSatisfies = predicate(x) ? [...satisfies, x] : satisfies;
-                    let partitionedDoesNotSatisfy = predicate(x) ? doesNotSatisfy : [...doesNotSatisfy, x];
-                    let $tmp$0 = xs;
-                    let $tmp$1 = predicate;
-                    let $tmp$2 = partitionedSatisfies;
-                    let $tmp$3 = partitionedDoesNotSatisfy;
-                    list = $tmp$0;
-                    predicate = $tmp$1;
-                    satisfies = $tmp$2;
-                    doesNotSatisfy = $tmp$3;
-                    continue rec;
-                }
+            let __anf_1 = undefined;
+            let x,xs;if (list.length === 0) {
+                // partition(a[], fn(a) -> bool, a[], a[]) -> (a[], a[])
+                __anf_1 = [satisfies, doesNotSatisfy];
+            } else if (list.length >= 1 && (x = list[0], true) && (xs = list.slice(1), true)) {
+                let partitionedSatisfies = predicate(x) ? [...satisfies, x] : satisfies;
+                let partitionedDoesNotSatisfy = predicate(x) ? doesNotSatisfy : [...doesNotSatisfy, x];
+                __anf_1 = partition$$4(xs, predicate, partitionedSatisfies, partitionedDoesNotSatisfy);
             }
+            return __anf_1;
         }
         function partition() {
             if (arguments.length === 2) {
@@ -267,22 +247,16 @@ fn test_all_impl() {
         }
         // all(a[], fn(a) -> bool, bool) -> bool
         function all$$3(list, predicate, acc) {
-            rec:while (true) {
-                let x,xs;if (list.length === 0) {
-                    // all(a[], fn(a) -> bool, bool) -> bool
-                    return acc;
-                } else if (list.length >= 1 && (x = list[0], true) && !predicate(x)) {
-                    return false;
-                } else if (list.length >= 1 && (xs = list.slice(1), true)) {
-                    let $tmp$0 = xs;
-                    let $tmp$1 = predicate;
-                    let $tmp$2 = acc;
-                    list = $tmp$0;
-                    predicate = $tmp$1;
-                    acc = $tmp$2;
-                    continue rec;
-                }
+            let __anf_0 = undefined;
+            let x,xs;if (list.length === 0) {
+                // all(a[], fn(a) -> bool, bool) -> bool
+                __anf_0 = acc;
+            } else if (list.length >= 1 && (x = list[0], true) && !predicate(x)) {
+                __anf_0 = false;
+            } else if (list.length >= 1 && (xs = list.slice(1), true)) {
+                __anf_0 = all$$3(xs, predicate, acc);
             }
+            return __anf_0;
         }
         function all() {
             if (arguments.length === 2) {

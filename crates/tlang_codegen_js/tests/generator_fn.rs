@@ -15,13 +15,15 @@ fn test_recursive_function_definition() {
         // factorial(int) -> int
         // factorial(int) -> int
         function factorial(n) {
+            let __anf_0 = undefined;
             if (n === 0) {
                 // factorial(int) -> int
-                return 1;
+                __anf_0 = 1;
             } else {
                 // factorial(int) -> int
-                return n * factorial(n - 1);
+                __anf_0 = n * factorial(n - 1);
             }
+            return __anf_0;
         }
     "};
     assert_eq!(output, expected_output);
@@ -33,13 +35,15 @@ fn test_recursive_function_definition() {
     "});
     let expected_output = indoc! {"
         function fibonacci(n) {
+            let __anf_0 = undefined;
             if (n === 0) {
-                return 0;
+                __anf_0 = 0;
             } else if (n === 1) {
-                return 1;
+                __anf_0 = 1;
             } else {
-                return fibonacci(n - 1) + fibonacci(n - 2);
+                __anf_0 = fibonacci(n - 1) + fibonacci(n - 2);
             }
+            return __anf_0;
         }
     "};
     assert_eq!(output, expected_output);
@@ -54,13 +58,15 @@ fn test_recursive_function_definition_multiple_with_multiple_args() {
     "});
     let expected_output = indoc! {"
         function gcd(m, n) {
+            let __anf_0 = undefined;
             if (m === 0) {
-                return n;
+                __anf_0 = n;
             } else if (n === 0) {
-                return m;
+                __anf_0 = m;
             } else {
-                return gcd(n, m % n);
+                __anf_0 = gcd(n, m % n);
             }
+            return __anf_0;
         }
     "};
     assert_eq!(output, expected_output);
@@ -79,11 +85,13 @@ fn test_tail_recursive_factorial_nested() {
     let expected_output = indoc! {"
         function factorial(n) {
             function factorial_rec(n, acc) {
+                let __anf_0 = undefined;
                 if (n === 0) {
-                    return acc;
+                    __anf_0 = acc;
                 } else {
-                    return factorial_rec(n - 1, n * acc);
+                    __anf_0 = factorial_rec(n - 1, n * acc);
                 }
+                return __anf_0;
             }
             return factorial_rec(n, 1);
         }
@@ -103,11 +111,13 @@ fn test_tail_recursive_factorial_idiomatic() {
             return factorial$$2(n, 1);
         }
         function factorial$$2(n, acc) {
+            let __anf_0 = undefined;
             if (n === 0) {
-                return acc;
+                __anf_0 = acc;
             } else {
-                return factorial$$2(n - 1, n * acc);
+                __anf_0 = factorial$$2(n - 1, n * acc);
             }
+            return __anf_0;
         }
         function factorial() {
             if (arguments.length === 1) {
@@ -128,11 +138,13 @@ fn test_recursive_sum() {
     "});
     let expected_output = indoc! {"
         function sum(arg0) {
+            let __anf_0 = undefined;
             let x,xs;if (arg0.length === 0) {
-                return 0;
+                __anf_0 = 0;
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true)) {
-                return x + sum(xs);
+                __anf_0 = x + sum(xs);
             }
+            return __anf_0;
         }
     "};
     assert_eq!(output, expected_output);
@@ -146,11 +158,13 @@ fn test_recursive_map() {
     "});
     let expected_output = indoc! {"
         function map(arg0, f) {
+            let __anf_0 = undefined;
             let x,xs;if (arg0.length === 0) {
-                return [];
+                __anf_0 = [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true)) {
-                return [f(x), ...map(xs, f)];
+                __anf_0 = [f(x), ...map(xs, f)];
             }
+            return __anf_0;
         }
     "};
     assert_eq!(output, expected_output);
@@ -165,13 +179,15 @@ fn test_function_declarations_with_guard() {
     "});
     let expected_output = indoc! {"
         function filter(arg0, f) {
+            let __anf_0 = undefined;
             let x,xs;if (arg0.length === 0) {
-                return [];
+                __anf_0 = [];
             } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && f(x)) {
-                return [x, ...filter(xs, f)];
+                __anf_0 = [x, ...filter(xs, f)];
             } else if (arg0.length >= 1 && (xs = arg0.slice(1), true)) {
-                return filter(xs, f);
+                __anf_0 = filter(xs, f);
             }
+            return __anf_0;
         }
     "};
     assert_eq!(output, expected_output);
@@ -186,13 +202,15 @@ fn test_function_declarations_with_if_let_guard() {
     "});
     let expected_output = indoc! {"
         function filter_map(arg0, f) {
-            let $tmp$0,x,xs,y;if (arg0.length === 0) {
-                return [];
-            } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && ($tmp$0 = f(x), true) && (y = $tmp$0, true)) {
-                return [y, ...filter_map(xs, f)];
+            let __anf_1 = undefined;
+            let x,xs;if (arg0.length === 0) {
+                __anf_1 = [];
+            } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && __anf_0) {
+                __anf_1 = [y, ...filter_map(xs, f)];
             } else if (arg0.length >= 1 && (xs = arg0.slice(1), true)) {
-                return filter_map(xs, f);
+                __anf_1 = filter_map(xs, f);
             }
+            return __anf_1;
         }
     "};
     assert_eq!(output, expected_output);
@@ -207,13 +225,15 @@ fn test_function_declarations_with_if_let_guard_enum() {
     "});
     let expected_output = indoc! {"
         function filter_map(arg0, f) {
-            let $tmp$0,x,xs,y;if (arg0.length === 0) {
-                return [];
-            } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && ($tmp$0 = f(x), true) && $tmp$0.tag === Option.Some && (y = $tmp$0[0], true)) {
-                return [y, ...filter_map(xs, f)];
+            let __anf_1 = undefined;
+            let x,xs;if (arg0.length === 0) {
+                __anf_1 = [];
+            } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && __anf_0) {
+                __anf_1 = [y, ...filter_map(xs, f)];
             } else if (arg0.length >= 1 && (xs = arg0.slice(1), true)) {
-                return filter_map(xs, f);
+                __anf_1 = filter_map(xs, f);
             }
+            return __anf_1;
         }
     "};
     assert_eq!(output, expected_output);
@@ -228,13 +248,15 @@ fn test_function_declarations_with_if_let_guard_named_fields_enum() {
     "});
     let expected_output = indoc! {"
         function filter_map(arg0, f) {
-            let $tmp$0,x,xs,value;if (arg0.length === 0) {
-                return [];
-            } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && ($tmp$0 = f(x), true) && $tmp$0.tag === Option.Some && (value = $tmp$0.value, true)) {
-                return [value, ...filter_map(xs, f)];
+            let __anf_1 = undefined;
+            let x,xs;if (arg0.length === 0) {
+                __anf_1 = [];
+            } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && __anf_0) {
+                __anf_1 = [value, ...filter_map(xs, f)];
             } else if (arg0.length >= 1 && (xs = arg0.slice(1), true)) {
-                return filter_map(xs, f);
+                __anf_1 = filter_map(xs, f);
             }
+            return __anf_1;
         }
     "};
     assert_eq!(output, expected_output);
@@ -255,16 +277,18 @@ fn test_function_declarations_with_comments_inbetween() {
         // Comment 2
         // Comment 3
         function filter_map(arg0, f) {
-            let $tmp$0,x,xs,value;if (arg0.length === 0) {
+            let __anf_1 = undefined;
+            let x,xs;if (arg0.length === 0) {
                 // Comment 1
-                return [];
-            } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && ($tmp$0 = f(x), true) && $tmp$0.tag === Option.Some && (value = $tmp$0.value, true)) {
+                __anf_1 = [];
+            } else if (arg0.length >= 1 && (x = arg0[0], true) && (xs = arg0.slice(1), true) && __anf_0) {
                 // Comment 2
-                return [value, ...filter_map(xs, f)];
+                __anf_1 = [value, ...filter_map(xs, f)];
             } else if (arg0.length >= 1 && (xs = arg0.slice(1), true)) {
                 // Comment 3
-                return filter_map(xs, f);
+                __anf_1 = filter_map(xs, f);
             }
+            return __anf_1;
         }
     "};
     assert_eq!(output, expected_output);
@@ -280,12 +304,14 @@ fn test_function_declarations_with_guard_in_first_declaration() {
     let expected_output = indoc! {"
         // gcd(int, int) -> int
         function gcd(a, b) {
+            let __anf_0 = undefined;
             if (b === 0) {
                 // gcd(int, int) -> int
-                return a;
+                __anf_0 = a;
             } else {
-                return gcd(b, a % b);
+                __anf_0 = gcd(b, a % b);
             }
+            return __anf_0;
         }
     "};
 
@@ -326,17 +352,19 @@ fn test_function_reuse_param_name_with_pattern() {
     let expected_output = indoc! {"
         // quicksort(a[]) -> a[]
         function quicksort(list) {
+            let __anf_0 = undefined;
             if (list.length === 0) {
                 // quicksort(a[]) -> a[]
-                return [];
+                __anf_0 = [];
             } else {
                 let pivotIndex = random_int(len(list));
                 let pivot = list[pivotIndex];
                 let list$0 = [...list.slice(0, pivotIndex), ...list.slice(pivotIndex + 1)];
                 let smaller = filter(list$0, (y) => y <= pivot);
                 let greater = filter(list$0, (y) => y > pivot);
-                return [...quicksort(smaller), pivot, ...quicksort(greater)];
+                __anf_0 = [...quicksort(smaller), pivot, ...quicksort(greater)];
             }
+            return __anf_0;
         }
     "};
     assert_eq!(output, expected_output);

@@ -92,10 +92,9 @@ fn test_codegen_operator_precedence() {
 fn test_block_expression() {
     let output = compile!("let one = { 1 };");
     let expected_output = indoc! {"
-        let $tmp$0;{
-            $tmp$0 = 1;
-        };
-        let one = $tmp$0;
+        let __anf_0 = undefined;
+        __anf_0 = 1;
+        let one = __anf_0;
     "};
     assert_eq!(output, expected_output);
 }
@@ -199,23 +198,27 @@ fn test_if_else_as_expression_nested() {
     );
     let expected_output = indoc! {"
         function main() {
-            let $tmp$0;if (true) {
-                let $tmp$1;if (true) {
-                    $tmp$1 = 1;
+            let __anf_0 = undefined;
+            if (true) {
+                let $tmp$0;if (true) {
+                    $tmp$0 = 1;
                 } else {
-                    $tmp$1 = 2;
+                    $tmp$0 = 2;
                 }
-                let x = $tmp$1;
-                let $tmp$2;if (x === 1) {
-                    $tmp$2 = 3;
-                } else {
-                    $tmp$2 = 4;
-                }
-                $tmp$0 = $tmp$2;
+                let x = $tmp$0;
+                __anf_0 = if (x === 1) {
+                                let $tmp$1;{
+                        $tmp$1 = 3;
+                    };
+        $tmp$1        } else {
+                                let $tmp$2;{
+                        $tmp$2 = 4;
+                    };
+        $tmp$2        };
             } else {
-                $tmp$0 = 5;
+                __anf_0 = 5;
             }
-            let result = $tmp$0;
+            let result = __anf_0;
         }
     "};
     assert_eq!(output, expected_output);
