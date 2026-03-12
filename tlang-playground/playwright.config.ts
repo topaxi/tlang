@@ -18,8 +18,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run preview',
-    url: 'http://localhost:4173',
+    command: 'npm run preview -- --base=/tlang',
+    url: 'http://localhost:4173/tlang',
     reuseExistingServer: !process.env['CI'],
   },
 });

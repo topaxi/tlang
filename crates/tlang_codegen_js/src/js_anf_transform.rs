@@ -93,10 +93,12 @@ impl<'a> AnfFolder<'a> {
         self.ctx.hir_id_allocator.next_id()
     }
 
-    fn fresh_temp_name(&mut self) -> String {
+    fn fresh_anf_var(&mut self) -> (String, tlang_span::HirId) {
         let n = *self.counter;
         *self.counter += 1;
-        format!("__anf_{n}")
+        let name = format!("__anf_{n}");
+        let pat_hir_id = self.alloc_hir_id();
+        (name, pat_hir_id)
     }
 
     /// Returns true if the TailCall is self-referencing (callee matches the
@@ -111,14 +113,16 @@ impl<'a> AnfFolder<'a> {
         false
     }
 
-    fn make_path_expr(&mut self, name: &str) -> hir::Expr {
+    fn make_path_expr(&mut self, name: &str, pat_hir_id: tlang_span::HirId) -> hir::Expr {
         let hir_id = self.alloc_hir_id();
+        let mut path = hir::Path::new(
+            vec![hir::PathSegment::from_str(name, Span::default())],
+            Span::default(),
+        );
+        path.res = hir::Res::new_local(pat_hir_id);
         hir::Expr {
             hir_id,
-            kind: hir::ExprKind::Path(Box::new(hir::Path::new(
-                vec![hir::PathSegment::from_str(name, Span::default())],
-                Span::default(),
-            ))),
+            kind: hir::ExprKind::Path(Box::new(path)),
             span: Span::default(),
         }
     }
@@ -132,9 +136,14 @@ impl<'a> AnfFolder<'a> {
         }
     }
 
-    fn make_assign_stmt(&mut self, name: &str, value: hir::Expr) -> hir::Stmt {
+    fn make_assign_stmt(
+        &mut self,
+        name: &str,
+        pat_hir_id: tlang_span::HirId,
+        value: hir::Expr,
+    ) -> hir::Stmt {
         let hir_id = self.alloc_hir_id();
-        let lhs = self.make_path_expr(name);
+        let lhs = self.make_path_expr(name, pat_hir_id);
         hir::Stmt::new(
             hir_id,
             hir::StmtKind::Expr(Box::new(hir::Expr {
@@ -150,9 +159,13 @@ impl<'a> AnfFolder<'a> {
         )
     }
 
-    fn make_let_stmt(&mut self, name: &str, init: hir::Expr) -> hir::Stmt {
+    fn make_let_stmt(
+        &mut self,
+        name: &str,
+        pat_hir_id: tlang_span::HirId,
+        init: hir::Expr,
+    ) -> hir::Stmt {
         let hir_id = self.alloc_hir_id();
-        let pat_hir_id = self.alloc_hir_id();
         hir::Stmt::new(
             hir_id,
             hir::StmtKind::Let(
@@ -175,12 +188,13 @@ impl<'a> AnfFolder<'a> {
     fn rewrite_if_else_completions(
         &mut self,
         temp_name: &str,
+        pat_hir_id: tlang_span::HirId,
         then_block: &mut hir::Block,
         else_branches: &mut [hir::ElseClause],
     ) {
-        self.rewrite_block_completion(temp_name, then_block);
+        self.rewrite_block_completion(temp_name, pat_hir_id, then_block);
         for clause in else_branches.iter_mut() {
-            self.rewrite_block_completion(temp_name, &mut clause.consequence);
+            self.rewrite_block_completion(temp_name, pat_hir_id, &mut clause.consequence);
         }
     }
 
@@ -188,12 +202,18 @@ impl<'a> AnfFolder<'a> {
     /// If the completion is itself a compound expression (if/else, match, block),
     /// recursively rewrite its branches to assign to `temp_name` instead of
     /// wrapping in `temp = if(...)` (which would be invalid JS).
-    fn rewrite_block_completion(&mut self, temp_name: &str, block: &mut hir::Block) {
+    fn rewrite_block_completion(
+        &mut self,
+        temp_name: &str,
+        pat_hir_id: tlang_span::HirId,
+        block: &mut hir::Block,
+    ) {
         if let Some(completion) = block.expr.take() {
             match completion.kind {
                 hir::ExprKind::IfElse(cond, mut then_block, mut else_branches) => {
                     self.rewrite_if_else_completions(
                         temp_name,
+                        pat_hir_id,
                         &mut then_block,
                         &mut else_branches,
                     );
@@ -209,7 +229,7 @@ impl<'a> AnfFolder<'a> {
                     block.stmts.push(if_stmt);
                 }
                 hir::ExprKind::Match(scrutinee, mut arms) => {
-                    self.rewrite_match_completions(temp_name, &mut arms);
+                    self.rewrite_match_completions(temp_name, pat_hir_id, &mut arms);
                     let match_stmt = hir::Stmt::new(
                         self.alloc_hir_id(),
                         hir::StmtKind::Expr(Box::new(hir::Expr {
@@ -222,7 +242,7 @@ impl<'a> AnfFolder<'a> {
                     block.stmts.push(match_stmt);
                 }
                 hir::ExprKind::Block(mut inner_block) => {
-                    self.rewrite_block_completion(temp_name, &mut inner_block);
+                    self.rewrite_block_completion(temp_name, pat_hir_id, &mut inner_block);
                     block.stmts.extend(inner_block.stmts);
                 }
                 // Break/Continue are control flow — emit as statements, not assignments.
@@ -245,7 +265,7 @@ impl<'a> AnfFolder<'a> {
                     block.stmts.push(stmt);
                 }
                 _ => {
-                    let assign = self.make_assign_stmt(temp_name, completion);
+                    let assign = self.make_assign_stmt(temp_name, pat_hir_id, completion);
                     block.stmts.push(assign);
                 }
             }
@@ -253,9 +273,14 @@ impl<'a> AnfFolder<'a> {
     }
 
     /// Rewrite match arm completions to assign into `temp_name`.
-    fn rewrite_match_completions(&mut self, temp_name: &str, arms: &mut [hir::MatchArm]) {
+    fn rewrite_match_completions(
+        &mut self,
+        temp_name: &str,
+        pat_hir_id: tlang_span::HirId,
+        arms: &mut [hir::MatchArm],
+    ) {
         for arm in arms.iter_mut() {
-            self.rewrite_block_completion(temp_name, &mut arm.block);
+            self.rewrite_block_completion(temp_name, pat_hir_id, &mut arm.block);
         }
     }
 
@@ -263,14 +288,19 @@ impl<'a> AnfFolder<'a> {
     /// Pushes the necessary preceding stmts into `self.pending` and returns
     /// a Path reference to the temp variable.
     fn lift_expr(&mut self, expr: hir::Expr) -> hir::Expr {
-        let temp_name = self.fresh_temp_name();
+        let (temp_name, pat_hir_id) = self.fresh_anf_var();
         let init = self.make_literal_none_expr();
-        let let_stmt = self.make_let_stmt(&temp_name, init);
+        let let_stmt = self.make_let_stmt(&temp_name, pat_hir_id, init);
         self.pending.push(let_stmt);
 
         match expr.kind {
             hir::ExprKind::IfElse(cond, mut then_block, mut else_branches) => {
-                self.rewrite_if_else_completions(&temp_name, &mut then_block, &mut else_branches);
+                self.rewrite_if_else_completions(
+                    &temp_name,
+                    pat_hir_id,
+                    &mut then_block,
+                    &mut else_branches,
+                );
                 let if_stmt = hir::Stmt::new(
                     self.alloc_hir_id(),
                     hir::StmtKind::Expr(Box::new(hir::Expr {
@@ -283,7 +313,7 @@ impl<'a> AnfFolder<'a> {
                 self.pending.push(if_stmt);
             }
             hir::ExprKind::Match(scrutinee, mut arms) => {
-                self.rewrite_match_completions(&temp_name, &mut arms);
+                self.rewrite_match_completions(&temp_name, pat_hir_id, &mut arms);
                 let match_stmt = hir::Stmt::new(
                     self.alloc_hir_id(),
                     hir::StmtKind::Expr(Box::new(hir::Expr {
@@ -296,11 +326,11 @@ impl<'a> AnfFolder<'a> {
                 self.pending.push(match_stmt);
             }
             hir::ExprKind::Block(mut block) => {
-                self.rewrite_block_completion(&temp_name, &mut block);
+                self.rewrite_block_completion(&temp_name, pat_hir_id, &mut block);
                 self.pending.extend(block.stmts);
             }
             hir::ExprKind::Loop(mut block) => {
-                rewrite_break_values_in_block(&temp_name, &mut block, self);
+                rewrite_break_values_in_block(&temp_name, pat_hir_id, &mut block, self);
                 let loop_stmt = hir::Stmt::new(
                     self.alloc_hir_id(),
                     hir::StmtKind::Expr(Box::new(hir::Expr {
@@ -313,13 +343,13 @@ impl<'a> AnfFolder<'a> {
                 self.pending.push(loop_stmt);
             }
             _ => {
-                let assign = self.make_assign_stmt(&temp_name, expr);
+                let assign = self.make_assign_stmt(&temp_name, pat_hir_id, expr);
                 self.pending.push(assign);
             }
         }
 
         *self.changed = true;
-        self.make_path_expr(&temp_name)
+        self.make_path_expr(&temp_name, pat_hir_id)
     }
 
     /// If `expr` needs lifting, lift it and return the Path reference.
@@ -408,21 +438,35 @@ impl<'a> AnfFolder<'a> {
 }
 
 /// Rewrite `break <value>` inside a loop to `{ __t = <value>; break; }`.
-fn rewrite_break_values_in_block(temp_name: &str, block: &mut hir::Block, folder: &mut AnfFolder) {
+fn rewrite_break_values_in_block(
+    temp_name: &str,
+    pat_hir_id: tlang_span::HirId,
+    block: &mut hir::Block,
+    folder: &mut AnfFolder,
+) {
     for stmt in &mut block.stmts {
-        rewrite_break_values_in_stmt(temp_name, stmt, folder);
+        rewrite_break_values_in_stmt(temp_name, pat_hir_id, stmt, folder);
     }
     if let Some(ref mut expr) = block.expr {
-        rewrite_break_values_in_expr(temp_name, expr, folder);
+        rewrite_break_values_in_expr(temp_name, pat_hir_id, expr, folder);
     }
 }
 
-fn rewrite_break_values_in_stmt(temp_name: &str, stmt: &mut hir::Stmt, folder: &mut AnfFolder) {
+fn rewrite_break_values_in_stmt(
+    temp_name: &str,
+    pat_hir_id: tlang_span::HirId,
+    stmt: &mut hir::Stmt,
+    folder: &mut AnfFolder,
+) {
     match &mut stmt.kind {
-        hir::StmtKind::Expr(expr) => rewrite_break_values_in_expr(temp_name, expr, folder),
-        hir::StmtKind::Let(_, expr, _) => rewrite_break_values_in_expr(temp_name, expr, folder),
+        hir::StmtKind::Expr(expr) => {
+            rewrite_break_values_in_expr(temp_name, pat_hir_id, expr, folder)
+        }
+        hir::StmtKind::Let(_, expr, _) => {
+            rewrite_break_values_in_expr(temp_name, pat_hir_id, expr, folder)
+        }
         hir::StmtKind::Return(Some(expr)) => {
-            rewrite_break_values_in_expr(temp_name, expr, folder);
+            rewrite_break_values_in_expr(temp_name, pat_hir_id, expr, folder);
         }
         hir::StmtKind::Return(None)
         | hir::StmtKind::FunctionDeclaration(_)
@@ -434,7 +478,12 @@ fn rewrite_break_values_in_stmt(temp_name: &str, stmt: &mut hir::Stmt, folder: &
     }
 }
 
-fn rewrite_break_values_in_expr(temp_name: &str, expr: &mut hir::Expr, folder: &mut AnfFolder) {
+fn rewrite_break_values_in_expr(
+    temp_name: &str,
+    pat_hir_id: tlang_span::HirId,
+    expr: &mut hir::Expr,
+    folder: &mut AnfFolder,
+) {
     match &mut expr.kind {
         hir::ExprKind::Break(Some(inner)) => {
             let value = std::mem::replace(
@@ -445,7 +494,7 @@ fn rewrite_break_values_in_expr(temp_name: &str, expr: &mut hir::Expr, folder: &
                     span: Span::default(),
                 },
             );
-            let assign = folder.make_assign_stmt(temp_name, value);
+            let assign = folder.make_assign_stmt(temp_name, pat_hir_id, value);
             let break_stmt = hir::Stmt::new(
                 folder.alloc_hir_id(),
                 hir::StmtKind::Expr(Box::new(hir::Expr {
@@ -464,38 +513,38 @@ fn rewrite_break_values_in_expr(temp_name: &str, expr: &mut hir::Expr, folder: &
             expr.kind = hir::ExprKind::Block(Box::new(block));
         }
         hir::ExprKind::IfElse(cond, then_block, else_branches) => {
-            rewrite_break_values_in_expr(temp_name, cond, folder);
-            rewrite_break_values_in_block(temp_name, then_block, folder);
+            rewrite_break_values_in_expr(temp_name, pat_hir_id, cond, folder);
+            rewrite_break_values_in_block(temp_name, pat_hir_id, then_block, folder);
             for clause in else_branches.iter_mut() {
                 if let Some(ref mut c) = clause.condition {
-                    rewrite_break_values_in_expr(temp_name, c, folder);
+                    rewrite_break_values_in_expr(temp_name, pat_hir_id, c, folder);
                 }
-                rewrite_break_values_in_block(temp_name, &mut clause.consequence, folder);
+                rewrite_break_values_in_block(temp_name, pat_hir_id, &mut clause.consequence, folder);
             }
         }
         hir::ExprKind::Match(scrutinee, arms) => {
-            rewrite_break_values_in_expr(temp_name, scrutinee, folder);
+            rewrite_break_values_in_expr(temp_name, pat_hir_id, scrutinee, folder);
             for arm in arms.iter_mut() {
                 if let Some(ref mut g) = arm.guard {
-                    rewrite_break_values_in_expr(temp_name, g, folder);
+                    rewrite_break_values_in_expr(temp_name, pat_hir_id, g, folder);
                 }
-                rewrite_break_values_in_block(temp_name, &mut arm.block, folder);
+                rewrite_break_values_in_block(temp_name, pat_hir_id, &mut arm.block, folder);
             }
         }
         hir::ExprKind::Block(block) | hir::ExprKind::Loop(block) => {
-            rewrite_break_values_in_block(temp_name, block, folder);
+            rewrite_break_values_in_block(temp_name, pat_hir_id, block, folder);
         }
         hir::ExprKind::Binary(_, lhs, rhs) => {
-            rewrite_break_values_in_expr(temp_name, lhs, folder);
-            rewrite_break_values_in_expr(temp_name, rhs, folder);
+            rewrite_break_values_in_expr(temp_name, pat_hir_id, lhs, folder);
+            rewrite_break_values_in_expr(temp_name, pat_hir_id, rhs, folder);
         }
         hir::ExprKind::Unary(_, inner) | hir::ExprKind::Cast(inner, _) => {
-            rewrite_break_values_in_expr(temp_name, inner, folder);
+            rewrite_break_values_in_expr(temp_name, pat_hir_id, inner, folder);
         }
         hir::ExprKind::Call(call) | hir::ExprKind::TailCall(call) => {
-            rewrite_break_values_in_expr(temp_name, &mut call.callee, folder);
+            rewrite_break_values_in_expr(temp_name, pat_hir_id, &mut call.callee, folder);
             for arg in &mut call.arguments {
-                rewrite_break_values_in_expr(temp_name, arg, folder);
+                rewrite_break_values_in_expr(temp_name, pat_hir_id, arg, folder);
             }
         }
         _ => {}
