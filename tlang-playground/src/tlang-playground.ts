@@ -433,7 +433,7 @@ export class TlangPlayground extends LitElement {
               popovertarget="optimization-options"
               aria-label="Optimization Settings"
             >
-              ⚙️
+              
             </t-button>
             <t-menu id="optimization-options" popover=${floating()}>
               <t-menuitem-checkbox
