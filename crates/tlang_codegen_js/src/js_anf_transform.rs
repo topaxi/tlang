@@ -460,10 +460,10 @@ fn rewrite_break_values_in_stmt(
 ) {
     match &mut stmt.kind {
         hir::StmtKind::Expr(expr) => {
-            rewrite_break_values_in_expr(temp_name, pat_hir_id, expr, folder)
+            rewrite_break_values_in_expr(temp_name, pat_hir_id, expr, folder);
         }
         hir::StmtKind::Let(_, expr, _) => {
-            rewrite_break_values_in_expr(temp_name, pat_hir_id, expr, folder)
+            rewrite_break_values_in_expr(temp_name, pat_hir_id, expr, folder);
         }
         hir::StmtKind::Return(Some(expr)) => {
             rewrite_break_values_in_expr(temp_name, pat_hir_id, expr, folder);
@@ -519,7 +519,12 @@ fn rewrite_break_values_in_expr(
                 if let Some(ref mut c) = clause.condition {
                     rewrite_break_values_in_expr(temp_name, pat_hir_id, c, folder);
                 }
-                rewrite_break_values_in_block(temp_name, pat_hir_id, &mut clause.consequence, folder);
+                rewrite_break_values_in_block(
+                    temp_name,
+                    pat_hir_id,
+                    &mut clause.consequence,
+                    folder,
+                );
             }
         }
         hir::ExprKind::Match(scrutinee, arms) => {
