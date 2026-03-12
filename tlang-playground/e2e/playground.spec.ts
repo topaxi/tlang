@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Tlang Playground', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/tlang');
   });
 
   test('has correct page title', async ({ page }) => {
