@@ -2,11 +2,14 @@ use tlang_hir as hir;
 use tlang_hir_opt::hir_opt::{HirOptContext, HirOptGroup};
 use tlang_hir_opt::{self as hir_opt, HirPass};
 
+use crate::js_anf_transform::JsAnfTransform;
+
 pub struct JsHirOptimizer(HirOptGroup);
 
 impl Default for JsHirOptimizer {
     fn default() -> Self {
         Self::new(vec![
+            Box::new(JsAnfTransform::default()),
             Box::new(hir_opt::symbol_resolution::SymbolResolution::default()),
             Box::new(hir_opt::constant_folding::ConstantFolding::default()),
         ])

@@ -412,7 +412,14 @@ impl CodegenJS {
 
     pub(crate) fn needs_semicolon(&self, expr: Option<&hir::Expr>) -> bool {
         match expr.map(|expr| &expr.kind) {
-            Some(hir::ExprKind::Block(..) | hir::ExprKind::Match(..)) => false,
+            Some(hir::ExprKind::Block(..) | hir::ExprKind::Match(..) | hir::ExprKind::Loop(..)) => {
+                false
+            }
+            // Self-referencing TailCall emits `continue rec;\n` — no semicolon.
+            // Mutual TailCall is a regular call expression — needs semicolon.
+            Some(hir::ExprKind::TailCall(..)) => {
+                expr.is_some_and(|e| !self.is_self_referencing_tail_call(e))
+            }
             Some(hir::ExprKind::IfElse(expr, then_branch, else_branches)) => {
                 self.should_render_if_else_as_ternary(expr, then_branch, else_branches)
             }

@@ -206,15 +206,11 @@ fn test_if_else_as_expression_nested() {
                     $tmp$0 = 2;
                 }
                 let x = $tmp$0;
-                __anf_0 = if (x === 1) {
-                                let $tmp$1;{
-                        $tmp$1 = 3;
-                    };
-        $tmp$1        } else {
-                                let $tmp$2;{
-                        $tmp$2 = 4;
-                    };
-        $tmp$2        };
+                if (x === 1) {
+                    __anf_0 = 3;
+                } else {
+                    __anf_0 = 4;
+                }
             } else {
                 __anf_0 = 5;
             }
@@ -230,14 +226,15 @@ fn test_if_else_if_as_expression() {
         compile!("fn main() { let result = if true { 1 } else if true { 2 } else { 3 }; }");
     let expected_output = indoc! {"
         function main() {
-            let $tmp$0;if (true) {
-                $tmp$0 = 1;
+            let __anf_0 = undefined;
+            if (true) {
+                __anf_0 = 1;
             } else if (true) {
-                $tmp$0 = 2;
+                __anf_0 = 2;
             } else {
-                $tmp$0 = 3;
+                __anf_0 = 3;
             }
-            let result = $tmp$0;
+            let result = __anf_0;
         }
     "};
     assert_eq!(output, expected_output);

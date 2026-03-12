@@ -8,15 +8,24 @@ impl CodegenJS {
 
         match &statement.kind {
             hir::StmtKind::Expr(expr) => {
-                self.push_indent();
-                self.push_context(BlockContext::Statement);
-                self.generate_expr(expr, None);
-                self.pop_context();
+                // Self-referencing TailCall handles its own indentation and
+                // line breaks (it renders param reassignment + continue rec).
+                // Mutual TailCall is a regular call — rendered normally.
+                if self.is_self_referencing_tail_call(expr) {
+                    self.push_context(BlockContext::Statement);
+                    self.generate_expr(expr, None);
+                    self.pop_context();
+                } else {
+                    self.push_indent();
+                    self.push_context(BlockContext::Statement);
+                    self.generate_expr(expr, None);
+                    self.pop_context();
 
-                if self.needs_semicolon(Some(expr)) {
-                    self.push_char(';');
+                    if self.needs_semicolon(Some(expr)) {
+                        self.push_char(';');
+                    }
+                    self.push_newline();
                 }
-                self.push_newline();
             }
             hir::StmtKind::Let(pattern, expression, _ty) => {
                 self.generate_variable_declaration(pattern, expression);

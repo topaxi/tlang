@@ -10,14 +10,14 @@ false
 true
 10
 
-[stdin]:217
+[stdin]:249
   throw new Error(msg);
   ^
 
 Error: Called unwrap on None
-    at panic ([stdin]:217:9)
-    at Option.unwrap ([stdin]:26:16)
-    at [stdin]:245:20
+    at panic ([stdin]:249:9)
+    at Option.unwrap ([stdin]:31:19)
+    at [stdin]:277:20
     at runScriptInThisContext (node:internal/vm:218:10)
     at node:internal/process/execution:456:12
     at [stdin]-wrapper:6:24

@@ -1239,6 +1239,7 @@ dependencies = [
  "tlang_hir_opt",
  "tlang_parser",
  "tlang_semantics",
+ "tlang_span",
  "tlang_symbols",
 ]
 

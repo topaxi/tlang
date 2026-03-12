@@ -105,7 +105,7 @@ impl CodegenJS {
             Literal::String(value) | Literal::Char(value) => {
                 self.generate_string_literal(value);
             }
-            Literal::None => unreachable!(),
+            Literal::None => self.push_str("undefined"),
         }
     }
 
@@ -147,21 +147,17 @@ impl CodegenJS {
             }
             hir::ExprKind::Block(block) => self.generate_block(block),
             hir::ExprKind::Loop(block) => {
-                self.push_str("(() => {");
-                self.push_newline();
-                self.inc_indent();
-                self.push_indent();
-
-                self.push_indent();
                 self.push_str("for (;;) {");
                 self.push_newline();
                 self.inc_indent();
 
                 for stmt in &block.stmts {
                     self.generate_stmt(stmt);
+                    self.flush_statement_buffer();
                 }
 
                 if block.has_completion() {
+                    self.push_indent();
                     self.generate_expr(block.expr.as_ref().unwrap(), None);
                     self.push_char(';');
                     self.push_newline();
@@ -170,21 +166,15 @@ impl CodegenJS {
                 self.dec_indent();
                 self.push_indent();
                 self.push_char('}');
-                self.push_newline();
-
-                self.dec_indent();
-                self.push_indent();
-                self.push_str("})()");
             }
-            hir::ExprKind::Break(expr) => {
-                self.push_str("return");
-
-                if let Some(expr) = expr {
-                    self.push_char(' ');
-                    self.generate_expr(expr, parent_op);
+            hir::ExprKind::Break(value) => {
+                if let Some(value) = value {
+                    self.generate_expr(value, parent_op);
+                    self.push_char(';');
+                    self.push_newline();
+                    self.push_indent();
                 }
-
-                self.push_char(';');
+                self.push_str("break");
             }
             hir::ExprKind::Continue => self.push_str("continue"),
             hir::ExprKind::Call(expr) => self.generate_call_expression(expr),
